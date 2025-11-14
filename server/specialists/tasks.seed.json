@@ -1,0 +1,17 @@
+[
+  {
+    "domain": "math",
+    "task_id": "math:tank-1",
+    "text": "A tank fills at 3 L/min for 14 min, then drains 8 L. Final volume if start=5 L?"
+  },
+  {
+    "domain": "code",
+    "task_id": "code:balanced-1",
+    "prompt": "Implement isBalanced(s) for (), {}, [] with a stack; include tests."
+  },
+  {
+    "domain": "philo",
+    "task_id": "philo:precaution-vs-stewardship-1",
+    "prompt": "Lay out a synthesis between precautionary ethics and star-scale engineering."
+  }
+]

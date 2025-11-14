@@ -1,0 +1,23 @@
+[
+  {
+    "id": "mock-helix-local",
+    "description": "Sample registry entry used by tokenizer-verify + canary tests",
+    "tokenizerJson": "datasets/tokenizers/mock/tokenizer.json",
+    "merges": "datasets/tokenizers/mock/merges.txt",
+    "gguf": null,
+    "canary": "tests/fixtures/tokenizer-canary.json",
+    "expected": {
+      "tokenizerHash": "sha256:4e339ff37c0617f65ddffc188abb983ed5c2bba2d4d64e3fe4818a253841ff35",
+      "mergesHash": "sha256:5007fd9d5816ffefec0fa1f6c29991ec33f47b15c297560cc0d75ae2203c4b74",
+      "vocabSize": 32,
+      "mergesCount": 0,
+      "specialTokens": {
+        "bos": 0,
+        "eos": 2,
+        "pad": 1,
+        "unk": 3
+      }
+    }
+  }
+]
+

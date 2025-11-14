@@ -4,6 +4,13 @@ import type { ImmersionScores } from "@/lib/noise/immersion";
 import type { BarWindow, HelixPacket, TempoMeta } from "@/types/noise-gens";
 import type { TextureFingerprint } from "@/lib/noise/texture-map";
 import { textureFrom, createDeterministicRng } from "@/lib/noise/texture-map";
+import {
+  makeGrid,
+  barBoundaries,
+  blockSplitsByBoundaries,
+  BeatLockedLFO,
+  type TimeSig,
+} from "@/lib/noise/beat-scheduler";
 
 type CoverRenderRequest = {
   t: "render";
@@ -36,6 +43,7 @@ const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobal
 let manifestPromise: Promise<ManifestRecord> | null = null;
 const impulseCache = new Map<string, Promise<AudioBuffer>>();
 let abortToken: string | null = null;
+const CHORUS_BASE_DELAY = 0.015;
 
 ctx.onmessage = (event: MessageEvent<WorkerInbound>) => {
   const message = event.data;
@@ -238,6 +246,22 @@ async function renderWindow({
 }: RenderWindowParams): Promise<AudioBuffer> {
   const { startTimeSec, durationSec } = windowToSeconds(window, tempo);
   const frameCount = Math.max(1, Math.ceil(durationSec * sampleRate));
+  const renderDurationSec = frameCount / sampleRate;
+  const grid = makeGrid(sampleRate, tempo.bpm, tempo.timeSig as TimeSig, tempo.offsetMs);
+  const windowStartSample = Math.round(startTimeSec * sampleRate);
+  const windowEndSample = windowStartSample + frameCount;
+  const barMarkers = barBoundaries(grid, windowStartSample, windowEndSample)
+    .map((idx) => idx - windowStartSample)
+    .filter((idx) => idx > 0 && idx < frameCount)
+    .sort((a, b) => a - b);
+  const chorusConfig = {
+    rate: clamp(texture.chorus.rate, 0.05, 4),
+    depth: clamp(texture.chorus.depth, 0.0005, 0.01),
+  };
+  const chorusCurve =
+    frameCount > 1
+      ? buildBeatLockedDelayCurve(frameCount, sampleRate, tempo.bpm, chorusConfig.rate, chorusConfig.depth, barMarkers)
+      : null;
 
   const context = new OfflineAudioContext({
     numberOfChannels: 2,
@@ -250,7 +274,12 @@ async function renderWindow({
   preGain.gain.value = dbToGain(-3);
 
   const eqOutput = applyEq(context, preGain, texture.eqPeaks);
-  const chorus = applyChorus(context, eqOutput, texture.chorus);
+  const chorus = applyChorus(
+    context,
+    eqOutput,
+    chorusConfig,
+    chorusCurve ? { curve: chorusCurve, duration: renderDurationSec } : undefined,
+  );
   const saturator = applySaturation(context, chorus.output, texture.sat.drive);
   const compressor = context.createDynamicsCompressor();
   compressor.threshold.value = -12;
@@ -369,27 +398,43 @@ function applyEq(context: OfflineAudioContext, input: AudioNode, peaks: readonly
   return node;
 }
 
+type LFOHandle = { start(when?: number): void; stop(when?: number): void };
+
 function applyChorus(
   context: OfflineAudioContext,
   input: AudioNode,
   config: { rate: number; depth: number },
+  automation?: { curve: Float32Array; duration: number },
 ) {
   const chorusInput = context.createGain();
   const delay = context.createDelay(0.05);
-  delay.delayTime.value = 0.015;
-
-  const lfo = context.createOscillator();
-  lfo.type = "sine";
-  lfo.frequency.value = clamp(config.rate, 0.05, 4);
-
-  const lfoGain = context.createGain();
-  lfoGain.gain.value = clamp(config.depth, 0.0005, 0.01);
-
-  lfo.connect(lfoGain);
-  lfoGain.connect(delay.delayTime);
+  const baseDelay = CHORUS_BASE_DELAY;
+  delay.delayTime.value = baseDelay;
 
   const wetGain = context.createGain();
   wetGain.gain.value = 0.28;
+
+  let lfoHandle: LFOHandle;
+  if (automation?.curve && automation.curve.length > 1) {
+    delay.delayTime.cancelScheduledValues(0);
+    delay.delayTime.setValueAtTime(baseDelay, 0);
+    delay.delayTime.setValueCurveAtTime(automation.curve, 0, automation.duration);
+    lfoHandle = {
+      start: () => {},
+      stop: () => {},
+    };
+  } else {
+    const lfo = context.createOscillator();
+    lfo.type = "sine";
+    lfo.frequency.value = clamp(config.rate, 0.05, 4);
+
+    const lfoGain = context.createGain();
+    lfoGain.gain.value = clamp(config.depth, 0.0005, 0.01);
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(delay.delayTime);
+    lfoHandle = lfo;
+  }
 
   input.connect(chorusInput);
   chorusInput.connect(delay);
@@ -399,7 +444,7 @@ function applyChorus(
   chorusInput.connect(output);
   wetGain.connect(output);
 
-  return { input: chorusInput, output, lfo };
+  return { input: chorusInput, output, lfo: lfoHandle };
 }
 
 function applySaturation(context: OfflineAudioContext, input: AudioNode, drive: number) {
@@ -407,6 +452,66 @@ function applySaturation(context: OfflineAudioContext, input: AudioNode, drive: 
   shaper.curve = createSaturationCurve(drive);
   input.connect(shaper);
   return shaper;
+}
+
+function buildBeatLockedDelayCurve(
+  frameCount: number,
+  sampleRate: number,
+  bpm: number,
+  rateHz: number,
+  depth: number,
+  boundaries: number[],
+): Float32Array {
+  const curve = new Float32Array(frameCount);
+  if (frameCount <= 0) return curve;
+
+  const baseDelay = CHORUS_BASE_DELAY;
+  const beatsPerSecond = bpm / 60;
+  if (!Number.isFinite(rateHz) || rateHz <= 0 || !Number.isFinite(depth) || depth <= 0 || beatsPerSecond <= 0) {
+    curve.fill(baseDelay);
+    return curve;
+  }
+
+  const sortedBoundaries = [...boundaries]
+    .map((idx) => Math.round(idx))
+    .filter((idx) => idx > 0 && idx < frameCount)
+    .sort((a, b) => a - b);
+
+  const uniqueBoundaries: number[] = [];
+  for (const idx of sortedBoundaries) {
+    if (uniqueBoundaries.length === 0 || uniqueBoundaries[uniqueBoundaries.length - 1] !== idx) {
+      uniqueBoundaries.push(idx);
+    }
+  }
+
+  const ratio = rateHz / beatsPerSecond;
+  const lfo = new BeatLockedLFO(sampleRate, bpm, ratio, 1, 0);
+  const splits = blockSplitsByBoundaries(0, frameCount, uniqueBoundaries);
+
+  let cursor = 0;
+  let boundaryIdx = 0;
+  for (const segment of splits) {
+    if (segment <= 0) continue;
+    const { phase0, dphi } = lfo.advance(segment);
+    for (let i = 0; i < segment; i += 1) {
+      curve[cursor + i] = baseDelay + Math.sin(phase0 + dphi * i) * depth;
+    }
+    cursor += segment;
+    while (boundaryIdx < uniqueBoundaries.length && uniqueBoundaries[boundaryIdx] <= cursor) {
+      if (Math.abs(uniqueBoundaries[boundaryIdx] - cursor) <= 1) {
+        lfo.reset(0);
+      }
+      boundaryIdx += 1;
+    }
+  }
+
+  if (cursor < frameCount) {
+    for (let i = cursor; i < frameCount; i += 1) {
+      curve[i] = baseDelay;
+    }
+  }
+
+  return curve;
 }
 
 function applyWindowFades(gain: AudioParam, durationSec: number) {

@@ -14,7 +14,7 @@ export const SOURCE_LOADERS: Record<string, RawSourceLoader> = import.meta.glob<
     "/../shared/**/*.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
     "/../modules/**/*.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
   ],
-  { as: "raw" },
+  { query: "?raw", import: "default" },
 );
 
 export type SourceLoaderRecord = typeof SOURCE_LOADERS;

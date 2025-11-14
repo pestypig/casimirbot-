@@ -1,5 +1,5 @@
 // live-energy-pipeline.tsx
-import { startTransition } from "react";
+import { startTransition, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,6 +7,8 @@ import { Calculator, Zap, Atom, Settings } from "lucide-react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { useRegisterWhisperContext } from "@/lib/whispers/contextRegistry";
+import { usePanelHashFocus } from "@/lib/whispers/usePanelHashFocus";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -84,12 +86,73 @@ export function LiveEnergyPipeline({
     return undefined;
   };
 
+  const clampPos = (value: number | undefined, fallback: number) =>
+    Number.isFinite(value) && value! > 0 ? value! : fallback;
+
   // Build live descriptions for all modes using actual pipeline values
   const buildLiveDesc = (P_MW: number, M_kg: number, zeta: number) => [
     Number.isFinite(P_MW) ? `${P_MW.toFixed(1)} MW` : "— MW",
     Number.isFinite(M_kg) ? `${M_kg.toFixed(0)} kg` : "— kg", 
     Number.isFinite(zeta) ? `ζ=${zeta.toFixed(3)}` : "ζ=—"
   ].join(" • ");
+
+  const dutyEffectiveFRRaw =
+    Number.isFinite(P.dutyEffectiveFR)
+      ? P.dutyEffectiveFR
+      : Number.isFinite(P.dutyEffective_FR)
+        ? P.dutyEffective_FR
+        : Number.isFinite(P.dutyShip)
+          ? P.dutyShip
+          : undefined;
+  const sectorsTotalLive =
+    Number.isFinite(P.sectorsTotal)
+      ? Number(P.sectorsTotal)
+      : Number.isFinite(P.sectorCount)
+        ? Number(P.sectorCount)
+        : Number.isFinite(P.sectors)
+          ? Number(P.sectors)
+          : Number.isFinite(sectorCount)
+            ? sectorCount
+            : 400;
+  const sectorsConcurrentLive =
+    Number.isFinite(P.sectorsConcurrent)
+      ? Number(P.sectorsConcurrent)
+      : Number.isFinite(P.concurrentSectors)
+        ? Number(P.concurrentSectors)
+        : Number.isFinite(P.sectorStrobing)
+          ? Number(P.sectorStrobing)
+          : Number.isFinite(live.sectorStrobing)
+            ? Number(live.sectorStrobing)
+            : 1;
+  const localBurstFracLive =
+    Number.isFinite(P.localBurstFrac)
+      ? Number(P.localBurstFrac)
+      : Number.isFinite(P.dutyBurst)
+        ? Number(P.dutyBurst)
+        : live.dutyCycle ?? duty ?? 0.14;
+  const derivedDutyFR = Math.min(
+    1,
+    clampPos(localBurstFracLive, 0) *
+      (clampPos(sectorsConcurrentLive, 1) / clampPos(sectorsTotalLive, 1)),
+  );
+  const dutyEffectiveFR = Number.isFinite(dutyEffectiveFRRaw)
+    ? dutyEffectiveFRRaw!
+    : derivedDutyFR;
+  const dutyFromTelemetry = Number.isFinite(dutyEffectiveFRRaw);
+  const zetaLive = Number.isFinite(P.zeta) ? P.zeta : undefined;
+
+  const energyWhisperContext = useMemo(
+    () => ({
+      dutyEffectiveFR,
+      sectorCount: sectorsTotalLive,
+      gammaGeo: live.gammaGeo,
+      gammaVanDenBroeck: live.gammaVanDenBroeck,
+      zeta: zetaLive,
+    }),
+    [dutyEffectiveFR, sectorsTotalLive, live.gammaGeo, live.gammaVanDenBroeck, zetaLive],
+  );
+  useRegisterWhisperContext("#energy-control", energyWhisperContext);
+  const panelRef = usePanelHashFocus("#energy-control", () => energyWhisperContext);
 
   // Current mode live description
   const liveDesc = buildLiveDesc(live.P_avg_MW, live.M_exotic_kg, live.zeta);
@@ -131,8 +194,6 @@ export function LiveEnergyPipeline({
     const mantissa = value / Math.pow(10, exp);
     return `${mantissa.toFixed(decimals)} × 10^${exp}`;
   };
-  const clampPos = (x: number, d: number) => (Number.isFinite(x) && x > 0 ? x : d);
-
   // === Equations (live substitution) — purely explanatory; backend remains authoritative ===
   // Constants
   const PI = Math.PI;
@@ -143,10 +204,11 @@ export function LiveEnergyPipeline({
   const a_m = clampPos((gapDistance ?? 1.0) * 1e-9, 1e-12); // gap in meters, lower-bounded to keep formula finite
   const A_tile_m2 = clampPos((tileArea ?? 1) * 1e-4, 1e-12); // cm² → m²
   const f_mod_Hz = clampPos((live.modulationFreq_GHz ?? 15) * 1e9, 1); // Hz
-  const S_total = clampPos(sectorCount ?? 400, 1);
-  const S_live = clampPos(live.sectorStrobing ?? 1, 1);
-  const burstLocal = clampPos(live.dutyCycle ?? duty ?? 0.14, 0); // interpret UI duty as local on-fraction
-  const d_eff = Math.min(1, burstLocal * (S_live / S_total));     // Ford–Roman averaged duty (illustrative)
+  const S_total = clampPos(sectorsTotalLive, 1);
+  const S_live = clampPos(sectorsConcurrentLive, 1);
+  const burstLocal = clampPos(localBurstFracLive, 0); // interpret pipeline burst frac as local on-fraction
+  const d_eff_derived = derivedDutyFR;
+  const d_eff = dutyEffectiveFR;     // Ford–Roman averaged duty (authoritative if server provided)
   const L_long_m = clampPos(2 * (shipRadius ?? 82.0), 1e-3);      // simple geometric proxy
 
   // Casimir energy density and derived energies
@@ -171,7 +233,8 @@ export function LiveEnergyPipeline({
       : NaN;
 
   return (
-    <Card className="bg-card border border-border">
+    <section ref={panelRef} data-panel-hash="#energy-control">
+      <Card className="bg-card border border-border">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -477,8 +540,14 @@ export function LiveEnergyPipeline({
               <div>d<sub>eff</sub> ≈ burst<sub>local</sub> · S<sub>live</sub> / S<sub>total</sub></div>
               <div className="text-slate-500">
                 = ({fmt(burstLocal, "—", 3)}) · {S_live} / {S_total}
-                {" "}= <strong>{d_eff.toPrecision(3)}</strong>
-                <span className="ml-2 text-[11px] opacity-70">(illustrative; backend may compute FR duty differently)</span>
+                {" "}= <strong>{d_eff_derived.toPrecision(3)}</strong>
+                {dutyFromTelemetry ? (
+                  <span className="ml-2 text-[11px] opacity-70">
+                    telemetry override: d<sub>eff</sub> = {d_eff.toPrecision(3)}
+                  </span>
+                ) : (
+                  <span className="ml-2 text-[11px] opacity-70">derived from mode knobs</span>
+                )}
               </div>
             </div>
 
@@ -566,7 +635,8 @@ export function LiveEnergyPipeline({
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </section>
   );
 }
 

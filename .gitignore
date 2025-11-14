@@ -4,6 +4,7 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+data/
 # Simulation output artifacts (large, reproducible)
 simulations/*/output.log
 simulations/*/output.Energy

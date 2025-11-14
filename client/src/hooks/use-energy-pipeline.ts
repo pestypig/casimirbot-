@@ -4,7 +4,7 @@ import * as React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
-import { getModeWisdom } from "@/lib/luma-whispers";
+import { getModeWisdom } from "@/lib/luma-whispers-core";
 import type {
   VacuumGapSweepRow,
   DynamicConfig,
@@ -984,14 +984,22 @@ export function useUpdatePipeline() {
 export function useSwitchMode() {
   return useMutation({
     mutationFn: async (mode: EnergyPipelineState['currentMode']) => {
+      const requireOk = async (response: Response, label: string) => {
+        if (!response.ok) {
+          const detail = await response.text().catch(() => response.statusText);
+          throw new Error(`${label} failed: ${detail || response.statusText}`);
+        }
+      };
+
       // 1) switch server mode
       const resMode = await apiRequest('POST', '/api/helix/pipeline/mode', { mode });
+      await requireOk(resMode, 'Mode switch');
       const data = await resMode.json();
 
       // 2) immediately push mode-specific knobs so duty/strobing/qSpoil are in sync
       const cfg = MODE_CONFIGS[mode];
       if (cfg) {
-        await apiRequest('POST', '/api/helix/pipeline/update', {
+        const resUpdate = await apiRequest('POST', '/api/helix/pipeline/update', {
           dutyCycle: cfg.dutyCycle,
           sectorStrobing: cfg.sectorStrobing,
           qSpoilingFactor: cfg.qSpoilingFactor,
@@ -999,6 +1007,7 @@ export function useSwitchMode() {
           localBurstFrac: (cfg as any).localBurstFrac ?? cfg.dutyCycle,
           sectorsTotal: (cfg as any).sectorsTotal,
         });
+        await requireOk(resUpdate, 'Mode knob sync');
       }
       publish("warp:reload", { reason: "mode-switch-local", mode, ts: Date.now() });
       return data;
@@ -1017,6 +1026,14 @@ export function useSwitchMode() {
       // Trigger Luma whisper for mode changes
       const wisdom = getModeWisdom(mode);
       publish("luma:whisper", { text: wisdom });
+    },
+    onError: () => {
+      startTransition(() => {
+        queryClient.invalidateQueries({ predicate: q =>
+          Array.isArray(q.queryKey) &&
+          (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+        });
+      });
     }
   });
 }

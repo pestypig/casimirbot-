@@ -15,6 +15,11 @@ import { Switch } from "@/components/ui/switch";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { useGlobalPhase } from "@/hooks/useGlobalPhase";
 import { PHASE_STREAK_BASE_HUE } from "@/constants/phase-streak";
+import {
+  CURVATURE_PALETTES,
+  type CurvaturePalette,
+  normalizeCurvaturePalette,
+} from "@/lib/curvature-directive";
 
 export type VolumeViz = 0 | 1 | 2; // 0=θ_GR, 1=ρ_GR, 2=θ_Drive
 
@@ -34,7 +39,7 @@ type Overlay3DControlsSnapshot = {
   animate: boolean;
   curvAlpha: number;
   curvGain: number;
-  curvPalette: 0 | 1;
+  curvPalette: CurvaturePalette;
   curvMargin: boolean;
 };
 
@@ -51,6 +56,12 @@ const labels: Record<VolumeViz, { short: string; title: string }> = {
     short: `${RHO} (GR)`,
     title: `${RHO} (GR) — Hamiltonian constraint energy density (≤ 0 in shell)`,
   },
+};
+
+const paletteLabels: Record<CurvaturePalette, string> = {
+  cool: "Cool sequential",
+  warm: "Warm sequential",
+  diverging: "Diverging",
 };
 
 export interface VolumeModeToggleProps {
@@ -140,7 +151,14 @@ function OverlaysBlock({ className }: { className?: string }) {
 function Overlay3DControls({ className }: { className?: string }) {
   const queryClient = useQueryClient();
   const savedOverlay = React.useMemo<Overlay3DControlsSnapshot | undefined>(() => {
-    return queryClient.getQueryData(OVERLAY_STATE_QUERY_KEY) as Overlay3DControlsSnapshot | undefined;
+    const raw = queryClient.getQueryData(OVERLAY_STATE_QUERY_KEY) as
+      | Partial<Overlay3DControlsSnapshot>
+      | undefined;
+    if (!raw) return undefined;
+    return {
+      ...raw,
+      curvPalette: normalizeCurvaturePalette(raw.curvPalette),
+    } as Overlay3DControlsSnapshot;
   }, [queryClient]);
 
   const [mode, setMode] = React.useState<0 | 1 | 2 | 3 | 4>(() => savedOverlay?.mode ?? 0);
@@ -157,7 +175,9 @@ function Overlay3DControls({ className }: { className?: string }) {
   const [animate, setAnimate] = React.useState(() => savedOverlay?.animate ?? true);
   const [curvAlpha, setCurvAlpha] = React.useState(() => savedOverlay?.curvAlpha ?? 0.45);
   const [curvGain, setCurvGain] = React.useState(() => savedOverlay?.curvGain ?? 1.0);
-  const [curvPalette, setCurvPalette] = React.useState<0 | 1>(() => savedOverlay?.curvPalette ?? 0);
+  const [curvPalette, setCurvPalette] = React.useState<CurvaturePalette>(() =>
+    normalizeCurvaturePalette(savedOverlay?.curvPalette)
+  );
   const [curvMargin, setCurvMargin] = React.useState(() => savedOverlay?.curvMargin ?? false);
   const phaseAnim = useGlobalPhase({ mode: "auto", periodMs: 8000, damp: 0.12, publishBus: false });
   const [phase01, setPhase01] = React.useState(() => savedOverlay?.phase01 ?? 0);
@@ -364,13 +384,16 @@ function Overlay3DControls({ className }: { className?: string }) {
             />
 
             <span className="text-[11px] text-slate-400">Palette</span>
-            <Select value={String(curvPalette)} onValueChange={(v) => setCurvPalette(Number(v) as 0 | 1)}>
+            <Select value={curvPalette} onValueChange={(value: CurvaturePalette) => setCurvPalette(value)}>
               <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Sequential" />
+                <SelectValue placeholder="Palette" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="0">Sequential</SelectItem>
-                <SelectItem value="1">Diverging</SelectItem>
+                {CURVATURE_PALETTES.map((palette) => (
+                  <SelectItem key={palette} value={palette}>
+                    {paletteLabels[palette]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 

@@ -18,6 +18,8 @@ import {
 } from "recharts";
 import { useHardwareFeeds, type HardwareConnectHelp } from "@/hooks/useHardwareFeeds";
 import HardwareConnectButton from "./HardwareConnectButton";
+import { useRegisterWhisperContext } from "@/lib/whispers/contextRegistry";
+import { usePanelHashFocus } from "@/lib/whispers/usePanelHashFocus";
 
 /**
  * SpectrumTunerPanel.tsx
@@ -184,6 +186,7 @@ export default function SpectrumTunerPanel({
   const a_eff_nm_geomOnly = a_nm - sag_nm;
   const a_eff_nm = showGeom ? a_eff_nm_geomOnly : a_nm;
   const gamma_geo = showGeom ? a_nm / a_eff_nm_geomOnly : 1.0;
+  const hit984 = Math.abs(a_eff_nm - 0.984) < 5e-4;
 
   // Cutoff in normalized frequency units (0..1 axis): place x_cut proportional to 1/a_eff
   const x_cut = clamp01((a_nm / a_eff_nm) * 0.25 + 0.05); // heuristic mapping for viz
@@ -256,11 +259,47 @@ export default function SpectrumTunerPanel({
     return out;
   }, [showTimeLoop, duty, sectors, etaDCE, f_mod_GHz]);
 
+  const spectrumWhisperContext = useMemo(
+    () => ({
+      showGeom,
+      showDCE,
+      showTimeLoop,
+      a_nm,
+      sagDepth_nm: sag_nm,
+      a_eff_nm,
+      gamma_geo,
+      qCavity,
+      duty,
+      sectors,
+      effDuty,
+      etaDCE,
+      badge984: hit984,
+    }),
+    [
+      showGeom,
+      showDCE,
+      showTimeLoop,
+      a_nm,
+      sag_nm,
+      a_eff_nm,
+      gamma_geo,
+      qCavity,
+      duty,
+      sectors,
+      effDuty,
+      etaDCE,
+      hit984,
+    ],
+  );
+  useRegisterWhisperContext("#spectrum", spectrumWhisperContext);
+  const panelRef = usePanelHashFocus("#spectrum", () => spectrumWhisperContext);
+
   // Provenance badges mapping
   const prov = liveInputs.prov ?? {};
 
   return (
-    <Card className={`w-full min-w-0 shadow-sm ${className ?? ""}`}>
+    <section ref={panelRef} data-panel-hash="#spectrum">
+      <Card className={`w-full min-w-0 shadow-sm ${className ?? ""}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -319,7 +358,7 @@ export default function SpectrumTunerPanel({
                 <span className="font-mono">{(2 * a_eff_nm).toFixed(3)}</span>
               </div>
               <div className="col-span-2">
-                {Math.abs(a_eff_nm - 0.984) < 5e-4 && (
+                {hit984 && (
                   <Badge className="w-full justify-center bg-amber-500/20 text-amber-800">0.984 nm achieved</Badge>
                 )}
               </div>
@@ -552,6 +591,7 @@ export default function SpectrumTunerPanel({
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </section>
   );
 }

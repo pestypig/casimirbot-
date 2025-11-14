@@ -56,6 +56,24 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
   const marginClass = status.marginClass;
 
   const observerLabel = qi.observerId || "observer";
+  const homogenizerValues = [
+    qi.varT00_lattice,
+    qi.gradT00_norm,
+    qi.C_warp,
+    qi.QI_envelope_okPct,
+  ];
+  const homogenizerSource = qi.homogenizerSource;
+  const homogenizerOffline = homogenizerSource === "offline";
+  const showHomogenizer =
+    homogenizerSource != null || homogenizerValues.some((value) => Number.isFinite(Number(value)));
+  const cWarp = Number(qi.C_warp);
+  const cWarpClass = !Number.isFinite(cWarp)
+    ? "text-right"
+    : cWarp >= 0.8
+      ? "text-right text-emerald-300"
+      : cWarp >= 0.6
+        ? "text-right text-amber-300"
+        : "text-right text-rose-300";
 
   return (
     <div
@@ -104,6 +122,49 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
         <span>Observer: {observerLabel}</span>
         <span>dt x samples ~ {fmt(Number(qi.dt_ms) * Number(qi.samples) / 1000, 2)} s</span>
       </div>
+
+      {showHomogenizer && (
+        <>
+          <div className="mt-3 flex items-center justify-between border-t border-slate-800/70 pt-3 text-[11px] uppercase tracking-wide text-slate-400">
+            <span>Lattice Homogenizer</span>
+            {homogenizerSource && (
+              <span
+                className={cn(
+                  "rounded border px-2 py-0.5 font-mono text-[10px]",
+                  homogenizerSource === "hardware" && "border-emerald-500/60 text-emerald-200",
+                  homogenizerSource === "synthetic" && "border-amber-400/60 text-amber-200",
+                  homogenizerSource === "offline" && "border-slate-600/60 text-slate-300",
+                )}
+              >
+                {homogenizerSource === "hardware"
+                  ? "live"
+                  : homogenizerSource === "synthetic"
+                    ? "simulated"
+                    : "offline"}
+              </span>
+            )}
+          </div>
+          {homogenizerOffline ? (
+            <div className="mt-2 rounded border border-slate-700/60 bg-slate-900/60 p-2 text-[11px] text-amber-200">
+              Telemetry unavailable. Waiting for lattice tiles to report.
+            </div>
+          ) : (
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-slate-300">
+              <span className="text-slate-400">var T00 (norm)</span>
+              <span className="text-right">{fmt(qi.varT00_lattice, 3)}</span>
+
+              <span className="text-slate-400">|grad T00| (norm)</span>
+              <span className="text-right">{fmt(qi.gradT00_norm, 3)}</span>
+
+              <span className="text-slate-400">C_warp</span>
+              <span className={cn(cWarpClass)}>{fmt(qi.C_warp, 3)}</span>
+
+              <span className="text-slate-400">QI ok %</span>
+              <span className="text-right">{fmt(qi.QI_envelope_okPct, 1)}</span>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

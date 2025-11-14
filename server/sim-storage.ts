@@ -1,5 +1,5 @@
-import { SimulationResult, InsertSimulationResult } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { SimulationResult, type InsertSimulationResult } from "@shared/schema";
+import { randomUUID } from "node:crypto";
 
 export interface IStorage {
   getSimulation(id: string): Promise<SimulationResult | undefined>;
@@ -30,16 +30,14 @@ export class MemStorage implements IStorage {
   async updateSimulation(id: string, updates: Partial<SimulationResult>): Promise<SimulationResult | undefined> {
     const existing = this.simulations.get(id);
     if (!existing) return undefined;
-    
+
     const updated = { ...existing, ...updates };
     this.simulations.set(id, updated);
     return updated;
   }
 
   async getAllSimulations(): Promise<SimulationResult[]> {
-    return Array.from(this.simulations.values()).sort((a, b) => 
-      b.startTime.getTime() - a.startTime.getTime()
-    );
+    return Array.from(this.simulations.values()).sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
   }
 
   async deleteSimulation(id: string): Promise<boolean> {

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { registerWebGLContext } from "@/lib/webgl/context-pool";
+import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
+import { mapThetaToDisplay, type DisplayMode } from "@/lib/visual/curvature-display";
 
 /**
  * WarpBubbleGLPanel — a minimal, self-contained WebGL (WebGL1/2) viewer
@@ -200,6 +202,25 @@ export default function WarpBubbleGLPanel({
   const uniformsRef = useRef<Record<string, WebGLUniformLocation>>({} as any);
   const [status, setStatus] = useState<'ok'|'none'|'lost'|'error'>('none');
   const grid = useMemo(() => makeGrid(1.6, 96), []);
+  // Optional display settings via bus (debug HUD)
+  const displayModeRef = useRef<DisplayMode>('exaggerated');
+  const displayGainRef = useRef<number>(20);
+  const zeroStopRef = useRef<number>(1e-9);
+  const ridgeModeOverrideRef = useRef<0|1|undefined>(undefined);
+
+  useEffect(() => {
+    const onSettings = (payload: any) => {
+      if (!payload || typeof payload !== 'object') return;
+      if (payload.displayMode) displayModeRef.current = payload.displayMode as DisplayMode;
+      if (Number.isFinite(payload.displayGain)) displayGainRef.current = +payload.displayGain;
+      if (Number.isFinite(payload.zeroStop)) zeroStopRef.current = +payload.zeroStop;
+      if (payload.ridgeMode === 0 || payload.ridgeMode === 1) ridgeModeOverrideRef.current = payload.ridgeMode as 0|1;
+    };
+    const handlerId = subscribe('warp:viz:display-settings', onSettings);
+    return () => {
+      unsubscribe(handlerId);
+    };
+  }, []);
 
   // Create GL context + program once
   useEffect(() => {
@@ -301,9 +322,11 @@ export default function WarpBubbleGLPanel({
       ? Math.max(0, Math.min(1, snapshot.dutyEffectiveFR as number))
       : Math.max(0, Math.min(1, (snapshot.dutyCycle ?? 0) * (sLive / sTot)));
 
-    const ridgeMode = (snapshot.ridgeMode != null)
-      ? (snapshot.ridgeMode as number)
-      : (snapshot.physicsParityMode ? 0 : 1);
+    const ridgeMode = (ridgeModeOverrideRef.current != null)
+      ? (ridgeModeOverrideRef.current as number)
+      : ((snapshot.ridgeMode != null)
+          ? (snapshot.ridgeMode as number)
+          : (snapshot.physicsParityMode ? 0 : 1));
 
     const viewAvg    = snapshot.viewAvg === false ? 0 : 1; // default ON for operational averaging
   const wallWidth  = Math.max(1e-4, Number(snapshot.wallWidth ?? 0.06));
@@ -323,15 +346,48 @@ export default function WarpBubbleGLPanel({
     gl.uniform1i(u.u_viewAvg, viewAvg);
     gl.uniform1i(u.u_ridgeMode, ridgeMode);
 
+    // Centralized display transfer
+    const mode: DisplayMode = snapshot.physicsParityMode ? 'raw' : (displayModeRef.current || 'exaggerated');
+    const out = mapThetaToDisplay({
+      gammaGeo,
+      q,
+      gammaVdB,
+      dutyFR: dFR,
+      viewAvg: !!viewAvg,
+    }, {
+      mode,
+      ridgeMode: ridgeMode as 0|1,
+      zeroStop: zeroStopRef.current,
+      gain: displayGainRef.current,
+    });
+
     gl.uniform1f(u.u_epsTilt, 5e-7);         // small constant tilt; could be prop
     gl.uniform3f(u.u_betaTilt, 0.0, -1.0, 0.0);
-    gl.uniform1f(u.u_displayGain, snapshot.physicsParityMode ? 1.0 : 20.0);
-    gl.uniform1f(u.u_zeroStop, 1e-9);
+    gl.uniform1f(u.u_displayGain, out.displayGain);
+    gl.uniform1f(u.u_zeroStop, out.zeroStop);
 
     const rgb = hexToRgb(color);
     gl.uniform3f(u.u_color, rgb[0]/255, rgb[1]/255, rgb[2]/255);
 
     const vertCount = grid.length / 3;
+    try {
+      publish('warp:viz:trace', {
+        t: Date.now(),
+        mode,
+        ridgeMode,
+        gammaGeo,
+        q,
+        gammaVdB,
+        dutyFR: dFR,
+        viewAvg: !!viewAvg,
+        wallWidth,
+        axesClip: axes,
+        displayGain: out.displayGain,
+        zeroStop: out.zeroStop,
+        cameraZ,
+      });
+    } catch {}
+
     gl.drawArrays(gl.LINES, 0, vertCount);
   }, [snapshot, background, color, grid]);
 

@@ -27,7 +27,16 @@ import { omega0_from_gap, domega0_dd } from "../modules/sim_core/static-casimir.
 import { writePhaseCalibration, reducePhaseCalLogToLookup } from "./utils/phase-calibration.js";
 // ROBUST speed of light import: handle named/default or missing module gracefully
 import { C } from './utils/physics-const-safe';
-import { buildCurvatureBrick, serializeBrick, type CurvBrickParams } from "./curvature-brick";
+import {
+  buildCurvatureBrick,
+  serializeBrick,
+  type CurvBrickParams,
+  type Vec3,
+  type CurvDebugStamp,
+  setCurvatureDebugStamp,
+  clearCurvatureDebugStamp,
+  getCurvatureDebugStamp,
+} from "./curvature-brick";
 import {
   dynamicConfigSchema,
   vacuumGapSweepConfigSchema,
@@ -1735,6 +1744,84 @@ const parseDimsParam = (value: unknown, fallback: [number, number, number]) => {
   return fallback;
 };
 
+const parseVec3Param = (value: unknown, fallback: Vec3): Vec3 => {
+  if (Array.isArray(value) && value.length === 3) {
+    const tuple = value.map((v) => parseNumberParam(v, NaN));
+    if (tuple.every((n) => Number.isFinite(n))) return tuple as Vec3;
+  }
+  if (typeof value === "string") {
+    const normalized = value.replace(/x/gi, ",");
+    const parts = normalized.split(",").map((segment) => parseNumberParam(segment.trim(), NaN));
+    if (parts.length >= 3 && parts.slice(0, 3).every((n) => Number.isFinite(n))) {
+      return [parts[0], parts[1], parts[2]] as Vec3;
+    }
+  }
+  return fallback;
+};
+
+const parseVec3ParamOptional = (value: unknown): Vec3 | null => {
+  if (value === undefined || value === null) return null;
+  const sentinel: Vec3 = [Number.NaN, Number.NaN, Number.NaN];
+  const parsed = parseVec3Param(value, sentinel);
+  return parsed.every((component) => Number.isFinite(component)) ? parsed : null;
+};
+
+const normalizeVec3OrNull = (value: Vec3 | null | undefined): Vec3 | null => {
+  if (!value) return null;
+  const [x, y, z] = value;
+  const mag = Math.hypot(x, y, z);
+  if (!Number.isFinite(mag) || mag === 0) return null;
+  return [x / mag, y / mag, z / mag];
+};
+
+const clampVecRange = (vec: Vec3, minVal: number, maxVal: number): [number, number, number] => [
+  Math.max(minVal, Math.min(maxVal, vec[0] ?? 0)),
+  Math.max(minVal, Math.min(maxVal, vec[1] ?? 0)),
+  Math.max(minVal, Math.min(maxVal, vec[2] ?? 0)),
+] as [number, number, number];
+
+const DEFAULT_STAMP_CENTER: Vec3 = [0.82, 0.18, 0.72];
+const DEFAULT_STAMP_SIZE: Vec3 = [0.05, 0.05, 0.05];
+
+const parseStampBlendParam = (value: unknown): CurvDebugStamp["blend"] => {
+  if (typeof value === "string") {
+    const lowered = value.toLowerCase();
+    if (lowered === "set" || lowered === "max" || lowered === "add") {
+      return lowered as CurvDebugStamp["blend"];
+    }
+  }
+  return undefined;
+};
+
+const parseStampShapeParam = (value: unknown): CurvDebugStamp["shape"] => {
+  if (typeof value === "string") {
+    const lowered = value.toLowerCase();
+    if (lowered === "box" || lowered === "sphere") {
+      return lowered as CurvDebugStamp["shape"];
+    }
+  }
+  return undefined;
+};
+
+const normalizeCurvatureStampRequest = (input: Record<string, unknown> | null | undefined): CurvDebugStamp | null => {
+  if (!input) return null;
+  const enabled = parseBooleanParam(input.enabled, true);
+  const centerRaw = parseVec3Param(input.center, DEFAULT_STAMP_CENTER);
+  const sizeRaw = parseVec3Param(input.size, DEFAULT_STAMP_SIZE);
+  const value = parseNumberParam(input.value, 1);
+  const blend = parseStampBlendParam(input.blend);
+  const shape = parseStampShapeParam(input.shape);
+  const stamp: CurvDebugStamp = {
+    enabled,
+    center: clampVecRange(centerRaw, 0, 1),
+    size: clampVecRange(sizeRaw, 1e-3, 1),
+    value,
+  };
+  if (blend) stamp.blend = blend;
+  if (shape) stamp.shape = shape;
+  return stamp;
+};
+
 const dimsForQuality = (quality: string | undefined): [number, number, number] => {
   switch ((quality ?? "").toLowerCase()) {
     case "low":
@@ -1783,6 +1870,12 @@ export function getCurvatureBrick(req: Request, res: Response) {
     const gammaVdB = parseNumberParam(query.gammaVdB ?? state.gammaVanDenBroeck, state.gammaVanDenBroeck ?? 1e11);
     const ampBase = parseNumberParam(query.ampBase, 0);
     const clampQI = parseBooleanParam(query.clampQI, true);
+    const edgeWeight = Math.max(0, Math.min(1, parseNumberParam(query.edgeWeight, 0)));
+    const edgeSharpness = Math.max(parseNumberParam(query.edgeSharpness, 1.25), 0.1);
+    const betaShift = Math.max(-1, Math.min(1, parseNumberParam(query.betaShift, 0)));
+    const debugBlockValueRaw = parseNumberParam(query.debugBlockValue, Number.NaN);
+    const debugBlockRadius = Math.max(0, Math.min(0.49, parseNumberParam(query.debugBlockRadius, 0)));
+    const debugBlockCenterRaw = parseVec3Param(query.debugBlockCenter, [0.5, 0.5, 0.5]);
 
     const params: Partial<CurvBrickParams> = {
       dims,
@@ -1802,7 +1895,27 @@ export function getCurvatureBrick(req: Request, res: Response) {
       gammaVdB,
       ampBase,
       clampQI,
+      edgeWeight,
+      edgeSharpness,
+      betaShift,
     };
+
+    const overrideDriveDir = parseVec3ParamOptional(query.driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
+    if (driveDir) {
+      params.driveDir = driveDir;
+    }
+
+    if (debugBlockRadius > 0 && Number.isFinite(debugBlockValueRaw)) {
+      params.debugBlockRadius = debugBlockRadius;
+      params.debugBlockValue = debugBlockValueRaw;
+      params.debugBlockCenter = [
+        Math.max(0, Math.min(1, debugBlockCenterRaw[0])),
+        Math.max(0, Math.min(1, debugBlockCenterRaw[1])),
+        Math.max(0, Math.min(1, debugBlockCenterRaw[2])),
+      ] as Vec3;
+    }
 
     const brick = buildCurvatureBrick(params);
     const payload = serializeBrick(brick);
@@ -1812,6 +1925,33 @@ export function getCurvatureBrick(req: Request, res: Response) {
     const message = err instanceof Error ? err.message : "Failed to build curvature brick";
     res.status(500).json({ error: message });
   }
+}
+
+export function postCurvatureBrickDebugStamp(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const body = (req.body && typeof req.body === "object") ? req.body as Record<string, unknown> : null;
+  if (!body) {
+    res.status(400).json({ error: "invalid-body" });
+    return;
+  }
+  const stamp = normalizeCurvatureStampRequest(body);
+  if (!stamp) {
+    res.status(400).json({ error: "invalid-stamp" });
+    return;
+  }
+  setCurvatureDebugStamp(stamp);
+  res.json({ ok: true, stamp });
+}
+
+export function postCurvatureBrickDebugClear(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const previous = getCurvatureDebugStamp();
+  clearCurvatureDebugStamp();
+  res.json({ ok: true, previous });
 }
 
 export function getPhaseBiasTable(req: Request, res: Response) {

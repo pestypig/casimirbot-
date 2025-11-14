@@ -114,4 +114,65 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
   }
+
+  [data-rationale-highlight="true"] {
+    outline: 2px solid var(--rationale-color, #38bdf8);
+    outline-offset: 3px;
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0 2px var(--rationale-color, #38bdf8), 0 0 12px var(--rationale-color, #38bdf8);
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: var(--rationale-color, #38bdf8);
+    text-decoration-thickness: 2px;
+    transition: outline-color 0.15s ease, box-shadow 0.15s ease;
+  }
+}
+
+/* Desktop window chrome + blending */
+.desktop-window {
+  background: transparent;
+}
+
+.desktop-window::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px) saturate(1.05);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  z-index: -1;
+}
+
+@supports (background: color-mix(in srgb, black 50%, white 50%)) {
+  .desktop-window::before {
+    background-color: color-mix(
+      in srgb,
+      var(--background) calc(var(--window-bg-strength, 1) * 100%),
+      transparent
+    );
+    border-color: color-mix(
+      in srgb,
+      var(--border) calc(var(--window-bg-strength, 1) * 100%),
+      transparent
+    );
+  }
+}
+
+.desktop-window .blend-text
+  :where(h1, h2, h3, h4, h5, h6, p, span, small, li, code, pre, label, strong, em) {
+  mix-blend-mode: plus-lighter;
+}
+
+@supports not (mix-blend-mode: plus-lighter) {
+  .desktop-window .blend-text
+    :where(h1, h2, h3, h4, h5, h6, p, span, small, li, code, pre, label, strong, em) {
+    mix-blend-mode: screen;
+  }
+}
+
+.desktop-window .blend-text :where(h1, h2, h3, h4, h5, h6, p, span, small, li, label) {
+  text-shadow: 0 0 0.5px rgba(0, 0, 0, 0.35);
 }

@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
@@ -22,7 +22,7 @@ const VIRTUAL_NODE_SHIM_PREFIX = "\0node-shim:";
 
 const toPosix = (value: string) => value.split(path.sep).join(path.posix.sep);
 
-const webTreeSitterNodeShim = () => ({
+const webTreeSitterNodeShim = (): Plugin => ({
   name: "web-tree-sitter-node-shim",
   enforce: "pre",
   resolveId(source: string, importer: string | undefined) {
@@ -82,6 +82,7 @@ const webTreeSitterNodeShim = () => ({
 });
 
 export default defineConfig({
+  envPrefix: ["VITE_", "ENABLE_", "KNOWLEDGE_"],
   plugins: [
     react(),
     runtimeErrorOverlay(),

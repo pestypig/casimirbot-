@@ -10,6 +10,8 @@
   import { Button } from '@/components/ui/button'
   import { Play, Pause, RotateCcw } from 'lucide-react'
   import { zenLongToast } from '@/lib/zen-long-toasts'
+  import { subscribe, unsubscribe, publish } from '@/lib/luma-bus'
+  import { mapThetaToDisplay, type DisplayMode } from '@/lib/visual/curvature-display'
   import * as VIS from '@/constants/VIS'
 
   // 🔁 Adapter is the single authority for physics → uniforms
@@ -116,6 +118,9 @@
     const [loadError, setLoadError] = useState<string | null>(null)
     const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'loading', message: 'Initializing…' })
     const [initNonce, setInitNonce] = useState(0)
+    const displayModeRef = useRef<DisplayMode>('exaggerated')
+    const displayGainRef = useRef<number>(20)
+    const zeroStopRef = useRef<number>(VIS.zeroStopDefault)
 
     // Engine constructor shim
     const makeEngine = (EngineCtor: any) => {
@@ -386,6 +391,9 @@
           withoutPhysics({
             ...consolidatedUniforms,
             exoticMass_kg: (typeof _liveAny?.M_exotic === 'number' && isFinite(_liveAny.M_exotic)) ? _liveAny.M_exotic : _p.exoticMass_kg,
+            // current exposure/zeroStop from overrides
+            exposure: Number.isFinite(displayGainRef.current) ? Math.max(1.0, displayGainRef.current) : VIS.exposureDefault,
+            zeroStop: Number.isFinite(zeroStopRef.current) ? Math.max(1e-18, zeroStopRef.current) : VIS.zeroStopDefault,
           }),
           'visualizer'
         )
@@ -453,6 +461,53 @@
       if (isLoaded && engineRef.current) handleResize()
       window.addEventListener('resize', handleResize)
       return () => window.removeEventListener('resize', handleResize)
+    }, [isLoaded])
+
+    // Subscribe to Viz Diagnostics HUD settings and push to engine
+    useEffect(() => {
+      if (!engineRef.current) return
+      const handlerId = subscribe('warp:viz:display-settings', (payload: any) => {
+        try {
+          if (!engineRef.current) return
+          const mode: DisplayMode = (payload?.displayMode as DisplayMode) || displayModeRef.current
+          const gain: number = Number.isFinite(payload?.displayGain) ? Number(payload.displayGain) : displayGainRef.current
+          const zero: number = Number.isFinite(payload?.zeroStop) ? Number(payload.zeroStop) : zeroStopRef.current
+          displayModeRef.current = mode
+          displayGainRef.current = gain
+          zeroStopRef.current = zero
+
+          // Map mode to exposure for this engine (exposure ~ visual gain)
+          const mapped = mapThetaToDisplay({
+            gammaGeo: 1, q: 1, gammaVdB: 1, dutyFR: 1, viewAvg: true
+          }, { mode, ridgeMode: 1, zeroStop: zero, gain })
+          const exposure = Math.max(1.0, mapped.displayGain)
+
+          gatedUpdateUniforms(
+            engineRef.current,
+            withoutPhysics({ exposure, zeroStop: mapped.zeroStop }),
+            'visualizer'
+          )
+          try {
+            publish('warp:viz:trace', {
+              t: Date.now(),
+              mode,
+              ridgeMode: engineRef.current?.uniforms?.ridgeMode ?? (parameters.physicsParityMode ? 0 : 1),
+              gammaGeo: engineRef.current?.uniforms?.gammaGeo ?? 1,
+              q: engineRef.current?.uniforms?.q ?? 1,
+              gammaVdB: engineRef.current?.uniforms?.gammaVanDenBroeck ?? 1,
+              dutyFR: engineRef.current?.uniforms?.dutyEffectiveFR ?? parameters.dutyEffectiveFR ?? parameters.dutyCycle,
+              viewAvg: true,
+              wallWidth: engineRef.current?.uniforms?.wallWidth ?? (parameters.wall?.w_norm ?? VIS.defaultWallWidthRho),
+              axesClip: engineRef.current?.uniforms?.axesClip ?? [1,1,1],
+              displayGain: exposure,
+              zeroStop: mapped.zeroStop,
+              cameraZ: engineRef.current?.uniforms?.cameraZ ?? 0,
+            })
+          } catch {}
+          engineRef.current.requestRewarp?.()
+        } catch {}
+      })
+      return () => { try { unsubscribe(handlerId) } catch {} }
     }, [isLoaded])
 
     // Scene scale global

@@ -15,6 +15,27 @@ export type GateRouteRole = z.infer<typeof gateRouteRoleSchema>;
 export const samplingKindSchema = z.enum(["gaussian", "lorentzian"]);
 export type SamplingKind = z.infer<typeof samplingKindSchema>;
 
+// --- Navigation / Pose -------------------------------------------------------
+
+export type NavFrame = "heliocentric-ecliptic" | "simulation" | "geocentric";
+
+/**
+ * Ground-truth world-frame pose for the craft (or a simulated stand-in).
+ * Units are meters / m/s; heading is projected into the ecliptic plane.
+ */
+export interface NavigationPose {
+  /** unix epoch (ms) of the sample */
+  timestamp_ms: number;
+  /** reference frame of position/velocity */
+  frame: NavFrame;
+  /** world position [x,y,z] in meters */
+  position_m: [number, number, number];
+  /** world velocity [vx,vy,vz] in meters per second */
+  velocity_mps: [number, number, number];
+  /** heading in degrees, 0 = +x axis of the frame */
+  heading_deg: number;
+}
+
 export const observerWorldlineSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -40,8 +61,69 @@ export const qiStatsSchema = z.object({
   margin: z.number(),
   window_ms: z.number().nonnegative(),
   samples: z.number().int().nonnegative(),
+  varT00_lattice: z.number().min(0).optional(),
+  gradT00_norm: z.number().min(0).optional(),
+  C_warp: z.number().min(0).max(1).optional(),
+  QI_envelope_okPct: z.number().min(0).max(100).optional(),
+  sigmaT00_norm: z.number().min(0).optional(),
+  sigmaT00_Jm3: z.number().min(0).optional(),
+  maxTileSigma: z.number().min(0).optional(),
+  trimEnergy_pct: z.number().min(0).optional(),
+  meanT00_abs: z.number().min(0).optional(),
+  homogenizerSource: z.enum(["synthetic", "hardware", "offline"]).optional(),
 });
 export type QiStats = z.infer<typeof qiStatsSchema>;
+
+// ---- QI lattice live stream types ------------------------------------------
+
+export interface QITileSnapshot {
+  /** Stable tile identifier consistent with scheduler / pipeline ids */
+  tileId: string;
+  /** Integer lattice index */
+  ijk: [number, number, number];
+  /** Physical tile center (meters) */
+  center_m: [number, number, number];
+  /** Saturation ratio S = |∫ g(t) ρ_neg(t) dt| / qi_limit (clamped to ≈1.5) */
+  S: number;
+  /** Instantaneous negative energy density (J/m^3) */
+  rho_neg_Jm3: number;
+  /** Effective sampling window (seconds) */
+  tau_eff_s: number;
+  /** Applied Ford–Roman bound */
+  qi_limit: number;
+  /** Optional diagnostics */
+  Q_factor?: number;
+  T_K?: number;
+  /** Magnitude of |T^{00}| in J/m^3 (if supplied by the producer) */
+  absRho_Jm3?: number;
+  /** Deviation from the lattice mean (J/m^3) */
+  deviation_Jm3?: number;
+  /** Normalized deviation (sigma units) */
+  sigmaNorm?: number;
+  /** Optional signal weight / confidence (0..1) */
+  weight?: number;
+}
+
+export interface QISample {
+  /** Unix time (ms) when the snapshot was computed */
+  tUnixMs: number;
+  /** Tiles included in this frame (full set or deltas) */
+  tiles: QITileSnapshot[];
+  meta: {
+    /** Effective sampling window supplied by the producer */
+    window_s: number;
+    sampler: SamplingKind;
+    /** Frames alternate between 'full' dumps and 'delta' updates */
+    frame_kind?: "full" | "delta";
+    /** Optional monotonic sequence for client-side ordering */
+    sequence?: number;
+  };
+}
+
+export const QI_S_THRESH = {
+  amber: 0.7,
+  red: 0.9,
+} as const;
 
 // ---- Phase schedule telemetry for HUD overlays -----------------
 export interface PhaseScheduleTelemetry {

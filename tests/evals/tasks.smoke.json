@@ -1,0 +1,7 @@
+[
+  { "goal": "Summarize the repository architecture in 3 bullets." },
+  { "goal": "Generate a 512px icon of a geometric warp bubble." },
+  { "goal": "Transcribe a short demo audio clip (skip if backend off)." },
+  { "goal": "Restate Persona ACL rules from memory." },
+  { "goal": "Do a two-step plan: search -> image." }
+]

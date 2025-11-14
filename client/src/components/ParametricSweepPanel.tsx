@@ -21,7 +21,10 @@ import {
   DEFAULT_MIN_DEPTH_PCT,
   RHO_CUTOFF,
   depthPctToEpsilon,
+  resolvePhaseWindows,
 } from "@/lib/parametric-sweep";
+import { useRegisterWhisperContext } from "@/lib/whispers/contextRegistry";
+import { usePanelHashFocus } from "@/lib/whispers/usePanelHashFocus";
 import type {
   SweepRanges,
   SweepResolution,
@@ -389,6 +392,53 @@ export default function ParametricSweepPanel({ onCapturePreset }: PanelProps) {
     return best;
   }, [aggregate?.phiStarIndex, currentSlice, refF0, refGap, rhoEstimate]);
 
+  const phaseWindowsCount = React.useMemo(
+    () => resolvePhaseWindows(ranges.phase_deg).length,
+    [ranges.phase_deg],
+  );
+  const subMargin =
+    typeof phiStar?.subThresholdMargin === "number"
+      ? phiStar.subThresholdMargin
+      : typeof aggregate?.topRidge?.[0]?.subThresholdMargin === "number"
+        ? aggregate.topRidge![0].subThresholdMargin
+        : undefined;
+  const rhoPeak =
+    typeof phiStar?.rho === "number"
+      ? phiStar.rho
+      : typeof aggregate?.topRidge?.[0]?.rho === "number"
+        ? aggregate.topRidge![0].rho
+        : undefined;
+  const depthViolation = (stats?.filteredDepth ?? 0) > 0;
+  const clippedAny = (stats?.clipped ?? 0) > 0;
+  const jitterCollapse = (stats?.linewidthCollapse ?? 0) > 0;
+  const sanitizedSubMargin = Number.isFinite(subMargin) ? subMargin : undefined;
+  const sanitizedRho = Number.isFinite(rhoPeak) ? rhoPeak : undefined;
+
+  const sweepWhisperContext = React.useMemo(
+    () => ({
+      subThresholdMargin: sanitizedSubMargin,
+      rho: sanitizedRho,
+      rhoCutoff: RHO_CUTOFF,
+      phaseWindows: phaseWindowsCount,
+      depthViolation,
+      depthBounds: [MIN_DEPTH_PCT, MAX_DEPTH_PCT] as [number, number],
+      clipped: clippedAny,
+      jitterCollapse,
+      jitterSamples: simulationParams.jitterSamples,
+    }),
+    [
+      sanitizedSubMargin,
+      sanitizedRho,
+      phaseWindowsCount,
+      depthViolation,
+      clippedAny,
+      jitterCollapse,
+      simulationParams.jitterSamples,
+    ],
+  );
+  useRegisterWhisperContext("#sweeps", sweepWhisperContext);
+  const panelRef = usePanelHashFocus("#sweeps", () => sweepWhisperContext);
+
   const onBiasPhiStar = React.useCallback(() => {
     if (!phiStar) {
       return;
@@ -414,7 +464,8 @@ export default function ParametricSweepPanel({ onCapturePreset }: PanelProps) {
   }, [stop]);
 
   return (
-    <Card className="bg-slate-900/60 border-slate-800">
+    <section ref={panelRef} data-panel-hash="#sweeps">
+      <Card className="bg-slate-900/60 border-slate-800">
       <CardHeader>
         <CardTitle className="text-sm font-semibold">
           Gap x Phase x Omega Sweep
@@ -716,7 +767,8 @@ export default function ParametricSweepPanel({ onCapturePreset }: PanelProps) {
           </CardContent>
         </Card>
       </CardContent>
-    </Card>
+      </Card>
+    </section>
   );
 }
 

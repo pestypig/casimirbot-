@@ -155,16 +155,24 @@ function toUint8Array(content: SnapshotInputFile["content"]) {
 }
 
 async function sha256Hex(bytes: Uint8Array) {
-  if (typeof globalThis.crypto?.subtle !== "undefined") {
+  const hasWebCrypto =
+    typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.subtle !== "undefined";
+  if (hasWebCrypto) {
     const buf = await globalThis.crypto.subtle.digest("SHA-256", bytes);
     return Array.from(new Uint8Array(buf))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   }
 
-  if (typeof process !== "undefined") {
-    const nodeCrypto = await import(/* @vite-ignore */ "crypto");
-    return nodeCrypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex");
+  const isNodeLike =
+    typeof process !== "undefined" &&
+    typeof process.versions === "object" &&
+    typeof process.versions?.node === "string";
+  if (isNodeLike) {
+    const { createHash } = await import(/* @vite-ignore */ "node:crypto").catch(async () => {
+      return import(/* @vite-ignore */ "crypto");
+    });
+    return createHash("sha256").update(bytes).digest("hex");
   }
 
   throw new Error("Unable to compute SHA-256: no crypto implementation available");

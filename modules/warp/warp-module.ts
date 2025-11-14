@@ -12,6 +12,17 @@ import type { CasimirModule } from '../core/module-registry.js';
 import type { SimulationParameters } from '../../shared/schema.js';
 import { calculateNatarioWarpBubble, type NatarioWarpParams, type NatarioWarpResult } from './natario-warp.js';
 
+const DEBUG_WARP =
+  typeof process !== 'undefined' &&
+  typeof process.env?.HELIX_DEBUG === 'string' &&
+  process.env.HELIX_DEBUG.includes('warp');
+const debugLog = (...args: unknown[]) => {
+  if (DEBUG_WARP) console.log(...args);
+};
+const debugWarn = (...args: unknown[]) => {
+  if (DEBUG_WARP) console.warn(...args);
+};
+
 export interface WarpBubbleResult extends NatarioWarpResult {
   // Module-specific additions
   moduleVersion: string;
@@ -29,7 +40,7 @@ export interface WarpBubbleResult extends NatarioWarpResult {
  * Resolve effective duty from pipeline parameters (no double division)
  */
 function resolveDutyEff(params: SimulationParameters): number {
-  console.log('[WarpModule] resolveDutyEff input params:', {
+  debugLog('[WarpModule] resolveDutyEff input params:', {
     dynamicConfig: params.dynamicConfig,
     dutyEffectiveFR: (params as any).dutyEffectiveFR,
     dutyShip: (params as any).dutyShip,
@@ -39,7 +50,7 @@ function resolveDutyEff(params: SimulationParameters): number {
   const dyn = params.dynamicConfig;
   const S_total = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
   
-  console.log('[WarpModule] Sector count:', S_total);
+  debugLog('[WarpModule] Sector count:', S_total);
 
   // 1) Prefer authoritative FR duty if present (server/pipeline)
   const frFromPipeline =
@@ -47,11 +58,11 @@ function resolveDutyEff(params: SimulationParameters): number {
     (params as any).dutyShip ??
     (params as any).dutyEff;
   
-  console.log('[WarpModule] FR from pipeline:', frFromPipeline);
+  debugLog('[WarpModule] FR from pipeline:', frFromPipeline);
   
   if (Number.isFinite(+frFromPipeline) && +frFromPipeline > 0) {
     const result = Math.max(1e-12, Math.min(1, +frFromPipeline));
-    console.log('[WarpModule] Using pipeline FR duty:', result);
+    debugLog('[WarpModule] Using pipeline FR duty:', result);
     return result;
   }
 
@@ -59,37 +70,37 @@ function resolveDutyEff(params: SimulationParameters): number {
   const burst = dyn?.burstLengthUs;
   const dwell = dyn?.cycleLengthUs;
   
-  console.log('[WarpModule] Burst/dwell timing:', { burst, dwell });
+  debugLog('[WarpModule] Burst/dwell timing:', { burst, dwell });
   
   if (Number.isFinite(burst) && Number.isFinite(dwell) && (dwell as number) > 0) {
     const d_local = Math.max(0, Math.min(1, (burst as number) / (dwell as number)));
-    console.log('[WarpModule] Calculated local duty:', d_local);
+    debugLog('[WarpModule] Calculated local duty:', d_local);
     
     // If a sectorDuty is provided and already ≤ local, assume it's FR and don't divide again
     if (dyn && Number.isFinite(dyn.sectorDuty) && (dyn.sectorDuty as number) <= d_local && (dyn.sectorDuty as number) > 0) {
       const result = Math.max(1e-12, Math.min(1, dyn.sectorDuty as number));
-      console.log('[WarpModule] Using provided sectorDuty as FR:', result);
+      debugLog('[WarpModule] Using provided sectorDuty as FR:', result);
       return result;
     }
     const result = Math.max(1e-12, Math.min(1, d_local / S_total));
-    console.log('[WarpModule] Converting local to FR duty:', result, '(', d_local, '/', S_total, ')');
+    debugLog('[WarpModule] Converting local to FR duty:', result, '(', d_local, '/', S_total, ')');
     return result;
   }
 
   // 3) Fall back to sectorDuty:
   // Use standard physical default of 2.5e-5 (matching MODE_POLICY hover mode)
   const dProvided = (dyn && Number.isFinite(dyn.sectorDuty) && (dyn.sectorDuty as number) > 0) ? (dyn.sectorDuty as number) : 2.5e-5;
-  console.log('[WarpModule] Fallback sectorDuty:', dProvided);
+  debugLog('[WarpModule] Fallback sectorDuty:', dProvided);
   
   // More physically reasonable threshold: if duty < 1/S_total, likely already FR
   const localThreshold = 1.0 / S_total;
   if (S_total > 1 && dProvided < localThreshold * 0.1) {
-    console.log('[WarpModule] Treating small duty as already FR (< 10% of local threshold):', dProvided);
+    debugLog('[WarpModule] Treating small duty as already FR (< 10% of local threshold):', dProvided);
     return Math.max(1e-12, Math.min(1, dProvided));
   }
   
   const result = Math.max(1e-12, Math.min(1, dProvided / S_total));
-  console.log('[WarpModule] Treating as local duty, converting to FR:', result);
+  debugLog('[WarpModule] Treating as local duty, converting to FR:', result);
   return result;
 }
 
@@ -97,33 +108,63 @@ function resolveDutyEff(params: SimulationParameters): number {
  * Convert simulation parameters to Natário warp parameters (pipeline-true)
  */
 function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
-  console.log('[WarpModule] convertToWarpParams input:', params);
+  debugLog('[WarpModule] convertToWarpParams input:', params);
   
   const dyn = params.dynamicConfig;
-  console.log('[WarpModule] Dynamic config:', dyn);
+  debugLog('[WarpModule] Dynamic config:', dyn);
 
   // Prefer pipeline hull if present; else fallback to Needle Hull with validated dimensions
-  const hull = (params as any).hull
-    ? { 
-        a: Math.max(1, (params as any).hull.Lx_m / 2), 
-        b: Math.max(1, (params as any).hull.Ly_m / 2), 
-        c: Math.max(1, (params as any).hull.Lz_m / 2) 
+  const MIN_HULL_SEMI_AXIS_M = 1e-3; // keep hull strictly positive but allow centimeter-scale rigs
+  const clampAxis = (value: number | undefined) =>
+    Math.max(MIN_HULL_SEMI_AXIS_M, Math.abs(value ?? MIN_HULL_SEMI_AXIS_M));
+
+  const rawHull = (params as any).hull;
+  const hull = (() => {
+    if (rawHull) {
+      if (
+        Number.isFinite(rawHull.a) &&
+        Number.isFinite(rawHull.b) &&
+        Number.isFinite(rawHull.c)
+      ) {
+        return {
+          a: clampAxis(rawHull.a),
+          b: clampAxis(rawHull.b),
+          c: clampAxis(rawHull.c),
+        };
       }
-    : { a: 503.5, b: 132.0, c: 86.5 }; // meters (semi-axes) - validated Needle Hull defaults
+      if (
+        Number.isFinite(rawHull.Lx_m) &&
+        Number.isFinite(rawHull.Ly_m) &&
+        Number.isFinite(rawHull.Lz_m)
+      ) {
+        return {
+          a: clampAxis(rawHull.Lx_m / 2),
+          b: clampAxis(rawHull.Ly_m / 2),
+          c: clampAxis(rawHull.Lz_m / 2),
+        };
+      }
+    }
+    const radiusUm = Number((params as any).radius);
+    if (Number.isFinite(radiusUm) && radiusUm > 0) {
+      const r_m = clampAxis(radiusUm * 1e-6); // radius arrives in μm
+      return { a: r_m, b: r_m, c: r_m };
+    }
+    return { a: 503.5, b: 132.0, c: 86.5 }; // meters (semi-axes) - validated Needle Hull defaults
+  })();
   const R_geom_m = Math.cbrt(hull.a * hull.b * hull.c); // meters
   const R_geom_um = R_geom_m * 1e6;                     // Natário expects µm
   
-  console.log('[WarpModule] Hull geometry:', { hull, R_geom_m, R_geom_um });
+  debugLog('[WarpModule] Hull geometry:', { hull, R_geom_m, R_geom_um });
 
   // Sector counts / duty
   const sectorCount = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
   const d_eff = resolveDutyEff(params);
   
-  console.log('[WarpModule] Sector/duty resolution:', { sectorCount, d_eff });
+  debugLog('[WarpModule] Sector/duty resolution:', { sectorCount, d_eff });
 
   // Pipeline seeds (thread through untouched if provided)
   const amps = (params as any).amps ?? {};
-  console.log('[WarpModule] Amps object:', amps);
+  debugLog('[WarpModule] Amps object:', amps);
   
   // Amplification factors with validated ranges
   const gammaGeo = (() => {
@@ -145,7 +186,7 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     return Math.max(0.001, Math.min(1000, val)); // Physical bounds for Q spoiling
   })();
     
-  console.log('[WarpModule] Amplification factors:', {
+  debugLog('[WarpModule] Amplification factors:', {
     gammaGeo,
     gammaVanDenBroeck,
     qSpoilingFactor
@@ -182,13 +223,13 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     if (tileCount && Number.isFinite(tileCount) && Number.isFinite(d_eff) && d_eff > 0) {
       const baselinePowerPerTile = 1e-12; // Reasonable baseline power per tile (1 pW)
       const totalPower = baselinePowerPerTile * tileCount * d_eff;
-      console.log('[WarpModule] Calculated fallback power:', totalPower, 'W from', tileCount, 'tiles with duty', d_eff);
+      debugLog('[WarpModule] Calculated fallback power:', totalPower, 'W from', tileCount, 'tiles with duty', d_eff);
       return totalPower;
     }
     return undefined;
   })();
     
-  console.log('[WarpModule] Tile and power data:', {
+  debugLog('[WarpModule] Tile and power data:', {
     tileCount,
     tileArea_m2,
     P_avg_W,
@@ -200,26 +241,26 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     // Prefer burst timing for local duty calculation if available
     if (dyn && Number.isFinite(dyn.burstLengthUs) && Number.isFinite(dyn.cycleLengthUs) && (dyn.cycleLengthUs as number) > 0) {
       const localDuty = Math.max(0, Math.min(1, (dyn.burstLengthUs as number) / (dyn.cycleLengthUs as number)));
-      console.log('[WarpModule] Calculated local duty from timing:', localDuty);
+      debugLog('[WarpModule] Calculated local duty from timing:', localDuty);
       return localDuty;
     }
     // Fallback to provided sectorDuty, but validate it's reasonable
     if (dyn && Number.isFinite(dyn.sectorDuty)) {
       const duty = Math.max(1e-6, Math.min(0.5, dyn.sectorDuty as number)); // Clamp to reasonable range
-      console.log('[WarpModule] Using clamped sectorDuty:', duty);
+      debugLog('[WarpModule] Using clamped sectorDuty:', duty);
       return duty;
     }
     return 0.01; // Standard 1% duty default
   })();
   
-  console.log('[WarpModule] Duty factor calculation:', dutyFactor);
+  debugLog('[WarpModule] Duty factor calculation:', dutyFactor);
 
   // **CRITICAL FIX**: Pass through calibrated pipeline mass to avoid independent calculation
   const exoticMassTarget_kg = Number.isFinite(+(params as any).exoticMassTarget_kg) 
     ? +(params as any).exoticMassTarget_kg 
     : undefined;
   
-  console.log('[WarpModule] Exotic mass target from pipeline:', exoticMassTarget_kg);
+  debugLog('[WarpModule] Exotic mass target from pipeline:', exoticMassTarget_kg);
 
   const finalParams = {
     // Geometry (Natário warp currently expects µm & nm)
@@ -258,7 +299,7 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     // powerTolerance: 0.10,
   };
   
-  console.log('[WarpModule] Final warp parameters:', finalParams);
+  debugLog('[WarpModule] Final warp parameters:', finalParams);
   return finalParams;
 }
 
@@ -266,7 +307,7 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
  * Validate warp bubble calculation results using pipeline inputs (not fixed "paper" bands)
  */
 function validateWarpResults(result: NatarioWarpResult, params: SimulationParameters): WarpBubbleResult['validationSummary'] {
-  console.log('[WarpModule] Validating warp results:', {
+  debugLog('[WarpModule] Validating warp results:', {
     inputParams: params,
     warpResult: result
   });
@@ -275,7 +316,7 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
   const γ_vdb = (params as any).amps?.gammaVanDenBroeck ?? 3.83e1;
   const Q      = params.dynamicConfig?.cavityQ ?? 1e9;
 
-  console.log('[WarpModule] Validation parameters:', { γ_geo, γ_vdb, Q });
+  debugLog('[WarpModule] Validation parameters:', { γ_geo, γ_vdb, Q });
 
   // More reasonable validation bands based on physics
   const geomMin = 0.1 * γ_geo;  // Allow 90% deviation below
@@ -287,7 +328,7 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
   const ampMin  = baseAmp * 1e-3;  // Very conservative lower bound
   const ampMax  = baseAmp * 1e12;  // Allow very high amplification
 
-  console.log('[WarpModule] Validation bounds:', {
+  debugLog('[WarpModule] Validation bounds:', {
     geometry: { min: geomMin, max: geomMax, actual: result.geometricBlueshiftFactor },
     amplification: { min: ampMin, max: ampMax, actual: result.totalAmplificationFactor },
     qEnhancement: { min: qEnhMin, actual: result.qEnhancementFactor }
@@ -307,7 +348,7 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
                          !!result.isCurlFree && 
                          !!result.stressEnergyTensor?.isNullEnergyConditionSatisfied;
 
-  console.log('[WarpModule] Validation checks:', {
+  debugLog('[WarpModule] Validation checks:', {
     geometryValid,
     amplificationValid, 
     quantumSafe,
@@ -325,7 +366,7 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
     geometryValid && amplificationValid && quantumSafe                       ? 'acceptable' :
     geometryValid && quantumSafe                                             ? 'warning' : 'failure';
 
-  console.log('[WarpModule] Overall validation status:', overallStatus);
+  debugLog('[WarpModule] Overall validation status:', overallStatus);
   
   return { geometryValid, amplificationValid, quantumSafe, warpFieldStable, overallStatus };
 }
@@ -341,13 +382,13 @@ export const warpBubbleModule: CasimirModule = {
 
   async initialize(): Promise<boolean> {
     // Validate physics constants and dependencies
-    console.log('Initializing Warp Bubble module...');
+    debugLog('Initializing Warp Bubble module...');
     return true;
   },
 
   async calculate(params: SimulationParameters): Promise<WarpBubbleResult> {
     const startTime = Date.now();
-    console.log('[WarpModule] Starting calculation with params:', params);
+    debugLog('[WarpModule] Starting calculation with params:', params);
 
     try {
       // Validate input parameters first
@@ -356,12 +397,12 @@ export const warpBubbleModule: CasimirModule = {
       }
 
       if (!params.dynamicConfig) {
-        console.warn('[WarpModule] No dynamicConfig found, using defaults');
+        debugWarn('[WarpModule] No dynamicConfig found, using defaults');
       }
 
       // Convert simulation parameters to warp parameters
       const warpParams = convertToWarpParams(params);
-      console.log('[WarpModule] Converted warp parameters:', warpParams);
+      debugLog('[WarpModule] Converted warp parameters:', warpParams);
 
       // Validate critical warp parameters
       if (!Number.isFinite(warpParams.bowlRadius) || warpParams.bowlRadius <= 0) {
@@ -377,7 +418,7 @@ export const warpBubbleModule: CasimirModule = {
 
       // Perform Natário warp bubble calculations
       const warpResult = calculateNatarioWarpBubble(warpParams);
-      console.log('[WarpModule] Warp calculation result:', warpResult);
+      debugLog('[WarpModule] Warp calculation result:', warpResult);
 
       // Validate critical results
       if (!Number.isFinite(warpResult.totalAmplificationFactor)) {
@@ -387,10 +428,10 @@ export const warpBubbleModule: CasimirModule = {
 
       // Validate results
       const validationSummary = validateWarpResults(warpResult, params);
-      console.log('[WarpModule] Validation summary:', validationSummary);
+      debugLog('[WarpModule] Validation summary:', validationSummary);
 
       const calculationTime = Date.now() - startTime;
-      console.log('[WarpModule] Calculation completed in', calculationTime, 'ms');
+      debugLog('[WarpModule] Calculation completed in', calculationTime, 'ms');
 
       // Add debug information for shift vector field
       // Provide a small runtime-safe interface for shiftVectorField so consumers can rely on these keys
@@ -405,7 +446,7 @@ export const warpBubbleModule: CasimirModule = {
 
       if (warpResult.shiftVectorField) {
         const sv = warpResult.shiftVectorField as ShiftVectorField;
-        console.log('[WarpModule] Shift vector field validation:', {
+        debugLog('[WarpModule] Shift vector field validation:', {
           amplitude: Number.isFinite(sv?.amplitude) ? sv!.amplitude : undefined,
           hasRadialProfile: typeof sv?.radialProfile === 'function',
           tangentialComponent: typeof sv?.tangentialComponent === 'function' ? 'fn' : undefined,
@@ -421,7 +462,7 @@ export const warpBubbleModule: CasimirModule = {
         validationSummary
       };
       
-      console.log('[WarpModule] Final result keys:', Object.keys(finalResult));
+      debugLog('[WarpModule] Final result keys:', Object.keys(finalResult));
       return finalResult;
 
     } catch (error) {

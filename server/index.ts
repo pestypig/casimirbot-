@@ -1,16 +1,69 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import type { Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { registerMetricsEndpoint, metrics } from "./metrics";
+import { jwtMiddleware } from "./auth/jwt";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+registerMetricsEndpoint(app);
+app.use(jwtMiddleware);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const docsDir = path.resolve(__dirname, "..", "docs");
+
+let serverInstance: Server | null = null;
+let shuttingDown = false;
+const requestShutdown = (signal: NodeJS.Signals) => {
+  try {
+    console.error(`[process] signal received: ${signal}`);
+  } catch {}
+
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+
+  const forceExitTimer = setTimeout(() => {
+    try {
+      console.error("[process] forcing exit after graceful shutdown timeout");
+    } catch {}
+    process.exit(1);
+  }, 5000);
+
+  const exit = (code: number) => {
+    clearTimeout(forceExitTimer);
+    process.exit(code);
+  };
+
+  if (!serverInstance) {
+    exit(0);
+    return;
+  }
+
+  try {
+    serverInstance.close((err) => {
+      if (err) {
+        try {
+          console.error("[process] error while closing server:", err);
+        } catch {}
+        exit(1);
+        return;
+      }
+      exit(0);
+    });
+  } catch (err) {
+    try {
+      console.error("[process] server close threw:", err);
+    } catch {}
+    exit(1);
+  }
+};
 
 // Keep the dev server resilient: log unexpected errors instead of exiting
 process.on('uncaughtException', (err) => {
@@ -35,11 +88,7 @@ process.on('exit', (code) => {
   } catch {}
 });
 for (const sig of ['SIGINT','SIGTERM'] as const) {
-  process.on(sig, () => {
-    try {
-      console.error(`[process] signal received: ${sig}`);
-    } catch {}
-  });
+  process.on(sig, () => requestShutdown(sig));
 }
 
 // Serve PDF files from attached_assets folder
@@ -53,6 +102,13 @@ app.use('/warp-engine*.js', (req, res, next) => {
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   next();
 });
+
+const redirectToDesktop = (_req: Request, res: Response) => {
+  res.redirect(302, "/desktop");
+};
+
+app.get("/", redirectToDesktop);
+app.head("/", redirectToDesktop);
 
 const previewResponseBody = (body: unknown, maxLength = 80): string | undefined => {
   if (body === undefined) return undefined;
@@ -113,6 +169,17 @@ const previewResponseBody = (body: unknown, maxLength = 80): string | undefined 
   }
 };
 
+const resolveRouteLabel = (req: Request): string => {
+  if (req.route?.path) {
+    return req.baseUrl ? `${req.baseUrl}${req.route.path}` : req.route.path;
+  }
+  if (req.baseUrl) {
+    return req.baseUrl;
+  }
+  const url = typeof req.path === "string" && req.path ? req.path : req.originalUrl || "/";
+  return url || "/";
+};
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -126,6 +193,8 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
+    const routeLabel = resolveRouteLabel(req);
+    metrics.observeHttpRequest(req.method, routeLabel, res.statusCode, duration);
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonPreview) {
@@ -133,7 +202,7 @@ app.use((req, res, next) => {
       }
 
       if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+        logLine = logLine.slice(0, 79) + "...";
       }
 
       log(logLine);
@@ -149,6 +218,7 @@ app.use((req, res, next) => {
   await initializeModules();
   
   const server = await registerRoutes(app);
+  serverInstance = server;
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -187,6 +257,17 @@ app.use((req, res, next) => {
   const isWin = process.platform === 'win32';
   const listenOpts: any = { port, host: '0.0.0.0' };
   if (!isWin) listenOpts.reusePort = true;
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err?.code === 'EADDRINUSE') {
+      console.error(`[server] port ${port} is already in use. Another Casimir server is still running or the OS has not released the socket yet.`);
+      console.error('[server] stop the other process or set PORT to an open value before retrying.');
+      process.exit(1);
+      return;
+    }
+    console.error('[server] unexpected listen error:', err);
+  });
+
   server.listen(listenOpts, () => {
     log(`serving on port ${port}`);
   });

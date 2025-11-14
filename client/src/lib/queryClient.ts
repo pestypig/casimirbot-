@@ -1,10 +1,13 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { isFlagEnabled } from "@/lib/envFlags";
 
 interface ApiRequestOptions {
   allowUnauthorized?: boolean;
 }
 
 type FixedTuple3 = [number, number, number];
+
+const HELIX_DEV_MOCKS_ENABLED = isFlagEnabled("HELIX_DEV_MOCKS", true);
 
 const BASE64_ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -138,6 +141,7 @@ export async function apiRequest(
 
   // Helper: dev-only minimal mocks when backend isn't up.
   const shouldMock = () => {
+    if (!HELIX_DEV_MOCKS_ENABLED) return false;
     // Vite dev environment check
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,7 +152,7 @@ export async function apiRequest(
     }
   };
 
-  const makeMock = (): Response | null => {
+  const makeMock = (reason?: string): Response | null => {
     if (!shouldMock()) return null;
     // Very small, UI-friendly defaults to keep Helix Core page stable without backend
     const now = Date.now();
@@ -223,7 +227,11 @@ export async function apiRequest(
     const body = jsonFor();
     if (body == null) return null;
     // eslint-disable-next-line no-console
-    console.warn('[apiRequest] Using DEV mock for', method, url);
+    if (reason) {
+      console.warn('[apiRequest] Using DEV mock for', method, url, `:: ${reason}`);
+    } else {
+      console.warn('[apiRequest] Using DEV mock for', method, url);
+    }
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -244,7 +252,7 @@ export async function apiRequest(
         return res;
       }
       // Try dev mock on non-OK responses
-      const mocked = makeMock();
+      const mocked = makeMock(`${res.status} ${res.statusText}`.trim());
       if (mocked) return mocked;
     }
 
@@ -252,7 +260,8 @@ export async function apiRequest(
     return res;
   } catch (err) {
     // Network or other error: try dev mock
-    const mocked = makeMock();
+    const message = err instanceof Error ? err.message : String(err);
+    const mocked = makeMock(message);
     if (mocked) return mocked;
     throw err;
   }

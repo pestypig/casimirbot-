@@ -6,8 +6,25 @@ import {
   summarizeUrl,
   type ChatMsg,
 } from "../services/luma";
+import { answerWithSelfConsistency } from "../services/decoding/selfConsistency";
 
 export const lumaRouter = express.Router();
+
+function sanitizeMessages(payload: unknown): ChatMsg[] {
+  if (!Array.isArray(payload)) return [];
+  const sanitized: ChatMsg[] = [];
+  for (const msg of payload) {
+    if (!msg || typeof msg !== "object") continue;
+    const { role, content } = msg as ChatMsg;
+    if (
+      (role === "user" || role === "assistant" || role === "system") &&
+      typeof content === "string"
+    ) {
+      sanitized.push({ role, content });
+    }
+  }
+  return sanitized;
+}
 
 lumaRouter.get("/skills", (_req, res) => {
   res.json({
@@ -66,17 +83,7 @@ lumaRouter.post("/chat/stream", async (req: Request, res: Response) => {
     return res.end();
   }
 
-  const sanitized: ChatMsg[] = [];
-  for (const msg of messages) {
-    if (!msg || typeof msg !== "object") continue;
-    const { role, content } = msg as ChatMsg;
-    if (
-      (role === "user" || role === "assistant" || role === "system") &&
-      typeof content === "string"
-    ) {
-      sanitized.push({ role, content });
-    }
-  }
+  const sanitized = sanitizeMessages(messages);
 
   if (sanitized.length === 0) {
     res.write(`data: ${JSON.stringify({ error: "no valid messages" })}\n\n`);
@@ -103,5 +110,40 @@ lumaRouter.post("/chat/stream", async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({ error: err?.message || "stream error" })}\n\n`);
     res.write(`data: [DONE]\n\n`);
     res.end();
+  }
+});
+
+lumaRouter.post("/chat/self-consistency", async (req: Request, res: Response) => {
+  const { messages, temperature, runs, seeds } = req.body || {};
+  const sanitized = sanitizeMessages(messages);
+  if (sanitized.length === 0) {
+    return res.status(400).json({ error: "messages required" });
+  }
+
+  if (
+    runs !== undefined &&
+    (typeof runs !== "number" || !Number.isInteger(runs) || runs <= 0 || !Number.isFinite(runs))
+  ) {
+    return res.status(400).json({ error: "runs must be a positive number when provided" });
+  }
+
+  if (
+    seeds !== undefined &&
+    (!Array.isArray(seeds) ||
+      !seeds.every((s) => typeof s === "number" && Number.isInteger(s) && Number.isFinite(s)))
+  ) {
+    return res.status(400).json({ error: "seeds must be an array of integers when provided" });
+  }
+
+  try {
+    const result = await answerWithSelfConsistency({
+      messages: sanitized,
+      temperature: typeof temperature === "number" ? temperature : undefined,
+      runs: runs ?? undefined,
+      seeds: seeds ?? undefined,
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "self consistency failed" });
   }
 });

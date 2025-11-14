@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import {
   Card,
@@ -22,9 +22,17 @@ import { SUB_THRESHOLD_MARGIN, RHO_CUTOFF } from "@/lib/parametric-sweep";
 
 
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useMetrics } from "@/hooks/use-metrics";
 import { useCurvatureBrick } from "@/hooks/useCurvatureBrick";
 import { useCycleLedger, LEDGER_GUARD_THRESHOLD } from "@/hooks/useCycleLedger";
+import { publish } from "@/lib/luma-bus";
 import { CurvatureLedgerPanel } from "./CurvatureLedgerPanel";
+import { QiGuardBadge } from "./QiGuardBadge";
+import {
+  computeSurfaceDivergenceBeta,
+  helmholtzProjectDivergenceFree,
+} from "@/lib/york-time";
+import type { AxesABC, YorkSample, Vec3 } from "@/lib/york-time";
 
 
 import { DefinitionChip, useTermRegistry } from "@/components/DefinitionChip";
@@ -175,10 +183,12 @@ type TileAreaResult = {
 };
 
 const clamp = (value: number, min: number, max: number) =>
-
-
-
   Math.min(max, Math.max(min, value));
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const NATARIO_K_TOL = 1e-6;
+const DEFAULT_HULL_AXIS = 503.5;
+const YORK_THETA_STEPS = 24;
+const YORK_PHI_STEPS = 48;
 
 
 
@@ -1050,21 +1060,106 @@ function computeCurvatureProxy(pipeline: any, dEff: number) {
 
 
 export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = {}) {
-
-
-
   const { data: pipeline, sweepResults } = useEnergyPipeline({ refetchInterval: 1500 });
-
-
-
   const pipe = pipeline as any;
-
-
-
   const [readMode, setReadMode] = useState(false);
-
+  const [helmholtzEnabled, setHelmholtzEnabled] = useState(false);
+  const [natarioGateEnabled, setNatarioGateEnabled] = useState(true);
+  const { data: metrics } = useMetrics();
   const { sample: curv } = useCurvatureBrick();
   const cycleLedger = useCycleLedger();
+
+  const hullAxes = useMemo<AxesABC>(() => {
+    const hull = pipe?.hull ?? {};
+    const axisFrom = (primary?: number, fallback?: number) => {
+      const primaryNum = typeof primary === "number" ? primary : Number(primary);
+      if (Number.isFinite(primaryNum) && primaryNum > 0) return primaryNum;
+      if (typeof fallback === "number" && Number.isFinite(fallback) && fallback > 0) return fallback;
+      return undefined;
+    };
+    const half = (value?: number) =>
+      typeof value === "number" && Number.isFinite(value) && value > 0 ? value / 2 : undefined;
+    const a = axisFrom(hull.a, half(hull.Lx_m)) ?? DEFAULT_HULL_AXIS;
+    const b = axisFrom(hull.b, half(hull.Ly_m)) ?? a;
+    const c = axisFrom(hull.c, half(hull.Lz_m)) ?? a;
+    return {
+      a: Math.abs(a) || DEFAULT_HULL_AXIS,
+      b: Math.abs(b) || Math.abs(a) || DEFAULT_HULL_AXIS,
+      c: Math.abs(c) || Math.abs(a) || DEFAULT_HULL_AXIS,
+    };
+  }, [
+    pipe?.hull?.a,
+    pipe?.hull?.b,
+    pipe?.hull?.c,
+    pipe?.hull?.Lx_m,
+    pipe?.hull?.Ly_m,
+    pipe?.hull?.Lz_m,
+  ]);
+  const axesKey = `${hullAxes.a.toFixed(3)}|${hullAxes.b.toFixed(3)}|${hullAxes.c.toFixed(3)}`;
+  const metricsShift = metrics?.shiftVector;
+  const betaVecCandidate = (metricsShift?.betaTiltVec ??
+    pipe?.betaTiltVec ??
+    pipe?.natario?.shiftVectorField?.betaTiltVec ??
+    [0, -1, 0]) as Vec3;
+  const betaDirection =
+    normalizeVec([
+      Number(betaVecCandidate[0]) || 0,
+      Number(betaVecCandidate[1]) || 0,
+      Number(betaVecCandidate[2]) || 0,
+    ]) ?? ([0, -1, 0] as Vec3);
+  const betaDirKey = `${betaDirection[0].toFixed(4)}|${betaDirection[1].toFixed(4)}|${betaDirection[2].toFixed(4)}`;
+  const betaAmplitudeRaw = firstFinite(
+    metricsShift?.epsilonTilt,
+    pipe?.beta_avg,
+    pipe?.natario?.shiftVectorField?.amplitude,
+    pipe?.epsilonTilt,
+    0
+  );
+  const betaAmplitude = Number.isFinite(betaAmplitudeRaw) ? Math.abs(betaAmplitudeRaw as number) : 0;
+  const yorkBaseSamples = useMemo<YorkSample[]>(() => {
+    if (!betaAmplitude) return [];
+    return buildYorkSamples({
+      axes: hullAxes,
+      direction: betaDirection,
+      amplitude: betaAmplitude,
+      thetaSteps: YORK_THETA_STEPS,
+      phiSteps: YORK_PHI_STEPS,
+    });
+  }, [axesKey, betaDirKey, betaAmplitude]);
+  const yorkSamples = useMemo<YorkSample[]>(() => {
+    if (!yorkBaseSamples.length) return yorkBaseSamples;
+    if (!helmholtzEnabled) return yorkBaseSamples;
+    return helmholtzProjectDivergenceFree(yorkBaseSamples, hullAxes);
+  }, [yorkBaseSamples, helmholtzEnabled, axesKey]);
+  const yorkStats = useMemo(() => {
+    if (!yorkSamples.length) return null;
+    return computeSurfaceDivergenceBeta(yorkSamples, hullAxes);
+  }, [yorkSamples, axesKey]);
+  const divMaxVal = Number.isFinite(yorkStats?.divMax) ? Math.abs(yorkStats!.divMax) : 0;
+  const natarioGateFactor = clamp01(1 - divMaxVal / NATARIO_K_TOL);
+  const kRmsValue = Number.isFinite(yorkStats?.kRMS) ? Math.abs(yorkStats!.kRMS) : NaN;
+  const divRmsValue = Number.isFinite(yorkStats?.divRMS) ? Math.abs(yorkStats!.divRMS) : NaN;
+  const betaSourceLabel = metricsShift ? "metrics" : Number.isFinite(pipe?.beta_avg) ? "live" : "derived";
+  const showNatarioProvenance = Number.isFinite(pipe?.beta_avg) && !!pipe?.stressEnergy;
+  const natarioOk = divMaxVal < NATARIO_K_TOL;
+  const natarioBadgeTone = natarioOk
+    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+    : "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  const natarioBadgeLabel = natarioOk ? "Natario K≈0" : "Natario violated";
+  const helmholtzDisabled = yorkBaseSamples.length === 0;
+  const yorkSampleCount = yorkBaseSamples.length;
+  const yorkDocString = "Natario = divergence-free shift ((∇·β = 0) ⇒ York time (K=0)).";
+  const divMaxDisplay = Number.isFinite(divMaxVal) ? toSci(divMaxVal, 2) : "n/a";
+  const kRmsDisplay = Number.isFinite(kRmsValue) ? toSci(kRmsValue, 2) : "n/a";
+  useEffect(() => {
+    publish("natario:diagnostics", {
+      divMax: divMaxVal,
+      kRms: kRmsValue,
+      helmholtzEnabled,
+      gateEnabled: natarioGateEnabled,
+      source: betaSourceLabel,
+    });
+  }, [divMaxVal, kRmsValue, helmholtzEnabled, natarioGateEnabled, betaSourceLabel]);
 
 
 
@@ -3258,10 +3353,56 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
+        <div className="space-y-2 rounded-lg border border-slate-800/70 bg-slate-900/40 p-3 text-xs text-slate-200">
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="inline-flex items-center gap-1">
+              <input
+                type="checkbox"
+                className="accent-emerald-500"
+                checked={helmholtzEnabled}
+                onChange={(event) => setHelmholtzEnabled(event.target.checked)}
+                disabled={helmholtzDisabled}
+              />
+              Project β to div-free (Helmholtz)
+            </label>
+            <label className="inline-flex items-center gap-1">
+              <input
+                type="checkbox"
+                className="accent-emerald-500"
+                checked={natarioGateEnabled}
+                onChange={(event) => setNatarioGateEnabled(event.target.checked)}
+              />
+              Gate shell on Natario
+            </label>
+          </div>
+          <div className="font-mono text-[11px] text-slate-400">{yorkDocString}</div>
+          <div className="grid grid-cols-2 gap-3 font-mono">
+            <div>
+              <div className="text-slate-500">max|∇·β|</div>
+              <div className="text-cyan-200">{divMaxDisplay}</div>
+            </div>
+            <div>
+              <div className="text-slate-500">K_rms</div>
+              <div className="text-cyan-200">{kRmsDisplay}</div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+            <span>β samples: {betaSourceLabel}</span>
+            <span>{yorkSampleCount ? `${YORK_THETA_STEPS}×${YORK_PHI_STEPS}` : "n/a"}</span>
+          </div>
+        </div>
+
+
+
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200">
-
-
-
+          <Badge className={`border ${natarioBadgeTone}`}>
+            {natarioBadgeLabel}
+          </Badge>
+          {showNatarioProvenance && (
+            <Badge variant="outline" className="border border-slate-600 text-slate-300">
+              metrics/live/derived
+            </Badge>
+          )}
           <Badge className={`border ${averagingBadgeTone}`}>
 
 
@@ -6060,6 +6201,10 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
+            <QiGuardBadge className="w-full" />
+
+
+
             <GuardBadge
 
 
@@ -6459,6 +6604,81 @@ function BetweenPanels({
 
 
 
+
+const TWO_PI = Math.PI * 2;
+
+function buildYorkSamples(params: {
+  axes: AxesABC;
+  direction: Vec3;
+  amplitude: number;
+  thetaSteps: number;
+  phiSteps: number;
+}): YorkSample[] {
+  const { axes, amplitude } = params;
+  const thetaCount = Math.max(3, params.thetaSteps);
+  const phiCount = Math.max(3, params.phiSteps);
+  const dirNorm = normalizeVec(params.direction) ?? ([0, -1, 0] as Vec3);
+  const samples: YorkSample[] = [];
+
+  for (let ti = 0; ti < thetaCount; ti += 1) {
+    const theta =
+      thetaCount === 1 ? 0 : (ti / (thetaCount - 1)) * Math.PI;
+    const sinTheta = Math.sin(theta);
+    const cosTheta = Math.cos(theta);
+    for (let pj = 0; pj < phiCount; pj += 1) {
+      const phi = (pj / phiCount) * TWO_PI;
+      const pos: Vec3 = [
+        axes.a * sinTheta * Math.cos(phi),
+        axes.b * sinTheta * Math.sin(phi),
+        axes.c * cosTheta,
+      ];
+      const normal = ellipsoidNormal(pos, axes);
+      const tangential =
+        normalizeVec(projectOntoTangent(dirNorm, normal)) ??
+        fallbackTangent(normal);
+      const betaVec: Vec3 = [
+        tangential[0] * amplitude,
+        tangential[1] * amplitude,
+        tangential[2] * amplitude,
+      ];
+      samples.push({ pos, beta: betaVec });
+    }
+  }
+
+  return samples;
+}
+
+function ellipsoidNormal(pos: Vec3, axes: AxesABC): Vec3 {
+  const nx = pos[0] / (axes.a * axes.a);
+  const ny = pos[1] / (axes.b * axes.b);
+  const nz = pos[2] / (axes.c * axes.c);
+  return normalizeVec([nx, ny, nz]) ?? [0, 1, 0];
+}
+
+function projectOntoTangent(vec: Vec3, normal: Vec3): Vec3 {
+  const dot = vec[0] * normal[0] + vec[1] * normal[1] + vec[2] * normal[2];
+  return [
+    vec[0] - normal[0] * dot,
+    vec[1] - normal[1] * dot,
+    vec[2] - normal[2] * dot,
+  ];
+}
+
+function fallbackTangent(normal: Vec3): Vec3 {
+  const axis: Vec3 = Math.abs(normal[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
+  const crossVec: Vec3 = [
+    normal[1] * axis[2] - normal[2] * axis[1],
+    normal[2] * axis[0] - normal[0] * axis[2],
+    normal[0] * axis[1] - normal[1] * axis[0],
+  ];
+  return normalizeVec(crossVec) ?? [1, 0, 0];
+}
+
+function normalizeVec(vec: Vec3): Vec3 | null {
+  const mag = Math.hypot(vec[0], vec[1], vec[2]);
+  if (!Number.isFinite(mag) || mag < 1e-9) return null;
+  return [vec[0] / mag, vec[1] / mag, vec[2] / mag];
+}
 
 function MetricTooltipBadge({
   label,

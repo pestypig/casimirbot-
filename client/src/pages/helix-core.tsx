@@ -1,6 +1,6 @@
 ﻿// client/src/pages/helix-core.tsx
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, AlertTriangle, Target, CheckCircle2, Video, Layers, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { C as SPEED_OF_LIGHT } from '@/lib/physics-const';
@@ -41,6 +41,7 @@ import SectorRolesHud from "@/components/SectorRolesHud";
 import CavityMechanismPanel from "@/components/CavityMechanismPanel";
 import { PHASE_STREAK_BASE_HUE_DEG } from "@/constants/phase-streak";
 import usePhaseBridge from "@/hooks/use-phase-bridge";
+import { useNavPoseDriver } from "@/hooks/use-nav-pose-driver";
 import NearZeroWidget from "@/components/NearZeroWidget";
 import VacuumGapHeatmap from "@/components/VacuumGapHeatmap";
 import SweepReplayControls from "@/components/SweepReplayControls";
@@ -48,6 +49,9 @@ import MetricAmplificationPocket from "../components/MetricAmplificationPocket";
 import VacuumContractBadge from "@/components/VacuumContractBadge";
 import DriveGuardsPanel from "@/components/DriveGuardsPanel";
 import DirectionPad from "@/components/DirectionPad";
+import NavPageSection from "@/components/NavPageSection";
+import { LumaWhispersProvider } from "@/lib/luma-whispers";
+import { SUPPRESS_HASH_SCROLL_KEY, useScrollHashSync } from "@/lib/whispers/useScrollHashSync";
 import { FractionalCoherenceRail } from "@/components/FractionalCoherenceRail";
 import { FractionalCoherenceGrid } from "@/components/FractionalCoherenceGrid";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
@@ -57,6 +61,7 @@ import { downloadCSV } from "@/utils/csv";
 import { computeTidalEij, type V3 } from "@/lib/tidal";
 import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import type { VacuumGapSweepRow, RidgePreset, DynamicConfig, SweepRuntime } from "@shared/schema";
+import type { VizIntent } from "@/lib/nav/nav-dynamics";
 import DeepMixingSolarView from "@/components/DeepMixingSolarView";
 import DeepMixSweetSpot from "@/components/deepmix/DeepMixSweetSpot";
 const DeepMixGlobePanel = lazy(() => import("@/components/deepmix/DeepMixGlobePanel"));
@@ -136,6 +141,13 @@ const HASH_ALIASES: Record<string, string> = {
 const clampPhaseBiasDeg = (value: number) => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(-10, Math.min(10, value));
+};
+
+const normalizePhaseToVizYaw = (phase01: number | undefined): number => {
+  if (!Number.isFinite(phase01)) return 0;
+  const wrapped = ((((phase01 as number) % 1) + 1) % 1);
+  const signed = ((wrapped * 360 + 180) % 360) - 180;
+  return signed / 180;
 };
 // Greens bridge: auto-publish  from pipeline/metrics so the Greens cards populate
 const poissonG = (r: number) => 1 / (4 * Math.PI * Math.max(r, 1e-6));
@@ -967,6 +979,7 @@ const formatMsgTime = (ts?: Date | string) => {
 };
 
 export default function HelixCore() {
+  useScrollHashSync();
   // Auto-publish  from server pipeline/metrics into the shared cache/event bus
   useGreensBridge();
   // Publish a single authoritative phase (warp:phase) for the renderer + overlays
@@ -997,6 +1010,41 @@ export default function HelixCore() {
   const SECTORS = useMemo(() => Array.from({ length: 400 }, (_, i) => ({ id: `S${i + 1}` })), []);
 
   const queryClient = useQueryClient();
+  const search = useSearch();
+  const helixPanelParam = useMemo(() => {
+    try {
+      return new URLSearchParams(search).get("panel")?.trim() ?? "";
+    } catch {
+      return "";
+    }
+  }, [search]);
+
+  useEffect(() => {
+    if (!helixPanelParam) return;
+    if (typeof window === "undefined") return;
+
+    const slug = helixPanelParam.toLowerCase();
+    if (!slug) return;
+
+    const currentHash = (window.location.hash ?? "").replace(/^#/, "");
+    if (currentHash !== slug) {
+      window.location.hash = slug;
+    } else {
+      const hashEvent =
+        typeof HashChangeEvent === "function"
+          ? new HashChangeEvent("hashchange")
+          : new Event("hashchange");
+      window.dispatchEvent(hashEvent);
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    params.delete("panel");
+    const nextSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${
+      slug ? `#${slug}` : ""
+    }`;
+    window.history.replaceState(window.history.state, "", nextUrl);
+  }, [helixPanelParam]);
 
 const [selectedSector, setSelectedSector] = useState<string | null>(null);
 const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
@@ -1020,15 +1068,25 @@ const [timeLapseOverlayDom, setTimeLapseOverlayDom] = useState<HTMLDivElement | 
 const [showSweepHud, setShowSweepHud] = useState(false);
 const [includeSweepSidecar, setIncludeSweepSidecar] = useState(true);
 const [isThetaHullMode, setIsThetaHullMode] = useState(false);
-const [vizIntent, setVizIntent] = useState<{ rise: number; planar: number }>({ rise: 0, planar: 0 });
+const [vizIntent, setVizIntent] = useState<VizIntent>({ rise: 0, planar: 0, yaw: 0 });
 const handleDirectionPadIntent = useCallback(
   ({ rise, planar }: { rise: number; planar: number }) => {
     setVizIntent((prev) =>
-      Math.abs(prev.rise - rise) > 1e-3 || Math.abs(prev.planar - planar) > 1e-3 ? { rise, planar } : prev
+      Math.abs(prev.rise - rise) > 1e-3 || Math.abs(prev.planar - planar) > 1e-3 ? { ...prev, rise, planar } : prev
     );
   },
   []
 );
+useEffect(() => {
+  const updateYaw = (phase: number | undefined) => {
+    const yaw = normalizePhaseToVizYaw(phase);
+    setVizIntent((prev) => (Math.abs((prev.yaw ?? 0) - yaw) > 1e-3 ? { ...prev, yaw } : prev));
+  };
+  updateYaw(useDriveSyncStore.getState().phase01);
+  const unsubscribe = useDriveSyncStore.subscribe((state) => updateYaw(state.phase01));
+  return unsubscribe;
+}, [setVizIntent]);
+useNavPoseDriver({ vizIntent });
 const handlePlanarVizModeChange = useCallback((mode: number) => {
   setIsThetaHullMode(mode === 3);
 }, []);
@@ -1085,6 +1143,10 @@ useEffect(() => {
     };
 
     const scrollToHash = (rawHash: string) => {
+      if (!rawHash) return;
+      if ((window as any)[SUPPRESS_HASH_SCROLL_KEY]) {
+        return;
+      }
       const normalized = (rawHash ?? "").replace(/^#/, "").trim().toLowerCase();
       if (!normalized) {
         return;
@@ -2696,7 +2758,8 @@ useEffect(() => {
   );
 
   return (
-    <TooltipProvider>
+    <LumaWhispersProvider>
+      <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
         <div className="container mx-auto p-4 text-slate-100">
           {/* Header */}
@@ -2855,6 +2918,18 @@ useEffect(() => {
             </CardHeader>
             <CardContent className="pt-2">
               <DirectionPad className="w-full" onVizIntent={handleDirectionPadIntent} />
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4 border border-slate-800 bg-slate-900/60">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Solar System Navigation</CardTitle>
+              <CardDescription className="text-xs text-slate-400">
+                Visualize nav pose on the layered spacetime grid with belts and planets.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <NavPageSection />
             </CardContent>
           </Card>
 
@@ -3789,7 +3864,9 @@ useEffect(() => {
             <div className="space-y-4">
               {/* ===== Green's Potential ( = G * )  Live Panel ===== */}
               <GreensLivePanel />
-              <SpectrumTunerPanel inputs={spectrumInputs} />
+              <section id="spectrum" data-panel-hash="spectrum">
+                <SpectrumTunerPanel inputs={spectrumInputs} />
+              </section>
               {/* Vacuum-gap Sweep card */}
               <Card
                 id={PANEL_HASHES.vacuumSweep}
@@ -4785,7 +4862,8 @@ useEffect(() => {
       </div>
         </div>
       </div>
-    </TooltipProvider>
+      </TooltipProvider>
+    </LumaWhispersProvider>
   );
 }
 

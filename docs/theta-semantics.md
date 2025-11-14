@@ -28,3 +28,54 @@ Migration guidance
 Notes
 - This file is authoritative guidance for code changes that intend to touch theta semantics. If you think the old `thetaScaleCore` key can be removed entirely, open a brief migration PR that updates all callers; otherwise keep the alias for backwards compatibility.
 
+```whisper
+id: "fr-margin"
+tags: ["#ford-roman", "#sampling", "#middle-way"]
+hashes: ["#spectrum", "#sweep"]
+severity: "warn"
+zen: "Leave a little slack in the bowstring."
+physics: "Your Ford–Roman margin ζ ≈ d_eff / 3×10⁻⁵ is nearing 1; keep the global average sub-threshold while locals do the heavy lifting."
+action: "Lower duty or increase sectorization to widen the sampling window."
+refs: ["docs/papers.md", "docs/theta-semantics.md"]
+rule:
+  anyHash: ["#spectrum", "#sweep"]
+  maxZeta: 1.0
+```
+
+```whisper
+id: "geometry-cutoff"
+tags: ["#emptiness", "#casimir", "#geometry"]
+hashes: ["#spectrum"]
+severity: "info"
+zen: "Form invites emptiness; emptiness reveals form."
+physics: "The concave bowl raises γ_geo and shifts the spectral cutoff; geometry alone moves the horizon of modes that ‘exist’ to be stirred."
+action: "Use geometry to place the cutoff before you chase Q."
+refs: ["docs/papers.md"]
+rule:
+  anyHash: ["#spectrum"]
+```
+
+```whisper
+id: "hf-averaging"
+tags: ["#raychaudhuri", "#isaacson", "#averaging"]
+hashes: ["#ledger", "#sweep"]
+severity: "hint"
+zen: "Breath steady: short strokes, long calm."
+physics: "When τ_pulse ≪ τ_LC (TS ≫ 1), GR responds to ⟨Tμν⟩; strobed tiles look like a smooth source along null rays."
+action: "Shorten pulses or widen light-crossing to keep ε = τ_pulse/τ_LC ≪ 1."
+refs: ["docs/theta-semantics.md"]
+rule: {}
+```
+
+```whisper
+id: "subthreshold-gain"
+tags: ["#safety", "#squeezing"]
+hashes: ["#sweep"]
+severity: "hint"
+zen: "Play just below the cliff’s edge."
+physics: "Stay sub-threshold (ρ cosφ < 1). Your sweep guardrails already gate points near linewidth collapse and clip excessive gain."
+action: "Favor stable ridge points; let squeezing be the tell rather than raw dB."
+refs: ["client/src/lib/parametric-sweep.ts"]
+rule:
+  requireSubThreshold: true
+```

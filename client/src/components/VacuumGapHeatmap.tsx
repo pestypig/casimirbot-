@@ -31,14 +31,15 @@ export const VacuumGapHeatmap: React.FC<VacuumGapHeatmapProps> = ({
   height = 380,
   onCellClick,
 }) => {
-  const dValues = React.useMemo(() => uniqueSorted(rows.map((r) => r.d_nm)), [rows]);
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const dValues = React.useMemo(() => uniqueSorted(safeRows.map((r) => r.d_nm)), [safeRows]);
   const omegaValues = React.useMemo(
-    () => uniqueSorted(rows.map((r) => r.Omega_GHz)),
-    [rows],
+    () => uniqueSorted(safeRows.map((r) => r.Omega_GHz)),
+    [safeRows],
   );
   const crestCells = React.useMemo(() => {
     const unique = new Map<string, VacuumGapSweepRow>();
-    for (const row of rows) {
+    for (const row of safeRows) {
       if (!row.crest) continue;
       const key = `${row.d_nm}|${row.Omega_GHz}`;
       const prev = unique.get(key);
@@ -51,7 +52,7 @@ export const VacuumGapHeatmap: React.FC<VacuumGapHeatmapProps> = ({
 
   const grid = React.useMemo(() => {
     const map = new Map<string, number>();
-    for (const row of rows) {
+    for (const row of safeRows) {
       const key = `${row.d_nm}|${row.Omega_GHz}`;
       const prev = map.get(key);
       if (prev == null || row.G > prev) {

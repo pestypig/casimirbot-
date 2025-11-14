@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
 
 export type FlightMode = "MAN" | "HDG";
@@ -29,6 +29,73 @@ const SOFT_SAT_START = 0.8;
 const INTEGRAL_DEADBAND_DEG = 0.35; // skip integrating very small errors to avoid chatter
 const INTEGRAL_BLEED_RATE = 5.0; // 1/s decay applied inside the deadband
 const RATE_EPS_DPS = 1e-3;
+const BASE_LEAD_ZERO_S = 0.08;
+const BASE_LEAD_POLE_S = 0.22;
+const MIN_LEAD_GAP_S = 0.04;
+const KAPPA_REF_MHZ = 5.0;
+const KAPPA_DOT_REF_MHZ_S = 0.35;
+const KP_FLOW_GAIN = 0.18;
+const KD_FLOW_GAIN = 0.22;
+const KI_RELIEF_GAIN = 0.9;
+const RATE_KP_GAIN = 0.12;
+const RATE_KI_RELIEF = 0.6;
+const RATE_KD_GAIN = 0.55;
+const RATE_KD_VORTEX_GAIN = 0.65;
+const RATE_CORNER_GAIN = 0.4;
+const FEED_FORWARD_BASE = 0.16;
+const FEED_FORWARD_ALPHA = 0.35;
+const FEED_FORWARD_BETA = 0.08;
+const FEED_FORWARD_MAX = 0.9;
+
+type LeadFilterState = {
+  output: number;
+  nextInput: number;
+  nextOutput: number;
+};
+
+const normalizeKappa = (kappaMHz: number) => Math.max(0, Math.min(4, kappaMHz / KAPPA_REF_MHZ));
+
+const leadParamsFor = (norm: number) => {
+  const phaseBoost = 1 + 0.55 * norm;
+  const zero = BASE_LEAD_ZERO_S / phaseBoost;
+  const poleBase = BASE_LEAD_POLE_S / Math.max(0.45, phaseBoost * 0.85);
+  const pole = Math.max(zero + MIN_LEAD_GAP_S, poleBase);
+  return { zero, pole };
+};
+
+const runLeadLagFilter = (
+  input: number,
+  prevInput: number,
+  prevOutput: number,
+  dt: number,
+  zero: number,
+  pole: number,
+): LeadFilterState => {
+  if (!Number.isFinite(dt) || dt <= 0 || !Number.isFinite(zero) || !Number.isFinite(pole)) {
+    return { output: input, nextInput: input, nextOutput: input };
+  }
+  const denom = 2 * pole + dt;
+  if (!Number.isFinite(denom) || Math.abs(denom) < 1e-6) {
+    return { output: input, nextInput: input, nextOutput: input };
+  }
+  const b0 = (2 * zero + dt) / denom;
+  const b1 = (dt - 2 * zero) / denom;
+  const a1 = (dt - 2 * pole) / denom;
+  const output = b0 * input + b1 * prevInput - a1 * prevOutput;
+  return {
+    output,
+    nextInput: input,
+    nextOutput: output,
+  };
+};
+
+const feedForwardGainFor = (norm: number) => {
+  const raw = FEED_FORWARD_BASE * (1 + FEED_FORWARD_ALPHA * norm + FEED_FORWARD_BETA * norm * norm);
+  return Math.min(FEED_FORWARD_MAX, Math.max(0, raw));
+};
+
+const rateCornerHzFor = (baseHz: number, norm: number) =>
+  baseHz > 0 ? baseHz * (1 + RATE_CORNER_GAIN * norm) : baseHz;
 
 export interface FlightDirectorState {
   enabled: boolean;
@@ -50,6 +117,12 @@ export interface FlightDirectorState {
   riseCmd: number;
   /** Bias slider mapping: 0..1 with 0.5 = station-hold. */
   thrustBias01: number;
+  /** Latest curvature proxy (MHz). */
+  curvatureKappa_MHz: number;
+  /** Curvature derivative (MHz / s). */
+  curvatureKappaDot_MHz_s: number;
+  /** Timestamp for curvature sample. */
+  curvatureTs_ms: number | null;
   /** Limits / gains */
   maxYawRate_dps: number;
   maxYawAccel_dps2: number;
@@ -67,6 +140,8 @@ export interface FlightDirectorState {
   _rateI: number;
   _rateDLP: number;
   _prevRateMeas_dps: number | null;
+  _leadPrevIn: number;
+  _leadPrevOut: number;
 
   setEnabled(on: boolean): void;
   setMode(mode: FlightMode): void;
@@ -81,6 +156,12 @@ export interface FlightDirectorState {
   setGains(kp: number, ki: number, kd: number): void;
   ingestSchedulerWedge(frac: number, ts?: number): void;
   setRelHold01(delta: number): void;
+  ingestCurvatureTelemetry(payload: {
+    kappa_MHz?: number;
+    kappaEff_MHz?: number;
+    kappaDot_MHz_s?: number;
+    timestamp_ms?: number;
+  }): void;
 
   tick(
     dt_s: number,
@@ -124,7 +205,7 @@ const computeRateSetpoint = (
   return clamp(state.yawRateCmd_dps, -state.maxYawRate_dps, state.maxYawRate_dps);
 };
 
-export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => ({
+export const useFlightDirectorStore = createWithEqualityFn<FlightDirectorState>((set, get) => ({
   enabled: true,
   mode: "MAN",
   coupling: "decoupled",
@@ -136,6 +217,9 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
   yawRate_dps: 0,
   riseCmd: 0,
   thrustBias01: 0.68,
+  curvatureKappa_MHz: 0,
+  curvatureKappaDot_MHz_s: 0,
+  curvatureTs_ms: null,
   maxYawRate_dps: 60,
   maxYawAccel_dps2: 180,
   kp: 2.15,
@@ -152,6 +236,8 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
   _rateI: 0,
   _rateDLP: 0,
   _prevRateMeas_dps: null,
+  _leadPrevIn: 0,
+  _leadPrevOut: 0,
 
   setEnabled: (on) => set({ enabled: !!on }),
   setMode: (mode) =>
@@ -173,17 +259,21 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
           _prevErrDeg: null,
           _rateI: alignedI,
           _prevRateMeas_dps: state.yawRate_dps,
+          _leadPrevIn: 0,
+          _leadPrevOut: 0,
         };
       }
       const spRate = clamp(state.yawRateCmd_dps, -state.maxYawRate_dps, state.maxYawRate_dps);
       const alignedI = alignRateIntegral(state, spRate);
-      return {
-        mode: "MAN" as FlightMode,
-        _errInt: 0,
-        _prevErrDeg: null,
-        _rateI: alignedI,
-        _prevRateMeas_dps: state.yawRate_dps,
-      };
+        return {
+          mode: "MAN" as FlightMode,
+          _errInt: 0,
+          _prevErrDeg: null,
+          _rateI: alignedI,
+          _prevRateMeas_dps: state.yawRate_dps,
+          _leadPrevIn: 0,
+          _leadPrevOut: 0,
+        };
     }),
   setCoupling: (mode) => {
     const ds = useDriveSyncStore.getState();
@@ -206,6 +296,8 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
           _prevErrDeg: null,
           _rateI: alignedI,
           _prevRateMeas_dps: state.yawRate_dps,
+          _leadPrevIn: 0,
+          _leadPrevOut: 0,
         };
       }
       if (state.coupling === "coupled") {
@@ -226,6 +318,8 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
           _prevErrDeg: null,
           _rateI: alignedI,
           _prevRateMeas_dps: state.yawRate_dps,
+          _leadPrevIn: 0,
+          _leadPrevOut: 0,
         };
       }
       return { coupling: "decoupled" as CouplingMode };
@@ -251,6 +345,8 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
           _prevErrDeg: null,
           _rateI: alignedI,
           _prevRateMeas_dps: state.yawRate_dps,
+          _leadPrevIn: 0,
+          _leadPrevOut: 0,
         };
       }
       const spRate = computeRateSetpoint(state, wrapped, currentYaw);
@@ -261,6 +357,8 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
         _prevErrDeg: null,
         _rateI: alignedI,
         _prevRateMeas_dps: state.yawRate_dps,
+        _leadPrevIn: 0,
+        _leadPrevOut: 0,
       };
     });
   },
@@ -348,6 +446,8 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
           _prevErrDeg: null,
           _rateI: alignedI,
           _prevRateMeas_dps: state.yawRate_dps,
+          _leadPrevIn: 0,
+          _leadPrevOut: 0,
         };
       }
       const spRate = computeRateSetpoint(state, state.targetYaw01, currentYaw);
@@ -358,9 +458,44 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
         _prevErrDeg: null,
         _rateI: alignedI,
         _prevRateMeas_dps: state.yawRate_dps,
+        _leadPrevIn: 0,
+        _leadPrevOut: 0,
       };
     });
   },
+  ingestCurvatureTelemetry: (payload) =>
+    set((state) => {
+      const ts =
+        typeof payload.timestamp_ms === "number" && Number.isFinite(payload.timestamp_ms)
+          ? (payload.timestamp_ms as number)
+          : Date.now();
+      const nextKappa =
+        typeof payload.kappaEff_MHz === "number" && payload.kappaEff_MHz > 0
+          ? payload.kappaEff_MHz
+          : typeof payload.kappa_MHz === "number" && payload.kappa_MHz > 0
+            ? payload.kappa_MHz
+            : undefined;
+      const nextDot =
+        typeof payload.kappaDot_MHz_s === "number" && Number.isFinite(payload.kappaDot_MHz_s)
+          ? payload.kappaDot_MHz_s
+          : undefined;
+
+      if (nextKappa === undefined && nextDot === undefined) {
+        return state;
+      }
+
+      let derivedDot = state.curvatureKappaDot_MHz_s;
+      if (nextKappa !== undefined && state.curvatureTs_ms != null && ts > state.curvatureTs_ms) {
+        const dt = Math.max(1e-3, (ts - state.curvatureTs_ms) / 1000);
+        derivedDot = (nextKappa - state.curvatureKappa_MHz) / dt;
+      }
+
+      return {
+        curvatureKappa_MHz: nextKappa ?? state.curvatureKappa_MHz,
+        curvatureKappaDot_MHz_s: nextDot ?? derivedDot,
+        curvatureTs_ms: nextKappa !== undefined ? ts : state.curvatureTs_ms ?? ts,
+      };
+    }),
 
   tick: (dt_s, currentYaw01, schedulerYaw01) => {
     const state = get();
@@ -382,7 +517,32 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
         ? wrap01(schedulerBase + state.relHold01)
         : state.targetYaw01;
 
+    const curvatureNorm = normalizeKappa(state.curvatureKappa_MHz);
+    const vortexMag = Math.abs(state.curvatureKappaDot_MHz_s ?? 0);
+    const vortexFactor = clamp(
+      KAPPA_DOT_REF_MHZ_S > 0 ? vortexMag / KAPPA_DOT_REF_MHZ_S : 0,
+      0,
+      1,
+    );
+    const { zero: leadZero, pole: leadPole } = leadParamsFor(curvatureNorm);
+    const feedForwardGain = feedForwardGainFor(curvatureNorm);
+    const kpEff = state.kp * (1 + KP_FLOW_GAIN * curvatureNorm);
+    const kdEff = state.kd * (1 + KD_FLOW_GAIN * curvatureNorm);
+    const kiEff = state.ki / (1 + KI_RELIEF_GAIN * curvatureNorm);
+    const rateKpEff = state.rateKp * (1 + RATE_KP_GAIN * curvatureNorm);
+    const rateKiEff = state.rateKi / (1 + RATE_KI_RELIEF * curvatureNorm);
+    const rateKdEff =
+      state.rateKd *
+      (1 + RATE_KD_GAIN * curvatureNorm) *
+      (1 + RATE_KD_VORTEX_GAIN * vortexFactor);
+    const rateCornerHz = rateCornerHzFor(state.rateDHz, curvatureNorm);
+
     let demand_dps = clamp(state.yawRateCmd_dps, -rateMax, rateMax);
+    let errIntNext = state._errInt;
+    let prevErrNext = state._prevErrDeg;
+    let leadPrevInNext = state._leadPrevIn;
+    let leadPrevOutNext = state._leadPrevOut;
+
     if (state.mode === "HDG") {
       const err01 = shortest01(targetAbs01, currentYaw01);
       const errDeg = err01 * 360;
@@ -390,30 +550,53 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
       const errRateDeg =
         state._prevErrDeg == null ? 0 : (errDeg - state._prevErrDeg) / Math.max(1e-3, dt);
       const integralLimit =
-        rateMax <= 0 || state.ki <= 0
+        rateMax <= 0 || kiEff <= 0
           ? 0
-          : (0.5 * rateMax) / Math.max(state.ki, 1e-3);
+          : (0.5 * rateMax) / Math.max(kiEff, 1e-3);
       const nextIntRaw =
         absErrDeg > INTEGRAL_DEADBAND_DEG
           ? state._errInt + errDeg * dt
           : state._errInt * Math.max(0, 1 - INTEGRAL_BLEED_RATE * dt);
       const nextInt = integralLimit > 0 ? clamp(nextIntRaw, -integralLimit, integralLimit) : nextIntRaw;
-      const pidDemand =
-        state.kp * errDeg + state.ki * nextInt + state.kd * errRateDeg;
+
+      const leadState = runLeadLagFilter(
+        errDeg,
+        state._leadPrevIn,
+        state._leadPrevOut,
+        dt,
+        leadZero,
+        leadPole,
+      );
+      const pidDemand = kpEff * leadState.output + kiEff * nextInt + kdEff * errRateDeg;
       demand_dps = clamp(pidDemand, -rateMax, rateMax);
-      set({ _errInt: nextInt, _prevErrDeg: errDeg });
-    } else if (state._errInt !== 0 || state._prevErrDeg !== null) {
-      set({ _errInt: 0, _prevErrDeg: null });
+      errIntNext = nextInt;
+      prevErrNext = errDeg;
+      leadPrevInNext = leadState.nextInput;
+      leadPrevOutNext = leadState.nextOutput;
+    } else if (
+      state._errInt !== 0 ||
+      state._prevErrDeg !== null ||
+      Math.abs(state._leadPrevIn) > 1e-6 ||
+      Math.abs(state._leadPrevOut) > 1e-6
+    ) {
+      errIntNext = 0;
+      prevErrNext = null;
+      leadPrevInNext = 0;
+      leadPrevOutNext = 0;
+    }
+
+    if (feedForwardGain > 0 && demand_dps !== 0) {
+      demand_dps = clamp(demand_dps + feedForwardGain * demand_dps, -rateMax, rateMax);
     }
 
     const measRate = clamp(state.yawRate_dps, -rateMax, rateMax);
     const prevMeas = state._prevRateMeas_dps ?? measRate;
     const dMeas = (measRate - prevMeas) / Math.max(dt, 1e-6);
-    const alpha = state.rateDHz > 0 ? Math.exp(-2 * Math.PI * state.rateDHz * dt) : 0;
+    const alpha = rateCornerHz > 0 ? Math.exp(-2 * Math.PI * rateCornerHz * dt) : 0;
     const dLP = alpha * state._rateDLP + (1 - alpha) * dMeas;
 
     const rateError = demand_dps - measRate;
-    const unsatAccel = state.rateKp * rateError + state._rateI - state.rateKd * dLP;
+    const unsatAccel = rateKpEff * rateError + state._rateI - rateKdEff * dLP;
     const hardAccel = clamp(unsatAccel, -accMax, accMax);
     const appliedAccel = satSoft(hardAccel, accMax);
 
@@ -422,13 +605,13 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
     const fightingLimit = limited && Math.sign(rateError) === Math.sign(unsatAccel - appliedAccel);
 
     let nextRateI = state._rateI;
-    if (state.rateKi > 0) {
+    if (rateKiEff > 0) {
       if (!fightingLimit) {
-        nextRateI += (state.rateKi * rateError + aw) * dt;
+        nextRateI += (rateKiEff * rateError + aw) * dt;
       } else {
         nextRateI += aw * dt;
       }
-      const iLimit = accMax > 0 ? accMax / Math.max(state.rateKi, 1e-3) : Number.POSITIVE_INFINITY;
+      const iLimit = accMax > 0 ? accMax / Math.max(rateKiEff, 1e-3) : Number.POSITIVE_INFINITY;
       if (Number.isFinite(iLimit)) {
         nextRateI = clamp(nextRateI, -iLimit, iLimit);
       }
@@ -445,9 +628,12 @@ export const useFlightDirectorStore = create<FlightDirectorState>((set, get) => 
       _rateDLP: dLP,
       _prevRateMeas_dps: measRate,
       lastAccelCmd_dps2: appliedAccel,
+      _errInt: errIntNext,
+      _prevErrDeg: prevErrNext,
+      _leadPrevIn: leadPrevInNext,
+      _leadPrevOut: leadPrevOutNext,
     });
 
     return { nextYaw01, yawRate_dps: nextYawRate };
   },
 }));
-

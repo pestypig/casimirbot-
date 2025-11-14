@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage } from "./sim-storage";
 import { scuffemService } from "./services/scuffem";
 import { fileManager } from "./services/fileManager";
 import { simulationParametersSchema, sweepSpecSchema } from "@shared/schema";
@@ -12,17 +12,96 @@ import { WebSocket, WebSocketServer } from "ws";
 import targetValidationRoutes from "./routes/target-validation.js";
 import { lumaRouter } from "./routes/luma";
 import { lumaHceRouter } from "./routes/luma-hce";
+import { registerLumaWhisperRoute } from "./routes/luma-whispers";
 import { hceRouter } from "./routes/hce";
 import { getHorizonsElements } from "./utils/horizons-proxy";
 import { orchestratorRouter } from "./routes/orchestrator";
 import noiseGensRouter from "./routes/noise-gens";
+import { hullStatusRouter } from "./routes/hull.status";
+import { ethosRouter } from "./routes/ethos";
+import { qiSnapHub } from "./qi/qi-snap-broadcaster";
+import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
+
+const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
+  if (value === "1") return true;
+  if (value === "0") return false;
+  return defaultValue;
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   app.use("/api/luma/ops", lumaHceRouter);
   app.use("/api/luma", lumaRouter);
+  registerLumaWhisperRoute(app);
+  const { knowledgeRouter } = await import("./routes/knowledge");
+
+
+  app.use("/api/knowledge", knowledgeRouter);
+  app.use("/api/ethos", ethosRouter);
+
+
   app.use("/api/orchestrator", orchestratorRouter);
   app.use(noiseGensRouter);
+  app.use("/api/hull/status", hullStatusRouter);
+  if (process.env.HULL_MODE === "1" && process.env.ENABLE_CAPSULE_IMPORT === "1") {
+    const { hullCapsules } = await import("./routes/hull.capsules");
+    app.use("/api/hull/capsules", hullCapsules);
+  }
+
+  const enableEssence = flagEnabled(process.env.ENABLE_ESSENCE, true);
+  if (enableEssence) {
+    if (process.env.ENABLE_ESSENCE === undefined) {
+      console.warn("[routes] ENABLE_ESSENCE not set; defaulting to enabled (set ENABLE_ESSENCE=0 to disable).");
+    }
+    const { essenceRouter } = await import("./routes/essence");
+    app.use("/api/essence", essenceRouter);
+  }
+
+  const enableAgi = flagEnabled(process.env.ENABLE_AGI, true);
+  if (enableAgi) {
+    if (process.env.ENABLE_AGI === undefined) {
+      console.warn("[routes] ENABLE_AGI not set; defaulting to enabled (set ENABLE_AGI=0 to disable).");
+    }
+    const { personaRouter } = await import("./routes/agi.persona");
+    const { memoryRouter } = await import("./routes/agi.memory");
+    const { planRouter } = await import("./routes/agi.plan");
+    const { evalRouter } = await import("./routes/agi.eval");
+    const enableDebate = flagEnabled(process.env.ENABLE_DEBATE, false);
+    if (enableDebate) {
+      const { debateRouter } = await import("./routes/agi.debate");
+      app.use("/api/agi/debate", debateRouter);
+    }
+    app.use("/api/agi/persona", personaRouter);
+    app.use("/api/agi/memory", memoryRouter);
+    if (process.env.ENABLE_AGI === "1" && process.env.ENABLE_TRACE_API === "1") {
+      const { traceRouter } = await import("./routes/agi.trace");
+      app.use("/api/agi/trace", traceRouter);
+      if (process.env.ENABLE_MEMORY_UI === "1") {
+        const { memoryTraceRouter } = await import("./routes/agi.memory.trace");
+        app.use("/api/agi/memory", memoryTraceRouter);
+      }
+    }
+    app.use("/api/agi", planRouter);
+    app.use("/api/agi/eval", evalRouter);
+  }
+
+  // Jobs + Tokens router (env-gated optional)
+  if (flagEnabled(process.env.ENABLE_ESSENCE_JOBS, true)) {
+    const { jobsRouter } = await import("./routes/jobs");
+    app.use("/api/jobs", jobsRouter);
+  }
+
+  if (flagEnabled(process.env.ENABLE_ESSENCE_PROPOSALS, true)) {
+    const { proposalsRouter } = await import("./routes/proposals");
+    app.use("/api/proposals", proposalsRouter);
+    const { startProposalJobRunner } = await import("./services/proposals/job-runner");
+    startProposalJobRunner();
+  }
+
+  if (process.env.ENABLE_SPECIALISTS === "1") {
+    const { specialistsRouter } = await import("./routes/agi.specialists");
+    app.use("/api/agi/specialists", specialistsRouter);
+  }
 
   // --- Realtime plumbing ----------------------------------------------------
   // Support multiple WS subscribers per simulation + SSE fallback
@@ -768,6 +847,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     switchOperationalMode,
     getEnergySnapshot,
     getCurvatureBrick,
+    postCurvatureBrickDebugStamp,
+    postCurvatureBrickDebugClear,
     getPhaseBiasTable,
     getSpectrumLog,
     postSpectrumLog,
@@ -804,6 +885,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/helix/hardware/sector-state", ingestHardwareSectorState);
   app.options("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
   app.post("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
+
+  app.get("/api/qisnap/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+    res.write(`: qi-snap connected ${Date.now()}\n\n`);
+
+    const clamp = (value: number, min: number, max: number, fallback: number) => {
+      if (!Number.isFinite(value)) return fallback;
+      if (value < min) return min;
+      if (value > max) return max;
+      return value;
+    };
+    const readQuery = (value: unknown): string | undefined => {
+      if (Array.isArray(value)) {
+        return value.length ? String(value[0]) : undefined;
+      }
+      return typeof value === "string" ? value : undefined;
+    };
+
+    const allowMock =
+      process.env.NODE_ENV !== "production" ||
+      process.env.QI_SNAP_ALLOW_MOCK === "1" ||
+      isLoopback(req.ip);
+    const query = req.query as Record<string, unknown>;
+    const hzParam = Number(readQuery(query.hz));
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: ping ${Date.now()}\n\n`);
+      } catch {
+        // ignore stream write errors; close handler will cleanup
+      }
+    }, 15_000);
+
+    let cleanup: (() => void) | null = null;
+    const enableMock = allowMock && readQuery(query.mock) === "1";
+
+    if (enableMock) {
+      const tilesParam = Number(readQuery(query.tiles));
+      const tileTarget = clamp(tilesParam || 400, 16, 4096, 400);
+      const sampler =
+        readQuery(query.sampler) === "gaussian" ? "gaussian" : "lorentzian";
+      const windowParam = Number(readQuery(query.windowS));
+      const window_s = windowParam > 0 ? windowParam : 2e-3;
+      const hz = clamp(hzParam || 10, 1, 60, 10);
+      const intervalMs = Math.max(10, Math.round(1000 / hz));
+      const side = Math.ceil(Math.sqrt(tileTarget));
+      let t = 0;
+
+      const emit = () => {
+        const tiles: RawTileInput[] = [];
+        for (let i = 0; i < side; i++) {
+          for (let j = 0; j < side; j++) {
+            if (tiles.length >= tileTarget) break;
+            const phase = Math.sin(0.17 * i + 0.11 * j + 0.9 * t);
+            tiles.push({
+              id: `mock-${i}-${j}`,
+              ijk: [i, j, 0],
+              center_m: [i * 1e-3, j * 1e-3, 0],
+              rho_neg_Jm3: -Math.abs(0.5 + 0.45 * phase),
+              tau_eff_s: window_s,
+              qi_limit: 1.0,
+            });
+          }
+        }
+        const frame = reduceTilesToSample(tiles, Date.now(), sampler, window_s, {
+          frame_kind: "delta",
+        });
+        try {
+          res.write(`data: ${JSON.stringify(frame)}\n\n`);
+        } catch {
+          // let close handler clean up
+        }
+        t += intervalMs * 1e-3;
+      };
+
+      const timer = setInterval(emit, intervalMs);
+      emit();
+      cleanup = () => clearInterval(timer);
+    } else {
+      const minGap = hzParam > 0 ? Math.floor(1000 / clamp(hzParam, 1, 120, 15)) : 0;
+      let lastSent = 0;
+      const unsubscribe = qiSnapHub.subscribe((frame) => {
+        const now = Date.now();
+        if (minGap && now - lastSent < minGap) {
+          return;
+        }
+        lastSent = now;
+        try {
+          res.write(`data: ${JSON.stringify(frame)}\n\n`);
+        } catch {
+          // swallow; close handler clears listener
+        }
+      });
+      cleanup = unsubscribe;
+    }
+
+    const close = () => {
+      clearInterval(heartbeat);
+      if (cleanup) {
+        cleanup();
+        cleanup = null;
+      }
+    };
+
+    req.on("close", close);
+    req.on("error", close);
+  });
+
   // NEW: expose exact computeEnergySnapshot result (GET returns current defaults; POST accepts optional { sim })
   app.get ("/api/helix/snapshot", getEnergySnapshot);
   app.post("/api/helix/snapshot", getEnergySnapshot);
@@ -870,11 +1062,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/helix/mode", switchOperationalMode);
   app.get("/api/helix/curvature-brick", getCurvatureBrick);
   app.post("/api/helix/curvature-brick", getCurvatureBrick);
+  app.post("/api/helix/curvature-brick/debug-stamp", postCurvatureBrickDebugStamp);
+  app.post("/api/helix/curvature-brick/debug-clear", postCurvatureBrickDebugClear);
   app.get("/api/helix/phase-bias", getPhaseBiasTable);
   app.get("/api/helix/spectrum", getSpectrumLog);
   app.post("/api/helix/spectrum", postSpectrumLog);
 
+  // Ensure API requests never fall through to the Vite HTML handler.
+  app.use("/api", (req, res) => {
+    res.status(404).json({
+      error: "api_not_found",
+      path: req.originalUrl ?? req.path,
+      hint: "Enable the corresponding server feature flag (e.g., ENABLE_AGI=1) or check the requested path.",
+    });
+  });
+
   return httpServer;
+}
+
+function isLoopback(ip?: string | string[] | null): boolean {
+  if (!ip) return false;
+  if (Array.isArray(ip)) {
+    return ip.some((value) => isLoopback(value));
+  }
+  return ip === "127.0.0.1" || ip === "::1" || ip.startsWith("::ffff:127.0.0.1");
 }
 
 // Export a minimal routes list so tooling importing routes succeeds.

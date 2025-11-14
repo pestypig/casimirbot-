@@ -220,7 +220,7 @@ export function rhoToDepthPct(
   return Number.isFinite(depth_pct) ? depth_pct : null;
 }
 
-function resolvePhaseWindows(
+export function resolvePhaseWindows(
   baseRange: [number, number]
 ): [number, number][] {
   const [startRaw, endRaw] = baseRange;

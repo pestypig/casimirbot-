@@ -16,12 +16,16 @@ import { Button } from "@/components/ui/button";
 import { fetchMoodPresets, fetchTopGenerations, fetchTopOriginals } from "@/lib/api/noiseGens";
 import type { Generation, MoodPreset, Original, TempoMeta } from "@/types/noise-gens";
 import { cn } from "@/lib/utils";
+import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
+import { isFlagEnabled } from "@/lib/envFlags";
+import { deriveKnowledgeTitle, isAudioKnowledgeFile, pseudoListenCount } from "@/lib/knowledge/audio";
 
 type DualTopListsProps = {
   selectedOriginalId?: string | null;
   onOriginalSelected: (original: Original) => void;
   onGenerationsPresenceChange?: (hasGenerations: boolean) => void;
   onMoodPresetsLoaded?: (presets: MoodPreset[]) => void;
+  onOriginalsHydrated?: (originals: Original[]) => void;
   sessionTempo?: TempoMeta | null;
 };
 
@@ -35,6 +39,25 @@ type ConnectorPath = {
 
 const SEARCH_DEBOUNCE_MS = 250;
 const TEMPO_BOOST_WEIGHT = 0.15;
+const MIN_DURATION_SECONDS = 45;
+const MAX_DURATION_SECONDS = 600;
+const FALLBACK_DURATION_SECONDS = 180;
+
+const clampDuration = (seconds: number): number => {
+  if (!Number.isFinite(seconds)) return FALLBACK_DURATION_SECONDS;
+  if (seconds < MIN_DURATION_SECONDS) return MIN_DURATION_SECONDS;
+  if (seconds > MAX_DURATION_SECONDS) return MAX_DURATION_SECONDS;
+  return seconds;
+};
+
+const estimateDurationFromSize = (bytes?: number): number => {
+  if (!Number.isFinite(bytes) || !bytes || bytes <= 0) {
+    return FALLBACK_DURATION_SECONDS;
+  }
+  // Assume moderately compressed audio (~16 KB/sec) for an order-of-magnitude estimate.
+  const approxSeconds = Math.round(bytes / 16_000);
+  return clampDuration(approxSeconds);
+};
 
 function tempoBadge(tempo?: TempoMeta) {
   if (!tempo?.bpm) return null;
@@ -297,6 +320,7 @@ export function DualTopLists({
   onOriginalSelected,
   onGenerationsPresenceChange,
   onMoodPresetsLoaded,
+  onOriginalsHydrated,
   sessionTempo,
 }: DualTopListsProps) {
   const [searchOriginals, setSearchOriginals] = useState("");
@@ -306,6 +330,14 @@ export function DualTopLists({
   const prefersReducedMotion = usePrefersReducedMotion();
   const isLargeScreen = useIsLargeScreen();
   const showConnectors = isLargeScreen && !prefersReducedMotion;
+  const knowledgeEnabled = isFlagEnabled("ENABLE_KNOWLEDGE_PROJECTS", true);
+  const isBrowser = typeof window !== "undefined";
+  const shouldHydrateKnowledge = knowledgeEnabled && isBrowser;
+  const knowledgeProjects = useKnowledgeProjectsStore((state) => state.projects);
+  const knowledgeProjectFiles = useKnowledgeProjectsStore((state) => state.projectFiles);
+  const refreshKnowledgeProjects = useKnowledgeProjectsStore((state) => state.refresh);
+  const refreshKnowledgeFiles = useKnowledgeProjectsStore((state) => state.refreshFiles);
+  const knowledgeRefreshRequestedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const originalRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const generationRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -332,6 +364,39 @@ export function DualTopLists({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!shouldHydrateKnowledge || knowledgeRefreshRequestedRef.current) return;
+    knowledgeRefreshRequestedRef.current = true;
+    void refreshKnowledgeProjects();
+  }, [refreshKnowledgeProjects, shouldHydrateKnowledge]);
+
+  const missingKnowledgeProjectIds = useMemo(() => {
+    if (!shouldHydrateKnowledge) return [];
+    return knowledgeProjects
+      .filter((project) => !knowledgeProjectFiles[project.id])
+      .map((project) => project.id);
+  }, [knowledgeProjects, knowledgeProjectFiles, shouldHydrateKnowledge]);
+
+  useEffect(() => {
+    if (!shouldHydrateKnowledge || missingKnowledgeProjectIds.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const projectId of missingKnowledgeProjectIds) {
+        if (cancelled) return;
+        try {
+          await refreshKnowledgeFiles(projectId);
+        } catch (error) {
+          if (import.meta.env?.DEV) {
+            console.warn(`[DualTopLists] Failed to load files for project ${projectId}`, error);
+          }
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [missingKnowledgeProjectIds, refreshKnowledgeFiles, shouldHydrateKnowledge]);
 
   const { data: originalsData, isLoading: originalsLoading, isError: originalsError } = useQuery({
     queryKey: ["noise-gens", "originals", debouncedOriginals],
@@ -362,9 +427,45 @@ export function DualTopLists({
     onGenerationsPresenceChange?.((generationsData ?? []).length > 0);
   }, [generationsData, onGenerationsPresenceChange]);
 
+  const userOriginals = useMemo<Original[]>(() => {
+    if (!shouldHydrateKnowledge) return [];
+    const aggregated: Original[] = [];
+    for (const project of knowledgeProjects) {
+      const files = knowledgeProjectFiles[project.id];
+      if (!files?.length) continue;
+      for (const file of files) {
+        if (!isAudioKnowledgeFile(file)) continue;
+        aggregated.push({
+          id: `knowledge:${file.id}`,
+          title: deriveKnowledgeTitle(file),
+          artist: project.name || "My Knowledge",
+          listens: pseudoListenCount(file),
+          duration: estimateDurationFromSize(file.size),
+        });
+      }
+    }
+    return aggregated;
+  }, [knowledgeProjectFiles, knowledgeProjects, shouldHydrateKnowledge]);
+
+  const combinedOriginalSource = useMemo<Original[]>(() => {
+    const merged: Original[] = [];
+    const seen = new Set<string>();
+    const append = (list?: Original[]) => {
+      if (!list) return;
+      for (const entry of list) {
+        if (seen.has(entry.id)) continue;
+        seen.add(entry.id);
+        merged.push(entry);
+      }
+    };
+    append(originalsData);
+    append(userOriginals);
+    return merged;
+  }, [originalsData, userOriginals]);
+
   const originals = useMemo<RankedOriginal[]>(() => {
     return buildRankedList(
-      originalsData ?? [],
+      combinedOriginalSource,
       debouncedOriginals,
       (item) => [item.title, item.artist],
       {
@@ -372,7 +473,12 @@ export function DualTopLists({
         sessionTempoBpm: sessionTempo?.bpm,
       },
     );
-  }, [originalsData, debouncedOriginals, sessionTempo?.bpm]);
+  }, [combinedOriginalSource, debouncedOriginals, sessionTempo?.bpm]);
+
+  useEffect(() => {
+    if (!onOriginalsHydrated) return;
+    onOriginalsHydrated(originals);
+  }, [onOriginalsHydrated, originals]);
 
   const generations = useMemo<RankedGeneration[]>(() => {
     return buildRankedList(

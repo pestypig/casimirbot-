@@ -1,4 +1,5 @@
-import { Switch, Route } from "wouter";
+import { useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -21,11 +22,25 @@ import HelixObservablesPage from "@/pages/helix-observables";
 import IngestPage from "@/pages/ingest";
 import RagAdminPage from "@/pages/rag-admin";
 import CodeAdminPage from "@/pages/code-admin";
+import DesktopPage from "@/pages/desktop";
+import SignInPage from "@/pages/sign-in";
+import { useQiStream } from "@/hooks/useQiStream";
+
+function DesktopRedirect() {
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    setLocation("/desktop", { replace: true });
+  }, [setLocation]);
+
+  return null;
+}
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={StartPortal} />
+      <Route path="/" component={DesktopRedirect} />
+      <Route path="/start" component={StartPortal} />
       <Route path="/bridge" component={Home} />
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
@@ -39,6 +54,8 @@ function Router() {
       <Route path="/rag/ingest" component={IngestPage} />
       <Route path="/rag/admin" component={RagAdminPage} />
       <Route path="/code-admin" component={CodeAdminPage} />
+      <Route path="/desktop" component={DesktopPage} />
+      <Route path="/sign-in" component={SignInPage} />
       <Route path="/why" component={Why} />
       <Route path="/station/:role" component={StationPage} />
       <Route path="/optimist-station" component={StationPage} />
@@ -51,6 +68,7 @@ function Router() {
 }
 
 function App() {
+  useQiStream(true, { hz: 10 });
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

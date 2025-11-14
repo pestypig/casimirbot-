@@ -58,6 +58,8 @@ import { slewPumpMultiTone } from "./instruments/pump-multitone.js";
 import { computeSectorPhaseOffsets, applyPhaseScheduleToPulses } from "./energy/phase-scheduler.js";
 import { QiMonitor } from "./qi/qi-monitor.js";
 import { configuredQiScalarBound } from "./qi/qi-bounds.js";
+import type { RawTileInput } from "./qi/qi-saturation.js";
+import { updatePipelineQiTiles } from "./qi/pipeline-qi-stream.js";
 
 export type MutableDynamicConfig = DynamicConfigLike;
 
@@ -108,6 +110,19 @@ const DEFAULT_QI_SETTINGS: QiSettings = {
   observerId: 'ship',
   guardBand: DEFAULT_QI_GUARD,
 };
+
+const QI_STREAM_GRID_MIN = Math.max(4, Math.floor(parseEnvNumber(process.env.QI_STREAM_GRID_MIN, 8)));
+const QI_STREAM_GRID_MAX = Math.max(
+  QI_STREAM_GRID_MIN,
+  Math.floor(parseEnvNumber(process.env.QI_STREAM_GRID_MAX, 24)),
+);
+const QI_STREAM_GRID_DEFAULT = Math.min(
+  QI_STREAM_GRID_MAX,
+  Math.max(
+    QI_STREAM_GRID_MIN,
+    Math.floor(parseEnvNumber(process.env.QI_STREAM_GRID_DEFAULT, 16)),
+  ),
+);
 
 const qiMonitor = new QiMonitor(DEFAULT_QI_SETTINGS, DEFAULT_QI_DT_MS, DEFAULT_QI_BOUND_SCALAR);
 
@@ -2039,6 +2054,7 @@ export async function calculateEnergyPipeline(
       material: 'PEC' as const,
       temperature: state.temperature_K ?? 20,
       moduleType: 'warp' as const,
+      hull: hullGeomWarp,
       // **CRITICAL FIX**: Pass calibrated pipeline mass to avoid independent calculation
       exoticMassTarget_kg: state.M_exotic, // Use calibrated mass (1405 kg) from pipeline
       dynamicConfig: {
@@ -2104,8 +2120,17 @@ function flushPendingPumpCommand(): void {
 }
 
 function updateQiTelemetry(state: EnergyPipelineState) {
-  const stats = qiMonitor.tick(estimateEffectiveRhoFromState(state));
+  const baseStats = qiMonitor.tick(estimateEffectiveRhoFromState(state));
+  const { tiles: synthesizedTiles, metrics, source } = buildQiTilesFromState(state, baseStats);
+  const stats: QiStats = metrics
+    ? { ...baseStats, ...metrics, homogenizerSource: source }
+    : baseStats;
   state.qi = stats;
+  if (synthesizedTiles.length) {
+    updatePipelineQiTiles(synthesizedTiles);
+  } else {
+    updatePipelineQiTiles([]);
+  }
 
   if (PUMP_TONE_ENABLE) {
     const cmd = getPumpCommandForQi(stats, { epoch_ms: GLOBAL_PUMP_EPOCH_MS });
@@ -2140,6 +2165,295 @@ function updateQiTelemetry(state: EnergyPipelineState) {
   }
 
   state.qiBadge = badge;
+}
+
+type HomogenizerSource = "synthetic" | "hardware" | "offline";
+
+type LatticeHomogenizationMetrics = {
+  varT00_lattice: number;
+  gradT00_norm: number;
+  C_warp: number;
+  QI_envelope_okPct: number;
+  sigmaT00_norm: number;
+  sigmaT00_Jm3: number;
+  maxTileSigma: number;
+  trimEnergy_pct: number;
+  meanT00_abs: number;
+};
+
+type LatticeHomogenizationResult = {
+  tiles: RawTileInput[];
+  metrics: LatticeHomogenizationMetrics;
+  source: HomogenizerSource;
+};
+
+type TileTemplate = {
+  id: string;
+  ijk: [number, number, number];
+  center: [number, number, number];
+  envelope: number;
+};
+
+const EMPTY_LATTICE_RESULT: LatticeHomogenizationResult = {
+  tiles: [],
+  source: "offline",
+  metrics: {
+    varT00_lattice: 0,
+    gradT00_norm: 0,
+    C_warp: 1,
+    QI_envelope_okPct: 100,
+    sigmaT00_norm: 0,
+    sigmaT00_Jm3: 0,
+    maxTileSigma: 0,
+    trimEnergy_pct: 0,
+    meanT00_abs: 0,
+  },
+};
+
+function buildQiTilesFromState(
+  state: EnergyPipelineState,
+  stats: QiStats,
+): LatticeHomogenizationResult {
+  const tileHint = firstFinite(
+    state.activeTiles,
+    (state as any)?.tiles?.active,
+    state.N_tiles,
+    state.tilesPerSector,
+  );
+  const gridEdgeRaw =
+    tileHint && tileHint > 0
+      ? Math.round(Math.sqrt(Math.min(tileHint, QI_STREAM_GRID_MAX * QI_STREAM_GRID_MAX)))
+      : QI_STREAM_GRID_DEFAULT;
+  const gridEdge = clampInt(gridEdgeRaw, QI_STREAM_GRID_MIN, QI_STREAM_GRID_MAX);
+  const cols = Math.max(1, gridEdge);
+  const rows = Math.max(1, gridEdge);
+  const total = cols * rows;
+  if (total <= 0) return EMPTY_LATTICE_RESULT;
+
+  const tau_s =
+    Number.isFinite(stats.tau_s_ms) && stats.tau_s_ms > 0
+      ? (stats.tau_s_ms as number) / 1000
+      : DEFAULT_QI_TAU_MS / 1000;
+  const limit = Math.max(
+    1e-6,
+    Math.abs(Number(stats.bound)) || Math.abs(DEFAULT_QI_BOUND_SCALAR) || 1,
+  );
+  const baseAvg = Math.abs(Math.min(0, Number(stats.avg) || 0)) / limit;
+  const baseS = clampNumber(Number.isFinite(baseAvg) ? baseAvg : 0, 0, 1.5);
+  const activity = clampNumber(state.activeFraction ?? 0.25, 0, 1);
+  const guardRatio = clampNumber(
+    Math.abs(Number(stats.margin) || 0) / Math.max(limit, 1e-6),
+    0,
+    1.5,
+  );
+  const qFactor = Number.isFinite(state.qCavity) ? (state.qCavity as number) : undefined;
+  const temperature = Number.isFinite(state.temperature_K)
+    ? (state.temperature_K as number)
+    : undefined;
+  const shipRadius = Number.isFinite(state.shipRadius_m)
+    ? Math.max(1, state.shipRadius_m as number)
+    : 100;
+  const span = Math.max(1, shipRadius * 2);
+  const spacing = span / Math.max(cols, rows);
+  const origin = -span / 2;
+  const diagNorm = Math.max(1, Math.hypot(cols, rows));
+  const phase = Date.now() * 0.0007;
+
+  const rhoField: number[] = new Array(total);
+  const saturationField: number[] = new Array(total);
+  const templates: TileTemplate[] = new Array(total);
+  let minSat = Number.POSITIVE_INFINITY;
+  let maxSat = Number.NEGATIVE_INFINITY;
+  const guardPenalty = clampNumber(1 - 0.6 * guardRatio, 0.15, 1);
+  const rippleAmpBase = 0.15 + 0.35 * (0.5 + 0.5 * guardPenalty);
+  const envelopeAmpBase = 0.2 + 0.4 * guardPenalty;
+  const checkerAmp = 0.06 * guardPenalty;
+  const bias = 0.05 * guardPenalty;
+  for (let idx = 0; idx < total; idx += 1) {
+    const i = idx % cols;
+    const j = Math.floor(idx / cols);
+    const radial = Math.hypot(i - cols / 2, j - rows / 2) / (diagNorm / 2);
+    const envelope = 1 - clampNumber(radial, 0, 1);
+    const ripple = Math.sin(phase + 0.23 * i + 0.31 * j) * Math.cos(0.07 * phase + 0.19 * i - 0.13 * j);
+    const checker = ((i + j) & 1) === 0 ? 1 : -1;
+    const stress =
+      guardPenalty * baseS +
+      rippleAmpBase * ripple +
+      envelopeAmpBase * envelope +
+      checkerAmp * checker +
+      bias;
+    const S = clampNumber(stress, 0.02, 1.5);
+    const rho = -limit * S;
+    rhoField[idx] = rho;
+    saturationField[idx] = S;
+    if (S < minSat) minSat = S;
+    if (S > maxSat) maxSat = S;
+    templates[idx] = {
+      id: `sim-${i}-${j}`,
+      ijk: [i, j, 0],
+      center: [origin + (i + 0.5) * spacing, origin + (j + 0.5) * spacing, 0],
+      envelope,
+    };
+  }
+  if (maxSat - minSat < 1e-4) {
+    for (let idx = 0; idx < total; idx += 1) {
+      const i = idx % cols;
+      const j = Math.floor(idx / cols);
+      const envelope = templates[idx]?.envelope ?? 0.5;
+      const ripple = Math.sin(0.37 * phase + 0.29 * i - 0.11 * j);
+      const fallback = clampNumber(0.08 + 0.25 * envelope + 0.12 * ripple, 0.01, 0.6);
+      saturationField[idx] = fallback;
+      rhoField[idx] = -limit * fallback;
+    }
+  }
+  const metrics = deriveLatticeHomogenizationMetrics(rhoField, saturationField, cols, rows, limit);
+  const meanAbs = metrics.meanT00_abs ?? 0;
+  const sigmaAbs = metrics.sigmaT00_Jm3 ?? 0;
+  const invSigma = sigmaAbs > 1e-9 ? 1 / sigmaAbs : 0;
+  const tiles: RawTileInput[] = new Array(total);
+  for (let idx = 0; idx < total; idx += 1) {
+    const template = templates[idx];
+    const rho = rhoField[idx];
+    const absRho = Math.abs(rho);
+    const deviation = absRho - meanAbs;
+    const sigmaNorm = invSigma ? deviation * invSigma : 0;
+    const envelope = template?.envelope ?? 0;
+    const guardPenalty = 1 - clampNumber(guardRatio, 0, 1);
+    const weight = clampNumber(0.25 + 0.75 * envelope * guardPenalty, 0.05, 1);
+    tiles[idx] = {
+      id: template?.id ?? `sim-${idx}`,
+      ijk: template?.ijk ?? [idx % cols, Math.floor(idx / cols), 0],
+      center_m:
+        template?.center ?? [origin + ((idx % cols) + 0.5) * spacing, origin + (Math.floor(idx / cols) + 0.5) * spacing, 0],
+      rho_neg_Jm3: rho,
+      tau_eff_s: tau_s,
+      qi_limit: limit,
+      Q_factor: qFactor,
+      T_K: temperature,
+      absRho_Jm3: absRho,
+      deviation_Jm3: deviation,
+      sigmaNorm,
+      weight,
+    };
+  }
+  return { tiles, metrics, source: "synthetic" };
+}
+
+function deriveLatticeHomogenizationMetrics(
+  rhoField: number[],
+  saturationField: number[],
+  cols: number,
+  rows: number,
+  limit: number,
+): LatticeHomogenizationMetrics {
+  const total = rhoField.length;
+  if (!total) return EMPTY_LATTICE_RESULT.metrics;
+
+  const limitAbs = Math.max(Math.abs(limit), 1e-6);
+  let meanSat = 0;
+  for (const sat of saturationField) meanSat += sat;
+  meanSat /= total;
+
+  let varianceSat = 0;
+  let maxSatDelta = 0;
+  let satDeviationSum = 0;
+  for (const sat of saturationField) {
+    const delta = sat - meanSat;
+    varianceSat += delta * delta;
+    const mag = Math.abs(delta);
+    if (mag > maxSatDelta) maxSatDelta = mag;
+    satDeviationSum += mag;
+  }
+  varianceSat /= total;
+  const sigmaSat = Math.sqrt(Math.max(varianceSat, 0));
+  const sigmaAbs = sigmaSat * limitAbs;
+  const sigmaNorm = sigmaSat;
+  const maxTileSigma = sigmaSat > 1e-9 ? maxSatDelta / sigmaSat : 0;
+  const trimEnergyPct = (satDeviationSum / Math.max(total, 1)) * 100;
+
+  const gradNorm = computeNormalizedGradient(saturationField, cols, rows, 1);
+
+  let okCount = 0;
+  for (const sat of saturationField) {
+    if (sat <= 1) okCount += 1;
+  }
+  const okPct = total ? (okCount / total) * 100 : 0;
+
+  const absValues = rhoField.map((value) => Math.abs(value)).sort((a, b) => a - b);
+  const median = absValues[Math.floor(absValues.length / 2)] ?? 0;
+  const peak = absValues[absValues.length - 1] ?? 0;
+  const ratio =
+    median > 1e-6 ? peak / median : peak > 0 ? Number.POSITIVE_INFINITY : 1;
+  const ratioPenalty = clampNumber((ratio - 1) / 4, 0, 4);
+
+  const cWarp = clampNumber(
+    1 -
+      (0.5 * clampNumber(sigmaNorm, 0, 4) +
+        0.3 * clampNumber(gradNorm, 0, 4) +
+        0.2 * ratioPenalty),
+    0,
+    1,
+  );
+
+  return {
+    varT00_lattice: clampNumber(sigmaNorm, 0, 4),
+    gradT00_norm: clampNumber(gradNorm, 0, 4),
+    C_warp: cWarp,
+    QI_envelope_okPct: clampNumber(okPct, 0, 100),
+    sigmaT00_norm: clampNumber(sigmaNorm, 0, 4),
+    sigmaT00_Jm3: sigmaAbs,
+    maxTileSigma: clampNumber(maxTileSigma, 0, 8),
+    trimEnergy_pct: clampNumber(trimEnergyPct, 0, 400),
+    meanT00_abs: meanSat * limitAbs,
+  };
+}
+
+function computeNormalizedGradient(
+  field: number[],
+  cols: number,
+  rows: number,
+  scale: number,
+): number {
+  if (!(cols > 0 && rows > 0)) return 0;
+  let accum = 0;
+  let samples = 0;
+  for (let j = 0; j < rows; j += 1) {
+    for (let i = 0; i < cols; i += 1) {
+      const idx = j * cols + i;
+      const center = field[idx];
+      if (i + 1 < cols) {
+        accum += Math.abs(center - field[idx + 1]);
+        samples += 1;
+      }
+      if (j + 1 < rows) {
+        accum += Math.abs(center - field[idx + cols]);
+        samples += 1;
+      }
+    }
+  }
+  if (!samples) return 0;
+  const avgDiff = accum / samples;
+  return avgDiff / Math.max(scale, 1e-6);
+}
+
+function firstFinite(...values: Array<number | null | undefined>): number | undefined {
+  for (const value of values) {
+    if (Number.isFinite(value)) {
+      return Number(value);
+    }
+  }
+  return undefined;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  return Math.round(clampNumber(value, min, max));
 }
 
 function estimateEffectiveRhoFromState(state: EnergyPipelineState): number {

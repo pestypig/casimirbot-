@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
@@ -13,6 +13,7 @@ import { Hull3DRenderer, Hull3DRendererMode, Hull3DQualityPreset, Hull3DQualityO
 import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
 import { smoothSectorWeights } from "@/lib/sector-weights";
 import { TheoryBadge } from "./common/TheoryBadge";
+import { normalizeCurvaturePalette, type CurvaturePalette } from "@/lib/curvature-directive";
 /**
  * TheoryRefs:
  *  - vanden-broeck-1999: UI exposes gamma_VdB with provenance
@@ -31,8 +32,19 @@ interface AlcubierrePanelProps {
   vizIntent?: {
     rise: number;
     planar: number;
+    yaw?: number;
   };
 }
+
+type TiltDirective = {
+  enabled: boolean;
+  dir: [number, number];
+  magnitude: number;
+  alpha?: number;
+  source?: string;
+  gain?: number; // [tilt-gain]
+  gainMode?: "manual" | "curvature"; // [tilt-gain]
+};
 
 function FlightDirectorStatusRow() {
   const { enabled, mode, coupling } = useFlightDirectorStore(
@@ -756,13 +768,26 @@ const [showKHeatOverlay, setShowKHeatOverlay] = useState(true);
 const [showThetaIsoOverlay, setShowThetaIsoOverlay] = useState(true);
 const [showFordRomanBar, setShowFordRomanBar] = useState(true);
 const [showSectorArcOverlay, setShowSectorArcOverlay] = useState(true);
-const [showTiltOverlay, setShowTiltOverlay] = useState(false);
+const [showTiltOverlay, setShowTiltOverlay] = useState<boolean>(() => {
+  if (typeof window === "undefined") return true;
+  const w: any = window;
+  if (typeof w.__hullShowTiltOverlay === "boolean") return !!w.__hullShowTiltOverlay;
+  return true;
+});
 const [showGreensOverlay, setShowGreensOverlay] = useState(false);
-const [curvatureOverlay, setCurvatureOverlay] = useState({
+const tiltFromBusRef = useRef<TiltDirective | null>(null);
+const [tiltBusVersion, bumpTiltVersion] = useReducer((x: number) => x + 1, 0);
+const [curvatureOverlay, setCurvatureOverlay] = useState<{
+  enabled: boolean;
+  gain: number;
+  alpha: number;
+  palette: CurvaturePalette;
+  showQIMargin: boolean;
+}>({
   enabled: false,
   gain: 1.0,
   alpha: 0.45,
-  palette: 0,
+  palette: "diverging",
   showQIMargin: false,
 });
 useEffect(() => {
@@ -772,13 +797,13 @@ useEffect(() => {
       const enabled = Boolean((payload as any).enabled);
       const gainRaw = Number((payload as any).gain);
       const alphaRaw = Number((payload as any).alpha);
-      const paletteRaw = Number((payload as any).palette);
+      const paletteRaw = (payload as any).palette;
       const showMarginRaw = (payload as any).showQIMargin;
       return {
         enabled,
         gain: Number.isFinite(gainRaw) ? gainRaw : prev.gain,
         alpha: Number.isFinite(alphaRaw) ? Math.max(0, Math.min(1, alphaRaw)) : prev.alpha,
-        palette: Number.isFinite(paletteRaw) ? Math.max(0, Math.floor(paletteRaw)) : prev.palette,
+        palette: normalizeCurvaturePalette(paletteRaw, prev.palette),
         showQIMargin: Boolean(showMarginRaw),
       };
     });
@@ -787,6 +812,69 @@ useEffect(() => {
     unsubscribe(id);
   };
 }, []);
+
+useEffect(() => {
+  const handlerId = subscribe("hull3d:tilt", (payload: any) => {
+    let nextDirective: TiltDirective | null = null;
+    if (payload && typeof payload === "object" && payload.enabled) {
+      const dirRaw = (payload as any).dir;
+      if (Array.isArray(dirRaw) && dirRaw.length >= 2) {
+        const dx = Number(dirRaw[0]);
+        const dy = Number(dirRaw[1]);
+        if (Number.isFinite(dx) && Number.isFinite(dy)) {
+          const magnitudeRaw = Number((payload as any).magnitude);
+          const alphaRaw = Number((payload as any).alpha);
+          const gainRaw = Number((payload as any).gain); // [tilt-gain]
+          const gainModeRaw = (payload as any).gainMode; // [tilt-gain]
+          nextDirective = {
+            enabled: true,
+            dir: [dx, dy],
+            magnitude: clamp(Number.isFinite(magnitudeRaw) ? magnitudeRaw : 0, 0, 1),
+            alpha: Number.isFinite(alphaRaw) ? clamp(alphaRaw, 0, 1) : undefined,
+            source: typeof (payload as any).source === "string" ? (payload as any).source : undefined,
+            ...(Number.isFinite(gainRaw) ? { gain: gainRaw } : {}), // [tilt-gain]
+            ...(gainModeRaw === "manual" || gainModeRaw === "curvature"
+              ? { gainMode: gainModeRaw as "manual" | "curvature" }
+              : {}), // [tilt-gain]
+          };
+        }
+      }
+    }
+
+    const prev = tiltFromBusRef.current;
+    const prevGain = typeof prev?.gain === "number" ? prev.gain : undefined; // [tilt-gain]
+    const nextGain = typeof nextDirective?.gain === "number" ? nextDirective.gain : undefined; // [tilt-gain]
+    const gainClose = // [tilt-gain]
+      (prevGain === undefined && nextGain === undefined) ||
+      (prevGain !== undefined && nextGain !== undefined && Math.abs(prevGain - nextGain) < 1e-4); // [tilt-gain]
+    const prevGainMode = prev?.gainMode ?? "__none__"; // [tilt-gain]
+    const nextGainMode = nextDirective?.gainMode ?? "__none__"; // [tilt-gain]
+    const same =
+      (prev === null && nextDirective === null) ||
+      (prev !== null &&
+        nextDirective !== null &&
+        Math.abs(prev.dir[0] - nextDirective.dir[0]) < 1e-4 &&
+        Math.abs(prev.dir[1] - nextDirective.dir[1]) < 1e-4 &&
+        Math.abs(prev.magnitude - nextDirective.magnitude) < 1e-4 &&
+        Math.abs((prev.alpha ?? 0.85) - (nextDirective.alpha ?? 0.85)) < 1e-4 &&
+        gainClose && // [tilt-gain]
+        prevGainMode === nextGainMode); // [tilt-gain]
+
+    if (!same) {
+      tiltFromBusRef.current = nextDirective;
+      if (typeof window !== "undefined") {
+        (window as any).__tiltBusLast = nextDirective;
+      }
+      bumpTiltVersion();
+    }
+  });
+
+  return () => {
+    unsubscribe(handlerId);
+  };
+}, []);
+
+const busTiltDirective = useMemo<TiltDirective | null>(() => tiltFromBusRef.current, [tiltBusVersion]);
 
 const liveVolumeMode = useMemo(() => volumeModeFromHull(hullVolumeVizLive), [hullVolumeVizLive]);
 const setLiveVolumeMode = useCallback((mode: VolumeViz) => {
@@ -845,8 +933,14 @@ const showSectorGridOverlay = useHull3DSharedStore(
 useEffect(() => {
   if (typeof window !== "undefined") {
     (window as any).__hullShowSurfaceOverlay = showHullSurfaceOverlay;
+    (window as any).__surfaceDebugEcho = showHullSurfaceOverlay;
   }
 }, [showHullSurfaceOverlay]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    (window as any).__hullShowTiltOverlay = showTiltOverlay;
+  }
+}, [showTiltOverlay]);
 useEffect(() => {
   const handlerId = subscribe("warp:viz", (payload: any) => {
     const v = Number(payload?.volumeViz);
@@ -1638,14 +1732,31 @@ const res = 256;
     const rawTilt = ((live as any)?.betaTiltVec
       ?? (live as any)?.shiftVector?.betaTiltVec
       ?? (live as any)?.warp?.betaTiltVec) as number[] | undefined;
-    if (showTiltOverlay && Number.isFinite(epsilonTilt) && rawTilt && rawTilt.length === 3) {
+
+    let derivedTilt: TiltDirective | null = null;
+    if (Number.isFinite(epsilonTilt) && rawTilt && rawTilt.length === 3) {
       const dir2: [number, number] = [rawTilt[0] || 0, rawTilt[1] || 0];
       const len = Math.hypot(dir2[0], dir2[1]) || 1;
-      overlays.tilt = {
+      derivedTilt = {
         enabled: true,
         dir: [dir2[0] / len, dir2[1] / len],
         magnitude: Math.min(1, Math.abs(epsilonTilt) / 5e-7),
         alpha: 0.85,
+      };
+    }
+
+    const tiltSource = busTiltDirective?.enabled ? busTiltDirective : derivedTilt;
+    if (showTiltOverlay && tiltSource) {
+      const norm = Math.hypot(tiltSource.dir[0], tiltSource.dir[1]) || 1;
+      overlays.tilt = {
+        enabled: true,
+        dir: [tiltSource.dir[0] / norm, tiltSource.dir[1] / norm],
+        magnitude: clamp(tiltSource.magnitude ?? 0, 0, 1),
+        alpha: tiltSource.alpha !== undefined ? clamp(tiltSource.alpha, 0, 1) : 0.85,
+        ...(typeof tiltSource.gain === "number" ? { gain: tiltSource.gain } : {}), // [tilt-gain]
+        ...(tiltSource.gainMode === "manual" || tiltSource.gainMode === "curvature"
+          ? { gainMode: tiltSource.gainMode }
+          : {}), // [tilt-gain]
       };
     }
 
@@ -1667,6 +1778,7 @@ const res = 256;
     vizFloors.rhoGR,
     live,
     curvatureOverlay,
+    busTiltDirective,
   ]);
 
   const syncMode = useMemo(() => (syncScheduler && schedulerCenter !== null ? 1 : 0), [syncScheduler, schedulerCenter]);
@@ -2047,7 +2159,7 @@ const res = 256;
   );
 
   // Lock vertical scale against phase-only jitter in Î¸ (Drive)
-  const [lockScale, setLockScale] = useState<boolean>(true);
+  const [lockScale, setLockScale] = useState<boolean>(false);
   const [lockedYGain, setLockedYGain] = useState<number>(() => yGain);
   // Refresh locked gain on non-phase changes
   useEffect(() => {
@@ -2950,17 +3062,22 @@ const res = 256;
       expected != null && Math.abs(expected) > 1e-18 && thetaUsed != null
         ? thetaUsed / expected
         : undefined;
-    setSharedPhysics({
+    const payload: any = {
       locked: lockScale,
       thetaExpected: expected,
       thetaUsed,
       ratio,
-      yGain: yGainFinal,
-      kColor,
       analyticPeak: Number.isFinite(ampRef ?? NaN) ? ampRef : undefined,
       tailPeak: Number.isFinite(thetaPk ?? NaN) ? thetaPk : undefined,
-    });
-  }, [setSharedPhysics, lockScale, yGainFinal, kColor, thetaScaleExpected, thetaDrive_est, ampRef, thetaPk]);
+    };
+    // Only push yGain/kColor into shared store when lock is enabled,
+    // so Viz HUD can control display-only knobs when unlocked.
+    if (sharedPhysicsLock || lockScale) {
+      payload.yGain = yGainFinal;
+      payload.kColor = kColor;
+    }
+    setSharedPhysics(payload);
+  }, [setSharedPhysics, lockScale, sharedPhysicsLock, yGainFinal, kColor, thetaScaleExpected, thetaDrive_est, ampRef, thetaPk]);
 
   useEffect(() => {
     if (planarVizMode !== 2) return;
@@ -3749,9 +3866,8 @@ const res = 256;
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className="accent-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="accent-emerald-500"
                   checked={showTiltOverlay}
-                  disabled={!betaOverlayEnabled}
                   onChange={(event) => setShowTiltOverlay(event.target.checked)}
                 />
                 <span>ß-tilt arrow</span>

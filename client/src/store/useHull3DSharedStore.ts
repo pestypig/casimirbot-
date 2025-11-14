@@ -1,4 +1,5 @@
-import { create, type StateCreator } from "zustand";
+import { type StateCreator } from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
 
 export type HullSamplingWindowKey = "instant" | "tauLC" | "burst" | "sector";
 
@@ -140,13 +141,13 @@ const creator: StateCreator<Hull3DSharedState> = (set) => ({
     provenance: "Instantaneous sample",
   },
   physics: {
-    locked: true,
+    locked: false,
     thetaExpected: undefined,
     thetaUsed: undefined,
     ratio: undefined,
-    trimDb: 0,
-    yGain: 1,
-    kColor: 1,
+    trimDb: 24,
+    yGain: 1e-12,
+    kColor: 0.05,
     analyticPeak: undefined,
     tailPeak: undefined,
     updatedAt: 0,
@@ -293,4 +294,4 @@ const creator: StateCreator<Hull3DSharedState> = (set) => ({
     })),
 });
 
-export const useHull3DSharedStore = create<Hull3DSharedState>(creator);
+export const useHull3DSharedStore = createWithEqualityFn<Hull3DSharedState>(creator);

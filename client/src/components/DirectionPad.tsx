@@ -15,6 +15,7 @@ import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
 import { useFlightDirectorStore } from "@/store/useFlightDirectorStore";
+import { useFlightDirectorCurvatureBridge } from "@/hooks/useFlightDirectorCurvatureBridge";
 import { useUpdatePipeline } from "@/hooks/use-energy-pipeline";
 import { shallow } from "zustand/shallow";
 
@@ -37,6 +38,9 @@ const ZERO_RATE_DPS = 0.1;
 const MIN_RAF_DT_S = 1 / 240;
 const MAX_RAF_DT_S = 1 / 30;
 const JERK_MULTIPLIER = 4; // jerk ~= 4 * accel per second by default
+const PLANAR_BIAS_DELTA_MAX = 0.18;
+const PLANAR_INTENT_DEADBAND = 0.015;
+const RISE_INTENT_DEADBAND = 0.05;
 
 type AxisProfileState = {
   v_dps: number;
@@ -344,6 +348,7 @@ const DriveIntentReadout = React.memo(function DriveIntentReadout() {
 
 export default function DirectionPad({ className, onVizIntent }: DirectionPadProps) {
   const {
+    splitEnabled,
     splitFrac: splitFracState,
     sigmaSectors: sigmaSectorsState,
     sectorFloor: floorState,
@@ -357,6 +362,7 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     setNudge01,
   } = useDriveSyncStore(
     (state) => ({
+      splitEnabled: state.splitEnabled,
       splitFrac: state.splitFrac,
       sigmaSectors: state.sigmaSectors,
       sectorFloor: state.sectorFloor,
@@ -372,7 +378,41 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     shallow
   );
   const setPhase = useDriveSyncStore((state) => state.setPhase);
+  useFlightDirectorCurvatureBridge();
   const mutatePipeline = useUpdatePipeline();
+  const negFractionPendingRef = useRef<number | null>(null);
+  const negFractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushNegFraction = useCallback(() => {
+    if (negFractionPendingRef.current == null) {
+      negFractionTimerRef.current = null;
+      return;
+    }
+    const target = clampRange(negFractionPendingRef.current, 0, 1);
+    negFractionPendingRef.current = null;
+    negFractionTimerRef.current = null;
+    try {
+      mutatePipeline.mutate({ negativeFraction: target });
+    } catch {
+      // Endpoint unavailable is non-fatal in mock contexts
+    }
+  }, [mutatePipeline]);
+  const scheduleNegFractionUpdate = useCallback(
+    (value: number) => {
+      negFractionPendingRef.current = clampRange(value, 0, 1);
+      if (negFractionTimerRef.current == null) {
+        negFractionTimerRef.current = setTimeout(flushNegFraction, 140);
+      }
+    },
+    [flushNegFraction]
+  );
+  useEffect(
+    () => () => {
+      if (negFractionTimerRef.current) {
+        clearTimeout(negFractionTimerRef.current);
+      }
+    },
+    []
+  );
   const [controlMode, setControlMode] = useState<"simple" | "advanced">("simple");
   const handleModeChange = (value: string) => {
     setControlMode(value === "advanced" ? "advanced" : "simple");
@@ -522,6 +562,14 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     return clampRange(value, 0, 1);
   }, [splitFracState]);
 
+  const planarBiasActiveRef = useRef(false);
+  const biasBaselineRef = useRef(splitFrac);
+  useEffect(() => {
+    if (!planarBiasActiveRef.current) {
+      biasBaselineRef.current = splitFrac;
+    }
+  }, [splitFrac]);
+
   const sigmaSectors = useMemo(() => {
     const value =
       typeof sigmaSectorsState === "number" && Number.isFinite(sigmaSectorsState)
@@ -537,6 +585,20 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
         : 0.2;
     return clampRange(value, 0, 0.99);
   }, [floorState]);
+
+  const riseShapingActiveRef = useRef(false);
+  const sigmaBaselineRef = useRef(sigmaSectors);
+  useEffect(() => {
+    if (!riseShapingActiveRef.current) {
+      sigmaBaselineRef.current = sigmaSectors;
+    }
+  }, [sigmaSectors]);
+  const floorBaselineRef = useRef(floor);
+  useEffect(() => {
+    if (!riseShapingActiveRef.current) {
+      floorBaselineRef.current = floor;
+    }
+  }, [floor]);
 
   const initialPhase = useDriveSyncStore.getState().phase01;
   const phaseRef = useRef(Number.isFinite(initialPhase) ? wrap01(initialPhase) : 0);
@@ -561,20 +623,6 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     onVizIntentRef.current = onVizIntent;
   }, [onVizIntent]);
   useEffect(() => {
-    const unsubscribe = useDriveSyncStore.subscribe((state) => {
-      const value = state.intent;
-      intentRef.current = value;
-      const cb = onVizIntentRef.current;
-      if (cb) {
-        const rise = clampRange(value.z, -1, 1);
-        const planar = clampRange(Math.hypot(value.x, value.y), 0, 1);
-        cb({ rise, planar });
-      }
-    });
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
     const state = useFlightDirectorStore.getState();
     if (Math.abs(state.thrustBias01 - splitFrac) > 1e-3) {
       state.setThrustBias01(splitFrac);
@@ -584,12 +632,9 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
   const onBiasChange = (value: number) => {
     const bias = clampRange(value, 0, 1);
     setSplit(true, bias);
-    try {
-      const negFrac = clampRange(1 - bias, 0, 1);
-      mutatePipeline.mutate({ negativeFraction: negFrac });
-    } catch {
-      // pipeline endpoint may be unavailable in mock environments
-    }
+    biasBaselineRef.current = bias;
+    const negFrac = clampRange(1 - bias, 0, 1);
+    scheduleNegFractionUpdate(negFrac);
     const state = useFlightDirectorStore.getState();
     state.setThrustBias01(bias);
   };
@@ -618,6 +663,111 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
       phaseModeRef.current = "manual";
     }
   };
+
+  const applyPlanarIntentBias = useCallback(
+    (
+      planarMag: number,
+      autopEnabled: boolean,
+      driveState: { splitEnabled: boolean; splitFrac: number }
+    ) => {
+      const magnitude = clampRange(planarMag, 0, 1);
+      const shouldDrive = autopEnabled && magnitude > PLANAR_INTENT_DEADBAND;
+      if (!shouldDrive) {
+        if (planarBiasActiveRef.current) {
+          planarBiasActiveRef.current = false;
+          const baseline = clampRange(biasBaselineRef.current, 0, 1);
+          if (!driveState.splitEnabled || Math.abs(driveState.splitFrac - baseline) > 1e-3) {
+            setSplit(true, baseline);
+          }
+          scheduleNegFractionUpdate(1 - baseline);
+          const fd = useFlightDirectorStore.getState();
+          if (Math.abs(fd.thrustBias01 - baseline) > 1e-3) {
+            fd.setThrustBias01(baseline);
+          }
+        }
+        return;
+      }
+
+      planarBiasActiveRef.current = true;
+      const eased = 1 - Math.pow(1 - magnitude, 2);
+      const targetSplit = clampRange(
+        0.5 + PLANAR_BIAS_DELTA_MAX * eased,
+        0.5 - PLANAR_BIAS_DELTA_MAX,
+        0.5 + PLANAR_BIAS_DELTA_MAX
+      );
+      if (!driveState.splitEnabled || Math.abs(driveState.splitFrac - targetSplit) > 1e-3) {
+        setSplit(true, targetSplit);
+      }
+      scheduleNegFractionUpdate(1 - targetSplit);
+      const fd = useFlightDirectorStore.getState();
+      if (Math.abs(fd.thrustBias01 - targetSplit) > 1e-3) {
+        fd.setThrustBias01(targetSplit);
+      }
+    },
+    [setSplit, scheduleNegFractionUpdate]
+  );
+
+  const applyRiseIntentShaping = useCallback(
+    (
+      riseValue: number,
+      autopEnabled: boolean,
+      geometryState: { sigmaSectors: number; sectorFloor: number }
+    ) => {
+      const riseAbs = Math.abs(clampRange(riseValue, -1, 1));
+      const shouldShape = autopEnabled && riseAbs > RISE_INTENT_DEADBAND;
+      if (!shouldShape) {
+        if (riseShapingActiveRef.current) {
+          riseShapingActiveRef.current = false;
+          const sigmaTarget = clampRange(sigmaBaselineRef.current, 0.25, 8);
+          const floorTarget = clampRange(floorBaselineRef.current, 0, 0.99);
+          if (Math.abs(sigmaTarget - geometryState.sigmaSectors) > 1e-3) {
+            setSigmaStore(sigmaTarget);
+          }
+          if (Math.abs(floorTarget - geometryState.sectorFloor) > 1e-3) {
+            setFloorStore(floorTarget);
+          }
+        }
+        return;
+      }
+
+      riseShapingActiveRef.current = true;
+      const sigmaBase = clampRange(sigmaBaselineRef.current, 0.25, 8);
+      const floorBase = clampRange(floorBaselineRef.current, 0, 0.99);
+      const sigmaTarget = clampRange(sigmaBase * (1 - 0.15 * riseAbs), 0.25, 8);
+      const floorTarget = clampRange(floorBase + 0.1 * riseAbs, 0, 0.99);
+      if (Math.abs(sigmaTarget - geometryState.sigmaSectors) > 1e-3) {
+        setSigmaStore(sigmaTarget);
+      }
+      if (Math.abs(floorTarget - geometryState.sectorFloor) > 1e-3) {
+        setFloorStore(floorTarget);
+      }
+    },
+    [setSigmaStore, setFloorStore]
+  );
+
+  useEffect(() => {
+    const unsubscribe = useDriveSyncStore.subscribe((state) => {
+      const value = state.intent;
+      intentRef.current = value;
+      const rise = clampRange(value.z, -1, 1);
+      const planar = clampRange(Math.hypot(value.x, value.y), 0, 1);
+      const cb = onVizIntentRef.current;
+      if (cb) {
+        cb({ rise, planar });
+      }
+      const director = useFlightDirectorStore.getState();
+      const autopEnabled = director.enabled && director.mode === "MAN";
+      applyPlanarIntentBias(planar, autopEnabled, {
+        splitEnabled: state.splitEnabled,
+        splitFrac: typeof state.splitFrac === "number" ? state.splitFrac : 0.5,
+      });
+      applyRiseIntentShaping(rise, autopEnabled, {
+        sigmaSectors: typeof state.sigmaSectors === "number" ? state.sigmaSectors : 0.25,
+        sectorFloor: typeof state.sectorFloor === "number" ? state.sectorFloor : 0.2,
+      });
+    });
+    return unsubscribe;
+  }, [applyPlanarIntentBias, applyRiseIntentShaping]);
 
   const onModeChange = (next: string) => {
     if (!next) return;

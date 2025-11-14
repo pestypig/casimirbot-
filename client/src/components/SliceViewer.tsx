@@ -405,6 +405,37 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
       }
       ctx.restore();
     }
+
+    // Highlight the current drive direction along the φ axis so it lines up with the UI hull ring
+    const planarLen = Math.hypot(dN[0], dN[2]);
+    if (planarLen > 1e-4) {
+      let phiDrive = Math.atan2(dN[2], dN[0]);
+      if (phiDrive < 0) phiDrive += Math.PI * 2;
+      const yPos = (phiDrive / (Math.PI * 2)) * (H - 1);
+      ctx.save();
+      ctx.strokeStyle = "rgba(49, 243, 137, 0.85)";
+      ctx.lineWidth = Math.max(1.5, dpr);
+      ctx.setLineDash([6 * dpr, 4 * dpr]);
+      ctx.beginPath();
+      ctx.moveTo(0, yPos + 0.5);
+      ctx.lineTo(W, yPos + 0.5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const arrowHalf = 6 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(W - 14 * dpr, yPos - arrowHalf);
+      ctx.lineTo(W - 3 * dpr, yPos + 0.5);
+      ctx.lineTo(W - 14 * dpr, yPos + arrowHalf);
+      ctx.stroke();
+      const deg = (phiDrive * 180) / Math.PI;
+      ctx.fillStyle = "rgba(49, 243, 137, 0.85)";
+      ctx.font = `${10 * dpr}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+      const labelY = Math.max(4 * dpr, Math.min(H - 12 * dpr, yPos - 10 * dpr));
+      ctx.fillText(`driveDir ≈ ${deg.toFixed(0)}°`, W - 4 * dpr, labelY);
+      ctx.restore();
+    }
   }, [
     width,
     height,

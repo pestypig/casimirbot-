@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Filter } from "bad-words";
 import {
   Dialog,
@@ -15,17 +15,45 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { uploadOriginal } from "@/lib/api/noiseGens";
 import { MiniPlayer } from "./MiniPlayer";
+import type { TempoMeta } from "@/types/noise-gens";
 
 type UploadOriginalsModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isAuthenticated: boolean;
   onRequestSignIn?: () => void;
-  onUploaded?: (trackId: string) => void;
+  onUploaded?: (payload: UploadCompletePayload) => void;
+  prefill?: UploadOriginalPrefill | null;
 };
 
 const MAX_TITLE = 120;
 const MAX_CREATOR = 60;
+const clampBpm = (value: number) => Math.max(40, Math.min(250, value));
+const sanitizeBpmInput = (value: string): number | null => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return clampBpm(numeric);
+};
+
+const extractFileMetadata = (file: File): { title?: string; bpm?: number } => {
+  const base = file.name.replace(/\.[^/.]+$/, "");
+  const normalizedTitle = base.replace(/[_-]+/g, " ").trim();
+  const bpmMatches = Array.from(base.matchAll(/(\d{2,3}(?:\.\d{1,2})?)\s*(?:bpm|bp|tempo)?/gi));
+  let bpm: number | undefined;
+  if (bpmMatches.length > 0) {
+    const lastMatch = bpmMatches[bpmMatches.length - 1];
+    const candidate = Number(lastMatch[1]);
+    if (Number.isFinite(candidate)) {
+      bpm = clampBpm(candidate);
+    }
+  }
+  return {
+    title: normalizedTitle || undefined,
+    bpm,
+  };
+};
 
 const ACCEPTED_TYPES = [
   "audio/wav",
@@ -43,12 +71,51 @@ type FieldState = {
   error: string | null;
 };
 
+export type UploadOriginalPrefill = {
+  title?: string;
+  creator?: string;
+  notes?: string;
+  instrumental?: File | null;
+  vocal?: File | null;
+  bpm?: number;
+  timeSig?: "4/4" | "3/4" | "6/8";
+  barsInLoop?: number;
+  quantized?: boolean;
+  offsetMs?: number;
+  sourceHint?: string;
+  knowledgeProjectId?: string;
+  knowledgeProjectName?: string;
+};
+
+export type UploadCompletePayload = {
+  trackId: string;
+  title: string;
+  creator: string;
+  knowledgeProjectId?: string;
+  knowledgeProjectName?: string;
+  tempo?: TempoMeta;
+  durationSeconds?: number | null;
+};
+
+const DEFAULT_BARS_IN_LOOP = 8;
+
+const estimateLoopDurationSeconds = (tempo?: TempoMeta): number | null => {
+  if (!tempo) return null;
+  if (!Number.isFinite(tempo.bpm) || tempo.bpm <= 0) return null;
+  const [numerator] = tempo.timeSig.split("/").map((value) => Number(value));
+  const beatsPerBar = Number.isFinite(numerator) && numerator > 0 ? numerator : 4;
+  const bars = tempo.barsInLoop ?? DEFAULT_BARS_IN_LOOP;
+  const seconds = (bars * beatsPerBar * 60) / tempo.bpm;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+};
+
 export function UploadOriginalsModal({
   open,
   onOpenChange,
   isAuthenticated,
   onRequestSignIn,
   onUploaded,
+  prefill,
 }: UploadOriginalsModalProps) {
   const { toast } = useToast();
   const filter = useMemo(() => new Filter({ placeHolder: "*" }), []);
@@ -58,7 +125,7 @@ export function UploadOriginalsModal({
   const [instrumentalFile, setInstrumentalFile] = useState<File | null>(null);
   const [vocalFile, setVocalFile] = useState<File | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
-  const [bpm, setBpm] = useState<number | "">("");
+  const [bpm, setBpm] = useState<string>("");
   const [timeSig, setTimeSig] = useState<"4/4" | "3/4" | "6/8">("4/4");
   const [barsInLoop, setBarsInLoop] = useState<number>(8);
   const [quantized, setQuantized] = useState<boolean>(true);
@@ -80,6 +147,35 @@ export function UploadOriginalsModal({
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !prefill) return;
+    const metadata = prefill.instrumental ? extractFileMetadata(prefill.instrumental) : undefined;
+    const derivedTitle = prefill.title ?? metadata?.title ?? "";
+    const derivedCreator = prefill.creator ?? "";
+    setTitle({ value: derivedTitle, error: null });
+    setCreator({ value: derivedCreator, error: null });
+    setNotes(prefill.notes ?? "");
+    setInstrumentalFile(prefill.instrumental ?? null);
+    setVocalFile(prefill.vocal ?? null);
+    if (typeof prefill.offsetMs === "number" && Number.isFinite(prefill.offsetMs)) {
+      setOffsetMs(Math.round(prefill.offsetMs));
+    } else {
+      setOffsetMs(0);
+    }
+    const resolvedBpm =
+      typeof prefill.bpm === "number" && Number.isFinite(prefill.bpm) ? clampBpm(prefill.bpm) : metadata?.bpm;
+    setBpm(resolvedBpm ? resolvedBpm.toFixed(2) : "");
+    const allowedTimeSig = prefill.timeSig === "3/4" || prefill.timeSig === "6/8" ? prefill.timeSig : "4/4";
+    setTimeSig(allowedTimeSig);
+    if (typeof prefill.barsInLoop === "number" && Number.isFinite(prefill.barsInLoop)) {
+      const clamped = Math.max(1, Math.min(256, Math.round(prefill.barsInLoop)));
+      setBarsInLoop(clamped);
+    } else {
+      setBarsInLoop(8);
+    }
+    setQuantized(prefill.quantized ?? true);
+  }, [open, prefill]);
+
   const validateField = (label: string, value: string, maxLength: number) => {
     const trimmed = value.trim();
     if (!trimmed) return `${label} is required`;
@@ -88,58 +184,104 @@ export function UploadOriginalsModal({
     return null;
   };
 
-  const canSubmit =
-    !isSubmitting &&
+  const hasRequiredFields =
     instrumentalFile != null &&
-    vocalFile != null &&
     !title.error &&
     !creator.error &&
     title.value.trim().length > 0 &&
     creator.value.trim().length > 0;
 
+  const canSubmit = !isSubmitting && hasRequiredFields;
+  const requiresAuth = !isAuthenticated;
+  const submitButtonLabel = requiresAuth
+    ? "Sign in to upload"
+    : isSubmitting
+      ? "Uploading..."
+      : "Upload";
+  const submitButtonDisabled = requiresAuth ? false : !canSubmit;
+
+  const bpmNumeric = useMemo(() => sanitizeBpmInput(bpm), [bpm]);
+
   const tempoPreview = useMemo(() => {
-    if (typeof bpm !== "number" || Number.isNaN(bpm)) return null;
+    if (bpmNumeric == null) return null;
     return {
-      bpm,
+      bpm: Number(bpmNumeric.toFixed(2)),
       timeSig,
       quantized,
     };
-  }, [bpm, timeSig, quantized]);
+  }, [bpmNumeric, timeSig, quantized]);
+
+  const autoFillFromFile = useCallback(
+    (file: File | null) => {
+      if (!file) return;
+      const metadata = extractFileMetadata(file);
+      if (metadata.title && !title.value.trim()) {
+        const clipped = metadata.title.slice(0, MAX_TITLE);
+        setTitle({ value: clipped, error: null });
+      }
+      if (metadata.bpm && !bpm) {
+        setBpm(metadata.bpm.toFixed(2));
+      }
+    },
+    [bpm, title.value],
+  );
+
+  const handleInstrumentalSelect = useCallback(
+    (file: File | null) => {
+      setInstrumentalFile(file);
+      autoFillFromFile(file);
+    },
+    [autoFillFromFile],
+  );
+
+  const handleVocalSelect = useCallback(
+    (file: File | null) => {
+      setVocalFile(file);
+      autoFillFromFile(file);
+    },
+    [autoFillFromFile],
+  );
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    if (!isAuthenticated) {
-      onOpenChange(false);
-      onRequestSignIn?.();
-      return;
-    }
     try {
       setIsSubmitting(true);
       const payload = new FormData();
       payload.append("title", title.value.trim());
       payload.append("creator", creator.value.trim());
       payload.append("instrumental", instrumentalFile as File);
-      payload.append("vocal", vocalFile as File);
+      if (vocalFile) {
+        payload.append("vocal", vocalFile);
+      }
       payload.append("offsetMs", String(offsetMs));
       if (notes.trim()) {
         payload.append("notes", notes.trim());
       }
-      if (typeof bpm === "number" && Number.isFinite(bpm)) {
-        const tempo = {
-          bpm,
+      let tempoMeta: TempoMeta | undefined;
+      if (bpmNumeric != null) {
+        tempoMeta = {
+          bpm: Number(bpmNumeric.toFixed(2)),
           timeSig,
           offsetMs,
           barsInLoop,
           quantized,
         };
-        payload.append("tempo", JSON.stringify(tempo));
+        payload.append("tempo", JSON.stringify(tempoMeta));
       }
       const result = await uploadOriginal(payload);
       toast({
         title: "Upload queued",
         description: "We will notify you when mastering finishes.",
       });
-      onUploaded?.(result.trackId);
+      onUploaded?.({
+        trackId: result.trackId,
+        title: title.value.trim(),
+        creator: creator.value.trim(),
+        knowledgeProjectId: prefill?.knowledgeProjectId,
+        knowledgeProjectName: prefill?.knowledgeProjectName,
+        tempo: tempoMeta,
+        durationSeconds: estimateLoopDurationSeconds(tempoMeta ?? undefined),
+      });
       onOpenChange(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed";
@@ -159,10 +301,16 @@ export function UploadOriginalsModal({
         <DialogHeader>
           <DialogTitle>Upload Originals</DialogTitle>
           <DialogDescription>
-            Provide your instrumental and vocal stems. We will align them exactly as uploaded, so
-            please double-check the sync using the preview.
+            Provide your instrumental stem and optionally a vocal. We will align them exactly as
+            uploaded, so please double-check the sync using the preview when both stems are present.
           </DialogDescription>
         </DialogHeader>
+
+        {prefill?.sourceHint ? (
+          <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
+            {prefill.sourceHint}
+          </div>
+        ) : null}
 
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -219,22 +367,24 @@ export function UploadOriginalsModal({
                 id="noise-upload-instrumental"
                 type="file"
                 accept={ACCEPTED_TYPES}
-                onChange={(event) => setInstrumentalFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => handleInstrumentalSelect(event.target.files?.[0] ?? null)}
               />
               <p className="text-xs text-muted-foreground">
                 {instrumentalFile ? instrumentalFile.name : "WAV, AIFF, FLAC, MP3, or OGG"}
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="noise-upload-vocal">Vocal stem</Label>
+              <Label htmlFor="noise-upload-vocal">Vocal stem (optional)</Label>
               <Input
                 id="noise-upload-vocal"
                 type="file"
                 accept={ACCEPTED_TYPES}
-                onChange={(event) => setVocalFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => handleVocalSelect(event.target.files?.[0] ?? null)}
               />
               <p className="text-xs text-muted-foreground">
-                {vocalFile ? vocalFile.name : "Provide a dry vocal or stacked harmonies."}
+                {vocalFile
+                  ? vocalFile.name
+                  : "Upload a dry vocal or stacked harmonies when available."}
               </p>
             </div>
           </div>
@@ -245,27 +395,27 @@ export function UploadOriginalsModal({
               <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                 BPM
                 <Input
-                  type="number"
-                  min={40}
-                  max={250}
-                  inputMode="numeric"
-                  value={typeof bpm === "number" ? String(bpm) : ""}
+                  type="text"
+                  inputMode="decimal"
+                  pattern="\\d*(\\.\\d{0,2})?"
+                  value={bpm}
                   onChange={(event) => {
                     const raw = event.target.value;
-                    if (raw.trim() === "") {
+                    if (raw === "" || /^\\d*(\\.\\d{0,2})?$/.test(raw)) {
+                      setBpm(raw);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!bpm) return;
+                    const numeric = sanitizeBpmInput(bpm);
+                    if (numeric == null) {
                       setBpm("");
                       return;
                     }
-                    const value = Number(raw);
-                    if (Number.isNaN(value)) {
-                      setBpm("");
-                      return;
-                    }
-                    const clamped = Math.max(40, Math.min(250, Math.round(value)));
-                    setBpm(clamped);
+                    setBpm(numeric.toFixed(2));
                   }}
                   className="rounded bg-slate-900 px-2 py-1 text-slate-100"
-                  placeholder="120"
+                  placeholder="120.00"
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
@@ -342,11 +492,17 @@ export function UploadOriginalsModal({
           </Button>
           <Button
             type="button"
-            onClick={() => void handleSubmit()}
-            disabled={!canSubmit}
+            onClick={() => {
+              if (requiresAuth) {
+                onRequestSignIn?.();
+                return;
+              }
+              void handleSubmit();
+            }}
+            disabled={submitButtonDisabled}
             className="min-w-[120px]"
           >
-            {isSubmitting ? "Uploading..." : "Upload"}
+            {submitButtonLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

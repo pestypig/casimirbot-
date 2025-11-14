@@ -1,4 +1,5 @@
-import { create, type StateCreator } from "zustand";
+import { type StateCreator } from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
 import { publishDriveSplit, subscribeDriveSplit, type DriveSplitState } from "@/lib/drive-split-channel";
 import { publishDriveIntent, subscribeDriveIntent, type DriveIntentState } from "@/lib/drive-intent-channel";
 import type { RidgePreset } from "@shared/schema";
@@ -231,7 +232,7 @@ const creator: StateCreator<DriveSyncState> = (set, get) => ({
   },
 });
 
-export const useDriveSyncStore = create<DriveSyncState>(creator);
+export const useDriveSyncStore = createWithEqualityFn<DriveSyncState>(creator);
 
 publishDriveSplit(toDriveSplitPayload(useDriveSyncStore.getState()));
 {

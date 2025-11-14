@@ -30,6 +30,17 @@ import { autoMatchTexture, resolveTextureById } from "@/lib/noise/kb-autoselect"
 
 export const COVER_DROPPABLE_ID = "noise-cover-creator";
 
+export type RenderJobUpdate = {
+  jobId: string;
+  status: JobStatus | null;
+  original?: Original | null;
+  previewUrl?: string | null;
+  sourceLabel?: string;
+  startedAt?: number;
+};
+
+export type RenderJobResult = RenderJobUpdate & { completedAt: number };
+
 type CoverCreatorProps = {
   selectedOriginal: Original | null;
   onClearSelection: () => void;
@@ -37,6 +48,8 @@ type CoverCreatorProps = {
   includeHelixPacket: boolean;
   helixPacket: HelixPacket | null;
   sessionTempo?: TempoMeta | null;
+  onRenderJobUpdate?: (event: RenderJobUpdate | null) => void;
+  onRenderJobComplete?: (event: RenderJobResult) => void;
 };
 
 type JobTracker = {
@@ -44,6 +57,9 @@ type JobTracker = {
   status: JobStatus;
   mode: "legacy" | "cover";
   snapshot?: CoverJob;
+  sourceLabel?: string;
+  original?: Original | null;
+  startedAt?: number;
 };
 
 const STATUS_ORDER: JobStatus[] = ["queued", "processing", "ready", "error"];
@@ -83,6 +99,8 @@ export function CoverCreator({
   includeHelixPacket,
   helixPacket,
   sessionTempo,
+  onRenderJobUpdate,
+  onRenderJobComplete,
 }: CoverCreatorProps) {
   const { toast } = useToast();
   const [seed, setSeed] = useState<string>("");
@@ -102,6 +120,7 @@ export function CoverCreator({
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const lastPlanTriggerRef = useRef<string | null>(null);
   const lastPreviewUrlRef = useRef<string | null>(null);
+  const lastCompletedJobRef = useRef<string | null>(null);
   const { isOver, setNodeRef } = useDroppable({ id: COVER_DROPPABLE_ID });
 
   const { mutateAsync: queueGeneration, isPending: isRequesting } = useMutation({
@@ -193,7 +212,15 @@ export function CoverCreator({
           if (prev && prev.id === id) {
             return { ...prev, status: response.status };
           }
-          return prev ?? { id, status: response.status, mode: "legacy" };
+          const fallbackMeta = job && job.id === id ? job : undefined;
+          return {
+            id,
+            status: response.status,
+            mode: "legacy",
+            sourceLabel: fallbackMeta?.sourceLabel,
+            original: fallbackMeta?.original ?? selectedOriginal,
+            startedAt: fallbackMeta?.startedAt ?? Date.now(),
+          };
         });
         if (response.detail) {
           setJobMessage(response.detail);
@@ -231,7 +258,16 @@ export function CoverCreator({
           if (prev && prev.id === id) {
             return { ...prev, status: response.status, snapshot: response };
           }
-          return { id, status: response.status, mode: "cover", snapshot: response };
+          const fallbackMeta = job && job.id === id ? job : undefined;
+          return {
+            id,
+            status: response.status,
+            mode: "cover",
+            snapshot: response,
+            sourceLabel: fallbackMeta?.sourceLabel,
+            original: fallbackMeta?.original ?? selectedOriginal,
+            startedAt: fallbackMeta?.startedAt ?? Date.now(),
+          };
         });
         const message =
           response.status === "error"
@@ -281,7 +317,7 @@ export function CoverCreator({
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [job, toast]);
+  }, [job, selectedOriginal, toast]);
 
   useEffect(() => {
     if (!job || job.mode !== "cover") return undefined;
@@ -357,6 +393,7 @@ export function CoverCreator({
       setSampleInfluence(0.7);
       setStyleInfluence(0.3);
       setWeirdness(0.2);
+      lastCompletedJobRef.current = null;
     }
   }, [selectedOriginal]);
 
@@ -504,7 +541,24 @@ export function CoverCreator({
           createdAt: now,
           updatedAt: now,
         };
-        setJob({ id: response.id, status: "processing", mode: "cover", snapshot });
+        const startedAt = Date.now();
+        setJob({
+          id: response.id,
+          status: "processing",
+          mode: "cover",
+          snapshot,
+          sourceLabel,
+          original: selectedOriginal,
+          startedAt,
+        });
+        onRenderJobUpdate?.({
+          jobId: response.id,
+          status: "processing",
+          original: selectedOriginal,
+          previewUrl: null,
+          sourceLabel,
+          startedAt,
+        });
         setJobMessage("Queued for local rendering");
         setRenderProgress({ pct: 0.05, stage: "Queued" });
         setLocalPreviewUrl(null);
@@ -537,8 +591,24 @@ export function CoverCreator({
             helixPacket: includeHelixPacket ? helixPacket ?? undefined : undefined,
           };
           const legacyJob = await queueGeneration(payload);
-          setJob({ id: legacyJob.jobId, status: "queued", mode: "legacy" });
+          const startedAt = Date.now();
+          setJob({
+            id: legacyJob.jobId,
+            status: "queued",
+            mode: "legacy",
+            sourceLabel: fallbackPreset.label,
+            original: selectedOriginal,
+            startedAt,
+          });
           setJobMessage("Falling back to legacy generator");
+          onRenderJobUpdate?.({
+            jobId: legacyJob.jobId,
+            status: "queued",
+            original: selectedOriginal,
+            previewUrl: null,
+            sourceLabel: fallbackPreset.label,
+            startedAt,
+          });
           toast({
             title: "Legacy render queued",
             description: `${sourceLabel} is rendering using the legacy pipeline.`,
@@ -572,6 +642,40 @@ export function CoverCreator({
       }
     };
   }, [localPreviewUrl]);
+
+  useEffect(() => {
+    if (!onRenderJobUpdate) return;
+    if (!job) {
+      onRenderJobUpdate(null);
+      return;
+    }
+    const previewUrl = job.snapshot?.previewUrl ?? localPreviewUrl ?? null;
+    onRenderJobUpdate({
+      jobId: job.id,
+      status: job.status,
+      original: job.original ?? selectedOriginal,
+      previewUrl,
+      sourceLabel: job.sourceLabel,
+      startedAt: job.startedAt,
+    });
+  }, [job, localPreviewUrl, onRenderJobUpdate, selectedOriginal]);
+
+  useEffect(() => {
+    if (!onRenderJobComplete) return;
+    if (!job || job.status !== "ready") return;
+    if (lastCompletedJobRef.current === job.id) return;
+    lastCompletedJobRef.current = job.id;
+    const previewUrl = job.snapshot?.previewUrl ?? localPreviewUrl ?? null;
+    onRenderJobComplete({
+      jobId: job.id,
+      status: job.status,
+      original: job.original ?? selectedOriginal,
+      previewUrl,
+      sourceLabel: job.sourceLabel,
+      startedAt: job.startedAt,
+      completedAt: Date.now(),
+    });
+  }, [job, localPreviewUrl, onRenderJobComplete, selectedOriginal]);
 
   const handleQueueGeneration = async (preset: MoodPreset) => {
     if (!selectedOriginal || isRequesting || isCoverJobPending) return;

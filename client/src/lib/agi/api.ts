@@ -1,0 +1,356 @@
+import type { TMemorySearchHit } from "@shared/essence-persona";
+import type { KnowledgeProjectExport } from "@shared/knowledge";
+import type { WhyBelongs } from "@shared/rationale";
+
+export type PlanResponse = {
+  traceId: string;
+  plan: unknown;
+  manifest?: unknown;
+  prompt?: string;
+};
+
+export type ExecuteResponse = {
+  ok: boolean;
+  steps: unknown[];
+  result_summary?: string;
+  traceId?: string;
+  why_belongs?: WhyBelongs;
+};
+
+export type PersonaSummary = {
+  id: string;
+  display_name: string;
+};
+
+export type DebateTurnPayload = {
+  id: string;
+  debate_id: string;
+  round: number;
+  role: "proponent" | "skeptic" | "referee";
+  text: string;
+  citations: string[];
+  verifier_results: { name: string; ok: boolean; reason: string }[];
+  created_at: string;
+  essence_id?: string;
+};
+
+export type DebateScoreboard = {
+  proponent: number;
+  skeptic: number;
+};
+
+export type DebateOutcomePayload = {
+  debate_id: string;
+  verdict: string;
+  confidence: number;
+  winning_role?: "proponent" | "skeptic";
+  key_turn_ids: string[];
+  created_at: string;
+};
+
+export type DebateSnapshot = {
+  id: string;
+  goal: string;
+  persona_id: string;
+  status: "pending" | "running" | "completed" | "timeout" | "aborted";
+  config: {
+    max_rounds: number;
+    max_wall_ms: number;
+    verifiers: string[];
+  };
+  created_at: string;
+  updated_at: string;
+  turns: DebateTurnPayload[];
+  scoreboard: DebateScoreboard;
+  outcome: DebateOutcomePayload | null;
+};
+
+export type DebateStreamEvent =
+  | {
+      type: "turn";
+      seq: number;
+      debateId: string;
+      turn: DebateTurnPayload;
+      scoreboard: DebateScoreboard;
+    }
+  | {
+      type: "status";
+      seq: number;
+      debateId: string;
+      status: DebateSnapshot["status"];
+      scoreboard: DebateScoreboard;
+    }
+  | {
+      type: "outcome";
+      seq: number;
+      debateId: string;
+      outcome: DebateOutcomePayload;
+      scoreboard: DebateScoreboard;
+    };
+
+export type DebateStartPayload = {
+  goal: string;
+  personaId: string;
+  maxRounds?: number;
+  maxWallMs?: number;
+  verifiers?: string[];
+};
+
+export type DebateStartResponse = {
+  debateId: string;
+};
+
+export type TraceMemoryHit = {
+  id: string;
+  kind: string;
+  owner_id: string;
+  created_at: string;
+  keys: string[];
+  snippet: string;
+  essence_id?: string;
+};
+
+export type TraceMemoryResponse = {
+  traceId: string;
+  personaId: string;
+  top_k: number;
+  memories: TraceMemoryHit[];
+  reflections: TraceMemoryHit[];
+};
+
+type PersonaListResponse = {
+  personas: PersonaSummary[];
+};
+
+export type MemorySearchResponse = {
+  items: TMemorySearchHit[];
+  query?: string;
+  top_k: number;
+  debateOnly?: boolean;
+};
+
+async function asJson<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+  const isJson = contentType.includes("application/json");
+
+  if (!isJson) {
+    const preview = await response
+      .text()
+      .then((text) => text.trim().slice(0, 200))
+      .catch(() => "");
+    const base = `${response.status} ${response.statusText || "Non-JSON response"}`;
+    const hint =
+      typeof response.url === "string" && response.url.includes("/api/agi")
+        ? " Ensure the AGI server routes are enabled (ENABLE_AGI=1)."
+        : "";
+    throw new Error(preview ? `${base}: ${preview}${hint}` : `${base}${hint}`);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw new Error(`Failed to parse JSON response: ${(error as Error).message}`);
+  }
+
+  if (!response.ok) {
+    const message =
+      (typeof (payload as any)?.message === "string" && (payload as any).message) ||
+      (typeof (payload as any)?.error === "string" && (payload as any).error) ||
+      `${response.status} ${response.statusText}`;
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
+export async function plan(
+  goal: string,
+  personaId?: string,
+  knowledgeContext?: KnowledgeProjectExport[],
+  knowledgeProjects?: string[],
+): Promise<PlanResponse> {
+  const body: Record<string, unknown> = { goal, personaId };
+  if (Array.isArray(knowledgeContext) && knowledgeContext.length > 0) {
+    body.knowledgeContext = knowledgeContext;
+  }
+  if (Array.isArray(knowledgeProjects) && knowledgeProjects.length > 0) {
+    body.knowledgeProjects = knowledgeProjects;
+  }
+  return asJson(
+    await fetch("/api/agi/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+  );
+}
+
+export async function execute(traceId: string): Promise<ExecuteResponse> {
+  return asJson(
+    await fetch("/api/agi/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ traceId })
+    })
+  );
+}
+
+export function subscribeToolLogs(onEvent: (event: any) => void): () => void {
+  if (typeof window === "undefined" || typeof EventSource === "undefined") {
+    return () => {};
+  }
+  const source = new EventSource("/api/agi/tools/logs/stream");
+  source.onmessage = (event) => {
+    try {
+      onEvent(JSON.parse(event.data));
+    } catch {
+      /* ignore malformed events */
+    }
+  };
+  source.onerror = () => {
+    /* best-effort stream, do nothing on error */
+  };
+  return () => {
+    source.close();
+  };
+}
+
+export async function syncKnowledgeProjects(projects: KnowledgeProjectExport[]): Promise<{ synced: number; projectIds: string[] }> {
+  if (!Array.isArray(projects) || projects.length === 0) {
+    return { synced: 0, projectIds: [] };
+  }
+  return asJson(
+    await fetch("/api/knowledge/projects/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projects }),
+    }),
+  );
+}
+
+export async function getTraceMemories(traceId: string, k = 10): Promise<TraceMemoryResponse> {
+  const search = new URLSearchParams({ k: String(k) });
+  return asJson(
+    await fetch(`/api/agi/memory/by-trace/${encodeURIComponent(traceId)}?${search.toString()}`, {
+      headers: { Accept: "application/json" }
+    })
+  );
+}
+
+export type MemorySearchParams = {
+  q: string;
+  k?: number;
+  personaId?: string;
+  debateOnly?: boolean;
+};
+
+export async function memorySearch({
+  q,
+  k = 10,
+  personaId,
+  debateOnly = false,
+}: MemorySearchParams): Promise<MemorySearchResponse> {
+  const search = new URLSearchParams();
+  search.set("q", q);
+  if (k) search.set("k", String(k));
+  if (personaId) search.set("owner", personaId);
+  if (debateOnly) search.set("debateOnly", "1");
+  return asJson(
+    await fetch(`/api/agi/memory/search?${search.toString()}`, {
+      headers: { Accept: "application/json" },
+    }),
+  );
+}
+
+export async function listPersonas(): Promise<PersonaSummary[]> {
+  const payload = await asJson<PersonaListResponse>(
+    await fetch("/api/agi/persona/list", {
+      headers: { Accept: "application/json" }
+    })
+  ).catch((error) => {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
+  });
+  if (!payload || !Array.isArray(payload.personas)) {
+    return [];
+  }
+  return payload.personas;
+}
+
+export async function startDebateSession(payload: DebateStartPayload): Promise<DebateStartResponse> {
+  const body: Record<string, unknown> = {
+    goal: payload.goal,
+    persona_id: payload.personaId,
+  };
+  if (Number.isFinite(payload.maxRounds)) {
+    body.max_rounds = payload.maxRounds;
+  }
+  if (Number.isFinite(payload.maxWallMs)) {
+    body.max_wall_ms = payload.maxWallMs;
+  }
+  if (Array.isArray(payload.verifiers) && payload.verifiers.length > 0) {
+    body.verifiers = payload.verifiers.map((name) => name?.toString().trim()).filter((name) => !!name);
+  }
+  return asJson(
+    await fetch("/api/agi/debate/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+  );
+}
+
+export async function getDebateStatus(debateId: string): Promise<DebateSnapshot> {
+  return asJson(
+    await fetch(`/api/agi/debate/${encodeURIComponent(debateId)}`, {
+      headers: { Accept: "application/json" }
+    })
+  );
+}
+
+export type DebateStreamHandlers = {
+  onEvent?: (event: DebateStreamEvent) => void;
+  onError?: (event: Event) => void;
+};
+
+type EventPayload<T extends DebateStreamEvent["type"]> = Omit<Extract<DebateStreamEvent, { type: T }>, "type">;
+
+const parseEventPayload = <T extends DebateStreamEvent["type"]>(event: Event): EventPayload<T> | null => {
+  try {
+    const data = JSON.parse((event as MessageEvent<string>).data || "{}") as EventPayload<T>;
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+export function connectDebateStream(debateId: string, handlers: DebateStreamHandlers = {}): () => void {
+  if (!debateId || typeof window === "undefined" || typeof EventSource === "undefined") {
+    return () => {};
+  }
+  const params = new URLSearchParams({ debateId });
+  const source = new EventSource(`/api/agi/debate/stream?${params.toString()}`);
+  const dispatch = <T extends DebateStreamEvent["type"]>(type: T) => (event: Event) => {
+    const payload = parseEventPayload<T>(event);
+    if (!payload) return;
+    handlers.onEvent?.({ ...payload, type } as Extract<DebateStreamEvent, { type: T }>);
+  };
+  const handleTurn = dispatch("turn");
+  const handleStatus = dispatch("status");
+  const handleOutcome = dispatch("outcome");
+  source.addEventListener("turn", handleTurn);
+  source.addEventListener("status", handleStatus);
+  source.addEventListener("outcome", handleOutcome);
+  source.onerror = (event) => {
+    handlers.onError?.(event);
+  };
+  return () => {
+    source.removeEventListener("turn", handleTurn);
+    source.removeEventListener("status", handleStatus);
+    source.removeEventListener("outcome", handleOutcome);
+    source.close();
+  };
+}

@@ -1,6 +1,12 @@
 ﻿import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { subscribeDriveIntent, type DriveIntentState } from "@/lib/drive-intent-channel";
 import { queryClient } from "@/lib/queryClient";
+import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
+import {
+  curvaturePaletteIndex,
+  isCurvatureDirectiveEnabled,
+  type CurvatureDirective,
+} from "@/lib/curvature-directive";
 
 
 
@@ -70,6 +76,10 @@ const AVG_UPDATE_INTERVAL_MS = 1000 / 20; // ~20 Hz (within 15-30 Hz target)
 
 const INV16PI = 1 / (16 * Math.PI);
 
+const CURVATURE_GAIN_MAX = 6;
+
+const CURVATURE_BOOST_MAX = 40;
+
 const wrapPhase01 = (value: number) => {
   const wrapped = value % 1;
   return wrapped < 0 ? wrapped + 1 : wrapped;
@@ -121,6 +131,64 @@ type OverlayToggleFlags = Partial<Record<OverlayFlagKey, boolean>>;
 
 
 const OVERLAY_QUERY_KEY = ["helix:overlays"] as const;
+
+type CurvStampGPU = {
+  center?: [number, number, number];
+  size?: [number, number, number];
+  value?: number;
+  format?: "float" | "byte";
+};
+
+declare global {
+  interface Window {
+    __hullCurvStampGPU?: CurvStampGPU;
+  }
+}
+
+function stampCurvTex3D(
+  gl: WebGL2RenderingContext,
+  tex: WebGLTexture,
+  dims: [number, number, number],
+  opts?: CurvStampGPU,
+) {
+  if (!tex || !opts) return;
+  const [nx, ny, nz] = dims;
+  if (nx <= 0 || ny <= 0 || nz <= 0) return;
+
+  const center = opts.center ?? [0.82, 0.18, 0.72];
+  const size = opts.size ?? [0.05, 0.05, 0.05];
+  const value = Math.min(1, Math.max(0, opts.value ?? 1));
+  const format = opts.format ?? "float";
+
+  const ix = Math.max(0, Math.min(nx - 1, Math.floor(center[0] * nx)));
+  const iy = Math.max(0, Math.min(ny - 1, Math.floor(center[1] * ny)));
+  const iz = Math.max(0, Math.min(nz - 1, Math.floor(center[2] * nz)));
+  const sx = Math.max(1, Math.floor(size[0] * nx));
+  const sy = Math.max(1, Math.floor(size[1] * ny));
+  const sz = Math.max(1, Math.floor(size[2] * nz));
+
+  const x0 = Math.max(0, Math.min(nx - sx, ix - (sx >> 1)));
+  const y0 = Math.max(0, Math.min(ny - sy, iy - (sy >> 1)));
+  const z0 = Math.max(0, Math.min(nz - sz, iz - (sz >> 1)));
+
+  const prevBinding = gl.getParameter(gl.TEXTURE_BINDING_3D) as WebGLTexture | null;
+  const prevAlignment = gl.getParameter(gl.UNPACK_ALIGNMENT) as number;
+  gl.bindTexture(gl.TEXTURE_3D, tex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+  if (format === "float") {
+    const buf = new Float32Array(sx * sy * sz);
+    buf.fill(value);
+    gl.texSubImage3D(gl.TEXTURE_3D, 0, x0, y0, z0, sx, sy, sz, gl.RED, gl.FLOAT, buf);
+  } else {
+    const buf = new Uint8Array(sx * sy * sz);
+    buf.fill(Math.round(value * 255));
+    gl.texSubImage3D(gl.TEXTURE_3D, 0, x0, y0, z0, sx, sy, sz, gl.RED, gl.UNSIGNED_BYTE, buf);
+  }
+
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, prevAlignment);
+  gl.bindTexture(gl.TEXTURE_3D, prevBinding);
+}
 
 
 
@@ -384,6 +452,14 @@ export interface Hull3DOverlayState {
 
 
 
+    gain?: number; // [tilt-gain]
+
+
+
+    gainMode?: "manual" | "curvature"; // [tilt-gain]
+
+
+
   };
 
 
@@ -418,33 +494,15 @@ export interface Hull3DOverlayState {
 
   };
 
-
-
-  curvature?: {
-
-
-
+  // Tensor-energy overlay: |T00| volume composited during ray-march
+  t00?: {
     enabled?: boolean;
-
-
-
-    gain?: number;
-
-
-
-    alpha?: number;
-
-
-
-    palette?: number;
-
-
-
-    showQIMargin?: boolean;
-
-
-
+    alpha?: number; // 0..1 overlay opacity contribution per step
+    gain?: number;  // transfer gain scalar
+    range?: [number, number]; // optional display range (min,max)
   };
+
+  curvature?: CurvatureDirective;
 
 
 
@@ -488,6 +546,18 @@ type CurvatureBrickMessage = {
 
 
   qiMargin?: Float32Array;
+
+
+
+  emaAlpha?: number;
+
+
+
+  residualMin?: number;
+
+
+
+  residualMax?: number;
 
 
 
@@ -781,7 +851,60 @@ type Vec3 = [number, number, number];
 
 
 
-const clamp = (x: number, min = -Infinity, max = Infinity) => Math.min(Math.max(x, min), max);
+const clamp = (x: number, min = -Infinity, max = Infinity) => Math.min(Math.max(x, min), max); // [tilt-gain]
+
+
+// [tilt-gain] Dev console recipes (window.__tilt*) keep tilt gain falsifiable without UI toggles.
+
+if (typeof window !== "undefined") { // [tilt-gain]
+
+
+
+  // [tilt-gain] window.__surfaceDebugEcho = true;
+
+
+
+  // [tilt-gain] window.__tiltBusScale = 1.0;
+
+
+
+  // [tilt-gain] window.__tiltGainFactor = 1.0;
+
+
+
+  // [tilt-gain] window.__tiltGainMode = "curvature"; // or "manual"
+
+
+
+  // [tilt-gain] window.__tiltGainManual = 1.0;
+
+
+
+  // [tilt-gain] window.dispatchEvent(new CustomEvent("hull3d:tilt", { detail: { enabled: true, dir: [0.707, 0.707], magnitude: 1, alpha: 1 } }));
+
+
+
+  const tiltDev = window as any; // [tilt-gain]
+
+
+
+  tiltDev.__tiltGainMode = tiltDev.__tiltGainMode ?? "curvature"; // [tilt-gain]
+
+
+
+  tiltDev.__tiltGainManual = tiltDev.__tiltGainManual ?? 0.65; // [tilt-gain]
+
+
+
+  tiltDev.__tiltGainFactor = tiltDev.__tiltGainFactor ?? 1.0; // [tilt-gain]
+
+
+
+  tiltDev.__tiltBusScale = tiltDev.__tiltBusScale ?? 1.0; // [tilt-gain]
+
+
+
+} // [tilt-gain]
 
 
 
@@ -1714,10 +1837,13 @@ uniform sampler2D u_radialLUT;
 
 
 uniform sampler3D u_curvTex;
+uniform sampler3D u_t00Tex;
 
 
 
 uniform float u_curvGain;
+uniform float u_t00Alpha;
+uniform float u_t00Gain;
 
 
 
@@ -1726,6 +1852,15 @@ uniform float u_curvAlpha;
 
 
 uniform int u_curvPaletteMode;
+
+uniform bool u_curvDebugOnly;
+
+uniform int u_curvDebugMode;
+
+uniform float u_curvBoost;
+
+uniform vec2 u_curvRange;
+uniform vec2 u_t00Range;
 
 
 
@@ -1966,6 +2101,8 @@ const float INV16PI = 0.019894367886486918;
 
 
 const int RADIAL_LAST = ${RADIAL_SIZE - 1};
+
+const float CURV_ALPHA_K = 6.0;
 
 
 
@@ -2225,6 +2362,17 @@ vec3 curvaturePalette(float t, int mode) {
     }
     return mix(mid, cold, clamp(-x, 0.0, 1.0));
   }
+  if (mode == 2) {
+    vec3 w0 = vec3(0.26, 0.05, 0.10);
+    vec3 w1 = vec3(0.58, 0.15, 0.14);
+    vec3 w2 = vec3(0.94, 0.52, 0.18);
+    vec3 w3 = vec3(1.00, 0.86, 0.48);
+    float segWarm = clamp(t * 3.0, 0.0, 3.0);
+    vec3 warmColor = mix(w0, w1, clamp(segWarm, 0.0, 1.0));
+    warmColor = mix(warmColor, w2, clamp(segWarm - 1.0, 0.0, 1.0));
+    warmColor = mix(warmColor, w3, clamp(segWarm - 2.0, 0.0, 1.0));
+    return warmColor;
+  }
   vec3 c0 = vec3(0.08, 0.20, 0.80);
   vec3 c1 = vec3(0.05, 0.65, 0.88);
   vec3 c2 = vec3(0.98, 0.90, 0.25);
@@ -2234,6 +2382,16 @@ vec3 curvaturePalette(float t, int mode) {
   color = mix(color, c2, clamp(seg - 1.0, 0.0, 1.0));
   color = mix(color, c3, clamp(seg - 2.0, 0.0, 1.0));
   return color;
+}
+
+float symLog01(float x, float boost) {
+  float safeBoost = max(1.0, boost);
+  float ax = clamp(abs(x), 0.0, 1.0);
+  float denom = log(1.0 + safeBoost);
+  float numer = log(1.0 + safeBoost * ax);
+  float scaled = denom > 1e-6 ? numer / denom : ax;
+  float signTerm = (x >= 0.0) ? 1.0 : -1.0;
+  return 0.5 + 0.5 * signTerm * scaled;
 }
 
 
@@ -2672,6 +2830,58 @@ void main() {
 
 
   float auxKijPeak = 0.0;
+
+
+
+  vec3 curvRgbAcc = vec3(0.0);
+
+
+
+  float curvAacc = 0.0;
+
+
+
+  float curvMIP = 0.0;
+
+
+
+  float curvSignAtMIP = 1.0;
+
+
+
+  float curvSpan = max(1e-6, max(abs(u_curvRange.x), abs(u_curvRange.y)));
+
+
+
+  float curvSpanInv = 1.0 / curvSpan;
+
+
+
+  float curvAlphaScale = clamp(u_curvAlpha, 0.0, 1.0);
+
+
+
+  float curvBoost = max(1.0, u_curvBoost);
+
+
+
+  bool curvOverlayActive = curvAlphaScale > 1e-5;
+
+
+
+  bool curvDebugActive = u_curvDebugOnly;
+
+
+
+  bool curvCompositeActive = curvOverlayActive || (curvDebugActive && u_curvDebugMode == 0);
+
+
+
+  bool curvAnyActive = curvOverlayActive || curvDebugActive;
+
+
+
+  bool curvMIPActive = curvDebugActive && u_curvDebugMode == 1;
 
 
 
@@ -3295,6 +3505,10 @@ void main() {
 
 
 
+    float stepLen = dtBase * adaptiveScale;
+
+
+
 
 
 
@@ -3323,7 +3537,7 @@ void main() {
 
 
 
-      t += dtBase * adaptiveScale;
+      t += stepLen;
 
 
 
@@ -3363,7 +3577,7 @@ void main() {
 
 
 
-      t += dtBase * adaptiveScale;
+      t += stepLen;
 
 
 
@@ -3399,18 +3613,42 @@ void main() {
 
 
 
-    if (u_curvAlpha > 1e-5) {
+    if (curvAnyActive) {
       vec3 sampleUVW = clamp(gridCentered * 0.5 + 0.5, 0.0, 1.0);
-      float residual = texture(u_curvTex, sampleUVW).r * u_curvGain;
-      float curvNorm = clamp(0.5 + 0.5 * residual, 0.0, 1.0);
-      vec3 curvColor = curvaturePalette(curvNorm, u_curvPaletteMode);
-      float a = clamp(u_curvAlpha, 0.0, 1.0);
-      color += (1.0 - accum.a) * curvColor * a;
+      float residual = texture(u_curvTex, sampleUVW).r;
+      float unitResidual = clamp(residual * curvSpanInv, -1.0, 1.0);
+      float boosted = symLog01(unitResidual * u_curvGain, curvBoost);
+      vec3 curvColor = curvaturePalette(boosted, u_curvPaletteMode);
+      float mag = abs(unitResidual);
+      float aStep = curvAlphaScale * (1.0 - exp(-CURV_ALPHA_K * mag * stepLen));
+      if (curvCompositeActive && aStep > 0.0) {
+        float remain = 1.0 - curvAacc;
+        float contrib = remain * aStep;
+        curvRgbAcc += curvColor * contrib;
+        curvAacc += contrib;
+      }
+      if (curvMIPActive && mag > curvMIP) {
+        curvMIP = mag;
+        curvSignAtMIP = (unitResidual >= 0.0) ? 1.0 : -1.0;
+      }
     }
 
 
 
     float alpha = 1.0 - exp(-density * 1.6);
+
+    // T00 overlay: sample |T00| field and tint as fog based on transfer
+    if (u_t00Alpha > 1e-5) {
+      vec3 t00UVW = clamp(gridCentered * 0.5 + 0.5, 0.0, 1.0);
+      float t00v = abs(texture(u_t00Tex, t00UVW).r);
+      float span = max(1e-12, max(abs(u_t00Range.x), abs(u_t00Range.y)));
+      float unit = clamp(t00v / span, 0.0, 1.0);
+      // simple 2-stop tf: blue->yellow
+      vec3 t00Tint = mix(vec3(0.1, 0.2, 0.8), vec3(1.0, 0.9, 0.3), unit);
+      float fog = clamp(unit * max(0.0, u_t00Gain), 0.0, 1.0) * clamp(u_t00Alpha, 0.0, 1.0);
+      color = mix(color, t00Tint, fog);
+      alpha = clamp(alpha + fog * 0.35, 0.0, 1.0);
+    }
 
 
 
@@ -3460,13 +3698,32 @@ void main() {
 
 
 
-    t += dtBase * adaptiveScale;
+    t += stepLen;
 
 
 
   }
 
 
+
+  if (u_curvDebugOnly) {
+    if (curvMIPActive) {
+      float signedPeak = curvSignAtMIP * curvMIP;
+      float tone = symLog01(signedPeak * u_curvGain, curvBoost);
+      vec3 rgb = curvaturePalette(tone, u_curvPaletteMode);
+      outColor = vec4(rgb, 1.0);
+    } else {
+      float alpha = clamp(curvAacc, 0.0, 1.0);
+      outColor = vec4(curvRgbAcc, alpha);
+    }
+    outAux = vec4(0.0);
+    return;
+  }
+
+  if (curvOverlayActive && curvAacc > 1e-5) {
+    float overlayAlpha = clamp(curvAacc, 0.0, 1.0);
+    accum.rgb = mix(accum.rgb, curvRgbAcc, overlayAlpha);
+  }
 
   if (u_debugMode == 4) {
 
@@ -3877,14 +4134,6 @@ uniform vec2 u_tiltDir;
 
 
 uniform float u_tiltMag;
-
-
-
-uniform float u_tiltAlpha;
-
-
-
-
 
 
 
@@ -5146,6 +5395,26 @@ uniform float u_vizFloorThetaDrive;
 
 
 
+uniform int   u_showTilt;
+
+
+
+uniform vec2  u_tiltDir;
+
+
+
+uniform float u_tiltMag;
+
+
+
+uniform float u_tiltAlpha;
+
+
+
+uniform float u_tiltGain; // [tilt-gain]
+
+
+
 
 
 
@@ -5335,6 +5604,86 @@ void main(){
 
 
   vec2 grid = a_pos;
+
+
+
+  vec2 tiltDir = vec2(0.0);
+
+
+
+  float tiltStrength = 0.0;
+
+
+
+  if (u_showTilt != 0) {
+
+
+
+
+
+
+
+    float lenTilt = length(u_tiltDir);
+
+
+
+
+
+
+
+    if (lenTilt > 1e-5) {
+
+
+
+
+
+
+
+      tiltDir = u_tiltDir / lenTilt;
+
+
+
+
+
+
+
+      float mag = clamp(u_tiltMag, 0.0, 1.0); // [tilt-gain]
+
+
+
+
+
+
+
+      float alpha = clamp(u_tiltAlpha, 0.0, 1.0); // [tilt-gain]
+
+
+
+
+
+
+
+      float _gain = (u_tiltGain > 0.0) ? u_tiltGain : 0.65; // [tilt-gain]
+
+
+
+      tiltStrength = mag * alpha * _gain; // [tilt-gain]
+
+
+
+
+
+
+
+    }
+
+
+
+
+
+
+
+  }
 
 
 
@@ -5638,7 +5987,15 @@ void main(){
 
 
 
-  vec4 pos = vec4(pView.x, y, pView.z, 1.0);
+  float lateral = dot(grid, tiltDir);
+
+
+
+  float tiltOffset = (tiltStrength > 1e-5) ? lateral * tiltStrength : 0.0; // [tilt-gain]
+
+
+
+  vec4 pos = vec4(pView.x, y + tiltOffset, pView.z, 1.0);
 
 
 
@@ -5693,13 +6050,7 @@ void main(){
 `;
 
 
-
-
-
-
-
 const SURFACE_OVERLAY_FS = `#version 300 es
-
 
 
 precision highp float;
@@ -5722,6 +6073,22 @@ uniform float u_alpha;
 
 
 
+uniform int   u_showTilt;
+
+
+
+uniform vec2  u_tiltDir;
+
+
+
+uniform float u_tiltAlpha;
+
+
+
+uniform float u_debugTiltEcho;
+
+
+
 out vec4 outColor;
 
 
@@ -5730,7 +6097,67 @@ void main(){
 
 
 
-  outColor = vec4(v_color, clamp(u_alpha, 0.0, 1.0));
+  float alpha = clamp(u_alpha, 0.0, 1.0);
+
+
+
+  bool echoActive = (u_debugTiltEcho > 0.5);
+
+
+
+  bool hasTiltDir = length(u_tiltDir) > 1e-5;
+
+
+
+  if (echoActive) {
+
+
+
+    vec2 axis = hasTiltDir ? normalize(u_tiltDir) : vec2(1.0, 0.0);
+
+
+
+    const float STRIPE_GAIN = 140.0;
+
+
+
+    vec2 centered = v_uv - 0.5;
+
+
+
+    float wave = sin(dot(centered, axis) * STRIPE_GAIN);
+
+
+
+    float stripe = step(0.0, wave);
+
+
+
+    vec3 baseColor = v_color;
+
+
+
+    float gain = mix(0.35, 1.35, stripe);
+
+
+
+    vec3 modulated = clamp(baseColor * gain, 0.0, 1.0);
+
+
+
+    outColor = vec4(modulated, 1.0);
+
+
+
+    return;
+
+
+
+  }
+
+
+
+  outColor = vec4(v_color, alpha);
 
 
 
@@ -5738,11 +6165,7 @@ void main(){
 
 
 
-`;
-
-
-
-
+`
 
 
 
@@ -6166,6 +6589,14 @@ type RayUniformParams = {
 
 
 
+  curvDebugOnly?: boolean;
+
+
+
+  curvDebugMode?: number;
+
+
+
 };
 
 
@@ -6259,6 +6690,7 @@ export class Hull3DRenderer {
 
 
   private curvatureBusId: string | null = null;
+  private t00BusId: string | null = null;
 
 
 
@@ -6430,9 +6862,31 @@ export class Hull3DRenderer {
 
 
 
+    range: [-8, 8] as [number, number],
+
+
+
   };
 
 
+
+  private _curvStats?: { emaMin: number; emaMax: number };
+
+  private curvatureStampWarned = false;
+
+  // T00 (energy density) volume state
+  private t00 = {
+    texA: null as WebGLTexture | null,
+    texB: null as WebGLTexture | null,
+    fallback: null as WebGLTexture | null,
+    front: 0 as 0 | 1,
+    dims: [1, 1, 1] as [number, number, number],
+    version: 0,
+    updatedAt: 0,
+    hasData: false,
+    range: [1e-12, 1e-12] as [number, number],
+  };
+  private t00StampWarned = false;
 
   private fallbackTex2D: WebGLTexture | null = null;
 
@@ -6731,6 +7185,24 @@ export class Hull3DRenderer {
 
 
     u_vizFloorThetaDrive: WebGLUniformLocation | null;
+
+
+
+    u_showTilt: WebGLUniformLocation | null;
+
+
+
+    u_tiltDir: WebGLUniformLocation | null;
+
+
+
+    u_tiltMag: WebGLUniformLocation | null;
+
+
+
+    u_tiltAlpha: WebGLUniformLocation | null;
+
+    u_tiltGain: WebGLUniformLocation | null; // [tilt-gain]
 
 
 
@@ -7104,6 +7576,16 @@ export class Hull3DRenderer {
 
     this.options = options;
 
+    if (typeof window !== "undefined") {
+      const dbg = window as any;
+      if (typeof dbg.__hullCurvDebugOnly === "undefined") {
+        dbg.__hullCurvDebugOnly = false;
+      }
+      if (typeof dbg.__hullCurvDebugMode === "undefined") {
+        dbg.__hullCurvDebugMode = 0;
+      }
+    }
+
 
 
     this.qualityPreset = options.quality ?? "auto";
@@ -7172,6 +7654,10 @@ export class Hull3DRenderer {
 
     this.curvatureBusId = subscribe("hull3d:curvature", (payload: any) => {
       this.handleCurvatureBrick(payload);
+    });
+
+    this.t00BusId = subscribe("hull3d:t00-volume", (payload: any) => {
+      this.handleT00Brick(payload);
     });
 
 
@@ -7869,6 +8355,14 @@ export class Hull3DRenderer {
 
 
           u_vizFloorThetaDrive: gl.getUniformLocation(prog, "u_vizFloorThetaDrive"),
+          u_showTilt: gl.getUniformLocation(prog, "u_showTilt"),
+          u_tiltDir: gl.getUniformLocation(prog, "u_tiltDir"),
+          u_tiltMag: gl.getUniformLocation(prog, "u_tiltMag"),
+          u_tiltAlpha: gl.getUniformLocation(prog, "u_tiltAlpha"),
+
+
+
+          u_tiltGain: gl.getUniformLocation(prog, "u_tiltGain"), // [tilt-gain]
 
 
 
@@ -10066,6 +10560,68 @@ export class Hull3DRenderer {
 
     const floorThetaDrive = Math.max(0, state.vizFloorThetaDrive ?? 1e-6);
 
+    const tiltCfg = state.overlays?.tilt;
+    const tiltEnabled = Boolean(tiltCfg?.enabled && tiltCfg?.dir);
+    const tiltDir = (tiltCfg?.dir ?? [0, 0]) as [number, number];
+    const dbgWindow = typeof window !== "undefined" ? (window as any) : undefined;
+    const tiltMag = Math.max(0, Math.min(1, tiltCfg?.magnitude ?? 0));
+    const tiltAlphaBase = tiltCfg?.alpha ?? 0.85;
+    const tiltAlpha = Math.max(0, Math.min(1, tiltAlphaBase));
+    const curvCfg = state.overlays?.curvature;
+    const curvActive = isCurvatureDirectiveEnabled(curvCfg);
+    const curvEnabled = curvActive && this.curvature.hasData;
+    const curvGainUi = curvActive ? curvCfg.gain : 1.0;
+    let curvGain = curvGainUi;
+    const autoGainEnabled = typeof globalThis !== "undefined" && (globalThis as any).__hullCurvAutoGain === true;
+    if (autoGainEnabled && this._curvStats) {
+      const span = Math.max(1e-6, this._curvStats.emaMax - this._curvStats.emaMin);
+      const targetSpan = 2.0;
+      const autoScale = targetSpan / span;
+      curvGain = clamp(curvGainUi * autoScale, 0.05, 24.0);
+    }
+
+
+
+    const curvPaletteMode = curvaturePaletteIndex(curvActive ? curvCfg.palette : undefined);
+
+
+
+    const curvDebugOnly = params.curvDebugOnly ?? false;
+
+
+
+    const curvAlpha =
+
+
+
+      (curvEnabled || curvDebugOnly)
+        ? clamp(curvActive ? curvCfg.alpha : 0.0, 0, 1)
+        : 0.0;
+
+
+
+    const curvDebugMode = clamp(Math.round(params.curvDebugMode ?? 0), 0, 1);
+
+
+
+    const curvRange = this.curvature.range ?? [-8, 8];
+
+
+
+    const curvRangeMin = Number.isFinite(curvRange?.[0]) ? curvRange[0] : -8;
+
+
+
+    const curvRangeMax = Number.isFinite(curvRange?.[1]) ? curvRange[1] : 8;
+
+
+
+    const gain01 = clamp(curvGain / CURVATURE_GAIN_MAX, 0, 1);
+
+
+
+    const curvBoost = 1 + gain01 * (CURVATURE_BOOST_MAX - 1);
+
 
 
     if (loc.u_axes) gl.uniform3f(loc.u_axes, state.axes[0], state.axes[1], state.axes[2]);
@@ -10101,6 +10657,31 @@ export class Hull3DRenderer {
 
 
     if (loc.u_vizFloorThetaDrive) gl.uniform1f(loc.u_vizFloorThetaDrive, floorThetaDrive);
+    this.uniformCache.set1i(gl, loc.u_showTilt, tiltEnabled ? 1 : 0);
+    if (loc.u_tiltDir) gl.uniform2f(loc.u_tiltDir, tiltDir[0], tiltDir[1]);
+    this.uniformCache.set1f(gl, loc.u_tiltMag, tiltMag);
+    this.uniformCache.set1f(gl, loc.u_tiltAlpha, tiltAlpha);
+
+
+
+    this.uniformCache.set1f(gl, loc.u_curvGain, curvGain);
+    this.uniformCache.set1f(gl, loc.u_curvAlpha, curvAlpha);
+    this.uniformCache.set1i(gl, loc.u_curvPaletteMode, curvPaletteMode);
+    this.uniformCache.set1i(gl, loc.u_curvDebugOnly, curvDebugOnly ? 1 : 0);
+    this.uniformCache.set1i(gl, loc.u_curvDebugMode, curvDebugMode);
+
+    if (loc.u_curvBoost) gl.uniform1f(loc.u_curvBoost, curvBoost);
+    if (loc.u_curvRange) gl.uniform2f(loc.u_curvRange, curvRangeMin, curvRangeMax);
+
+    // T00 overlay uniforms
+    const t00Cfg = state.overlays?.t00;
+    const t00Enabled = Boolean(t00Cfg?.enabled && this.t00.hasData);
+    const t00Alpha = t00Enabled ? clamp(t00Cfg?.alpha ?? 0.65, 0, 1) : 0;
+    const t00Gain = t00Cfg?.gain ?? 1.0;
+    const t00Range = this.t00.range ?? [1e-12, 1e-12];
+    if ((loc as any).u_t00Alpha) this.uniformCache.set1f(gl, (loc as any).u_t00Alpha, t00Alpha);
+    if ((loc as any).u_t00Gain) this.uniformCache.set1f(gl, (loc as any).u_t00Gain, t00Gain);
+    if ((loc as any).u_t00Range) gl.uniform2f((loc as any).u_t00Range, t00Range[0], t00Range[1]);
 
 
 
@@ -10315,6 +10896,7 @@ export class Hull3DRenderer {
         hullInvViewProj: baseInvViewProj,
       };
     }
+
     const model = identity();
     model[12] = offset[0];
     model[13] = offset[1];
@@ -10727,10 +11309,13 @@ export class Hull3DRenderer {
 
 
         u_curvTex: gl.getUniformLocation(this.resources.rayProgram, "u_curvTex"),
+        u_t00Tex: gl.getUniformLocation(this.resources.rayProgram, "u_t00Tex"),
 
 
 
         u_curvGain: gl.getUniformLocation(this.resources.rayProgram, "u_curvGain"),
+        u_t00Alpha: gl.getUniformLocation(this.resources.rayProgram, "u_t00Alpha"),
+        u_t00Gain: gl.getUniformLocation(this.resources.rayProgram, "u_t00Gain"),
 
 
 
@@ -10739,6 +11324,23 @@ export class Hull3DRenderer {
 
 
         u_curvPaletteMode: gl.getUniformLocation(this.resources.rayProgram, "u_curvPaletteMode"),
+
+
+
+        u_curvDebugOnly: gl.getUniformLocation(this.resources.rayProgram, "u_curvDebugOnly"),
+
+
+
+        u_curvDebugMode: gl.getUniformLocation(this.resources.rayProgram, "u_curvDebugMode"),
+
+
+
+        u_curvBoost: gl.getUniformLocation(this.resources.rayProgram, "u_curvBoost"),
+
+
+
+        u_curvRange: gl.getUniformLocation(this.resources.rayProgram, "u_curvRange"),
+        u_t00Range: gl.getUniformLocation(this.resources.rayProgram, "u_t00Range"),
 
 
 
@@ -11003,10 +11605,35 @@ export class Hull3DRenderer {
 
 
       gl.bindTexture(gl.TEXTURE_3D, curvTex);
+      this.maybeStampCurvatureTexture(curvTex);
+      this.maybeStampCurvatureTexture(curvTex);
+      this.maybeStampCurvatureTexture(curvTex);
 
 
 
       if (loc.u_curvTex) gl.uniform1i(loc.u_curvTex, 4);
+      // Bind T00 for test path
+      const t00TexC = this.t00.hasData ? this.getActiveT00Texture() : this.ensureT00Fallback();
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_3D, t00TexC);
+      if (loc.u_t00Tex) gl.uniform1i(loc.u_t00Tex, 5);
+      // Bind T00 volume (|T00|) at unit 5
+      const t00TexB = this.t00.hasData ? this.getActiveT00Texture() : this.ensureT00Fallback();
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_3D, t00TexB);
+      if (loc.u_t00Tex) gl.uniform1i(loc.u_t00Tex, 5);
+      // Bind T00 volume (|T00|) at unit 5
+      const t00TexA = this.t00.hasData ? this.getActiveT00Texture() : this.ensureT00Fallback();
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_3D, t00TexA);
+      if (loc.u_t00Tex) gl.uniform1i(loc.u_t00Tex, 5);
+
+      // Bind T00 volume (|T00|) at unit 5
+      const t00Tex = this.t00.hasData ? this.getActiveT00Texture() : this.ensureT00Fallback();
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_3D, t00Tex);
+      this.maybeStampT00Texture(t00Tex);
+      if (loc.u_t00Tex) gl.uniform1i(loc.u_t00Tex, 5);
 
 
 
@@ -11190,6 +11817,22 @@ export class Hull3DRenderer {
 
 
 
+      const curvDebugOnly = !!dbg.__hullCurvDebugOnly;
+
+
+
+      const curvDebugMode = Number.isInteger(dbg.__hullCurvDebugMode)
+
+
+
+        ? clamp(dbg.__hullCurvDebugMode | 0, 0, 1)
+
+
+
+        : 0;
+
+
+
       const ringOverlay = !!dbg.__hullShowRingOverlay ? 1 : 0;
 
 
@@ -11303,6 +11946,14 @@ export class Hull3DRenderer {
 
 
         testMode: 0,
+
+
+
+        curvDebugOnly,
+
+
+
+        curvDebugMode,
 
 
 
@@ -11573,7 +12224,8 @@ export class Hull3DRenderer {
 
 
 
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    // Additive blend so the sheet never mutes other translucent overlays (ring, HUD, etc.)
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 
 
 
@@ -11690,10 +12342,168 @@ export class Hull3DRenderer {
 
 
       u_vizFloorThetaDrive: gl.getUniformLocation(this.surfaceProgram, "u_vizFloorThetaDrive"),
+      u_showTilt: gl.getUniformLocation(this.surfaceProgram, "u_showTilt"),
+      u_tiltDir: gl.getUniformLocation(this.surfaceProgram, "u_tiltDir"),
+      u_tiltMag: gl.getUniformLocation(this.surfaceProgram, "u_tiltMag"),
+      u_tiltAlpha: gl.getUniformLocation(this.surfaceProgram, "u_tiltAlpha"),
+
+
+
+      u_tiltGain: gl.getUniformLocation(this.surfaceProgram, "u_tiltGain"), // [tilt-gain]
+      u_debugTiltEcho: gl.getUniformLocation(this.surfaceProgram, "u_debugTiltEcho"),
 
 
 
     } as const;
+
+    const tilt = state.overlays?.tilt; // [tilt-gain]
+
+
+
+    const tiltEnabled = Boolean(tilt?.enabled && tilt?.dir); // [tilt-gain]
+
+
+
+    const tiltDir = (tilt?.dir ?? [0, 0]) as [number, number]; // [tilt-gain]
+
+
+
+    const tiltAlphaBase = tilt?.alpha ?? 0.85; // [tilt-gain]
+
+
+
+    const tiltAlpha = Math.max(0, Math.min(1, tiltAlphaBase)); // [tilt-gain]
+
+
+
+    const dbgWindow = typeof window !== "undefined" ? (window as any) : undefined; // [tilt-gain]
+
+
+
+    const debugTiltEcho = dbgWindow?.__surfaceDebugEcho ? 1 : 0; // [tilt-gain]
+
+
+
+    const curvatureDirective = state.overlays?.curvature;
+    const curvGain = isCurvatureDirectiveEnabled(curvatureDirective)
+      ? curvatureDirective.gain
+      : 1; // [tilt-gain]
+
+
+
+    const gainMode = // [tilt-gain]
+
+
+
+      (tilt?.gainMode === "manual" || tilt?.gainMode === "curvature")
+
+
+
+        ? tilt.gainMode
+
+
+
+        : (dbgWindow?.__tiltGainMode === "manual" || dbgWindow?.__tiltGainMode === "curvature"
+
+
+
+            ? dbgWindow.__tiltGainMode
+
+
+
+            : "curvature"); // [tilt-gain]
+
+
+
+    const manualGainFromState = typeof tilt?.gain === "number" ? tilt.gain : undefined; // [tilt-gain]
+
+
+
+    const manualGainDev =
+
+
+
+      dbgWindow && typeof dbgWindow.__tiltGainManual === "number"
+
+
+
+        ? dbgWindow.__tiltGainManual
+
+
+
+        : 0.65; // [tilt-gain]
+
+
+
+    const manualGain = // [tilt-gain]
+
+
+
+      typeof manualGainFromState === "number" && Number.isFinite(manualGainFromState)
+
+
+
+        ? manualGainFromState
+
+
+
+        : manualGainDev; // [tilt-gain]
+
+
+
+    const gainFactor =
+
+
+
+      dbgWindow && typeof dbgWindow.__tiltGainFactor === "number"
+
+
+
+        ? dbgWindow.__tiltGainFactor
+
+
+
+        : 1; // [tilt-gain]
+
+
+
+    const tiltGainBase = gainMode === "curvature" ? curvGain : manualGain; // [tilt-gain]
+
+
+
+    const tiltGain = Math.max(0, tiltGainBase * gainFactor); // [tilt-gain]
+
+
+
+    const busScale = // [tilt-gain]
+
+
+
+      dbgWindow && typeof dbgWindow.__tiltBusScale === "number"
+
+
+
+        ? dbgWindow.__tiltBusScale
+
+
+
+        : 1; // [tilt-gain]
+
+
+
+    const magIn = Math.max(0, +(tilt?.magnitude ?? 0)); // [tilt-gain]
+
+
+
+    const magRaw = Math.max(0, magIn * busScale); // [tilt-gain]
+
+
+
+    const tiltMag = Math.min(1, magRaw); // [tilt-gain]
+
+    // Visual-only knobs from shared store (display only; physics unaffected)
+    const phys = useHull3DSharedStore.getState().physics;
+    const yGainRaw = Math.max(0, Number.isFinite(phys?.yGain) ? (phys!.yGain) : 1) * Math.pow(10, (Number(phys?.trimDb ?? 0)) / 20);
 
 
 
@@ -11705,7 +12515,7 @@ export class Hull3DRenderer {
 
 
 
-    const yGain = 1e-8;
+    const yGain = phys?.locked ? 1 : yGainRaw;
 
 
 
@@ -11713,11 +12523,11 @@ export class Hull3DRenderer {
 
 
 
-    const kColor = 1e-6;
+    const kColor = Math.max(0, Number.isFinite(phys?.kColor) ? (phys!.kColor) : 1);
 
 
 
-    const alpha = 0.24;
+    const alpha = 0.77;
 
 
 
@@ -11859,15 +12669,41 @@ export class Hull3DRenderer {
 
     if (loc.u_vizFloorRhoGR) gl.uniform1f(loc.u_vizFloorRhoGR, floorRhoGR);
 
-
-
     if (loc.u_vizFloorThetaDrive) gl.uniform1f(loc.u_vizFloorThetaDrive, floorThetaDrive);
 
+    this.uniformCache.set1i(gl, loc.u_showTilt, tiltEnabled ? 1 : 0); // [tilt-gain]
+    if (loc.u_tiltDir) gl.uniform2f(loc.u_tiltDir, tiltDir[0], tiltDir[1]); // [tilt-gain]
+    this.uniformCache.set1f(gl, loc.u_tiltMag, tiltMag); // [tilt-gain]
+    this.uniformCache.set1f(gl, loc.u_tiltAlpha, tiltAlpha); // [tilt-gain]
+    this.uniformCache.set1f(gl, loc.u_tiltGain, tiltGain); // [tilt-gain]
+    this.uniformCache.set1f(gl, loc.u_debugTiltEcho, debugTiltEcho); // [tilt-gain]
 
-
-
-
-
+    if (typeof window !== "undefined") { // [tilt-gain]
+      const surfaceDbg = ((window as any).__surfaceDbg ??= { frames: 0, last: null }); // [tilt-gain]
+      surfaceDbg.frames = (surfaceDbg.frames ?? 0) + 1; // [tilt-gain]
+      const dirSafe: [number, number] = [ // [tilt-gain]
+        Number.isFinite(tiltDir[0]) ? tiltDir[0] : 0, // [tilt-gain]
+        Number.isFinite(tiltDir[1]) ? tiltDir[1] : 0, // [tilt-gain]
+      ]; // [tilt-gain]
+      surfaceDbg.last = { // [tilt-gain]
+        show: tiltEnabled ? 1 : 0, // [tilt-gain]
+        dir: dirSafe, // [tilt-gain]
+        mag: tiltMag, // [tilt-gain]
+        alpha: tiltAlpha, // [tilt-gain]
+        overlayEnabled: Boolean(tilt?.enabled), // [tilt-gain]
+        debugEcho: debugTiltEcho > 0.5, // [tilt-gain]
+      }; // [tilt-gain]
+      surfaceDbg.tilt = { // [tilt-gain]
+        enabled: !!tilt?.enabled, // [tilt-gain]
+        dir: tilt?.dir ?? dirSafe, // [tilt-gain]
+        magIn, // [tilt-gain]
+        magSent: tiltMag, // [tilt-gain]
+        alpha: tilt?.alpha ?? 0, // [tilt-gain]
+        gainMode, // [tilt-gain]
+        curvGain, // [tilt-gain]
+        tiltGain, // [tilt-gain]
+      }; // [tilt-gain]
+    } // [tilt-gain]
 
     this.drawSurfaceGridGeometry(gl);
 
@@ -12237,19 +13073,11 @@ export class Hull3DRenderer {
 
 
 
-    const curvEnabled = !!curvCfg?.enabled && this.curvature.hasData;
-
-
-
-    const curvGain = curvCfg?.gain ?? 1.0;
-
-
-
-    const curvAlpha = curvEnabled ? Math.max(0, Math.min(1, curvCfg?.alpha ?? 0.0)) : 0.0;
-
-
-
-    const curvPaletteMode = curvCfg?.palette ?? 0;
+    const curvActive2D = isCurvatureDirectiveEnabled(curvCfg);
+    const curvEnabled = curvActive2D && this.curvature.hasData;
+    const curvGain = curvActive2D ? curvCfg.gain : 1.0;
+    const curvAlpha = curvEnabled ? Math.max(0, Math.min(1, curvActive2D ? curvCfg.alpha : 0.0)) : 0.0;
+    const curvPaletteMode = curvaturePaletteIndex(curvActive2D ? curvCfg.palette : undefined);
 
 
 
@@ -12555,13 +13383,17 @@ export class Hull3DRenderer {
 
     gl.useProgram(this.betaOverlayProgram);
 
+    // Visual-only knobs from shared store (display only; physics unaffected)
+    const phys = useHull3DSharedStore.getState().physics;
+    const yGainRaw = Math.max(0, Number.isFinite(phys?.yGain) ? (phys!.yGain) : 1) * Math.pow(10, (Number(phys?.trimDb ?? 0)) / 20);
 
 
 
 
 
 
-    const yGain = 1e-8;
+
+    const yGain = phys?.locked ? 1 : yGainRaw;
 
 
 
@@ -12569,11 +13401,19 @@ export class Hull3DRenderer {
 
 
 
-    const kColor = 1e-6;
+    const kColor = Math.max(0, Number.isFinite(phys?.kColor) ? (phys!.kColor) : 1);
 
 
 
     const alpha = 0.45;
+
+    const tiltCfg = state.overlays?.tilt;
+    const tiltEnabled = Boolean(tiltCfg?.enabled && tiltCfg?.dir);
+    const tiltDir = (tiltCfg?.dir ?? [0, 0]) as [number, number];
+    const dbgWindow = typeof window !== "undefined" ? (window as any) : undefined;
+    const tiltMag = Math.max(0, Math.min(1, tiltCfg?.magnitude ?? 0));
+    const tiltAlphaBase = tiltCfg?.alpha ?? 0.85;
+    const tiltAlpha = Math.max(0, Math.min(1, tiltAlphaBase));
 
 
 
@@ -12706,6 +13546,10 @@ export class Hull3DRenderer {
 
 
     if (u.u_vizFloorThetaDrive) gl.uniform1f(u.u_vizFloorThetaDrive, floorThetaDrive);
+    this.uniformCache.set1i(gl, u.u_showTilt, tiltEnabled ? 1 : 0);
+    if (u.u_tiltDir) gl.uniform2f(u.u_tiltDir, tiltDir[0], tiltDir[1]);
+    this.uniformCache.set1f(gl, u.u_tiltMag, tiltMag);
+    this.uniformCache.set1f(gl, u.u_tiltAlpha, tiltAlpha);
 
 
 
@@ -13297,6 +14141,24 @@ export class Hull3DRenderer {
     return active ?? this.ensureCurvatureFallback();
   }
 
+  private maybeStampCurvatureTexture(tex: WebGLTexture | null) {
+    if (!tex || typeof window === "undefined") return;
+    const stamp = window.__hullCurvStampGPU;
+    if (!stamp) {
+      this.curvatureStampWarned = false;
+      return;
+    }
+    try {
+      const dims = this.curvature?.dims ?? [1, 1, 1];
+      stampCurvTex3D(this.gl, tex, dims, stamp);
+    } catch (err) {
+      if (!this.curvatureStampWarned) {
+        console.warn("[Hull3DRenderer] curvature stamp failed:", err);
+        this.curvatureStampWarned = true;
+      }
+    }
+  }
+
   private handleCurvatureBrick(payload: any) {
     if (!payload || typeof payload !== "object") return;
 
@@ -13347,6 +14209,18 @@ export class Hull3DRenderer {
       clampMax = clampMin;
       clampMin = tmp;
     }
+    if (Number.isFinite(clampMinRaw) && Number.isFinite(clampMaxRaw)) {
+      const statsAlpha = Number.isFinite(alphaRaw) ? emaAlpha : 0.5;
+      const blend = clamp(statsAlpha, 1e-3, 1);
+      if (!this._curvStats) {
+        this._curvStats = { emaMin: clampMin, emaMax: clampMax };
+      } else {
+        const keep = 1 - blend;
+        this._curvStats.emaMin = keep * this._curvStats.emaMin + blend * clampMin;
+        this._curvStats.emaMax = keep * this._curvStats.emaMax + blend * clampMax;
+      }
+    }
+    this.curvature.range = [clampMin, clampMax];
     const resized = this.curvature.emaResidual.length !== expected;
     if (resized) {
       this.curvature.emaResidual = new Float32Array(expected);
@@ -13385,6 +14259,115 @@ export class Hull3DRenderer {
 
 
 
+
+  // --- T00 volume (|T00|) helpers -------------------------------------------------
+  private ensureT00Textures() {
+    const { gl } = this;
+    if (!this.t00.texA) {
+      this.t00.texA = this.createCurvatureTexture();
+      this.t00.front = 0;
+    }
+    if (!this.t00.texB) {
+      this.t00.texB = this.createCurvatureTexture();
+    }
+  }
+
+  private ensureT00Fallback(): WebGLTexture {
+    if (this.t00.fallback) return this.t00.fallback;
+    const tex = this.createCurvatureTexture();
+    this.t00.fallback = tex;
+    return tex;
+  }
+
+  private getActiveT00Texture(): WebGLTexture {
+    this.ensureT00Textures();
+    const active = this.t00.front === 0 ? this.t00.texA : this.t00.texB;
+    return active ?? this.ensureT00Fallback();
+  }
+
+  private maybeStampT00Texture(tex: WebGLTexture | null) {
+    if (!tex || typeof window === "undefined") return;
+    const stamp = (window as any).__hullT00StampGPU;
+    if (!stamp) {
+      this.t00StampWarned = false;
+      return;
+    }
+    try {
+      const dims = this.t00?.dims ?? [1, 1, 1];
+      stampCurvTex3D(this.gl, tex, dims, stamp);
+    } catch (err) {
+      if (!this.t00StampWarned) {
+        console.warn("[Hull3DRenderer] T00 stamp failed:", err);
+        this.t00StampWarned = true;
+      }
+    }
+  }
+
+  private handleT00Brick(payload: any) {
+    if (!payload || typeof payload !== "object") return;
+
+    const versionRaw = Number((payload as any).version ?? 0);
+    if (!Number.isFinite(versionRaw)) return;
+    if (versionRaw <= this.t00.version) return;
+
+    const dimsRaw = (payload as any).dims;
+    if (!Array.isArray(dimsRaw) || dimsRaw.length !== 3) return;
+
+    const dims: [number, number, number] = [
+      Math.max(1, Number(dimsRaw[0]) | 0),
+      Math.max(1, Number(dimsRaw[1]) | 0),
+      Math.max(1, Number(dimsRaw[2]) | 0),
+    ];
+
+    const dataSource = (payload as any).data;
+    let data: Float32Array | null = null;
+    if (dataSource instanceof Float32Array) {
+      data = dataSource;
+    } else if (dataSource instanceof ArrayBuffer) {
+      data = new Float32Array(dataSource);
+    } else if (Array.isArray(dataSource)) {
+      data = new Float32Array(dataSource);
+    } else if (dataSource && ArrayBuffer.isView(dataSource) && dataSource.buffer instanceof ArrayBuffer) {
+      try {
+        data = new Float32Array(dataSource.buffer);
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!data) return;
+    const expected = dims[0] * dims[1] * dims[2];
+    if (data.length < expected) return;
+
+    const upload = data.length === expected ? data : data.subarray(0, expected);
+
+    // Track absolute span for quick normalization
+    const minRaw = Number((payload as any).min);
+    const maxRaw = Number((payload as any).max);
+    let absSpan = 1e-12;
+    if (Number.isFinite(minRaw) || Number.isFinite(maxRaw)) {
+      const a = Math.abs(Number.isFinite(minRaw) ? (minRaw as number) : 0);
+      const b = Math.abs(Number.isFinite(maxRaw) ? (maxRaw as number) : 0);
+      absSpan = Math.max(a, b, 1e-12);
+    }
+    this.t00.range = [absSpan, absSpan];
+
+    this.ensureT00Textures();
+    const back = this.t00.front === 0 ? this.t00.texB : this.t00.texA;
+    if (!back) return;
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_3D, back);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.R32F, dims[0], dims[1], dims[2], 0, gl.RED, gl.FLOAT, upload);
+    gl.bindTexture(gl.TEXTURE_3D, null);
+
+    this.t00.front = (this.t00.front ^ 1) as 0 | 1;
+    this.t00.dims = dims;
+    this.t00.version = versionRaw;
+    this.t00.updatedAt = Number((payload as any).updatedAt ?? Date.now());
+    this.t00.hasData = true;
+  }
 
   private ensureFallback2D(): WebGLTexture {
 
@@ -16334,7 +17317,17 @@ export class Hull3DRenderer {
 
 
 
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      if (state.showSurfaceOverlay) {
+
+        // Additive blend keeps the ring visible on top of the surface sheet.
+
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+      } else {
+
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      }
 
 
 
@@ -17532,6 +18525,19 @@ export class Hull3DRenderer {
 
     }
 
+    if (this.t00.texA) {
+      gl.deleteTexture(this.t00.texA);
+      this.t00.texA = null;
+    }
+    if (this.t00.texB) {
+      gl.deleteTexture(this.t00.texB);
+      this.t00.texB = null;
+    }
+    if (this.t00.fallback) {
+      gl.deleteTexture(this.t00.fallback);
+      this.t00.fallback = null;
+    }
+
 
 
     if (this.curvature.fallback) {
@@ -17567,6 +18573,10 @@ export class Hull3DRenderer {
 
 
     this.curvature.updatedAt = 0;
+
+
+
+    this.curvature.range = [-8, 8];
 
 
 
@@ -17746,6 +18756,11 @@ export class Hull3DRenderer {
 
 
 
+    }
+
+    if (this.t00BusId) {
+      unsubscribe(this.t00BusId);
+      this.t00BusId = null;
     }
 
 

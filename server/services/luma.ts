@@ -4,10 +4,23 @@ export type ChatMsg = { role: "system" | "user" | "assistant"; content: string }
 
 type Provider = "openai" | "ollama" | "vllm";
 const PROVIDER = (process.env.LUMA_PROVIDER || "openai") as Provider;
-const MODEL = process.env.LUMA_MODEL || "gpt-4o-mini";
+const DEFAULT_MODEL_BY_PROVIDER: Record<Provider, string> = {
+  openai: "gpt-4o-mini",
+  ollama: "mistral:7b-instruct",
+  vllm: "mistralai/Mistral-7B-Instruct-v0.3",
+};
+const MODEL = process.env.LUMA_MODEL || DEFAULT_MODEL_BY_PROVIDER[PROVIDER];
+const LORA_ADAPTER = process.env.LORA_ADAPTER;
 const API_KEY = process.env.LUMA_API_KEY || "";
 const BASE_INTERNAL_URL =
   process.env.LUMA_BASE_URL || `http://127.0.0.1:${process.env.PORT || "5000"}`;
+
+type ChatStreamOptions = {
+  messages: ChatMsg[];
+  temperature?: number;
+  seed?: number;
+  loraAdapter?: string | string[];
+};
 
 function assertSameOrigin(url: string) {
   if (!/^https?:\/\//.test(url) && !url.startsWith("/")) {
@@ -43,20 +56,25 @@ export async function summarizeUrl(url: string): Promise<string> {
   return `${summary.trim()}\n\nSource: ${target}`;
 }
 
-export async function* chatStream(options: { messages: ChatMsg[]; temperature?: number }) {
-  const { messages, temperature = 0.2 } = options;
+export async function* chatStream(options: ChatStreamOptions) {
+  const { messages, temperature = 0.2, seed, loraAdapter } = options;
+  const adapter = loraAdapter ?? LORA_ADAPTER;
   const fullMessages: ChatMsg[] = [{ role: "system", content: ETHOS_PROMPT }, ...messages];
 
   if (PROVIDER === "ollama") {
+    const body: Record<string, unknown> = {
+      model: MODEL,
+      messages: fullMessages,
+      stream: true,
+      options: { temperature, ...(typeof seed === "number" ? { seed } : {}) },
+    };
+    if (adapter) {
+      body.adapter = adapter;
+    }
     const response = await fetch("http://127.0.0.1:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: fullMessages,
-        stream: true,
-        options: { temperature },
-      }),
+      body: JSON.stringify(body),
     });
     if (!response.ok || !response.body) {
       throw new Error(`ollama error ${response.status}`);
@@ -86,24 +104,34 @@ export async function* chatStream(options: { messages: ChatMsg[]; temperature?: 
     return;
   }
 
-  const endpoint =
-    PROVIDER === "openai"
-      ? "https://api.openai.com/v1/chat/completions"
-      : "http://127.0.0.1:8000/v1/chat/completions";
-  const headers: Record<string, string> =
-    PROVIDER === "openai"
-      ? { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` }
-      : { "Content-Type": "application/json" };
+  const isOpenAI = PROVIDER === "openai";
+  const endpoint = isOpenAI
+    ? "https://api.openai.com/v1/chat/completions"
+    : "http://127.0.0.1:8000/v1/chat/completions";
+  const headers: Record<string, string> = isOpenAI
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` }
+    : { "Content-Type": "application/json" };
+
+  const body: Record<string, unknown> = {
+    model: MODEL,
+    messages: fullMessages,
+    temperature,
+    stream: true,
+    ...(typeof seed === "number" ? { seed } : {}),
+  };
+  if (adapter && PROVIDER === "vllm") {
+    body.extra_body = {
+      lora_request: {
+        adapter_id: adapter,
+        scaling_factor: 1,
+      },
+    };
+  }
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      model: MODEL,
-      messages: fullMessages,
-      temperature,
-      stream: true,
-    }),
+    body: JSON.stringify(body),
   });
   if (!response.ok || !response.body) {
     throw new Error(`LLM error ${response.status}`);
@@ -135,6 +163,10 @@ export async function* chatStream(options: { messages: ChatMsg[]; temperature?: 
       }
     }
   }
+}
+
+export function getProviderConfig() {
+  return { provider: PROVIDER, model: MODEL, loraAdapter: LORA_ADAPTER };
 }
 
 export function planSteps(task: string) {

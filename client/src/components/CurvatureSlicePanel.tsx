@@ -2,9 +2,24 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { HelpCircle } from "lucide-react";
-import { SliceViewer } from "@/components/SliceViewer";
+import { SliceViewer, type Vec3 } from "@/components/SliceViewer";
 import { useEnergyPipeline, PIPE_CONST } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
+
+const FALLBACK_DRIVE_DIR: Vec3 = [1, 0, 0];
+
+const isVec3 = (value: unknown): value is Vec3 =>
+  Array.isArray(value) &&
+  value.length === 3 &&
+  value.every((component) => typeof component === "number" && Number.isFinite(component));
+
+const normalizeVec3Safe = (vec: Vec3): Vec3 => {
+  const mag = Math.hypot(vec[0], vec[1], vec[2]);
+  if (!Number.isFinite(mag) || mag === 0) {
+    return [...FALLBACK_DRIVE_DIR] as Vec3;
+  }
+  return [vec[0] / mag, vec[1] / mag, vec[2] / mag];
+};
 
 export default function CurvatureSlicePanel() {
   // Live pipeline (server authority)
@@ -77,6 +92,16 @@ export default function CurvatureSlicePanel() {
   const gammaVdB = Math.max(1, Number.isFinite(live?.gammaVanDenBroeck) ? Number(live!.gammaVanDenBroeck) : 1.4e5);
   const dutyUI   = Number.isFinite(live?.dutyCycle) ? Number(live!.dutyCycle) : 0.14;
 
+  const driveDirVec = useMemo<Vec3>(() => {
+    const metricsVecRaw = hullMetrics?.shiftVector?.betaTiltVec;
+    const pipelineVecRaw = live?.driveDir;
+    const candidate =
+      (metricsVecRaw && isVec3(metricsVecRaw) ? metricsVecRaw : null) ??
+      (pipelineVecRaw && isVec3(pipelineVecRaw) ? pipelineVecRaw : null) ??
+      FALLBACK_DRIVE_DIR;
+    return normalizeVec3Safe(candidate);
+  }, [hullMetrics, live?.driveDir]);
+
   return (
     <Card className="bg-slate-900/50 border-slate-800">
       <CardHeader>
@@ -116,6 +141,7 @@ export default function CurvatureSlicePanel() {
           physicsParityMode={true}
           viewAvg={true}
           dutyEffectiveFR={dutyFR}
+          driveDir={driveDirVec}
 
           gammaGeo={gammaGeo}
           qSpoilingFactor={qSpoil}

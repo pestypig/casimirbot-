@@ -1,0 +1,241 @@
+﻿# Personalâ€‘AGI Roadmap (Essence + Luma + noisegen)
+
+**Goal:** Reach **v1.0 "Personal AGI"** on a laptop by delivering a persistent, toolâ€‘using agent that can plan, act, remember, and createâ€”grounded in **Essence** provenanceâ€”without breaking existing features.
+
+---
+
+## Definition of Done (v1.0 threshold)
+
+- âœ… Plans and completes multiâ€‘step tasks with tool use (LLM + web/files + generation adapters).
+- âœ… Maintains longâ€‘lived **personal memory** (preferences, projects) retrievable via RAG.
+- âœ… All outputs are **collapsed to Essence** with provenance (seeds, transforms, signatures).
+- âœ… Selfâ€‘heal/retry; success â‰¥ **80%** on our internal eval suite; safeâ€‘ops gates respected.
+
+---
+
+## Milestones
+
+### v0.1 Agentic MVP
+- [ ] Tool/Skill registry with local LLM tool (stub ok).
+- [ ] Planner + Executor stubs (plan â†’ execute â†’ log TaskTrace).
+- [ ] Essence router mounted (gated) with SSE keepalive.
+- [ ] Basic Memory search (string match or simple embeddings).
+- [ ] Daily Jobs + Token budget surfaced in Essence console (list, budget, propose/complete).
+- **Acceptance:** Plan/execute succeeds on 5 canned tasks; TaskTrace recorded.
+- **Essence â‡† Codex loop:** Trace export JSON includes plan + manifest + knowledge context, policy denials render inline, and eval replay persists an Essence envelope.
+
+**Additional acceptance (local LLM / Hull Mode):**
+- [ ] **Local LLM spawn tool** (`llm.local.spawn.generate`) runs on a laptop with `LLM_POLICY=local` and produces an Essence envelope plus TaskTrace for at least one console turn.
+- [ ] **Metrics exposed** for local runs: `llm_local_spawn_calls_total` and `llm_local_spawn_latency_ms` visible at `GET /metrics`; `npm run bench` and `pnpm run eval:smoke` complete offline.
+
+### v0.2 Personalization
+- [ ] PersonaProfile CRUD.
+- [ ] RAG integration with Essence memory.
+- [ ] Reflection writes procedural/semantic memories after tasks.
+- **Acceptance:** â‰¥ 70% success; memory fetch within topâ€‘k for eval queries.
+
+### v0.3 Multimodal Creation
+- [ ] Luma/SD adapter with **LCMâ€‘LoRA** lowâ€‘step path; provenance to Essence.
+- [ ] STT adapter (fasterâ€‘whisper INT8) with CPU fallback.
+- **Acceptance:** Image 512px in â‰¤2s typical on laptop; provenance recorded.
+
+### v1.0 Personal AGI
+- [ ] KV budgeter wired; long chats stabilized via summarizeâ†’Essenceâ†’evict.
+- [ ] Determinism: record seeds/params; signatures on envelopes.
+- [ ] Safety gates (approvals for risky tools).
+- **Acceptance:** â‰¥ 80% success on eval battery; <5% weekly regression; safety checks enforced.
+
+---
+
+## Workstreams & Owners
+
+1. **Essence & Memory**
+   - Files: `shared/essence-schema.ts`, `server/routes/essence.ts`, `server/routes/agi.memory.ts`
+   - Tasks: collapse/provenance, memory search, verification endpoints.
+
+2. **Planner & Executor**
+   - Files: `server/routes/agi.plan.ts`, `server/services/planner/*`
+   - Tasks: plan DSL, execution engine, WS/SSE progress, retries.
+
+3. **Tools/Skills**
+   - Files: `shared/skills.ts`, `server/skills/*`
+   - Tasks: llm.local, essence.search/get, web.fetch (sandbox), file IO (safe).
+
+4. **Multimodal**
+   - Files: `server/skills/luma.generate.ts`, `server/skills/stt.whisper.ts`
+   - Tasks: LCM-`LoRA path, STT streaming, CPU fallback, provenance.
+
+5. **Safety & Approvals**
+   - Files: middleware in executor
+   - Tasks: policy checks, rate limits, human-in-the-loop approvals.
+
+6. **Observability & Eval**
+   - Files: metrics hooks; `tests/evals/*`
+   - Tasks: success rate, latency, hallucination complaints; eval harness.
+ 
+7. **Local LLM & Hull Mode**
+   - Focus: zero-HTTP local inference, offline posture, and operator tooling.
+
+8. **Jobs & Token Economy**
+   - Files: `shared/jobs.ts`, `server/routes/jobs.ts`, `server/services/jobs/*`, `client/src/components/agi/JobsBudgetModal.tsx`, `client/src/lib/agi/jobs.ts`
+   - Tasks: discover jobs from docs and repo (gap report, patch plan, alignment, TODO/FIXME), expose budget/ledger API, console modal for list + propose/complete, basic heuristics for proposal agreement, metrics hooks.
+### Workstream 7 — Local LLM & Hull Mode
+### Run Book â€” Hull Mode (local LLM)
+**Purpose:** flip a laptop into pure offline "Hull Mode" and verify local LLM is live with metrics and Essence provenance.
+
+```bash
+# Core gates
+export ENABLE_ESSENCE=1
+export ENABLE_AGI=1
+export ENABLE_LOG_TEXT=1
+
+# Trace / replay gates
+export ENABLE_TRACE_EXPORT=1
+export ENABLE_POLICY_REASONS=1
+export ENABLE_EVAL_REPLAY=1
+
+# Hull posture
+export HULL_MODE=1
+export LLM_POLICY=local
+
+# Local spawn adapter
+export ENABLE_LLM_LOCAL_SPAWN=1
+export LLM_LOCAL_CMD=./bin/llama-cli              # path to local binary
+export LLM_LOCAL_MODEL=./models/Local-7B-Q4.gguf  # quantized model
+export LLM_LOCAL_ARGS_BASE="--ctx-size=8192 --n-gpu-layers=20 --threads=6 --no-color"
+export LLM_LOCAL_MAX_TOKENS=512
+export LLM_LOCAL_TEMP=0.2
+export LLM_LOCAL_SEED=42
+
+pnpm dev
+
+# Smoke in the Essence console:
+# - Send a prompt â†’ Trace shows solver: llm.local.spawn.generate
+# - Live tool logs stream; an Essence text envelope is created
+
+# Observability
+curl -s http://localhost:3000/metrics | grep -E "llm_local_spawn_calls_total|llm_local_spawn_latency_ms" || true
+
+# Bench & eval (offline)
+npm run bench
+pnpm run eval:smoke
+```
+
+**Notes**
+- If first-token latency is high, enable prompt cache flags supported by your binary and set a stable preamble hash.
+- If GPU is thermally constrained, lower `--n-gpu-layers` or threads; the scheduler serializes LLM with other workloads.
+
+## Debate Mode (Proponent <-> Skeptic)
+
+- Gated by `ENABLE_DEBATE`; every round collapses to Essence envelopes + TaskTrace compatible SSE.
+- Roles: **Proponent** proposes, **Skeptic** challenges, **Referee** enforces stop rules + emits verdicts.
+- Budgets: `DEBATE_MAX_ROUNDS`, `DEBATE_MAX_WALL_MS`, `DEBATE_VERIFIERS`; metrics land in `agi_debate_*`.
+- UI: Essence console toggle adds a live two-column debate viewer with replayable SSE stream (`/api/agi/debate/stream`).
+
+### Run Book
+
+```bash
+# Enable
+export ENABLE_ESSENCE=1 ENABLE_AGI=1 ENABLE_DEBATE=1 ENABLE_TRACE_API=1
+
+pnpm dev
+
+# Start a debate via API
+curl -s -X POST http://localhost:3000/api/agi/debate/start \
+  -H "Content-Type: application/json" \
+  -d '{"goal":"Should we use math.expr or math.sum to compute 2*(3+4)?","persona_id":"persona:demo"}' | jq
+
+# Live stream (replace <id>)
+curl -N "http://localhost:3000/api/agi/debate/stream?debateId=<id>"
+
+# Inspect status/outcome
+curl -s "http://localhost:3000/api/agi/debate/<id>" | jq
+```
+
+---
+
+## Laptop Budget & Flags
+
+- `ENABLE_ESSENCE`, `ENABLE_AGI` gates
+- KV budget: `KV_BUDGET_BYTES=1500000000`, evict oldest turns â†’ write Essence summary
+- Diffusion lowâ€‘step path: `DIFF_ENGINE=sd15-lcm`, `DIFF_STEPS=4`, `DIFF_SLICING=true`
+
+---
+
+## Daily Jobs + Tokens (Essence Console)
+
+Purpose: keep a steady stream of repo-aware, provenance-friendly work available to the operator (and to Codex), while tying effort to a simple token budget that grows with completions.
+
+What ships
+- Server routes (gated by `ENABLE_ESSENCE_JOBS`):
+  - `GET /api/jobs/list` — discover daily jobs from docs (gap report, patch plan, alignment), repo TODO/FIXME, and user-submitted items.
+  - `GET /api/jobs/budget` — token balance, daily base, and a small ledger.
+  - `POST /api/jobs/complete { jobId }` — awards job.rewardTokens to the caller.
+  - `POST /api/jobs/propose { title, description, kind?, priority?, paths?, tags?, traceId? }` — user job submission; lightweight heuristic to mark `agreed`.
+- Client UI (Essence console):
+  - Header adds a “Budget” button (wallet icon) that opens the modal.
+  - Modal shows balance/ledger and a sortable daily job list.
+  - “Open in console” pre-fills a prompt for Codex; “Mark completed” credits tokens.
+  - “Propose a job” form posts to `/api/jobs/propose` and injects the new job.
+
+Env
+- `ENABLE_ESSENCE_JOBS=1` (default on)
+- `ESSENCE_TOKENS_DAILY_BASE=500` (optional; per-user daily refill)
+
+Implementation pointers
+- Types: `shared/jobs.ts`
+- Router: `server/routes/jobs.ts`
+- Engine: `server/services/jobs/engine.ts` (parses docs + scans repo + holds user jobs)
+- Budget: `server/services/jobs/token-budget.ts`
+- UI: `client/src/components/agi/JobsBudgetModal.tsx` (+ header button in `client/src/components/agi/essence.tsx`)
+- Client API: `client/src/lib/agi/jobs.ts`
+
+Acceptance
+- With `ENABLE_ESSENCE_JOBS=1`, the Budget modal opens and loads jobs + balance.
+- Completing a job increases balance by its reward and appends to the ledger.
+- Proposing a job returns `{ ok: true, agreed: <bool>, job }` and the job appears in the list.
+- Jobs pulled from docs include evidence/file paths and sensible priorities.
+
+Notes / next
+- Replace the heuristic “agree” with a chat-based validator (planner call + trace) and persist proposal provenance as Essence.
+- Persist jobs and balances in Postgres (current memory store is fine for dev).
+- Add Prometheus counters for job proposals/completions and expose a small dashboard.
+
+---
+## Smoke Tests
+
+```bash
+ENABLE_ESSENCE=1 ENABLE_AGI=1 pnpm dev
+
+# Essence SSE
+curl -N -H "Accept: text/event-stream" http://localhost:3000/api/essence/events
+
+# Persona + Memory
+curl -s -X PUT http://localhost:3000/api/agi/persona/alice -H "Content-Type: application/json" -d '{"display_name":"Alice"}'
+curl -s -X POST http://localhost:3000/api/agi/memory/put -H "Content-Type: application/json" -d '{"id":"m1","owner_id":"alice","created_at":"2025-11-08T00:00:00Z","kind":"semantic","text":"Alpha is on track"}'
+curl -s "http://localhost:3000/api/agi/memory/search?q=Alpha&k=6"
+
+# Plan + Execute
+curl -s -X POST http://localhost:3000/api/agi/plan -H "Content-Type: application/json" -d '{"goal":"Summarize Alpha"}'
+curl -s -X POST http://localhost:3000/api/agi/execute -H "Content-Type: application/json" -d '{"traceId":"<from_plan>"}'
+```
+
+---
+
+## Risks & Nonâ€‘goals
+
+* Don't change or remove existing simulation/lattice/warp/helix code paths.
+* Don't rely on long raw context; use Essence memory instead.
+* Avoid new heavy dependencies unless required for local runtimes.
+
+---
+
+## Done = Ready for Iteration
+
+Once v0.1 passes smoke tests, we proceed to v0.2 (persona + RAG + reflection), then v0.3 (multimodal), then v1.0 acceptance.
+
+
+
+
+
+
