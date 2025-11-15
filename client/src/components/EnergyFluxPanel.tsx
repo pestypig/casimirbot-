@@ -233,7 +233,7 @@ export default function EnergyFluxPanel() {
             <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
               <span>R histogram (div S / (epsilon + |T00|))</span>
               <span>
-                Stable window &lt; 0.1 =>{" "}
+                Stable window &lt; 0.1 =&gt;{" "}
                 {panelStatus.stablePct != null ? `${panelStatus.stablePct}%` : "-"}
               </span>
             </div>
@@ -243,7 +243,7 @@ export default function EnergyFluxPanel() {
             <p className="font-semibold text-slate-100">Why watch R?</p>
             <p className="mt-1 leading-relaxed">
               R measures how quickly energy accumulates relative to |T00|. Near-zero regions indicate
-              steady curvature pockets; sustained |R| >> 0.1 highlights pumping or bleeding sectors that
+              steady curvature pockets; sustained |R| &gt;&gt; 0.1 highlights pumping or bleeding sectors that
               deserve strobe or duty adjustments.
             </p>
           </div>
