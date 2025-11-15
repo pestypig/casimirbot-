@@ -847,6 +847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     switchOperationalMode,
     getEnergySnapshot,
     getCurvatureBrick,
+    getStressEnergyBrick,
     postCurvatureBrickDebugStamp,
     postCurvatureBrickDebugClear,
     getPhaseBiasTable,
@@ -1062,6 +1063,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/helix/mode", switchOperationalMode);
   app.get("/api/helix/curvature-brick", getCurvatureBrick);
   app.post("/api/helix/curvature-brick", getCurvatureBrick);
+  app.get("/api/helix/stress-energy-brick", getStressEnergyBrick);
+  app.post("/api/helix/stress-energy-brick", getStressEnergyBrick);
   app.post("/api/helix/curvature-brick/debug-stamp", postCurvatureBrickDebugStamp);
   app.post("/api/helix/curvature-brick/debug-clear", postCurvatureBrickDebugClear);
   app.get("/api/helix/phase-bias", getPhaseBiasTable);

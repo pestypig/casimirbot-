@@ -38,6 +38,11 @@ import {
   getCurvatureDebugStamp,
 } from "./curvature-brick";
 import {
+  buildStressEnergyBrick,
+  serializeStressEnergyBrick,
+  type StressEnergyBrickParams,
+} from "./stress-energy-brick";
+import {
   dynamicConfigSchema,
   vacuumGapSweepConfigSchema,
   sweepSpecSchema,
@@ -1923,6 +1928,62 @@ export function getCurvatureBrick(req: Request, res: Response) {
   } catch (err) {
     console.error("[helix-core] curvature brick error:", err);
     const message = err instanceof Error ? err.message : "Failed to build curvature brick";
+    res.status(500).json({ error: message });
+  }
+}
+
+export function getStressEnergyBrick(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const hull = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
+    const bounds: StressEnergyBrickParams["bounds"] = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+    };
+
+    const query = req.method === "GET" ? req.query : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const qualityDims = dimsForQuality(typeof query.quality === "string" ? query.quality : undefined);
+    const dims = parseDimsParam(query.dims, qualityDims);
+    const phase01 = parseNumberParam(query.phase01, 0);
+    const sigmaSector = parseNumberParam(query.sigmaSector, 0.05);
+    const splitEnabled = parseBooleanParam(query.splitEnabled, false);
+    const splitFrac = parseNumberParam(query.splitFrac, 0.6);
+    const dutyFRState = (state as any).dutyEffectiveFR ?? (state as any).dutyEffective_FR ?? state.dutyCycle;
+    const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
+    const q = parseNumberParam(query.q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
+    const gammaGeo = parseNumberParam(query.gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
+    const gammaVdB = parseNumberParam(query.gammaVdB ?? state.gammaVanDenBroeck, state.gammaVanDenBroeck ?? 1e5);
+    const ampBase = parseNumberParam(query.ampBase, 0);
+    const zeta = parseNumberParam(query.zeta, 0.84);
+    const overrideDriveDir = parseVec3ParamOptional(query.driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
+
+    const params: Partial<StressEnergyBrickParams> = {
+      dims,
+      bounds,
+      phase01,
+      sigmaSector,
+      splitEnabled,
+      splitFrac,
+      dutyFR: Math.max(dutyFR, 1e-8),
+      q: Math.max(q, 1e-6),
+      gammaGeo,
+      gammaVdB,
+      ampBase,
+      zeta,
+      driveDir: driveDir ?? undefined,
+    };
+
+    const brick = buildStressEnergyBrick(params);
+    const payload = serializeStressEnergyBrick(brick);
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] stress-energy brick error:", err);
+    const message = err instanceof Error ? err.message : "Failed to build stress-energy brick";
     res.status(500).json({ error: message });
   }
 }

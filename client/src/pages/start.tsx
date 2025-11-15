@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
 import VizDiagnosticsPanel from "@/components/warp/VizDiagnosticsPanel";
+import SplashCursor from "@/components/SplashCursor";
 import {
   PROFILE_STORAGE_KEY,
   useHelixStartSettings,
@@ -11,6 +12,8 @@ import {
 } from "@/hooks/useHelixStartSettings";
 import { ThemeInstrumentDeck } from "@/components/start/ThemeInstrumentDeck";
 import { useEssenceThemes } from "@/hooks/useEssenceThemes";
+
+const PENDING_PANEL_KEY = "helix:pending-panel";
 
 type ProfileKey = "optimist" | "engineer" | "diplomat" | "strategist";
 
@@ -74,6 +77,16 @@ export default function StartPortal() {
         : null;
 
   const pick = (k: ProfileKey) => setSelected(k);
+  const requestPanelWindow = React.useCallback((panelId: string) => {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(PENDING_PANEL_KEY, panelId);
+      } catch {
+        // Ignore storage failures; the desktop can still be opened manually.
+      }
+    }
+    setLocation("/desktop");
+  }, [setLocation]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -119,6 +132,7 @@ export default function StartPortal() {
         if (!next) setSettingsTab("preferences");
       }}
     >
+      {userSettings.enableSplashCursor && <SplashCursor />}
       <div className="relative min-h-screen bg-[#0b1020] text-slate-100 grid place-items-center px-4">
         <div className="pointer-events-none absolute left-0 right-0 top-4 flex items-center justify-end gap-2">
           <p className="hidden text-xs uppercase tracking-[0.25em] text-slate-400 sm:block">
@@ -208,7 +222,7 @@ export default function StartPortal() {
                     {PROFILES[selected].physics}
                   </p>
 
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       className={stationIsPrimary ? primaryButtonClass : secondaryButtonClass}
                       onClick={() => setLocation('/helix-core')}
@@ -226,6 +240,12 @@ export default function StartPortal() {
                       onClick={() => setLocation('/desktop')}
                     >
                       Open Desktop
+                    </button>
+                    <button
+                      className="px-3.5 py-2 rounded-lg border border-emerald-400/40 bg-emerald-400/10 text-emerald-200 text-sm"
+                      onClick={() => requestPanelWindow("energy-flux")}
+                    >
+                      Launch Energy Flux Panel
                     </button>
                   </div>
                 </div>
@@ -245,6 +265,33 @@ export default function StartPortal() {
             void refetchThemes();
           }}
         />
+
+        <section className="mt-10">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">New panel</p>
+                <h3 className="text-lg font-semibold text-white">Energy Flux Stability Monitor</h3>
+                <p className="text-sm leading-relaxed text-slate-300/80">
+                  Real-time |T⁰⁰| and ∇·S slices with a stability histogram for
+                  R = (∇·S)/(ε + |T⁰⁰|). Launch it whenever you need to inspect which sectors are steady
+                  versus oscillatory before touching duty or strobe settings.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 md:max-w-xs">
+                <button
+                  className="rounded-lg bg-cyan-500/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition hover:bg-cyan-500"
+                  onClick={() => requestPanelWindow("energy-flux")}
+                >
+                  Open as Desktop Window
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  Takes you to the Desktop and auto-opens the panel as a window.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
       <HelixSettingsDialogContent

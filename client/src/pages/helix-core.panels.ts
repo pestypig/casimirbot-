@@ -85,6 +85,15 @@ export const HELIX_PANELS: HelixPanelRef[] = [
     pinned: true
   },
   {
+    id: "energy-flux",
+    title: "Energy Flux Stability",
+    icon: Equal,
+    loader: lazyPanel(() => import("@/components/EnergyFluxPanel")),
+    defaultSize: { w: 960, h: 660 },
+    defaultPosition: { x: 120, y: 120 },
+    endpoints: [API.pipelineGet, API.helixMetrics]
+  },
+  {
     id: "drive-guards",
     title: "Drive Guards",
     icon: ShieldCheck,

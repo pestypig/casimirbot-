@@ -6,6 +6,7 @@ import { DesktopWindow } from "@/components/desktop/DesktopWindow";
 import { DesktopTaskbar } from "@/components/desktop/DesktopTaskbar";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
+import SplashCursor from "@/components/SplashCursor";
 import {
   PROFILE_STORAGE_KEY,
   useHelixStartSettings,
@@ -17,6 +18,7 @@ import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference }
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
+const PENDING_PANEL_KEY = "helix:pending-panel";
 
 function collectPanelIdsFromStructure(
   input: unknown,
@@ -84,6 +86,19 @@ export default function DesktopPage() {
   useEffect(() => {
     registerFromManifest(panelRegistry);
   }, [registerFromManifest]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const pending = window.localStorage.getItem(PENDING_PANEL_KEY);
+      if (pending) {
+        open(pending);
+        window.localStorage.removeItem(PENDING_PANEL_KEY);
+      }
+    } catch {
+      // ignore storage read failures
+    }
+  }, [open]);
 
   useEffect(() => {
     void refreshProjects();
@@ -243,6 +258,7 @@ export default function DesktopPage() {
         if (!next) setSettingsTab("preferences");
       }}
     >
+      {userSettings.enableSplashCursor && <SplashCursor />}
       <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-b from-slate-950 via-[#07122b] to-slate-900 text-slate-100">
         <div className="pointer-events-none absolute left-0 right-0 top-4 flex items-center justify-end gap-2 pr-4">
           <p className="hidden text-xs uppercase tracking-[0.25em] text-slate-400 md:block">

@@ -108,6 +108,35 @@ const CURVATURE_MOCKS = {
   high: buildCurvatureMock([16, 16, 16]),
 } as const;
 
+const buildStressMock = (dims: FixedTuple3) => {
+  const total = dims[0] * dims[1] * dims[2];
+  const makeField = (scale: number, bias = 0) => {
+    const data = new Float32Array(total);
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (let idx = 0; idx < total; idx += 1) {
+      const t = total > 1 ? idx / (total - 1) : 0;
+      const value = bias + Math.sin(t * Math.PI * 4) * scale;
+      data[idx] = value;
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+    if (!Number.isFinite(min)) min = 0;
+    if (!Number.isFinite(max)) max = 0;
+    return { data: encodeFloat32ToBase64(data), min, max };
+  };
+  return {
+    dims,
+    t00: makeField(0.08, -0.04),
+    Sx: makeField(0.02),
+    Sy: makeField(0.02),
+    Sz: makeField(0.02),
+    divS: makeField(0.01),
+  };
+};
+
+const STRESS_ENERGY_MOCK = buildStressMock([12, 12, 12]);
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -211,6 +240,33 @@ export async function apiRequest(
           residualMin: -residualScale,
           residualMax: residualScale,
           quality,
+          mock: true,
+          generatedAt: now,
+        };
+      }
+      if (method === 'GET' && normalizedPath === '/api/helix/stress-energy-brick') {
+        const mock = STRESS_ENERGY_MOCK;
+        return {
+          dims: mock.dims,
+          voxelBytes: 4,
+          format: "r32f",
+          channels: {
+            t00: mock.t00,
+            Sx: mock.Sx,
+            Sy: mock.Sy,
+            Sz: mock.Sz,
+            divS: mock.divS,
+          },
+          stats: {
+            totalEnergy_J: -1.2e12,
+            avgT00: -4e10,
+            avgFluxMagnitude: 2e9,
+            netFlux: [0, 0, 0],
+            divMin: mock.divS.min,
+            divMax: mock.divS.max,
+            dutyFR: 0.0025,
+            strobePhase: (now / 1000) % 1,
+          },
           mock: true,
           generatedAt: now,
         };
