@@ -2,6 +2,7 @@ import { createWithEqualityFn } from "zustand/traditional";
 import { persist } from "zustand/middleware";
 import { navigate } from "wouter/use-browser-location";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
+import { recordPanelActivity } from "@/lib/essence/activityReporter";
 
 export type Bounds = { x: number; y: number; w: number; h: number };
 
@@ -121,6 +122,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
           defs.forEach((def) => {
             const alwaysOnTop = Boolean(def.alwaysOnTop);
             const noMinimize = Boolean(def.noMinimize);
+            const defaultOpen = Boolean(def.defaultOpen);
             if (!windows[def.id]) {
               if (alwaysOnTop) {
                 topZCounter += 1;
@@ -130,7 +132,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
               const z = alwaysOnTop ? topZCounter : zCounter;
               windows[def.id] = normalizeWindowState({
                 id: def.id,
-                isOpen: def.id === "endpoints",
+                isOpen: defaultOpen,
                 isMinimized: false,
                 isMaximized: false,
                 isFullscreen: false,
@@ -159,7 +161,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
           return { windows, pinned, zCounter, topZCounter };
         }),
 
-      open: (id) =>
+      open: (id) => {
         set((state) => {
           const current = state.windows[id];
           if (!current) return state;
@@ -177,9 +179,11 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
               }
             }
           };
-        }),
+        });
+        recordPanelActivity(id, "open");
+      },
 
-      close: (id) =>
+      close: (id) => {
         set((state) => {
           const current = state.windows[id];
           if (!current) return state;
@@ -195,7 +199,9 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
               }
             }
           };
-        }),
+        });
+        recordPanelActivity(id, "close");
+      },
 
       minimize: (id) =>
         set((state) => {
@@ -209,7 +215,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
           };
         }),
 
-      restore: (id) =>
+      restore: (id) => {
         set((state) => {
           const current = state.windows[id];
           if (!current) return state;
@@ -227,9 +233,11 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
               }
             }
           };
-        }),
+        });
+        recordPanelActivity(id, "restore");
+      },
 
-      focus: (id) =>
+      focus: (id) => {
         set((state) => {
           const current = state.windows[id];
           if (!current) return state;
@@ -242,7 +250,9 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
               [id]: { ...current, z }
             }
           };
-        }),
+        });
+        recordPanelActivity(id, "focus");
+      },
 
       setOpacity: (id, opacity) =>
         set((state) => {
@@ -426,6 +436,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
         const target = panelId?.trim();
         if (!target) return;
         navigate(`/helix-core?panel=${encodeURIComponent(target)}`);
+        recordPanelActivity(target, "openInHelix");
       }
     }),
     { name: STORAGE_KEY }

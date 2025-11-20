@@ -1,0 +1,39 @@
+[
+  {
+    "filePath": "tests/agi-plan.spec.ts",
+    "status": "pass",
+    "updatedAt": "2025-11-20T04:55:10.000Z",
+    "tests": [
+      { "name": "renders a planner prompt that references the PlanDSL chain and manifest", "status": "pass" },
+      { "name": "executes the SEARCH+SUMMARIZE+CALL(tool) plan", "status": "pass" },
+      { "name": "records approvals for tools flagged as risky", "status": "pass" }
+    ]
+  },
+  {
+    "filePath": "tests/knowledge-compositor.spec.ts",
+    "status": "pass",
+    "updatedAt": "2025-11-20T04:57:02.000Z",
+    "tests": [
+      { "name": "includes headings and citations when snippets exist", "status": "pass" },
+      { "name": "gracefully handles empty knowledge context", "status": "pass" }
+    ]
+  },
+  {
+    "filePath": "tests/luma-generate.spec.ts",
+    "status": "fail",
+    "updatedAt": "2025-11-20T04:58:30.000Z",
+    "tests": [
+      { "name": "rejects invalid prompt inputs", "status": "pass" },
+      { "name": "queues a render job for valid payloads", "status": "fail" }
+    ]
+  },
+  {
+    "filePath": "tests/immersion.spec.ts",
+    "status": "pass",
+    "updatedAt": "2025-11-20T05:02:44.000Z",
+    "tests": [
+      { "name": "maintains fade state across frame updates", "status": "pass" },
+      { "name": "applies stochastic resonance boost when enabled", "status": "pass" }
+    ]
+  }
+]

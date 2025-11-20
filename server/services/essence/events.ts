@@ -23,12 +23,27 @@ export type ProposalChatEvent = {
 
 export type ProposalEvent = ProposalProgressEvent | ProposalChatEvent;
 
+export type CodeLatticeUpdateStats = {
+  filesTouched: number;
+  addedNodes: number;
+  updatedNodes: number;
+  removedNodes: number;
+  edgeDelta: number;
+};
+
+export type CodeLatticeUpdatedEvent = {
+  type: "code-lattice:updated";
+  version: number;
+  stats: CodeLatticeUpdateStats;
+};
+
 export type EssenceEvent =
   | { type: "created"; essenceId: string }
   | { type: "updated"; essenceId: string }
   | { type: "remix-progress"; jobId: string; progress: number }
   | { type: "remix-complete"; jobId: string; essenceId: string }
-  | ProposalEvent;
+  | ProposalEvent
+  | CodeLatticeUpdatedEvent;
 
 type Listener<T extends EssenceEvent["type"]> = (payload: Extract<EssenceEvent, { type: T }>) => void;
 

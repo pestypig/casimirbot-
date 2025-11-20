@@ -304,6 +304,18 @@
     <div class="badge-row" id="statusBadges">
       <!-- badges injected -->
     </div>
+    <div class="card" id="lrlProofCard">
+      <div class="title">Laplace–Runge–Lenz proofs</div>
+      <p class="description">
+        Live Maupertuis / √z / geometry locks from the pipeline.
+        <a href="/docs/alcubierre-alignment.md#proof-maupertuis" target="_blank" rel="noreferrer">Docs</a>
+      </p>
+      <dl class="metrics" id="lrlProofMetrics">
+        <dt>Proof I · Maupertuis</dt><dd>Loading…</dd>
+        <dt>Proof II · √z bridge</dt><dd>Loading…</dd>
+        <dt>Proof III · Geometry</dt><dd>Loading…</dd>
+      </dl>
+    </div>
 
     <section class="section">
       <header>
@@ -1089,18 +1101,19 @@ const DURATIONS = [
       { key: 'gamma', label: 'γ', ok: v => v >= 1e5 && v <= 1e6, warn: v => v >= 5e4 && v <= 2e6 }
     ];
 
-    let state = {
-      warpPreset: 'baseline',
-      payloadPreset: 'light',
-      bodyClass: 'rock',
-      collapsePreset: 'gamma',
-      gainModel: 'gammaQ',
-      duration: '3600s',
-      unitMode: 'cu',
-      overlap: false,
-      showBits: true,
-      readerMode: false
-    };
+let state = {
+  warpPreset: 'baseline',
+  payloadPreset: 'light',
+  bodyClass: 'rock',
+  collapsePreset: 'gamma',
+  gainModel: 'gammaQ',
+  duration: '3600s',
+  unitMode: 'cu',
+  overlap: false,
+  showBits: true,
+  readerMode: false
+};
+let lrlTelemetry = null;
 
     // Keep last solved kappa and geometry for the auto-fill buttons
     let __lastDriveKappa = NaN;
@@ -1813,6 +1826,62 @@ const DURATIONS = [
       $('tableCollapse').querySelector('tbody').innerHTML = collapseRows;
     }
 
+    const formatProof = (value, digits = 2) => {
+      if (!Number.isFinite(value)) return 'n/a';
+      const abs = Math.abs(value);
+      if (abs === 0) return '0';
+      if (abs >= 1e4 || abs < 1e-2) return value.toExponential(digits);
+      return value.toFixed(digits);
+    };
+
+    async function fetchLrlTelemetry() {
+      try {
+        const res = await fetch('/api/helix/pipeline');
+        if (!res.ok) throw new Error('bad response');
+        const json = await res.json();
+        lrlTelemetry = json?.qi || null;
+      } catch (err) {
+        console.warn('LRL telemetry fetch failed', err);
+        lrlTelemetry = null;
+      } finally {
+        renderLrlProofCard();
+      }
+    }
+
+    function renderLrlProofCard() {
+      const host = $('lrlProofMetrics');
+      if (!host) return;
+      if (!lrlTelemetry) {
+        host.innerHTML = '<dt>Telemetry</dt><dd>Unavailable</dd>';
+        return;
+      }
+      const proofs = [
+        {
+          label: 'Proof I · Maupertuis',
+          value: formatProof(Number(lrlTelemetry.lrlActionRate)) + ' kg·m²/s³',
+          ok: Number.isFinite(lrlTelemetry.lrlActionRate),
+        },
+        {
+          label: 'Proof II · √z bridge',
+          value: `|w| ${formatProof(Math.hypot(lrlTelemetry.lrlOscillatorCoordinate?.real ?? NaN, lrlTelemetry.lrlOscillatorCoordinate?.imag ?? NaN))}, residual ${formatProof(lrlTelemetry.lrlPlanarResidual)}`,
+          ok: Number.isFinite(lrlTelemetry.lrlPlanarResidual),
+        },
+        {
+          label: 'Proof III · Geometry',
+          value: `e ${formatProof(lrlTelemetry.eccentricity, 3)}, |A| ${formatProof(lrlTelemetry.lrlMagnitude)}`,
+          ok: Number.isFinite(lrlTelemetry.eccentricity),
+        },
+      ];
+      host.innerHTML = proofs
+        .map(
+          (proof) => `
+          <dt>${proof.label}</dt>
+          <dd><span class="badge ${proof.ok ? 'ok' : 'warn'}">${proof.value}</span></dd>
+        `,
+        )
+        .join('');
+    }
+
     function render() {
       document.body.classList.toggle('reader-mode', state.readerMode);
       if (toggleReaderEl) {
@@ -1847,6 +1916,8 @@ const DURATIONS = [
       populateSelectors();
       bindControls();
       render();
+      fetchLrlTelemetry();
+      setInterval(fetchLrlTelemetry, 10000);
     })();
   </script>
 </body>

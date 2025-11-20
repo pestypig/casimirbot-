@@ -32,7 +32,11 @@ import {
 } from '../modules/dynamic/dynamic-casimir.js';
 import { assignGateSummaries } from "../modules/dynamic/gates/index.js";
 import { calculateCasimirEnergy, omega0_from_gap } from '../modules/sim_core/static-casimir.js';
-import { toPipelineStressEnergy } from '../modules/dynamic/stress-energy-equations.js';
+import {
+  toPipelineStressEnergy,
+  computeLaplaceRungeLenz,
+  type Vec3,
+} from '../modules/dynamic/stress-energy-equations.js';
 import warpBubbleModule from '../modules/warp/warp-module.js';
 import { DEFAULT_GEOMETRY_SWEEP, DEFAULT_PHASE_MICRO_SWEEP } from "../shared/schema.js";
 import type {
@@ -59,7 +63,7 @@ import { computeSectorPhaseOffsets, applyPhaseScheduleToPulses } from "./energy/
 import { QiMonitor } from "./qi/qi-monitor.js";
 import { configuredQiScalarBound } from "./qi/qi-bounds.js";
 import type { RawTileInput } from "./qi/qi-saturation.js";
-import { updatePipelineQiTiles } from "./qi/pipeline-qi-stream.js";
+import { updatePipelineQiTiles, getLatestQiTileStats } from "./qi/pipeline-qi-stream.js";
 
 export type MutableDynamicConfig = DynamicConfigLike;
 
@@ -125,6 +129,15 @@ const QI_STREAM_GRID_DEFAULT = Math.min(
 );
 
 const qiMonitor = new QiMonitor(DEFAULT_QI_SETTINGS, DEFAULT_QI_DT_MS, DEFAULT_QI_BOUND_SCALAR);
+let qiMonitorDt_ms = DEFAULT_QI_DT_MS;
+let qiMonitorTau_ms = DEFAULT_QI_SETTINGS.tau_s_ms;
+let qiSampleAccumulator_ms = 0;
+let qiSampleLastTs = Date.now();
+const qiLrlHistory: { lastPosition: Vec3 | null; lastTimestamp: number } = {
+  lastPosition: null,
+  lastTimestamp: 0,
+};
+let lastQiStats: QiStats | null = null;
 
 const PUMP_EPOCH_ENV = Number(process.env.PUMP_EPOCH_MS);
 const GLOBAL_PUMP_EPOCH_MS = Number.isFinite(PUMP_EPOCH_ENV) ? PUMP_EPOCH_ENV : 0;
@@ -316,6 +329,7 @@ export interface EnergyPipelineState {
   gammaGeo: number;
   qMechanical: number;
   qCavity: number;
+  QL?: number;
   gammaVanDenBroeck: number;
   exoticMassTarget_kg: number;  // User-configurable exotic mass target
 
@@ -359,6 +373,7 @@ export interface EnergyPipelineState {
   strobeHz?: number;
   sectorPeriod_ms?: number;
   dutyBurst?: number;
+  localBurstFrac?: number;
   dutyEffective_FR?: number;
   phase01?: number;
   pumpPhase_deg?: number;
@@ -2120,16 +2135,31 @@ function flushPendingPumpCommand(): void {
 }
 
 function updateQiTelemetry(state: EnergyPipelineState) {
-  const baseStats = qiMonitor.tick(estimateEffectiveRhoFromState(state));
+  const desiredTau = Number.isFinite(state.qi?.tau_s_ms)
+    ? Number(state.qi?.tau_s_ms)
+    : DEFAULT_QI_TAU_MS;
+  const desiredDt = desiredQiSampleDt(state);
+  reconfigureQiMonitor(desiredTau, desiredDt);
+  const effectiveRho = estimateEffectiveRhoFromState(state);
+  const baseStats = advanceQiMonitor(effectiveRho);
   const { tiles: synthesizedTiles, metrics, source } = buildQiTilesFromState(state, baseStats);
+  const lrlTelemetry = deriveQiLaplaceRungeLenz(state, baseStats);
   const stats: QiStats = metrics
-    ? { ...baseStats, ...metrics, homogenizerSource: source }
-    : baseStats;
+    ? {
+        ...baseStats,
+        ...metrics,
+        homogenizerSource: source,
+        ...(lrlTelemetry ?? {}),
+      }
+    : {
+        ...baseStats,
+        ...(lrlTelemetry ?? {}),
+      };
   state.qi = stats;
   if (synthesizedTiles.length) {
-    updatePipelineQiTiles(synthesizedTiles);
+    updatePipelineQiTiles(synthesizedTiles, { source: "synthetic" });
   } else {
-    updatePipelineQiTiles([]);
+    updatePipelineQiTiles([], { source: "synthetic" });
   }
 
   if (PUMP_TONE_ENABLE) {
@@ -2458,6 +2488,14 @@ function clampInt(value: number, min: number, max: number): number {
 
 function estimateEffectiveRhoFromState(state: EnergyPipelineState): number {
   const nowMs = Date.now();
+  const tilesTelemetry = getLatestQiTileStats();
+  if (
+    tilesTelemetry?.avgNeg != null &&
+    tilesTelemetry.source != null &&
+    tilesTelemetry.source !== "synthetic"
+  ) {
+    return tilesTelemetry.avgNeg;
+  }
   const pulses = state.gateAnalytics?.pulses;
 
   if (Array.isArray(pulses) && pulses.length) {
@@ -2517,6 +2555,130 @@ function rhoFromTones(
     acc += depth * Math.cos(theta);
   }
   return acc;
+}
+
+function deriveQiLaplaceRungeLenz(state: EnergyPipelineState, stats: QiStats) {
+  const position: Vec3 = [
+    finiteNumber(stats.avg),
+    finiteNumber(stats.bound),
+    finiteNumber(stats.margin),
+  ];
+  const now = Date.now();
+  const last = qiLrlHistory.lastPosition;
+  const dtSeconds =
+    last && qiLrlHistory.lastTimestamp
+      ? Math.max((now - qiLrlHistory.lastTimestamp) / 1000, 1e-3)
+      : null;
+  const velocity: Vec3 =
+    last && dtSeconds
+      ? [
+          (position[0] - last[0]) / dtSeconds,
+          (position[1] - last[1]) / dtSeconds,
+          (position[2] - last[2]) / dtSeconds,
+        ]
+      : [0, 0, 0];
+
+  qiLrlHistory.lastPosition = position;
+  qiLrlHistory.lastTimestamp = now;
+
+  const mass = positiveOrFallback(state.M_exotic ?? state.exoticMassTarget_kg ?? 1, 1);
+  const centralMass = positiveOrFallback(state.exoticMassTarget_kg ?? mass, mass);
+
+  const result = computeLaplaceRungeLenz({
+    position,
+    velocity,
+    mass,
+    centralMass,
+  });
+
+  if (!Number.isFinite(result.eccentricity) || !Number.isFinite(result.periapsisAngle)) {
+    return null;
+  }
+
+  const lrlVector: [number, number, number] = [
+    result.vector[0],
+    result.vector[1],
+    result.vector[2],
+  ];
+
+  return {
+    eccentricity: result.eccentricity,
+    periapsisAngle: result.periapsisAngle,
+    lrlVector,
+    lrlMagnitude: result.magnitude,
+    lrlActionRate: result.actionRate,
+    lrlOscillatorCoordinate: result.oscillatorCoordinate,
+    lrlOscillatorVelocity: result.oscillatorVelocity,
+    lrlOscillatorEnergy: result.oscillatorEnergy,
+    lrlPlanarResidual: result.planarResidual,
+    lrlGeometryResidual: result.geometryResidual,
+  };
+}
+
+function finiteNumber(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function positiveOrFallback(value: unknown, fallback = 1, min = 1e-6, max = 1e12): number {
+  const raw = Number(value);
+  const n = Number.isFinite(raw) ? Math.abs(raw) : NaN;
+  if (!Number.isFinite(n) || n < min) {
+    return fallback;
+  }
+  if (n > max) {
+    return max;
+  }
+  return n;
+}
+
+function desiredQiSampleDt(state: EnergyPipelineState): number {
+  const sectorPeriod =
+    Number(state.phaseSchedule?.sectorPeriod_ms ?? state.sectorPeriod_ms) || DEFAULT_SECTOR_PERIOD_MS;
+  const sectors = Math.max(1, Math.floor(state.phaseSchedule?.N ?? state.sectorCount ?? DEFAULT_SECTORS_TOTAL));
+  const concurrent = Math.max(1, Math.floor(state.concurrentSectors ?? state.sectorStrobing ?? 1));
+  const dwellPerSample = sectorPeriod / Math.max(1, sectors / concurrent);
+  return clampNumber(dwellPerSample, 0.25, 10);
+}
+
+function reconfigureQiMonitor(tauMs: number, dtMs: number): void {
+  const clampedTau = Math.max(0.5, tauMs);
+  const clampedDt = clampNumber(dtMs, 0.25, 10);
+  const tauChanged = Math.abs(clampedTau - qiMonitorTau_ms) > 1e-3;
+  const dtChanged = Math.abs(clampedDt - qiMonitorDt_ms) > 1e-3;
+  if (!tauChanged && !dtChanged) return;
+  qiMonitor.reconfigure({ tau_s_ms: clampedTau, dt_ms: clampedDt });
+  qiMonitorTau_ms = clampedTau;
+  qiMonitorDt_ms = clampedDt;
+  qiSampleAccumulator_ms = 0;
+  qiSampleLastTs = Date.now();
+  lastQiStats = null;
+}
+
+function advanceQiMonitor(effectiveRho: number): QiStats {
+  const now = Date.now();
+  qiSampleAccumulator_ms += now - qiSampleLastTs;
+  qiSampleLastTs = now;
+  let steps =
+    qiMonitorDt_ms > 0 ? Math.floor(qiSampleAccumulator_ms / qiMonitorDt_ms) : 0;
+  steps = Math.max(1, steps);
+  let latest: QiStats | null = null;
+  for (let i = 0; i < steps; i += 1) {
+    latest = qiMonitor.tick(effectiveRho);
+    if (qiMonitorDt_ms > 0 && qiSampleAccumulator_ms >= qiMonitorDt_ms) {
+      qiSampleAccumulator_ms -= qiMonitorDt_ms;
+    }
+  }
+  qiSampleAccumulator_ms = clampNumber(
+    qiSampleAccumulator_ms,
+    0,
+    qiMonitorDt_ms * 8,
+  );
+  if (!latest && lastQiStats) {
+    return lastQiStats;
+  }
+  lastQiStats = latest;
+  return latest ?? qiMonitor.tick(effectiveRho);
 }
 
 // Mode switching function

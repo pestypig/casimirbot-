@@ -33,6 +33,8 @@ function clip(text: string, max: number): string {
 
 const knowledgeConfig = readKnowledgeConfig();
 const validateKnowledgeContext = buildKnowledgeValidator(knowledgeConfig);
+const databaseUrl = (process.env.DATABASE_URL ?? "").trim();
+const hasDatabaseUrl = Boolean(databaseUrl.length) && !databaseUrl.startsWith("pg-mem://");
 
 export const knowledgeRouter = Router();
 
@@ -102,6 +104,10 @@ knowledgeRouter.post("/projects/sync", async (req, res) => {
   }
   if (!validated || validated.length === 0) {
     return res.json({ synced: 0, projectIds: [] });
+  }
+  if (!hasDatabaseUrl) {
+    console.warn("[knowledge] skipping corpus sync because DATABASE_URL is not configured");
+    return res.json({ synced: 0, projectIds: [], skipped: "database_unconfigured" });
   }
   try {
     const result = await persistKnowledgeBundles(validated);

@@ -42,7 +42,10 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
   const base = normalizeBase();
   const model = (process.env.LLM_HTTP_MODEL ?? "gpt-4o-mini").trim();
   const temperature = Number(process.env.LLM_HTTP_TEMPERATURE ?? 0.2);
-  const apiKey = process.env.LLM_HTTP_API_KEY?.trim();
+  const apiKey = process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("LLM_HTTP_API_KEY or OPENAI_API_KEY not set; cannot call OpenAI");
+  }
   const personaId = ctx?.personaId ?? "persona:unknown";
   const now = new Date().toISOString();
 
@@ -61,7 +64,7 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(requestBody),
   });

@@ -149,6 +149,11 @@ export function QiLatticePanel({ hz = 15, mock = false, params }: QiLatticePanel
           </span>
         </div>
       </div>
+      <p className="mb-3 text-[11px] leading-snug text-slate-500">
+        Cycle-averaged |T<sup>00</sup>| variance tracked here is the same homogenization guard spelled out in
+        <code className="px-1">docs/qi-homogenization-addendum.md</code>; see the Action-Principle telemetry callout in
+        <code className="px-1">docs/needle-hull-mainframe.md</code> for how these sigma bands feed the least-action strip.
+      </p>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-[10px] uppercase tracking-wide text-slate-500">
         <span>Lattice view</span>
         <div className="flex gap-1">

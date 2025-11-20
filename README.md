@@ -9,6 +9,20 @@ Warp-field research cockpit that pairs a Helix Core operations console with the 
 - **Static research archives** - Halobank timeline and warp ledger microsites live under `warp-web/` with shared assets in `halobank-spore-timeline.js`.
 - **Design documentation** - Patch plans, focused reports, and sweep design notes in `PATCH_PLAN.md`, `REPORT.md`, and `docs/`.
 
+### Casimir tile narrative → implementation map
+
+If you need to prove that the Mk.1 Needle Hull story (Casimir tiles → ellipsoid tiling → γ_geo³ ladder → Ford–Roman duty/γ_VdB mass proxy) is wired into the codebase, read [`docs/casimir-tile-mechanism.md`](docs/casimir-tile-mechanism.md). It walks step-by-step from the research references through the exact functions (`server/energy-pipeline.ts`, `modules/sim_core/static-casimir.ts`, `warp-web/km-scale-warp-ledger.html`, etc.) so reviewers can go from theory to source in one pass.
+
+## Needle Hull Mainframe System
+
+HELIX-CORE advertises itself as the **Needle Hull Mainframe System**, meaning the console is pre-wired to the Mk 1 Natário geometry, Ford–Roman duty guards, and AI-assisted terminal tooling:
+
+- `client/src/pages/helix-core.tsx` renders the branded dashboard, log terminal, Hull3D renderer, and sweep HUDs, all bound to `useEnergyPipeline`.
+- `server/energy-pipeline.ts` seeds the global state with the canonical 1.007 km × 264 m × 173 m hull and 400-sector scheduler, while `modules/warp/warp-module.ts` keeps those semi-axes as the fallback for any Natário conversion.
+- `/api/helix/command` (implemented in `server/helix-core.ts`) provides the mainframe chat endpoint so operators can pulse sectors, request diagnostics, or load documents with function-call auditing.
+
+See `docs/needle-hull-mainframe.md` for the full architecture tour and list of endpoints/panels that make up the system.
+
 ## Alcubierre renderer + live telemetry
 
 ### Data path (bus -> overlay -> renderer)

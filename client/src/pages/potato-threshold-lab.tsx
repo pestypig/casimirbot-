@@ -15,6 +15,7 @@ import {
   Label,
 } from "recharts";
 import { useMetrics } from "@/hooks/use-metrics";
+import { kappaDrive as kappaDriveFromFlux, kappaBody } from "@/physics/curvature";
 
 /**
  * Warp Ledger vs Potato Threshold — Interactive
@@ -111,19 +112,14 @@ function areaFromScale(s: number) {
   return A0 * s;
 }
 
-function kappaDrive(s: number, dEff: number, geomGain: number) {
+function driveKappa(s: number, dEff: number, geomGain: number) {
   const A = areaFromScale(s);
   const flux = P_AVG / A; // W/m^2
-  // κ_drive ≈ (8πG/c^5) * flux * d_eff * 𝓖 (units 1/m^2)
-  return ((8 * Math.PI * G) / Math.pow(c, 5)) * flux * dEff * geomGain;
-}
-
-function kappaBody(rho: number) {
-  return ((8 * Math.PI * G) / (3 * c * c)) * rho; // 1/m^2
+  return kappaDriveFromFlux(flux, dEff, geomGain);
 }
 
 function efficiencyPotato(rho: number, s: number, dEff: number, geomGain: number) {
-  const kd = kappaDrive(s, dEff, geomGain);
+  const kd = driveKappa(s, dEff, geomGain);
   const kb = kappaBody(rho);
   return kd / kb;
 }
@@ -221,7 +217,7 @@ export default function PotatoThresholdLab() {
   const gamma = useMemo(() => gammaVdB(s, QL, dEff, Mminus), [s, QL, dEff, Mminus]);
   const TS = useMemo(() => timescaleSeparation(s), [s]);
   const z = useMemo(() => zeta(dEff), [dEff]);
-  const kd = useMemo(() => kappaDrive(s, dEff, geomGain), [s, dEff, geomGain]);
+  const kd = useMemo(() => driveKappa(s, dEff, geomGain), [s, dEff, geomGain]);
 
   const body = useMemo(() => BODIES.find((b) => b.name === selectedBody)!, [selectedBody]);
   const kb = useMemo(() => kappaBody(body.rho), [body]);

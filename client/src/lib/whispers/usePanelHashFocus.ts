@@ -3,6 +3,7 @@ import { publishPanelContext } from "./contextRegistry";
 import { attachHashFocus } from "./hashFocus";
 import { normalizeHash } from "./hashes";
 import type { WhisperPanelContext } from "./contextRegistry";
+import { recordActivitySample } from "@/lib/essence/activityReporter";
 
 type PanelContextFactory = () => WhisperPanelContext | null | undefined;
 
@@ -22,6 +23,7 @@ export function usePanelHashFocus(
     const canonical = normalizeHash(hash);
     const el = ref.current;
     if (!el || !canonical) return;
+    const tag = canonical.replace(/^#/, "");
 
     const detachHash = attachHashFocus(el, canonical);
 
@@ -38,6 +40,13 @@ export function usePanelHashFocus(
 
     const onEnter = () => {
       pushContext();
+      if (tag) {
+        recordActivitySample({
+          panelId: `hash:${tag}`,
+          tag,
+          meta: { hash: canonical, source: "panel-hash" },
+        });
+      }
     };
 
     el.addEventListener("pointerenter", onEnter);

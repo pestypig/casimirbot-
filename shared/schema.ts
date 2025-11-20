@@ -51,6 +51,11 @@ export const qiSettingsSchema = z.object({
 });
 export type QiSettings = z.infer<typeof qiSettingsSchema>;
 
+const complexSchema = z.object({
+  real: z.number(),
+  imag: z.number(),
+});
+
 export const qiStatsSchema = z.object({
   sampler: samplingKindSchema,
   tau_s_ms: z.number().positive(),
@@ -71,6 +76,16 @@ export const qiStatsSchema = z.object({
   trimEnergy_pct: z.number().min(0).optional(),
   meanT00_abs: z.number().min(0).optional(),
   homogenizerSource: z.enum(["synthetic", "hardware", "offline"]).optional(),
+  eccentricity: z.number().min(0).optional(),
+  periapsisAngle: z.number().optional(),
+  lrlVector: z.tuple([z.number(), z.number(), z.number()]).optional(),
+  lrlMagnitude: z.number().min(0).optional(),
+  lrlActionRate: z.number().optional(),
+  lrlOscillatorCoordinate: complexSchema.optional(),
+  lrlOscillatorVelocity: complexSchema.optional(),
+  lrlOscillatorEnergy: complexSchema.optional(),
+  lrlPlanarResidual: z.number().min(0).optional(),
+  lrlGeometryResidual: z.number().min(0).optional(),
 });
 export type QiStats = z.infer<typeof qiStatsSchema>;
 
@@ -124,6 +139,157 @@ export const QI_S_THRESH = {
   amber: 0.7,
   red: 0.9,
 } as const;
+
+// ---- QI controller + tile schema -------------------------------------------
+
+export const qiFieldTypeSchema = z.enum(["scalar", "em", "dirac"]);
+export type QiFieldType = z.infer<typeof qiFieldTypeSchema>;
+
+export const qiPulseEnvelopeSchema = z.enum(["rectangular", "gaussian", "raised_cosine"]);
+export type QiPulseEnvelope = z.infer<typeof qiPulseEnvelopeSchema>;
+
+export const qiControllerSafetyStateSchema = z.enum(["OK", "MARGIN_LOW", "QI_AT_RISK", "HARD_STOP"]);
+export type QiControllerSafetyState = z.infer<typeof qiControllerSafetyStateSchema>;
+
+export const qiTileTelemetrySchema = z.object({
+  tileId: z.string(),
+  label: z.string().optional(),
+  gap_nm: z.number(),
+  gapMin_nm: z.number(),
+  gapMax_nm: z.number(),
+  maxDeltaGap_nm_perTick: z.number().nonnegative(),
+  duty: z.number().min(0).max(1),
+  dutyMin: z.number().min(0).max(1),
+  dutyMax: z.number().min(0).max(1),
+  maxDutyStep: z.number().min(0).max(1).default(0.02),
+  Q_eff: z.number().positive(),
+  Q_min: z.number().positive().optional(),
+  temperatureK: z.number().nonnegative(),
+  T_maxK: z.number().positive(),
+  area_mm2: z.number().positive(),
+  gammaGeo: z.number().positive(),
+  roughness_nm: z.number().nonnegative(),
+  fieldType: qiFieldTypeSchema,
+  kernelType: samplingKindSchema,
+  tau_s: z.number().positive(),
+  guardBandFrac: z.number().min(0).max(1).optional(),
+  dutyNominal: z.number().min(0).max(1).optional(),
+  envelopeType: qiPulseEnvelopeSchema.default("rectangular"),
+  sectorId: z.number().int().nonnegative(),
+  drivePhase_rad: z.number(),
+  repRate_Hz: z.number().positive(),
+  safetySigma_Jm3: z.number().nonnegative().optional(),
+  tauKernel_s: z.number().positive().optional(),
+  slewLimit_nm_per_s: z.number().nonnegative().optional(),
+  telemetryAt: z.number().optional(),
+});
+export type QiTileTelemetry = z.infer<typeof qiTileTelemetrySchema>;
+
+export const qiTileControllerStateSchema = z.object({
+  tileId: z.string(),
+  label: z.string().optional(),
+  sectorId: z.number().int().nonnegative(),
+  drivePhase_rad: z.number(),
+  drivePhaseTarget_rad: z.number(),
+  gap_nm: z.number(),
+  gapTarget_nm: z.number(),
+  gapMin_nm: z.number(),
+  gapMax_nm: z.number(),
+  duty: z.number().min(0).max(1),
+  dutyTarget: z.number().min(0).max(1),
+  dutyMin: z.number().min(0).max(1),
+  dutyMax: z.number().min(0).max(1),
+  tau_s: z.number().positive(),
+  fieldType: qiFieldTypeSchema,
+  kernelType: samplingKindSchema,
+  envelopeType: qiPulseEnvelopeSchema.optional(),
+  rhoEff_Jm3: z.number(),
+  rhoAvg_Jm3: z.number(),
+  bound_Jm3: z.number(),
+  guardBand_Jm3: z.number(),
+  safetyBound_Jm3: z.number(),
+  margin_Jm3: z.number(),
+  targetMargin_Jm3: z.number().optional(),
+  qEff: z.number().positive(),
+  temperatureK: z.number().nonnegative(),
+  T_maxK: z.number().positive(),
+  limitFlags: z.array(z.string()).optional(),
+  suggestions: z.array(z.string()).optional(),
+  role: z.enum(["neg", "pos", "neutral"]).optional(),
+  safetyState: qiControllerSafetyStateSchema,
+  slewActive: z.boolean().optional(),
+  pendingUserInput: z.boolean().optional(),
+});
+export type QiTileControllerState = z.infer<typeof qiTileControllerStateSchema>;
+
+export const qiControllerStateSchema = z.object({
+  updatedAt: z.number(),
+  cycleTime_ms: z.number().nonnegative().optional(),
+  safetyState: qiControllerSafetyStateSchema,
+  marginMin_Jm3: z.number(),
+  marginTarget_Jm3: z.number().optional(),
+  marginHysteresis_Jm3: z.number().optional(),
+  marginMode: z.enum(["increase_margin", "hold"]).optional(),
+  payback: z
+    .object({
+      required: z.number().int().nonnegative(),
+      achieved: z.number().int().nonnegative(),
+      sectors: z.array(z.number().int().nonnegative()).optional(),
+    })
+    .optional(),
+  tiles: z.array(qiTileControllerStateSchema),
+  staggering: z
+    .object({
+      strategy: z.string(),
+      repRate_Hz: z.number().positive(),
+      tau_s: z.number().positive(),
+      phaseOffsets_rad: z.array(z.number()),
+      sectorPeriod_ms: z.number().positive(),
+      sectorCount: z.number().int().positive(),
+      negSectors: z.array(z.number().int().nonnegative()).optional(),
+      posSectors: z.array(z.number().int().nonnegative()).optional(),
+      weights: z.array(z.number()).optional(),
+    })
+    .optional(),
+  optimizer: z
+    .object({
+      iterations: z.number().int().nonnegative(),
+      infeasible: z.boolean(),
+      targetEnergy_Jm3: z.number(),
+      achievedEnergy_Jm3: z.number(),
+    })
+    .optional(),
+  intents: z
+    .array(
+      z.object({
+        intent: z.enum(["increase_negative_energy", "increase_margin", "hold", "custom"]),
+        aggressiveness: z.number().min(0).max(1).optional(),
+        issuedAt: z.number(),
+        expiresAt: z.number().optional(),
+        summary: z.string().optional(),
+      }),
+    )
+    .optional(),
+  notes: z.array(z.string()).optional(),
+});
+export type QiControllerState = z.infer<typeof qiControllerStateSchema>;
+
+export const qiSetpointSuggestionSchema = z.object({
+  intent: z.enum(["increase_negative_energy", "increase_margin", "hold", "custom"]).default("hold"),
+  aggressiveness: z.number().min(0).max(1).optional(),
+  notes: z.string().optional(),
+  tiles: z
+    .array(
+      z.object({
+        tileId: z.string(),
+        gap_nm: z.number().optional(),
+        duty: z.number().min(0).max(1).optional(),
+        tau_s: z.number().positive().optional(),
+      }),
+    )
+    .optional(),
+});
+export type QiSetpointSuggestion = z.infer<typeof qiSetpointSuggestionSchema>;
 
 // ---- Phase schedule telemetry for HUD overlays -----------------
 export interface PhaseScheduleTelemetry {

@@ -5,6 +5,7 @@ import {
   ThemeFieldPanel,
   ThemePanelRecord,
   type TThemePanelRecord,
+  type TThemeFieldPanel,
   type TThemeForce,
   type TThemeConstraint,
   type TThemeReframe,
@@ -420,7 +421,7 @@ function toThemeRecord(record: ThemeAccumulator, index: number): TThemePanelReco
   });
 }
 
-function buildField(record: ThemeAccumulator, corpusSize: number): ThemeFieldPanel {
+function buildField(record: ThemeAccumulator, corpusSize: number): TThemeFieldPanel {
   const forces: TThemeForce[] = [...record.forces.values()]
     .map((entry) => ({
       id: entry.pattern.id,
@@ -446,7 +447,7 @@ function buildField(record: ThemeAccumulator, corpusSize: number): ThemeFieldPan
   return ThemeFieldPanel.parse({
     forces,
     constraints,
-  });
+  }) as TThemeFieldPanel;
 }
 
 function buildStatePanel(record: ThemeAccumulator, dominantId: string): TThemeStatePanel {
@@ -512,6 +513,7 @@ function buildReframes(
       )} to ${nextState ? formatLabel(nextState) : "the next state"}?`,
       emphasis: "State shift",
       evidence: state.nodes.find((node) => node.id === state.stuckIn)?.evidence,
+      relatedForces: [],
     });
   }
   if (strongestForce) {
@@ -532,6 +534,7 @@ function buildReframes(
       }.`,
       emphasis: leaningAxis.label,
       evidence: leaningAxis.evidence[0],
+      relatedForces: [],
     });
   }
 
@@ -540,6 +543,7 @@ function buildReframes(
       id: "default",
       prompt: `What would make ${record.label} feel playful without losing its physics?`,
       evidence: record.evidence[0],
+      relatedForces: [],
     });
   }
 
@@ -550,7 +554,7 @@ function buildSummary(
   record: ThemeAccumulator,
   roleId: string,
   state: TThemeStatePanel,
-  field: ThemeFieldPanel,
+  field: TThemeFieldPanel,
 ): string {
   const roleLabel = ROLE_PATTERNS.find((pattern) => pattern.id === roleId)?.label ?? ROLE_FALLBACK.label;
   const leadingForce = field.forces[0]?.label;

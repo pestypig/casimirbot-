@@ -1,0 +1,52 @@
+{
+  "defaultField": "em",
+  "defaultKernel": "lorentzian",
+  "globalSafetySigma_Jm3": 40,
+  "tauFloor_s": 1e-6,
+  "tauCeiling_s": 0.05,
+  "fields": {
+    "em": {
+      "label": "Electromagnetic vacuum",
+      "defaultKernel": "lorentzian",
+      "safetySigma_Jm3": 28,
+      "kernels": {
+        "lorentzian": {
+          "K": 3.8e-30,
+          "safetySigma_Jm3": 24
+        },
+        "gaussian": {
+          "K": 2.9e-30,
+          "safetySigma_Jm3": 18
+        }
+      }
+    },
+    "scalar": {
+      "label": "Scalar field",
+      "defaultKernel": "gaussian",
+      "kernels": {
+        "lorentzian": {
+          "K": 2.4e-30,
+          "safetySigma_Jm3": 14
+        },
+        "gaussian": {
+          "K": 2.0e-30,
+          "safetySigma_Jm3": 12
+        }
+      }
+    },
+    "dirac": {
+      "label": "Dirac field",
+      "defaultKernel": "lorentzian",
+      "kernels": {
+        "lorentzian": {
+          "K": 4.4e-30,
+          "safetySigma_Jm3": 28
+        },
+        "gaussian": {
+          "K": 3.6e-30,
+          "safetySigma_Jm3": 22
+        }
+      }
+    }
+  }
+}

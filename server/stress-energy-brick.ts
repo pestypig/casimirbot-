@@ -34,6 +34,14 @@ export interface StressEnergyStats {
   divMax: number;
   dutyFR: number;
   strobePhase: number;
+  natario?: NatarioDiagnostics;
+}
+
+export interface NatarioDiagnostics {
+  divBetaMax: number;
+  divBetaRms: number;
+  gateLimit: number;
+  gNatario: number;
 }
 
 export interface StressEnergyBrick {
@@ -52,6 +60,7 @@ export interface StressEnergyBrick {
 
 const EPS = 1e-9;
 const TWO_PI = Math.PI * 2;
+const NATARIO_K_TOL = 1e-6;
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const wrap01 = (value: number) => {
@@ -180,6 +189,123 @@ const gradientZ = (field: Float32Array, x: number, y: number, z: number, nx: num
   return (frontVal - backVal) / denom;
 };
 
+const smoothVectorField = (
+  fieldX: Float32Array,
+  fieldY: Float32Array,
+  fieldZ: Float32Array,
+  nx: number,
+  ny: number,
+  nz: number,
+  passes = 1,
+) => {
+  if (passes <= 0) return;
+  const total = nx * ny * nz;
+  const tmpX = new Float32Array(total);
+  const tmpY = new Float32Array(total);
+  const tmpZ = new Float32Array(total);
+  for (let pass = 0; pass < passes; pass += 1) {
+    let idx = 0;
+    for (let z = 0; z < nz; z++) {
+      const zStart = Math.max(0, z - 1);
+      const zEnd = Math.min(nz - 1, z + 1);
+      for (let y = 0; y < ny; y++) {
+        const yStart = Math.max(0, y - 1);
+        const yEnd = Math.min(ny - 1, y + 1);
+        for (let x = 0; x < nx; x++) {
+          const xStart = Math.max(0, x - 1);
+          const xEnd = Math.min(nx - 1, x + 1);
+          let sumX = 0;
+          let sumY = 0;
+          let sumZ = 0;
+          let count = 0;
+          for (let zz = zStart; zz <= zEnd; zz += 1) {
+            for (let yy = yStart; yy <= yEnd; yy += 1) {
+              let base = zz * nx * ny + yy * nx + xStart;
+              for (let xx = xStart; xx <= xEnd; xx += 1) {
+                sumX += fieldX[base];
+                sumY += fieldY[base];
+                sumZ += fieldZ[base];
+                count += 1;
+                base += 1;
+              }
+            }
+          }
+          const inv = count > 0 ? 1 / count : 1;
+          tmpX[idx] = sumX * inv;
+          tmpY[idx] = sumY * inv;
+          tmpZ[idx] = sumZ * inv;
+          idx += 1;
+        }
+      }
+    }
+    fieldX.set(tmpX);
+    fieldY.set(tmpY);
+    fieldZ.set(tmpZ);
+  }
+};
+
+const computeBetaDivergenceStats = (
+  betaX: Float32Array,
+  betaY: Float32Array,
+  betaZ: Float32Array,
+  nx: number,
+  ny: number,
+  nz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+) => {
+  let divBetaMaxAbs = 0;
+  let divBetaRmsSum = 0;
+  let idx = 0;
+  for (let z = 0; z < nz; z++) {
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const divBeta =
+          gradientX(betaX, x, y, z, nx, ny, dx) +
+          gradientY(betaY, x, y, z, nx, ny, dy) +
+          gradientZ(betaZ, x, y, z, nx, ny, nz, dz);
+        const absVal = Math.abs(divBeta);
+        if (absVal > divBetaMaxAbs) divBetaMaxAbs = absVal;
+        divBetaRmsSum += divBeta * divBeta;
+        idx += 1;
+      }
+    }
+  }
+  return {
+    divBetaMaxAbs,
+    divBetaRms: Math.sqrt(divBetaRmsSum / Math.max(nx * ny * nz, 1)),
+  };
+};
+
+const clampNatarioShift = (
+  betaX: Float32Array,
+  betaY: Float32Array,
+  betaZ: Float32Array,
+  nx: number,
+  ny: number,
+  nz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+) => {
+  const stats = computeBetaDivergenceStats(betaX, betaY, betaZ, nx, ny, nz, dx, dy, dz);
+  if (stats.divBetaMaxAbs > NATARIO_K_TOL && stats.divBetaMaxAbs > 0) {
+    const scale = NATARIO_K_TOL / stats.divBetaMaxAbs;
+    for (let i = 0; i < betaX.length; i += 1) {
+      betaX[i] *= scale;
+      betaY[i] *= scale;
+      betaZ[i] *= scale;
+    }
+    return {
+      divBetaMaxAbs: NATARIO_K_TOL,
+      divBetaRms: stats.divBetaRms * scale,
+      scaled: true,
+    };
+  }
+  return { ...stats, scaled: false };
+};
+
 export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>): StressEnergyBrick {
   const defaults = defaultHullBounds();
   const dims: [number, number, number] = input.dims ?? [128, 128, 128];
@@ -263,6 +389,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const betaX = new Float32Array(totalVoxels);
   const betaY = new Float32Array(totalVoxels);
   const betaZ = new Float32Array(totalVoxels);
+  const betaMag = new Float32Array(totalVoxels);
   let t00Min = Number.POSITIVE_INFINITY;
   let t00Max = Number.NEGATIVE_INFINITY;
   let sumT00 = 0;
@@ -287,13 +414,50 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         const betaDir = blendDirections(normal, driveDirUnit, 0.32);
         const betaAmp = natarioShiftFromDensity(Math.abs(density), Math.max(radius, 1e-3));
         const sign = density >= 0 ? 1 : -1;
-        betaX[idx] = betaDir[0] * betaAmp * sign;
-        betaY[idx] = betaDir[1] * betaAmp * sign;
-        betaZ[idx] = betaDir[2] * betaAmp * sign;
+        const vecX = betaDir[0] * betaAmp * sign;
+        const vecY = betaDir[1] * betaAmp * sign;
+        const vecZ = betaDir[2] * betaAmp * sign;
+        const mag = Math.hypot(vecX, vecY, vecZ);
+        betaMag[idx] = mag;
+        if (mag > 0) {
+          betaX[idx] = vecX / mag;
+          betaY[idx] = vecY / mag;
+          betaZ[idx] = vecZ / mag;
+        } else {
+          betaX[idx] = 0;
+          betaY[idx] = 0;
+          betaZ[idx] = 0;
+        }
         idx += 1;
       }
     }
   }
+
+  smoothVectorField(betaX, betaY, betaZ, nx, ny, nz, 2);
+  for (let i = 0; i < totalVoxels; i += 1) {
+    const dirMag = Math.hypot(betaX[i], betaY[i], betaZ[i]);
+    const desired = betaMag[i];
+    const scale = dirMag > 1e-12 ? desired / dirMag : 0;
+    betaX[i] *= scale;
+    betaY[i] *= scale;
+    betaZ[i] *= scale;
+  }
+
+  const natarioClamp = clampNatarioShift(betaX, betaY, betaZ, nx, ny, nz, dx, dy, dz);
+  if (natarioClamp.scaled) {
+    console.warn("[Natario] Divergence exceeds gate; scaling shift field", {
+      divMax: natarioClamp.divBetaMaxAbs,
+      gate: NATARIO_K_TOL,
+      dutyFR,
+      phase01,
+    });
+  }
+  const natarioDiagnostics: NatarioDiagnostics = {
+    divBetaMax: natarioClamp.divBetaMaxAbs,
+    divBetaRms: natarioClamp.divBetaRms,
+    gateLimit: NATARIO_K_TOL,
+    gNatario: Math.max(0, 1 - natarioClamp.divBetaMaxAbs / NATARIO_K_TOL),
+  };
 
   const Sx = new Float32Array(totalVoxels);
   const Sy = new Float32Array(totalVoxels);
@@ -370,6 +534,12 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   if (!Number.isFinite(SzMax)) SzMax = 0;
   if (!Number.isFinite(divMin)) divMin = 0;
   if (!Number.isFinite(divMax)) divMax = 0;
+  const voxelNorm = Math.max(totalVoxels, 1);
+  netFlux = [
+    netFlux[0] / voxelNorm,
+    netFlux[1] / voxelNorm,
+    netFlux[2] / voxelNorm,
+  ];
 
   const stats: StressEnergyStats = {
     totalEnergy_J: sumT00 * cellVolume,
@@ -380,6 +550,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     divMax,
     dutyFR,
     strobePhase,
+    natario: natarioDiagnostics,
   };
 
   return {

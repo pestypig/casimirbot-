@@ -17,6 +17,7 @@ import {
   Map,
   Move3d,
   Navigation2,
+  Microscope,
   RadioTower,
   Rocket,
   ScrollText,
@@ -39,12 +40,14 @@ export type HelixPanelRef = {
   id: string;
   title: string;
   icon?: LucideIcon;
+  keywords?: string[];
   loader: LoaderFactory;
   endpoints?: string[];
   pinned?: boolean;
   skipTaskbar?: boolean;
   defaultSize?: { w: number; h: number };
   defaultPosition?: { x: number; y: number };
+  defaultOpen?: boolean;
 };
 
 const API = {
@@ -58,6 +61,54 @@ const API = {
   helixSpectrumRead: "GET /api/helix/spectrum",
   helixSpectrumWrite: "POST /api/helix/spectrum"
 } as const;
+
+const PANEL_KEYWORDS: Record<string, string[]> = {
+  "viz-diagnostics": ["viz hud", "diagnostics overlay", "shader debug", "fps meter", "render stack"],
+  "energy-flux": ["flux monitor", "stability histogram", "|T_ab|", "phi_A", "R = (phi_A)/(I3 + |T|)"],
+  "microscopy": ["microscopy mode", "microprobe", "phase contrast", "nm scale", "Coulomb sweep"],
+  "electron-orbital": ["orbital density", "Bohr k/q/g", "toroidal packets", "Coulomb probe", "iso-surface"],
+  "drive-guards": ["I3_geo", "I3_VdB", "Q_cavity", "guard bands", "sector strobing"],
+  "warp-ledger": ["km-scale ledger", "warp ledger", "bubble log", "warp km", "ledger bands"],
+  "spectrum-tuner": ["spectrum tuner", "FFT", "frequency dial", "harmonics sweep", "waveform tuner"],
+  "vacuum-gap-heatmap": ["vacuum gap", "Casimir gap", "nm gap map", "heatmap", "gap stress"],
+  "star-hydrostatic": ["HR map", "Gamow window", "potato threshold", "polytrope", "stellar ledger"],
+  "vacuum-gap-sweep": ["gap sweep", "delta gap", "scan HUD", "nm sweep", "sweep HUD"],
+  "cavity-mechanism": ["cavity frame", "mechanism view", "design layers", "actuator layout", "mechanism CAD"],
+  "fractional-coherence-rail": ["fractional coherence", "xi rail", "coherence rail", "phase rail", "coherence band"],
+  "fractional-coherence-grid": ["coherence grid", "xi grid", "fractional grid", "phase lattice", "coherence lattice"],
+  "near-zero": ["near zero widget", "delta H", "null detection", "near-zero pocket", "anomaly finder"],
+  "direction-pad": ["direction pad", "flight director", "vector pad", "nav pad", "pose nudge"],
+  "nav-system": ["nav system", "nav pose", "waypoints", "navigation hud", "pose tracking"],
+  "deepmix-solar": ["deep mix solar", "mixing bands", "sector solver", "solar telemetry", "mix heuristics"],
+  "solar-globe": ["solar globe", "synoptic globe", "field lines", "magnetogram", "solar surface"],
+  "deepmix-sweetspot": ["sweet spot", "deep mix target", "isoline", "mix optimization", "duty sweet spot"],
+  "deepmix-globe": ["deep mix globe", "mix field", "global mix", "deep mixing globe"],
+  "alcubierre-viewer": ["Alcubierre metric", "warp bubble", "metric tensor", "warp visualizer", "bubble hull"],
+  "shell-outline": ["shell outline", "hull trace", "hull shell", "outline view", "needle shell"],
+  "shift-vector": ["shift vector", "beta^i", "lapse shift", "ADM shift", "beta_i"],
+  "curvature-slice": ["curvature slice", "R_ab", "Ricci slice", "scalar curvature", "curvature cut"],
+  "curvature-ledger": ["curvature ledger", "Weyl bands", "tensor ledger", "Riemann register", "ledger trace"],
+  "operational-mode": ["operational mode", "station vs desktop", "mode toggle", "profile switch", "mission view"],
+  "casimir-tile-grid": ["Casimir tile grid", "tile spectrum", "grid view", "tile ledger", "Casimir tiles"],
+  "light-speed-strobe": ["light speed strobe", "c strobe", "strobes", "speed scale", "strobe ladder"],
+  "helix-casimir-amplifier": ["Helix amplifier", "Casimir amplifier", "gain stack", "amplifier tile", "Casimir gain"],
+  "resonance-scheduler": ["resonance scheduler", "duty planner", "phase scheduler", "auto duty", "resonance bands"],
+  "trip-player": ["trip player", "timeline playback", "recording", "session replay", "trip log"],
+  "fuel-gauge": ["fuel gauge", "drive budget", "burn rate", "energy reserve", "fuel burn"],
+  "vacuum-contract": ["vacuum contract", "negative energy covenant", "contract badge", "Casimir promise", "vacuum pledge"],
+  "metric-pocket": ["metric pocket", "amplification pocket", "tensor pocket", "metric gain", "metric amplifier"],
+  "halobank": ["HaloBank", "timeline", "halo ledger", "bank history", "halo archive"],
+  "qi-widget": ["QI widget", "quantum inequality", "Ford-Roman", "QI bounds", "rho_min"],
+  "qi-auto-tuner": ["QI auto tuner", "phase auto", "QI scheduler", "auto duty", "quantum inequality tuner"],
+  "sector-legend": ["sector legend", "color legend", "sector key", "legend ring", "sector palette"],
+  "sector-roles": ["sector roles", "sector HUD", "role badges", "sector overlay", "role legend"],
+  "sweep-replay": ["sweep replay", "sweep telemetry", "recorded sweep", "sweep log", "sweep playback"],
+  "hull-status": ["hull status", "capsule stress", "hull health", "integrity", "hull capsule"],
+  "agi-debate-view": ["AGI debate", "debate SSE", "argument stream", "multi agent debate", "debate dashboard"],
+  "agi-essence-console": ["Essence console", "AGI console", "plan execute", "tools logs", "command console"],
+  "agi-task-history": ["task history", "AGI trace", "task log", "history queue", "trace timeline"],
+  "essence-proposals": ["essence proposals", "proposal queue", "jobs board", "proposal actions", "proposal mgr"]
+};
 
 function lazyPanel<T extends Record<string, unknown>>(
   importer: () => Promise<T>,
@@ -74,7 +125,7 @@ function lazyPanel<T extends Record<string, unknown>>(
     });
 }
 
-export const HELIX_PANELS: HelixPanelRef[] = [
+const RAW_HELIX_PANELS: HelixPanelRef[] = [
   {
     id: "viz-diagnostics",
     title: "Viz Diagnostics HUD",
@@ -94,6 +145,24 @@ export const HELIX_PANELS: HelixPanelRef[] = [
     endpoints: [API.pipelineGet, API.helixMetrics]
   },
   {
+    id: "microscopy",
+    title: "Microscopy Mode",
+    icon: Microscope,
+    loader: lazyPanel(() => import("@/components/MicroscopyPanel"), "MicroscopyPanel"),
+    defaultSize: { w: 960, h: 660 },
+    defaultPosition: { x: 360, y: 220 },
+    endpoints: [API.pipelineGet, API.helixMetrics]
+  },
+  {
+    id: "electron-orbital",
+    title: "Electron Orbital Simulator",
+    icon: Atom,
+    loader: lazyPanel(() => import("@/components/ElectronOrbitalPanel")),
+    defaultSize: { w: 1120, h: 720 },
+    defaultPosition: { x: 180, y: 160 },
+    endpoints: [API.pipelineGet, API.helixSnapshot]
+  },
+  {
     id: "drive-guards",
     title: "Drive Guards",
     icon: ShieldCheck,
@@ -102,6 +171,16 @@ export const HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 920, h: 640 },
     defaultPosition: { x: 96, y: 64 },
     endpoints: [API.pipelineGet, API.helixMetrics]
+  },
+  {
+    id: "warp-ledger",
+    title: "KM-Scale Warp Ledger",
+    icon: ScrollText,
+    loader: lazyPanel(() => import("@/components/WarpLedgerPanel")),
+    pinned: true,
+    defaultSize: { w: 1080, h: 720 },
+    defaultPosition: { x: 140, y: 32 },
+    endpoints: ["GET /km-scale-warp-ledger"]
   },
   {
     id: "spectrum-tuner",
@@ -121,6 +200,14 @@ export const HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 960, h: 640 },
     defaultPosition: { x: 220, y: 160 },
     endpoints: [API.helixSweep]
+  },
+  {
+    id: "star-hydrostatic",
+    title: "Hydrostatic Equilibrium (HR)",
+    icon: Sun,
+    loader: lazyPanel(() => import("@/pages/star-hydrostatic-panel")),
+    defaultSize: { w: 1100, h: 720 },
+    defaultPosition: { x: 240, y: 140 }
   },
   {
     id: "vacuum-gap-sweep",
@@ -254,6 +341,16 @@ export const HELIX_PANELS: HelixPanelRef[] = [
     endpoints: [API.pipelineGet, API.helixMetrics]
   },
   {
+    id: "curvature-ledger",
+    title: "Curvature Ledger",
+    icon: LineChart,
+    loader: lazyPanel(() => import("@/components/CurvatureLedgerPanel"), "CurvatureLedgerPanel"),
+    defaultSize: { w: 440, h: 320 },
+    defaultPosition: { x: 420, y: 540 },
+    endpoints: [API.pipelineGet],
+    defaultOpen: true
+  },
+  {
     id: "operational-mode",
     title: "Operational Mode Switch",
     icon: Settings,
@@ -353,6 +450,15 @@ export const HELIX_PANELS: HelixPanelRef[] = [
     endpoints: [API.pipelineGet]
   },
   {
+    id: "qi-auto-tuner",
+    title: "QI Auto-Tuner",
+    icon: ShieldCheck,
+    loader: lazyPanel(() => import("@/components/QiAutoTunerPanel"), "QiAutoTunerPanel"),
+    defaultSize: { w: 640, h: 560 },
+    defaultPosition: { x: 760, y: 440 },
+    endpoints: [API.pipelineGet, API.pipelineUpdate]
+  },
+  {
     id: "sector-legend",
     title: "Sector Legend",
     icon: Layers,
@@ -428,3 +534,11 @@ export const HELIX_PANELS: HelixPanelRef[] = [
     endpoints: ["GET /api/proposals", "POST /api/proposals/:id/action", "GET /api/essence/events"]
   }
 ];
+
+export const HELIX_PANELS: HelixPanelRef[] = RAW_HELIX_PANELS.map((panel) => {
+  const fallbackKeywords = PANEL_KEYWORDS[panel.id];
+  if (!fallbackKeywords || panel.keywords?.length) {
+    return panel;
+  }
+  return { ...panel, keywords: fallbackKeywords };
+});

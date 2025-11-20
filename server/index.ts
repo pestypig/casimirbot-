@@ -6,6 +6,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
+import { startLatticeWatcher, type LatticeWatcherHandle } from "./services/code-lattice/watcher";
 
 const app = express();
 app.use(express.json());
@@ -18,6 +19,7 @@ const __dirname = path.dirname(__filename);
 const docsDir = path.resolve(__dirname, "..", "docs");
 
 let serverInstance: Server | null = null;
+let latticeWatcher: LatticeWatcherHandle | null = null;
 let shuttingDown = false;
 const requestShutdown = (signal: NodeJS.Signals) => {
   try {
@@ -28,6 +30,16 @@ const requestShutdown = (signal: NodeJS.Signals) => {
     return;
   }
   shuttingDown = true;
+
+  const watcherHandle = latticeWatcher;
+  latticeWatcher = null;
+  if (watcherHandle) {
+    watcherHandle.close().catch((err) => {
+      try {
+        console.error("[code-lattice] watcher close failed:", err);
+      } catch {}
+    });
+  }
 
   const forceExitTimer = setTimeout(() => {
     try {
@@ -219,6 +231,17 @@ app.use((req, res, next) => {
   
   const server = await registerRoutes(app);
   serverInstance = server;
+
+  if (process.env.ENABLE_LATTICE_WATCHER === "1") {
+    const debounceMs = Number(process.env.LATTICE_WATCHER_DEBOUNCE_MS);
+    const watcherOptions = Number.isFinite(debounceMs) ? { debounceMs } : undefined;
+    try {
+      latticeWatcher = await startLatticeWatcher(watcherOptions);
+      log(`[code-lattice] watcher ready (version=${latticeWatcher.getVersion()})`);
+    } catch (error) {
+      console.error("[code-lattice] watcher failed to start:", error);
+    }
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

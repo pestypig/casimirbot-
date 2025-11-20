@@ -131,6 +131,8 @@ function describeTarget(proposal: EssenceProposal): string {
       return `touching ${target.path}`;
     case "backend-multi":
       return `across ${target.paths.slice(0, 3).join(", ")}`;
+    case "environment":
+      return `adjusting ${target.scope}`;
     default:
       return "in environment";
   }

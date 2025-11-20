@@ -278,7 +278,7 @@ essenceRouter.get("/events", handleEssenceEventStream);
 /** GET /api/essence/stream/sse - legacy alias */
 essenceRouter.get("/stream/sse", handleEssenceEventStream);
 
-/** GET /api/essence/verify/hash?id=... — placeholder verification */
+/** GET /api/essence/verify/hash?id=... â€” placeholder verification */
 essenceRouter.get("/verify/hash", async (req, res) => {
   const id = typeof req.query.id === "string" ? req.query.id : "";
   if (!id) {
@@ -291,7 +291,7 @@ essenceRouter.get("/verify/hash", async (req, res) => {
   res.json({ id, ok: true, algo: env.header.source.original_hash.algo });
 });
 
-/** POST /api/essence/remix — stubbed deterministic job */
+/** POST /api/essence/remix â€” stubbed deterministic job */
 essenceRouter.post("/remix", async (req, res) => {
   const parsed = RemixRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -394,7 +394,7 @@ essenceRouter.post("/mix/create", async (req, res) => {
   }
 });
 
-/** GET /api/essence/:id — fetch envelope */
+/** GET /api/essence/:id â€” fetch envelope */
 essenceRouter.get("/:id([a-f0-9-]{36}|cid/.+)", async (req, res) => {
   const env = await ensureEnvelopeReadable(req, res, await getEnvelope(req.params.id));
   if (!env) {

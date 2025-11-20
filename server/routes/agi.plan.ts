@@ -4,18 +4,26 @@ import { z } from "zod";
 import type { ToolManifestEntry } from "@shared/skills";
 import type { TTaskTrace } from "@shared/essence-persona";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
+import type { ConsoleTelemetryBundle, PanelTelemetry } from "@shared/desktop";
+import type { ResonanceBundle, ResonanceCollapse } from "@shared/code-lattice";
 import { Routine, type TRoutine } from "@shared/agi-instructions";
 import {
   DEFAULT_SUMMARY_FOCUS,
   type ExecutorStep,
   type PlanNode,
   buildChatBPlan,
+  buildCandidatePlansFromResonance,
   compilePlan,
   executeCompiledPlan,
   summarizeExecutionResults,
   renderChatBPlannerPrompt,
   registerInMemoryTrace,
+  collapseResonancePatches,
 } from "../services/planner/chat-b";
+import { saveConsoleTelemetry, getConsoleTelemetry } from "../services/console-telemetry/store";
+import { persistConsoleTelemetrySnapshot } from "../services/console-telemetry/persist";
+import { summarizeConsoleTelemetry } from "../services/console-telemetry/summarize";
+import { ensureCasimirTelemetry } from "../services/casimir/telemetry";
 import { buildWhyBelongs } from "../services/planner/why-belongs";
 import { getTool, listTools, registerTool } from "../skills";
 import { llmLocalHandler, llmLocalSpec } from "../skills/llm.local";
@@ -36,9 +44,13 @@ import {
   KnowledgeValidationError,
   estimateKnowledgeContextBytes,
 } from "../services/knowledge/validation";
+import { mergeKnowledgeBundles } from "../services/knowledge/merge";
+import { buildResonanceBundle } from "../services/code-lattice/resonance";
+import { getLatticeVersion } from "../services/code-lattice/loader";
 
 const planRouter = Router();
 const LOCAL_SPAWN_TOOL_NAME = "llm.local.spawn.generate";
+const HTTP_TOOL_NAME = "llm.http.generate";
 const TRACE_SSE_LIMIT = (() => {
   const fallback = 50;
   const raw = Number(process.env.TRACE_SSE_BUFFER ?? fallback);
@@ -48,6 +60,7 @@ const TRACE_SSE_LIMIT = (() => {
   const clamped = Math.floor(raw);
   return Math.min(250, Math.max(1, clamped));
 })();
+const DEFAULT_DESKTOP_ID = "helix.desktop.main";
 
 type PlanRecord = {
   traceId: string;
@@ -61,6 +74,12 @@ type PlanRecord = {
   plannerPrompt: string;
   taskTrace: TTaskTrace;
   knowledgeContext?: KnowledgeProjectExport[];
+  desktopId?: string;
+  telemetry?: ConsoleTelemetryBundle | null;
+  telemetrySummary?: string | null;
+  resonance?: ResonanceBundle | null;
+  resonanceSelection?: ResonanceCollapse | null;
+  latticeVersion?: number | null;
 };
 
 const planRecords = new Map<string, PlanRecord>();
@@ -145,54 +164,15 @@ function clipKnowledgePreview(value?: string): string | undefined {
   return `${normalized.slice(0, MAX_KNOWLEDGE_PREVIEW_CHARS)}...`;
 }
 
-function mergeKnowledgeBundles(
-  base?: KnowledgeProjectExport[],
-  extra?: KnowledgeProjectExport[],
-): KnowledgeProjectExport[] | undefined {
-  if ((!base || base.length === 0) && (!extra || extra.length === 0)) {
-    return undefined;
-  }
-  const map = new Map<string, KnowledgeProjectExport>();
-  for (const bundle of base ?? []) {
-    map.set(bundle.project.id, { ...bundle, files: [...bundle.files] });
-  }
-  for (const bundle of extra ?? []) {
-    const existing = map.get(bundle.project.id);
-    if (!existing) {
-      map.set(bundle.project.id, { ...bundle, files: [...bundle.files] });
-      continue;
-    }
-    const seen = new Set(existing.files.map((file) => file.id));
-    const mergedFiles = [...existing.files];
-    for (const file of bundle.files) {
-      if (seen.has(file.id)) {
-        continue;
-      }
-      mergedFiles.push(file);
-      seen.add(file.id);
-    }
-    const mergedOmitted = [
-      ...(existing.omittedFiles ?? []),
-      ...(bundle.omittedFiles ?? []),
-    ].filter(Boolean);
-    map.set(bundle.project.id, {
-      project: existing.project,
-      summary: existing.summary ?? bundle.summary,
-      files: mergedFiles,
-      approxBytes: (existing.approxBytes ?? 0) + (bundle.approxBytes ?? 0),
-      omittedFiles: mergedOmitted.length > 0 ? mergedOmitted : undefined,
-    });
-  }
-  return Array.from(map.values());
-}
-
 function selectToolForGoal(goal: string, manifest: ToolManifestEntry[]): string {
   const available = new Set(manifest.map((entry) => entry.name));
   const prefersLocalSpawn =
     process.env.LLM_POLICY?.toLowerCase() === "local" && available.has(LOCAL_SPAWN_TOOL_NAME);
   const fallback = prefersLocalSpawn
     ? LOCAL_SPAWN_TOOL_NAME
-    : manifest.find((entry) => entry.name === llmLocalSpec.name)?.name ?? manifest[0]?.name ?? llmLocalSpec.name;
+    : available.has(HTTP_TOOL_NAME)
+        ? HTTP_TOOL_NAME
+        : manifest.find((entry) => entry.name === llmLocalSpec.name)?.name ?? manifest[0]?.name ?? llmLocalSpec.name;
   const normalized = goal.toLowerCase();
 
   const hasTool = (name: string) => available.has(name);
@@ -241,6 +221,25 @@ const KnowledgeProjectSchema = z.object({
   omittedFiles: z.array(z.string()).optional(),
 });
 
+const PanelTelemetrySchema = z.object({
+  panelId: z.string().min(1),
+  instanceId: z.string().min(1),
+  title: z.string().min(1),
+  kind: z.string().min(1).optional(),
+  metrics: z.record(z.number()).optional(),
+  flags: z.record(z.boolean()).optional(),
+  strings: z.record(z.string()).optional(),
+  sourceIds: z.array(z.string().min(1)).max(16).optional(),
+  notes: z.string().max(512).optional(),
+  lastUpdated: z.string().optional(),
+});
+
+const ConsoleTelemetrySchema = z.object({
+  desktopId: z.string().min(1).max(128),
+  capturedAt: z.string().optional(),
+  panels: z.array(PanelTelemetrySchema).max(32),
+});
+
 const PlanRequest = z.object({
   goal: z.string().min(3, "goal required"),
   personaId: z.string().min(1).default("default"),
@@ -251,6 +250,7 @@ const PlanRequest = z.object({
   knowledgeProjects: z.array(z.string().min(1).max(128)).max(32).optional(),
   routineId: z.string().min(1).optional(),
   routine: Routine.optional(),
+  desktopId: z.string().min(1).max(128).optional(),
 });
 
 const ExecuteRequest = z.object({
@@ -334,6 +334,28 @@ async function ensureDefaultTools(): Promise<void> {
   }
 }
 
+planRouter.post("/console/telemetry", (req, res) => {
+  const parsed = ConsoleTelemetrySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const capturedAt = parsed.data.capturedAt ?? new Date().toISOString();
+  const panels: PanelTelemetry[] = parsed.data.panels.map((panel) => ({
+    ...panel,
+    lastUpdated: panel.lastUpdated ?? capturedAt,
+  }));
+  const payload: ConsoleTelemetryBundle = {
+    desktopId: parsed.data.desktopId,
+    capturedAt,
+    panels,
+  };
+  saveConsoleTelemetry(payload);
+  void persistConsoleTelemetrySnapshot(payload).catch((error) => {
+    console.warn("[telemetry] failed to persist snapshot", error);
+  });
+  res.status(204).end();
+});
+
 planRouter.post("/plan", async (req, res) => {
   await ensureDefaultTools();
   await ensureSpecialistsRegistered();
@@ -350,13 +372,17 @@ planRouter.post("/plan", async (req, res) => {
     return res.status(403).json({ error: "forbidden" });
   }
   const { goal, searchQuery, topK, summaryFocus } = parsed.data;
-  let knowledgeContext: KnowledgeProjectExport[] | undefined;
+  const desktopId = parsed.data.desktopId?.trim() || DEFAULT_DESKTOP_ID;
+  const baseTelemetryBundle = getConsoleTelemetry(desktopId);
+  const { bundle: telemetryBundle } = ensureCasimirTelemetry({ desktopId, base: baseTelemetryBundle });
+  const telemetrySummary = summarizeConsoleTelemetry(telemetryBundle);
+  let baseKnowledgeContext: KnowledgeProjectExport[] | undefined;
   if (parsed.data.knowledgeContext && parsed.data.knowledgeContext.length > 0) {
     if (!knowledgeConfig.enabled) {
       return res.status(400).json({ error: "knowledge_projects_disabled" });
     }
     try {
-      knowledgeContext = validateKnowledgeContext(parsed.data.knowledgeContext);
+      baseKnowledgeContext = validateKnowledgeContext(parsed.data.knowledgeContext);
     } catch (error) {
       if (error instanceof KnowledgeValidationError) {
         return res.status(error.status).json({ error: "knowledge_context_invalid", message: error.message });
@@ -369,7 +395,7 @@ planRouter.post("/plan", async (req, res) => {
     parsed.data.knowledgeProjects?.map((id) => id.trim()).filter((id) => id.length > 0) ?? [];
 
   if (knowledgeConfig.enabled && requestedProjects.length > 0) {
-    const inlineBytes = estimateKnowledgeContextBytes(knowledgeContext);
+    const inlineBytes = estimateKnowledgeContextBytes(baseKnowledgeContext);
     const remainingBudget = Math.max(0, knowledgeConfig.contextBytes - inlineBytes);
     if (remainingBudget > 0) {
       try {
@@ -379,7 +405,7 @@ planRouter.post("/plan", async (req, res) => {
           maxFilesPerProject: knowledgeConfig.maxFilesPerProject,
         });
         if (fetched.length > 0) {
-          knowledgeContext = mergeKnowledgeBundles(knowledgeContext, fetched);
+          baseKnowledgeContext = mergeKnowledgeBundles(baseKnowledgeContext, fetched);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -387,6 +413,25 @@ planRouter.post("/plan", async (req, res) => {
       }
     }
   }
+
+  const query = (searchQuery ?? goal).trim();
+  let resonanceBundle: ResonanceBundle | null = null;
+  let resonanceSelection: ResonanceCollapse | null = null;
+  try {
+    resonanceBundle = await buildResonanceBundle({
+      goal,
+      query,
+      limit: Number(process.env.CODE_PATCH_TOPK ?? 12),
+      telemetry: telemetryBundle ?? null,
+    });
+    if (resonanceBundle) {
+      resonanceSelection = collapseResonancePatches({ bundle: resonanceBundle, goal });
+      // patch merge deferred until plan candidate selection
+    }
+  } catch (error) {
+    console.warn("[code-lattice] resonance patch build failed:", error);
+  }
+  const latticeVersion = getLatticeVersion() || null;
   const routine: TRoutine | undefined = parsed.data.routine
     ? Routine.parse(parsed.data.routine)
     : parsed.data.routineId
@@ -398,10 +443,29 @@ planRouter.post("/plan", async (req, res) => {
     .filter(Boolean)
     .join(" ");
   const selectedTool = selectToolForGoal(chooserText || goal, manifest);
-  const query = (searchQuery ?? goal).trim();
   const focus = summaryFocus?.trim() || DEFAULT_SUMMARY_FOCUS;
 
-  const plannerPrompt = renderChatBPlannerPrompt({
+  const basePlanArgs: BuildPlanArgs = {
+    goal,
+    searchQuery: query,
+    topK,
+    summaryFocus: focus,
+    finalTool: selectedTool,
+  };
+  const basePlan = buildChatBPlan(basePlanArgs);
+  const primaryPatchId = resonanceSelection?.primaryPatchId ?? null;
+  const planCandidates = buildCandidatePlansFromResonance({
+    basePlan: basePlanArgs,
+    personaId,
+    manifest,
+    baseKnowledgeContext,
+    resonanceBundle,
+    resonanceSelection,
+    topPatches: Number(process.env.RESONANCE_PLAN_BRANCHES ?? 3),
+    telemetryBundle,
+  });
+  let knowledgeContext = baseKnowledgeContext;
+  let plannerPrompt = renderChatBPlannerPrompt({
     goal,
     personaId,
     manifest,
@@ -409,14 +473,40 @@ planRouter.post("/plan", async (req, res) => {
     topK,
     summaryFocus: focus,
     knowledgeContext,
+    resonanceBundle,
+    resonanceSelection,
+    primaryPatchId,
+    telemetryBundle,
   });
-  const { nodes, planDsl } = buildChatBPlan({
-    goal,
-    searchQuery: query,
-    topK,
-    summaryFocus: focus,
-    finalTool: selectedTool,
-  });
+  let nodes = basePlan.nodes;
+  let planDsl = basePlan.planDsl;
+  const winningPlan =
+    (primaryPatchId && planCandidates.find((candidate) => candidate.patch.id === primaryPatchId)) ??
+    planCandidates[0];
+  if (winningPlan) {
+    knowledgeContext = winningPlan.knowledgeContext;
+    plannerPrompt = winningPlan.plannerPrompt;
+    nodes = winningPlan.nodes;
+    planDsl = winningPlan.planDsl;
+  } else if (primaryPatchId) {
+    const fallbackPatch = resonanceBundle?.candidates.find((patch) => patch.id === primaryPatchId);
+    if (fallbackPatch) {
+      knowledgeContext = mergeKnowledgeBundles(baseKnowledgeContext, [fallbackPatch.knowledge]);
+      plannerPrompt = renderChatBPlannerPrompt({
+        goal,
+        personaId,
+        manifest,
+        searchQuery: query,
+        topK,
+        summaryFocus: focus,
+        knowledgeContext,
+        resonanceBundle,
+        resonanceSelection,
+        primaryPatchId,
+        telemetryBundle,
+      });
+    }
+  }
   const executorStepsAll = compilePlan(nodes);
   const maxTurns = routine?.knobs?.max_turns;
   const executorSteps =
@@ -436,6 +526,8 @@ planRouter.post("/plan", async (req, res) => {
     approvals: [],
     knowledgeContext: persistedKnowledgeContext,
     plan_manifest: manifest,
+     resonance_bundle: resonanceBundle,
+     resonance_selection: resonanceSelection,
     routine_json: routine,
   };
 
@@ -451,6 +543,12 @@ planRouter.post("/plan", async (req, res) => {
     plannerPrompt,
     taskTrace,
     knowledgeContext,
+    desktopId,
+    telemetry: telemetryBundle ?? null,
+    telemetrySummary: telemetrySummary ?? null,
+    resonance: resonanceBundle,
+    resonanceSelection,
+    latticeVersion,
   };
 
   registerInMemoryTrace(taskTrace);
@@ -469,6 +567,9 @@ planRouter.post("/plan", async (req, res) => {
     executor_steps: executorSteps,
     task_trace: taskTrace,
     knowledge_context: knowledgeContext,
+    lattice_version: latticeVersion,
+    resonance_bundle: resonanceBundle,
+    resonance_selection: resonanceSelection,
   });
 });
 
@@ -500,13 +601,21 @@ planRouter.post("/execute", async (req, res) => {
   }
 
   const start = Date.now();
+  const runtimeTelemetry = record.telemetry ?? null;
+  const runtimeTelemetrySummary =
+    record.telemetrySummary ?? summarizeConsoleTelemetry(runtimeTelemetry) ?? null;
   const steps = await executeCompiledPlan(record.executorSteps, {
     goal: record.goal,
     personaId: record.personaId,
     sessionId: traceId,
     taskTrace: record.taskTrace,
     knowledgeContext: record.knowledgeContext,
+    telemetrySummary: runtimeTelemetrySummary,
+    resonanceBundle: record.resonance,
+    resonanceSelection: record.resonanceSelection,
   });
+  record.telemetry = runtimeTelemetry;
+  record.telemetrySummary = runtimeTelemetrySummary;
   const duration = Date.now() - start;
   let ok = steps.length > 0 && steps.every((step) => step.ok);
   // Enforce routine final_output schema if present
@@ -549,6 +658,8 @@ planRouter.post("/execute", async (req, res) => {
     result_summary: summary,
     task_trace: record.taskTrace,
     why_belongs: whyBelongs,
+    resonance_bundle: record.resonance,
+    resonance_selection: record.resonanceSelection,
   });
 });
 

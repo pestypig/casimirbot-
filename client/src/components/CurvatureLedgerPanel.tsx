@@ -94,6 +94,10 @@ export function CurvatureLedgerPanel() {
         </CardTitle>
         <CardDescription className="text-xs text-slate-400">
           {cadenceLabel} · {sourceLabel}
+          <span className="mt-1 block text-[11px] text-slate-500">
+            Guard threshold matches the cycle-averaged drive budget from <code className="px-1">docs/qi-homogenization-addendum.md</code>{" "}
+            and the Action-Principle telemetry note in{" "}<code className="px-1">docs/needle-hull-mainframe.md</code>.
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

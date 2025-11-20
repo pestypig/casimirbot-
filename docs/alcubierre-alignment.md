@@ -4,6 +4,15 @@ Purpose
 - Align this codebase with the canonical general relativity Alcubierre warp metric.
 - Provide a reusable rubric, LLM prompts, and validation notes that collaborators can run without prior context.
 
+## Symmetry‚ÄìBoundary Conservation Principle (SBCP)
+
+> Whenever the equations of motion are invariant under an **active continuous symmetry**, there exists a corresponding quantity whose change inside any system boundary equals the flux of that quantity through the boundary.
+
+- In practice: Nat√°rio symmetry (‚àá¬∑Œ≤ = 0) + the drive boundary ‚áí energy/momentum change = ‚àí‚àÆS¬∑dA.
+- Server implementation: `server/stress-energy-brick.ts` derives `S` and `‚àá¬∑S`; `netFlux` stays ‚âà0 for a closed hull.
+- Client implementation: the **FluxInvariantBadge** in `EnergyFluxPanel` highlights SBCP status; `DriveGuardsPanel` surfaces Nat√°rio/York-time checks.
+- Use `FluxInvariantBadge` (or the raw stats it wraps) whenever a new panel or diagnostic needs to assert ‚Äúconservation = symmetry + closed boundary.‚Äù
+
 Canonical reference (ground truth)
 - Metric (ADM 3+1 form, lapse alpha = 1):  
   `ds^2 = -c^2 dt^2 + [dx - v_s(t) f(r_s) dt]^2 + dy^2 + dz^2`, where `r_s = sqrt((x - x_s(t))^2 + y^2 + z^2)` and the only non-zero shift component is `beta^x = -v_s f(r_s)`.
@@ -20,6 +29,21 @@ Canonical reference (ground truth)
 - Physical reading from Alcubierre and Lobo: volume elements expand behind and contract in front; stress-energy lives in a torus. Violating classical energy conditions is expected. Natario solutions provide a divergence-free shift (`theta ~ 0`) for cross-checks.
 - Quick visual audit: single-plane `theta` must flip sign across the ship, and `T^{00}` must be toroidal with an axial node. If not, suspect a sign, orientation, or observer-frame mismatch.
 
+## Maupertuis duality and the LaplaceñRungeñLenz invariant
+
+### Proof I ó Maupertuis action lock {#proof-maupertuis}
+
+For a shell at fixed specific energy \(E\), Maupertuis's abbreviated action \(S_0 = \int \mathbf{p}\cdot d\mathbf{q}\) is stationary only when the trajectory hugs the Kepler solution. In practice we integrate the instantaneous action rate \(\dot S_0 = \mathbf{p}\cdot\mathbf{v}\) right next to the existing stress-energy tap, store it in the pipeline metadata, and expose it through the shared `LaplaceRungeLenzMeasure.actionRate`. Drive diagnostics (Flux invariant badge, Drive Guards, km-scale ledger) now show the same scalar you would compute analytically when auditing least-action.
+
+### Proof II ó \(w = \sqrt{z}\) conformal bridge {#proof-conformal}
+
+Promote in-plane points to complex values \(z = x + i y\) and apply \(w = \sqrt{z}\). The energy pipeline keeps both the planar sample and its oscillator lift: `oscillatorCoordinate` (the stored \(w\)), `oscillatorVelocity` (\(\dot{w}\)), and the complex energy \(E_c = \tfrac{m}{2} \dot{w}^2 + 4 w^2\). We also stash the residual \(|w^2 - z|\) so UI layers can display a green ìbridge lockedî badge only when the conformal dual really squares back to the sampled configuration point.
+
+### Proof III ó Geometric readout {#proof-geometry}
+
+Mapping \(E_c\) back down produces \(\mathbf{A} = \mathbf{p} \times \mathbf{L} - mk\,\hat{\mathbf{r}}\), the LaplaceñRungeñLenz vector that points to periapsis and whose magnitude equals \(|\mathbf{A}| = mk e\). The helper `computeLaplaceRungeLenz` (mirrored server/client) now returns `{vector, magnitude, eccentricity, periapsisAngle, angularMomentum}` plus the norms used to verify `|A| = mk e`. Energy panels, Drive Guards, Halobank, and the km-scale ledger all surface these numbers so a drift immediately flags a Maupertuis violation or a non-Keplerian perturbation.
+
+When the pipeline keeps \(|\mathbf{A}|\) fixed it is explicitly honoring the same least-action structure this alignment doc enforces for \(T^{00}\) and \(\theta\). If \(\mathbf{A}\) drifts, you either violated the Maupertuis constraint or injected a non-Keplerian potential; the diagnostics will tell you which.
 README-ready comparison rubric
 - Copy this block into `docs/alignment.md` or the README so reviewers and LLMs can check boxes quickly:
 
@@ -286,3 +310,4 @@ Implementation notes
 - Store YAML outputs from the prompts under `reports/` (for example `reports/alcubierre_alignment.yaml`) so changes can be tracked in CI.
 - When using these prompts with Copilot or ChatGPT, paste the exact block; the structured YAML makes comparisons and diffs straightforward.
 - Document any gauge or lapse deviations up front so reviewers can understand legitimate departures from the canonical solution.
+

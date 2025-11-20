@@ -33,11 +33,18 @@ const backendMultiTargetSchema = z.object({
   paths: z.array(z.string()).min(1),
 });
 
+const environmentTargetSchema = z.object({
+  type: z.literal("environment"),
+  ownerId: z.string().optional(),
+  scope: z.enum(["desktop-template", "layout", "theme"]).default("desktop-template"),
+});
+
 export const proposalTargetSchema = z.discriminatedUnion("type", [
   panelTargetSchema,
   panelSeedTargetSchema,
   backendFileTargetSchema,
   backendMultiTargetSchema,
+  environmentTargetSchema,
 ]);
 export type ProposalTarget = z.infer<typeof proposalTargetSchema>;
 

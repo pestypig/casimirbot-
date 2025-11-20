@@ -1,5 +1,6 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
+import LRLDocsTooltip from "@/components/common/LRLDocsTooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,82 @@ const fmtInt = (value: unknown) => {
   return Math.round(Number(value)).toLocaleString();
 };
 
+const wrapDegrees = (deg: number) => {
+  const normalized = deg % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+};
+
+const formatDegreesLabel = (deg: number, digits = 1) => `${deg.toFixed(digits)}°`;
+
+type LrlTone = {
+  chipClass: string;
+  textClass: string;
+};
+
+const getLrlTone = (eccentricity: number): LrlTone => {
+  if (!Number.isFinite(eccentricity)) {
+    return {
+      chipClass: "border-slate-600/60 text-slate-300 bg-slate-800/40",
+      textClass: "text-slate-300",
+    };
+  }
+  if (eccentricity <= 0.2) {
+    return {
+      chipClass: "border-emerald-400/70 text-emerald-200 bg-emerald-500/10",
+      textClass: "text-emerald-200",
+    };
+  }
+  if (eccentricity <= 0.5) {
+    return {
+      chipClass: "border-amber-400/70 text-amber-200 bg-amber-500/10",
+      textClass: "text-amber-200",
+    };
+  }
+  return {
+    chipClass: "border-rose-500/70 text-rose-200 bg-rose-500/10",
+    textClass: "text-rose-200",
+  };
+};
+
+type LRLCompassProps = {
+  angleDeg: number;
+  toneClass: string;
+};
+
+const LRLCompass: React.FC<LRLCompassProps> = ({ angleDeg, toneClass }) => (
+  <div
+    className={cn(
+      "flex h-12 w-12 items-center justify-center rounded-full border text-xs",
+      toneClass,
+    )}
+    aria-label="LRL periapsis compass"
+  >
+    <svg viewBox="0 0 32 32" width={32} height={32} className="text-current">
+      <circle
+        cx="16"
+        cy="16"
+        r="14"
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity={0.35}
+        strokeWidth="1"
+      />
+      <g transform={`rotate(${angleDeg} 16 16)`}>
+        <line
+          x1="16"
+          y1="16"
+          x2="16"
+          y2="4"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <polygon points="16,2 13,7 19,7" fill="currentColor" />
+      </g>
+    </svg>
+  </div>
+);
+
 export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
   const { data } = useEnergyPipeline();
   const qi = data?.qi;
@@ -74,6 +151,14 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
       : cWarp >= 0.6
         ? "text-right text-amber-300"
         : "text-right text-rose-300";
+  const lrlEccentricity = Number(qi.eccentricity);
+  const lrlPeriapsis = Number(qi.periapsisAngle);
+  const hasLrlTelemetry =
+    Number.isFinite(lrlEccentricity) && Number.isFinite(lrlPeriapsis);
+  const lrlAngleDeg = hasLrlTelemetry
+    ? wrapDegrees((lrlPeriapsis * 180) / Math.PI)
+    : 0;
+  const lrlTone = hasLrlTelemetry ? getLrlTone(lrlEccentricity) : null;
 
   return (
     <div
@@ -83,8 +168,11 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
       )}
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="uppercase tracking-wide text-[11px] text-slate-400">
-          Quantum Inequality
+        <div className="flex items-center gap-2">
+          <div className="uppercase tracking-wide text-[11px] text-slate-400">
+            Quantum Inequality
+          </div>
+          <LRLDocsTooltip className="border-slate-700/70 text-slate-400" />
         </div>
         <Badge className={cn("px-2.5 py-0.5 text-[11px] font-semibold", status.badgeClass)}>
           {status.label}
@@ -117,6 +205,20 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
         <span className="text-slate-400">Samples</span>
         <span className="text-right">{fmtInt(qi.samples)}</span>
       </div>
+
+      {hasLrlTelemetry && lrlTone && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-400">
+              LRL lock
+            </div>
+            <div className={cn("font-mono text-[11px]", lrlTone.textClass)}>
+              e={fmt(lrlEccentricity, 2)} · ϖ={formatDegreesLabel(lrlAngleDeg, 1)}
+            </div>
+          </div>
+          <LRLCompass angleDeg={lrlAngleDeg} toneClass={lrlTone.chipClass} />
+        </div>
+      )}
 
       <div className="mt-3 flex items-center justify-between text-[10px] text-slate-500">
         <span>Observer: {observerLabel}</span>

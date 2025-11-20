@@ -6,6 +6,7 @@ type MemoryDrawerProps = {
   open: boolean;
   onClose: () => void;
   offsetPx?: number;
+  variant?: "drawer" | "window";
 };
 
 const formatTimestamp = (value?: string): string => {
@@ -63,7 +64,7 @@ const MemoryList = ({
   </div>
 );
 
-export default function MemoryDrawer({ traceId, open, onClose, offsetPx = 0 }: MemoryDrawerProps) {
+export default function MemoryDrawer({ traceId, open, onClose, offsetPx = 0, variant = "drawer" }: MemoryDrawerProps) {
   const [data, setData] = useState<TraceMemoryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,13 +102,8 @@ export default function MemoryDrawer({ traceId, open, onClose, offsetPx = 0 }: M
     };
   }, [open, traceId]);
 
-  return (
-    <div
-      style={{ right: `${offsetPx}px` }}
-      className={`fixed top-0 h-full w-[360px] bg-[var(--panel-bg,#0f1115)] text-[var(--panel-fg,#e6e6e6)] border-l border-white/10 transition-transform duration-300 ${
-        open ? "translate-x-0" : "translate-x-full"
-      }`}
-    >
+  const drawerBody = (
+    <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         <div className="flex flex-col">
           <span className="font-semibold">Memory</span>
@@ -131,6 +127,36 @@ export default function MemoryDrawer({ traceId, open, onClose, offsetPx = 0 }: M
           </>
         )}
       </div>
+    </div>
+  );
+
+  if (variant === "window") {
+    return (
+      <div
+        className={`fixed inset-0 z-50 transition-opacity duration-300 ${
+          open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      >
+        <div className="absolute inset-0 bg-black/50" aria-hidden="true" onClick={onClose} />
+        <div
+          className={`relative mx-auto my-8 w-[min(420px,calc(100%-32px))] max-h-[80vh] bg-[var(--panel-bg,#0f1115)] text-[var(--panel-fg,#e6e6e6)] border border-white/10 rounded-xl shadow-2xl overflow-hidden transform transition-all duration-300 ${
+            open ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          }`}
+        >
+          {drawerBody}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{ right: `${offsetPx}px` }}
+      className={`fixed top-0 h-full w-[360px] bg-[var(--panel-bg,#0f1115)] text-[var(--panel-fg,#e6e6e6)] border-l border-white/10 transition-transform duration-300 ${
+        open ? "translate-x-0" : "translate-x-full"
+      }`}
+    >
+      {drawerBody}
     </div>
   );
 }

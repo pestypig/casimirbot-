@@ -48,7 +48,7 @@ export const EmbeddingMeta = z.object({
 export const EssenceHeader = z.object({
   id: z.string(), // CID or UUID
   version: z.literal("essence/1.0"),
-  modality: z.enum(["text", "audio", "image", "video", "multimodal"]),
+  modality: z.enum(["text", "audio", "image", "video", "code", "multimodal"]),
   created_at: z.string(),
   source: z.object({
     uri: z.string(), // allow URLs or paths
@@ -82,6 +82,101 @@ export const EssenceHeader = z.object({
       groups: z.array(z.string()).default([]),
     })
     .default({ visibility: "public", groups: [] }),
+});
+
+const CodeNodeKind = z.enum([
+  "function",
+  "component",
+  "schema",
+  "test",
+  "class",
+  "hook",
+  "store",
+  "interface",
+  "type",
+  "utility",
+]);
+
+const CodeResonanceKind = z.enum([
+  "architecture",
+  "ideology",
+  "ui",
+  "plumbing",
+  "test",
+  "doc",
+  "data",
+  "unknown",
+]);
+
+const CodeEdgeKind = z.enum(["import", "export", "call", "local", "cochange", "reference"]);
+
+const CodeByteRange = z.object({
+  start: z.number().int().nonnegative(),
+  end: z.number().int().nonnegative(),
+});
+
+const CodeSourceSpan = z.object({
+  startLine: z.number().int().nonnegative(),
+  startCol: z.number().int().nonnegative(),
+  endLine: z.number().int().nonnegative(),
+  endCol: z.number().int().nonnegative(),
+});
+
+export const CodeNeighbor = z.object({
+  nodeId: z.string().optional(),
+  filePath: z.string().optional(),
+  symbol: z.string().optional(),
+  kind: CodeEdgeKind,
+  weight: z.number().nonnegative().optional(),
+  note: z.string().optional(),
+});
+
+const CodeHealth = z.object({
+  coverage: z.number().min(0).max(1).optional(),
+  flaky: z.boolean().optional(),
+  lastStatus: z.enum(["pass", "fail", "unknown"]).optional(),
+  lastTestedAt: z.string().optional(),
+  tests: z.array(z.string()).optional(),
+});
+
+const CodeSalience = z.object({
+  attention: z.number().nonnegative().optional(),
+  lastTouchedByUserAt: z.string().optional(),
+  activePanels: z.array(z.string()).optional(),
+  traces: z.array(z.string()).optional(),
+});
+
+export const CodeFeature = z.object({
+  nodeId: z.string(),
+  symbol: z.string(),
+  exportName: z.string().optional(),
+  kind: CodeNodeKind,
+  resonanceKind: CodeResonanceKind.optional(),
+  filePath: z.string(),
+  signature: z.string().optional(),
+  astHash: z.string(),
+  fileHash: z.string().optional(),
+  byteRange: CodeByteRange.optional(),
+  loc: CodeSourceSpan.optional(),
+  doc: z.string().optional(),
+  snippet: z.string().optional(),
+  semanticEmbeddingId: z.string().optional(),
+  neighbors: z.array(CodeNeighbor).default([]),
+  dependencies: z.array(z.string()).default([]),
+  dependants: z.array(z.string()).default([]),
+  health: CodeHealth.optional(),
+  salience: CodeSalience.optional(),
+  metrics: z
+    .object({
+      bytes: z.number().int().nonnegative().optional(),
+      lines: z.number().int().nonnegative().optional(),
+      complexity: z.number().nonnegative().optional(),
+      imports: z.number().int().nonnegative().optional(),
+      exports: z.number().int().nonnegative().optional(),
+      commit: z.string().optional(),
+    })
+    .optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 export const Features = z.object({
@@ -125,6 +220,8 @@ export const Features = z.object({
       keyframe_phashes_url: z.string().optional(),
     })
     .optional(),
+
+  code: CodeFeature.optional(),
 
   physics: z
     .object({
@@ -176,6 +273,11 @@ export const Features = z.object({
 
 export type CollapseMixerFeature = NonNullable<z.infer<typeof Features>["mixer"]>;
 export type CollapseMixerKnobs = CollapseMixerFeature["knobs"];
+export type TCodeFeature = NonNullable<z.infer<typeof Features>["code"]>;
+export type TCodeNeighbor = TCodeFeature["neighbors"][number];
+export type TCodeHealth = NonNullable<TCodeFeature["health"]>;
+export type TCodeSalience = NonNullable<TCodeFeature["salience"]>;
+export type TCodeResonanceKind = z.infer<typeof CodeResonanceKind>;
 
 export const Provenance = z.object({
   pipeline: z.array(TransformStep),

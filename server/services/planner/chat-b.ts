@@ -1,5 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
+import type { ConsoleTelemetryBundle } from "@shared/desktop";
+import type {
+  ResonanceBundle,
+  ResonancePatch,
+  ResonanceNodeKind,
+  ResonanceCollapse,
+} from "@shared/code-lattice";
 import type { TMemoryRecord, TMemorySearchHit, TTaskTrace, TTaskApproval } from "@shared/essence-persona";
 import type { Tool, ToolManifestEntry, ToolRiskType } from "@shared/skills";
 import { putMemoryRecord, searchMemories } from "../essence/memory-store";
@@ -8,6 +15,7 @@ import { getTool } from "../../skills";
 import { metrics, recordTaskOutcome } from "../../metrics";
 import { appendToolLog } from "../observability/tool-log-store";
 import { runSpecialistPlan, runVerifierOnly, type SpecialistRunResult } from "../specialists/executor";
+import { mergeKnowledgeBundles } from "../knowledge/merge";
 import { composeKnowledgeAppendix } from "./knowledge-compositor";
 
 export const PLAN_DSL_CHAIN = "SEARCH→SUMMARIZE→CALL(tool)";
@@ -101,6 +109,10 @@ export interface PlannerPromptArgs {
   topK: number;
   summaryFocus: string;
   knowledgeContext?: KnowledgeProjectExport[];
+  resonanceBundle?: ResonanceBundle | null;
+  resonanceSelection?: ResonanceCollapse | null;
+  primaryPatchId?: string | null;
+  telemetryBundle?: ConsoleTelemetryBundle | null;
 }
 
 export interface BuildPlanArgs {
@@ -118,6 +130,279 @@ export interface ExecutionRuntime {
   taskTrace?: TTaskTrace;
   requestApproval?: ApprovalHandler;
   knowledgeContext?: KnowledgeProjectExport[];
+  telemetrySummary?: string | null;
+  resonanceBundle?: ResonanceBundle | null;
+  resonanceSelection?: ResonanceCollapse | null;
+}
+
+export type ResonantPlanCandidate = {
+  patch: ResonancePatch;
+  knowledgeContext?: KnowledgeProjectExport[];
+  plannerPrompt: string;
+  nodes: PlanNode[];
+  planDsl: string;
+};
+
+const FIX_KEYWORDS = /\b(fix|bug|broken|repair|debug|error|failing|regression)\b/;
+const IDEOLOGY_KEYWORDS = /\b(ethos|ideology|mission|philosophy|why|ethic|vision)\b/;
+const CASIMIR_PANEL_ID = "casimir-tiles";
+const CASIMIR_NODE_PATTERN = /casimir/i;
+
+const basename = (value: string) => value.split(/[/\\]/).pop() ?? value;
+
+const describePatchNodes = (patch: ResonancePatch, limit = 2): string => {
+  const nodes = patch.nodes.slice(0, limit);
+  if (nodes.length === 0) {
+    return "n/a";
+  }
+  return nodes.map((node) => `${node.symbol} (${basename(node.filePath)})`).join(", ");
+};
+
+const RESONANCE_KIND_ORDER: ResonanceNodeKind[] = [
+  "architecture",
+  "ideology",
+  "doc",
+  "ui",
+  "data",
+  "plumbing",
+  "test",
+  "unknown",
+];
+
+const getKindPriority = (kind?: ResonanceNodeKind): number => {
+  const resolved = kind ?? "unknown";
+  const index = RESONANCE_KIND_ORDER.indexOf(resolved);
+  return index >= 0 ? index : RESONANCE_KIND_ORDER.length;
+};
+
+type ResonanceSectionArgs = {
+  bundle?: ResonanceBundle | null;
+  selection?: ResonanceCollapse | null;
+  preferredPatchId?: string | null;
+  hotNodeLimit?: number;
+};
+
+const pickPatchForSection = ({
+  bundle,
+  selection,
+  preferredPatchId,
+}: ResonanceSectionArgs): ResonancePatch | null => {
+  if (!bundle || !bundle.candidates || bundle.candidates.length === 0) {
+    return null;
+  }
+  if (preferredPatchId) {
+    const preferred = bundle.candidates.find((candidate) => candidate.id === preferredPatchId);
+    if (preferred) {
+      return preferred;
+    }
+  }
+  const rankingOrder = selection?.ranking?.map((entry) => entry.patchId) ?? [];
+  for (const patchId of rankingOrder) {
+    const match = bundle.candidates.find((candidate) => candidate.id === patchId);
+    if (match) {
+      return match;
+    }
+  }
+  return bundle.candidates[0] ?? null;
+};
+
+const composeResonancePatchSection = ({
+  bundle,
+  selection,
+  preferredPatchId,
+  hotNodeLimit = 5,
+}: ResonanceSectionArgs): string => {
+  const patch = pickPatchForSection({ bundle, selection, preferredPatchId });
+  if (!patch) {
+    return "";
+  }
+  const stats = patch.stats ?? ({
+    nodeCount: patch.nodes.length,
+    failingTests: 0,
+    activePanels: 0,
+    activationTotal: patch.nodes.reduce((sum, node) => sum + (node.score ?? 0), 0),
+    telemetryWeight: 0,
+  } as ResonancePatch["stats"]);
+  const nodes = patch.nodes
+    .slice()
+    .sort((a, b) => {
+      const kindDiff = getKindPriority(a.kind) - getKindPriority(b.kind);
+      if (kindDiff !== 0) {
+        return kindDiff;
+      }
+      return (b.score ?? 0) - (a.score ?? 0);
+    })
+    .slice(0, Math.max(1, hotNodeLimit));
+
+  if (nodes.length === 0) {
+    return "";
+  }
+
+  const lines = [
+    "[Code Resonance Patch]",
+    `blueprint: ${patch.mode}`,
+    "stats:",
+    `  nodes: ${stats.nodeCount ?? nodes.length}`,
+    `  activation_total: ${(stats.activationTotal ?? 0).toFixed(3)}`,
+    `  telemetry_overlap: ${stats.telemetryWeight ?? 0}`,
+    `  failing_tests: ${stats.failingTests ?? 0}`,
+    "",
+    "hot_nodes:",
+  ];
+
+  for (const node of nodes) {
+    lines.push(
+      [
+        `- id: ${node.id}`,
+        `  file: ${node.filePath}`,
+        `  kind: ${node.kind ?? "unknown"}`,
+        `  summary: ${(node.summary ?? node.symbol).replace(/\s+/g, " ")}`,
+      ].join("\n"),
+    );
+  }
+
+  return lines.join("\n");
+};
+
+const pickCasimirNodes = (bundle?: ResonanceBundle | null, limit = 3) => {
+  if (!bundle || !bundle.candidates || bundle.candidates.length === 0) {
+    return [] as ResonancePatch["nodes"];
+  }
+  const nodes: ResonancePatch["nodes"][number][] = [];
+  for (const candidate of bundle.candidates) {
+    for (const node of candidate.nodes) {
+      if (CASIMIR_NODE_PATTERN.test(node.filePath) || CASIMIR_NODE_PATTERN.test(node.symbol ?? "")) {
+        nodes.push(node);
+      }
+    }
+  }
+  nodes.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  return nodes.slice(0, Math.max(1, limit));
+};
+
+const toFinite = (value?: number): number | null => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  return value;
+};
+
+const formatMetric = (value?: number, digits = 3): string => {
+  const finite = toFinite(value);
+  return finite === null ? "n/a" : finite.toFixed(digits);
+};
+
+const composeCasimirTelemetrySection = ({
+  telemetry,
+  bundle,
+}: {
+  telemetry?: ConsoleTelemetryBundle | null;
+  bundle?: ResonanceBundle | null;
+}): string => {
+  const panel = telemetry?.panels?.find((entry) => entry.panelId === CASIMIR_PANEL_ID) ?? null;
+  const nodes = pickCasimirNodes(bundle);
+  if (!panel) {
+    return [
+      "[Casimir telemetry]",
+      "status: none",
+      "reason: no casimir-tiles snapshot available in console telemetry",
+      "action: enable the Casimir tile emitter so planners can cite tile health.",
+    ].join("\n");
+  }
+  const lines = [
+    "[Casimir telemetry]",
+    `status: ${panel.flags?.hasActivity ? "active" : "idle"}`,
+  ];
+  const tilesActive = toFinite(panel.metrics?.tilesActive);
+  const totalTiles = toFinite(panel.metrics?.totalTiles);
+  if (tilesActive !== null || totalTiles !== null) {
+    lines.push(`tiles_active: ${tilesActive ?? "n/a"}/${totalTiles ?? "n/a"}`);
+  }
+  lines.push(`avg_q_factor: ${formatMetric(panel.metrics?.avgQFactor)}`);
+  lines.push(`coherence: ${formatMetric(panel.metrics?.coherence)}`);
+  if (panel.strings?.lastEventIso) {
+    lines.push(`last_event: ${panel.strings.lastEventIso}`);
+  }
+  if (nodes.length > 0) {
+    lines.push("", "activated_nodes:");
+    for (const node of nodes) {
+      const score = typeof node.score === "number" ? node.score.toFixed(3) : "n/a";
+      lines.push(`- ${node.id} (${node.kind ?? "unknown"}) score=${score}`);
+    }
+  } else {
+    lines.push("reason: telemetry present but Casimir nodes remained below the resonance threshold");
+    lines.push("action: raise tile activity or widen sampling before collapse.");
+  }
+  return lines.join("\n");
+};
+
+export function collapseResonancePatches(args: {
+  bundle?: ResonanceBundle | null;
+  goal: string;
+  jitter?: number;
+}): ResonanceCollapse | null {
+  const bundle = args.bundle;
+  if (!bundle || !bundle.candidates || bundle.candidates.length === 0) {
+    return null;
+  }
+  const jitter =
+    typeof args.jitter === "number" && Number.isFinite(args.jitter)
+      ? Math.abs(args.jitter)
+      : Number(process.env.RESONANCE_COLLAPSE_JITTER ?? 0.04);
+  const normalizedGoal = args.goal.toLowerCase();
+  const wantsFix = FIX_KEYWORDS.test(normalizedGoal);
+  const wantsIdeology = IDEOLOGY_KEYWORDS.test(normalizedGoal);
+
+  const rankingInternal = bundle.candidates
+    .map((patch) => {
+      let weight = patch.score;
+      if (wantsFix) {
+        weight += Math.min(1, patch.stats.failingTests * 0.12);
+      }
+      if (patch.stats.activePanels > 0) {
+        weight += Math.min(0.6, patch.stats.activePanels * 0.05);
+      }
+      if (wantsIdeology && patch.mode === "ideology") {
+        weight += 0.35;
+      } else if (!wantsIdeology && patch.mode === "ideology") {
+        weight -= 0.1;
+      }
+      if (!wantsIdeology && patch.mode === "local") {
+        weight += 0.05;
+      }
+      const noise = (Math.random() * 2 - 1) * jitter;
+      return { patch, weightedScore: weight + noise };
+    })
+    .sort((a, b) => b.weightedScore - a.weightedScore);
+
+  const primary = rankingInternal[0]?.patch;
+  if (!primary) {
+    return null;
+  }
+  const backup = rankingInternal[1]?.patch;
+  const ranking = rankingInternal.map((entry) => ({
+    patchId: entry.patch.id,
+    label: entry.patch.label,
+    mode: entry.patch.mode,
+    weightedScore: Number(entry.weightedScore.toFixed(4)),
+    stats: entry.patch.stats,
+  }));
+  const rationaleParts = [
+    `Selected ${primary.label} (${primary.mode})`,
+    `focus=${describePatchNodes(primary)}`,
+    `panels=${primary.stats.activePanels}`,
+    `failing_tests=${primary.stats.failingTests}`,
+  ];
+  if (backup) {
+    rationaleParts.push(`backup=${backup.label}`);
+  }
+
+  return {
+    primaryPatchId: primary.id,
+    backupPatchId: backup?.id,
+    rationale: rationaleParts.join(" | "),
+    ranking,
+  };
 }
 
 type ApprovalRequest = {
@@ -222,6 +507,23 @@ export function renderChatBPlannerPrompt(args: PlannerPromptArgs): string {
     'SEARCH("drive status",k=4)->SUMMARIZE(@s1,"Blockers")->CALL(llm.local.generate,{"prompt":"..."})',
   ];
 
+  const casimirSection = composeCasimirTelemetrySection({
+    telemetry: args.telemetryBundle,
+    bundle: args.resonanceBundle,
+  });
+  if (casimirSection) {
+    lines.push("", casimirSection);
+  }
+
+  const resonanceSection = composeResonancePatchSection({
+    bundle: args.resonanceBundle,
+    selection: args.resonanceSelection,
+    preferredPatchId: args.primaryPatchId,
+  });
+  if (resonanceSection) {
+    lines.push("", resonanceSection);
+  }
+
   const appendix = composeKnowledgeAppendix({
     goal: args.goal,
     knowledgeContext: args.knowledgeContext,
@@ -233,6 +535,65 @@ export function renderChatBPlannerPrompt(args: PlannerPromptArgs): string {
   }
 
   return lines.join("\n");
+}
+
+export function buildCandidatePlansFromResonance(args: {
+  basePlan: BuildPlanArgs;
+  personaId?: string;
+  manifest: ToolManifestEntry[];
+  baseKnowledgeContext?: KnowledgeProjectExport[];
+  resonanceBundle?: ResonanceBundle | null;
+  resonanceSelection?: ResonanceCollapse | null;
+  topPatches?: number;
+  telemetryBundle?: ConsoleTelemetryBundle | null;
+}): ResonantPlanCandidate[] {
+  const bundle = args.resonanceBundle;
+  if (!bundle || !bundle.candidates || bundle.candidates.length === 0) {
+    return [];
+  }
+  const ranking = args.resonanceSelection?.ranking ?? [];
+  const rankingOrder = ranking.map((entry) => entry.patchId);
+  const topLimit = Math.max(1, Math.min(bundle.candidates.length, args.topPatches ?? 3));
+  const sortedPatches = bundle.candidates
+    .slice()
+    .sort((a, b) => {
+      const aIndex = rankingOrder.indexOf(a.id);
+      const bIndex = rankingOrder.indexOf(b.id);
+      if (aIndex >= 0 || bIndex >= 0) {
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      }
+      return b.score - a.score;
+    })
+    .slice(0, topLimit);
+
+  const candidates: ResonantPlanCandidate[] = [];
+  for (const patch of sortedPatches) {
+    const knowledgeContext = mergeKnowledgeBundles(args.baseKnowledgeContext, [patch.knowledge]);
+    const plannerPrompt = renderChatBPlannerPrompt({
+      goal: args.basePlan.goal,
+      personaId: args.personaId,
+      manifest: args.manifest,
+      searchQuery: args.basePlan.searchQuery,
+      topK: args.basePlan.topK ?? 5,
+      summaryFocus: args.basePlan.summaryFocus ?? DEFAULT_SUMMARY_FOCUS,
+      knowledgeContext,
+      resonanceBundle: args.resonanceBundle,
+      resonanceSelection: args.resonanceSelection,
+      primaryPatchId: patch.id,
+      telemetryBundle: args.telemetryBundle,
+    });
+    const { nodes, planDsl } = buildChatBPlan(args.basePlan);
+    candidates.push({
+      patch,
+      knowledgeContext,
+      plannerPrompt,
+      nodes,
+      planDsl,
+    });
+  }
+  return candidates;
 }
 
 function maybeInjectSpecialists(goal: string, planSteps: PlanNode[]): PlanNode[] {
@@ -382,7 +743,21 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           persona: runtime.personaId ?? "default",
           summary: summaryText,
         });
-        const prompt = appendix.text ? `${promptBase}\n\n${appendix.text}` : promptBase;
+        const resonanceSection = composeResonancePatchSection({
+          bundle: runtime.resonanceBundle,
+          selection: runtime.resonanceSelection,
+          preferredPatchId: runtime.resonanceSelection?.primaryPatchId,
+        });
+        let prompt = promptBase;
+        if (resonanceSection) {
+          prompt += `\n\n${resonanceSection}`;
+        }
+        if (runtime.telemetrySummary) {
+          prompt += `\n\n[Panel snapshot]\n${runtime.telemetrySummary}`;
+        }
+        if (appendix.text) {
+          prompt += `\n\n${appendix.text}`;
+        }
         const input: Record<string, unknown> = { ...(step.extra ?? {}), prompt };
         if (runtime.knowledgeContext && runtime.knowledgeContext.length > 0) {
           input.knowledgeContext = runtime.knowledgeContext;

@@ -21,6 +21,8 @@ import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
+import { qiControllerRouter, startQiController } from "./modules/qi/qi-controller.js";
+import { codeLatticeRouter } from "./routes/code-lattice";
 
 const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === "1") return true;
@@ -37,6 +39,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   app.use("/api/knowledge", knowledgeRouter);
+  app.use("/api/code-lattice", codeLatticeRouter);
   app.use("/api/ethos", ethosRouter);
 
 
@@ -102,6 +105,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { specialistsRouter } = await import("./routes/agi.specialists");
     app.use("/api/agi/specialists", specialistsRouter);
   }
+
+  startQiController();
+  app.use("/api/qi", qiControllerRouter);
 
   // --- Realtime plumbing ----------------------------------------------------
   // Support multiple WS subscribers per simulation + SSE fallback

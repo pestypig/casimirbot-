@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
+import type { QiStats } from "@shared/schema";
 import {
   Card,
   CardContent,
@@ -25,6 +26,8 @@ import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useCurvatureBrick } from "@/hooks/useCurvatureBrick";
 import { useCycleLedger, LEDGER_GUARD_THRESHOLD } from "@/hooks/useCycleLedger";
+import { useNavPoseStore } from "@/store/useNavPoseStore";
+import { computeLaplaceRungeLenz, type LaplaceRungeLenzMeasure } from "@/physics/alcubierre";
 import { publish } from "@/lib/luma-bus";
 import { CurvatureLedgerPanel } from "./CurvatureLedgerPanel";
 import { QiGuardBadge } from "./QiGuardBadge";
@@ -36,6 +39,8 @@ import type { AxesABC, YorkSample, Vec3 } from "@/lib/york-time";
 
 
 import { DefinitionChip, useTermRegistry } from "@/components/DefinitionChip";
+import LRLDocsTooltip from "@/components/common/LRLDocsTooltip";
+import { kappaBody as kappaBodyFromDensity, kappaDriveFromPower } from "@/physics/curvature";
 
 
 
@@ -98,6 +103,9 @@ const GRAVITATIONAL_CONSTANT = 6.6743e-11; // m^3 kg^-1 s^-2
 const Q_BURST = 1e9; // storage factor used by the pipeline audit
 
 const CM2_TO_M2 = 1e-4;
+const SOLAR_STANDARD_GRAVITATIONAL_PARAMETER = 1.32712440018e20; // m^3/s^2 for the Sun
+const LRL_TEST_PARTICLE_MASS_KG = 1; // cancels in ratios; guard only monitors drift
+const LRL_DRIFT_THRESHOLD = 5e-3; // 0.5% normalized LRL change per nav tick
 
 
 
@@ -1039,13 +1047,7 @@ function computeCurvatureProxy(pipeline: any, dEff: number) {
 
 
 
-  const prefactor = (8 * Math.PI * GRAVITATIONAL_CONSTANT) / SPEED_OF_LIGHT ** 5;
-
-
-
-  const kappa = prefactor * (powerW / hullArea) * dEff * mathcalG;
-
-
+  const kappa = kappaDriveFromPower(powerW, hullArea, dEff, mathcalG);
 
   return { kappa, powerW, hullArea, mathcalG, gammaGeo, gammaVdB };
 
@@ -1068,6 +1070,59 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const { data: metrics } = useMetrics();
   const { sample: curv } = useCurvatureBrick();
   const cycleLedger = useCycleLedger();
+  const navPose = useNavPoseStore((state) => state.navPose);
+  const startNavPose = useNavPoseStore((state) => state.start);
+  const stopNavPose = useNavPoseStore((state) => state.stop);
+
+  useEffect(() => {
+    startNavPose();
+    return () => stopNavPose();
+  }, [startNavPose, stopNavPose]);
+
+  const [lrlDriftRatio, setLrlDriftRatio] = useState<number | null>(null);
+  const [lrlDeltaMagnitude, setLrlDeltaMagnitude] = useState<number | null>(null);
+  const [lrlMagnitude, setLrlMagnitude] = useState<number | null>(null);
+  const prevLrlRef = useRef<LaplaceRungeLenzMeasure | null>(null);
+
+  const lrlMeasure = useMemo<LaplaceRungeLenzMeasure | null>(() => {
+    if (!navPose) return null;
+    const position = navPose.position_m;
+    const velocity = navPose.velocity_mps;
+    if (!position || !velocity) return null;
+    const samples = [...position, ...velocity];
+    if (samples.some((value) => !Number.isFinite(value))) return null;
+    return computeLaplaceRungeLenz({
+      position: position as [number, number, number],
+      velocity: velocity as [number, number, number],
+      mass: LRL_TEST_PARTICLE_MASS_KG,
+      standardGravitationalParameter: SOLAR_STANDARD_GRAVITATIONAL_PARAMETER,
+    });
+  }, [navPose]);
+
+  useEffect(() => {
+    if (!lrlMeasure) {
+      prevLrlRef.current = null;
+      setLrlDriftRatio(null);
+      setLrlDeltaMagnitude(null);
+      setLrlMagnitude(null);
+      return;
+    }
+    const prev = prevLrlRef.current;
+    if (prev) {
+      const deltaX = lrlMeasure.vector[0] - prev.vector[0];
+      const deltaY = lrlMeasure.vector[1] - prev.vector[1];
+      const deltaZ = lrlMeasure.vector[2] - prev.vector[2];
+      const delta = Math.hypot(deltaX, deltaY, deltaZ);
+      const denom = Math.max(1e-9, Math.max(prev.magnitude, lrlMeasure.magnitude));
+      setLrlDeltaMagnitude(delta);
+      setLrlDriftRatio(delta / denom);
+    } else {
+      setLrlDriftRatio(null);
+      setLrlDeltaMagnitude(null);
+    }
+    setLrlMagnitude(lrlMeasure.magnitude);
+    prevLrlRef.current = lrlMeasure;
+  }, [lrlMeasure]);
 
   const hullAxes = useMemo<AxesABC>(() => {
     const hull = pipe?.hull ?? {};
@@ -1271,6 +1326,17 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     ledgerRatioValue !== undefined
       ? `|ΔE|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)} keeps curvature bookkeeping tight. Latest: ΔE ${toSci(cycleLedger.latest?.dE, 2)} J (bus ${toSci(cycleLedger.latest?.bus, 2)} J, sink ${toSci(cycleLedger.latest?.sink, 2)} J).`
       : "Ledger guard balances reversible (bus) and sink joules once samples arrive.";
+
+  const lrlDriftValue = Number.isFinite(lrlDriftRatio ?? Number.NaN) ? (lrlDriftRatio as number) : Number.NaN;
+  const lrlGuardOk = Number.isFinite(lrlDriftValue) ? lrlDriftValue < LRL_DRIFT_THRESHOLD : true;
+  const lrlDriftValueDisplay = Number.isFinite(lrlDriftValue) ? toPercent(lrlDriftValue, 3) : "Awaiting nav";
+  const lrlMagnitudeDisplay = Number.isFinite(lrlMagnitude ?? Number.NaN)
+    ? (lrlMagnitude as number).toExponential(3)
+    : "n/a";
+  const lrlDeltaDisplay = Number.isFinite(lrlDeltaMagnitude ?? Number.NaN)
+    ? (lrlDeltaMagnitude as number).toExponential(3)
+    : "n/a";
+  const lrlThresholdDisplay = toPercent(LRL_DRIFT_THRESHOLD, 2);
 
   const zeta = Number(pipe?.zeta ?? pipe?.fordRoman?.value);
 
@@ -1829,11 +1895,8 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
   const kappaBodyDerived =
-
     Number.isFinite(bodyDensityCandidate)
-
-      ? ((8 * Math.PI * GRAVITATIONAL_CONSTANT) / (3 * SPEED_OF_LIGHT ** 2)) * bodyDensityCandidate
-
+      ? kappaBodyFromDensity(bodyDensityCandidate as number)
       : NaN;
 
 
@@ -4037,7 +4100,6 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
             </div>
 
           </div>
-
         </section>
 
 
@@ -6153,6 +6215,62 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
+              label="LRL drift"
+
+
+
+              ok={lrlGuardOk}
+
+
+
+              value={Number.isFinite(lrlDriftValue) ? `ΔA_norm ${lrlDriftValueDisplay}` : "Awaiting nav samples"}
+
+
+
+              description={`Locked when normalized LRL change stays below ${lrlThresholdDisplay}.`}
+
+
+
+              readMode={readMode}
+
+
+
+              readValue={
+
+
+
+                Number.isFinite(lrlDriftValue)
+
+
+
+                  ? `LRL delta ${lrlDriftValueDisplay}; |A| ≈ ${lrlMagnitudeDisplay}, Δ|A| = ${lrlDeltaDisplay}.`
+
+
+
+                  : "LRL drift monitor waiting for navigation samples."
+
+
+
+              }
+
+
+
+              readDescription="Laplace–Runge–Lenz vector should stay conserved (docs/alcubierre-alignment). Drift implies Maupertuis violations or non-Keplerian potentials."
+
+
+
+            />
+
+
+
+            {pipe?.qi ? <LRLProofStrip telemetry={pipe.qi as QiStats} className="w-full" /> : null}
+
+
+
+            <GuardBadge
+
+
+
               label="Averaging"
 
 
@@ -6860,3 +6978,90 @@ function GuardBadge({
 
 
 }
+
+type LRLProofStripProps = {
+  telemetry?: QiStats | null;
+  className?: string;
+};
+
+const formatSci = (value: number, digits = 2) => {
+  if (!Number.isFinite(value)) return "n/a";
+  const abs = Math.abs(value);
+  if (abs === 0) return "0";
+  if (abs >= 1e4 || abs < 1e-2) {
+    return value.toExponential(digits);
+  }
+  return value.toFixed(digits);
+};
+
+const complexMagnitude = (value?: { real: number; imag: number } | null) => {
+  if (!value) return NaN;
+  return Math.hypot(value.real ?? 0, value.imag ?? 0);
+};
+
+function LRLProofStrip({ telemetry, className }: LRLProofStripProps) {
+  if (!telemetry) return null;
+
+  const action = Number(telemetry.lrlActionRate);
+  const planarResidual = Number(telemetry.lrlPlanarResidual);
+  const geometryResidual = Number(telemetry.lrlGeometryResidual);
+  const eccentricity = Number(telemetry.eccentricity);
+  const magnitude = Number(telemetry.lrlMagnitude);
+  const oscillatorMag = complexMagnitude(telemetry.lrlOscillatorCoordinate);
+  const energyMag = complexMagnitude(telemetry.lrlOscillatorEnergy);
+
+  const actionOk = Number.isFinite(action);
+  const bridgeOk = Number.isFinite(planarResidual) && planarResidual < 1e-3;
+  const geometryOk =
+    Number.isFinite(eccentricity) && eccentricity < 1.5 && Number.isFinite(geometryResidual);
+
+  const proofs = [
+    {
+      label: "Proof I · Maupertuis",
+      ok: actionOk,
+      primary: actionOk ? `${formatSci(action)} kg·m²/s³` : "action undefined",
+      detail: "Instantaneous p·v lock streamed with every stress-energy tick.",
+    },
+    {
+      label: "Proof II · √z bridge",
+      ok: bridgeOk && Number.isFinite(oscillatorMag),
+      primary: bridgeOk ? `|w| ≈ ${formatSci(oscillatorMag)} m¹ᐟ²` : "bridge unlock",
+      detail: bridgeOk
+        ? `Residual |w² - z| ≤ ${formatSci(planarResidual)} m · |E_c| ≈ ${formatSci(energyMag)}`
+        : "Conformal lift unavailable.",
+    },
+    {
+      label: "Proof III · Geometry",
+      ok: geometryOk && Number.isFinite(magnitude),
+      primary: geometryOk ? `e ≈ ${formatSci(eccentricity, 3)}` : "ecc undefined",
+      detail: geometryOk
+        ? `|A| ≈ ${formatSci(magnitude)} · residual ${formatSci(geometryResidual)}`
+        : "LRL magnitude missing.",
+    },
+  ];
+
+  return (
+    <div className={cn("rounded-lg border border-slate-700/60 bg-slate-950/60 p-3", className)}>
+      <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+        <span>LRL proofs</span>
+        <LRLDocsTooltip className="h-5 w-5 border-slate-600/70 text-slate-200" />
+      </div>
+      <dl className="space-y-2 text-xs text-slate-200">
+        {proofs.map((proof) => (
+          <div key={proof.label}>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="font-semibold text-slate-100">{proof.label}</dt>
+              <dd className={cn("font-mono text-[11px]", proof.ok ? "text-emerald-300" : "text-amber-300")}>
+                {proof.primary}
+              </dd>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">{proof.detail}</p>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+
+

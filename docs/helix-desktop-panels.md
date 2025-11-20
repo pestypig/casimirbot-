@@ -73,6 +73,7 @@ When you add a new entry to `HELIX_PANELS`, it automatically:
 | `id` | `HelixPanelRef` | Unique stable identifier used by the desktop store, URL params, and taskbar. Stick to lowercase + hyphen. |
 | `title` | `HelixPanelRef` | Display name in Helix Start, taskbar tooltips, and window chrome. |
 | `icon` | `HelixPanelRef` | Optional Lucide icon class rendered inside Helix Start and pinned tiles. |
+| `keywords` | `HelixPanelRef` | Optional array of search tags (metrics, abbreviations, equations). These feed the Helix Start command palette so searching for `I3_geo`, `phi_A`, etc. surfaces the right panel. |
 | `loader` | `HelixPanelRef` | `lazyPanel`-based import that returns `{ default: Component }`. Missing exports will throw when the window renders, so keep the string key updated. |
 | `defaultSize` | `HelixPanelRef` | `{ w, h }` in pixels. Enforced minimum/maximum are defined in `client/src/store/useDesktopStore.ts`. |
 | `defaultPosition` | `HelixPanelRef` | `{ x, y }` in pixels. Values are clamped to the viewport each time the desktop mounts. |
@@ -86,8 +87,20 @@ Non-Helix system panels (Live Energy, Endpoints, Taskbar) are declared directly 
 ## Troubleshooting Checklist
 
 - **Entry missing from Helix Start:** Ensure it was added to `HELIX_PANELS` (not just `panelRegistry`) and that the dev server restarted so Vite picks up the dynamic import.
+- **Search not finding a keyword:** Update the panel's `keywords` array (or add one) inside `client/src/pages/helix-core.panels.ts`. The Helix Start palette indexes `title`, `id`, `keywords`, and declared `endpoints`, so including metric symbols/IDs keeps search results aligned with what operators see inside the panel.
 - **Window opens off-screen:** Tweak `defaultPosition` and remember that `DesktopWindow` clamps values to the viewport minus the 48px taskbar height.
 - **Loader throws about missing export:** Double-check the component's export name matches the key passed into `lazyPanel`.
 - **State feels stale after refactors:** Clear `localStorage["desktop-windows-v2"]` so persisted bounds/opacities do not override new defaults.
 
 With this guide in place, Codex can confidently add or adjust Helix panels without re-reading the entire desktop subsystem.
+
+## Recent Additions
+
+- **Electron Orbital Simulator (`electron-orbital`) – Sept 2025**  
+  Hooks into the live energy pipeline via `useElectronOrbitSim`, renders orbital iso-surfaces plus Coulomb instrumentation, and exposes DRIFT/AGI events. Launchable from Helix Start and the Start portal's "Open Orbital Panel" buttons. Default bounds: 1120×720 at (180,160).
+
+## References
+
+- Williamson & van der Mark, *Is the Electron a Photon with Toroidal Topology?* (2010) – conceptual basis for the toroidal core overlay and derived charge/magnetic moment values used in the simulator.
+- Griffiths, *Introduction to Quantum Mechanics* (2nd ed.) – canonical hydrogenic orbitals, quantum numbers, and expectation values that inform the orbital density plots.
+- NIST CODATA 2022, *Fundamental Physical Constants* – source for canonical Coulomb constant, Bohr radius, Compton wavelength, and fine-structure constant displayed in the telemetry cards.

@@ -2,7 +2,7 @@ import React from "react";
 import * as Lucide from "lucide-react";
 import { TaskbarShelf } from "@/components/desktop/TaskbarPanel";
 import { useDesktopStore } from "@/store/useDesktopStore";
-import { HELIX_PANELS } from "@/pages/helix-core.panels";
+import { HELIX_PANELS, type HelixPanelRef } from "@/pages/helix-core.panels";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -43,6 +43,18 @@ function HelixStartLauncher() {
       ),
     []
   );
+
+  const keywordFilter = React.useCallback((value: string, search: string) => {
+    if (!search.trim()) return 1;
+    const normalizedValue = value.toLowerCase();
+    const tokens = search
+      .toLowerCase()
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
+    if (!tokens.length) return 1;
+    return tokens.every((token) => normalizedValue.includes(token)) ? 1 : 0;
+  }, []);
 
   const handleLaunch = React.useCallback(
     (panelId: string) => {
@@ -85,7 +97,7 @@ function HelixStartLauncher() {
           <p className="text-sm font-semibold tracking-wide text-cyan-100">Helix Start</p>
           <p className="text-xs text-slate-400">Launch Helix Core panels onto the desktop.</p>
         </div>
-        <Command className="bg-transparent">
+        <Command className="bg-transparent" filter={keywordFilter}>
           <CommandInput placeholder="Search panels..." />
           <CommandList className="max-h-[360px]">
             <CommandEmpty>No Helix panels match that search.</CommandEmpty>
@@ -99,10 +111,11 @@ function HelixStartLauncher() {
                   : win?.isMinimized
                     ? "Minimized"
                     : "Running";
+                const searchValue = buildPanelSearchValue(panel);
                 return (
                   <CommandItem
                     key={panel.id}
-                    value={`${panel.title} ${panel.id}`}
+                    value={searchValue}
                     onSelect={() => handleLaunch(panel.id)}
                     className="items-start gap-3 py-2"
                   >
@@ -133,4 +146,17 @@ function HelixStartLauncher() {
       </PopoverContent>
     </Popover>
   );
+}
+
+function buildPanelSearchValue(panel: HelixPanelRef) {
+  const sections = [
+    panel.title,
+    panel.id,
+    panel.keywords?.join(" ") ?? "",
+    panel.endpoints?.join(" ") ?? ""
+  ];
+  return sections
+    .map((section) => section.trim())
+    .filter((section) => section.length > 0)
+    .join(" ");
 }

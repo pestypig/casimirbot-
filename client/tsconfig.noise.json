@@ -1,6 +1,7 @@
 {
   "extends": "../tsconfig.json",
   "include": [
+    "src/types/**/*.d.ts",
     "src/types/noise-gens.ts",
     "src/lib/api/noiseGens.ts",
     "src/components/noise-gens/**/*",
@@ -15,4 +16,3 @@
     "src/pages/helix-core.tsx"
   ]
 }
-

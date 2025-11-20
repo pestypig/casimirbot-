@@ -9,6 +9,7 @@ import { migration007 } from "./migrations/007_proposal_enrichment";
 import { migration008 } from "./migrations/008_essence_preferences";
 import { migration009 } from "./migrations/009_essence_environment";
 import { migration010 } from "./migrations/010_knowledge_corpus";
+import { migration011 } from "./migrations/011_essence_activity";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -22,6 +23,7 @@ const MIGRATIONS = [
   migration008,
   migration009,
   migration010,
+  migration011,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

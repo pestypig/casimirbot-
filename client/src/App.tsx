@@ -24,6 +24,7 @@ import RagAdminPage from "@/pages/rag-admin";
 import CodeAdminPage from "@/pages/code-admin";
 import DesktopPage from "@/pages/desktop";
 import SignInPage from "@/pages/sign-in";
+import StarHydrostaticPanel from "@/pages/star-hydrostatic-panel";
 import { useQiStream } from "@/hooks/useQiStream";
 
 function DesktopRedirect() {
@@ -57,6 +58,7 @@ function Router() {
       <Route path="/desktop" component={DesktopPage} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/why" component={Why} />
+      <Route path="/star-hydrostatic" component={StarHydrostaticPanel} />
       <Route path="/station/:role" component={StationPage} />
       <Route path="/optimist-station" component={StationPage} />
       <Route path="/engineer-station" component={StationPage} />

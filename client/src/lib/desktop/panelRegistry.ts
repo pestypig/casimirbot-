@@ -1,14 +1,47 @@
 import type { ComponentType } from "react";
 import type { LucideIcon } from "lucide-react";
+import type { PanelTelemetry } from "@shared/desktop";
 import type { HelixPanelRef } from "@/pages/helix-core.panels";
 import { HELIX_PANELS } from "@/pages/helix-core.panels";
+import { isFlagEnabled } from "@/lib/envFlags";
+import { getResonanceWatcherState } from "@/lib/agi/resonanceVersion";
 
 export type PanelId =
   | "live-energy"
   | "helix-core"
   | "endpoints"
   | "taskbar"
+  | "docs-viewer"
+  | "casimir-tiles"
+  | "resonance-orchestra"
   | HelixPanelRef["id"];
+
+export type PanelTelemetryWindowSnapshot = {
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  isOpen?: boolean;
+  isMinimized?: boolean;
+  isMaximized?: boolean;
+  isFullscreen?: boolean;
+  z?: number;
+  opacity?: number;
+};
+
+export type PanelTelemetryContext = {
+  desktopId: string;
+  panelId: PanelId | (string & {});
+  instanceId: string;
+  now: Date;
+  window?: PanelTelemetryWindowSnapshot;
+};
+
+export type PanelTelemetryDetails = Partial<
+  Omit<PanelTelemetry, "panelId" | "instanceId" | "title"> & { lastUpdated?: string }
+>;
+
+export type PanelTelemetryCollector = (ctx: PanelTelemetryContext) => PanelTelemetryDetails | null;
 
 export interface PanelDefinition {
   id: PanelId | (string & {});
@@ -17,11 +50,14 @@ export interface PanelDefinition {
   loader: () => Promise<{ default: ComponentType<any> }>;
   defaultSize?: { w: number; h: number };
   defaultPosition?: { x: number; y: number };
+  defaultOpen?: boolean;
   endpoints?: string[];
   pinned?: boolean;
   skipTaskbar?: boolean;
   alwaysOnTop?: boolean;
   noMinimize?: boolean;
+  telemetryKind?: string;
+  collectTelemetry?: PanelTelemetryCollector;
 }
 
 type ModuleLoader<T = Record<string, ComponentType<any>>> = () => Promise<T>;
@@ -141,11 +177,19 @@ export const panelRegistry: PanelDefinition[] = [
     defaultPosition: { x: 300, y: 260 }
   },
   {
+    id: "star-hydrostatic",
+    title: "Hydrostatic Equilibrium",
+    loader: load(() => import("@/pages/star-hydrostatic-panel")),
+    defaultSize: { w: 1100, h: 720 },
+    defaultPosition: { x: 320, y: 220 }
+  },
+  {
     id: "endpoints",
     title: "Endpoints & Panels",
     loader: load(() => import("@/components/desktop/EndpointsPanel")),
     defaultSize: { w: 520, h: 420 },
-    defaultPosition: { x: 60, y: 420 }
+    defaultPosition: { x: 60, y: 420 },
+    defaultOpen: true
   },
   {
     id: "taskbar",
@@ -158,6 +202,48 @@ export const panelRegistry: PanelDefinition[] = [
     alwaysOnTop: true,
     noMinimize: true
   },
+  {
+    id: "docs-viewer",
+    title: "Docs & Papers",
+    loader: load(() => import("@/components/DocViewerPanel")),
+    defaultSize: { w: 1040, h: 720 },
+    defaultPosition: { x: 180, y: 120 }
+  },
+  {
+    id: "casimir-tiles",
+    title: "Casimir Tiles",
+    loader: load(() => import("@/components/panels/CasimirTilesPanel")),
+    defaultSize: { w: 360, h: 260 },
+    defaultPosition: { x: 360, y: 200 }
+  },
+  ...(isFlagEnabled("ENABLE_RESONANCE_ORCHESTRA", true)
+    ? [
+        {
+          id: "resonance-orchestra",
+          title: "Resonance Orchestra",
+          loader: load(() => import("@/components/agi/ResonanceOrchestraPanel")),
+          defaultSize: { w: 640, h: 520 },
+          defaultPosition: { x: 420, y: 220 },
+          collectTelemetry: () => {
+            const watcher = getResonanceWatcherState();
+            const ageMs = watcher.lastEventTs ? Math.max(0, Date.now() - watcher.lastEventTs) : null;
+            return {
+              kind: "client",
+              metrics: {
+                latticeVersion: watcher.version,
+                filesTouched: watcher.stats?.filesTouched ?? 0
+              },
+              flags: { sseConnected: watcher.connected },
+              strings: ageMs !== null ? { lastEventAge: `${Math.round(ageMs / 1000)}s` } : undefined,
+              sourceIds: [
+                "client/src/components/agi/ResonanceOrchestraPanel.tsx",
+                "client/src/lib/agi/resonanceVersion.ts"
+              ]
+            };
+          }
+        }
+      ]
+    : []),
   ...HELIX_PANELS
 ];
 

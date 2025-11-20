@@ -77,7 +77,7 @@ export function QiGuardBadge({
         fontSize: 12,
         lineHeight: 1.2,
         cursor: onClick ? "pointer" : "default",
-        userSelect: "none",
+        userSelect: "text",
         width: "100%",
       }}
     >

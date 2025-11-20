@@ -24,6 +24,9 @@ const HASH_ALIASES: Record<string, string> = {
   "#ledger-averaging": "#ledger",
   "#ledger-shift": "#ledger",
   "#ledger-step-b": "#ledger",
+  "#warp-ledger": "#ledger",
+  "#km-scale-ledger": "#ledger",
+  "#km-scale-warp-ledger": "#ledger",
   "#halobank": "#halobank",
   "#halo-bank": "#halobank",
 };

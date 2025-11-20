@@ -1,0 +1,91 @@
+{
+  "desktopId": "helix.desktop.main",
+  "capturedAt": "2025-11-20T05:30:00.000Z",
+  "panels": [
+    {
+      "panelId": "code-admin",
+      "instanceId": "code-admin",
+      "title": "Code Admin",
+      "kind": "code",
+      "metrics": {
+        "attention": 1.35,
+        "openPanels": 5
+      },
+      "flags": {
+        "searchFocused": true
+      },
+      "strings": {
+        "summary": "Inspecting lattice + atlas hits"
+      },
+      "sourceIds": [
+        "client/src/pages/code-admin.tsx",
+        "scripts/build-code-lattice.ts",
+        "client/src/lib/code-index/search.ts"
+      ],
+      "notes": "User comparing atlas search vs resonance patch",
+      "lastUpdated": "2025-11-20T05:29:12.000Z"
+    },
+    {
+      "panelId": "essence-proposals",
+      "instanceId": "essence-proposals",
+      "title": "Essence Proposals",
+      "kind": "agi",
+      "metrics": {
+        "attention": 0.8
+      },
+      "flags": {
+        "hasWarnings": false
+      },
+      "strings": {
+        "mode": "console"
+      },
+      "sourceIds": [
+        "server/services/planner/chat-b.ts",
+        "server/routes/agi.plan.ts"
+      ],
+      "notes": "Planner log review",
+      "lastUpdated": "2025-11-20T05:29:40.000Z"
+    },
+    {
+      "panelId": "docs-viewer",
+      "instanceId": "docs-viewer",
+      "title": "Docs Viewer",
+      "kind": "docs",
+      "metrics": {
+        "attention": 0.45
+      },
+      "flags": {
+        "livePreview": true
+      },
+      "strings": {
+        "doc": "docs/ESSENCE-CONSOLE_PATCH-PLAN.md"
+      },
+      "sourceIds": [
+        "docs/ESSENCE-CONSOLE_PATCH-PLAN.md"
+      ],
+      "notes": "Referencing patch instructions",
+      "lastUpdated": "2025-11-20T05:28:05.000Z"
+    },
+    {
+      "panelId": "helix-core",
+      "instanceId": "helix-core",
+      "title": "Helix Core",
+      "kind": "dashboard",
+      "metrics": {
+        "attention": 0.25
+      },
+      "flags": {
+        "hasAlerts": true
+      },
+      "strings": {
+        "alert": "Qi guard saturation approaching"
+      },
+      "sourceIds": [
+        "client/src/components/NearZeroWidget.tsx",
+        "client/src/components/QiWidget.tsx"
+      ],
+      "notes": "Background monitoring while coding",
+      "lastUpdated": "2025-11-20T05:26:32.000Z"
+    }
+  ]
+}

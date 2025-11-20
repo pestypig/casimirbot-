@@ -35,6 +35,19 @@ export type EssenceMixResult = {
 
 const MAX_INPUTS = 64;
 const DEFAULT_DIM = 512;
+const DEFAULT_COLLAPSE_KNOBS: TCollapseMixRecipe["knobs"] = {
+  w_t: 1 / 3,
+  w_i: 1 / 3,
+  w_a: 1 / 3,
+  lambda: 0.5,
+  drive_norm: 1,
+  conditioning: {},
+};
+
+const buildKnobs = (seed?: number): TCollapseMixRecipe["knobs"] => ({
+  ...DEFAULT_COLLAPSE_KNOBS,
+  ...(seed != null ? { seed } : {}),
+});
 
 export async function createEssenceMix(args: CreateEssenceMixArgs): Promise<EssenceMixResult> {
   if (args.mode === "project-assets") {
@@ -60,9 +73,7 @@ async function mixProjectAssets(args: CreateEssenceMixArgs): Promise<EssenceMixR
     kind: "collapse_mixer",
     dim: DEFAULT_DIM,
     inputs: grouped,
-    knobs: {
-      seed: args.seed ?? Date.now() % 1_000_000,
-    },
+    knobs: buildKnobs(args.seed ?? Date.now() % 1_000_000),
   };
   const lookup = new Map(assets.map((env) => [env.header.id, env]));
   const sourceIds = [...grouped.text, ...grouped.image, ...grouped.audio];
@@ -103,11 +114,9 @@ async function mixProposalIdentity(args: CreateEssenceMixArgs): Promise<EssenceM
       image: [],
       audio: [],
     },
-    knobs: {
-      seed: args.seed ?? Date.now() % 1_000_000,
-    },
+    knobs: buildKnobs(args.seed ?? Date.now() % 1_000_000),
   };
-  const sourceIds = [...recipe.inputs.text];
+  const sourceIds = [...(recipe.inputs.text ?? [])];
   const { fused, feature } = await collapseMix({
     recipe,
     fetchEnvelope: async (id) => {

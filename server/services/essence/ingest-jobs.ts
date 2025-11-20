@@ -315,6 +315,7 @@ function buildEmbeddingFromText(text: string, space: string): EmbeddingEntry {
     dim: vec.length,
     storage: { inline_base64: float32ToBase64(vec) },
     composer: "ingest/enrichment-0.1",
+    dtype: "f32",
   };
 }
 
@@ -326,6 +327,7 @@ function buildEmbeddingFromHash(buffer: Buffer, space: string): EmbeddingEntry {
     dim: vec.length,
     storage: { inline_base64: float32ToBase64(vec) },
     composer: "ingest/enrichment-0.1",
+    dtype: "f32",
   };
 }
 

@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MODE_CONFIGS, type ModeKey } from "@/hooks/use-energy-pipeline";
 import { publish } from "@/lib/luma-bus";
+import { usePanelTelemetryPublisher } from "@/lib/desktop/panelTelemetryBus";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,13 @@ const DEFAULT_CLOCK_STATE: ClockState = {
   monitorTTR: false,
   limiter: "none",
   advice: "ok",
+};
+
+const DEFAULT_GUARDS: NearZeroBusGuards = {
+  q: NaN,
+  zeta: NaN,
+  stroke_pm: NaN,
+  TS: NaN,
 };
 
 const ADVICE_COLORS: AdvicePalette = {
@@ -588,6 +596,7 @@ export function NearZeroWidget({
   onAction,
   className,
 }: NearZeroWidgetProps) {
+  const guardValues = guards ?? DEFAULT_GUARDS;
   const [clockState, setClockState] = useState<ClockState>(DEFAULT_CLOCK_STATE);
   const samplesRef = useRef<Sample[]>([]);
   const latestRef = useRef<{
@@ -597,7 +606,7 @@ export function NearZeroWidget({
     navSpeed?: number;
     split?: number;
   }>({
-    guards,
+    guards: guardValues,
     thermal,
     env,
     navSpeed: nav?.speed_mps,
@@ -609,16 +618,101 @@ export function NearZeroWidget({
     TTR: createHysteresisSlot(),
   });
   const lastTickRef = useRef<number | null>(null);
+  usePanelTelemetryPublisher(
+    "near-zero",
+    () => {
+      const metrics: Record<string, number> = {};
+      const flags: Record<string, boolean> = {};
+      const strings: Record<string, string> = {};
+      const addMetric = (key: string, value?: number | null) => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          metrics[key] = value;
+        }
+      };
+      const addFlag = (key: string, value?: boolean) => {
+        if (typeof value === "boolean") {
+          flags[key] = value;
+        }
+      };
+      const addString = (key: string, value?: string | null) => {
+        if (value) {
+          strings[key] = value;
+        }
+      };
+      addMetric("q", safeNumber(guardValues.q));
+      addMetric("zeta", safeNumber(guardValues.zeta));
+      addMetric("stroke_pm", safeNumber(guardValues.stroke_pm));
+      addMetric("TS", safeNumber(guardValues.TS));
+      addMetric("fr_duty", safeNumber(frDuty));
+      addMetric("split", safeNumber(split));
+      addMetric("quality_factor", safeNumber(QL));
+      addMetric("nav_speed_mps", safeNumber(nav?.speed_mps));
+      addMetric("atm_density", safeNumber(env?.atmDensity_kg_m3));
+      addMetric("altitude_m", safeNumber(env?.altitude_m));
+      addMetric("burst_frac", safeNumber(burst?.frac));
+      addMetric("burst_dwell_s", safeNumber(burst?.dwell_s));
+      addMetric("tau_lc_s", safeNumber(tauLC_s));
+      addMetric("sectors_total", safeNumber(sectorsTotal));
+      if (Number.isFinite(clockState.TTA)) {
+        addMetric("tta_s", clampClock(clockState.TTA));
+      }
+      if (Number.isFinite(clockState.TTR)) {
+        addMetric("ttr_s", clampClock(clockState.TTR));
+      }
+      addFlag("mode_active", mode === "nearzero");
+      addFlag("bounded_tta", clockState.boundedTTA);
+      addFlag("bounded_ttr", clockState.boundedTTR);
+      addFlag("monitor_tta", clockState.monitorTTA);
+      addFlag("monitor_ttr", clockState.monitorTTR);
+      addString("mode", typeof mode === "string" ? mode : String(mode));
+      addString("limiter", limiterLabel(clockState.limiter));
+      addString("advice", clockState.advice);
+      if (!Object.keys(metrics).length && !Object.keys(flags).length && !Object.keys(strings).length) {
+        return null;
+      }
+      return {
+        kind: "theme.nearzero",
+        metrics,
+        flags,
+        strings,
+      };
+    },
+    [
+      mode,
+      guardValues.q,
+      guardValues.zeta,
+      guardValues.stroke_pm,
+      guardValues.TS,
+      clockState.TTA,
+      clockState.TTR,
+      clockState.boundedTTA,
+      clockState.boundedTTR,
+      clockState.monitorTTA,
+      clockState.monitorTTR,
+      clockState.limiter,
+      clockState.advice,
+      frDuty,
+      split,
+      QL,
+      nav?.speed_mps,
+      env?.atmDensity_kg_m3,
+      env?.altitude_m,
+      burst?.frac,
+      burst?.dwell_s,
+      tauLC_s,
+      sectorsTotal,
+    ],
+  );
 
   useEffect(() => {
     latestRef.current = {
-      guards,
+      guards: guardValues,
       thermal,
       env,
       navSpeed: nav?.speed_mps,
       split,
     };
-  }, [guards, thermal, env, nav?.speed_mps, split]);
+  }, [guardValues, thermal, env, nav?.speed_mps, split]);
 
   useEffect(() => {
     if (mode !== "nearzero") {
@@ -839,12 +933,12 @@ export function NearZeroWidget({
   const guardCfg = nearZeroConfig.guards;
   const guardStatuses = useMemo(
     () => ({
-      q: guardStatus(guards.q, guardCfg?.q, "up"),
-      zeta: guardStatus(guards.zeta, guardCfg?.zeta, "up"),
-      stroke_pm: guardStatus(guards.stroke_pm, guardCfg?.stroke_pm, "up"),
-      TS: guardStatus(guards.TS, guardCfg?.TS, "down"),
+      q: guardStatus(guardValues.q, guardCfg?.q, "up"),
+      zeta: guardStatus(guardValues.zeta, guardCfg?.zeta, "up"),
+      stroke_pm: guardStatus(guardValues.stroke_pm, guardCfg?.stroke_pm, "up"),
+      TS: guardStatus(guardValues.TS, guardCfg?.TS, "down"),
     }),
-    [guards, guardCfg]
+    [guardValues, guardCfg]
   );
 
   const total = Math.max(1, sectorsTotal ?? nearZeroConfig.sectorsTotal ?? 400);
@@ -946,15 +1040,15 @@ export function NearZeroWidget({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={BADGE_COLORS[guardStatuses.q]}>q {Number.isFinite(guards.q) ? guards.q.toFixed(2) : "—"}</Badge>
+          <Badge className={BADGE_COLORS[guardStatuses.q]}>q {Number.isFinite(guardValues.q) ? guardValues.q.toFixed(2) : "—"}</Badge>
           <Badge className={BADGE_COLORS[guardStatuses.zeta]}>
-            ζ {Number.isFinite(guards.zeta) ? guards.zeta.toFixed(2) : "—"}
+            ζ {Number.isFinite(guardValues.zeta) ? guardValues.zeta.toFixed(2) : "—"}
           </Badge>
           <Badge className={BADGE_COLORS[guardStatuses.stroke_pm]}>
-            Stroke {Number.isFinite(guards.stroke_pm) ? `${guards.stroke_pm.toFixed(1)} pm` : "—"}
+            Stroke {Number.isFinite(guardValues.stroke_pm) ? `${guardValues.stroke_pm.toFixed(1)} pm` : "—"}
           </Badge>
           <Badge className={BADGE_COLORS[guardStatuses.TS]}>
-            TS {Number.isFinite(guards.TS) ? guards.TS.toFixed(0) : "—"}
+            TS {Number.isFinite(guardValues.TS) ? guardValues.TS.toFixed(0) : "—"}
           </Badge>
         </div>
 

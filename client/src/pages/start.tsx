@@ -12,6 +12,7 @@ import {
 } from "@/hooks/useHelixStartSettings";
 import { ThemeInstrumentDeck } from "@/components/start/ThemeInstrumentDeck";
 import { useEssenceThemes } from "@/hooks/useEssenceThemes";
+import { DOC_VIEWER_PANEL_ID, saveDocViewerIntent, type DocViewerIntent } from "@/lib/docs/docViewer";
 
 const PENDING_PANEL_KEY = "helix:pending-panel";
 
@@ -77,16 +78,22 @@ export default function StartPortal() {
         : null;
 
   const pick = (k: ProfileKey) => setSelected(k);
-  const requestPanelWindow = React.useCallback((panelId: string) => {
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(PENDING_PANEL_KEY, panelId);
-      } catch {
-        // Ignore storage failures; the desktop can still be opened manually.
+  const requestPanelWindow = React.useCallback(
+    (panelId: string, options?: { docIntent?: DocViewerIntent }) => {
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(PENDING_PANEL_KEY, panelId);
+          if (panelId === DOC_VIEWER_PANEL_ID && options?.docIntent) {
+            saveDocViewerIntent(options.docIntent);
+          }
+        } catch {
+          // Ignore storage failures; the desktop can still be opened manually.
+        }
       }
-    }
-    setLocation("/desktop");
-  }, [setLocation]);
+      setLocation("/desktop");
+    },
+    [setLocation],
+  );
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -247,6 +254,26 @@ export default function StartPortal() {
                     >
                       Launch Energy Flux Panel
                     </button>
+                    <button
+                      className="px-3.5 py-2 rounded-lg border border-cyan-400/40 bg-cyan-400/10 text-cyan-100 text-sm"
+                      onClick={() => requestPanelWindow("electron-orbital")}
+                    >
+                      Launch Electron Orbitals Panel
+                    </button>
+                    <button
+                      className="px-3.5 py-2 rounded-lg border border-amber-400/50 bg-amber-400/10 text-amber-100 text-sm"
+                      onClick={() => requestPanelWindow("star-hydrostatic")}
+                    >
+                      Launch Hydrostatic Panel
+                    </button>
+                    <button
+                      className="px-3.5 py-2 rounded-lg border border-slate-400/40 bg-slate-800/30 text-slate-100 text-sm"
+                      onClick={() =>
+                        requestPanelWindow(DOC_VIEWER_PANEL_ID, { docIntent: { mode: "directory" } })
+                      }
+                    >
+                      Browse Docs & Papers
+                    </button>
                   </div>
                 </div>
               </div>
@@ -287,6 +314,86 @@ export default function StartPortal() {
                 </button>
                 <p className="text-[11px] text-slate-400">
                   Takes you to the Desktop and auto-opens the panel as a window.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-purple-300">New panel</p>
+                <h3 className="text-lg font-semibold text-white">Electron Orbital Simulator</h3>
+                <p className="text-sm leading-relaxed text-slate-300/80">
+                  Visualize orbital density clouds, sweep Coulomb probes, and watch toroidal spin packets stay tied to the live energy pipeline. Perfect for deriving k, q, and g inside the same telemetry loop you trust for duty changes.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 md:max-w-xs">
+                <button
+                  className="rounded-lg bg-purple-500/80 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:bg-purple-500"
+                  onClick={() => requestPanelWindow("electron-orbital")}
+                >
+                  Open Orbital Panel
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  Opens the Desktop with the orbital window already instrumented.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-amber-300">Docs & digests</p>
+                <h3 className="text-lg font-semibold text-white">Docs & Papers Viewer</h3>
+                <p className="text-sm leading-relaxed text-slate-300/80">
+                  Browse every repo note, ethos memo, and Ford-Roman digest without leaving the Desktop.
+                  The new panel includes a searchable directory plus anchor support for theory badges.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 md:max-w-xs">
+                <button
+                  className="rounded-lg bg-slate-800/80 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/40 transition hover:bg-slate-800"
+                  onClick={() =>
+                    requestPanelWindow(DOC_VIEWER_PANEL_ID, { docIntent: { mode: "directory" } })
+                  }
+                >
+                  Open Docs Directory
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  Launches the Desktop with the docs viewer already focused on the directory.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-amber-200">Stellar ledger</p>
+                <h3 className="text-lg font-semibold text-white">Hydrostatic Equilibrium — HR Map</h3>
+                <p className="text-sm leading-relaxed text-slate-300/80">
+                  Compare κ_drive to κ_body at stellar densities, watch the Gamow window light up, and keep the
+                  potato threshold story intact from rubble piles to stars. HR presets plus polytrope solver are one
+                  click away.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 md:max-w-xs">
+                <button
+                  className="rounded-lg bg-amber-500/85 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/30 transition hover:bg-amber-500"
+                  onClick={() => requestPanelWindow("star-hydrostatic")}
+                >
+                  Open Hydrostatic Panel
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  Opens Desktop mode with the Hydrostatic Equilibrium window ready to explore.
                 </p>
               </div>
             </div>

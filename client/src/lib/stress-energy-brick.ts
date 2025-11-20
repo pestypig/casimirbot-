@@ -20,6 +20,12 @@ export interface StressEnergyBrickStats {
   divMax: number;
   dutyFR: number;
   strobePhase: number;
+  natario?: {
+    divBetaMax: number;
+    divBetaRms: number;
+    gateLimit: number;
+    gNatario: number;
+  };
 }
 
 export interface StressEnergyBrickDecoded {
@@ -102,6 +108,30 @@ export async function fetchStressEnergyBrick(request: StressEnergyBrickRequest, 
   const Sy = decodeChannel(json.channels?.Sy, "Sy");
   const Sz = decodeChannel(json.channels?.Sz, "Sz");
   const divS = decodeChannel(json.channels?.divS, "divS");
+  const natarioRaw = json.stats?.natario;
+  const natarioStats =
+    natarioRaw && typeof natarioRaw === "object"
+      ? (() => {
+          const divBetaMax = Number(natarioRaw.divBetaMax ?? natarioRaw.divMax);
+          const divBetaRms = Number(natarioRaw.divBetaRms ?? natarioRaw.divRms);
+          const gateLimit = Number(natarioRaw.gateLimit ?? natarioRaw.kTol);
+          const gNatario = Number(natarioRaw.gNatario);
+          if (
+            !Number.isFinite(divBetaMax) &&
+            !Number.isFinite(divBetaRms) &&
+            !Number.isFinite(gateLimit) &&
+            !Number.isFinite(gNatario)
+          ) {
+            return undefined;
+          }
+          return {
+            divBetaMax,
+            divBetaRms,
+            gateLimit,
+            gNatario,
+          };
+        })()
+      : undefined;
 
   return {
     dims: [dims[0], dims[1], dims[2]],
@@ -118,6 +148,7 @@ export async function fetchStressEnergyBrick(request: StressEnergyBrickRequest, 
       divMax: Number(json.stats?.divMax ?? 0),
       dutyFR: Number(json.stats?.dutyFR ?? request.dutyFR ?? 0),
       strobePhase: Number(json.stats?.strobePhase ?? 0),
+      natario: natarioStats,
     },
   };
 }

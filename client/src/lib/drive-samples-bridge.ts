@@ -9,6 +9,7 @@ export interface DriveSampleMessage {
   ratios?: number[];
   sidebandDeltaHz?: number;
   flush?: boolean;
+  synthetic?: boolean;
 }
 
 type Listener = (message: DriveSampleMessage) => void;
@@ -62,6 +63,7 @@ function normalizePayload(payload: unknown): DriveSampleMessage | null {
     : undefined;
 
   const flush = raw.flush === true;
+  const synthetic = raw.synthetic === true;
 
   if (fs != null) latestFS = fs;
   if (f0 != null) latestF0 = f0;
@@ -79,6 +81,7 @@ function normalizePayload(payload: unknown): DriveSampleMessage | null {
     ratios: ratios && ratios.length ? ratios : undefined,
     sidebandDeltaHz,
     flush,
+    synthetic,
   };
 }
 

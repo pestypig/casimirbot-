@@ -10,7 +10,16 @@
 
 import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
 
+export type Vec3 = readonly [number, number, number];
+
 const G = 6.67430e-11; // m^3 kg^-1 s^-2
+const ZERO_VEC3: Vec3 = [0, 0, 0];
+export interface Complex2 {
+  real: number;
+  imag: number;
+}
+
+const ZERO_COMPLEX: Complex2 = Object.freeze({ real: 0, imag: 0 });
 
 /**
  * Pragmatic internal-Q model for Nb3Sn cavities.
@@ -223,4 +232,155 @@ export function toPipelineStressEnergy(p: {
   const beta_avg = natarioShiftFromDensity(rho_avg, Rg);
 
   return { ...T, beta_avg, rho_avg, rho_inst, dutyEff: d_eff };
+}
+
+const cross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+] as Vec3;
+
+const scaleVec = (v: Vec3, s: number): Vec3 => [v[0] * s, v[1] * s, v[2] * s] as Vec3;
+const addVec = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]] as Vec3;
+const subVec = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]] as Vec3;
+const magnitudeVec = (v: Vec3) => Math.hypot(v[0], v[1], v[2]);
+const complexAdd = (a: Complex2, b: Complex2): Complex2 => ({ real: a.real + b.real, imag: a.imag + b.imag });
+const complexSub = (a: Complex2, b: Complex2): Complex2 => ({ real: a.real - b.real, imag: a.imag - b.imag });
+const complexScale = (c: Complex2, s: number): Complex2 => ({ real: c.real * s, imag: c.imag * s });
+const complexSquare = (c: Complex2): Complex2 => ({
+  real: c.real * c.real - c.imag * c.imag,
+  imag: 2 * c.real * c.imag,
+});
+const complexMagnitude = (c: Complex2) => Math.hypot(c.real, c.imag);
+const complexDivide = (a: Complex2, b: Complex2): Complex2 => {
+  const denom = b.real * b.real + b.imag * b.imag;
+  if (denom < 1e-12) return ZERO_COMPLEX;
+  return {
+    real: (a.real * b.real + a.imag * b.imag) / denom,
+    imag: (a.imag * b.real - a.real * b.imag) / denom,
+  };
+};
+const complexSqrt = (c: Complex2): Complex2 => {
+  const r = complexMagnitude(c);
+  if (r === 0) return ZERO_COMPLEX;
+  const real = Math.sqrt(Math.max(0, (r + c.real) / 2));
+  const imagSign = c.imag >= 0 ? 1 : -1;
+  const imag = Math.sqrt(Math.max(0, (r - c.real) / 2)) * imagSign;
+  return { real, imag };
+};
+
+export interface LaplaceRungeLenzInput {
+  position: Vec3;
+  velocity: Vec3;
+  mass: number;
+  /** Optional explicit coupling constant k where V(r) = -k/r. */
+  couplingConstant?: number;
+  /** Central gravitating mass (kg). Used when couplingConstant is omitted. */
+  centralMass?: number;
+  /** Gravitational parameter (GM). Overrides centralMass if provided. */
+  standardGravitationalParameter?: number;
+  gravitationalConstant?: number;
+}
+
+export interface LaplaceRungeLenzResult {
+  vector: Vec3;
+  magnitude: number;
+  eccentricity: number;
+  periapsisAngle: number;
+  angularMomentum: Vec3;
+  actionRate: number;
+  oscillatorCoordinate: Complex2;
+  oscillatorVelocity: Complex2;
+  oscillatorEnergy: Complex2;
+  planarResidual: number;
+  geometryResidual: number;
+  couplingConstant?: number;
+}
+
+const resolveCoupling = ({
+  couplingConstant,
+  centralMass,
+  standardGravitationalParameter,
+  gravitationalConstant,
+  mass,
+}: LaplaceRungeLenzInput): number | undefined => {
+  if (Number.isFinite(couplingConstant)) return couplingConstant as number;
+  if (Number.isFinite(standardGravitationalParameter)) {
+    return (standardGravitationalParameter as number) * mass;
+  }
+  if (Number.isFinite(centralMass)) {
+    const Guse = gravitationalConstant ?? G;
+    return Guse * (centralMass as number) * mass;
+  }
+  return undefined;
+};
+
+/**
+ * Compute the Laplace–Runge–Lenz invariant for a keplerian particle.
+ * This feeds diagnostics that need eccentricity + periapsis orientation.
+ */
+export function computeLaplaceRungeLenz(input: LaplaceRungeLenzInput): LaplaceRungeLenzResult {
+  const { position, velocity, mass } = input;
+  const coupling = resolveCoupling(input);
+
+  const rMag = magnitudeVec(position);
+  if (rMag === 0 || mass <= 0 || !Number.isFinite(mass)) {
+    return {
+      vector: ZERO_VEC3,
+      magnitude: 0,
+      eccentricity: 0,
+      periapsisAngle: 0,
+      angularMomentum: ZERO_VEC3,
+      actionRate: 0,
+      oscillatorCoordinate: ZERO_COMPLEX,
+      oscillatorVelocity: ZERO_COMPLEX,
+      oscillatorEnergy: ZERO_COMPLEX,
+      planarResidual: 0,
+      geometryResidual: 0,
+      couplingConstant: coupling,
+    };
+  }
+
+  const momentum: Vec3 = scaleVec(velocity, mass);
+  const angularMomentum = cross(position, momentum);
+  const rungeCore = cross(momentum, angularMomentum);
+
+  const rHat = scaleVec(position, 1 / rMag);
+  const couplingTerm = coupling ? scaleVec(rHat, coupling) : ZERO_VEC3;
+
+  const vector = coupling ? subVec(rungeCore, couplingTerm) : rungeCore;
+  const magnitude = magnitudeVec(vector);
+  const eccDenom = coupling ? Math.max(1e-12, Math.abs(coupling)) : Infinity;
+  const eccentricity = coupling ? magnitude / eccDenom : 0;
+  const periapsisAngle = Math.atan2(vector[1], vector[0]);
+  const actionRate = momentum[0] * velocity[0] + momentum[1] * velocity[1] + momentum[2] * velocity[2];
+
+  const planar: Complex2 = { real: position[0], imag: position[1] };
+  const planarVelocity: Complex2 = { real: velocity[0], imag: velocity[1] };
+  const oscillatorCoordinate = complexSqrt(planar);
+  const wSquared = complexSquare(oscillatorCoordinate);
+  const planarResidual = complexMagnitude(complexSub(wSquared, planar));
+  const denomVec = complexScale(oscillatorCoordinate, 2);
+  const oscillatorVelocity =
+    denomVec.real === 0 && denomVec.imag === 0 ? ZERO_COMPLEX : complexDivide(planarVelocity, denomVec);
+  const oscillatorEnergy = complexAdd(
+    complexScale(complexSquare(oscillatorVelocity), mass / 2),
+    complexScale(wSquared, 4),
+  );
+  const geometryResidual = coupling ? Math.abs(magnitude - Math.abs(coupling) * eccentricity) : 0;
+
+  return {
+    vector,
+    magnitude,
+    eccentricity,
+    periapsisAngle,
+    angularMomentum,
+    actionRate,
+    oscillatorCoordinate,
+    oscillatorVelocity,
+    oscillatorEnergy,
+    planarResidual,
+    geometryResidual,
+    couplingConstant: coupling,
+  };
 }

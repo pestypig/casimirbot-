@@ -83,6 +83,8 @@ const DEFAULT_GRID_SPEC: FractionalGridSpec = Object.freeze({
   maxRatio: 4,
   segmentCount: 6,
 });
+const SYNTHESIS_TRIGGER_MS = 1_600;
+const SYNTHESIS_CHUNK_MS = 12;
 
 export type FractionalRatioKey = `${number}:${number}`;
 
@@ -143,6 +145,37 @@ function coerceF0ForDsp(rawF0: number, fs: number) {
   }
 
   return Math.max(16, Math.min(f, MAX_BASEBAND_HZ));
+}
+
+function computeSyntheticAmplitude(pipeline: any): number {
+  if (pipeline) {
+    const dutyCandidates = [
+      pipeline.dutyCycle,
+      pipeline.dutyEffectiveFR,
+      pipeline.dutyEff,
+      pipeline.dutyShip,
+      pipeline.dutyFR,
+      pipeline.dutyFR_slice,
+      pipeline.dutyFR_ship,
+      pipeline.dutyBurst,
+      pipeline?.drive?.dutyCycle,
+    ];
+    for (const candidate of dutyCandidates) {
+      const num = Number(candidate);
+      if (Number.isFinite(num) && num > 0) {
+        return Math.max(0.05, Math.min(0.9, num));
+      }
+    }
+    const burst = Number(pipeline?.burst_ms);
+    const dwell = Number(pipeline?.dwell_ms);
+    if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
+      const duty = burst / dwell;
+      if (Number.isFinite(duty) && duty > 0) {
+        return Math.max(0.05, Math.min(0.9, duty));
+      }
+    }
+  }
+  return 0.12;
 }
 
 function sanitizeGridSpec(spec?: FractionalGridSpec | null): FractionalGridSpec | null {
@@ -309,12 +342,19 @@ export function useFractionalCoherence(
   const [pinnedKeys, setPinnedKeysState] = useState<FractionalRatioKey[]>([]);
   const pinnedSetRef = useRef<Set<FractionalRatioKey>>(new Set());
   const displayF0Ref = useRef<number>(pipelineConfig.displayF0);
+  const synthDutyRef = useRef<number>(computeSyntheticAmplitude(pipeline));
+  const lastRealFeedRef = useRef<number>(0);
+  const fallbackPhaseRef = useRef<number>(0);
 
   const workerRef = useRef<Worker | null>(null);
   const configRef = useRef<FractionalScanConfig | null>(null);
   const lastWarnAtRef = useRef<number>(0);
   const lastFeedAtRef = useRef<number>(0);
   const ratiosKey = useMemo(() => ratios.join(","), [ratios]);
+
+  useEffect(() => {
+    synthDutyRef.current = computeSyntheticAmplitude(pipeline);
+  }, [pipeline]);
 
   const syncGridPins = useCallback((next: Set<FractionalRatioKey>) => {
     setGridState((prev) => {
@@ -523,6 +563,11 @@ export function useFractionalCoherence(
 
       const chunk = payload.samples;
       if (!(chunk instanceof Float32Array)) return;
+      const feedTimestamp =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      if (!payload.synthetic) {
+        lastRealFeedRef.current = feedTimestamp;
+      }
 
       const overrides: Partial<FractionalScanConfig> = {};
       let physicalOverrideF0: number | null = null;
@@ -595,8 +640,7 @@ export function useFractionalCoherence(
 
       const copy = new Float32Array(chunk);
       worker.postMessage({ type: "push", samples: copy }, [copy.buffer]);
-      lastFeedAtRef.current =
-        typeof performance !== "undefined" ? performance.now() : Date.now();
+      lastFeedAtRef.current = feedTimestamp;
     },
     [ratios, reinitWorker, pipelineConfig.fs],
   );
@@ -653,6 +697,90 @@ export function useFractionalCoherence(
       }
     };
   }, [processSamples]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    let cancelled = false;
+    let timer: number | null = null;
+    let phase = fallbackPhaseRef.current || 0;
+
+    const schedule = (delay: number) => {
+      if (timer != null) {
+        window.clearTimeout(timer);
+      }
+      timer = window.setTimeout(tick, Math.max(8, delay));
+    };
+
+    const tick = () => {
+      if (cancelled) return;
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const lastRealFeed = lastRealFeedRef.current;
+      const hasRecentRealFeed =
+        lastRealFeed > 0 && now - lastRealFeed < SYNTHESIS_TRIGGER_MS;
+      if (hasRecentRealFeed) {
+        schedule(SYNTHESIS_TRIGGER_MS);
+        return;
+      }
+
+      const fs = pipelineConfig.fs;
+      const freq = pipelineConfig.displayF0 || pipelineConfig.f0;
+      if (!Number.isFinite(fs) || fs <= 0 || !Number.isFinite(freq) || freq <= 0) {
+        schedule(SYNTHESIS_TRIGGER_MS);
+        return;
+      }
+
+      const amplitude = synthDutyRef.current;
+      if (!Number.isFinite(amplitude) || amplitude <= 0) {
+        schedule(SYNTHESIS_TRIGGER_MS);
+        return;
+      }
+
+      const samplesPerChunk = Math.max(256, Math.round((fs * SYNTHESIS_CHUNK_MS) / 1000));
+      if (!Number.isFinite(samplesPerChunk) || samplesPerChunk <= 0) {
+        schedule(SYNTHESIS_TRIGGER_MS);
+        return;
+      }
+
+      const chunk = new Float32Array(samplesPerChunk);
+      const omega = 2 * Math.PI * freq;
+      for (let idx = 0; idx < samplesPerChunk; idx++) {
+        const t = idx / fs;
+        const theta = phase + omega * t;
+        chunk[idx] =
+          amplitude *
+          (0.72 * Math.sin(theta) +
+            0.18 * Math.sin(theta * 1.5 + 0.4) +
+            0.1 * Math.sin(theta * 2.5 - 1.1));
+      }
+      phase += omega * (samplesPerChunk / fs);
+      if (!Number.isFinite(phase)) {
+        phase = 0;
+      } else {
+        phase %= 2 * Math.PI;
+      }
+
+      processSamples({
+        samples: chunk,
+        fs,
+        f0: freq,
+        windowMs: SYNTHESIS_CHUNK_MS,
+        hopMs: SYNTHESIS_CHUNK_MS / 2,
+        synthetic: true,
+      });
+
+      schedule(SYNTHESIS_CHUNK_MS);
+    };
+
+    schedule(SYNTHESIS_TRIGGER_MS);
+
+    return () => {
+      cancelled = true;
+      if (timer != null) {
+        window.clearTimeout(timer);
+      }
+      fallbackPhaseRef.current = phase;
+    };
+  }, [pipelineConfig.f0, pipelineConfig.fs, pipelineConfig.displayF0, processSamples]);
 
   return useMemo(
     () => ({

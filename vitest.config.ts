@@ -8,5 +8,5 @@ export default defineConfig({
       "@shared": path.resolve(__dirname, "shared"),
     },
   },
-  test: { environment: "node", include: ["tests/**/*.spec.ts"] },
+  test: { environment: "node", include: ["tests/**/*.spec.ts", "server/**/__tests__/**/*.spec.ts"] },
 });

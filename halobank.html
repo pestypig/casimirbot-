@@ -1167,6 +1167,37 @@ function makeNarrative(A, B, score, diffs, extras={}){
   return `<div class="story"><span class="lead">${lead}</span> ${aLine}${change}${envLine}${vecLine}${longLine}${bandsLine}</div>`;
 }
 
+function renderLrlProofStory(A, B) {
+  const la = A?.states?.lrl;
+  const lb = B?.states?.lrl;
+  if (!la && !lb) return "";
+  const wMag = (state) => (state && state.oscillatorCoordinate ? Math.hypot(state.oscillatorCoordinate.real, state.oscillatorCoordinate.imag) : NaN);
+  const fmtProof = (value, digits = 3) => {
+    if (!Number.isFinite(value)) return "n/a";
+    const abs = Math.abs(value);
+    if (abs === 0) return "0";
+    if (abs >= 1e3 || abs < 1e-3) return value.toExponential(digits);
+    return value.toFixed(digits);
+  };
+  const rows = [];
+  rows.push(
+    `<li><b>Proof I — Maupertuis:</b> p·v ${fmtProof(la?.actionRate)} → ${fmtProof(lb?.actionRate)} kg·m²/s³.</li>`,
+  );
+  rows.push(
+    `<li><b>Proof II — √z bridge:</b> |w| ${fmtProof(wMag(la))} → ${fmtProof(wMag(lb))}, residual |w² - z| ${fmtProof(la?.planarResidual)} → ${fmtProof(lb?.planarResidual)}.</li>`,
+  );
+  rows.push(
+    `<li><b>Proof III — Geometry:</b> e ${fmtProof(la?.eccentricity, 4)} → ${fmtProof(lb?.eccentricity, 4)}, |A| ${fmtProof(la?.magnitude)} → ${fmtProof(lb?.magnitude)}.</li>`,
+  );
+  return `
+    <div class="story" data-lrl-proof>
+      <p class="lead">Laplace–Runge–Lenz proofs (A → B)</p>
+      <ul>${rows.join("")}</ul>
+      <p class="muted">See <a href="/docs/alcubierre-alignment.md#proof-maupertuis" target="_blank" rel="noreferrer">alignment notes</a> for the derivations.</p>
+    </div>
+  `;
+}
+
 // Planetary tidal context - tiny but real contributions
 // Constants
 const AU_km = 149_597_870.7;
@@ -1187,10 +1218,88 @@ const MU = {
 };
 
 // Map Horizons numeric IDs to labels & μ
-const MU_BY_ID = new Map([
-  [199, MU.mercury], [299, MU.venus], [399, MU.earth], [499, MU.mars],
-  [599, MU.jupiter], [699, MU.saturn], [799, MU.uranus], [899, MU.neptune]
-]);
+  const MU_BY_ID = new Map([
+    [199, MU.mercury], [299, MU.venus], [399, MU.earth], [499, MU.mars],
+    [599, MU.jupiter], [699, MU.saturn], [799, MU.uranus], [899, MU.neptune]
+  ]);
+
+  const AU_M = 149597870700;
+  const DAY_S = 86400;
+
+  function vecCross(a, b) {
+    return [
+      a[1] * b[2] - a[2] * b[1],
+      a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0],
+    ];
+  }
+  function vecScale(v, s) {
+    return [v[0] * s, v[1] * s, v[2] * s];
+  }
+  function vecSub(a, b) {
+    return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  }
+  function vecMagnitude(v) {
+    return Math.hypot(v[0], v[1], v[2]);
+  }
+  const ZERO_COMPLEX = Object.freeze({ real: 0, imag: 0 });
+  const complexMagnitude = (c) => Math.hypot(c.real, c.imag);
+  const complexSquare = (c) => ({
+    real: c.real * c.real - c.imag * c.imag,
+    imag: 2 * c.real * c.imag,
+  });
+  const complexScale = (c, s) => ({ real: c.real * s, imag: c.imag * s });
+  function complexDivide(a, b) {
+    const denom = b.real * b.real + b.imag * b.imag;
+    if (denom < 1e-12) return ZERO_COMPLEX;
+    return {
+      real: (a.real * b.real + a.imag * b.imag) / denom,
+      imag: (a.imag * b.real - a.real * b.imag) / denom,
+    };
+  }
+  function complexSqrt(c) {
+    const r = complexMagnitude(c);
+    if (r === 0) return ZERO_COMPLEX;
+    const real = Math.sqrt(Math.max(0, (r + c.real) / 2));
+    const imagSign = c.imag >= 0 ? 1 : -1;
+    const imag = Math.sqrt(Math.max(0, (r - c.real) / 2)) * imagSign;
+    return { real, imag };
+  }
+
+  function computeLaplaceRungeLenzState({ position_m, velocity_mps, massKg = 1, gm }) {
+    const mass = Math.max(1e-6, massKg);
+    const rMag = vecMagnitude(position_m);
+    if (!Number.isFinite(rMag) || rMag === 0) return null;
+    const momentum = vecScale(velocity_mps, mass);
+    const angularMomentum = vecCross(position_m, momentum);
+    const rungeCore = vecCross(momentum, angularMomentum);
+    const coupling = gm * mass;
+    const rHat = vecScale(position_m, 1 / rMag);
+    const vector = coupling ? vecSub(rungeCore, vecScale(rHat, coupling)) : rungeCore;
+    const magnitude = vecMagnitude(vector);
+    const denom = Math.max(1e-12, Math.abs(coupling || 1));
+    const eccentricity = coupling ? magnitude / denom : 0;
+    const actionRate = momentum[0] * velocity_mps[0] + momentum[1] * velocity_mps[1] + momentum[2] * velocity_mps[2];
+    const planar = { real: position_m[0], imag: position_m[1] };
+    const planarVelocity = { real: velocity_mps[0], imag: velocity_mps[1] };
+    const oscillatorCoordinate = complexSqrt(planar);
+    const wSquared = complexSquare(oscillatorCoordinate);
+    const planarResidual = complexMagnitude({ real: wSquared.real - planar.real, imag: wSquared.imag - planar.imag });
+    const denomVec = complexScale(oscillatorCoordinate, 2);
+    const oscillatorVelocity =
+      denomVec.real === 0 && denomVec.imag === 0 ? ZERO_COMPLEX : complexDivide(planarVelocity, denomVec);
+
+    return {
+      vector,
+      magnitude,
+      eccentricity,
+      periapsisAngle: Math.atan2(vector[1], vector[0]),
+      actionRate,
+      oscillatorCoordinate,
+      oscillatorVelocity,
+      planarResidual,
+    };
+  }
 
 /**
  * Compute tiny planetary tidal add-ons at Earth (nGal) and the Sun's barycentric reflex.
@@ -1567,6 +1676,26 @@ async function buildRecordFromTimestamp(name, ts, opts={}) {
   record.states.tideNet = { ah_uGal: netAh_uGal, bearingDeg: netBearingDeg };
   record.states.eqElevation_mm = eqElev_mm;           // null → hidden in UI
   record.states.eqElevation_norm = +((oneSec.Ubar) * 1000).toFixed(2); // "normalized mm-equiv"
+  if (eph?.earth?.r_AU && eph?.earth?.v_AUperD) {
+    const position_m = [
+      eph.earth.r_AU[0] * AU_M,
+      eph.earth.r_AU[1] * AU_M,
+      eph.earth.r_AU[2] * AU_M,
+    ];
+    const velocity_mps = [
+      eph.earth.v_AUperD[0] * AU_M / DAY_S,
+      eph.earth.v_AUperD[1] * AU_M / DAY_S,
+      eph.earth.v_AUperD[2] * AU_M / DAY_S,
+    ];
+    record.states.lrl = computeLaplaceRungeLenzState({
+      position_m,
+      velocity_mps,
+      massKg: 1,
+      gm: MU.sun,
+    });
+  } else {
+    record.states.lrl = null;
+  }
   
   return record;
 }
@@ -2355,10 +2484,16 @@ function renderStates(){
     diff.appendChild(zenRow);
     
     // Add Complete Story narrative
-    const storyRow = document.createElement('div');
-    storyRow.style.marginTop = '10px';
-    storyRow.innerHTML = makeNarrative(a, b, score, diffData, extraData);
-    diff.appendChild(storyRow);
+      const storyRow = document.createElement('div');
+      storyRow.style.marginTop = '10px';
+      storyRow.innerHTML = makeNarrative(a, b, score, diffData, extraData);
+      diff.appendChild(storyRow);
+      const lrlStory = renderLrlProofStory(a, b);
+      if (lrlStory) {
+        const lrlRow = document.createElement('div');
+        lrlRow.innerHTML = lrlStory;
+        diff.appendChild(lrlRow);
+      }
 
     const diffs = [
       ['Δ Solar contribution', `${dSolar.toFixed(1)}%`,
@@ -5828,7 +5963,7 @@ window.addEventListener('perihelion:ready', () => {
       return mem;
     }
 
-    function recomputeTagCounts(entries) {
+  function recomputeTagCounts(entries) {
       const counts = {};
       for (const mem of entries) {
         for (const tag of mem.tags) {

@@ -138,3 +138,24 @@ export async function createIdentityMix(label?: string): Promise<{ mixId: string
   const payload = (await res.json()) as { mixId: string; summary: string };
   return payload;
 }
+
+export async function synthesizeNightlyProposals(params?: {
+  hours?: number;
+  minScore?: number;
+  limit?: number;
+  dryRun?: boolean;
+}): Promise<EssenceProposal[]> {
+  const res = await fetch("/api/essence/proposals/synth", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params ?? {}),
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => res.statusText);
+    throw new Error(message || `proposal_synth_failed:${res.status}`);
+  }
+  const payload = (await res.json()) as {
+    proposals?: EssenceProposal[];
+  };
+  return Array.isArray(payload?.proposals) ? payload.proposals.filter(Boolean) : [];
+}

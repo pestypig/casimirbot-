@@ -1,4 +1,5 @@
 import React from "react";
+import { openDocPanel } from "@/lib/docs/openDocPanel";
 
 type TheoryBadgeProps = {
   /** Digest ids, e.g., ["ford-roman-qi-1995"] */
@@ -18,13 +19,21 @@ export const TheoryBadge: React.FC<TheoryBadgeProps> = ({
   ariaLabel,
 }) => {
   const [open, setOpen] = React.useState(false);
+  const normalizedBase = React.useMemo(() => docsBaseHref.replace(/\/$/, "") || "/docs", [docsBaseHref]);
   const categoryHref = categoryAnchor
-    ? `${docsBaseHref}/papers.md#${encodeURIComponent(categoryAnchor)}`
+    ? `${normalizedBase}/papers.md#${encodeURIComponent(categoryAnchor)}`
     : undefined;
 
   const toggle = (event: React.MouseEvent) => {
     event.preventDefault();
     setOpen((state) => !state);
+  };
+
+  const handleCategoryClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (categoryHref) {
+      openDocPanel(categoryHref);
+    }
   };
 
   const handleKey = (event: React.KeyboardEvent) => {
@@ -40,16 +49,15 @@ export const TheoryBadge: React.FC<TheoryBadgeProps> = ({
   return (
     <div style={wrapperStyle}>
       {categoryHref ? (
-        <a
-          href={categoryHref}
-          title="Open theory category"
-          style={linkStyle}
+        <button
+          type="button"
+          onClick={handleCategoryClick}
+          style={buttonStyle}
           aria-label={ariaLabel ?? `Open ${categoryAnchor}`}
-          target="_blank"
-          rel="noreferrer"
+          title="Open theory category"
         >
           ?
-        </a>
+        </button>
       ) : (
         <button
           type="button"
@@ -69,12 +77,12 @@ export const TheoryBadge: React.FC<TheoryBadgeProps> = ({
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Digests</div>
           <ul style={{ margin: 0, paddingLeft: 16 }}>
             {refs.map((id) => {
-              const href = `${docsBaseHref}/papers/${id}.md`;
+              const href = `${normalizedBase}/papers/${id}.md`;
               return (
                 <li key={id} style={{ margin: "2px 0" }}>
-                  <a href={href} target="_blank" rel="noreferrer" style={anchorStyle}>
+                  <button type="button" onClick={() => openDocPanel(href)} style={linkButtonStyle}>
                     {id}
-                  </a>
+                  </button>
                 </li>
               );
             })}
@@ -106,10 +114,6 @@ const sharedLabelStyle: React.CSSProperties = {
   userSelect: "none",
 };
 
-const linkStyle: React.CSSProperties = {
-  ...sharedLabelStyle,
-};
-
 const buttonStyle: React.CSSProperties = {
   ...sharedLabelStyle,
   cursor: "pointer",
@@ -133,4 +137,14 @@ const popoverStyle: React.CSSProperties = {
 
 const anchorStyle: React.CSSProperties = {
   textDecoration: "underline",
+};
+
+const linkButtonStyle: React.CSSProperties = {
+  ...anchorStyle,
+  background: "transparent",
+  border: "none",
+  color: "inherit",
+  cursor: "pointer",
+  padding: 0,
+  font: "inherit",
 };

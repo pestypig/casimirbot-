@@ -53,9 +53,9 @@ export function CasimirTileGridPanel({
 
   metrics: metricsProp,
 
-  width = 320,
+  width: widthProp,
 
-  height = 170,
+  height: heightProp,
 
   dark = true,
 
@@ -102,6 +102,51 @@ export function CasimirTileGridPanel({
   const { sectorStrobing, tilesPerSector, strobeHz, currentSector } = resolvedMetrics;
 
   const ref = React.useRef<HTMLCanvasElement>(null);
+  const canvasContainerRef = React.useRef<HTMLDivElement>(null);
+  const explicitWidth = typeof widthProp === "number" ? widthProp : undefined;
+  const explicitHeight = typeof heightProp === "number" ? heightProp : undefined;
+  const needsAutoWidth = explicitWidth === undefined;
+  const needsAutoHeight = explicitHeight === undefined;
+  const [autoSize, setAutoSize] = React.useState(() => ({
+    width: explicitWidth ?? 320,
+    height: explicitHeight ?? 170,
+  }));
+  const canvasWidth = explicitWidth ?? autoSize.width;
+  const canvasHeight = explicitHeight ?? autoSize.height;
+
+  React.useLayoutEffect(() => {
+    if (!needsAutoWidth && !needsAutoHeight) return;
+    const element = canvasContainerRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+
+    const clampDimension = (value: number, fallback: number) => {
+      const candidate = Number.isFinite(value) ? value : fallback;
+      return Math.max(120, Math.floor(candidate || fallback || 120));
+    };
+
+    const updateFromRect = (rect: DOMRectReadOnly | DOMRect) => {
+      setAutoSize((prev) => {
+        const nextWidth = needsAutoWidth ? clampDimension(rect.width, prev.width) : prev.width;
+        const nextHeight = needsAutoHeight ? clampDimension(rect.height, prev.height) : prev.height;
+        if (nextWidth === prev.width && nextHeight === prev.height) {
+          return prev;
+        }
+        return { width: nextWidth, height: nextHeight };
+      });
+    };
+
+    updateFromRect(element.getBoundingClientRect());
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries.find((item) => item.target === element);
+      if (!entry) return;
+      updateFromRect(entry.contentRect);
+    });
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [needsAutoWidth, needsAutoHeight]);
 
 
 
@@ -211,9 +256,9 @@ export function CasimirTileGridPanel({
 
     const dpr = window.devicePixelRatio || 1;
 
-    cvs.width = Math.floor(width * dpr);
+    cvs.width = Math.floor(canvasWidth * dpr);
 
-    cvs.height = Math.floor(height * dpr);
+    cvs.height = Math.floor(canvasHeight * dpr);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -223,9 +268,9 @@ export function CasimirTileGridPanel({
 
     const legendH = 30;
 
-    const w = width - pad * 2;
+    const w = canvasWidth - pad * 2;
 
-    const h = height - pad * 2 - legendH;
+    const h = canvasHeight - pad * 2 - legendH;
 
     const x0 = pad;
 
@@ -273,7 +318,7 @@ export function CasimirTileGridPanel({
 
     ctx.fillStyle = dark ? "#0a0f1a" : "#0b1220";
 
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
 
 
@@ -453,9 +498,9 @@ export function CasimirTileGridPanel({
 
   }, [
 
-    width,
+    canvasWidth,
 
-    height,
+    canvasHeight,
 
     rows,
 
@@ -525,7 +570,7 @@ export function CasimirTileGridPanel({
 
   return (
 
-    <div className="rounded-lg border border-white/10 bg-black/40 p-2">
+    <div className="flex h-full flex-col rounded-lg border border-white/10 bg-black/40 p-2">
 
       <div className="flex items-center justify-between px-1 pb-1">
 
@@ -543,7 +588,39 @@ export function CasimirTileGridPanel({
 
       </div>
 
-      <canvas ref={ref} style={{ width, height, display: "block" }} />
+      <div
+
+        ref={canvasContainerRef}
+
+        className={`relative overflow-hidden ${needsAutoHeight ? "flex-1 min-h-[170px]" : ""}`}
+
+        style={{
+
+          width: explicitWidth,
+
+          height: explicitHeight,
+
+        }}
+
+      >
+
+        <canvas
+
+          ref={ref}
+
+          style={{
+
+            width: needsAutoWidth ? "100%" : canvasWidth,
+
+            height: needsAutoHeight ? "100%" : canvasHeight,
+
+            display: "block",
+
+          }}
+
+        />
+
+      </div>
 
     </div>
 

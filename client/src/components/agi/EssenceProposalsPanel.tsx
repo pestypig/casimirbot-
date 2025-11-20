@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import type { EssenceProposal, ProposalStatus } from "@shared/proposals";
-import { actOnProposal, createIdentityMix, fetchProposals, useProposalEvents } from "@/lib/agi/proposals";
+import { actOnProposal, createIdentityMix, fetchProposals, synthesizeNightlyProposals, useProposalEvents } from "@/lib/agi/proposals";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { shallow } from "zustand/shallow";
+import type { TPhaseProfile } from "@shared/essence-activity";
 
 const STATUS_FILTERS: Array<{ label: string; value: ProposalStatus | "all" }> = [
   { label: "New", value: "new" },
@@ -28,6 +29,8 @@ export function EssenceProposalsPanel() {
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
   const [mixing, setMixing] = useState(false);
   const [mixStatus, setMixStatus] = useState<string | null>(null);
+  const [synthLoading, setSynthLoading] = useState(false);
+  const [synthStatus, setSynthStatus] = useState<string | null>(null);
   const { ensureContextSession, addContextMessage } = useAgiChatStore(
     useCallback(
       (state) => ({
@@ -143,6 +146,22 @@ export function EssenceProposalsPanel() {
     }
   }, []);
 
+  const handleSynthNightly = useCallback(async () => {
+    setSynthLoading(true);
+    setSynthStatus("Synthesizing nightly desktop...");
+    try {
+      const created = await synthesizeNightlyProposals();
+      setSynthStatus(
+        created.length ? `Synthesized ${created.length} proposal${created.length === 1 ? "" : "s"}.` : "No new phases detected.",
+      );
+      await loadProposals();
+    } catch (err) {
+      setSynthStatus(err instanceof Error ? err.message : "Nightly synthesis failed.");
+    } finally {
+      setSynthLoading(false);
+    }
+  }, [loadProposals]);
+
   return (
     <div className="flex h-full bg-[#05060c] text-white">
       <aside className="w-72 border-r border-white/5 bg-black/30">
@@ -185,7 +204,18 @@ export function EssenceProposalsPanel() {
           >
             {mixing ? "Mixing..." : "Create identity mix"}
           </button>
+          <button
+            onClick={() => void handleSynthNightly()}
+            disabled={synthLoading}
+            className={clsx(
+              "w-full rounded border px-3 py-1 text-[11px]",
+              synthLoading ? "border-slate-500 bg-slate-700/40 text-slate-400" : "border-sky-500/50 text-slate-100 hover:border-sky-300",
+            )}
+          >
+            {synthLoading ? "Synthesizing..." : "Nightly template"}
+          </button>
           {mixStatus && <div className="text-[11px] text-slate-400">{mixStatus}</div>}
+          {synthStatus && <div className="text-[11px] text-slate-400">{synthStatus}</div>}
         </div>
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {loading && <div className="px-2 py-2 text-[12px] text-slate-300">Loading proposals...</div>}
@@ -399,6 +429,86 @@ function TargetDetails({ proposal }: { proposal: EssenceProposal }) {
             <li key={path}>{path}</li>
           ))}
         </ul>
+      </div>
+    );
+  }
+  if (proposal.target.type === "environment") {
+    const template = proposal.metadata?.proposalTemplate as
+      | {
+          changes?: {
+            openPanels?: Array<{ id: string; layout?: string }>;
+            pinFiles?: string[];
+            consoleTabs?: string[];
+            setEnv?: Record<string, string | number | boolean>;
+          };
+        }
+      | undefined;
+    const profile = proposal.metadata?.phaseProfile as TPhaseProfile | undefined;
+    const envEntries = template?.changes?.setEnv ? Object.entries(template.changes.setEnv) : [];
+    return (
+      <div className="space-y-3 text-sm text-slate-200">
+        <div>
+          <div className="text-[11px] uppercase text-slate-500">Scope</div>
+          <div className="mt-1 font-semibold capitalize text-white">{proposal.target.scope.replace("-", " ")}</div>
+        </div>
+        {profile && (
+          <div className="rounded-lg border border-white/10 bg-black/30 p-3 text-xs text-slate-300">
+            <div className="flex justify-between text-[11px] uppercase text-slate-500">
+              <span>Phase</span>
+              <span>{(profile.score * 100).toFixed(1)}%</span>
+            </div>
+            <div className="mt-1 font-semibold text-slate-100">{profile.id}</div>
+            {profile.rationale && <div className="mt-1 text-slate-400">{profile.rationale}</div>}
+          </div>
+        )}
+        {template?.changes?.openPanels?.length ? (
+          <div>
+            <div className="text-[11px] uppercase text-slate-500">Panels</div>
+            <ul className="mt-1 list-outside list-disc pl-4 text-xs text-slate-300">
+              {template.changes.openPanels.map((panel) => (
+                <li key={panel.id}>
+                  {panel.id}
+                  {panel.layout ? <span className="text-slate-500"> · {panel.layout}</span> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {template?.changes?.pinFiles?.length ? (
+          <div>
+            <div className="text-[11px] uppercase text-slate-500">Pinned files</div>
+            <ul className="mt-1 list-outside list-disc pl-4 text-xs text-slate-300">
+              {template.changes.pinFiles.map((file) => (
+                <li key={file}>{file}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {template?.changes?.consoleTabs?.length ? (
+          <div>
+            <div className="text-[11px] uppercase text-slate-500">Console tabs</div>
+            <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-300">
+              {template.changes.consoleTabs.map((tab) => (
+                <span key={tab} className="rounded-full bg-black/40 px-2 py-0.5">
+                  {tab}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {envEntries.length ? (
+          <div>
+            <div className="text-[11px] uppercase text-slate-500">Env hints</div>
+            <dl className="mt-1 grid grid-cols-2 gap-2 text-xs text-slate-300">
+              {envEntries.map(([key, value]) => (
+                <div key={key} className="rounded border border-white/10 bg-black/30 p-2">
+                  <dt className="text-[10px] uppercase text-slate-500">{key}</dt>
+                  <dd className="mt-1 font-mono text-[11px] text-white">{String(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
       </div>
     );
   }

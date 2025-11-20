@@ -1,12 +1,19 @@
 import type { TMemorySearchHit } from "@shared/essence-persona";
+import type { ResonanceBundle, ResonanceCollapse } from "@shared/code-lattice";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { WhyBelongs } from "@shared/rationale";
+import { DEFAULT_DESKTOP_ID, pushConsoleTelemetry } from "@/lib/agi/consoleTelemetry";
+import { ensureLatestLattice } from "@/lib/agi/resonanceVersion";
+import { useResonanceStore } from "@/store/useResonanceStore";
 
 export type PlanResponse = {
   traceId: string;
   plan: unknown;
   manifest?: unknown;
   prompt?: string;
+  lattice_version?: number;
+  resonance_bundle?: ResonanceBundle | null;
+  resonance_selection?: ResonanceCollapse | null;
 };
 
 export type ExecuteResponse = {
@@ -164,12 +171,19 @@ async function asJson<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
+export type PlanRequestOptions = {
+  desktopId?: string;
+  includeTelemetry?: boolean;
+};
+
 export async function plan(
   goal: string,
   personaId?: string,
   knowledgeContext?: KnowledgeProjectExport[],
   knowledgeProjects?: string[],
+  options?: PlanRequestOptions,
 ): Promise<PlanResponse> {
+  await ensureLatestLattice();
   const body: Record<string, unknown> = { goal, personaId };
   if (Array.isArray(knowledgeContext) && knowledgeContext.length > 0) {
     body.knowledgeContext = knowledgeContext;
@@ -177,13 +191,31 @@ export async function plan(
   if (Array.isArray(knowledgeProjects) && knowledgeProjects.length > 0) {
     body.knowledgeProjects = knowledgeProjects;
   }
-  return asJson(
+  const desktopId = options?.desktopId ?? DEFAULT_DESKTOP_ID;
+  if (desktopId) {
+    body.desktopId = desktopId;
+  }
+  if (options?.includeTelemetry !== false) {
+    try {
+      await pushConsoleTelemetry(desktopId);
+    } catch (error) {
+      console.warn("[agi] console telemetry push failed", error);
+    }
+  }
+  const payload = await asJson<PlanResponse>(
     await fetch("/api/agi/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    })
+      body: JSON.stringify(body),
+    }),
   );
+  useResonanceStore.getState().setResonancePayload({
+    bundle: payload.resonance_bundle ?? null,
+    selection: payload.resonance_selection ?? null,
+    latticeVersion: payload.lattice_version ?? null,
+    traceId: payload.traceId,
+  });
+  return payload;
 }
 
 export async function execute(traceId: string): Promise<ExecuteResponse> {
@@ -216,17 +248,23 @@ export function subscribeToolLogs(onEvent: (event: any) => void): () => void {
   };
 }
 
-export async function syncKnowledgeProjects(projects: KnowledgeProjectExport[]): Promise<{ synced: number; projectIds: string[] }> {
+export async function syncKnowledgeProjects(
+  projects: KnowledgeProjectExport[],
+): Promise<{ synced: number; projectIds: string[] }> {
   if (!Array.isArray(projects) || projects.length === 0) {
     return { synced: 0, projectIds: [] };
   }
-  return asJson(
+  const payload = await asJson<{ synced: number; projectIds: string[]; skipped?: string }>(
     await fetch("/api/knowledge/projects/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ projects }),
     }),
   );
+  if (payload.skipped) {
+    return { synced: 0, projectIds: [] };
+  }
+  return payload;
 }
 
 export async function getTraceMemories(traceId: string, k = 10): Promise<TraceMemoryResponse> {

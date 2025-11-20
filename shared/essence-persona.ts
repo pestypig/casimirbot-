@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { KnowledgeProjectExport } from "./knowledge";
+import type { ResonanceBundle, ResonancePatchMode, ResonancePatchStats } from "./code-lattice";
 import { ToolRisk } from "./skills";
 import type { ToolManifestEntry } from "./skills";
 
@@ -73,11 +74,28 @@ export const TaskTrace = z.object({
   result_summary: z.string().optional(),
   ok: z.boolean().optional(),
   knowledgeContext: z.any().optional(),
+  resonance_bundle: z.any().optional(),
+  resonance_selection: z.any().optional(),
   // Agent instructions captured alongside the trace
   routine_json: z.any().optional(),
 });
 
+export type TResonanceSelectionSnapshot = {
+  primaryPatchId: string;
+  backupPatchId?: string;
+  rationale: string;
+  ranking: Array<{
+    patchId: string;
+    label: string;
+    mode: ResonancePatchMode;
+    weightedScore: number;
+    stats: ResonancePatchStats;
+  }>;
+};
+
 export type TTaskTrace = z.infer<typeof TaskTrace> & {
   knowledgeContext?: KnowledgeProjectExport[];
   plan_manifest?: ToolManifestEntry[];
+  resonance_bundle?: ResonanceBundle | null;
+  resonance_selection?: TResonanceSelectionSnapshot | null;
 };

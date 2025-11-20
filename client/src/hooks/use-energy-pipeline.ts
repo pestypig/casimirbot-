@@ -196,6 +196,7 @@ export interface EnergyPipelineState {
 }
 
 const MAX_SWEEP_ROWS = 2000;
+let issuedInitialMarginIntent = false;
 const MAX_STREAM_SWEEP_ROWS = 5000;
 
 const ACTIVE_SLEW_DEFAULT_MOD_DEPTH_CAP_PCT = 0.8;
@@ -666,6 +667,12 @@ export interface SystemMetrics {
   currentMode?: string;
   tileData?: TileDatum[]; // current server shape
   tiles?: TileDatum[];    // legacy shape
+  hull?: {
+    Lx_m?: number;
+    Ly_m?: number;
+    Lz_m?: number;
+  };
+  axes_m?: [number, number, number];
   // Optional LC/timing structure from backend metrics, if available
   lightCrossing?: {
     tauLC_ms?: number;        // preferred
@@ -866,6 +873,28 @@ export function useEnergyPipeline(options?: {
     staleTime: options?.staleTime,
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
   });
+
+  React.useEffect(() => {
+    if (issuedInitialMarginIntent) return;
+    issuedInitialMarginIntent = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        await apiRequest("POST", "/api/qi/setpoint", {
+          intent: "increase_margin",
+          aggressiveness: 0.7,
+        });
+      } catch (err) {
+        console.warn("[HELIX] Failed to issue initial QI margin intent:", err);
+        if (!cancelled) {
+          issuedInitialMarginIntent = false;
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [sweepResults, setSweepResults] = React.useState<VacuumGapSweepRow[]>([]);
   const [sweepMeta, setSweepMeta] = React.useState<SweepResultsMeta>(EMPTY_SWEEP_META);
@@ -1083,41 +1112,40 @@ export type ModeConfig = {
 };
 
 // Mode configurations for UI display (synchronized with backend)
+const GUARDED_SWEEP_DEFAULTS = {
+  sectorsTotal: 400,
+  sectorsConcurrent: 1,
+  localBurstFrac: 0.01,
+  sectorStrobing: 1,
+} as const;
+
 export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
   standby: {
     name: "Standby",
     color: "text-slate-300",
     description: "Field idle / safed",
+    ...GUARDED_SWEEP_DEFAULTS,
     dutyCycle: 0.0,
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,        // harmless placeholder; FR duty will be 0 because burst=0
-    localBurstFrac: 0.0,         // no RF
+    localBurstFrac: 0.0,         // override safe sweep defaults so RF stays muted
     powerTarget_W: 0,
-    sectorStrobing: 1,
     qSpoilingFactor: 0.1,
   },
   hover: {
     name: "Hover",
     color: "text-sky-300",
     description: "Gentle bulge / training profile",
+    ...GUARDED_SWEEP_DEFAULTS,
     dutyCycle: 0.14,
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,        // one live sector at a time (classic sweep)
-    localBurstFrac: 0.01,        // 1% local ON inside dwell
     powerTarget_W: 83.3e6,       // match your display target
-    sectorStrobing: 1,
     qSpoilingFactor: 1,
   },
   taxi: {
     name: "Taxi",
     color: "text-sky-300",
     description: "Ground ops posture; translation suppressed",
+    ...GUARDED_SWEEP_DEFAULTS,
     dutyCycle: 0.14,
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,        // identical electrical posture; translation stays suppressed
-    localBurstFrac: 0.01,
     powerTarget_W: 83.3e6,       // inherits hover power budget
-    sectorStrobing: 1,
     qSpoilingFactor: 1,
   },
   nearzero: {
@@ -1125,11 +1153,9 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     color: "text-amber-300",
     description: "Zero-β hover-climb regime",
     hint: "Zero-β hover-climb",
+    ...GUARDED_SWEEP_DEFAULTS,
     dutyCycle: 0.12,
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,
     localBurstFrac: 0.0075,
-    sectorStrobing: 1,
     qSpoilingFactor: 1,
     envCaps: {
       rho_pad: 0.1,
@@ -1149,24 +1175,21 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     name: "Cruise",
     color: "text-cyan-300",
     description: "Coherent 400× sweep; FR duty mostly from averaging",
-    dutyCycle: 0.005,
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,        // keep 1 unless you want faster pass speed
-    localBurstFrac: 0.01,        // keep 1% local ON; FR change comes from S_live/S_total
+    ...GUARDED_SWEEP_DEFAULTS,
+    dutyCycle: 0.12,
     powerTarget_W: 40e6,
-    sectorStrobing: 1,
     qSpoilingFactor: 0.625,
   },
   emergency: {
     name: "Emergency",
     color: "text-rose-300",
     description: "Max response window; fewer averages",
-    dutyCycle: 0.50,
+    dutyCycle: 0.2,
     sectorsTotal: 400,
-    sectorsConcurrent: 8,        // widen the live window (try 4, 8, or 16)
-    localBurstFrac: 0.50,        // big local ON fraction
+    sectorsConcurrent: 2,        // still widens the live window but stays within guarded defaults
+    localBurstFrac: 0.1,         // bigger than hover yet far from continuous
     powerTarget_W: 120e6,
-    sectorStrobing: 8,
+    sectorStrobing: 2,
     qSpoilingFactor: 1,
   },
 };

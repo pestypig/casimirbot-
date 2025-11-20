@@ -31,4 +31,11 @@ describe("stress-energy brick builder", () => {
     const totalDiv = brick.channels.divS.data.reduce((acc, value) => acc + value, 0);
     expect(Math.abs(totalDiv)).toBeLessThan(5e-3);
   });
+
+  it("embeds Natario diagnostics", () => {
+    const brick = buildStressEnergyBrick(baseParams);
+    expect(brick.stats.natario).toBeDefined();
+    expect(brick.stats.natario?.gateLimit).toBeGreaterThan(0);
+    expect(Number.isFinite(brick.stats.natario?.divBetaMax)).toBe(true);
+  });
 });
