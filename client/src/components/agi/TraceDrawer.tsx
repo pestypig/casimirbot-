@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
-import type { ResonanceBundle } from "@shared/code-lattice";
+import type { ResonanceBundle, ResonanceCollapse } from "@shared/code-lattice";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { useResonanceStore } from "@/store/useResonanceStore";
 import { isFlagEnabled } from "@/lib/envFlags";
@@ -48,6 +48,10 @@ type TaskTracePayload = {
   steps?: TraceStep[];
   plan_json?: PlanNodeLike[];
   knowledgeContext?: KnowledgeProjectExport[];
+  planner_prompt?: string | null;
+  prompt_hash?: string | null;
+  telemetry_summary?: string | Record<string, unknown> | null;
+  lattice_version?: string | number | null;
   resonance_bundle?: ResonanceBundle | null;
   resonance_selection?: {
     primaryPatchId?: string;
@@ -69,6 +73,53 @@ type TaskTracePayload = {
   } | null;
 };
 
+const normalizeResonanceSelection = (
+  selection: TaskTracePayload["resonance_selection"],
+): ResonanceCollapse | null => {
+  if (
+    !selection ||
+    typeof selection.primaryPatchId !== "string" ||
+    !selection.primaryPatchId ||
+    typeof selection.rationale !== "string"
+  ) {
+    return null;
+  }
+  if (!Array.isArray(selection.ranking)) {
+    return null;
+  }
+  const ranking = selection.ranking
+    .map((entry) => {
+      if (!entry || typeof entry.patchId !== "string" || typeof entry.label !== "string") {
+        return null;
+      }
+      const statsSrc = entry.stats ?? {};
+      const stats: ResonanceCollapse["ranking"][number]["stats"] = {
+        activationTotal: Number(statsSrc.activationTotal ?? 0),
+        telemetryWeight: Number(statsSrc.telemetryWeight ?? 0),
+        failingTests: Number(statsSrc.failingTests ?? 0),
+        activePanels: Number(statsSrc.activePanels ?? 0),
+        nodeCount: Number(statsSrc.nodeCount ?? 0),
+      };
+      return {
+        patchId: entry.patchId,
+        label: entry.label,
+        mode: entry.mode as ResonanceCollapse["ranking"][number]["mode"],
+        weightedScore: Number(entry.weightedScore ?? 0),
+        stats,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => !!entry);
+  if (ranking.length === 0) {
+    return null;
+  }
+  return {
+    primaryPatchId: selection.primaryPatchId,
+    backupPatchId: selection.backupPatchId,
+    rationale: selection.rationale,
+    ranking,
+  };
+};
+
 type StepRow = {
   id: string;
   kind: string;
@@ -80,7 +131,21 @@ type StepRow = {
 };
 
 const MAX_LOG_LINES = 200;
+const PROMPT_PREVIEW_LIMIT = 600;
 export const TRACE_DRAWER_WIDTH = 420;
+
+type ToolLogEntry = {
+  seq?: number;
+  ts?: string;
+  traceId?: string;
+  tool?: string;
+  ok?: boolean;
+  text?: string;
+  promptHash?: string;
+  paramsHash?: string;
+  durationMs?: number;
+  stepId?: string;
+};
 
 type TraceDrawerProps = {
   traceId?: string;
@@ -93,8 +158,12 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
   const [trace, setTrace] = useState<TaskTracePayload | null>(null);
   const [traceError, setTraceError] = useState<string | null>(null);
   const [lines, setLines] = useState<string[]>([]);
+  const [logEntries, setLogEntries] = useState<ToolLogEntry[]>([]);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [telemetryExpanded, setTelemetryExpanded] = useState(false);
   const selectProjects = useKnowledgeProjectsStore((state) => state.selectProjects);
   const publishResonance = useResonanceStore((state) => state.setResonancePayload);
   const traceExportFlag = isFlagEnabled("ENABLE_TRACE_EXPORT");
@@ -110,6 +179,39 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
     }
     return map;
   }, [trace?.plan_json]);
+
+  const telemetrySummaryText = useMemo(() => {
+    const summary = trace?.telemetry_summary;
+    if (!summary) {
+      return null;
+    }
+    if (typeof summary === "string") {
+      return summary;
+    }
+    try {
+      return JSON.stringify(summary, null, 2);
+    } catch {
+      return String(summary);
+    }
+  }, [trace?.telemetry_summary]);
+
+  const plannerPrompt = trace?.planner_prompt ?? "";
+  const promptHash = (trace?.prompt_hash ?? (trace as any)?.promptHash) ?? null;
+  const promptOverflow = plannerPrompt.length > PROMPT_PREVIEW_LIMIT;
+
+  useEffect(() => {
+    setPromptExpanded(false);
+  }, [traceId, plannerPrompt]);
+
+  const promptPreview = useMemo(() => {
+    if (!plannerPrompt) {
+      return "";
+    }
+    if (promptExpanded || !promptOverflow) {
+      return plannerPrompt;
+    }
+    return `${plannerPrompt.slice(0, PROMPT_PREVIEW_LIMIT)}...`;
+  }, [plannerPrompt, promptExpanded, promptOverflow]);
 
   useEffect(() => {
     if (!open || !traceId) {
@@ -146,12 +248,26 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
       return;
     }
     setLines([]);
+    setLogEntries([]);
     const source = new EventSource("/api/agi/tools/logs/stream?limit=200");
     source.onmessage = (event) => {
-      setLines((prev) => {
-        const next = [...prev, event.data];
-        return next.length > MAX_LOG_LINES ? next.slice(next.length - MAX_LOG_LINES) : next;
-      });
+      try {
+        const parsed = JSON.parse(event.data) as ToolLogEntry;
+        if (traceId) {
+          if (!parsed.traceId || parsed.traceId !== traceId) {
+            return;
+          }
+        }
+        setLogEntries((prev) => {
+          const next = [...prev, parsed];
+          return next.length > MAX_LOG_LINES ? next.slice(next.length - MAX_LOG_LINES) : next;
+        });
+      } catch {
+        setLines((prev) => {
+          const next = [...prev, event.data];
+          return next.length > MAX_LOG_LINES ? next.slice(next.length - MAX_LOG_LINES) : next;
+        });
+      }
     };
     source.onerror = () => {
       /* best-effort stream */
@@ -159,7 +275,22 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
     return () => {
       source.close();
     };
-  }, [open]);
+  }, [open, traceId]);
+
+  const handleCopyText = async (label: string, text?: string | null) => {
+    if (!text || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(label);
+      setTimeout(() => {
+        setCopiedField((current) => (current === label ? null : current));
+      }, 1200);
+    } catch {
+      /* ignore copy failures */
+    }
+  };
 
   const rows: StepRow[] = useMemo(() => {
     if (!Array.isArray(trace?.steps)) {
@@ -276,14 +407,23 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
     });
   }, [trace?.resonance_bundle, trace?.resonance_selection]);
   const resonanceRationale = trace?.resonance_selection?.rationale;
+  const resonanceSelection = useMemo(
+    () => normalizeResonanceSelection(trace?.resonance_selection),
+    [trace?.resonance_selection],
+  );
+  const casimirTelemetry = trace?.resonance_bundle?.telemetry?.casimir;
+  const casimirBands = casimirTelemetry?.bands ?? [];
+  const casimirTileSample = casimirTelemetry?.tileSample;
+  const formatBandMetric = (value?: number) =>
+    typeof value === "number" && Number.isFinite(value) ? value.toFixed(3) : "n/a";
 
   useEffect(() => {
     publishResonance({
       bundle: trace?.resonance_bundle ?? null,
-      selection: trace?.resonance_selection ?? null,
+      selection: resonanceSelection,
       traceId: trace?.id ?? traceId ?? null,
     });
-  }, [publishResonance, trace, traceId]);
+  }, [publishResonance, trace, traceId, resonanceSelection]);
 
   const handleExportClick = async (id: string) => {
     setExportBusy(true);
@@ -353,6 +493,91 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
         {!traceId && <div className="opacity-60 text-sm">Trigger a task to view its trace.</div>}
         {traceId && !trace && !traceError && <div className="opacity-60 text-sm">Loading trace…</div>}
         {traceError && <div className="text-sm text-red-400">Trace error: {traceError}</div>}
+        {plannerPrompt && (
+          <div className="rounded border border-white/10 bg-black/20 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold text-white">Prompt</div>
+                {trace?.lattice_version && (
+                  <div className="text-[10px] uppercase opacity-60">Lattice snapshot {trace.lattice_version}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-[11px]">
+                {promptOverflow && (
+                  <button
+                    className="underline opacity-80 hover:opacity-100"
+                    onClick={() => setPromptExpanded((prev) => !prev)}
+                  >
+                    {promptExpanded ? "Collapse" : "View full"}
+                  </button>
+                )}
+                <button
+                  className="underline opacity-80 hover:opacity-100"
+                  onClick={() => handleCopyText("planner_prompt", plannerPrompt)}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+            <div
+              className="text-[11px] opacity-90 whitespace-pre-wrap border border-white/10 bg-black/25 rounded p-2"
+              style={promptExpanded ? { maxHeight: 320, overflow: "auto" } : { maxHeight: 180, overflow: "auto" }}
+            >
+              {promptPreview}
+            </div>
+            {(promptHash || promptOverflow || copiedField === "planner_prompt" || copiedField === "prompt_hash") && (
+              <div className="space-y-1 text-[10px] opacity-80">
+                {promptHash && (
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-mono break-all leading-relaxed">promptHash: {promptHash}</div>
+                    <button
+                      className="underline opacity-80 hover:opacity-100 shrink-0"
+                      onClick={() => handleCopyText("prompt_hash", promptHash)}
+                    >
+                      Copy hash
+                    </button>
+                  </div>
+                )}
+                {copiedField === "prompt_hash" && (
+                  <div className="text-green-300">Prompt hash copied.</div>
+                )}
+                {copiedField === "planner_prompt" && (
+                  <div className="text-green-300">Prompt copied.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {telemetrySummaryText && (
+          <div className="rounded border border-white/10 bg-black/15 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-white">Console Telemetry Summary</div>
+              <div className="flex items-center gap-3">
+                <button
+                  className="text-[11px] underline opacity-80 hover:opacity-100"
+                  onClick={() => handleCopyText("telemetry_summary", telemetrySummaryText)}
+                >
+                  Copy
+                </button>
+                <button
+                  className="text-[11px] underline opacity-70 hover:opacity-100"
+                  onClick={() => setTelemetryExpanded((prev) => !prev)}
+                >
+                  {telemetryExpanded ? "Collapse" : "Expand"}
+                </button>
+              </div>
+            </div>
+            <div
+              className="text-[11px] opacity-90 whitespace-pre-wrap"
+              style={telemetryExpanded ? { maxHeight: 260, overflow: "auto" } : { maxHeight: 96, overflow: "hidden" }}
+            >
+              {telemetrySummaryText}
+            </div>
+            {copiedField === "telemetry_summary" && (
+              <div className="text-[10px] text-green-300">Telemetry summary copied.</div>
+            )}
+          </div>
+        )}
         {(resonanceFiles.length > 0 || resonanceRanking.length > 0) && (
           <div className="rounded border border-indigo-400/70 bg-indigo-950/20 p-3 space-y-3">
             <div className="flex items-center justify-between">
@@ -370,6 +595,39 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
             </div>
             {resonanceRationale && (
               <div className="text-[10px] text-indigo-200/80">{resonanceRationale}</div>
+            )}
+            {(casimirTileSample || casimirBands.length > 0) && (
+              <div className="space-y-1 text-[11px] text-indigo-100">
+                {casimirTileSample && (
+                  <div className="text-indigo-200/80">
+                    Tile sample: {casimirTileSample.active ?? "?"} / {casimirTileSample.total ?? "?"} active
+                  </div>
+                )}
+                {casimirBands.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    {casimirBands.slice(0, 4).map((band) => (
+                      <div
+                        key={`${band.name}-${band.lastEventIso ?? ""}`}
+                        className="rounded border border-indigo-400/40 bg-indigo-500/10 px-2 py-1"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-tight">{band.name}</div>
+                          {band.lastEventIso && <div className="text-[10px] opacity-60">{band.lastEventIso}</div>}
+                        </div>
+                        <div className="text-[10px] opacity-80">
+                          seed {formatBandMetric(band.seed)} · coh {formatBandMetric(band.coherence)} · q {formatBandMetric(band.q)} · occ{" "}
+                          {formatBandMetric(band.occupancy)}
+                        </div>
+                        {band.sourceIds?.length ? (
+                          <div className="text-[10px] text-indigo-200/90 truncate">
+                            sources: {band.sourceIds.slice(0, 5).join(", ")}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             {resonanceRanking.length > 0 && (
               <div className="space-y-2">
@@ -520,13 +778,43 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
           </div>
         ))}
       </div>
-      <div className="border-t border-white/10 p-3 h-[140px] overflow-auto text-[11px] opacity-80 bg-black/20">
-        {lines.length === 0 && <div className="opacity-60">Waiting for tool logs…</div>}
-        {lines.map((line, index) => (
-          <div key={`${line}-${index}`} className="whitespace-pre">
-            {line}
+      <div className="border-t border-white/10 p-3 h-[160px] overflow-auto text-[11px] opacity-80 bg-black/20 space-y-2">
+        {logEntries.length === 0 && lines.length === 0 && <div className="opacity-60">Waiting for tool logs…</div>}
+        {logEntries.map((entry, index) => (
+          <div
+            key={`${entry.seq ?? entry.ts ?? index}`}
+            className="space-y-1 border-b border-white/5 pb-2 last:border-0 last:pb-0"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-white">{entry.tool ?? "tool"}</span>
+                {entry.stepId && <span className="text-[10px] opacity-70">step {entry.stepId}</span>}
+              </div>
+              <div className="flex items-center gap-2 text-[10px]">
+                {typeof entry.durationMs === "number" && <span>{Math.round(entry.durationMs)} ms</span>}
+                <span className={entry.ok === false ? "text-red-300" : "text-green-300"}>
+                  {entry.ok === false ? "fail" : "ok"}
+                </span>
+              </div>
+            </div>
+            {(entry.promptHash || entry.paramsHash) && (
+              <div className="text-[10px] font-mono break-all leading-relaxed opacity-90">
+                {entry.promptHash && <div>promptHash: {entry.promptHash}</div>}
+                {entry.paramsHash && <div>paramsHash: {entry.paramsHash}</div>}
+              </div>
+            )}
+            {entry.text && <div className="text-[11px] opacity-80 break-words">{entry.text}</div>}
           </div>
         ))}
+        {lines.length > 0 && (
+          <div className="space-y-1 pt-1">
+            {lines.map((line, index) => (
+              <div key={`${line}-${index}`} className="whitespace-pre">
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

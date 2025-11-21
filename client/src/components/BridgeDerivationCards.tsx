@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useMetrics } from "@/hooks/use-metrics";
 import type { HelixMetrics } from "@/hooks/use-metrics";
 import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
+import { Badge } from "@/components/ui/badge";
+import { HELIX_DEV_MOCK_EVENT, getDevMockStatus, type DevMockStatus } from "@/lib/queryClient";
 
 /* ---------- tiny helpers ---------- */
 const Eq = ({ children }: { children: React.ReactNode }) => (
@@ -23,6 +25,29 @@ const fmt = (x: unknown, digits = 3) => (num(x) !== undefined ? num(x)!.toFixed(
 const fexp = (x: unknown, digits = 2) => (num(x) !== undefined ? num(x)!.toExponential(digits) : "—");
 const fint = (x: unknown) => (num(x) !== undefined ? Math.round(num(x)!).toLocaleString() : "—");
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+const formatUnitFirst = (value: number | undefined, unit: string, digits = 2) => {
+  if (!Number.isFinite(value)) return "—";
+  return `${unit} ${Number(value).toFixed(digits)}`;
+};
+
+function useHelixDevMockStatus(): DevMockStatus {
+  const [status, setStatus] = React.useState<DevMockStatus>(() => getDevMockStatus());
+  React.useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as DevMockStatus | undefined;
+      if (detail) setStatus(detail);
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener(HELIX_DEV_MOCK_EVENT, handler);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(HELIX_DEV_MOCK_EVENT, handler);
+      }
+    };
+  }, []);
+  return status;
+}
 
 /** Reusable formula block: Base → Substitute → Result (+provenance) */
 function FormulaBlock({
@@ -416,6 +441,20 @@ function TimeScaleCard({ m }: { m: HelixMetrics }) {
   const f_m = num(ts.f_m_Hz); // Hz
   const T_m = f_m !== undefined && f_m > 0 ? 1 / f_m : undefined;
 
+  const formatTime = (seconds?: number) => {
+    if (!Number.isFinite(seconds)) return undefined;
+    const s = seconds as number;
+    const abs = Math.abs(s);
+    if (abs >= 1) return `${s.toFixed(2)} s`;
+    if (abs >= 1e-3) return `${(s * 1e3).toFixed(2)} ms`;
+    if (abs >= 1e-6) return `${(s * 1e6).toFixed(2)} µs`;
+    if (abs >= 1e-9) return `${(s * 1e9).toFixed(2)} ns`;
+    return `${s.toExponential(2)} s`;
+  };
+
+  const tLongDisplay = formatTime(T_long);
+  const tModDisplay = formatTime(T_m);
+
   const TS_long = T_long !== undefined && T_m !== undefined && T_m > 0 ? T_long / T_m : undefined;
 
   return (
@@ -426,14 +465,22 @@ function TimeScaleCard({ m }: { m: HelixMetrics }) {
         title="Light-crossing time"
         base="T_LC = L_long / c"
         sub={L_long !== undefined ? `T_LC = ${fmt(L_long, 3)} m / ${c.toLocaleString()} m·s⁻¹` : undefined}
-        result={T_long !== undefined ? `T_LC = ${fexp(T_long, 2)} s` : undefined}
+        result={
+          T_long !== undefined && tLongDisplay
+            ? `T_LC = ${tLongDisplay} (=${fexp(T_long, 2)} s)`
+            : undefined
+        }
       />
 
       <FormulaBlock
         title="Modulation period"
         base="T_m = 1 / f_m"
         sub={f_m !== undefined ? `T_m = 1 / ${f_m.toLocaleString()} Hz` : undefined}
-        result={T_m !== undefined ? `T_m = ${fexp(T_m, 2)} s` : undefined}
+        result={
+          T_m !== undefined && tModDisplay
+            ? `T_m = ${tModDisplay} (=${fexp(T_m, 2)} s)`
+            : undefined
+        }
       />
 
       <FormulaBlock
@@ -499,6 +546,14 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
     serverAuditTheta != null &&
     thetaExpectedCal != null &&
     Math.abs(serverAuditTheta - thetaExpectedCal) > tol(thetaExpectedCal);
+  const thetaDelta =
+    serverAuditTheta != null && thetaExpectedCal != null
+      ? serverAuditTheta - thetaExpectedCal
+      : undefined;
+  const thetaDeltaPct =
+    thetaDelta != null && thetaExpectedCal != null && thetaExpectedCal !== 0
+      ? (thetaDelta / thetaExpectedCal) * 100
+      : undefined;
 
   const baseEq = "θ = γ_geo^3 · q · γ_VdB · d_eff";
 
@@ -538,6 +593,12 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
               Server: θ_cal = {thetaCal ? fexp(thetaCal, 2) : '—'} • 
               Expected: {thetaExpectedCal ? fexp(thetaExpectedCal, 2) : '—'}
               {mismatchCal && <span className="ml-2 text-amber-500">⚠ mismatch</span>}
+              {mismatchCal && thetaDelta != null && (
+                <div className="mt-1 text-[10px] text-amber-300">
+                  Delta(server-ui) = {fexp(thetaDelta, 2)}
+                  {thetaDeltaPct != null ? ` (${thetaDeltaPct.toFixed(4)}%)` : ""}
+                </div>
+              )}
             </div>
           </>
         }
@@ -892,9 +953,9 @@ function GreensCard({ m }: { m: HelixMetrics }) {
 
       {/* Provenance chips (makes data path obvious) */}
       <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
-        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">τ_LC: {T.tauLC.from}</span>
-        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst: {T.burst.from}</span>
-        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell: {T.dwell.from}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">τ_LC (ms/us): {T.tauLC.from}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst (ms): {T.burst.from}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell (ms): {T.dwell.from}</span>
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_total: {T.sectorsTotal.from}</span>
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_live: {T.sectorsConcurrent.from}</span>
       </div>
@@ -927,7 +988,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         }>
           {isNum(duty_display) ? fmtPct(duty_display) : "—"}
         </div>
-        <div className="text-muted-foreground">τ_LC / burst / dwell</div>
+        <div className="text-muted-foreground">τ_LC / burst / dwell (ms)</div>
         <div className="font-mono">{fmtSI(τ_LC_ms)} • {fmtSI(burst_ms)} • {fmtSI(dwell_ms)}</div>
 
         {/* Reciprocity status (payload or local compute) */}
@@ -1134,6 +1195,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
 export default function BridgeDerivationCards() {
   const metricsResult = useMetrics();
   const m = metricsResult?.data;
+  const devMockStatus = useHelixDevMockStatus();
 
   const uexp: UniformsExplain | undefined = (m as any)?.uniformsExplain;
 
@@ -1180,6 +1242,37 @@ export default function BridgeDerivationCards() {
     num((m as any)?.qSpoilingFactor) ??
     num((m as any)?.q);
 
+  const mockBannerUsed =
+    devMockStatus.used ||
+    Boolean((m as any)?.__mockData || (m as any)?.pipeline?.__mockData || (uexp as any)?.live?.__mockData);
+
+  const burstMs =
+    num((m as any)?.lightCrossing?.burst_ms) ??
+    num((m as any)?.pipeline?.burst_ms) ??
+    num((m as any)?.burst_ms) ??
+    num((uexp as any)?.live?.burst_ms);
+
+  const dwellMs =
+    num((m as any)?.lightCrossing?.dwell_ms ?? (m as any)?.lightCrossing?.sectorPeriod_ms) ??
+    num((m as any)?.pipeline?.dwell_ms ?? (m as any)?.pipeline?.sectorPeriod_ms) ??
+    num((m as any)?.dwell_ms ?? (m as any)?.sectorPeriod_ms) ??
+    num((uexp as any)?.live?.dwell_ms ?? (uexp as any)?.live?.sectorPeriod_ms);
+
+  const expectedFixtures = [
+    { key: "γ_geo", expected: 26, actual: gammaGeo, unit: "dimless", tolerance: 0.5, digits: 1 },
+    { key: "d_eff(FR)", expected: 2.5e-5, actual: dEff, unit: "—", tolerance: 3e-6, digits: 6 },
+    { key: "burst", expected: 10, actual: burstMs, unit: "ms", tolerance: 0.5, digits: 1 },
+    { key: "dwell", expected: 1000, actual: dwellMs, unit: "ms", tolerance: 6, digits: 0 },
+    { key: "S_total", expected: 400, actual: S_total, unit: "ct", tolerance: 0.49, digits: 0 },
+    { key: "S_live", expected: 1, actual: S_live, unit: "ct", tolerance: 0.51, digits: 0 },
+  ];
+
+  const mockAssertions = expectedFixtures.map((entry) => {
+    const diff = Number.isFinite(entry.actual as number) ? Math.abs((entry.actual as number) - entry.expected) : NaN;
+    const pass = Number.isFinite(diff) ? diff <= entry.tolerance : false;
+    return { ...entry, pass };
+  });
+
   if (!m) {
     return (
       <div className="bg-card/60 border rounded-lg p-4">
@@ -1223,6 +1316,40 @@ export default function BridgeDerivationCards() {
             <div>γ_geo: <Eq>{summary.gammaGeo !== undefined ? fmt(summary.gammaGeo, 0) : "—"}</Eq></div>
             <div>γ_VdB: <Eq>{summary.gammaVdB !== undefined ? fexp(summary.gammaVdB, 2) : "—"}</Eq></div>
             <div>q: <Eq>{summary.q !== undefined ? fmt(summary.q, 3) : "—"}</Eq></div>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-lg border border-amber-400/40 bg-amber-500/5 p-3">
+          <div className="flex items-center justify-between text-xs font-semibold text-amber-100">
+            <span>HELIX endpoint contract (mock fixtures as assertions)</span>
+            <Badge
+              variant="outline"
+              className={mockBannerUsed ? "border-amber-400 text-amber-200 bg-amber-500/10" : "border-slate-600 text-slate-200"}
+            >
+              {mockBannerUsed ? "DEV MOCK" : "LIVE"}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
+            {mockAssertions.map((row) => (
+              <div
+                key={row.key}
+                className={`rounded border px-2 py-1 text-[11px] ${row.pass ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100" : "border-rose-500/40 bg-rose-500/10 text-rose-100"}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">{row.key}</span>
+                  <span className="font-mono">
+                    {row.unit} {row.expected.toFixed(row.digits ?? 2)}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[10px] font-mono">
+                  <span>seen {formatUnitFirst(row.actual as number, row.unit, row.digits ?? 2)}</span>
+                  <span className="opacity-70">{row.pass ? "✓ within tolerance" : "× drifted"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 text-[10px] text-amber-200/90">
+            Bridge blocks the guards until the mock fixtures line up with the expected units; swap in live data once these turn green.
           </div>
         </div>
 

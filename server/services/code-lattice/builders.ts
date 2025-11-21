@@ -185,7 +185,7 @@ function parseSuiteEntry(entry: any): TestSuiteStatus | null {
       if (!title) return null;
       return { name: title, status: toTestStatus(test.status ?? test.state ?? test.result) };
     })
-    .filter((test): test is TestSuiteCase => !!test);
+    .filter((test: TestSuiteCase | null): test is TestSuiteCase => !!test);
   const suiteStatus =
     entry.status && entry.status !== "unknown"
       ? toTestStatus(entry.status)
@@ -298,11 +298,14 @@ function hashSnippet(snippet: string) {
   return createHash("sha256").update(snippet).digest("hex");
 }
 
+const getNodeModifiers = (node: ts.Node) =>
+  ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+
 const isExported = (node: ts.Node) =>
-  Boolean(node.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword));
+  Boolean(getNodeModifiers(node)?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword));
 
 const hasDefaultModifier = (node: ts.Node) =>
-  Boolean(node.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.DefaultKeyword));
+  Boolean(getNodeModifiers(node)?.some((mod) => mod.kind === ts.SyntaxKind.DefaultKeyword));
 
 function detectNodeKind(
   symbol: string,

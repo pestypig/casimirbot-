@@ -10,7 +10,16 @@ import type {
   ResonancePatch,
   ResonancePatchMode,
   ResonanceNodeKind,
+  ResonanceTelemetrySummary,
 } from "@shared/code-lattice";
+import {
+  CASIMIR_BAND_BIAS,
+  CASIMIR_BLUEPRINT_BY_BAND,
+  CASIMIR_LOW_SIGNAL,
+  RESONANCE_EVENT_RATE_CAP,
+  RESONANCE_RECENCY_TAU_MS,
+  RESONANCE_WEIGHTS,
+} from "./resonance.constants";
 import { loadCodeLattice } from "./loader";
 
 type LatticeIndex = {
@@ -22,6 +31,8 @@ type LatticeIndex = {
 };
 
 type PanelHitMap = Map<string, Set<string>>;
+type NodeBandMap = Map<string, Set<string>>;
+type NodeSourceMap = Map<string, Set<string>>;
 
 type ResonancePatchConfig = {
   id: string;
@@ -58,6 +69,14 @@ const PATCH_BLUEPRINTS: ResonancePatchConfig[] = [
   { id: "patch_module", label: "Module resonance", mode: "module", hops: 4, limitScale: 1 },
   { id: "patch_ideology", label: "Ideology resonance", mode: "ideology", hops: 6, limitScale: 1.25 },
 ];
+
+type TelemetrySeedResult = {
+  seeds: Map<string, number>;
+  panels: PanelHitMap;
+  bandsByNode: NodeBandMap;
+  sourcesByNode: NodeSourceMap;
+  telemetry?: ResonanceTelemetrySummary;
+};
 
 let cachedIndex: LatticeIndex | null = null;
 
@@ -160,30 +179,195 @@ function resolveTelemetryTargets(
   return [...new Set([...explicit, ...ids])];
 }
 
+const toFiniteNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const addToSetMap = <T>(map: Map<string, Set<T>>, key: string, value: T): void => {
+  const set = map.get(key) ?? new Set<T>();
+  set.add(value);
+  map.set(key, set);
+};
+
+type CasimirSeedArtifacts = {
+  seeds: Map<string, number>;
+  panels: PanelHitMap;
+  bandsByNode: NodeBandMap;
+  sourcesByNode: NodeSourceMap;
+  telemetry?: ResonanceTelemetrySummary;
+};
+
+const normalizeBand = (name?: string): string => (name ?? "").toLowerCase();
+
+function collectCasimirSeeds(
+  panel: NonNullable<ConsoleTelemetryBundle["panels"]>[number],
+  nodesById: Map<string, TCodeFeature>,
+  nodesByFile: Map<string, TCodeFeature[]>,
+  now = Date.now(),
+): CasimirSeedArtifacts {
+  const seeds = new Map<string, number>();
+  const panels = new Map<string, Set<string>>();
+  const bandsByNode: NodeBandMap = new Map();
+  const sourcesByNode: NodeSourceMap = new Map();
+  const tileSample = panel.tile_sample ?? {
+    total: toFiniteNumber(panel.metrics?.totalTiles) ?? undefined,
+    active: toFiniteNumber(panel.metrics?.tilesActive) ?? undefined,
+  };
+  const fallbackOccupancy =
+    tileSample?.total && tileSample?.total > 0 && tileSample?.active != null
+      ? clamp01(tileSample.active / tileSample.total)
+      : clamp01(toFiniteNumber(panel.metrics?.occupancy) ?? 0);
+  const bandCandidates =
+    (panel.bands ?? []).filter(
+      (band) => toFiniteNumber(band?.q) !== null || toFiniteNumber(band?.coherence) !== null || band?.name,
+    ) ??
+    [];
+  const bands =
+    bandCandidates.length > 0
+      ? bandCandidates
+      : [
+          {
+            name: "mhz",
+            q: toFiniteNumber(panel.metrics?.avgQFactor) ?? 0,
+            coherence: toFiniteNumber(panel.metrics?.coherence) ?? 0,
+            occupancy: fallbackOccupancy,
+            event_rate: toFiniteNumber(panel.metrics?.eventRate ?? panel.metrics?.eventsPerMin ?? panel.metrics?.eventsPerMinute) ?? undefined,
+            last_event: panel.strings?.lastEventIso ?? panel.strings?.lastEvent,
+          },
+        ];
+
+  const bandStats: NonNullable<ResonanceTelemetrySummary["casimir"]>["bands"] = [];
+  let totalCoherence = 0;
+
+  for (const band of bands) {
+    const q = clamp01(toFiniteNumber((band as any)?.q) ?? 0);
+    const coherence = clamp01(toFiniteNumber((band as any)?.coherence) ?? 0);
+    const occupancy = clamp01(toFiniteNumber((band as any)?.occupancy) ?? fallbackOccupancy);
+    const lastEventIso = (band as any)?.last_event ?? panel.strings?.lastEventIso ?? panel.strings?.lastEvent ?? null;
+    const dtMs = lastEventIso ? Math.max(0, now - Date.parse(lastEventIso)) : null;
+    const recency = dtMs === null ? 0 : Math.exp(-dtMs / RESONANCE_RECENCY_TAU_MS);
+    const eventsPerMin =
+      toFiniteNumber((band as any)?.event_rate) ??
+      toFiniteNumber(panel.metrics?.eventRate ?? panel.metrics?.eventsPerMinute ?? panel.metrics?.eventsPerMin);
+    const eventTerm = clamp01(((eventsPerMin ?? 0) as number) / RESONANCE_EVENT_RATE_CAP);
+    let seed =
+      RESONANCE_WEIGHTS.wOcc * occupancy +
+      RESONANCE_WEIGHTS.wQ * q +
+      RESONANCE_WEIGHTS.wCoh * coherence +
+      RESONANCE_WEIGHTS.wRec * recency +
+      RESONANCE_WEIGHTS.wEvt * eventTerm;
+    if (occupancy < CASIMIR_LOW_SIGNAL.occupancy && coherence < CASIMIR_LOW_SIGNAL.coherence) {
+      seed *= CASIMIR_LOW_SIGNAL.damp;
+    }
+    if (!Number.isFinite(seed) || seed <= 0) {
+      continue;
+    }
+    const bandName = normalizeBand((band as any)?.name ?? "mhz");
+    totalCoherence += coherence;
+    const sourceIds = Array.isArray(panel.sourceIds) ? panel.sourceIds.filter(Boolean) : [];
+    for (const sourceId of sourceIds) {
+      const targets = resolveTelemetryTargets(sourceId, nodesById, nodesByFile);
+      for (const nodeId of targets) {
+        seeds.set(nodeId, (seeds.get(nodeId) ?? 0) + seed);
+        addToSetMap(panels, nodeId, panel.panelId);
+        addToSetMap(bandsByNode, nodeId, bandName);
+        addToSetMap(sourcesByNode, nodeId, sourceId);
+      }
+    }
+    bandStats.push({
+      name: bandName,
+      seed,
+      q,
+      coherence,
+      occupancy,
+      eventRate: eventsPerMin ?? undefined,
+      lastEventIso: lastEventIso ?? undefined,
+      sourceIds,
+    });
+  }
+
+  const telemetry =
+    bandStats.length > 0
+      ? {
+          casimir: {
+            bands: bandStats,
+            tileSample,
+            totalCoherence,
+          },
+        }
+      : undefined;
+
+  return { seeds, panels, bandsByNode, sourcesByNode, telemetry };
+}
+
+function mergeSeedArtifacts(target: TelemetrySeedResult, incoming: TelemetrySeedResult): TelemetrySeedResult {
+  for (const [nodeId, value] of incoming.seeds.entries()) {
+    target.seeds.set(nodeId, (target.seeds.get(nodeId) ?? 0) + value);
+  }
+  for (const [nodeId, set] of incoming.panels.entries()) {
+    for (const panelId of set.values()) {
+      addToSetMap(target.panels, nodeId, panelId);
+    }
+  }
+  for (const [nodeId, set] of incoming.bandsByNode.entries()) {
+    for (const band of set.values()) {
+      addToSetMap(target.bandsByNode, nodeId, band);
+    }
+  }
+  for (const [nodeId, set] of incoming.sourcesByNode.entries()) {
+    for (const source of set.values()) {
+      addToSetMap(target.sourcesByNode, nodeId, source);
+    }
+  }
+
+  const existingCasimir = target.telemetry?.casimir;
+  const incomingCasimir = incoming.telemetry?.casimir;
+  if (incomingCasimir) {
+    const mergedCasimir = {
+      bands: [...(existingCasimir?.bands ?? []), ...incomingCasimir.bands],
+      tileSample: incomingCasimir.tileSample ?? existingCasimir?.tileSample,
+      totalCoherence: (existingCasimir?.totalCoherence ?? 0) + (incomingCasimir.totalCoherence ?? 0),
+    };
+    target.telemetry = { ...(target.telemetry ?? {}), casimir: mergedCasimir };
+  }
+
+  return target;
+}
+
 function collectTelemetrySeeds(
   telemetry: ConsoleTelemetryBundle | null,
   nodesById: Map<string, TCodeFeature>,
   nodesByFile: Map<string, TCodeFeature[]>,
-): { seeds: Map<string, number>; panels: PanelHitMap } {
-  const seeds = new Map<string, number>();
-  const panels = new Map<string, Set<string>>();
+): TelemetrySeedResult {
+  const seedResult: TelemetrySeedResult = {
+    seeds: new Map<string, number>(),
+    panels: new Map<string, Set<string>>(),
+    bandsByNode: new Map<string, Set<string>>(),
+    sourcesByNode: new Map<string, Set<string>>(),
+    telemetry: undefined,
+  };
   if (!telemetry) {
-    return { seeds, panels };
+    return seedResult;
   }
   for (const panel of telemetry.panels ?? []) {
     if (!Array.isArray(panel.sourceIds) || panel.sourceIds.length === 0) continue;
+    if (panel.kind === "casimir") {
+      const casimirSeeds = collectCasimirSeeds(panel, nodesById, nodesByFile);
+      mergeSeedArtifacts(seedResult, casimirSeeds);
+      continue;
+    }
     const panelWeight = Math.max(0.5, (panel.metrics?.attention ?? 0) + 1);
     for (const sourceId of panel.sourceIds) {
       const targets = resolveTelemetryTargets(sourceId, nodesById, nodesByFile);
       for (const nodeId of targets) {
-        seeds.set(nodeId, (seeds.get(nodeId) ?? 0) + panelWeight);
-        const set = panels.get(nodeId) ?? new Set<string>();
-        set.add(panel.panelId);
-        panels.set(nodeId, set);
+        seedResult.seeds.set(nodeId, (seedResult.seeds.get(nodeId) ?? 0) + panelWeight);
+        addToSetMap(seedResult.panels, nodeId, panel.panelId);
+        addToSetMap(seedResult.sourcesByNode, nodeId, sourceId);
       }
     }
   }
-  return { seeds, panels };
+  return seedResult;
 }
 
 function propagateActivations(
@@ -212,6 +396,29 @@ function propagateActivations(
   }
   return scores;
 }
+
+const applyBlueprintBias = (
+  seeds: Map<string, number>,
+  bandsByNode: NodeBandMap,
+  mode: ResonancePatchMode,
+): Map<string, number> => {
+  const biasFactor = CASIMIR_BAND_BIAS[mode];
+  if (!biasFactor || biasFactor <= 1) {
+    return seeds;
+  }
+  const adjusted = new Map<string, number>();
+  for (const [nodeId, score] of seeds.entries()) {
+    const bands = bandsByNode.get(nodeId);
+    const hasMatch =
+      bands &&
+      Array.from(bands).some((band) => {
+        const mapped = CASIMIR_BLUEPRINT_BY_BAND[normalizeBand(band)];
+        return mapped === mode;
+      });
+    adjusted.set(nodeId, hasMatch ? score * biasFactor : score);
+  }
+  return adjusted;
+};
 
 const clip = (value: string, max = 360) => {
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -278,13 +485,17 @@ type PatchBuilderArgs = {
   seeds: Map<string, number>;
   panels: PanelHitMap;
   indexed: LatticeIndex;
+  bandsByNode: NodeBandMap;
+  sourcesByNode: NodeSourceMap;
+  casimirCoherence?: number;
 };
 
 const clampLimit = (base: number, scale: number) => Math.max(3, Math.min(64, Math.round(base * scale)));
 
 function buildPatchFromBlueprint(args: PatchBuilderArgs): ResonancePatch | null {
   const limit = clampLimit(args.baseLimit, args.blueprint.limitScale);
-  const propagated = propagateActivations(args.seeds, args.indexed.adjacency, args.blueprint.hops);
+  const biasedSeeds = applyBlueprintBias(args.seeds, args.bandsByNode, args.blueprint.mode);
+  const propagated = propagateActivations(biasedSeeds, args.indexed.adjacency, args.blueprint.hops);
   const rankedRaw = Array.from(propagated.entries())
     .map(([nodeId, score]) => {
       const node = args.indexed.nodesById.get(nodeId);
@@ -319,6 +530,8 @@ function buildPatchFromBlueprint(args: PatchBuilderArgs): ResonancePatch | null 
   for (const entry of rankedRaw) {
     const { node, score } = entry;
     const panelSet = args.panels.get(node.nodeId);
+    const nodeBands = args.bandsByNode.get(node.nodeId);
+    const nodeSources = args.sourcesByNode.get(node.nodeId);
     if (panelSet && panelSet.size > 0) {
       for (const panelId of panelSet) {
         touchedPanels.add(panelId);
@@ -337,6 +550,8 @@ function buildPatchFromBlueprint(args: PatchBuilderArgs): ResonancePatch | null 
       score,
       kind: resolveKind(node.resonanceKind),
       panels: panelSet ? Array.from(panelSet) : undefined,
+      bands: nodeBands ? Array.from(nodeBands) : undefined,
+      sources: nodeSources ? Array.from(nodeSources) : undefined,
       attention: node.salience?.attention,
       tests: status || undefined,
       summary: summarizeNode(node),
@@ -385,6 +600,7 @@ function buildPatchFromBlueprint(args: PatchBuilderArgs): ResonancePatch | null 
       failingTests,
       activePanels: touchedPanels.size,
       nodeCount: nodes.length,
+      casimirBandTotalCoherence: args.casimirCoherence,
     },
     nodes,
     knowledge: {
@@ -413,14 +629,18 @@ export async function buildResonanceBundle(args: BuildResonanceArgs): Promise<Re
   }
   const tokenSet = new Set(tokenize(trimmed));
   const seeds = new Map<string, number>();
-  const { seeds: telemetrySeeds, panels } = collectTelemetrySeeds(
+  const telemetrySeedResult = collectTelemetrySeeds(
     args.telemetry ?? null,
     indexed.nodesById,
     indexed.nodesByFile,
   );
-  for (const [nodeId, score] of telemetrySeeds) {
+  for (const [nodeId, score] of telemetrySeedResult.seeds) {
     seeds.set(nodeId, (seeds.get(nodeId) ?? 0) + score);
   }
+  const bandsByNode = telemetrySeedResult.bandsByNode;
+  const sourcesByNode = telemetrySeedResult.sourcesByNode;
+  const telemetrySummary = telemetrySeedResult.telemetry;
+
   for (const node of indexed.nodesById.values()) {
     const textScore = textMatchScore(node, tokenSet);
     if (textScore > 0) {
@@ -445,8 +665,11 @@ export async function buildResonanceBundle(args: BuildResonanceArgs): Promise<Re
       baseLimit: limit,
       trimmed,
       seeds,
-      panels,
+      panels: telemetrySeedResult.panels,
       indexed,
+      bandsByNode,
+      sourcesByNode,
+      casimirCoherence: telemetrySummary?.casimir?.totalCoherence,
     });
     if (patch) {
       candidates.push(patch);
@@ -466,6 +689,7 @@ export async function buildResonanceBundle(args: BuildResonanceArgs): Promise<Re
     baseLimit: limit,
     seedCount: seeds.size,
     candidates,
+    telemetry: telemetrySummary,
   };
 }
 

@@ -49,11 +49,15 @@ interface DynamicControlsProps {
 
 export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
   if (!isVisible) return null;
-  const { publishSweepControls } = useEnergyPipeline({
+  const { publishSweepControls, data: pipeline } = useEnergyPipeline({
     refetchInterval: 0,
     refetchOnWindowFocus: false,
     staleTime: 5_000,
   });
+  const mechanical = (pipeline as any)?.mechanical as any;
+  const maxStrokeGuard = mechanical && Number.isFinite(mechanical?.maxStroke_pm)
+    ? Number(mechanical.maxStroke_pm)
+    : undefined;
 
   return (
     <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-blue-200 dark:border-blue-700">
@@ -90,7 +94,17 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                         placeholder="15" 
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value)}
+                        onChange={(e) => {
+                          const raw = e.target.value; 
+                          const parsed = raw === "" ? undefined : Number(raw); 
+                          const guard = Number.isFinite(maxStrokeGuard) ? (maxStrokeGuard as number) : undefined; 
+                          if (typeof parsed !== "number" || !Number.isFinite(parsed)) { 
+                            field.onChange(raw); 
+                            return; 
+                          } 
+                          const next = guard != null && parsed > guard ? guard : parsed; 
+                          field.onChange(next); 
+                        }} 
                         className="pr-12"
                       />
                     </FormControl>
@@ -122,7 +136,12 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                     </FormControl>
                     <span className="absolute right-3 top-2 text-sm text-muted-foreground">pm</span>
                   </div>
-                  <FormDescription className="text-xs">Peak displacement amplitude (±0.1-1000 pm)</FormDescription>
+                  <FormDescription className="text-xs">
+                    Peak displacement amplitude (+/-0.1-1000 pm)
+                    {maxStrokeGuard != null
+                      ? ` mechanical guard <= ${maxStrokeGuard.toFixed(1)} pm`
+                      : ""}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -521,7 +540,6 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
     </Card>
   );
 }
-
 
 
 

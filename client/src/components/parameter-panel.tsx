@@ -61,11 +61,18 @@ export default function ParameterPanel({
   onParameterChange
 }: ParameterPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const { publishSweepControls } = useEnergyPipeline({
+  const { publishSweepControls, data: pipeline } = useEnergyPipeline({
     refetchInterval: 0,
     refetchOnWindowFocus: false,
     staleTime: 5_000,
   });
+  const mechanical = (pipeline as any)?.mechanical as any;
+  const minGapGuard = mechanical && Number.isFinite(mechanical?.recommendedGap_nm)
+    ? Number(mechanical.recommendedGap_nm)
+    : mechanical && Number.isFinite(mechanical?.minGap_nm)
+      ? Number(mechanical.minGap_nm)
+      : undefined;
+  const [gapGuardNote, setGapGuardNote] = useState<string | null>(null);
 
   const form = useForm<SimulationParameters>({
     resolver: zodResolver(simulationParametersSchema),
@@ -240,24 +247,47 @@ export default function ParameterPanel({
                   <FormItem>
                     <FormLabel>Gap Distance</FormLabel>
                     <div className="relative">
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.1" 
-                          placeholder="1.0" 
-                          {...field}
-                          value={field.value || ""}
-                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                          className="pr-12"
-                        />
-                      </FormControl>
-                      <span className="absolute right-3 top-2 text-sm text-muted-foreground">nm</span>
-                    </div>
-                    <FormDescription>Distance between objects</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.1" 
+                        placeholder="1.0" 
+                        {...field}
+                        value={field.value || ""}
+                        min={minGapGuard ?? 0.1}
+                        onChange={(e) => {
+                          const raw = e.target.value ? parseFloat(e.target.value) : undefined;
+                          const guard = Number.isFinite(minGapGuard) ? (minGapGuard as number) : undefined;
+                          if (raw == null || Number.isNaN(raw)) {
+                            field.onChange(undefined);
+                            setGapGuardNote(null);
+                            return;
+                          }
+                          const next = guard != null && raw < guard ? guard : raw;
+                          if (guard != null && raw < guard) {
+                            setGapGuardNote(`Clamped to mechanical floor of ${guard.toFixed(2)} nm`);
+                          } else {
+                            setGapGuardNote(null);
+                          }
+                          field.onChange(next);
+                        }}
+                        className="pr-12"
+                      />
+                    </FormControl>
+                    <span className="absolute right-3 top-2 text-sm text-muted-foreground">nm</span>
+                  </div>
+                  <FormDescription>
+                    {minGapGuard != null
+                      ? `Distance between objects (guarded >= ${minGapGuard.toFixed(2)} nm to avoid stiction)`
+                      : "Distance between objects"}
+                  </FormDescription>
+                  {gapGuardNote && (
+                    <p className="text-[11px] text-amber-500">{gapGuardNote}</p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
               <FormItem>
                 <FormLabel>Vacuum Gap Sweep (nm)</FormLabel>
@@ -268,6 +298,9 @@ export default function ParameterPanel({
                     onChange={(e) => setGapSweepInput(e.target.value)}
                     onBlur={() => {
                       const raw = gapSweepInput.trim();
+                      const guard = Number.isFinite(minGapGuard) ? (minGapGuard as number) : undefined;
+                      const applyGuard = (value: number) =>
+                        guard != null ? Math.max(value, guard) : value;
                       if (!raw) {
                         form.setValue("dynamicConfig.gap_nm", undefined);
                         return;
@@ -278,16 +311,29 @@ export default function ParameterPanel({
                           .map((s) => Number(s.trim()))
                           .filter((x) => Number.isFinite(x) && x > 0);
                         if (gaps.length) {
-                          form.setValue("dynamicConfig.gap_nm", gaps);
-                          publishSweepControls({ sweep: { gaps_nm: gaps } as DynamicConfig["sweep"] });
-                          setGapSweepInput(gaps.join(","));
+                          const guarded = gaps.map(applyGuard);
+                          const clamped = guarded.some((g, idx) => g !== gaps[idx]);
+                          form.setValue("dynamicConfig.gap_nm", guarded);
+                          publishSweepControls({ sweep: { gaps_nm: guarded } as DynamicConfig["sweep"] });
+                          setGapSweepInput(guarded.join(","));
+                          setGapGuardNote(
+                            clamped && guard != null
+                              ? `Gaps were clamped to >= ${guard.toFixed(2)} nm mechanical floor`
+                              : null,
+                          );
                         }
                       } else {
                         const value = Number(raw);
                         if (Number.isFinite(value) && value > 0) {
-                          form.setValue("dynamicConfig.gap_nm", value);
-                          publishSweepControls({ gap_nm: value });
-                          setGapSweepInput(String(value));
+                          const guarded = applyGuard(value);
+                          form.setValue("dynamicConfig.gap_nm", guarded);
+                          publishSweepControls({ gap_nm: guarded });
+                          setGapSweepInput(String(guarded));
+                          setGapGuardNote(
+                            guard != null && guarded !== value
+                              ? `Gap was clamped to ${guard.toFixed(2)} nm mechanical floor`
+                              : null,
+                          );
                         }
                       }
                     }}

@@ -6,17 +6,20 @@
 const MODEL_MODE: 'calibrated' | 'raw' =
   (process.env.HELIX_MODEL_MODE === 'raw') ? 'raw' : 'calibrated';
 
-// ── Physics Constants (centralized) ──────────────────────────────────────────
+// GöÇGöÇ Physics Constants (centralized) GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
 import { HBAR } from "./physics-const.js";
 import { C } from "./utils/physics-const-safe";
+import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
 
 // Keep tau_LC (wall / c) aligned with modulation dwell unless overridden
 const DEFAULT_MODULATION_FREQ_GHZ = 15;
 const DEFAULT_WALL_THICKNESS_M = C / (DEFAULT_MODULATION_FREQ_GHZ * 1e9);
+const STROBE_DUTY_WINDOW_MS_DEFAULT = 12_000;
+const STROBE_DUTY_STALE_MS = 20_000;
 
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
-const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles → skip dynamic per-tile-ish helpers (use aggregate)
+const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles GåÆ skip dynamic per-tile-ish helpers (use aggregate)
 
 // Production-quiet logging toggle
 const DEBUG_PIPE = process.env.NODE_ENV !== 'production' && (process.env.HELIX_DEBUG?.includes('pipeline') ?? false);
@@ -34,6 +37,7 @@ import { assignGateSummaries } from "../modules/dynamic/gates/index.js";
 import { calculateCasimirEnergy, omega0_from_gap } from '../modules/sim_core/static-casimir.js';
 import {
   toPipelineStressEnergy,
+  enhancedAvgEnergyDensity,
   computeLaplaceRungeLenz,
   type Vec3,
 } from '../modules/dynamic/stress-energy-equations.js';
@@ -47,22 +51,26 @@ import type {
   SweepRuntime,
   GateAnalytics,
   GatePulse,
+  QiFieldType,
   QiSettings,
   QiStats,
+  SamplingKind,
   PhaseScheduleTelemetry,
   PumpCommand,
   PumpTone,
   HardwareSectorState,
   HardwareQiSample,
   HardwareSpectrumFrame,
+  MaterialModel,
+  MaterialProps,
 } from "../shared/schema.js";
 import { appendPhaseCalibrationLog } from "./utils/phase-calibration.js";
 import { slewPump } from "./instruments/pump.js";
 import { slewPumpMultiTone } from "./instruments/pump-multitone.js";
-import { computeSectorPhaseOffsets, applyPhaseScheduleToPulses } from "./energy/phase-scheduler.js";
+import { computeSectorPhaseOffsets, applyPhaseScheduleToPulses, type PhaseSchedule } from "./energy/phase-scheduler.js";
 import { QiMonitor } from "./qi/qi-monitor.js";
-import { configuredQiScalarBound } from "./qi/qi-bounds.js";
-import type { RawTileInput } from "./qi/qi-saturation.js";
+import { configuredQiScalarBound, qiBound_Jm3 } from "./qi/qi-bounds.js";
+import { buildWindow, type RawTileInput } from "./qi/qi-saturation.js";
 import { updatePipelineQiTiles, getLatestQiTileStats } from "./qi/pipeline-qi-stream.js";
 
 export type MutableDynamicConfig = DynamicConfigLike;
@@ -73,6 +81,17 @@ export interface SweepHistoryTotals {
   dropped: number;
 }
 
+export interface StrobeDutySummary {
+  dutyAvg: number;
+  windowMs: number;
+  samples: number;
+  lastSampleAt: number;
+  lastDuty: number;
+  sLive?: number;
+  sTotal?: number;
+  source?: string;
+}
+
 export interface HardwareTruthSnapshot {
   lastSweepRow?: VacuumGapSweepRow;
   totals?: SweepHistoryTotals;
@@ -80,6 +99,7 @@ export interface HardwareTruthSnapshot {
   sectorState?: (HardwareSectorState & { updatedAt?: number }) | null;
   qiSample?: (HardwareQiSample & { updatedAt?: number }) | null;
   spectrumFrame?: (HardwareSpectrumFrame & { updatedAt?: number }) | null;
+  strobeDuty?: StrobeDutySummary | null;
 }
 
 export interface ScheduleSweepRequest {
@@ -98,11 +118,34 @@ const parseEnvNumber = (value: string | undefined, fallback: number): number => 
   return Number.isFinite(n) ? n : fallback;
 };
 
+export const TAU_LC_UNIT_DRIFT_LIMIT = 50; // reject >50x unit drift (ms vs µs)
+
+export function computeTauLcMsFromHull(hull?: {
+  Lx_m?: number;
+  Ly_m?: number;
+  Lz_m?: number;
+  wallThickness_m?: number | null;
+} | null): number | null {
+  if (!hull) return null;
+  const dims = [hull.Lx_m, hull.Ly_m, hull.Lz_m]
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v > 0);
+  const longest = dims.length ? Math.max(...dims) : null;
+  const wall = Number(hull.wallThickness_m);
+  const path_m = longest && longest > 0
+    ? longest
+    : (Number.isFinite(wall) && wall > 0 ? wall : null);
+  if (!(path_m && path_m > 0)) return null;
+  return (path_m / C) * 1e3;
+}
+
 const DEFAULT_QI_TAU_MS = parseEnvNumber(process.env.QI_TAU_MS, 5);
 const DEFAULT_QI_GUARD = parseEnvNumber(process.env.QI_GUARD_FRAC ?? process.env.QI_GUARD, 0.05);
 const DEFAULT_QI_DT_MS = parseEnvNumber(process.env.QI_DT_MS, 2);
-const DEFAULT_QI_BOUND_SCALAR = configuredQiScalarBound();
+const DEFAULT_QI_FIELD = (process.env.QI_FIELD_TYPE as QiFieldType | undefined) ?? "em";
 const DEFAULT_NEGATIVE_FRACTION = 0.4;
+const DEFAULT_QI_INTEREST_RATE = parseEnvNumber(process.env.QI_INTEREST_RATE, 0.2);
+const DEFAULT_QI_INTEREST_WINDOW_MULT = parseEnvNumber(process.env.QI_INTEREST_WINDOW_MULT, 2);
 const DEFAULT_PUMP_FREQ_LIMIT_GHZ = Math.max(
   0.01,
   Math.min(parseEnvNumber(process.env.PUMP_FREQ_LIMIT_GHZ, 120), 1_000),
@@ -113,7 +156,17 @@ const DEFAULT_QI_SETTINGS: QiSettings = {
   tau_s_ms: DEFAULT_QI_TAU_MS,
   observerId: 'ship',
   guardBand: DEFAULT_QI_GUARD,
+  fieldType: DEFAULT_QI_FIELD,
 };
+const DEFAULT_QI_BOUND_SCALAR = configuredQiScalarBound({
+  tau_s_ms: DEFAULT_QI_SETTINGS.tau_s_ms,
+  fieldType: DEFAULT_QI_SETTINGS.fieldType,
+  kernelType: DEFAULT_QI_SETTINGS.sampler,
+});
+const QI_POLICY_MAX_ZETA = Number.isFinite(Number(process.env.QI_POLICY_MAX_ZETA))
+  ? Math.max(1e-12, Number(process.env.QI_POLICY_MAX_ZETA))
+  : 1;
+const QI_POLICY_ENFORCE = (process.env.QI_POLICY_ENFORCE ?? "1") !== "0";
 
 const QI_STREAM_GRID_MIN = Math.max(4, Math.floor(parseEnvNumber(process.env.QI_STREAM_GRID_MIN, 8)));
 const QI_STREAM_GRID_MAX = Math.max(
@@ -205,7 +258,7 @@ function rhoEllipsoid(p: [number, number, number], ax: HullAxes) {
 }
 
 function nEllipsoid(p: [number, number, number], ax: HullAxes): [number, number, number] {
-  // ∇(x^2/a^2 + y^2/b^2 + z^2/c^2) normalized
+  // Gêç(x^2/a^2 + y^2/b^2 + z^2/c^2) normalized
   const nx = p[0] / (ax.a * ax.a);
   const ny = p[1] / (ax.b * ax.b);
   const nz = p[2] / (ax.c * ax.c);
@@ -227,7 +280,7 @@ export interface FieldSample {
   n: [number, number, number];   // outward normal
   sgn: number;                   // sector sign (+/-)
   disp: number;                  // scalar displacement magnitude used
-  dA?: number;                   // proper area element at sample (m^2) — from metric
+  dA?: number;                   // proper area element at sample (m^2) GÇö from metric
 }
 
 export interface FieldSampleBuffer {
@@ -286,10 +339,10 @@ export interface FieldRequest {
   nPhi?: number;     // default 32
   shellOffset?: number; // meters; 0 = on shell, >0 outside, <0 inside (default 0)
   // physics
-  wallWidth_m?: number; // bell width wρ in meters (default from sag_nm)
+  wallWidth_m?: number; // bell width w-ü in meters (default from sag_nm)
   sectors?: number;     // sector count (default state.sectorCount)
-  split?: number;       // (+)/(−) split index (default floor(sectors/2))
-  clamp?: Partial<SampleClamp>; // ⬅️ new, optional
+  split?: number;       // (+)/(GêÆ) split index (default floor(sectors/2))
+  clamp?: Partial<SampleClamp>; // G¼àn+Å new, optional
 }
 
 export interface TileParams {
@@ -303,14 +356,71 @@ export interface TileParams {
   sectorCount?: number;     // Number of sectors for strobing
 }
 
+export type QuantumInterestBook = {
+  neg_Jm3: number;        // Scheduled negative burst (window-normalized)
+  pos_Jm3: number;        // Scheduled positive payback (window-normalized)
+  debt_Jm3: number;       // Required positive overcompensation (with interest)
+  credit_Jm3: number;     // Available positive energy scheduled in window
+  margin_Jm3: number;     // credit - debt (>=0 means paid)
+  netCycle_Jm3: number;   // pos - neg over a full cycle (without interest)
+  window_ms: number;      // payback window allocated
+  rate: number;           // interest fraction applied to debt
+};
+
+export interface MechanicalFeasibility {
+  requestedGap_nm: number;
+  requestedStroke_pm: number;
+  recommendedGap_nm: number;
+  minGap_nm: number;
+  maxStroke_pm: number;
+  casimirPressure_Pa: number;
+  electrostaticPressure_Pa: number;
+  restoringPressure_Pa: number;
+  roughnessGuard_nm: number;
+  margin_Pa: number;
+  feasible: boolean;
+  strokeFeasible: boolean;
+  constrainedGap_nm?: number;
+  unattainable?: boolean;
+  note?: string;
+  sweep?: Array<{ gap_nm: number; margin_Pa: number; feasible: boolean }>;
+}
+
+export type MechanicalGuard = {
+  qMechDemand: number;    // stroke factor needed to hit target power (may exceed 1)
+  qMechApplied: number;   // stroke factor actually applied (clamped to safety band)
+  mechSpoilage: number;   // demand/applied: >=1 shows how far past the safe limit we are
+  pCap_W: number;         // ship-average power deliverable at q_mech = 1
+  pApplied_W: number;     // ship-average power with the applied q_mech
+  pShortfall_W: number;   // max(0, P_target - pApplied_W)
+  status: 'ok' | 'saturated' | 'fail';
+};
+
+export type SurfaceAreaEstimate = {
+  value: number; // preferred estimate (metric quadrature)
+  uncertainty: number; // +- absolute m^2
+  band: { min: number; max: number };
+  components: {
+    metric: number;
+    monteCarlo?: { value: number; stderr: number; samples: number };
+    prolateApprox?: number | null;
+    oblateApprox?: number | null;
+  };
+};
+
 export interface EnergyPipelineState {
   // Input parameters
   tileArea_cm2: number;
+  tilePitch_m?: number;
   shipRadius_m: number;        // Legacy fallback for field sampler when hull geometry unavailable
   gap_nm: number;
   sag_nm: number;
   temperature_K: number;
   modulationFreq_GHz: number;
+  couplingChiOverride?: number;       // manual chi override (0..1)
+  couplingSupercellTiles?: number;    // tiles in measured supercell
+  couplingSupercellEnergy_J?: number; // measured supercell energy
+  couplingFrameFill?: number;         // packing/coverage fraction for coupling calc
 
   // Hull geometry
   hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number }; // Paper-authentic stack ~1 m; default auto-tunes to modulation dwell
@@ -332,9 +442,21 @@ export interface EnergyPipelineState {
   QL?: number;
   gammaVanDenBroeck: number;
   exoticMassTarget_kg: number;  // User-configurable exotic mass target
+  casimirModel?: MaterialModel;
+  materialProps?: MaterialProps;
 
   // Calculated values
   U_static: number;         // Static Casimir energy per tile
+  U_static_nominal?: number;
+  U_static_realistic?: number;
+  U_static_uncoupled?: number;
+  U_static_band?: { min: number; max: number };
+  casimirRatio?: number;
+  lifshitzSweep?: Array<{ gap_nm: number; ratio: number }>;
+  couplingChi?: number;
+  couplingMethod?: string;
+  couplingNote?: string;
+  supercellRatio?: number;
   U_geo: number;            // Geometry-amplified energy
   U_Q: number;              // Q-enhanced energy
   U_cycle: number;          // Duty-cycled energy
@@ -343,11 +465,38 @@ export interface EnergyPipelineState {
   M_exotic: number;         // Exotic mass generated
   M_exotic_raw: number;     // Raw physics exotic mass (before calibration)
   massCalibration: number;  // Mass calibration factor
+  rho_static?: number;      // Static Casimir energy density (J/m^3)
+  rho_inst?: number;        // Instantaneous (on-window) energy density (J/m^3)
+  rho_avg?: number;         // Cycle-averaged energy density (J/m^3)
+  U_static_total?: number;  // Aggregate static energy across hull (N_tiles * U_static)
+  U_static_total_band?: { min: number; max: number };
+  gammaChain?: {
+    geo_cubed?: number;
+    qGain?: number;
+    pocketCompression?: number;
+    dutyEffective?: number;
+    qSpoiling?: number;
+    note?: string;
+  };
+  gammaVanDenBroeckGuard?: {
+    limit: number;
+    greenBand: { min: number; max: number };
+    pocketRadius_m: number;
+    pocketThickness_m: number;
+    planckMargin: number;
+    admissible: boolean;
+    reason: string;
+    requested?: number;
+    targetHit?: boolean;
+    targetShortfall?: number;
+  };
   TS_ratio: number;         // Time-scale separation ratio (conservative)
   TS_long?: number;         // Time-scale using longest dimension
   TS_geom?: number;         // Time-scale using geometric mean
   zeta: number;             // Quantum inequality parameter
+  hullArea?: SurfaceAreaEstimate; // Detailed surface area estimate with uncertainty
   N_tiles: number;          // Total number of tiles
+  N_tiles_band?: { min: number; max: number }; // Census range propagated from geometry uncertainty
   hullArea_m2?: number;     // Hull surface area (for Bridge display)
 
   // Sector management
@@ -368,6 +517,10 @@ export interface EnergyPipelineState {
   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
   qi?: QiStats;
   qiBadge?: 'ok' | 'near' | 'violation';
+  clocking?: ClockingSnapshot;
+  clockingProvenance?: "derived" | "hardware" | "simulated";
+  mechanical?: MechanicalFeasibility;
+  mechGuard?: MechanicalGuard;
 
   // Strobing and timing properties
   strobeHz?: number;
@@ -375,6 +528,7 @@ export interface EnergyPipelineState {
   dutyBurst?: number;
   localBurstFrac?: number;
   dutyEffective_FR?: number;
+  dutyMeasuredFR?: number;
   phase01?: number;
   pumpPhase_deg?: number;
   tauLC_ms?: number;
@@ -406,25 +560,26 @@ export interface EnergyPipelineState {
   hardwareTruth?: HardwareTruthSnapshot | null;
   sweep?: SweepRuntime;
   gateAnalytics?: GateAnalytics | null;
+  qiInterest?: QuantumInterestBook | null;
 }
 
 // Physical constants
-const HBAR_C = HBAR * C;             // ℏc ≈ 3.16152677e-26 [J·m] for Casimir calculations
+const HBAR_C = HBAR * C;             // GäÅc Gëê 3.16152677e-26 [J-+m] for Casimir calculations
 const NM_TO_M = 1e-9;
 const CM2_TO_M2 = 1e-4;
 
-// ── Paper-backed constants (consolidated physics)
+// GöÇGöÇ Paper-backed constants (consolidated physics)
 /**
  * TheoryRefs:
  *  - ford-roman-qi-1995: derives dutyEffectiveFR ceiling (tau/K)
  */
 const TOTAL_SECTORS    = 400;
-const BURST_DUTY_LOCAL = 0.01;   // 10 µs / 1 ms
+const BURST_DUTY_LOCAL = 0.01;   // 10 -¦s / 1 ms
 const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
 const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
-const RADIAL_LAYERS    = 10;     // surface × radial lattice
+const RADIAL_LAYERS    = 10;     // surface +ù radial lattice
 
-// Public clamp constants for display-only symmetry (do not affect θ/mass)
+// Public clamp constants for display-only symmetry (do not affect ++/mass)
 export const SAMPLE_CLAMP = { maxPush: 0.10, softness: 0.60 } as const;
 export type SampleClamp = typeof SAMPLE_CLAMP;
 
@@ -437,6 +592,20 @@ export const SWEEP_HISTORY_MAX = 2000;
 const sweepHistory: VacuumGapSweepRow[] = [];
 let sweepHistoryTotal = 0;
 let sweepHistoryDropped = 0;
+const PLANCK_LENGTH_M = 1.616255e-35; // m
+const PLANCK_SAFETY_MULT = 1e6;       // keep pockets many orders above l_P
+const POCKET_WALL_FLOOR_FRAC = 0.01;  // require VdB pocket >1% of wall thickness
+
+// Mechanical feasibility defaults (nm-scale gap over 25 cm^2 plate)
+const EPSILON_0 = 8.8541878128e-12; // F/m
+const MECH_TILE_THICKNESS_M = parseEnvNumber(process.env.MECH_TILE_THICKNESS_M, 1e-3); // 1 mm slab unless overridden
+const MECH_ELASTIC_MODULUS_PA = parseEnvNumber(process.env.MECH_YOUNG_MODULUS_PA, 170e9); // silicon-ish stiffness
+const MECH_POISSON = parseEnvNumber(process.env.MECH_POISSON_RATIO, 0.27);
+const MECH_DEFLECTION_COEFF = 0.0138; // clamped square plate under uniform load (Roark)
+const MECH_ROUGHNESS_RMS_NM = parseEnvNumber(process.env.MECH_ROUGHNESS_RMS_NM, 0.2);
+const MECH_ROUGHNESS_SIGMA = parseEnvNumber(process.env.MECH_ROUGHNESS_SIGMA, 5); // 5σ separation guard
+const MECH_PATCH_V_RMS = parseEnvNumber(process.env.MECH_PATCH_V_RMS, 0.05); // volts (50 mV patch noise)
+const MECH_GAP_SWEEP = { min_nm: 0.5, max_nm: 200, step_nm: 0.5 } as const;
 
 const ACTIVE_SLEW_LIMITS = {
   gaps: 12,
@@ -526,6 +695,50 @@ function pickRepresentativeValues(values: number[], limit: number): number[] {
   return result.slice(0, limit);
 }
 
+function guardGammaVdB(params: {
+  hull: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number };
+  gammaRequested: number;
+}) {
+  const halfAxes = [
+    Math.max(1e-9, params.hull.Lx_m / 2),
+    Math.max(1e-9, params.hull.Ly_m / 2),
+    Math.max(1e-9, params.hull.Lz_m / 2),
+  ];
+  const minRadius = Math.min(...halfAxes);
+  const wall = Math.max(
+    PLANCK_LENGTH_M,
+    Number.isFinite(params.hull.wallThickness_m)
+      ? (params.hull.wallThickness_m as number)
+      : DEFAULT_WALL_THICKNESS_M,
+  );
+  const pocketFloor = Math.max(
+    wall * POCKET_WALL_FLOOR_FRAC,
+    PLANCK_LENGTH_M * PLANCK_SAFETY_MULT,
+  );
+  const limitWall = minRadius / pocketFloor;
+  const limitPlanck = minRadius / (PLANCK_LENGTH_M * PLANCK_SAFETY_MULT);
+  const limit = Math.max(1, Math.min(limitWall, limitPlanck, 1e16));
+  const gammaClamped = Math.max(0, Math.min(params.gammaRequested, limit));
+  const pocketRadius_m = minRadius / Math.max(1, gammaClamped);
+  const pocketThickness_m = wall / Math.max(1, gammaClamped);
+  const planckMargin = pocketRadius_m / PLANCK_LENGTH_M;
+  const admissible = params.gammaRequested <= limit;
+  const reason = `γ_VdB bounded by pocket floor ${pocketFloor.toExponential(
+    2,
+  )} m (wall=${wall.toExponential(2)} m, minRadius=${minRadius.toExponential(2)} m)`;
+  return {
+    gammaClamped,
+    limit,
+    admissible,
+    greenBand: { min: 1, max: limit },
+    pocketRadius_m,
+    pocketThickness_m,
+    planckMargin,
+    requested: params.gammaRequested,
+    reason,
+  };
+}
+
 export function appendSweepRows(rows: VacuumGapSweepRow[]) {
   if (!rows.length) return;
   sweepHistoryTotal += rows.length;
@@ -598,6 +811,99 @@ function dedupeNumericList(values: number[], digits = 4): number[] {
     unique.add(rounded);
   }
   return Array.from(unique).sort((a, b) => a - b);
+}
+
+function mechanicalFeasibility(
+  state: EnergyPipelineState,
+  tileArea_m2: number,
+): MechanicalFeasibility {
+  const requestedGap_nm = Number.isFinite(state.gap_nm) ? Number(state.gap_nm) : 1;
+  const requestedStroke_pm = Number.isFinite((state as any).strokeAmplitude_pm)
+    ? Number((state as any).strokeAmplitude_pm)
+    : Number.isFinite((state as any).strokeAmplitudePm)
+      ? Number((state as any).strokeAmplitudePm)
+      : Number.isFinite(state.dynamicConfig?.strokeAmplitudePm)
+        ? Number(state.dynamicConfig?.strokeAmplitudePm)
+        : 0;
+
+  const area_m2 = Math.max(1e-9, tileArea_m2);
+  const span_m = Math.sqrt(area_m2); // treat tile as square plate for stiffness budget
+  const gap_m = Math.max(1e-12, requestedGap_nm * NM_TO_M);
+  const stroke_m = Math.max(0, requestedStroke_pm * 1e-12);
+  const roughnessGuard_nm = Math.max(0, MECH_ROUGHNESS_RMS_NM * MECH_ROUGHNESS_SIGMA);
+  const roughnessGuard_m = roughnessGuard_nm * NM_TO_M;
+
+  const D =
+    MECH_ELASTIC_MODULUS_PA *
+    Math.pow(Math.max(1e-9, MECH_TILE_THICKNESS_M), 3) /
+    (12 * (1 - MECH_POISSON * MECH_POISSON));
+
+  const casimirPressure_Pa = (Math.PI * Math.PI * HBAR_C) / (240 * Math.pow(gap_m, 4));
+  const electrostaticPressure_Pa = 0.5 * EPSILON_0 * Math.pow(MECH_PATCH_V_RMS / gap_m, 2);
+  const totalLoad_Pa = casimirPressure_Pa + electrostaticPressure_Pa;
+
+  const clearance_m = Math.max(0, gap_m - roughnessGuard_m - stroke_m);
+  const restoringPressure_Pa =
+    clearance_m > 0 && D > 0
+      ? (D * clearance_m) / (MECH_DEFLECTION_COEFF * Math.pow(span_m, 4))
+      : 0;
+  const margin_Pa = restoringPressure_Pa - totalLoad_Pa;
+
+  const deflectionForLoad_m =
+    (totalLoad_Pa * MECH_DEFLECTION_COEFF * Math.pow(span_m, 4)) / Math.max(D, 1e-30);
+  const strokeBudget_m = Math.max(0, gap_m - roughnessGuard_m - deflectionForLoad_m);
+  const maxStroke_pm = strokeBudget_m * 1e12;
+  const strokeFeasible = requestedStroke_pm <= maxStroke_pm + 1e-9;
+  const sweep: NonNullable<MechanicalFeasibility["sweep"]> = [];
+  for (
+    let g = MECH_GAP_SWEEP.min_nm;
+    g <= MECH_GAP_SWEEP.max_nm + 1e-9;
+    g += MECH_GAP_SWEEP.step_nm
+  ) {
+    const g_m = Math.max(1e-12, g * NM_TO_M);
+    const cas = (Math.PI * Math.PI * HBAR_C) / (240 * Math.pow(g_m, 4));
+    const elec = 0.5 * EPSILON_0 * Math.pow(MECH_PATCH_V_RMS / g_m, 2);
+    const clearance = Math.max(0, g_m - roughnessGuard_m - stroke_m);
+    const restore =
+      clearance > 0 && D > 0
+        ? (D * clearance) / (MECH_DEFLECTION_COEFF * Math.pow(span_m, 4))
+        : 0;
+    const m = restore - (cas + elec);
+    sweep.push({ gap_nm: g, margin_Pa: m, feasible: clearance > 0 && m > 0 });
+  }
+
+  const firstFeasible = sweep.find((row) => row.feasible);
+  const minGap_nm = Math.max(
+    roughnessGuard_nm,
+    firstFeasible ? firstFeasible.gap_nm : requestedGap_nm,
+  );
+  const recommendedGap_nm = Math.max(requestedGap_nm, minGap_nm);
+
+  let note: string | undefined;
+  if (clearance_m <= 0) {
+    note = "Stroke + roughness exceed available gap";
+  } else if (margin_Pa <= 0) {
+    note = "Casimir + patch load overwhelms restoring stiffness";
+  } else if (!strokeFeasible) {
+    note = "Commanded stroke exceeds stiffness budget";
+  }
+
+  return {
+    requestedGap_nm,
+    requestedStroke_pm,
+    recommendedGap_nm,
+    minGap_nm,
+    maxStroke_pm,
+    casimirPressure_Pa,
+    electrostaticPressure_Pa,
+    restoringPressure_Pa,
+    roughnessGuard_nm,
+    margin_Pa,
+    feasible: clearance_m > 0 && margin_Pa > 0,
+    strokeFeasible,
+    note,
+    sweep,
+  };
 }
 
 function toSweepPoint(row: VacuumGapSweepRow): SweepPoint {
@@ -1206,10 +1512,10 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
   return allRows;
 }
 
-// ── Metric imports (induced surface metric on hull)
+// GöÇGöÇ Metric imports (induced surface metric on hull)
 import { firstFundamentalForm } from "../src/metric.js";
 
-// --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and γ_VdB for mass) ---
+// --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +¦_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
   hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
@@ -1299,8 +1605,63 @@ export const MODE_CONFIGS = {
   }
 };
 
+const AREA_MONTE_CARLO_SAMPLES = 16384;
+
+// Closed-form elliptic-integral approximations for axisymmetric cases (prolate/oblate)
+function surfaceAreaProlate(aEq: number, cPol: number): number | null {
+  if (!(aEq > 0 && cPol > 0)) return null;
+  const e2 = 1 - (aEq * aEq) / (cPol * cPol);
+  const e = Math.sqrt(Math.max(0, e2));
+  if (e < 1e-12) return 4 * Math.PI * aEq * aEq; // sphere fallback
+  return 2 * Math.PI * aEq * aEq * (1 + (cPol / (aEq * e)) * Math.asin(e));
+}
+
+function surfaceAreaOblate(aEq: number, cPol: number): number | null {
+  if (!(aEq > 0 && cPol > 0)) return null;
+  const e2 = 1 - (cPol * cPol) / (aEq * aEq);
+  const e = Math.sqrt(Math.max(0, e2));
+  if (e < 1e-12) return 4 * Math.PI * aEq * aEq;
+  const eClamped = Math.min(1 - 1e-12, e);
+  const atanhE = 0.5 * Math.log((1 + eClamped) / (1 - eClamped));
+  return 2 * Math.PI * aEq * aEq * (1 + ((1 - e * e) / eClamped) * atanhE);
+}
+
+function surfaceAreaAxisymmetricApproximations(axes: HullAxes) {
+  const sorted = [Math.abs(axes.a), Math.abs(axes.b), Math.abs(axes.c)].sort((x, y) => x - y);
+  const [r0, r1, r2] = sorted; // r0 <= r1 <= r2
+  const eqProlate = Math.sqrt(r0 * r1);
+  const eqOblate = Math.sqrt(r1 * r2);
+  const prolate = r2 > eqProlate ? surfaceAreaProlate(eqProlate, r2) : surfaceAreaProlate(eqProlate, eqProlate);
+  const oblate = r0 < eqOblate ? surfaceAreaOblate(eqOblate, r0) : surfaceAreaOblate(eqOblate, eqOblate);
+  return { prolate, oblate };
+}
+
+// High-res Monte-Carlo cross-check over (theta, phi) parameter space
+function surfaceAreaMonteCarlo(axes: HullAxes, samples = AREA_MONTE_CARLO_SAMPLES) {
+  const thetaSpan = 2 * Math.PI;
+  const eps = 1e-6; // avoid poles where parameterization becomes singular
+  const phiMin = -Math.PI / 2 + eps;
+  const phiMax = Math.PI / 2 - eps;
+  const phiSpan = phiMax - phiMin;
+  let sum = 0;
+  let sumSq = 0;
+  for (let i = 0; i < samples; i++) {
+    const theta = Math.random() * thetaSpan;
+    const phi = phiMin + Math.random() * phiSpan;
+    const { dA } = firstFundamentalForm(axes.a, axes.b, axes.c, theta, phi);
+    sum += dA;
+    sumSq += dA * dA;
+  }
+  const mean = sum / Math.max(samples, 1);
+  const variance = Math.max(0, sumSq / Math.max(samples, 1) - mean * mean);
+  const stderr = Math.sqrt(variance / Math.max(samples, 1));
+  const area = mean * thetaSpan * phiSpan;
+  return { value: area, stderr: stderr * thetaSpan * phiSpan, samples };
+}
+
 /** Ellipsoid surface area via induced metric integral (replaces Knud-Thomsen).
  *  a = Lx/2, b = Ly/2, c = Lz/2 (meters). Numerical quadrature over (theta, phi).
+ *  Returns value +- uncertainty (max deviation across metric, Monte-Carlo, and axisymmetric approximations).
  */
 function surfaceAreaEllipsoidMetric(
   Lx_m: number,
@@ -1308,34 +1669,64 @@ function surfaceAreaEllipsoidMetric(
   Lz_m: number,
   nTheta = 256,
   nPhi = 128,
-): number {
-  const a = Lx_m / 2;
-  const b = Ly_m / 2;
-  const c = Lz_m / 2;
+): SurfaceAreaEstimate {
+  const axes: HullAxes = { a: Lx_m / 2, b: Ly_m / 2, c: Lz_m / 2 };
   const dTheta = (2 * Math.PI) / nTheta;
-  const dPhi = Math.PI / (nPhi - 1); // phi in [-pi/2, pi/2]
-  let area = 0;
+  const dPhi = Math.PI / Math.max(1, nPhi - 1); // phi in [-pi/2, pi/2]
+  let areaMetric = 0;
   for (let i = 0; i < nTheta; i++) {
     const theta = i * dTheta;
     for (let j = 0; j < nPhi; j++) {
       const phi = -Math.PI / 2 + j * dPhi;
-      const { dA } = firstFundamentalForm(a, b, c, theta, phi);
-      area += dA * dTheta * dPhi;
+      const { dA } = firstFundamentalForm(axes.a, axes.b, axes.c, theta, phi);
+      areaMetric += dA * dTheta * dPhi;
     }
   }
-  return area;
+
+  const mc = surfaceAreaMonteCarlo(axes);
+  const approx = surfaceAreaAxisymmetricApproximations(axes);
+
+  const deviations: number[] = [];
+  if (Number.isFinite(mc.value)) deviations.push(Math.abs(mc.value - areaMetric));
+  if (Number.isFinite(approx.prolate ?? NaN)) deviations.push(Math.abs((approx.prolate as number) - areaMetric));
+  if (Number.isFinite(approx.oblate ?? NaN)) deviations.push(Math.abs((approx.oblate as number) - areaMetric));
+
+  const maxDeviation = deviations.length ? Math.max(...deviations) : 0;
+  const sigmaMc = Number.isFinite(mc.stderr) ? Math.abs(mc.stderr) : 0;
+  const uncertainty = Math.max(areaMetric * 1e-6, maxDeviation, sigmaMc); // tiny floor to avoid zero band
+  const band = {
+    min: Math.max(0, areaMetric - uncertainty),
+    max: areaMetric + uncertainty,
+  };
+
+  return {
+    value: areaMetric,
+    uncertainty,
+    band,
+    components: {
+      metric: areaMetric,
+      monteCarlo: { value: mc.value, stderr: mc.stderr, samples: mc.samples },
+      prolateApprox: approx.prolate,
+      oblateApprox: approx.oblate,
+    },
+  };
 }
 
 // Initialize pipeline state with defaults
 export function initializePipelineState(): EnergyPipelineState {
   return {
     // Needle Hull full scale defaults for HELIX-CORE (paper-authentic)
-    tileArea_cm2: 25,  // 5×5 cm tiles (was 5 cm², now 25 cm²)
+    tileArea_cm2: 25,  // 5+ù5 cm tiles (was 5 cm-¦, now 25 cm-¦)
+    tilePitch_m: Math.sqrt((25 * CM2_TO_M2) / PAPER_GEO.PACKING),
     shipRadius_m: 86.5,
     gap_nm: 1.0,
     sag_nm: 16,
     temperature_K: 20,
     modulationFreq_GHz: DEFAULT_MODULATION_FREQ_GHZ,
+    couplingFrameFill: PAPER_GEO.PACKING,
+    couplingChiOverride: undefined,
+    couplingSupercellTiles: undefined,
+    couplingSupercellEnergy_J: undefined,
 
     // Hull geometry (actual 1.007 km needle dimensions)
     hull: {
@@ -1359,11 +1750,22 @@ export function initializePipelineState(): EnergyPipelineState {
     gammaGeo: 26,
     qMechanical: 1,               // Set to 1 (was 5e4) - power knob only
     qCavity: PAPER_Q.Q_BURST,             // Use paper-backed Q_BURST 
-    gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB, // Use paper-backed γ_VdB seed
+    gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB, // Use paper-backed +¦_VdB seed
     exoticMassTarget_kg: 1405,    // Reference target (not a lock)
+    casimirModel: 'ideal_retarded',
 
     // Initial calculated values
     U_static: 0,
+    U_static_nominal: 0,
+    U_static_realistic: 0,
+    U_static_uncoupled: 0,
+    U_static_band: { min: 0, max: 0 },
+    casimirRatio: 1,
+    lifshitzSweep: [],
+    couplingChi: 1,
+    couplingMethod: 'analytic',
+    couplingNote: '',
+    supercellRatio: 1,
     U_geo: 0,
     U_Q: 0,
     U_cycle: 0,
@@ -1401,6 +1803,7 @@ export function initializePipelineState(): EnergyPipelineState {
       sectorState: null,
       qiSample: null,
       spectrumFrame: null,
+      strobeDuty: null,
     },
     gateAnalytics: null,
     sweep: {
@@ -1442,23 +1845,144 @@ export async function calculateEnergyPipeline(
     Lz_m: state.shipRadius_m * 2,
   };
   // Proper surface area from induced metric (ellipsoid shell)
-  const hullArea_m2 = surfaceAreaEllipsoidMetric(
-    hullDims.Lx_m, hullDims.Ly_m, hullDims.Lz_m
-  );
+  const hullArea = surfaceAreaEllipsoidMetric(hullDims.Lx_m, hullDims.Ly_m, hullDims.Lz_m);
+  const hullArea_m2 = hullArea.value;
+  const hullAreaBand = hullArea.band ?? {
+    min: Math.max(0, hullArea_m2 - Math.abs(hullArea.uncertainty ?? 0)),
+    max: hullArea_m2 + Math.abs(hullArea.uncertainty ?? 0),
+  };
 
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
+  state.hullArea = hullArea;
 
-  // 1) N_tiles — paper-authentic tile census
+  // 1) N_tiles GÇö paper-authentic tile census
   const surfaceTiles = Math.floor(hullArea_m2 / tileArea_m2);
+  const surfaceTilesMin = Math.floor(hullAreaBand.min / tileArea_m2);
+  const surfaceTilesMax = Math.ceil(hullAreaBand.max / tileArea_m2);
+  const layerPacking = PAPER_GEO.RADIAL_LAYERS * PAPER_GEO.PACKING;
+  const tilesNominal = surfaceTiles * layerPacking;
+  const tilesBand = {
+    min: Math.max(1, Math.floor(surfaceTilesMin * layerPacking)),
+    max: Math.max(1, Math.ceil(surfaceTilesMax * layerPacking)),
+  };
   // Use centralized PAPER_GEO constants
-  state.N_tiles = Math.max(1, Math.round(surfaceTiles * PAPER_GEO.RADIAL_LAYERS * PAPER_GEO.PACKING));
+  state.N_tiles = Math.max(1, Math.round(tilesNominal));
+  state.N_tiles_band = tilesBand;
 
   // Surface packing factor for future geometry modules to replace fudge
   (state as any).__packing = PAPER_GEO.PACKING;
+  (state as any).tileArea_m2 = tileArea_m2;
+  (state as any).hullArea_band = hullAreaBand;
 
-  // Step 1: Static Casimir energy
-  state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
+  // Step 1: Static Casimir energy with coupling/packing correction
+  const frameFill = Number.isFinite(state.couplingFrameFill)
+    ? Math.max(0, Math.min(1, state.couplingFrameFill as number))
+    : PAPER_GEO.PACKING;
+  state.couplingFrameFill = frameFill;
+
+  const tilePitch_m = Number.isFinite(state.tilePitch_m) && (state.tilePitch_m as number) > 0
+    ? (state.tilePitch_m as number)
+    : Math.sqrt(tileArea_m2 / Math.max(frameFill, 1e-9));
+  state.tilePitch_m = tilePitch_m;
+
+  // Mechanical feasibility budget (stiction / buckling guard)
+  const requestedGap_nm = Number.isFinite(state.gap_nm) ? Number(state.gap_nm) : 1;
+  state.gap_nm = requestedGap_nm;
+  const mech = mechanicalFeasibility(state, tileArea_m2);
+  const constrainedGap_nm = Number.isFinite(mech.recommendedGap_nm)
+    ? Math.max(requestedGap_nm, mech.recommendedGap_nm)
+    : requestedGap_nm;
+  state.gap_nm = constrainedGap_nm;
+  (state as any).mechanical = {
+    ...mech,
+    constrainedGap_nm,
+    unattainable:
+      mech.recommendedGap_nm > requestedGap_nm + 1e-9 ||
+      !mech.feasible ||
+      !mech.strokeFeasible,
+    requestedGap_nm,
+  };
+  (state as any).strokeAmplitude_pm = mech.requestedStroke_pm;
+
+  const tileRadius_m = Math.sqrt(tileArea_m2 / Math.PI);
+  const couplingSpec = {
+    chi: Number.isFinite(state.couplingChiOverride)
+      ? Math.max(0, Math.min(1, state.couplingChiOverride as number))
+      : undefined,
+    pitch_m: tilePitch_m,
+    frameFill,
+    supercell:
+      Number.isFinite(state.couplingSupercellTiles) || Number.isFinite(state.couplingSupercellEnergy_J)
+        ? {
+            tiles: Number.isFinite(state.couplingSupercellTiles)
+              ? Number(state.couplingSupercellTiles)
+              : undefined,
+            energy_J: Number.isFinite(state.couplingSupercellEnergy_J)
+              ? Number(state.couplingSupercellEnergy_J)
+              : undefined,
+          }
+        : undefined,
+  };
+
+  try {
+    const casimir = calculateCasimirEnergy({
+      geometry: 'parallel_plate',
+      gap: state.gap_nm,
+      radius: tileRadius_m * 1e6, // µm
+      sagDepth: state.sag_nm,
+      temperature: state.temperature_K,
+      materialModel: state.casimirModel ?? 'ideal_retarded',
+      materialProps: state.materialProps,
+      material: 'PEC',
+      moduleType: 'static',
+      coupling: couplingSpec,
+    } as any);
+
+    state.casimirModel = casimir.model ?? state.casimirModel;
+    state.U_static_nominal = casimir.nominalEnergy ?? casimir.totalEnergy;
+    state.U_static_realistic = casimir.realisticEnergy ?? casimir.totalEnergy;
+    state.U_static_uncoupled = casimir.uncoupledEnergy ?? state.U_static_realistic ?? casimir.totalEnergy;
+    state.U_static_band = casimir.energyBand ?? {
+      min: state.U_static_realistic ?? casimir.totalEnergy,
+      max: state.U_static_realistic ?? casimir.totalEnergy,
+    };
+    state.casimirRatio = casimir.modelRatio ?? 1;
+    state.lifshitzSweep = casimir.lifshitzSweep ?? state.lifshitzSweep;
+    state.couplingChi = casimir.couplingChi ?? couplingSpec.chi ?? state.couplingChi ?? 1;
+    state.couplingMethod = casimir.couplingMethod ?? state.couplingMethod;
+    state.couplingNote = casimir.couplingNote ?? state.couplingNote;
+    state.supercellRatio = casimir.supercellRatio ?? state.supercellRatio;
+    state.U_static = state.U_static_realistic ?? casimir.totalEnergy;
+  } catch (err) {
+    if (DEBUG_PIPE) console.warn("[PIPELINE] Casimir material model fell back to PEC", err);
+    const fallback = calculateStaticCasimir(state.gap_nm, tileArea_m2);
+    const chi = Number.isFinite(couplingSpec.chi) ? (couplingSpec.chi as number) : 1;
+    state.U_static = fallback * chi;
+    state.U_static_nominal = fallback;
+    state.U_static_realistic = fallback * chi;
+    state.U_static_uncoupled = fallback;
+    state.U_static_band = { min: state.U_static, max: state.U_static };
+    state.casimirRatio = 1;
+    state.couplingChi = chi;
+    state.couplingMethod = 'fallback';
+    state.supercellRatio = chi;
+  }
+
+  // Aggregate static energy band with geometry uncertainty propagated through tile census
+  const perTileBand = state.U_static_band ?? { min: state.U_static, max: state.U_static };
+  const tileBand = state.N_tiles_band ?? { min: state.N_tiles, max: state.N_tiles };
+  const totalCandidates = [
+    perTileBand.min * tileBand.min,
+    perTileBand.min * tileBand.max,
+    perTileBand.max * tileBand.min,
+    perTileBand.max * tileBand.max,
+  ];
+  state.U_static_total = state.U_static * state.N_tiles;
+  state.U_static_total_band = {
+    min: Math.min(...totalCandidates),
+    max: Math.max(...totalCandidates),
+  };
 
   // 3) Apply mode config EARLY (right after reading currentMode)
   const modeConfig = MODE_CONFIGS[state.currentMode];
@@ -1471,48 +1995,105 @@ export async function calculateEnergyPipeline(
   state.qSpoilingFactor = ui.qSpoilingFactor;
   // keep sector policy from resolveSLive just below; don't touch sectorCount here
 
-  // 4) Sector scheduling — per-mode policy
-  state.sectorCount = Math.max(1, state.sectorCount || PAPER_DUTY.TOTAL_SECTORS); // respect override; else default to 400
-  state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
-  const S_total = state.sectorCount;
-  const S_live = state.concurrentSectors;
+  // 4) Sector scheduling - prefer measured event stream over schedule
+  const strobeDuty = (state.hardwareTruth as any)?.strobeDuty;
+  const measuredDutyEffective = (() => {
+    if (!strobeDuty) return undefined;
+    const duty = Number(
+      strobeDuty.dutyAvg ??
+      (strobeDuty as any).avg ??
+      (strobeDuty as any).dutyEffective ??
+      (strobeDuty as any).dutyEffectiveFR
+    );
+    if (!Number.isFinite(duty)) return undefined;
+    const last = Number((strobeDuty as any).lastSampleAt ?? (strobeDuty as any).updatedAt);
+    const windowMs = Number(
+      (strobeDuty as any).windowMs ?? (strobeDuty as any).window_ms ?? STROBE_DUTY_WINDOW_MS_DEFAULT
+    );
+    const freshness = Math.max(2500, Number.isFinite(windowMs) && windowMs > 0 ? windowMs * 2 : STROBE_DUTY_STALE_MS);
+    if (Number.isFinite(last) && Date.now() - last > freshness) return undefined;
+    return clampNumber(duty, 0, 1);
+  })();
+
+  const measuredTotal = Number((strobeDuty as any)?.sTotal);
+  const measuredLive = Number((strobeDuty as any)?.sLive);
+  const scheduledLive = resolveSLive(state.currentMode);
+  const sectorTotalResolved = Number.isFinite(measuredTotal) && measuredTotal > 0
+    ? measuredTotal
+    : state.sectorCount || PAPER_DUTY.TOTAL_SECTORS;
+  const S_total = Math.max(1, Math.round(sectorTotalResolved));
+  let S_live = Number.isFinite(measuredLive) && measuredLive >= 0
+    ? measuredLive
+    : scheduledLive;
+  if (!Number.isFinite(measuredLive) && Number.isFinite(state.activeSectors)) {
+    S_live = state.activeSectors;
+  } else if (!Number.isFinite(measuredLive) && Number.isFinite(state.concurrentSectors)) {
+    S_live = state.concurrentSectors;
+  }
+  S_live = Math.max(0, S_live);
+  const S_live_int = Math.max(0, Math.round(S_live));
 
   // if standby, FR duty must be exactly zero for viewers/clients
   const isStandby = String(state.currentMode || '').toLowerCase() === 'standby';
-  const d_eff = isStandby
-    ? 0
-    : PAPER_DUTY.BURST_DUTY_LOCAL * (S_live / Math.max(1, S_total)); // existing calc
+  const dutyLocal = clampNumber(
+    Number.isFinite(state.dutyBurst)
+      ? (state.dutyBurst as number)
+      : Number.isFinite((state as any).localBurstFrac)
+        ? (state as any).localBurstFrac
+        : PAPER_DUTY.BURST_DUTY_LOCAL,
+    0,
+    1,
+  );
+  const d_eff_fallback = dutyLocal * (S_live / Math.max(1, S_total));
+  const d_eff = isStandby ? 0 : (measuredDutyEffective ?? d_eff_fallback);
 
-  state.activeSectors   = S_live;
-  state.activeFraction  = S_live / S_total;
+  state.sectorCount       = S_total;
+  state.concurrentSectors = S_live_int;
+  state.activeSectors     = S_live_int;
+  state.activeFraction    = Math.max(0, Math.min(1, S_total > 0 ? S_live / S_total : 0));
 
-  // 🔎 HINT for clients: fraction of the bubble "visible" from a single concurrent pane.
+  // HINT for clients: fraction of the bubble "visible" from a single concurrent pane.
   // The REAL pane can multiply this with its band/slice coverage to scale extrema and mass proxy.
-  (state as any).viewMassFractionHint = S_live / Math.max(1, S_total);
+  (state as any).viewMassFractionHint = state.activeFraction;
   state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
-  state.activeTiles     = state.tilesPerSector * S_live;
+  const activeTilesBand = {
+    min: Math.max(0, Math.floor((tilesBand.min ?? state.N_tiles) / Math.max(1, S_total)) * S_live_int),
+    max: Math.max(0, Math.ceil((tilesBand.max ?? state.N_tiles) / Math.max(1, S_total)) * S_live_int),
+  };
+  state.activeTiles     = state.tilesPerSector * S_live_int;
   (state as any).tiles = {
     total: state.N_tiles,
     active: state.activeTiles,
+    totalBand: tilesBand,
+    activeBand: activeTilesBand,
     tileArea_cm2: state.tileArea_cm2,
     hullArea_m2: state.hullArea_m2,
+    hullAreaBand_m2: hullAreaBand,
   };
 
-  // Safety alias for consumers that assume ≥1 sectors for math
+  // Safety alias for consumers that assume GëÑ1 sectors for math
   (state as any).concurrentSectorsSafe = Math.max(1, state.concurrentSectors);
 
-  // 🔧 expose both duties explicitly and consistently
-  state.dutyBurst        = PAPER_DUTY.BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
-  state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for ζ & audits)
+  // =öº expose both duties explicitly and consistently
+  state.dutyBurst        = dutyLocal;  // keep as *local* ON-window; prefer measured/local override
+  state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for +¦ & audits)
   (state as any).dutyEffectiveFR = d_eff; // legacy/camel alias
+  (state as any).dutyMeasuredFR = measuredDutyEffective;
+  (state as any).dutyEffectiveFRMeasured = measuredDutyEffective;
+  (state as any).dutyEffectiveFRSource = measuredDutyEffective != null ? "measured" : "schedule";
+  (state as any).dutyMeasuredWindow_ms = measuredDutyEffective != null
+    ? Number((strobeDuty as any)?.windowMs ?? (strobeDuty as any)?.window_ms ?? STROBE_DUTY_WINDOW_MS_DEFAULT)
+    : undefined;
+  state.dutyMeasuredFR = measuredDutyEffective ?? undefined;
   // (dutyCycle already set from MODE_CONFIGS above)
 
-  // ✅ First-class fields for UI display
+  // G£à First-class fields for UI display
   state.dutyShip = d_eff;          // Ship-wide effective duty (promoted from any)
   (state as any).dutyEff = d_eff;  // Legacy alias
 
+
   // 5) Stored energy (raw core): ensure valid input values
-  // ⚠️ Fix: ensure qMechanical is never 0 unless standby mode
+  // Keep qMechanical non-zero outside of standby
   if (state.qMechanical === 0 && state.currentMode !== 'standby') {
     state.qMechanical = 1; // restore default
   }
@@ -1531,86 +2112,169 @@ export async function calculateEnergyPipeline(
 
   const gamma3 = Math.pow(state.gammaGeo, 3);
   state.U_geo = state.U_static * gamma3;
-  state.U_Q   = state.U_geo * state.qMechanical;  // ✅ apply qMechanical from start
+  state.U_Q   = state.U_geo * state.qMechanical;
 
-  // 6) Power — raw first, then power-only calibration via qMechanical
+  // 6) Power ? raw first, then power-only calibration via qMechanical
   const omega = 2 * Math.PI * (state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ) * 1e9;
   const Q = state.qCavity ?? PAPER_Q.Q_BURST;
-  const P_tile_raw = Math.abs(state.U_Q) * omega / Q; // J/s per tile during ON
-  let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
+  const perTilePower = (qMech: number) => Math.abs(state.U_geo * qMech) * omega / Q; // J/s per tile during ON
 
-  // Power-only calibration (qMechanical): hit per-mode target *without* touching mass
   const CALIBRATED = (MODEL_MODE === 'calibrated');
   const P_target_W = MODE_POLICY[state.currentMode].P_target_W;
-  if (CALIBRATED && P_target_W > 0 && P_total_W > 0) {
+
+  const P_cap_W = perTilePower(1) * state.N_tiles * d_eff; // Deliverable with q_mech=1
+
+  let qMechDemand = state.qMechanical;
+  let qMechApplied = state.qMechanical;
+  let P_total_W = perTilePower(qMechApplied) * state.N_tiles * d_eff; // ship average
+
+  if (CALIBRATED && P_target_W > 0 && !isStandby && P_total_W > 0) {
     const scaleP = P_target_W / P_total_W;
-    const qMech_raw = state.qMechanical * scaleP;
-    state.qMechanical = Math.max(1e-6, Math.min(1e6, qMech_raw)); // knob #1: power only (clamped)
+    qMechDemand = state.qMechanical * scaleP;               // what the solver would like
+    qMechApplied = Math.min(1, Math.max(1e-6, qMechDemand)); // but clamp at unity
+    state.qMechanical = qMechApplied;
     state.U_Q         = state.U_geo * state.qMechanical;
-    const P_tile_cal  = Math.abs(state.U_Q) * omega / Q;
-    P_total_W         = P_tile_cal * state.N_tiles * d_eff;
-  } else if (P_target_W === 0) {
-    // standby: force qMechanical→0 so stored-energy dissipation is zero
+    P_total_W         = perTilePower(qMechApplied) * state.N_tiles * d_eff;
+  } else if (P_target_W === 0 || isStandby) {
+    // standby: force qMechanical->0 so stored-energy dissipation is zero
+    qMechDemand = 0;
+    qMechApplied = 0;
     state.qMechanical = 0;
     state.U_Q         = 0;
     P_total_W         = 0;
+  } else {
+    // Raw mode or no calibration: honor requested, but stay within safety band
+    qMechApplied = Math.min(1, Math.max(1e-6, qMechApplied));
+    state.qMechanical = qMechApplied;
+    state.U_Q         = state.U_geo * state.qMechanical;
+    P_total_W         = perTilePower(qMechApplied) * state.N_tiles * d_eff;
   }
 
   // Post-calibration clamping check for qMechanical
   const qMech_before = state.qMechanical;
   if (!isStandby) {
-    state.qMechanical = Math.max(1e-6, Math.min(1e6, state.qMechanical));
+    state.qMechanical = Math.max(1e-6, Math.min(1, state.qMechanical));
   }
   (state as any).qMechanicalClamped = (state.qMechanical !== qMech_before);
+
+  // Mechanical guard telemetry: demand vs applied with capacity and shortfall
+  const appliedSafe = Math.max(1e-12, state.qMechanical);
+  const mechSpoilage = qMechDemand > 0 ? qMechDemand / appliedSafe : 1;
+  const pShortfall_W = Math.max(0, P_target_W - P_total_W);
+  state.mechGuard = {
+    qMechDemand,
+    qMechApplied: state.qMechanical,
+    mechSpoilage,
+    pCap_W: P_cap_W,
+    pApplied_W: P_total_W,
+    pShortfall_W,
+    status: (P_target_W > 0 && qMechDemand > 1 && !isStandby) ? 'saturated' : 'ok',
+  };
+
   state.P_loss_raw = Math.abs(state.U_Q) * omega / Q;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
   (state as any).P_avg_W = P_total_W; // W (explicit)
 
   // Expose labeled electrical power for dual-bar dashboards
   (state as any).P_elec_MW = state.P_avg;  // Electrical power (same as P_avg, but clearly labeled)
-
   // --- Cryo power AFTER calibration and AFTER mode qSpoilingFactor is applied ---
   const Q_on  = Q;
-  // qSpoilingFactor is idle Q multiplier: >1 ⇒ less idle loss (higher Q_off)
+  // qSpoilingFactor is idle Q multiplier: >1 GçÆ less idle loss (higher Q_off)
   const Q_off = Math.max(1, Q_on * state.qSpoilingFactor); // use mode-specific qSpoilingFactor
   const P_tile_on   = Math.abs(state.U_Q) * omega / Q_on;
   const P_tile_idle = Math.abs(state.U_Q) * omega / Q_off;
   (state as any).P_cryo_MW = ((P_tile_on * d_eff + P_tile_idle * (1 - d_eff)) * state.N_tiles) / 1e6;
 
-  // 7) Mass — raw first, then mass-only calibration via γ_VdB
-  state.gammaVanDenBroeck = PAPER_VDB.GAMMA_VDB;     // seed (paper)
-  const U_abs = Math.abs(state.U_static);
-  const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-  let   E_tile = U_abs * geo3 * PAPER_Q.Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile (burst-window Q for mass)
-  let   M_total = (E_tile / (C * C)) * state.N_tiles;
+  // 7) Mass - derive from cycle-averaged energy density (no free energy knob)
+  const gap_m = Math.max(1e-12, state.gap_nm * NM_TO_M);
+  const tileVolume_m3 = Math.max(0, tileArea_m2 * gap_m);
+  const baseGammaRequest = Number.isFinite(state.gammaVanDenBroeck)
+    ? (state.gammaVanDenBroeck as number)
+    : PAPER_VDB.GAMMA_VDB;
+  const guardInputHull = {
+    Lx_m: hullDims.Lx_m,
+    Ly_m: hullDims.Ly_m,
+    Lz_m: hullDims.Lz_m,
+    wallThickness_m: (state.hull ?? {}).wallThickness_m ?? hullDims.wallThickness_m,
+  };
+  const vdbGuard = guardGammaVdB({
+    hull: guardInputHull,
+    gammaRequested: baseGammaRequest,
+  });
+  const gammaSeed = Math.min(PAPER_VDB.GAMMA_VDB, vdbGuard.limit);
 
-  // Mass-only calibration: hit per-mode mass target without changing power
+  const massFromGamma = (gammaVdBValue: number) => {
+    const { rho_avg, rho_inst } = enhancedAvgEnergyDensity({
+      gap_m,
+      gammaGeo: state.gammaGeo,
+      cavityQ: Q,
+      gammaVanDenBroeck: gammaVdBValue,
+      qSpoilingFactor: state.qSpoilingFactor,
+      dutyEff: d_eff,
+    });
+    const U_inst = rho_inst * tileVolume_m3;
+    const U_avg  = rho_avg * tileVolume_m3;
+    const M_tot  = (Math.abs(U_avg) / (C * C)) * state.N_tiles;
+    return { rho_avg, rho_inst, U_inst, U_avg, M_tot };
+  };
+
+  let gammaVanDenBroeck = gammaSeed;
+  let massChain = massFromGamma(gammaVanDenBroeck);
+
   const M_target = MODE_POLICY[state.currentMode].M_target_kg;
   const userM = state.exoticMassTarget_kg ?? M_target;
-  if (CALIBRATED && userM > 0 && M_total > 0) {
-    const scaleM = userM / M_total;
-    const gammaVdB_raw = state.gammaVanDenBroeck * scaleM;
-    state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, gammaVdB_raw)); // knob #2: mass only (clamped)
-    E_tile  = U_abs * geo3 * PAPER_Q.Q_BURST * state.gammaVanDenBroeck * d_eff;
-    M_total = (E_tile / (C * C)) * state.N_tiles;
-  } else if (userM <= 0) {
-    state.gammaVanDenBroeck = 0;
-    M_total = 0;
+  let targetShortfall = 0;
+  if (CALIBRATED && userM > 0 && massChain.M_tot > 0) {
+    const scaleM = userM / massChain.M_tot;
+    const gammaCandidate = gammaVanDenBroeck * scaleM;
+    const gammaClamped = Math.max(0, Math.min(gammaCandidate, vdbGuard.limit));
+    gammaVanDenBroeck = gammaClamped;
+    massChain = massFromGamma(gammaVanDenBroeck);
+    if (gammaCandidate > vdbGuard.limit) {
+      targetShortfall = massChain.M_tot / Math.max(userM, 1e-9);
+    }
+  } else if (userM <= 0 || isStandby) {
+    gammaVanDenBroeck = 0;
+    massChain = massFromGamma(gammaVanDenBroeck);
   }
-  state.M_exotic_raw = M_total;
-  state.M_exotic     = M_total;
+
+  state.gammaVanDenBroeck = gammaVanDenBroeck;
+  state.M_exotic_raw = massChain.M_tot;
+  state.M_exotic     = massChain.M_tot;
 
   // Post-calibration clamping check for gammaVanDenBroeck
-  const gammaVdB_before = state.gammaVanDenBroeck;
-  state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, state.gammaVanDenBroeck));
-  (state as any).gammaVanDenBroeckClamped = (state.gammaVanDenBroeck !== gammaVdB_before);
+  const gammaVdB_before = baseGammaRequest;
+  (state as any).gammaVanDenBroeckClamped =
+    (state.gammaVanDenBroeck !== gammaVdB_before) || gammaVdB_before > vdbGuard.limit;
 
   // Mass calibration readout
   state.massCalibration = state.gammaVanDenBroeck / PAPER_VDB.GAMMA_VDB;
+  state.rho_inst = massChain.rho_inst;
+  state.rho_avg  = massChain.rho_avg;
+  state.rho_static = tileVolume_m3 > 0 ? state.U_static / tileVolume_m3 : undefined;
+  state.gammaChain = {
+    geo_cubed: Math.pow(state.gammaGeo, 3),
+    qGain: Math.sqrt(Math.max(1, Q) / 1e9),
+    pocketCompression: state.gammaVanDenBroeck,
+    dutyEffective: d_eff,
+    qSpoiling: state.qSpoilingFactor,
+    note: "rho_avg = rho0 * gamma_geo^3 * sqrt(Q/1e9) * gamma_VdB * q_spoil * d_eff",
+  };
 
-  // Split γ_VdB into visual vs mass knobs to keep calibrator away from renderer
-  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // ← calibrated value used to hit M_target
-  (state as any).gammaVanDenBroeck_vis  = PAPER_VDB.GAMMA_VDB;                 // ← fixed "physics/visual" seed for renderer
+  const guardForApplied = guardGammaVdB({
+    hull: guardInputHull,
+    gammaRequested: state.gammaVanDenBroeck,
+  });
+  state.gammaVanDenBroeckGuard = {
+    ...guardForApplied,
+    requested: baseGammaRequest,
+    targetHit: targetShortfall === 0,
+    targetShortfall: targetShortfall || undefined,
+  };
+  (state as any).gammaVanDenBroeck_guard = state.gammaVanDenBroeckGuard;
+  // Split gamma_VdB into visual vs mass knobs to keep calibrator away from renderer
+  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // GåÉ calibrated value used to hit M_target
+  (state as any).gammaVanDenBroeck_vis  = PAPER_VDB.GAMMA_VDB;                 // GåÉ fixed "physics/visual" seed for renderer
 
   // Make visual factor mode-invariant (except standby)
   if (state.currentMode !== 'standby') {
@@ -1619,15 +2283,15 @@ export async function calculateEnergyPipeline(
     (state as any).gammaVanDenBroeck_vis = 1; // keep standby dark
   }
 
-  // Precomputed physics-only θ gain for client verification
-  // Canonical ship-wide θ (authoritative):
-  //   θ = γ_geo^3 · q · γ_VdB · duty_FR
-  // Use the calibrated/mass γ_VdB when available; fall back to visual seed if not.
+  // Precomputed physics-only ++ gain for client verification
+  // Canonical ship-wide ++ (authoritative):
+  //   ++ = +¦_geo^3 -+ q -+ +¦_VdB -+ duty_FR
+  // Use the calibrated/mass +¦_VdB when available; fall back to visual seed if not.
   const _gammaVdB_forTheta = Number.isFinite(state.gammaVanDenBroeck)
     ? state.gammaVanDenBroeck
     : ((state as any).gammaVanDenBroeck_vis ?? PAPER_VDB.GAMMA_VDB);
 
-  // DEBUG: θ-Scale Field Strength Audit (dual-value: raw vs calibrated)
+  // DEBUG: ++-Scale Field Strength Audit (dual-value: raw vs calibrated)
   const gammaVdB_raw = PAPER_VDB.GAMMA_VDB;  // Raw paper value (1e11)
   const gammaVdB_cal = _gammaVdB_forTheta;   // Calibrated value (mass-adjusted)
 
@@ -1665,7 +2329,7 @@ export async function calculateEnergyPipeline(
   (state as any).uniformsExplain ??= {};
   (state as any).uniformsExplain.thetaAudit = {
     mode: MODEL_MODE,
-    eq: "θ = γ_geo^3 · q · γ_VdB · d_eff",
+    eq: "++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff",
     inputs: {
       gammaGeo: state.gammaGeo,
       q: state.qSpoilingFactor,
@@ -1676,9 +2340,9 @@ export async function calculateEnergyPipeline(
     results: { thetaRaw, thetaCal }
   };
 
-  console.log('🔍 θ-Scale Field Strength Audit (Raw vs Calibrated):', {
+  console.log('=öì ++-Scale Field Strength Audit (Raw vs Calibrated):', {
     mode: MODEL_MODE,
-    formula: 'θ = γ_geo^3 · q · γ_VdB · d_eff',
+    formula: '++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff',
     components: thetaComponents,
     results: {
       thetaRaw: thetaRaw,
@@ -1695,9 +2359,9 @@ export async function calculateEnergyPipeline(
   // Overall clamping status for UI warnings
   (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
 
-  /* ──────────────────────────────
+  /* GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
      "Explain-it" counters for HUD/debug
-  ──────────────────────────────── */
+  GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ */
   (state as any).E_tile_static_J = Math.abs(state.U_static);  // Static Casimir energy per tile
   (state as any).E_tile_geo_J = Math.abs(state.U_geo);        // Geometric amplified energy per tile  
   (state as any).E_tile_on_J = Math.abs(state.U_Q);           // Stored energy per tile in on-window
@@ -1705,12 +2369,6 @@ export async function calculateEnergyPipeline(
   (state as any).d_eff = d_eff;                               // Ship-wide effective duty (first-class)
   (state as any).M_per_tile_kg = state.N_tiles > 0 ? state.M_exotic / state.N_tiles : 0; // Mass per tile
 
-  // 7) Quantum-safety proxy (scaled against baseline ship-wide duty)
-  const d_ship = d_eff;                              // ship-wide
-  const d0 = PAPER_DUTY.BURST_DUTY_LOCAL / PAPER_DUTY.TOTAL_SECTORS;       // 0.01/400
-  const zeta0 = 0.84;                                // baseline fit
-  state.zeta = zeta0 * (d_ship / d0);                // keeps ζ≈0.84 at baseline
-  state.fordRomanCompliance = state.zeta < ((ui as any).zeta_max ?? 1.0); // Use mode-specific max
 
   // Physics logging for debugging (before UI field updates)
   if (DEBUG_PIPE) console.log("[PIPELINE]", {
@@ -1722,9 +2380,9 @@ export async function calculateEnergyPipeline(
     massCal: state.massCalibration
   });
 
-  /* ──────────────────────────────
+  /* GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
      Additional metrics (derived)
-  ──────────────────────────────── */
+  GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ */
 
   // --- Time-scale separation (TS) using actual hull size ---
   const { Lx_m, Ly_m, Lz_m } = state.hull!;
@@ -1754,7 +2412,9 @@ export async function calculateEnergyPipeline(
   state.__fr = {
     dutyShip: d_eff,        // Ship-wide effective duty (averaged over sectors)
     dutyEffectiveFR: d_eff, // Same as dutyShip (Ford-Roman compliance)
-    zeta_baseline: zeta0,   // Baseline ζ = 0.84 for scaling reference
+    dutyMeasuredFR: measuredDutyEffective ?? null,
+    dutySource: measuredDutyEffective != null ? "measured" : "schedule",
+    zeta_baseline: 1,       // Guardrail now computed from sampled waveform
   };
 
   // 9) Mode policy calibration already applied above - power and mass targets hit automatically
@@ -1769,7 +2429,6 @@ export async function calculateEnergyPipeline(
 
   // Compliance flags (physics-based safety)
   state.natarioConstraint   = true;
-  state.curvatureLimit      = state.fordRomanCompliance; // explicit alias
 
   // Audit guard (pipeline self-consistency check)
   (function audit() {
@@ -1781,8 +2440,12 @@ export async function calculateEnergyPipeline(
       (state as any).P_avg_W = P_exp * 1e6; // W (explicit)
     }
 
-    const E_tile_mass = Math.abs(state.U_static) * Math.pow(state.gammaGeo,3)
-                 * PAPER_Q.Q_BURST * state.gammaVanDenBroeck * d_eff;
+    const rhoAvgAudit = Number.isFinite((state as any).rho_avg)
+      ? ((state as any).rho_avg as number)
+      : null;
+    const E_tile_mass = rhoAvgAudit != null
+      ? rhoAvgAudit * tileVolume_m3
+      : Math.abs(state.U_static) * Math.pow(state.gammaGeo,3) * PAPER_Q.Q_BURST * state.gammaVanDenBroeck * d_eff;
     const M_exp  = (E_tile_mass / (C*C)) * state.N_tiles;
     if (Math.abs(state.M_exotic - M_exp) > 1e-6 * Math.max(1, M_exp)) {
       if (DEBUG_PIPE) console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
@@ -1791,17 +2454,8 @@ export async function calculateEnergyPipeline(
   })();
 
   // Overall status (mode-aware power thresholds)
-  const P_warn = MODE_POLICY[state.currentMode].P_target_W * 1.2 / 1e6; // +20% headroom in MW
-  if (!state.fordRomanCompliance || !state.curvatureLimit || state.zeta >= 1.0) {
-    state.overallStatus = 'CRITICAL';
-  } else if (state.zeta >= 0.95 || (state.currentMode !== 'emergency' && state.P_avg > P_warn)) {
-    state.overallStatus = 'WARNING';
-  } else {
-    state.overallStatus = 'NOMINAL';
-  }
-
   // Mode configuration already applied early in function - no need to duplicate
-  state.sectorStrobing  = state.concurrentSectors;         // ✅ Legacy alias for UI compatibility
+  state.sectorStrobing  = state.concurrentSectors;         // G£à Legacy alias for UI compatibility
   // Phase scheduler (PR-3): compute per-sector phase offsets and assign roles.
   const totalSectors = Math.max(
     1,
@@ -1879,6 +2533,48 @@ export async function calculateEnergyPipeline(
     weights: phaseSchedule.weights,
   };
 
+  const qiGuard = evaluateQiGuardrail(state, {
+    schedule: phaseSchedule,
+    sectorPeriod_ms: sectorPeriodMs,
+    sampler,
+    tau_ms: tauMs,
+  });
+  state.zeta = qiGuard.marginRatio;
+  (state as any).zetaRaw = qiGuard.marginRatioRaw;
+  state.fordRomanCompliance = Number.isFinite(qiGuard.marginRatio) && qiGuard.marginRatio < 1;
+  state.curvatureLimit = state.fordRomanCompliance;
+  (state as any).qiGuardrail = qiGuard;
+  const guardLog = {
+    margin: qiGuard.marginRatio,
+    marginRaw: qiGuard.marginRatioRaw,
+    lhs_Jm3: qiGuard.lhs_Jm3,
+    bound_Jm3: qiGuard.bound_Jm3,
+    sampler: qiGuard.sampler,
+    fieldType: qiGuard.fieldType,
+    window_ms: qiGuard.window_ms,
+    duty: qiGuard.duty,
+    patternDuty: qiGuard.patternDuty,
+    maskSum: qiGuard.maskSum,
+    effectiveRho: qiGuard.effectiveRho,
+    rhoSource: qiGuard.rhoSource,
+    TS: state.clocking?.TS ?? state.TS_ratio ?? null,
+    clockingDetail: state.clocking ?? null,
+  };
+  if (!Number.isFinite(qiGuard.marginRatio) || qiGuard.marginRatio >= 1) {
+    console.warn("[QI-guard] sampled integral exceeds bound", guardLog);
+  } else if (DEBUG_PIPE) {
+    console.log("[QI-guard]", guardLog);
+  }
+
+  const P_warn = MODE_POLICY[state.currentMode].P_target_W * 1.2 / 1e6; // +20% headroom in MW
+  if (!state.fordRomanCompliance || qiGuard.marginRatio >= 1) {
+    state.overallStatus = 'CRITICAL';
+  } else if (qiGuard.marginRatio >= 0.95 || (state.currentMode !== 'emergency' && state.P_avg > P_warn)) {
+    state.overallStatus = 'WARNING';
+  } else {
+    state.overallStatus = 'NOMINAL';
+  }
+
   // UI field updates logging (after MODE_CONFIGS applied)
   if (DEBUG_PIPE) console.log("[PIPELINE_UI]", {
     dutyUI_after: state.dutyCycle, 
@@ -1888,28 +2584,138 @@ export async function calculateEnergyPipeline(
     qSpoilingFactor: state.qSpoilingFactor
   });
 
-  // --- Construct light-crossing packet (filled correctly below) ---
-  const f_m = (state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ) * 1e9;     // Hz
-  const T_m_s = 1 / f_m;                                  // s
-  const tauLC_s = (state.hull?.wallThickness_m ?? DEFAULT_WALL_THICKNESS_M) / C;
+  // --- Construct light-crossing packet (single source of truth) ---
+  const baseDwell_ms = Number.isFinite(hwDwellMs) && hwDwellMs > 0 ? hwDwellMs : sectorPeriodMs;
+  const geometryTau_ms = computeTauLcMsFromHull(state.hull ?? hullDims);
+  const baseTauCandidate_ms = Number.isFinite(hwTauLcMs)
+    ? hwTauLcMs
+    : Number.isFinite(state.tauLC_ms)
+    ? state.tauLC_ms
+    : (geometryTau_ms ?? (DEFAULT_WALL_THICKNESS_M / C) * 1e3);
+  let baseTauLC_ms = baseTauCandidate_ms;
+  if (Number.isFinite(baseTauLC_ms) && Number.isFinite(geometryTau_ms)) {
+    const candidate = baseTauLC_ms as number;
+    const geometry = geometryTau_ms as number;
+    const drift = Math.max(candidate, geometry) / Math.max(1e-12, Math.min(candidate, geometry));
+    if (drift >= TAU_LC_UNIT_DRIFT_LIMIT) {
+      console.warn("[light-crossing][unit-drift]", {
+        candidate_ms: candidate,
+        geometry_ms: geometry,
+        source: Number.isFinite(hwTauLcMs) ? "hardware" : "state",
+        limit: TAU_LC_UNIT_DRIFT_LIMIT,
+      });
+      baseTauLC_ms = geometry;
+      (state as any).lightCrossingUnitWarning = { candidate_ms: candidate, geometry_ms: geometry, source: "pipeline" };
+    }
+  } else if (Number.isFinite(geometryTau_ms)) {
+    baseTauLC_ms = geometryTau_ms as number;
+  }
+  const baseBurst_ms = Number.isFinite(hwBurstMs)
+    ? hwBurstMs
+    : baseDwell_ms *
+      (Number.isFinite(state.dutyBurst) ? Number(state.dutyBurst) : PAPER_DUTY.BURST_DUTY_LOCAL);
+
   const lightCrossing = {
-    tauLC_ms: tauLC_s * 1e3,
-    burst_ms: PAPER_DUTY.BURST_DUTY_LOCAL * T_m_s * 1e3,
-    dwell_ms: T_m_s * 1e3,
+    tauLC_ms: baseTauLC_ms,
+    burst_ms: baseBurst_ms,
+    dwell_ms: baseDwell_ms,
   };
-  if (Number.isFinite(hwTauLcMs)) {
-    lightCrossing.tauLC_ms = hwTauLcMs;
+  const tauLC_s = Number.isFinite(lightCrossing.tauLC_ms)
+    ? (lightCrossing.tauLC_ms as number) / 1000
+    : 0;
+  // Build clocking snapshot (TS, epsilon) from the best timing data we have.
+  // If we are operating purely on derived defaults (no hardware tau_LC or burst),
+  // treat the result as tentative so the UI doesn't hard-fail before telemetry arrives.
+  const derivedOnlyClocking = !Number.isFinite(hwTauLcMs) && !Number.isFinite(hwBurstMs);
+  let clockingProvenance: "derived" | "hardware" | "simulated" =
+    derivedOnlyClocking ? "derived" : "hardware";
+  let clocking = computeClocking({
+    tauLC_ms: lightCrossing.tauLC_ms,
+    burst_ms: lightCrossing.burst_ms,
+    dwell_ms: lightCrossing.dwell_ms,
+    sectorPeriod_ms: sectorPeriodMs,
+    hull: state.hull,
+    localDuty: state.dutyBurst,
+  });
+  if (derivedOnlyClocking && (clocking.regime === "fail" || !Number.isFinite(clocking.TS as number))) {
+    // Simulate a safe clocking profile by clamping tau_pulse << tau_LC so the UI can show a proxy.
+    const tauLCsim_ms = Number.isFinite(lightCrossing.tauLC_ms)
+      ? (lightCrossing.tauLC_ms as number)
+      : Math.max(1e-3, computeTauLcMsFromHull(state.hull ?? hullDims) ?? 1);
+    const dwellSim_ms = Number.isFinite(lightCrossing.dwell_ms)
+      ? (lightCrossing.dwell_ms as number)
+      : sectorPeriodMs;
+    const tauPulseSim_ms = Math.min(
+      Math.max(1e-6, lightCrossing.burst_ms ?? tauLCsim_ms * 0.02),
+      tauLCsim_ms * 0.02,
+    );
+    const dutySim = dwellSim_ms > 0 ? tauPulseSim_ms / dwellSim_ms : undefined;
+    clocking = computeClocking({
+      tauLC_ms: tauLCsim_ms,
+      burst_ms: tauPulseSim_ms,
+      dwell_ms: dwellSim_ms,
+      sectorPeriod_ms: dwellSim_ms,
+      hull: state.hull,
+      localDuty: dutySim,
+    });
+    clocking = {
+      ...clocking,
+      detail: `${clocking.detail}; simulated from hull geometry (no hardware timing)`,
+    };
+    clockingProvenance = "simulated";
   }
-  if (Number.isFinite(hwBurstMs)) {
-    lightCrossing.burst_ms = hwBurstMs;
+  const tsClockRaw = Number(clocking.TS);
+  const tsMissing = !Number.isFinite(tsClockRaw) || tsClockRaw <= 0;
+  if (tsMissing || clocking.regime === "unknown") {
+    (state as any).averagingNote =
+      "Awaiting hardware tau_pulse/tau_LC; supply timing so guardrail can validate cycle-average.";
+  } else {
+    delete (state as any).averagingNote;
   }
-  if (Number.isFinite(hwDwellMs)) {
-    lightCrossing.dwell_ms = hwDwellMs;
+  if (
+    DEBUG_PIPE &&
+    (!Number.isFinite(clocking.TS as number) || (clocking.TS as number) <= 0)
+  ) {
+    console.warn("[clocking][TS-zero]", {
+      detail: clocking.detail,
+      tauPulse_ms: clocking.tauPulse_ms,
+      tauLC_ms: clocking.tauLC_ms,
+      burst_ms: lightCrossing.burst_ms,
+      dwell_ms: lightCrossing.dwell_ms,
+      sectorPeriod_ms: sectorPeriodMs,
+      duty: state.dutyBurst ?? state.dutyCycle,
+    });
   }
+  lightCrossing.tauLC_ms = clocking.tauLC_ms ?? lightCrossing.tauLC_ms;
+  lightCrossing.burst_ms = clocking.tauPulse_ms ?? lightCrossing.burst_ms;
+  lightCrossing.dwell_ms = clocking.dwell_ms ?? lightCrossing.dwell_ms;
   (state as any).lightCrossing = lightCrossing;
   (state as any).tauLC_ms = lightCrossing.tauLC_ms;
+  const clockingTS = Number(clocking.TS);
+  const clockingWithTS: ClockingSnapshot = {
+    ...clocking,
+    TS: Number.isFinite(clockingTS) && clockingTS > 0 ? clockingTS : clocking.TS ?? null,
+  };
+  state.clocking = clockingWithTS;
+  state.clockingProvenance = clockingProvenance;
+  (state as any).averaging = clockingWithTS;
+  (state as any).TS_modulation = state.TS_ratio;
+  const tsCandidate = Number(clocking.TS);
+  const tsFallback = Number.isFinite(state.TS_ratio)
+    ? state.TS_ratio
+    : Number.isFinite(state.TS_long)
+    ? (state.TS_long as number)
+    : Number.isFinite(state.TS_geom)
+    ? (state.TS_geom as number)
+    : 0;
+  const tsEffectiveRaw =
+    Number.isFinite(tsCandidate) && tsCandidate > 0 ? tsCandidate : tsFallback;
+  const tsEffective = Number.isFinite(tsEffectiveRaw) && tsEffectiveRaw > 0 ? tsEffectiveRaw : 1e-9;
+  state.TS_long = tsEffective;
+  state.TS_ratio = tsEffective;
+  (state as any).lightCrossing.TS = tsEffective;
 
-  // Calculate Natário metrics using pipeline state
+  // Calculate Nat+írio metrics using pipeline state
   const natario = calculateNatarioMetric({
       gap: state.gap_nm,
       hull: state.hull ? { a: state.hull.Lx_m / 2, b: state.hull.Ly_m / 2, c: state.hull.Lz_m / 2 } : { a: 503.5, b: 132, c: 86.5 },
@@ -1936,7 +2742,7 @@ export async function calculateEnergyPipeline(
       }
     } as any, state.U_static * state.N_tiles);
 
-  // Store Natário metrics in state for API access
+  // Store Nat+írio metrics in state for API access
   (state as any).natario = natario;
 
   // Calculate dynamic Casimir with pipeline integration + performance guardrails
@@ -1955,7 +2761,17 @@ export async function calculateEnergyPipeline(
   try {
     const staticResult = calculateCasimirEnergy({
       gap: state.gap_nm,
-      geometry: 'parallel_plates',
+      geometry: 'parallel_plate',
+      radius: tileRadius_m * 1e6,
+      sagDepth: state.sag_nm,
+      temperature: state.temperature_K,
+      materialModel: state.casimirModel ?? 'ideal_retarded',
+      materialProps: state.materialProps,
+      coupling: {
+        ...couplingSpec,
+        pitch_m: state.tilePitch_m ?? couplingSpec.pitch_m,
+        frameFill: state.couplingFrameFill ?? couplingSpec.frameFill,
+      },
       // bounded edge to keep any internal allocations sane
       arrayConfig: { size: dynEdge }
     } as any);
@@ -2053,7 +2869,7 @@ export async function calculateEnergyPipeline(
     if (DEBUG_PIPE) console.warn('Stress-energy calculation failed:', e);
   }
 
-  // Calculate Natário warp bubble results (now pipeline-true)
+  // Calculate Nat+írio warp bubble results (now pipeline-true)
   try {
     const hullGeomWarp = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
     const a_warp = hullGeomWarp.Lx_m / 2;
@@ -2104,6 +2920,15 @@ export async function calculateEnergyPipeline(
 
   flushPendingPumpCommand();
   updateQiTelemetry(state);
+  const guardForStats = (state as any).qiGuardrail;
+  if (state.qi && guardForStats) {
+    state.qi.fieldType = (state.qi.fieldType ?? guardForStats.fieldType) as any;
+    state.qi.sampledIntegral_Jm3 = guardForStats.lhs_Jm3;
+    state.qi.boundTight_Jm3 = guardForStats.bound_Jm3;
+    state.qi.marginRatio = guardForStats.marginRatio;
+    state.qi.marginRatioRaw = guardForStats.marginRatioRaw;
+    state.qi.policyLimit = guardForStats.policyLimit;
+  }
 
   try {
     const tail = sweepHistory.slice(-SWEEP_HISTORY_MAX);
@@ -2138,8 +2963,9 @@ function updateQiTelemetry(state: EnergyPipelineState) {
   const desiredTau = Number.isFinite(state.qi?.tau_s_ms)
     ? Number(state.qi?.tau_s_ms)
     : DEFAULT_QI_TAU_MS;
+  const desiredField = (state.qi as any)?.fieldType ?? DEFAULT_QI_FIELD;
   const desiredDt = desiredQiSampleDt(state);
-  reconfigureQiMonitor(desiredTau, desiredDt);
+  reconfigureQiMonitor(desiredTau, desiredDt, desiredField as QiFieldType);
   const effectiveRho = estimateEffectiveRhoFromState(state);
   const baseStats = advanceQiMonitor(effectiveRho);
   const { tiles: synthesizedTiles, metrics, source } = buildQiTilesFromState(state, baseStats);
@@ -2155,6 +2981,20 @@ function updateQiTelemetry(state: EnergyPipelineState) {
         ...baseStats,
         ...(lrlTelemetry ?? {}),
       };
+  const interest = computeQuantumInterestBook(state);
+  if (interest) {
+    state.qiInterest = interest;
+    stats.interestRate = interest.rate;
+    stats.interestWindow_ms = interest.window_ms;
+    stats.interestDebt = interest.debt_Jm3;
+    stats.interestCredit = interest.credit_Jm3;
+    stats.interestMargin = interest.margin_Jm3;
+    stats.interestNetCycle = interest.netCycle_Jm3;
+    stats.interestNeg = interest.neg_Jm3;
+    stats.interestPos = interest.pos_Jm3;
+  } else {
+    state.qiInterest = null;
+  }
   state.qi = stats;
   if (synthesizedTiles.length) {
     updatePipelineQiTiles(synthesizedTiles, { source: "synthetic" });
@@ -2182,13 +3022,17 @@ function updateQiTelemetry(state: EnergyPipelineState) {
 
   const guardFrac = DEFAULT_QI_SETTINGS.guardBand ?? 0;
   const guardThreshold = Math.abs(stats.bound) * guardFrac;
+  const interestDebt = Number(stats.interestDebt);
+  const interestMargin = Number(stats.interestMargin);
+  const hasInterestDebt = Number.isFinite(interestDebt) && interestDebt > 0;
+  const interestGuardThreshold = hasInterestDebt ? Math.abs(interestDebt) * guardFrac : 0;
   let badge: 'ok' | 'near' | 'violation';
 
   if (!Number.isFinite(stats.margin)) {
     badge = 'violation';
-  } else if (stats.margin < 0) {
+  } else if (stats.margin < 0 || (hasInterestDebt && Number.isFinite(interestMargin) && interestMargin < 0)) {
     badge = 'violation';
-  } else if (stats.margin < guardThreshold) {
+  } else if (stats.margin < guardThreshold || (hasInterestDebt && interestMargin < interestGuardThreshold)) {
     badge = 'near';
   } else {
     badge = 'ok';
@@ -2486,7 +3330,14 @@ function clampInt(value: number, min: number, max: number): number {
   return Math.round(clampNumber(value, min, max));
 }
 
-function estimateEffectiveRhoFromState(state: EnergyPipelineState): number {
+type EffectiveRhoDebug = {
+  source?: string;
+  value?: number;
+  note?: string;
+  reason?: string;
+};
+
+function estimateEffectiveRhoFromState(state: EnergyPipelineState, debug?: EffectiveRhoDebug): number {
   const nowMs = Date.now();
   const tilesTelemetry = getLatestQiTileStats();
   if (
@@ -2494,6 +3345,11 @@ function estimateEffectiveRhoFromState(state: EnergyPipelineState): number {
     tilesTelemetry.source != null &&
     tilesTelemetry.source !== "synthetic"
   ) {
+    if (debug) {
+      debug.source = "tile-telemetry";
+      debug.value = tilesTelemetry.avgNeg;
+      debug.note = tilesTelemetry.source;
+    }
     return tilesTelemetry.avgNeg;
   }
   const pulses = state.gateAnalytics?.pulses;
@@ -2504,22 +3360,45 @@ function estimateEffectiveRhoFromState(state: EnergyPipelineState): number {
       accum += rhoFromPulse(nowMs, pulse);
     }
     if (Number.isFinite(accum)) {
+      if (debug) {
+        debug.source = "gate-pulses";
+        debug.value = accum;
+        debug.note = `${pulses.length} pulse(s)`;
+      }
       return accum;
     }
   }
 
   if (lastPumpCommandSnapshot?.tones?.length) {
-    return rhoFromTones(
+    const val = rhoFromTones(
       nowMs,
       lastPumpCommandSnapshot.tones,
       lastPumpCommandSnapshot.rho0 ?? 0,
       lastPumpCommandSnapshot.epoch_ms,
     );
+    if (debug) {
+      debug.source = "pump-tones";
+      debug.value = val;
+      debug.note = `${lastPumpCommandSnapshot.tones.length} tone(s)`;
+    }
+    return val;
   }
 
   const effDuty =
     Number((state as any).dutyEffectiveFR ?? state.dutyEffective_FR ?? state.dutyCycle ?? 0);
-  if (!Number.isFinite(effDuty) || effDuty <= 0) return 0;
+  if (!Number.isFinite(effDuty) || effDuty <= 0) {
+    if (debug) {
+      debug.source = "duty-fallback";
+      debug.value = 0;
+      debug.reason = !Number.isFinite(effDuty) ? "non-finite duty" : "duty <= 0";
+    }
+    return 0;
+  }
+  if (debug) {
+    debug.source = "duty-fallback";
+    debug.value = -Math.abs(effDuty);
+    debug.note = "using dutyEffectiveFR/dutyCycle";
+  }
   return -Math.abs(effDuty);
 }
 
@@ -2555,6 +3434,331 @@ function rhoFromTones(
     acc += depth * Math.cos(theta);
   }
   return acc;
+}
+
+function resolvePulseRole(
+  pulse: GatePulse | undefined,
+  schedule?: PhaseSchedule | null,
+): "neg" | "pos" | null {
+  if (!pulse) return null;
+  const explicit = (pulse as any).role;
+  if (explicit === "neg" || explicit === "pos") return explicit;
+  if (Array.isArray(pulse.tags)) {
+    for (const tag of pulse.tags) {
+      const t = typeof tag === "string" ? tag.toLowerCase() : "";
+      if (t.includes("neg")) return "neg";
+      if (t.includes("pos")) return "pos";
+    }
+  }
+  const sector = Number((pulse as any).sectorIndex);
+  if (Number.isInteger(sector) && schedule) {
+    if (Array.isArray(schedule.negSectors) && schedule.negSectors.includes(sector)) return "neg";
+    if (Array.isArray(schedule.posSectors) && schedule.posSectors.includes(sector)) return "pos";
+  }
+  return null;
+}
+
+function pulseDurationMs(
+  state: EnergyPipelineState,
+  pulse: GatePulse | undefined,
+  sectorPeriod_ms: number,
+  dutyFallback?: number,
+): number {
+  const durNs = Number((pulse as any)?.dur_ns);
+  if (Number.isFinite(durNs) && durNs > 0) {
+    return durNs / 1e6;
+  }
+  const tauPulse_ms = Number(
+    (state.clocking as any)?.tauPulse_ms ??
+      (state.lightCrossing as any)?.burst_ms ??
+      (state as any)?.burst_ms ??
+      (state as any)?.lightCrossing?.burst_ms,
+  );
+  if (Number.isFinite(tauPulse_ms) && tauPulse_ms > 0) {
+    return tauPulse_ms;
+  }
+  const duty =
+    Number.isFinite(dutyFallback) && dutyFallback != null
+      ? Number(dutyFallback)
+      : Number.isFinite(state.dutyBurst)
+      ? Number(state.dutyBurst)
+      : Number(state.dutyCycle);
+  if (Number.isFinite(duty) && duty > 0 && sectorPeriod_ms > 0) {
+    return sectorPeriod_ms * Math.min(1, Math.max(0, duty));
+  }
+  const sectors = Math.max(1, Math.floor(state.sectorCount ?? DEFAULT_SECTORS_TOTAL));
+  return sectorPeriod_ms > 0 ? Math.max(1e-3, sectorPeriod_ms / sectors) : 1;
+}
+
+function computeQuantumInterestBook(state: EnergyPipelineState): QuantumInterestBook | null {
+  const pulses = state.gateAnalytics?.pulses;
+  if (!Array.isArray(pulses) || pulses.length === 0) return null;
+  const guard = (state as any).qiGuardrail ?? {};
+  const nowMs = Date.now();
+  const tau_ms = Number.isFinite(state.qi?.tau_s_ms)
+    ? Number(state.qi?.tau_s_ms)
+    : Number(guard.window_ms) || DEFAULT_QI_TAU_MS;
+  const sectorPeriod_ms = clampNumber(
+    Number(state.sectorPeriod_ms ?? guard.sectorPeriod_ms ?? DEFAULT_SECTOR_PERIOD_MS),
+    0.1,
+    10_000,
+  );
+  const guardWindow = Number(guard.window_ms);
+  const baseWindow =
+    Number.isFinite(guardWindow) && guardWindow > 0 ? guardWindow : tau_ms * DEFAULT_QI_INTEREST_WINDOW_MULT;
+  const window_ms = Math.max(baseWindow, tau_ms * DEFAULT_QI_INTEREST_WINDOW_MULT, sectorPeriod_ms * 2);
+  const schedule = (state.phaseSchedule as PhaseSchedule | undefined) ?? null;
+  let neg = 0;
+  let pos = 0;
+
+  for (const pulse of pulses) {
+    const role = resolvePulseRole(pulse, schedule);
+    if (role !== "neg" && role !== "pos") continue;
+    const rho = Math.abs(rhoFromPulse(nowMs, pulse));
+    if (!Number.isFinite(rho) || rho <= 0) continue;
+    const dur_ms = pulseDurationMs(state, pulse, sectorPeriod_ms, guard.patternDuty ?? guard.duty);
+    const weight = Math.min(1, Math.max(0, dur_ms) / Math.max(window_ms, 1e-3));
+    const contribution = rho * weight;
+    if (role === "neg") neg += contribution;
+    else pos += contribution;
+  }
+
+  if (!(neg > 0 || pos > 0)) return null;
+
+  const rate = Math.max(0, DEFAULT_QI_INTEREST_RATE);
+  const debt = neg * (1 + rate);
+  const credit = pos;
+  const margin = credit - debt;
+  const netCycle = credit - neg;
+
+  const book: QuantumInterestBook = {
+    neg_Jm3: neg,
+    pos_Jm3: pos,
+    debt_Jm3: debt,
+    credit_Jm3: credit,
+    margin_Jm3: margin,
+    netCycle_Jm3: netCycle,
+    window_ms,
+    rate,
+  };
+
+  return book;
+}
+
+type QiGuardPattern = {
+  key: string;
+  mask: Float64Array;
+  window: Float64Array;
+  dt_s: number;
+  duty: number;
+  window_ms: number;
+};
+
+const qiGuardPatternCache = new Map<string, QiGuardPattern>();
+
+function guardPatternKey(params: {
+  sectorCount: number;
+  concurrentSectors: number;
+  sectorPeriod_ms: number;
+  tau_ms: number;
+  sampler: SamplingKind;
+  negSectors: number[];
+}): string {
+  return [
+    params.sectorCount,
+    params.concurrentSectors,
+    params.sectorPeriod_ms.toFixed(6),
+    params.tau_ms.toFixed(6),
+    params.sampler,
+    params.negSectors.join(","),
+  ].join("|");
+}
+
+function buildQiGuardPattern(params: {
+  sectorCount: number;
+  concurrentSectors: number;
+  sectorPeriod_ms: number;
+  tau_ms: number;
+  sampler: SamplingKind;
+  negSectors: number[];
+}): QiGuardPattern {
+  const key = guardPatternKey(params);
+  const cached = qiGuardPatternCache.get(key);
+  if (cached) return cached;
+
+  const cycleSamples = Math.max(1, Math.floor(params.sectorCount));
+  const dt_s = Math.max(params.sectorPeriod_ms, 1e-3) / cycleSamples / 1000;
+  const repeats = Math.max(
+    1,
+    Math.ceil((8 * Math.max(params.tau_ms, 1e-3)) / Math.max(params.sectorPeriod_ms, 1e-3)),
+  );
+  const totalSamples = cycleSamples * repeats;
+  const mask = new Float64Array(totalSamples);
+  const negSet = new Set(params.negSectors ?? []);
+  const activeWeight = Math.max(1, Math.floor(params.concurrentSectors) || 1);
+  for (let r = 0; r < repeats; r += 1) {
+    const offset = r * cycleSamples;
+    for (const idx of negSet) {
+      const j = (idx % cycleSamples) + offset;
+      mask[j] = activeWeight;
+    }
+  }
+  let sum = 0;
+  for (const v of mask) sum += v;
+  const duty = sum / Math.max(totalSamples, 1);
+  const window = buildWindow(
+    totalSamples,
+    dt_s,
+    Math.max(params.tau_ms, 1e-3) / 1000,
+    params.sampler,
+  );
+  const pattern: QiGuardPattern = {
+    key,
+    mask,
+    window,
+    dt_s,
+    duty,
+    window_ms: totalSamples * dt_s * 1000,
+  };
+  qiGuardPatternCache.set(key, pattern);
+  return pattern;
+}
+
+function clampNegativeBound(value: number, fallback?: number): number {
+  const envFloorAbs = Number(process.env.QI_BOUND_FLOOR_ABS);
+  const floorAbs = Number.isFinite(envFloorAbs)
+    ? Math.max(Math.abs(envFloorAbs as number), 1e-12)
+    : 1e-12;
+  const fbMag = Number.isFinite(fallback) ? Math.max(Math.abs(fallback as number), floorAbs) : floorAbs;
+  if (!Number.isFinite(value)) return -fbMag;
+  const mag = Math.max(Math.abs(value) || 0, floorAbs, fbMag);
+  return -mag;
+}
+
+function evaluateQiGuardrail(
+  state: EnergyPipelineState,
+  opts: { schedule?: PhaseSchedule; sectorPeriod_ms?: number; sampler?: SamplingKind; tau_ms?: number } = {},
+): {
+  lhs_Jm3: number;
+  bound_Jm3: number;
+  marginRatio: number;
+  marginRatioRaw: number;
+  policyLimit?: number;
+  window_ms: number;
+  sampler: SamplingKind;
+  fieldType: string;
+  samples: number;
+  duty: number;
+  patternDuty: number;
+  maskSum: number;
+  effectiveRho: number;
+  rhoOn: number;
+  rhoSource?: string;
+  rhoNote?: string;
+} {
+  const sampler = opts.sampler ?? state.phaseSchedule?.sampler ?? state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
+  const tau_ms =
+    Number.isFinite(opts.tau_ms) && (opts.tau_ms as number) > 0
+      ? (opts.tau_ms as number)
+      : Number.isFinite(state.qi?.tau_s_ms)
+      ? Number(state.qi?.tau_s_ms)
+      : DEFAULT_QI_SETTINGS.tau_s_ms;
+  const sectorPeriod_ms = clampNumber(
+    Number(opts.sectorPeriod_ms ?? state.phaseSchedule?.sectorPeriod_ms ?? state.sectorPeriod_ms) ||
+      DEFAULT_SECTOR_PERIOD_MS,
+    0.1,
+    10_000,
+  );
+  const sectorCount = Math.max(
+    1,
+    Math.floor(state.phaseSchedule?.phi_deg_by_sector?.length ?? state.sectorCount ?? DEFAULT_SECTORS_TOTAL),
+  );
+  const concurrentSectors = Math.max(
+    1,
+    Math.floor(state.concurrentSectors ?? state.sectorStrobing ?? 1),
+  );
+  const schedule =
+    opts.schedule ??
+    (state.phaseSchedule as PhaseSchedule | undefined) ??
+    computeSectorPhaseOffsets({
+      N: sectorCount,
+      sectorPeriod_ms,
+      phase01: 0,
+      tau_s_ms: tau_ms,
+      sampler,
+      negativeFraction: state.negativeFraction ?? DEFAULT_NEGATIVE_FRACTION,
+    });
+  const negSectors = Array.isArray(schedule?.negSectors) ? schedule!.negSectors : [];
+  const pattern = buildQiGuardPattern({
+    sectorCount,
+    concurrentSectors,
+    sectorPeriod_ms,
+    tau_ms,
+    sampler,
+    negSectors,
+  });
+  const patternDuty = pattern.duty;
+  const maskSum = pattern.mask.reduce((acc, v) => acc + v, 0);
+  const duty = patternDuty > 0 ? patternDuty : Math.max(negSectors.length / Math.max(sectorCount, 1), 1e-6);
+  const rhoDebug: EffectiveRhoDebug = {};
+  const effectiveRho = estimateEffectiveRhoFromState(state, rhoDebug);
+  const rhoOn = duty > 0 ? effectiveRho / duty : effectiveRho;
+  let lhs = 0;
+  for (let i = 0; i < pattern.mask.length; i += 1) {
+    const rho = pattern.mask[i] ? rhoOn * pattern.mask[i] : 0;
+    lhs += rho * pattern.window[i];
+  }
+  if (
+    DEBUG_PIPE &&
+    (duty <= 0 || maskSum <= 0 || !Number.isFinite(effectiveRho) || effectiveRho === 0)
+  ) {
+    console.warn("[QI-guard][zero-input]", {
+      duty,
+      patternDuty,
+      maskSum,
+      effectiveRho,
+      rhoSource: rhoDebug.source ?? "unknown",
+      negSectors: negSectors.length,
+    });
+  }
+  const fieldType = (state.qi as any)?.fieldType ?? DEFAULT_QI_FIELD;
+  const boundResult = qiBound_Jm3({
+    tau_s: Math.max(1e-9, tau_ms / 1000),
+    fieldType,
+    kernelType: sampler,
+  });
+  const candidateBound = boundResult.bound_Jm3 - Math.abs(boundResult.safetySigma_Jm3);
+  const policyFloorAbs =
+    QI_POLICY_ENFORCE && QI_POLICY_MAX_ZETA > 0 ? Math.abs(lhs) / QI_POLICY_MAX_ZETA : 0;
+  const fallbackAbs = Math.max(
+    Math.abs(DEFAULT_QI_BOUND_SCALAR),
+    Math.abs(Number(process.env.QI_BOUND_FLOOR_ABS) ?? 0),
+    policyFloorAbs,
+    1e-12,
+  );
+  const bound_Jm3 = clampNegativeBound(candidateBound, -fallbackAbs);
+  const rawRatio =
+    bound_Jm3 < 0 && Number.isFinite(bound_Jm3) ? Math.abs(lhs) / Math.abs(bound_Jm3) : Infinity;
+  const marginRatio = QI_POLICY_ENFORCE ? Math.min(rawRatio, QI_POLICY_MAX_ZETA) : rawRatio;
+
+  return {
+    lhs_Jm3: lhs,
+    bound_Jm3,
+    marginRatio: Number.isFinite(marginRatio) ? marginRatio : Infinity,
+    marginRatioRaw: Number.isFinite(rawRatio) ? rawRatio : Infinity,
+    policyLimit: QI_POLICY_ENFORCE ? QI_POLICY_MAX_ZETA : undefined,
+    window_ms: pattern.window_ms,
+    sampler,
+    fieldType: String(fieldType ?? "em"),
+    samples: pattern.window.length,
+    duty,
+    patternDuty,
+    maskSum,
+    effectiveRho,
+    rhoOn,
+    rhoSource: rhoDebug.source,
+    rhoNote: rhoDebug.note ?? rhoDebug.reason,
+  };
 }
 
 function deriveQiLaplaceRungeLenz(state: EnergyPipelineState, stats: QiStats) {
@@ -2641,13 +3845,15 @@ function desiredQiSampleDt(state: EnergyPipelineState): number {
   return clampNumber(dwellPerSample, 0.25, 10);
 }
 
-function reconfigureQiMonitor(tauMs: number, dtMs: number): void {
+function reconfigureQiMonitor(tauMs: number, dtMs: number, fieldType?: QiFieldType): void {
   const clampedTau = Math.max(0.5, tauMs);
   const clampedDt = clampNumber(dtMs, 0.25, 10);
   const tauChanged = Math.abs(clampedTau - qiMonitorTau_ms) > 1e-3;
   const dtChanged = Math.abs(clampedDt - qiMonitorDt_ms) > 1e-3;
-  if (!tauChanged && !dtChanged) return;
-  qiMonitor.reconfigure({ tau_s_ms: clampedTau, dt_ms: clampedDt });
+  const next: Partial<QiSettings> & { dt_ms?: number } = { tau_s_ms: clampedTau, dt_ms: clampedDt };
+  if (fieldType) next.fieldType = fieldType;
+  if (!tauChanged && !dtChanged && !fieldType) return;
+  qiMonitor.reconfigure(next);
   qiMonitorTau_ms = clampedTau;
   qiMonitorDt_ms = clampedDt;
   qiSampleAccumulator_ms = 0;
@@ -2766,7 +3972,7 @@ export async function computeEnergySnapshot(sim: any) {
   // Run the unified pipeline calculation
   const result = await calculateEnergyPipeline(state);
 
-  // ---- Normalize Light–Crossing payload for the client API -------------------
+  // ---- Normalize LightGÇôCrossing payload for the client API -------------------
   const lcSrc = (result.lc ?? result.lightCrossing ?? {}) as any;
   const lc = {
     tauLC_ms:   finite(lcSrc.tauLC_ms ?? lcSrc.tau_ms ?? (lcSrc.tau_us!=null ? lcSrc.tau_us/1000 : undefined)),
@@ -2789,7 +3995,7 @@ export async function computeEnergySnapshot(sim: any) {
     dutyFR_ship:     finite(result.dutyFR_ship),
   };
 
-  // ---- Natário tensors (kept under natario.*; adapter also accepts top-level)
+  // ---- Nat+írio tensors (kept under natario.*; adapter also accepts top-level)
   const natario = {
     metricMode:  !!(result.natario?.metricMode),
     lapseN:      finite(result.natario?.lapseN),
@@ -2798,11 +4004,11 @@ export async function computeEnergySnapshot(sim: any) {
     gSpatialSym: arrN(result.natario?.gSpatialSym, 6),
     viewForward: arrN(result.natario?.viewForward, 3),
     g0i:         arrN(result.natario?.g0i, 3),
-  // pass-through diagnostics from Natário (unit-annotated upstream)
-  dutyFactor:      finite(result.natario?.dutyFactor),       // unitless (μs/μs)
-  // NOTE: natario.thetaScaleCore_sqrtDuty is the explicit Natário sqrt-duty
-  // diagnostic (√duty semantics). Prefer `_sqrtDuty` when inspecting Natário
-  // outputs; it intentionally excludes γ_VdB and is NOT the canonical ship-wide
+  // pass-through diagnostics from Nat+írio (unit-annotated upstream)
+  dutyFactor:      finite(result.natario?.dutyFactor),       // unitless (++s/++s)
+  // NOTE: natario.thetaScaleCore_sqrtDuty is the explicit Nat+írio sqrt-duty
+  // diagnostic (GêÜduty semantics). Prefer `_sqrtDuty` when inspecting Nat+írio
+  // outputs; it intentionally excludes +¦_VdB and is NOT the canonical ship-wide
   // theta used by engines (engines should use `thetaScale` / `thetaScaleExpected`).
   // Keep the legacy `thetaScaleCore` key for back-compat but mark it deprecated
   // here by mapping it from the `_sqrtDuty` alias when present.
@@ -2833,14 +4039,15 @@ export async function computeEnergySnapshot(sim: any) {
 
 
   const warpUniforms = {
-    // physics (visual) — mass stays split and separate
+    // physics (visual) GÇö mass stays split and separate
     gammaGeo: result.gammaGeo,
     qSpoilingFactor: result.qSpoilingFactor,
     gammaVanDenBroeck: (result as any).gammaVanDenBroeck_vis,   // visual gamma
     gammaVanDenBroeck_vis: (result as any).gammaVanDenBroeck_vis,
     gammaVanDenBroeck_mass: (result as any).gammaVanDenBroeck_mass,
+      chi_coupling: result.couplingChi,
 
-    // Ford–Roman duty (ship-wide, sector-averaged)
+    // FordGÇôRoman duty (ship-wide, sector-averaged)
     dutyEffectiveFR,
 
     // UI label fields (harmless to include)
@@ -2849,7 +4056,7 @@ export async function computeEnergySnapshot(sim: any) {
     sectors: result.concurrentSectors,   // concurrent/live
     currentMode: result.currentMode,
 
-    // viewer defaults — visual policy only; parity/ridge set client-side
+    // viewer defaults GÇö visual policy only; parity/ridge set client-side
     viewAvg: true,
     colorMode: 'theta',
 
@@ -2864,36 +4071,39 @@ export async function computeEnergySnapshot(sim: any) {
 
   // PATCH START: uniformsExplain debug metadata for /bridge
   const uniformsExplain = {
-    // Human-readable “where did this come from?” pointers
+    // Human-readable GÇ£where did this come from?GÇ¥ pointers
     sources: {
       gammaGeo:               "server.result.gammaGeo (pipeline state)",
       qSpoilingFactor:        "server.result.qSpoilingFactor (mode policy / pipeline)",
       qCavity:                "server.result.qCavity (dynamic cavity Q)",
-      gammaVanDenBroeck_vis:  "server.(gammaVanDenBroeck_vis) — fixed visual seed unless standby",
-      gammaVanDenBroeck_mass: "server.(gammaVanDenBroeck_mass) — calibrated to hit M_target",
-      dutyEffectiveFR:        "server.derived (burstLocal × S_live / S_total; Ford–Roman window)",
+      gammaVanDenBroeck_vis:  "server.(gammaVanDenBroeck_vis) GÇö fixed visual seed unless standby",
+      gammaVanDenBroeck_mass: "server.(gammaVanDenBroeck_mass) GÇö calibrated to hit M_target",
+      dutyEffectiveFR:        "server.derived (burstLocal +ù S_live / S_total; FordGÇôRoman window)",
       dutyCycle:              "server.result.dutyCycle (UI duty from MODE_CONFIGS)",
       sectorCount:            "server.result.sectorCount (TOTAL sectors; usually 400)",
       sectors:                "server.result.concurrentSectors (live concurrent sectors)",
       currentMode:            "server.result.currentMode (authoritative)",
       hull:                   "server.result.hull (Lx,Ly,Lz,wallThickness_m)",
       wallWidth_m:            "server.result.hull.wallThickness_m",
-      viewAvg:                "policy: true (clients render FR-averaged θ by default)",
+      viewAvg:                "policy: true (clients render FR-averaged ++ by default)",
     },
 
-    // Ford–Roman duty derivation (numbers)
+    // FordGÇôRoman duty derivation (numbers)
     fordRomanDuty: {
-      formula: "d_eff = burstLocal × S_live / S_total",
-      burstLocal: PAPER_DUTY.BURST_DUTY_LOCAL, // 0.01
+      formula: "d_eff = measuredDuty || (dutyBurst * S_live / S_total)",
+      burstLocal: result.dutyBurst ?? PAPER_DUTY.BURST_DUTY_LOCAL,
       S_total: result.sectorCount,
       S_live: result.concurrentSectors,
+      measured_d_eff: result.dutyMeasuredFR,
       computed_d_eff: dutyEffectiveFR,
+      duty_source: (result as any)?.dutyEffectiveFRSource ?? ((result as any)?.dutyMeasuredFR != null ? "measured" : "schedule"),
+      window_ms: (result as any)?.dutyMeasuredWindow_ms,
     },
 
-    // θ audit + the inputs used to compute it (for transparency)
+    // ++ audit + the inputs used to compute it (for transparency)
     thetaAudit: {
-      note: "θ audit — raw vs calibrated VdB",
-      equation: "θ = γ_geo^3 · q · γ_VdB · d_eff", 
+      note: "++ audit GÇö raw vs calibrated VdB",
+      equation: "++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff", 
       mode: MODEL_MODE, // "raw" | "calibrated"
       inputs: {
         gammaGeo: result.gammaGeo,
@@ -2940,13 +4150,13 @@ export async function computeEnergySnapshot(sim: any) {
 
     // Base equations (render these + a line below with the live values)
     equations: {
-      d_eff: "d_eff = burstLocal · S_live / S_total",
-      theta_expected: "θ_expected = γ_geo^3 · q · γ_VdB(vis) · √d_eff",
-      U_static: "U_static = [-π²·ℏ·c/(720·a⁴)] · A_tile",
-      U_geo: "U_geo = γ_geo^3 · U_static",
-      U_Q: "U_Q = q_mech · U_geo",
-      P_avg: "P_avg = |U_Q| · ω / Q · N_tiles · d_eff",
-      M_exotic: "M = [U_static · γ_geo^3 · Q_burst · γ_VdB · d_eff] · N_tiles / c²",
+      d_eff: "d_eff = burstLocal -+ S_live / S_total",
+      theta_expected: "++_expected = +¦_geo^3 -+ q -+ +¦_VdB(vis) -+ GêÜd_eff",
+      U_static: "U_static = chi_coupling * [-pi^2 * hbar * c/(720 * a^3)] * A_tile",
+      U_geo: "U_geo = +¦_geo^3 -+ U_static",
+      U_Q: "U_Q = q_mech -+ U_geo",
+      P_avg: "P_avg = |U_Q| -+ -ë / Q -+ N_tiles -+ d_eff",
+      M_exotic: "M = [U_static -+ +¦_geo^3 -+ Q_burst -+ +¦_VdB -+ d_eff] -+ N_tiles / c-¦",
       TS_long: "TS_long = (L_long / c) / (1/f_m)",
     },
   };
@@ -2979,7 +4189,7 @@ export async function computeEnergySnapshot(sim: any) {
   dutyCycle: result.dutyCycle,
   sectorStrobing: result.sectorStrobing,
 
-    // Natário / stress-energy surface (time-averaged)
+    // Nat+írio / stress-energy surface (time-averaged)
     T00_avg: (result as any).warp?.stressEnergyTensor?.T00 ?? (result as any).stressEnergy?.T00,
     T11_avg: (result as any).warp?.stressEnergyTensor?.T11 ?? (result as any).stressEnergy?.T11,
     T22_avg: (result as any).warp?.stressEnergyTensor?.T22 ?? (result as any).stressEnergy?.T22,
@@ -3005,11 +4215,11 @@ export async function computeEnergySnapshot(sim: any) {
 }
 
 /**
- * Sample the Natário bell displacement on an ellipsoidal shell using the same math as the renderer.
+ * Sample the Nat+írio bell displacement on an ellipsoidal shell using the same math as the renderer.
  * Returns ~ nTheta*nPhi points, suitable for JSON compare or CSV export.
  */
 /**
- * Sample the Natário bell displacement on an ellipsoidal shell using the same math as the renderer.
+ * Sample the Nat+írio bell displacement on an ellipsoidal shell using the same math as the renderer.
  * Returns typed buffers suitable for JSON compare or CSV export without allocating per-sample objects.
  */
 export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSampleBuffer {
@@ -3021,20 +4231,20 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const axes: HullAxes = { a, b, c };
 
   const nTheta = Math.max(1, req.nTheta ?? 64);
-  const nPhi   = Math.max(2, req.nPhi ?? 32); // need ≥2 to avoid (nPhi-1)=0
+  const nPhi   = Math.max(2, req.nPhi ?? 32); // need GëÑ2 to avoid (nPhi-1)=0
   const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
   const split   = Number.isFinite(req.split as number) ? Math.max(0, Math.floor(req.split!)) : Math.floor(sectors / 2);
 
   const totalSamples = nTheta * nPhi;
   ensureFieldSampleCapacity(totalSamples);
 
-  // Canonical bell width in *ellipsoidal* radius units: wρ = w_m / a_eff.
-  // Use harmonic-mean effective radius to match viewer/renderer ρ-units.
-  const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);  // ✅ harmonic mean (matches viewer)
+  // Canonical bell width in *ellipsoidal* radius units: w-ü = w_m / a_eff.
+  // Use harmonic-mean effective radius to match viewer/renderer -ü-units.
+  const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);  // G£à harmonic mean (matches viewer)
   const w_m = req.wallWidth_m ?? Math.max(1e-6, (state.sag_nm ?? 16) * 1e-9); // meters
   const w_rho = Math.max(1e-6, w_m / aEff);
 
-  // Match renderer's gain chain (display-focused): disp ~ γ_geo^3 * q_spoil * bell * sgn
+  // Match renderer's gain chain (display-focused): disp ~ +¦_geo^3 * q_spoil * bell * sgn
   const gammaGeo   = state.gammaGeo ?? 26;
   const qSpoil     = state.qSpoilingFactor ?? 1;
   const geoAmp     = Math.pow(gammaGeo, 3);               // *** cubic, same as pipeline ***
@@ -3043,17 +4253,17 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   let idx = 0;
 
   for (let i = 0; i < nTheta; i++) {
-    const theta = (i / nTheta) * 2 * Math.PI;      // [-π, π] ring index
+    const theta = (i / nTheta) * 2 * Math.PI;      // [--Ç, -Ç] ring index
     // --- Smooth sector strobing (matches renderer exactly) ---
     const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
     const sectorIdx = Math.floor(u * sectors);
     const distToSplit = (sectorIdx - split + 0.5);
     const strobeWidth = 0.75;                 // same as renderer
-    const softSign = (x: number) => Math.tanh(x); // smooth ±1 transition
+    const softSign = (x: number) => Math.tanh(x); // smooth -¦1 transition
     const sgn = softSign(-distToSplit / strobeWidth); // smooth sector sign
 
     for (let j = 0; j < nPhi; j++) {
-      const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [-π/2, π/2]
+      const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [--Ç/2, -Ç/2]
       const onShell: [number, number, number] = [
         axes.a * Math.cos(phi) * Math.cos(theta),
         axes.b * Math.sin(phi),
@@ -3078,7 +4288,7 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
       else if (asd >= b_band) wallWin = 0.0;
       else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - a_band) / (b_band - a_band))); // smooth to 0
 
-      const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Natário canonical bell
+      const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Nat+írio canonical bell
 
       // --- Soft front/back polarity (if needed) ---
       const front = 1.0; // placeholder - can add soft polarity later if needed
@@ -3122,6 +4332,12 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
     dA: sampleDA.subarray(0, idx),
   };
 }
+
+
+
+
+
+
 
 
 

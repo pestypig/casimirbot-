@@ -43,6 +43,8 @@ export type ResonancePatchNode = {
   attention?: number;
   tests?: string;
   summary?: string;
+  bands?: string[];
+  sources?: string[];
 };
 
 export type ResonancePatchStats = {
@@ -51,6 +53,7 @@ export type ResonancePatchStats = {
   failingTests: number;
   activePanels: number;
   nodeCount: number;
+  casimirBandTotalCoherence?: number;
 };
 
 export type ResonancePatch = {
@@ -88,4 +91,69 @@ export type ResonanceBundle = {
   baseLimit: number;
   seedCount: number;
   candidates: ResonancePatch[];
+  telemetry?: ResonanceTelemetrySummary;
 };
+
+export type ResonanceTelemetryBand = {
+  name: string;
+  seed: number;
+  coherence?: number;
+  q?: number;
+  occupancy?: number;
+  eventRate?: number;
+  lastEventIso?: string;
+  sourceIds?: string[];
+  nodeIds?: string[];
+};
+
+export type ResonanceTelemetrySummary = {
+  casimir?: {
+    bands: ResonanceTelemetryBand[];
+    tileSample?: {
+      total?: number;
+      active?: number;
+      hot?: number[];
+    };
+    totalCoherence?: number;
+  };
+};
+
+export type ResonanceWeightConfig = {
+  wOcc: number;
+  wQ: number;
+  wCoh: number;
+  wRec: number;
+  wEvt: number;
+  tauMs: number;
+};
+
+export const RESONANCE_WEIGHT_DEFAULTS: ResonanceWeightConfig = {
+  wOcc: 0.2,
+  wQ: 0.25,
+  wCoh: 0.35,
+  wRec: 0.15,
+  wEvt: 0.05,
+  tauMs: 30_000,
+};
+
+const readNumber = (value: string | undefined, fallback: number): number => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return fallback;
+  }
+  return num;
+};
+
+export function readResonanceWeightsFromEnv(env: Record<string, string | undefined> = typeof process !== "undefined"
+  ? (process.env as Record<string, string | undefined>)
+  : {}): ResonanceWeightConfig {
+  const base = RESONANCE_WEIGHT_DEFAULTS;
+  return {
+    wOcc: readNumber(env.RESO_W_OCC, base.wOcc),
+    wQ: readNumber(env.RESO_W_Q, base.wQ),
+    wCoh: readNumber(env.RESO_W_COH, base.wCoh),
+    wRec: readNumber(env.RESO_W_REC, base.wRec),
+    wEvt: readNumber(env.RESO_W_EVT, base.wEvt),
+    tauMs: readNumber(env.RESO_TAU_MS, base.tauMs),
+  };
+}

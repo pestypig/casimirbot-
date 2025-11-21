@@ -51,6 +51,8 @@ type FordRomanConfig = {
   fields: Record<string, FieldConfig>;
 };
 
+const QI_BOUND_FLOOR_ABS = Number(process.env.QI_BOUND_FLOOR_ABS);
+
 const DEFAULT_CONFIG: FordRomanConfig = {
   defaultField: "em",
   defaultKernel: "lorentzian",
@@ -179,12 +181,21 @@ export function qiBound_Jm3(input: QiBoundInput): QiBoundResult {
   };
 }
 
+function effectiveBound(result: QiBoundResult, fallback?: number): number {
+  // Subtract safety to ensure the bound remains negative and conservative.
+  const safety = Math.abs(result.safetySigma_Jm3 ?? 0);
+  const candidate = result.bound_Jm3 - safety;
+  return clampNegative(candidate, fallback ?? result.bound_Jm3);
+}
+
 export function fordRomanBound({
   tau_s_ms,
   sampler,
   fieldKind,
   safetySigma_Jm3,
-  scalarFallback = -1,
+  scalarFallback = Number.isFinite(Number(process.env.QI_BOUND_SCALAR ?? process.env.QI_BOUND))
+    ? Number(process.env.QI_BOUND_SCALAR ?? process.env.QI_BOUND)
+    : -1,
 }: FordRomanBoundArgs): number {
   const tau_s = Math.max(1e-9, tau_s_ms / 1000);
   try {
@@ -194,7 +205,7 @@ export function fordRomanBound({
       kernelType: sampler,
       safetySigma_Jm3,
     });
-    return clampNegative(result.bound_Jm3 + result.safetySigma_Jm3);
+    return effectiveBound(result, scalarFallback);
   } catch (err) {
     console.warn("[qi-bounds] failed to compute ford-roman bound:", err);
     return scalarFallback;
@@ -212,21 +223,27 @@ export function configuredQiScalarBound(options: {
   safetySigma_Jm3?: number;
 } = {}): number {
   const tau_s_ms = Number.isFinite(options.tau_s_ms) ? (options.tau_s_ms as number) : Number(process.env.QI_TAU_MS) || 5;
+  const legacyFloor = Number(process.env.QI_BOUND_SCALAR ?? process.env.QI_BOUND);
+  const fallback = Number.isFinite(legacyFloor) ? Math.min(legacyFloor as number, -1e-12) : undefined;
   try {
-    const { bound_Jm3, safetySigma_Jm3 } = qiBound_Jm3({
+    const result = qiBound_Jm3({
       tau_s: Math.max(1e-9, tau_s_ms / 1000),
       fieldType: options.fieldType,
       kernelType: options.kernelType,
       safetySigma_Jm3: options.safetySigma_Jm3,
     });
-    return clampNegative(bound_Jm3 + safetySigma_Jm3);
+    return effectiveBound(result, fallback);
   } catch {
-    const legacy = Number(process.env.QI_BOUND_SCALAR ?? process.env.QI_BOUND);
-    return Number.isFinite(legacy) ? (legacy as number) : -1;
+    return fallback ?? -1;
   }
 }
 
-function clampNegative(value: number): number {
-  if (!Number.isFinite(value)) return -1;
-  return Math.min(value, -1e-12);
+function clampNegative(value: number, fallback?: number): number {
+  const floorAbs = Number.isFinite(QI_BOUND_FLOOR_ABS)
+    ? Math.max(Math.abs(QI_BOUND_FLOOR_ABS as number), 1e-12)
+    : 1e-12;
+  const fallbackMag = Number.isFinite(fallback) ? Math.max(Math.abs(fallback as number), floorAbs) : floorAbs;
+  if (!Number.isFinite(value)) return -fallbackMag;
+  const mag = Math.max(Math.abs(value) || 0, floorAbs, fallbackMag);
+  return -mag;
 }

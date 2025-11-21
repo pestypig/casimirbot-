@@ -40,6 +40,15 @@ function formatMHz(value?: number | null, digits = 3): string {
   return `${value.toFixed(digits)} MHz`;
 }
 
+function formatTauUnitsFirst(ms?: number | null): string {
+  if (!isFiniteNumber(ms)) return FALLBACK;
+  if (ms < 1) {
+    const us = ms * 1000;
+    return `${us.toFixed(3)} µs`;
+  }
+  return `${ms.toFixed(3)} ms`;
+}
+
 function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="space-y-0.5">
@@ -166,6 +175,11 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
     return null;
   }
 
+  const isMock =
+    Boolean((pipeline as any)?.__mockData) ||
+    Boolean((pipeline as any)?.mock) ||
+    Boolean((pipeline as any)?.mocked);
+
   const tileArea_cm2 = isFiniteNumber(pipeline?.tileArea_cm2)
     ? (pipeline!.tileArea_cm2 as number)
     : isFiniteNumber((pipeline as any)?.tiles?.tileArea_cm2)
@@ -190,6 +204,39 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
     : undefined;
 
   const staticEnergy_J = isFiniteNumber(pipeline?.U_static) ? (pipeline!.U_static as number) : undefined;
+  const staticEnergyNominal_J = isFiniteNumber((pipeline as any)?.U_static_nominal)
+    ? ((pipeline as any).U_static_nominal as number)
+    : staticEnergy_J;
+  const staticEnergyRealistic_J = isFiniteNumber((pipeline as any)?.U_static_realistic)
+    ? ((pipeline as any).U_static_realistic as number)
+    : staticEnergy_J;
+  const staticEnergyUncoupled_J = isFiniteNumber((pipeline as any)?.U_static_uncoupled)
+    ? ((pipeline as any).U_static_uncoupled as number)
+    : undefined;
+  const bandMin_J = isFiniteNumber((pipeline as any)?.U_static_band?.min)
+    ? ((pipeline as any).U_static_band.min as number)
+    : undefined;
+  const bandMax_J = isFiniteNumber((pipeline as any)?.U_static_band?.max)
+    ? ((pipeline as any).U_static_band.max as number)
+    : undefined;
+  const casimirModel = (pipeline as any)?.casimirModel ?? 'ideal_retarded';
+  const casimirRatio = isFiniteNumber((pipeline as any)?.casimirRatio)
+    ? ((pipeline as any).casimirRatio as number)
+    : isFiniteNumber(staticEnergyNominal_J) && staticEnergyNominal_J !== 0 && isFiniteNumber(staticEnergyRealistic_J)
+    ? (staticEnergyRealistic_J as number) / (staticEnergyNominal_J as number)
+    : undefined;
+  const perAreaIdeal_J_m2 =
+    isFiniteNumber(staticEnergyNominal_J) && isFiniteNumber(tileArea_m2) && tileArea_m2 !== 0
+      ? (staticEnergyNominal_J as number) / (tileArea_m2 as number)
+      : undefined;
+  const perAreaRealistic_J_m2 =
+    isFiniteNumber(staticEnergyRealistic_J) && isFiniteNumber(tileArea_m2) && tileArea_m2 !== 0
+      ? (staticEnergyRealistic_J as number) / (tileArea_m2 as number)
+      : undefined;
+  const perTileIdeal_mJ = isFiniteNumber(staticEnergyNominal_J) ? staticEnergyNominal_J * 1e3 : undefined;
+  const perTileRealistic_mJ = isFiniteNumber(staticEnergyRealistic_J)
+    ? staticEnergyRealistic_J * 1e3
+    : undefined;
   const modulationFreq_GHz = isFiniteNumber(pipeline?.modulationFreq_GHz)
     ? (pipeline!.modulationFreq_GHz as number)
     : isFiniteNumber((pipeline as any)?.dynamicConfig?.modulationFreqGHz)
@@ -265,7 +312,17 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
             <Waves className="h-5 w-5 text-cyan-300" />
             Casimir Tile Cavity
           </CardTitle>
-          <Badge className="bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40 animate-pulse">LIVE</Badge>
+          <Badge
+            className={cn(
+              'ring-1 text-[11px] font-semibold',
+              isMock
+                ? 'bg-amber-500/15 text-amber-100 ring-amber-400/50'
+                : 'bg-emerald-500/20 text-emerald-200 ring-emerald-400/40 animate-pulse',
+            )}
+            title={isMock ? 'DEV mock fixture active — deterministic output' : 'Live endpoint values'}
+          >
+            {isMock ? 'DEV MOCK' : 'LIVE'}
+          </Badge>
         </div>
         <CardDescription className="text-xs text-slate-400">
           Geometry, drive, and sweep baseline pulled from the active HELIX pipeline snapshot.
@@ -281,22 +338,40 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
             <Metric
               label="Plate gap a"
               value={formatNumber(gap_nm, 2, ' nm')}
-              hint="Defines ρ₀ = −π²ħc/(720 a⁴)"
+              hint="Defines u = -pi^2*hbar*c/(720*a^3)"
             />
             <Metric
               label="Tile area"
-              value={formatNumber(tileArea_m2, 4, ' m²')}
-              hint={isFiniteNumber(tileArea_cm2) ? `${formatNumber(tileArea_cm2, 1, ' cm²')}` : undefined}
+              value={formatNumber(tileArea_m2, 4, ' m^2')}
+              hint={isFiniteNumber(tileArea_cm2) ? `${formatNumber(tileArea_cm2, 1, ' cm^2')}` : undefined}
             />
             <Metric
               label="Tile volume"
-              value={formatSci(tileVolume_m3, 2, ' m³')}
-              hint="Area × gap"
+              value={formatSci(tileVolume_m3, 2, ' m^3')}
+              hint="Area x gap"
             />
             <Metric
-              label="Static energy U₀"
+              label="Static energy U0"
               value={formatSci(staticEnergy_J, 2, ' J')}
-              hint="Per tile baseline"
+              hint={
+                isFiniteNumber(staticEnergyNominal_J) && staticEnergyNominal_J !== staticEnergy_J
+                  ? `PEC (retarded): ${formatSci(staticEnergyNominal_J, 2, ' J')}`
+                  : 'Per tile baseline'
+              }
+            />
+            <Metric
+              label="Material model"
+              value={String(casimirModel)}
+              hint={isFiniteNumber(casimirRatio) ? `lifshitz/ret = ${casimirRatio.toFixed(2)}x` : undefined}
+            />
+            <Metric
+              label="Realistic U band"
+              value={
+                isFiniteNumber(bandMin_J) && isFiniteNumber(bandMax_J)
+                  ? `${formatSci(bandMin_J, 2, ' J')} ... ${formatSci(bandMax_J, 2, ' J')}`
+                  : formatSci(staticEnergyRealistic_J, 2, ' J')
+              }
+              hint="Non-retarded + finite-sigma estimate"
             />
             <Metric
               label="Tiles engaged"
@@ -307,11 +382,68 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
               label="Amplification chain"
               value={
                 isFiniteNumber(gammaGeo) && isFiniteNumber(gammaVdB) && isFiniteNumber(qSpoil)
-                  ? `γ_geo=${formatNumber(gammaGeo, 1)} · γ_VdB=${formatSci(gammaVdB, 1)} · q_spoil=${formatSci(qSpoil, 1)}`
+                  ? `gamma_geo=${formatNumber(gammaGeo, 1)} * gamma_VdB=${formatSci(gammaVdB, 1)} * q_spoil=${formatSci(qSpoil, 1)}`
                   : FALLBACK
               }
               hint="Instantaneous scaling"
             />
+          </div>
+          <div className="mt-4 rounded-lg border border-slate-800/60 bg-slate-900/50 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+              <span>Physics anchor (per area & per tile)</span>
+              <div className="flex flex-wrap gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'border-slate-700 bg-slate-900/60 text-[11px] text-slate-200',
+                    casimirModel?.includes('drude') && 'border-cyan-500/50 text-cyan-100',
+                    casimirModel?.includes('plasma') && 'border-fuchsia-500/50 text-fuchsia-100',
+                    casimirModel?.includes('ideal') && 'border-emerald-500/60 text-emerald-100',
+                  )}
+                >
+                  {casimirModel ?? 'uniform'}
+                </Badge>
+                {isFiniteNumber(casimirRatio) ? (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'border-slate-700 bg-slate-900/60 text-[11px] font-semibold',
+                      casimirRatio > 1 ? 'border-rose-400/60 text-rose-100' : 'border-emerald-400/50 text-emerald-100',
+                    )}
+                    title="Realistic / ideal energy ratio (chi=1 path)"
+                  >
+                    ratio {casimirRatio.toFixed(3)}
+                  </Badge>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-2 grid gap-3 sm:grid-cols-3 text-[11px] text-slate-200">
+              <div className="space-y-1">
+                <div className="text-slate-400">Ideal per-area</div>
+                <div className="font-mono text-sm">{formatSci(perAreaIdeal_J_m2, 3, ' J·m^-2')}</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-slate-400">Realistic per-area</div>
+                <div className="font-mono text-sm">
+                  {isFiniteNumber(perAreaRealistic_J_m2) ? formatSci(perAreaRealistic_J_m2, 3, ' J·m^-2') : FALLBACK}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-slate-400">Per-tile (mJ)</div>
+                <div className="font-mono text-sm">
+                  {isFiniteNumber(perTileRealistic_mJ)
+                    ? perTileRealistic_mJ.toFixed(3)
+                    : isFiniteNumber(perTileIdeal_mJ)
+                    ? perTileIdeal_mJ.toFixed(3)
+                    : FALLBACK}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500">
+              {`Ratios use the uncoupled chi=1 path${
+                isFiniteNumber(staticEnergyUncoupled_J) ? " (uncoupled band available)" : ""
+              }; check nm->m and cm^2->m^2 unit guards if values drift.`}
+            </div>
           </div>
         </section>
 
@@ -343,9 +475,20 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
             />
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <Metric label="τ_LC" value={formatNumber(tauLC_ms, 3, ' ms')} hint="Light-crossing" />
+            <Metric label="τ_LC" value={formatTauUnitsFirst(tauLC_ms)} hint="Light-crossing (units-first)" />
             <Metric label="Burst" value={formatNumber(burst_ms, 3, ' ms')} hint="ON window" />
             <Metric label="Dwell" value={formatNumber(dwell_ms, 3, ' ms')} hint="OFF window" />
+          </div>
+          <div className="mt-2 grid gap-3 sm:grid-cols-3 text-[11px] text-slate-400">
+            <div>{`Units sourcing: tauLC_ms -> formatted as microseconds when < 1 ms.`}</div>
+            <div>
+              HF proxy: {Number.isFinite((pipeline as any)?.epsilon) ? `I_eps=${(pipeline as any).epsilon}` : "awaiting I_eps"}
+            </div>
+            <div className="text-slate-500">
+              {isFiniteNumber(staticEnergyUncoupled_J)
+                ? `Uncoupled static band: ${formatSci(staticEnergyUncoupled_J, 2, " J")}`
+                : "Uncoupled static band uses chi=1 baseline"}
+            </div>
           </div>
         </section>
 

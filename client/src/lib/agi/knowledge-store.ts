@@ -41,6 +41,9 @@ const PREVIEW_BYTE_LIMIT = 4096;
 const INLINE_CONTENT_LIMIT = 32_768;
 const MIN_PREVIEW_BUDGET = 64;
 const encoder = new TextEncoder();
+const PDF_TEXT_LIMIT = INLINE_CONTENT_LIMIT;
+const PDF_PAGE_LIMIT = 20;
+const WHITESPACE_RE = /\s+/g;
 
 type EnvShape = Record<string, string | undefined>;
 const env: EnvShape = ((import.meta as any)?.env ?? {}) as EnvShape;
@@ -96,6 +99,7 @@ const EXTENSION_MIME: Record<string, string> = {
   ".markdown": "text/markdown",
   ".txt": "text/plain",
   ".json": "application/json",
+  ".pdf": "application/pdf",
   ".csv": "text/plain",
   ".ts": "text/plain",
   ".tsx": "text/plain",
@@ -120,6 +124,8 @@ const EXTENSION_MIME: Record<string, string> = {
 
 const PROJECT_SLUG_FALLBACK = "project";
 const FILE_SLUG_FALLBACK = "file";
+const pdfTextCache = new Map<string, string | null>();
+const pdfTextInflight = new Map<string, Promise<string | null>>();
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -281,6 +287,60 @@ function inferFileKind(mime: string, name: string): KnowledgeFileKind {
   return "text";
 }
 
+const pdfCacheKey = (record: KnowledgeFileRecord): string => record.id ?? `${record.name}:${record.size}`;
+
+type PdfExtractorModule = typeof import("@/lib/rag/ingest-pdf");
+let pdfExtractorPromise: Promise<PdfExtractorModule> | null = null;
+
+const loadPdfExtractor = async (): Promise<PdfExtractorModule> => {
+  if (!pdfExtractorPromise) {
+    pdfExtractorPromise = import("@/lib/rag/ingest-pdf").catch((error) => {
+      pdfExtractorPromise = null;
+      throw error;
+    });
+  }
+  return pdfExtractorPromise;
+};
+
+const normalizePdfText = (value: string | undefined): string => (value ?? "").replace(WHITESPACE_RE, " ").trim();
+
+async function getPdfText(record: KnowledgeFileRecord): Promise<string | null> {
+  if (!isPdfRecord(record)) {
+    return null;
+  }
+  if (typeof window === "undefined" || typeof File === "undefined") {
+    return null;
+  }
+  const key = pdfCacheKey(record);
+  if (pdfTextCache.has(key)) {
+    return pdfTextCache.get(key) ?? null;
+  }
+  if (pdfTextInflight.has(key)) {
+    return pdfTextInflight.get(key)!;
+  }
+  const task = (async () => {
+    try {
+      const { extractTextFromPDF } = await loadPdfExtractor();
+      const file = new File([record.data], record.name || "document.pdf", {
+        type: record.mime || "application/pdf",
+      });
+      const raw = await extractTextFromPDF(file, { maxPages: PDF_PAGE_LIMIT });
+      const normalized = normalizePdfText(raw);
+      if (!normalized) {
+        return null;
+      }
+      return normalized.slice(0, PDF_TEXT_LIMIT);
+    } catch {
+      return null;
+    }
+  })();
+  pdfTextInflight.set(key, task);
+  const result = await task;
+  pdfTextInflight.delete(key);
+  pdfTextCache.set(key, result);
+  return result;
+}
+
 const ensureMimeAllowed = (mime: string) => {
   if (!allowedMimeSet.has(mime.toLowerCase())) {
     throw new Error(`File type ${mime} is not allowed for knowledge projects.`);
@@ -294,6 +354,9 @@ const formatBytes = (bytes: number): string => {
   return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
 };
 
+const isPdfRecord = (record: KnowledgeFileRecord): boolean =>
+  record.mime?.includes("pdf") || record.name.toLowerCase().endsWith(".pdf");
+
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   if (typeof Buffer !== "undefined") {
     return Buffer.from(buffer).toString("base64");
@@ -306,6 +369,10 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   }
   return globalThis.btoa ? globalThis.btoa(binary) : binary;
 };
+
+export async function extractKnowledgePdfText(record: KnowledgeFileRecord): Promise<string | null> {
+  return getPdfText(record);
+}
 
 export async function createProject(payload: CreateProjectPayload): Promise<KnowledgeProjectRecord> {
   const db = await openKnowledgeDB();
@@ -491,6 +558,13 @@ const buildPreview = async (record: KnowledgeFileRecord): Promise<string> => {
   if (record.kind === "image") {
     return `Image reference · ${record.name} · ${formatBytes(record.size)}`;
   }
+  if (isPdfRecord(record)) {
+    const pdfText = await getPdfText(record);
+    if (pdfText) {
+      return pdfText.slice(0, PREVIEW_CHAR_LIMIT);
+    }
+    return `PDF document · ${record.name} · ${formatBytes(record.size)}`;
+  }
   try {
     const chunk = await record.data.slice(0, PREVIEW_BYTE_LIMIT, record.mime).text();
     const trimmed = chunk.trim().slice(0, PREVIEW_CHAR_LIMIT);
@@ -526,6 +600,24 @@ const buildAttachment = async (record: KnowledgeFileRecord, budgetBytes?: number
     const buffer = await record.data.arrayBuffer();
     contentBase64 = arrayBufferToBase64(buffer);
     contentBytes = buffer.byteLength;
+  } else if (!contentBase64 && isPdfRecord(record)) {
+    const pdfText = await getPdfText(record);
+    if (pdfText) {
+      const pdfBytes = encoder.encode(pdfText);
+      let inlineBytes = pdfBytes;
+      if (typeof remainingAfterPreview === "number") {
+        const allowed = Math.max(0, remainingAfterPreview);
+        if (allowed === 0) {
+          inlineBytes = new Uint8Array(0);
+        } else if (allowed < pdfBytes.byteLength) {
+          inlineBytes = pdfBytes.slice(0, allowed);
+        }
+      }
+      if (inlineBytes.byteLength > 0) {
+        contentBase64 = arrayBufferToBase64(inlineBytes.buffer);
+        contentBytes = inlineBytes.byteLength;
+      }
+    }
   }
   return {
     attachment: {

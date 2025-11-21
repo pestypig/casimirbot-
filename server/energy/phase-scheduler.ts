@@ -40,6 +40,14 @@ export function computeSectorPhaseOffsets(args: {
     let w: number;
     if (sampler === "gaussian") {
       w = Math.exp(-((t_k * t_k) / (2 * tau * tau)));
+    } else if (sampler === "compact") {
+      const dist = Math.abs(t_k);
+      if (dist > tau) {
+        w = 0;
+      } else {
+        const x = dist / Math.max(tau, 1e-3);
+        w = 0.5 * (1 + Math.cos(Math.PI * x)); // compact Hann window
+      }
     } else {
       w = 1 / (1 + (t_k * t_k) / (tau * tau));
     }

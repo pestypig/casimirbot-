@@ -95,6 +95,9 @@ export async function insertActivitySamples(
   if (!samples.length) {
     return 0;
   }
+  if (!ownerId) {
+    return 0;
+  }
   await ensureDatabase();
   const pool = getPool();
   const normalized = samples.map((sample) => ActivitySample.parse(sample));

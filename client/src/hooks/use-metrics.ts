@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { ClockingSnapshot } from "@shared/clocking";
 
 // ---------------- Types (unchanged) ----------------
 export interface ShiftVectorMetrics {
@@ -99,12 +100,21 @@ function deriveMetricsFromPipeline(p: any): HelixMetrics {
     0;
 
   // Timescales
+  const clocking = p?.clocking as ClockingSnapshot | undefined;
   const Llong_m   = num(p?.L_long ?? p?.L_long_m ?? p?.hull?.L_long_m ?? p?.metrics?.L_long_m, 0);
   const c         = 299_792_458;
-  const T_LC_s    = Llong_m > 0 ? (Llong_m / c) : num(p?.T_LC ?? p?.T_LC_s, 0);
+  const T_LC_s    = Number.isFinite(num(clocking?.tauLC_ms, NaN)) && num(clocking?.tauLC_ms, NaN) > 0
+    ? num(clocking?.tauLC_ms) / 1000
+    : (Llong_m > 0 ? (Llong_m / c) : num(p?.T_LC ?? p?.T_LC_s, 0));
   const f_m_Hz    = num(p?.modulationFreq_Hz ?? (p?.modulationFreq_GHz * 1e9), 0);
   const T_m_s     = f_m_Hz > 0 ? (1 / f_m_Hz) : num(p?.T_m ?? p?.T_m_s, 0);
-  const TS_long   = (T_LC_s > 0 && T_m_s > 0) ? (T_LC_s / T_m_s) : num(p?.TS_ratio ?? p?.TS ?? p?.timescales?.TS_long, 0);
+  const TS_long   = (() => {
+    const tsClock = num(clocking?.TS, NaN);
+    if (Number.isFinite(tsClock) && tsClock > 0) return tsClock;
+    const tsRatio = num(p?.TS_ratio ?? p?.TS ?? p?.timescales?.TS_long, NaN);
+    if (Number.isFinite(tsRatio) && tsRatio > 0) return tsRatio;
+    return (T_LC_s > 0 && T_m_s > 0) ? (T_LC_s / T_m_s) : 0;
+  })();
 
   // Tiles/hull
   const N_tiles   = num(p?.N_tiles ?? p?.tiles?.N_tiles, 0);
@@ -124,8 +134,10 @@ function deriveMetricsFromPipeline(p: any): HelixMetrics {
   })();
 
   // Ford-Roman compliance
-  const zeta = num(p?.zeta ?? p?.fordRoman?.value ?? p?.fordRoman?.zeta, 0);
-  const fordRomanStatus = p?.fordRomanCompliance ? "PASS" : (zeta >= 1.0 ? "FAIL" : "PASS");
+  const zetaLimit = num(p?.qi?.policyLimit ?? p?.fordRoman?.limit ?? 1.0, 1.0);
+  const zetaRaw = num(p?.zetaRaw ?? p?.qi?.marginRatioRaw ?? p?.zeta ?? p?.fordRoman?.value ?? p?.fordRoman?.zeta, 0);
+  const zeta = num(p?.zeta ?? p?.qi?.marginRatio ?? p?.fordRoman?.value ?? p?.fordRoman?.zeta, zetaRaw);
+  const fordRomanStatus = p?.fordRomanCompliance ? "PASS" : (zetaRaw >= zetaLimit ? "FAIL" : "PASS");
 
   // Strobing metrics
   const strobingMetrics = {
@@ -183,7 +195,7 @@ function deriveMetricsFromPipeline(p: any): HelixMetrics {
     exoticMass: exoticKg,
     timeScaleRatio: TS_long,
     curvatureMax: num(p?.curvature_max ?? p?.curvatureMax ?? 0),
-    fordRoman: { value: zeta, limit: 1.0, status: fordRomanStatus },
+    fordRoman: { value: zetaRaw, limit: zetaLimit, status: fordRomanStatus },
     sectorStrobing: sectors,
     activeTiles: tiles,
     totalTiles: num(p?.totalTiles ?? N_tiles, 0),
@@ -224,7 +236,15 @@ export function useMetrics(pollMs = 2000) {
       if (!mounted) return;
       // Prefer the canonical energy pipeline snapshot from react-query cache
       try {
+        const metricsFromQuery = queryClient.getQueryData(['/api/helix/metrics']) as any | undefined;
         const pipeline = queryClient.getQueryData(['/api/helix/pipeline']) as any | undefined;
+        if (metricsFromQuery) {
+          const merged = pipeline
+            ? { ...pipeline, ...metricsFromQuery, pipeline }
+            : { ...metricsFromQuery, pipeline: metricsFromQuery?.pipeline ?? pipeline };
+          setData(merged);
+          return;
+        }
         if (pipeline) {
           // Derive a compact HelixMetrics-like view for UI consumers
           const derived = deriveMetricsFromPipeline(pipeline);

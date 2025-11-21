@@ -22,6 +22,8 @@
     "test": "vitest run",
     "db:push": "drizzle-kit push",
     "link:theory": "node scripts/link-theory.mjs",
+    "debate:harness": "node --experimental-fetch scripts/debate-harness.mjs",
+    "debate:plan-exec": "node --experimental-fetch scripts/plan-exec-with-debate.mjs",
     "ideology:extract": "tsx scripts/extract-ideology.ts",
     "test:watch": "vitest",
     "test:repo": "vitest --root . --run"
@@ -72,6 +74,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "connect-pg-simple": "^10.0.0",
+    "csv-parse": "^5.6.0",
     "date-fns": "^3.6.0",
     "drizzle-orm": "^0.39.1",
     "drizzle-zod": "^0.7.0",

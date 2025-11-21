@@ -13,10 +13,14 @@ type HelixMetrics = {
   overallStatus?: string;
   fordRoman?: { status?: string };
   dutyCycle?: number;
+  coherence?: number;
+  qFactor?: number;
+  eventsPerMinute?: number;
+  eventRate?: number;
+  lastEventIso?: string;
 };
 
-const DEFAULT_METRICS: Required<Pick<HelixMetrics, "totalTiles" | "activeTiles" | "activeSectors" | "totalSectors" | "strobeHz" | "sectorPeriod_ms">> &
-  Pick<HelixMetrics, "overallStatus"> = {
+const DEFAULT_METRICS: HelixMetrics = {
   totalTiles: 0,
   activeTiles: 0,
   activeSectors: 0,
@@ -24,6 +28,8 @@ const DEFAULT_METRICS: Required<Pick<HelixMetrics, "totalTiles" | "activeTiles" 
   strobeHz: 0,
   sectorPeriod_ms: 0,
   overallStatus: "unknown",
+  tilesPerSector: 0,
+  dutyCycle: 0,
 };
 
 const fetchHelixMetrics = async (): Promise<HelixMetrics | null> => {
@@ -60,24 +66,30 @@ export default function CasimirTilesPanel() {
     refetchInterval: 2000,
   });
   const metrics = data ?? DEFAULT_METRICS;
-  const totalTiles = metrics.totalTiles ?? DEFAULT_METRICS.totalTiles;
-  const activeTiles = metrics.activeTiles ?? DEFAULT_METRICS.activeTiles;
+  const totalTiles = typeof metrics.totalTiles === "number" ? metrics.totalTiles : 0;
+  const activeTiles = typeof metrics.activeTiles === "number" ? metrics.activeTiles : 0;
   const activePct = totalTiles > 0 ? activeTiles / totalTiles : 0;
-  const totalSectors = Math.max(1, metrics.totalSectors ?? DEFAULT_METRICS.totalSectors);
-  const activeSectors = metrics.activeSectors ?? DEFAULT_METRICS.activeSectors;
+  const totalSectors = Math.max(1, typeof metrics.totalSectors === "number" ? metrics.totalSectors : 1);
+  const activeSectors = typeof metrics.activeSectors === "number" ? metrics.activeSectors : 0;
   const status = metrics.overallStatus ?? metrics.fordRoman?.status ?? "unknown";
   const dutyPercent = typeof metrics.dutyCycle === "number" ? metrics.dutyCycle * 100 : null;
+  const coherence = typeof metrics.coherence === "number" ? metrics.coherence : activeSectors / Math.max(1, totalSectors);
+  const qFactor = typeof metrics.qFactor === "number" ? metrics.qFactor : undefined;
+  const eventRate = typeof metrics.eventRate === "number" ? metrics.eventRate : metrics.eventsPerMinute;
+  const lastEventIso = metrics.lastEventIso;
 
   usePanelTelemetryPublisher(
     "casimir-tiles",
     () => ({
-      kind: "client",
+      kind: "casimir",
       metrics: {
         tilesActive: activeTiles,
         totalTiles,
         strobeHz: metrics.strobeHz ?? 0,
         activeSectors,
         totalSectors,
+        coherence: coherence ?? 0,
+        avgQFactor: qFactor ?? 0,
       },
       flags: {
         hasActivity: activeTiles > 0,
@@ -85,6 +97,21 @@ export default function CasimirTilesPanel() {
       },
       strings: {
         status,
+        ...(lastEventIso ? { lastEventIso } : {}),
+      },
+      bands: [
+        {
+          name: "mhz",
+          q: qFactor ?? 0,
+          coherence: coherence ?? 0,
+          occupancy: totalTiles > 0 ? activeTiles / totalTiles : 0,
+          event_rate: eventRate,
+          last_event: lastEventIso,
+        },
+      ],
+      tile_sample: {
+        total: totalTiles,
+        active: activeTiles,
       },
       sourceIds: [
         "client/src/components/panels/CasimirTilesPanel.tsx",
@@ -93,7 +120,7 @@ export default function CasimirTilesPanel() {
         "modules/dynamic/dynamic-casimir.ts",
       ],
     }),
-    [activeTiles, totalTiles, metrics.strobeHz, activeSectors, totalSectors, status],
+    [activeTiles, totalTiles, metrics.strobeHz, activeSectors, totalSectors, status, coherence, qFactor, eventRate, lastEventIso],
   );
 
   const derived = useMemo(

@@ -131,6 +131,21 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
 
   const status = STATUS_META[badge] ?? STATUS_META.idle;
   const marginClass = status.marginClass;
+  const interestDebt = Number(qi.interestDebt);
+  const interestCredit = Number(qi.interestCredit);
+  const interestMargin = Number(qi.interestMargin);
+  const interestWindow_ms = Number(qi.interestWindow_ms);
+  const interestNet = Number(qi.interestNetCycle);
+  const hasInterest = Number.isFinite(interestDebt) || Number.isFinite(interestCredit);
+  const interestGuardFrac = 0.05;
+  const interestTone =
+    !Number.isFinite(interestMargin)
+      ? "text-right text-slate-400"
+      : interestMargin < 0
+        ? "text-right text-rose-300"
+        : Number.isFinite(interestDebt) && interestDebt > 0 && interestMargin < interestDebt * interestGuardFrac
+          ? "text-right text-amber-300"
+          : "text-right text-emerald-300";
 
   const observerLabel = qi.observerId || "observer";
   const homogenizerValues = [
@@ -159,6 +174,31 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
     ? wrapDegrees((lrlPeriapsis * 180) / Math.PI)
     : 0;
   const lrlTone = hasLrlTelemetry ? getLrlTone(lrlEccentricity) : null;
+  const badgeTitleParts = [
+    `margin ${fmt(qi.margin, 4)}`,
+    `window ${fmt(qi.window_ms, 2)} ms`,
+  ];
+  if (Number.isFinite(interestMargin)) {
+    const payoffWindow = Number.isFinite(interestWindow_ms) ? `${fmt(interestWindow_ms, 2)} ms` : null;
+    badgeTitleParts.push(
+      `interest ${fmt(interestMargin, 4)}${payoffWindow ? ` @ ${payoffWindow}` : ""}`,
+    );
+  }
+  const badgeTitle = badgeTitleParts.filter(Boolean).join(" | ");
+  const qiSamples = Number(qi.samples);
+  const marginRaw =
+    Number.isFinite(qi.marginRatioRaw) && Number(qi.marginRatioRaw) !== 0
+      ? Number(qi.marginRatioRaw)
+      : Number.isFinite(qi.marginRatio)
+        ? Number(qi.marginRatio)
+        : Number(qi.margin);
+  const sigmaNorm = Number(qi.sigmaT00_norm);
+  const sigmaDisplay = Number.isFinite(sigmaNorm) ? sigmaNorm.toPrecision(3) : FALLBACK;
+  const sigmaOverRootN =
+    Number.isFinite(sigmaNorm) && Number.isFinite(qiSamples) && qiSamples > 0
+      ? (sigmaNorm / Math.sqrt(qiSamples)).toPrecision(3)
+      : null;
+  const policyLimit = Number(qi.policyLimit);
 
   return (
     <div
@@ -174,7 +214,10 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
           </div>
           <LRLDocsTooltip className="border-slate-700/70 text-slate-400" />
         </div>
-        <Badge className={cn("px-2.5 py-0.5 text-[11px] font-semibold", status.badgeClass)}>
+        <Badge
+          className={cn("px-2.5 py-0.5 text-[11px] font-semibold", status.badgeClass)}
+          title={badgeTitle}
+        >
           {status.label}
         </Badge>
       </div>
@@ -205,6 +248,56 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
         <span className="text-slate-400">Samples</span>
         <span className="text-right">{fmtInt(qi.samples)}</span>
       </div>
+
+      <div className="mt-3 rounded border border-slate-800/70 bg-slate-900/60 p-3">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-400">
+          <span>Sampling stability</span>
+          <span className="text-slate-500">
+            {sigmaOverRootN ? `${sigmaOverRootN} ~ σ/√N` : "variance ~ 1/√N"}
+          </span>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-slate-300">
+          <span className="text-slate-400">ζ raw</span>
+          <span className="text-right">{fmt(marginRaw, 3)}</span>
+
+          <span className="text-slate-400">σ (norm)</span>
+          <span className="text-right">{sigmaDisplay}</span>
+
+          <span className="text-slate-400">σ / √N</span>
+          <span className="text-right">{sigmaOverRootN ?? FALLBACK}</span>
+
+          {Number.isFinite(policyLimit) && (
+            <>
+              <span className="text-slate-400">Policy cap</span>
+              <span className="text-right">{fmt(policyLimit, 3)}</span>
+            </>
+          )}
+        </div>
+        {policyLimit === 0 && (
+          <div className="mt-2 text-[11px] text-amber-300">
+            Policy clamp enforced (ζ displayed as 0). Toggle enforcement to inspect ζ_raw.
+          </div>
+        )}
+      </div>
+
+      {hasInterest && (
+        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 rounded border border-slate-800/70 bg-slate-900/50 p-3">
+          <span className="text-slate-400">Interest debt</span>
+          <span className="text-right">{fmt(interestDebt, 4)}</span>
+
+          <span className="text-slate-400">Payback scheduled</span>
+          <span className="text-right">{fmt(interestCredit, 4)}</span>
+
+          <span className="text-slate-400">Interest margin</span>
+          <span className={interestTone}>{fmt(interestMargin, 4)}</span>
+
+          <span className="text-slate-400">Payback window</span>
+          <span className="text-right">{fmt(interestWindow_ms, 2)} ms</span>
+
+          <span className="text-slate-400">Net cycle</span>
+          <span className="text-right">{fmt(interestNet, 4)}</span>
+        </div>
+      )}
 
       {hasLrlTelemetry && lrlTone && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded border border-slate-800/70 bg-slate-900/40 px-3 py-2">

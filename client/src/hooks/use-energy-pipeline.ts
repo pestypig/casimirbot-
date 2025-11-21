@@ -15,6 +15,7 @@ import type {
   QiStats,
   PhaseScheduleTelemetry,
 } from "@shared/schema";
+import type { ClockingSnapshot } from "@shared/clocking";
 
 /**
  * TheoryRefs:
@@ -32,6 +33,46 @@ export interface GreensPayload {
   phi: Float32Array;         // normalized or raw potential samples (per-tile order)
   size: number;              // phi.length
   source: GreensSource;      // who computed it
+}
+
+export type QuantumInterestBook = {
+  neg_Jm3: number;
+  pos_Jm3: number;
+  debt_Jm3: number;
+  credit_Jm3: number;
+  margin_Jm3: number;
+  netCycle_Jm3: number;
+  window_ms: number;
+  rate: number;
+};
+
+export interface MechanicalFeasibility {
+  requestedGap_nm: number;
+  requestedStroke_pm: number;
+  recommendedGap_nm: number;
+  minGap_nm: number;
+  maxStroke_pm: number;
+  casimirPressure_Pa: number;
+  electrostaticPressure_Pa: number;
+  restoringPressure_Pa: number;
+  roughnessGuard_nm: number;
+  margin_Pa: number;
+  feasible: boolean;
+  strokeFeasible: boolean;
+  constrainedGap_nm?: number;
+  unattainable?: boolean;
+  note?: string;
+  sweep?: Array<{ gap_nm: number; margin_Pa: number; feasible: boolean }>;
+}
+
+export interface MechanicalGuard {
+  qMechDemand: number;
+  qMechApplied: number;
+  mechSpoilage: number;
+  pCap_W: number;
+  pApplied_W: number;
+  pShortfall_W: number;
+  status: "ok" | "saturated" | "fail";
 }
 
 export interface EnergyPipelineState {
@@ -133,6 +174,10 @@ export interface EnergyPipelineState {
   P_avg_W?: number;             // alias for power in watts
   qi?: QiStats;
   qiBadge?: "ok" | "near" | "violation";
+  qiInterest?: QuantumInterestBook | null;
+  clocking?: ClockingSnapshot;
+  mechanical?: MechanicalFeasibility;
+  mechGuard?: MechanicalGuard;
   phaseSchedule?: PhaseScheduleTelemetry;
 
   // Hull parameters for UI overlays
@@ -172,6 +217,29 @@ export interface EnergyPipelineState {
   M_exotic: number;
   M_exotic_raw: number;     // Raw physics exotic mass (before calibration)
   massCalibration: number;  // Mass calibration factor
+  rho_static?: number;      // Static Casimir energy density (J/m^3)
+  rho_inst?: number;        // Instantaneous (on-window) energy density (J/m^3)
+  rho_avg?: number;         // Cycle-averaged energy density (J/m^3)
+  gammaChain?: {
+    geo_cubed?: number;
+    qGain?: number;
+    pocketCompression?: number;
+    dutyEffective?: number;
+    qSpoiling?: number;
+    note?: string;
+  };
+  gammaVanDenBroeckGuard?: {
+    limit: number;
+    greenBand: { min: number; max: number };
+    pocketRadius_m: number;
+    pocketThickness_m: number;
+    planckMargin: number;
+    admissible: boolean;
+    reason: string;
+    requested?: number;
+    targetHit?: boolean;
+    targetShortfall?: number;
+  };
   TS_ratio: number;
   TS_long?: number;
   TS_geom?: number;
@@ -813,20 +881,47 @@ export function useEnergyPipeline(options?: {
   const selectPipelineState = React.useCallback(
     (raw: EnergyPipelineState): EnergyPipelineState => {
       if (!raw) return raw;
-      const rows = Array.isArray(raw.vacuumGapSweepResults)
-        ? raw.vacuumGapSweepResults
+      let snapshot: EnergyPipelineState = raw;
+
+      // Enforce server-provided γ_VdB green-band guard so UI solvers cannot wander outside it
+      const vdbGuard =
+        (snapshot as any).gammaVanDenBroeckGuard ??
+        (snapshot as any).gammaVanDenBroeck_guard;
+      if (vdbGuard && Number.isFinite((vdbGuard as any).limit)) {
+        const limit = Number((vdbGuard as any).limit);
+        const requested = Number(
+          (vdbGuard as any).requested ?? snapshot.gammaVanDenBroeck,
+        );
+        const boundedGamma = Math.min(
+          snapshot.gammaVanDenBroeck ?? limit,
+          limit,
+        );
+        const boundedMass = Number.isFinite(snapshot.gammaVanDenBroeck_mass)
+          ? Math.min(snapshot.gammaVanDenBroeck_mass as number, limit)
+          : undefined;
+        snapshot = {
+          ...snapshot,
+          gammaVanDenBroeck: boundedGamma,
+          gammaVanDenBroeck_mass: boundedMass ?? boundedGamma,
+        };
+        (snapshot as any).gammaVanDenBroeck_greenBand = (vdbGuard as any).greenBand;
+        (snapshot as any).gammaVanDenBroeck_nonAdmissible = requested > limit;
+      }
+
+      const rows = Array.isArray(snapshot.vacuumGapSweepResults)
+        ? snapshot.vacuumGapSweepResults
         : [];
       const visibleCount = rows.length;
       const totalFromServer =
-        typeof raw.vacuumGapSweepRowsTotal === "number"
-          ? raw.vacuumGapSweepRowsTotal
+        typeof snapshot.vacuumGapSweepRowsTotal === "number"
+          ? snapshot.vacuumGapSweepRowsTotal
           : visibleCount;
       const total = Math.max(totalFromServer, visibleCount);
 
       if (visibleCount > MAX_SWEEP_ROWS) {
         const trimmed = rows.slice(-MAX_SWEEP_ROWS);
         return {
-          ...raw,
+          ...snapshot,
           vacuumGapSweepResults: trimmed,
           vacuumGapSweepRowsTotal: total,
           vacuumGapSweepRowsDropped: total - trimmed.length,
@@ -834,19 +929,19 @@ export function useEnergyPipeline(options?: {
       }
 
       const dropped =
-        typeof raw.vacuumGapSweepRowsDropped === "number"
-          ? Math.max(0, raw.vacuumGapSweepRowsDropped)
+        typeof snapshot.vacuumGapSweepRowsDropped === "number"
+          ? Math.max(0, snapshot.vacuumGapSweepRowsDropped)
           : Math.max(0, total - visibleCount);
 
       if (
-        raw.vacuumGapSweepRowsTotal === total &&
-        raw.vacuumGapSweepRowsDropped === dropped
+        snapshot.vacuumGapSweepRowsTotal === total &&
+        snapshot.vacuumGapSweepRowsDropped === dropped
       ) {
-        return raw;
+        return snapshot;
       }
 
       return {
-        ...raw,
+        ...snapshot,
         vacuumGapSweepRowsTotal: total,
         vacuumGapSweepRowsDropped: dropped,
       };

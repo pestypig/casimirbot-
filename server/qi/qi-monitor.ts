@@ -40,6 +40,7 @@ export class QiMonitor {
     const bound = fordRomanBound({
       tau_s_ms: this.settings.tau_s_ms,
       sampler: this.settings.sampler,
+      fieldKind: this.settings.fieldType,
       scalarFallback: this.boundScalar,
     });
 
@@ -47,6 +48,7 @@ export class QiMonitor {
       sampler: this.settings.sampler,
       tau_s_ms: this.settings.tau_s_ms,
       observerId: this.settings.observerId,
+      fieldType: this.settings.fieldType,
       dt_ms: this.kernel.dt_ms,
       avg: acc,
       bound,
@@ -86,6 +88,18 @@ function makeKernel(kind: SamplingKind, tau_s_ms: number, dt_ms: number): Kernel
     for (let k = 0; k < span; k += 1) {
       const t = (k - span + 1) * dt_ms;
       weights[k] = Math.exp(-(t * t) / (2 * sigma2 || 1));
+    }
+  } else if (kind === "compact") {
+    const radius = Math.max(tau_s_ms, dt_ms);
+    for (let k = 0; k < span; k += 1) {
+      const t = Math.abs((k - span + 1) * dt_ms);
+      if (t > radius) {
+        weights[k] = 0;
+      } else {
+        // Raised-cosine bump with compact support on [-tau, tau]
+        const x = t / Math.max(radius, 1e-6);
+        weights[k] = 0.5 * (1 + Math.cos(Math.PI * x));
+      }
     }
   } else {
     for (let k = 0; k < span; k += 1) {

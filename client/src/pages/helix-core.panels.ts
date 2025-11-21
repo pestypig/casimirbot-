@@ -107,7 +107,9 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "agi-debate-view": ["AGI debate", "debate SSE", "argument stream", "multi agent debate", "debate dashboard"],
   "agi-essence-console": ["Essence console", "AGI console", "plan execute", "tools logs", "command console"],
   "agi-task-history": ["task history", "AGI trace", "task log", "history queue", "trace timeline"],
-  "essence-proposals": ["essence proposals", "proposal queue", "jobs board", "proposal actions", "proposal mgr"]
+  "essence-proposals": ["essence proposals", "proposal queue", "jobs board", "proposal actions", "proposal mgr"],
+  "fashion-lookbook": ["fashion", "garment", "cape", "shirt", "pants", "knit", "palette"],
+  "stellar-lsr": ["stars", "lsr", "local standard of rest", "catalog", "nav", "stellar"]
 };
 
 function lazyPanel<T extends Record<string, unknown>>(
@@ -523,6 +525,30 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 520, h: 600 },
     defaultPosition: { x: 1140, y: 140 },
     pinned: true
+  },
+  {
+    id: "fashion-lookbook",
+    title: "Fashion Lookbook",
+    icon: Sparkles,
+    loader: lazyPanel(() => import("@/components/essence/FashionLookbook")),
+    defaultSize: { w: 1040, h: 820 },
+    defaultPosition: { x: 220, y: 160 },
+    endpoints: [
+      "POST /api/fashion/pieces/:piece/looks",
+      "POST /api/fashion/pieces/:piece/normalize",
+      "POST /api/fashion/palette",
+      "POST /api/fashion/stitchgrid",
+      "POST /api/fashion/export-pack"
+    ]
+  },
+  {
+    id: "stellar-lsr",
+    title: "Stellar LSR Viewer",
+    icon: Navigation2,
+    loader: lazyPanel(() => import("@/components/StellarLsrPanel")),
+    defaultSize: { w: 1120, h: 780 },
+    defaultPosition: { x: 180, y: 120 },
+    endpoints: ["GET /api/stellar/local-rest", "GET /api/stellar/local-rest/stream"]
   },
   {
     id: "essence-proposals",

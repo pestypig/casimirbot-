@@ -19,6 +19,19 @@ export function buildWindow(
       kernel[k] = v;
       accum += v;
     }
+  } else if (sampler === "compact") {
+    const radius = Math.max(tau_s, dt_s);
+    for (let k = 0; k < kernel.length; k++) {
+      const t = Math.abs((k - mid) * dt_s);
+      if (t > radius) {
+        kernel[k] = 0;
+      } else {
+        const x = t / Math.max(radius, 1e-9);
+        const v = 0.5 * (1 + Math.cos(Math.PI * x)); // Hann bump, compact on [-tau, tau]
+        kernel[k] = v;
+        accum += v;
+      }
+    }
   } else {
     const twoSigmaSq = 2 * tau_s * tau_s;
     for (let k = 0; k < kernel.length; k++) {

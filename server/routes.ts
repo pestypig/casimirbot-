@@ -23,6 +23,7 @@ import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
 import { qiControllerRouter, startQiController } from "./modules/qi/qi-controller.js";
 import { codeLatticeRouter } from "./routes/code-lattice";
+import { stellarRouter } from "./routes/stellar";
 
 const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === "1") return true;
@@ -40,6 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/knowledge", knowledgeRouter);
   app.use("/api/code-lattice", codeLatticeRouter);
+  app.use("/api/stellar", stellarRouter);
   app.use("/api/ethos", ethosRouter);
 
 
@@ -58,6 +60,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     const { essenceRouter } = await import("./routes/essence");
     app.use("/api/essence", essenceRouter);
+    const { fashionRouter } = await import("./routes/fashion");
+    app.use("/api/fashion", fashionRouter);
   }
 
   const enableAgi = flagEnabled(process.env.ENABLE_AGI, true);

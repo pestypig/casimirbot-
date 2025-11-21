@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
-import { DebateConfig, type TDebateConfig, type TDebateOutcome, type TDebateTurn } from "@shared/essence-debate";
+import { DebateConfig, type TDebateConfig, type TDebateOutcome, type TDebateTurn, type TDebateContext } from "@shared/essence-debate";
 import { EssenceEnvelope } from "@shared/essence-schema";
 import { metrics } from "../../metrics";
 import { putEnvelope } from "../essence/store";
+import { getTool } from "../../skills";
 
 type DebateStatus = "pending" | "running" | "completed" | "timeout" | "aborted";
 
@@ -31,6 +32,7 @@ type DebateRecord = {
   seq: number;
   running: boolean;
   reason?: string;
+  context?: TDebateContext;
 };
 
 export type DebateStreamEvent =
@@ -71,6 +73,7 @@ export type DebateSnapshot = {
   turns: StoredDebateTurn[];
   scoreboard: DebateScoreboard;
   outcome: TDebateOutcome | null;
+  context?: TDebateContext | null;
 };
 
 type EventListener = (event: DebateStreamEvent) => void;
@@ -116,6 +119,7 @@ export async function startDebate(rawConfig: TDebateConfig): Promise<{ debateId:
     endedAt: undefined,
     seq: 0,
     running: false,
+    context: parsed.context,
   };
   debates.set(debateId, record);
   appendStatusEvent(record);
@@ -143,6 +147,7 @@ export function getDebateSnapshot(debateId: string): DebateSnapshot | null {
     turns: record.turns.map((turn) => ({ ...turn })),
     scoreboard: snapshotScore(record),
     outcome: record.outcome ?? null,
+    context: record.context,
   };
 }
 
@@ -177,6 +182,49 @@ export function resumeDebate(debateId: string): void {
 
 export function getDebateOwner(debateId: string): string | null {
   return debates.get(debateId)?.personaId ?? null;
+}
+
+export async function waitForDebateOutcome(debateId: string, timeoutMs?: number): Promise<TDebateOutcome | null> {
+  const snapshot = getDebateSnapshot(debateId);
+  if (!snapshot) {
+    return null;
+  }
+  if (snapshot.outcome) {
+    return snapshot.outcome;
+  }
+  const maxWait =
+    typeof timeoutMs === "number" && Number.isFinite(timeoutMs)
+      ? Math.max(0, timeoutMs)
+      : snapshot.config.max_wall_ms + 2000;
+
+  return await new Promise<TDebateOutcome | null>((resolve) => {
+    let finished = false;
+    const finish = (outcome: TDebateOutcome | null) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      unsubscribe?.();
+      resolve(outcome);
+    };
+    const unsubscribe = subscribeToDebate(debateId, (event) => {
+      if (event.type === "outcome") {
+        finish(event.outcome);
+      }
+    });
+    const timer = setTimeout(() => {
+      const snap = getDebateSnapshot(debateId);
+      finish(snap?.outcome ?? null);
+    }, maxWait);
+    resumeDebate(debateId);
+  });
+}
+
+export async function startDebateAndWaitForOutcome(
+  rawConfig: TDebateConfig,
+): Promise<{ debateId: string; outcome: TDebateOutcome | null }> {
+  const { debateId } = await startDebate(rawConfig);
+  const outcome = await waitForDebateOutcome(debateId, rawConfig.max_wall_ms);
+  return { debateId, outcome };
 }
 
 export function __resetDebateStore(): void {
@@ -225,7 +273,7 @@ async function advanceDebate(debateId: string): Promise<void> {
       await persistTurn(record, skepticTurn);
       metrics.recordDebateRound("skeptic");
 
-      const verifierResults = runVerifierSweep(record, round);
+      const verifierResults = await runVerifierSweep(record, round);
       const refereeTurn = await synthesizeRefereeTurn(record, round, verifierResults);
       await persistTurn(record, refereeTurn);
       metrics.recordDebateRound("referee");
@@ -452,21 +500,145 @@ type VerifierResult = {
   reason: string;
 };
 
-function runVerifierSweep(record: DebateRecord, round: number): VerifierResult[] {
+type VerifierContext = {
+  goal: string;
+  round: number;
+  latestTurn?: StoredDebateTurn;
+  attachments: Array<{ title: string; url: string }>;
+  telemetrySummary?: string | null;
+};
+
+const FALLBACK_ATTACHMENTS: Array<{ title: string; url: string }> = [
+  {
+    title: "Stellar Consciousness (Orch OR Review)",
+    url: "/mnt/data/Reformatted; Stellar Consciousness by Orchestrated Objective Reduction Review.pdf",
+  },
+  {
+    title: "Quantum Computation in Brain Microtubules (1998)",
+    url: "/mnt/data/Quantum Computation in Brain Microtubules The Penrose-Hameroff hameroff-1998.pdf",
+  },
+];
+
+const buildVerifierContext = (record: DebateRecord, round: number): VerifierContext => {
+  const latestTurn = [...record.turns].reverse().find((turn) => turn.role !== "referee");
+  const attachments = record.context?.attachments && record.context.attachments.length > 0 ? record.context.attachments : FALLBACK_ATTACHMENTS;
+  return {
+    goal: record.goal,
+    round,
+    latestTurn,
+    attachments,
+    telemetrySummary: record.context?.telemetry_summary,
+  };
+};
+
+async function invokeTool(
+  name: string,
+  input: Record<string, unknown>,
+): Promise<{ ok: boolean; reason: string }> {
+  const tool = getTool(name);
+  if (!tool) {
+    return { ok: false, reason: "Tool not registered" };
+  }
+  try {
+    const result = await tool.handler(input, {});
+    const summary = typeof result === "object" && result !== null ? Object.keys(result as Record<string, unknown>).join(", ") : "ok";
+    return { ok: true, reason: `Executed ${name}: ${summary || "ok"}`.slice(0, 180) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: message.slice(0, 200) };
+  }
+}
+
+async function runVerifierSweep(record: DebateRecord, round: number): Promise<VerifierResult[]> {
   const verifiers = record.config.verifiers ?? [];
   if (verifiers.length === 0) {
     return [];
   }
-  return verifiers.map((name, index) => {
-    const parity = (round + index + record.scoreboard.proponent) % 2 === 0;
-    const ok = parity;
+  const ctx = buildVerifierContext(record, round);
+  const results: VerifierResult[] = [];
+
+  for (const name of verifiers) {
+    let ok = true;
+    let reason = "verified";
+    try {
+      if (name === "docs.evidence.search.md") {
+        const { ok: pass, reason: detail } = await invokeTool(name, {
+          query: ctx.latestTurn?.text ?? ctx.goal,
+          projectIds: ["baseline"],
+          k: 3,
+          window: { tokens: 160 },
+        });
+        ok = pass;
+        reason = detail;
+      } else if (name === "docs.evidence.search.pdf") {
+        const files = ctx.attachments.map((att) => ({ title: att.title, url: att.url }));
+        const { ok: pass, reason: detail } = await invokeTool(name, {
+          query: ctx.latestTurn?.text ?? ctx.goal,
+          files: files.length ? files : FALLBACK_ATTACHMENTS,
+          k: Math.min(3, files.length || 2),
+          windowChars: 600,
+        });
+        ok = pass;
+        reason = detail;
+      } else if (name === "citation.verify.span") {
+        const citation =
+          ctx.attachments.length > 0
+            ? { type: "pdf", path: ctx.attachments[0].url, page: 1 }
+            : { type: "md", path: "docs/baseline.md", heading: "overview" };
+        const { ok: pass, reason: detail } = await invokeTool(name, {
+          quote: (ctx.latestTurn?.text ?? ctx.goal).slice(0, 200),
+          citation,
+        });
+        ok = pass;
+        reason = detail;
+      } else if (name === "numeric.extract.units") {
+        const { ok: pass, reason: detail } = await invokeTool(name, {
+          text: ctx.latestTurn?.text ?? ctx.goal,
+          system: "SI",
+        });
+        ok = pass;
+        reason = detail;
+      } else if (name === "contradiction.scan") {
+        const { ok: pass, reason: detail } = await invokeTool(name, {
+          claim: ctx.latestTurn?.text ?? ctx.goal,
+          scope: { projects: ["baseline"] },
+          k: 3,
+        });
+        ok = pass;
+        reason = detail;
+      } else if (name === "telemetry.crosscheck.docs") {
+        const { ok: pass, reason: detail } = await invokeTool(name, {
+          telemetry: { coherence: 0.551, q: 0.56, occupancy: 0.005 },
+          thresholds: [{ name: "coherence_min", value: 0.56, source: "docs/fractional-coherence.md#thresholds" }],
+        });
+        ok = pass;
+        reason = detail;
+      } else if (name === "debate.checklist.score" || name === "checklist.method.score") {
+        const checklist = { intention: ctx.goal, hypotheses: [{ id: "H1", text: ctx.goal }], conflicts: [] };
+        const { ok: pass, reason: detail } = await invokeTool("checklist.method.score", {
+          checklist,
+          claims: ctx.latestTurn ? [{ text: ctx.latestTurn.text }] : [],
+          evidence: ctx.attachments,
+          verifierResults: results.map((entry) => ({ name: entry.name, ok: entry.ok })),
+        });
+        ok = pass;
+        reason = detail;
+      } else if (name === "math.sympy.verify") {
+        ok = (round + record.scoreboard.proponent + record.scoreboard.skeptic) % 2 === 0;
+        reason = ok ? "Sympy verifier placeholder pass." : "Sympy verifier placeholder fail.";
+      } else {
+        ok = (round + results.length) % 2 === 0;
+        reason = "Generic verifier placeholder.";
+      }
+    } catch (error) {
+      ok = false;
+      reason = error instanceof Error ? error.message : String(error);
+    }
     metrics.recordDebateVerification(name, ok);
-    return {
-      name,
-      ok,
-      reason: ok ? "Verification passed via deterministic check." : "Counter-example suggested by skeptic narrative.",
-    };
-  });
+    results.push({ name, ok, reason });
+  }
+
+  return results;
 }
 
 function updateScoreboard(record: DebateRecord, verifierResults: VerifierResult[]): void {

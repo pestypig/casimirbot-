@@ -2,6 +2,8 @@ import type { TMemorySearchHit } from "@shared/essence-persona";
 import type { ResonanceBundle, ResonanceCollapse } from "@shared/code-lattice";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { WhyBelongs } from "@shared/rationale";
+import type { ConsoleTelemetryBundle, PanelTelemetry } from "@shared/desktop";
+import type { BadgeTelemetrySnapshot } from "@shared/badge-telemetry";
 import { DEFAULT_DESKTOP_ID, pushConsoleTelemetry } from "@/lib/agi/consoleTelemetry";
 import { ensureLatestLattice } from "@/lib/agi/resonanceVersion";
 import { useResonanceStore } from "@/store/useResonanceStore";
@@ -10,10 +12,17 @@ export type PlanResponse = {
   traceId: string;
   plan: unknown;
   manifest?: unknown;
+  plan_dsl?: string;
+  plan_steps?: unknown[];
+  executor_steps?: unknown[];
   prompt?: string;
-  lattice_version?: number;
+  planner_prompt?: string;
+  telemetry_bundle?: ConsoleTelemetryBundle | null;
+  telemetry_summary?: string | Record<string, unknown> | null;
+  lattice_version?: number | string | null;
   resonance_bundle?: ResonanceBundle | null;
   resonance_selection?: ResonanceCollapse | null;
+  debate_id?: string | null;
 };
 
 export type ExecuteResponse = {
@@ -22,6 +31,28 @@ export type ExecuteResponse = {
   result_summary?: string;
   traceId?: string;
   why_belongs?: WhyBelongs;
+  planner_prompt?: string;
+  telemetry_bundle?: ConsoleTelemetryBundle | null;
+  telemetry_summary?: string | Record<string, unknown> | null;
+  lattice_version?: number | string | null;
+  resonance_bundle?: ResonanceBundle | null;
+  resonance_selection?: ResonanceCollapse | null;
+  debate_id?: string | null;
+};
+
+export type ToolLogEvent = {
+  id?: string;
+  seq?: number;
+  ts?: string;
+  traceId?: string;
+  tool?: string;
+  ok?: boolean;
+  text?: string;
+  debateId?: string;
+  promptHash?: string;
+  paramsHash?: string;
+  durationMs?: number;
+  stepId?: string;
 };
 
 export type PersonaSummary = {
@@ -70,6 +101,7 @@ export type DebateSnapshot = {
   turns: DebateTurnPayload[];
   scoreboard: DebateScoreboard;
   outcome: DebateOutcomePayload | null;
+  context?: Record<string, unknown> | null;
 };
 
 export type DebateStreamEvent =
@@ -135,6 +167,16 @@ export type MemorySearchResponse = {
   top_k: number;
   debateOnly?: boolean;
 };
+
+export type PanelSnapshotResponse = {
+  desktopId: string;
+  capturedAt: string;
+  panels: PanelTelemetry[];
+  relatedPanels?: Array<{ id: string; title?: string }> | null;
+  relationNotes?: string[] | null;
+};
+
+export type BadgeTelemetryResponse = BadgeTelemetrySnapshot;
 
 async function asJson<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
@@ -209,10 +251,16 @@ export async function plan(
       body: JSON.stringify(body),
     }),
   );
+  const latticeVersionValue =
+    payload.lattice_version === null || payload.lattice_version === undefined
+      ? null
+      : Number.isFinite(Number(payload.lattice_version))
+        ? Number(payload.lattice_version)
+        : null;
   useResonanceStore.getState().setResonancePayload({
     bundle: payload.resonance_bundle ?? null,
     selection: payload.resonance_selection ?? null,
-    latticeVersion: payload.lattice_version ?? null,
+    latticeVersion: latticeVersionValue,
     traceId: payload.traceId,
   });
   return payload;
@@ -228,14 +276,14 @@ export async function execute(traceId: string): Promise<ExecuteResponse> {
   );
 }
 
-export function subscribeToolLogs(onEvent: (event: any) => void): () => void {
+export function subscribeToolLogs(onEvent: (event: ToolLogEvent) => void): () => void {
   if (typeof window === "undefined" || typeof EventSource === "undefined") {
     return () => {};
   }
   const source = new EventSource("/api/agi/tools/logs/stream");
   source.onmessage = (event) => {
     try {
-      onEvent(JSON.parse(event.data));
+      onEvent(JSON.parse(event.data) as ToolLogEvent);
     } catch {
       /* ignore malformed events */
     }
@@ -346,6 +394,36 @@ export async function getDebateStatus(debateId: string): Promise<DebateSnapshot>
     await fetch(`/api/agi/debate/${encodeURIComponent(debateId)}`, {
       headers: { Accept: "application/json" }
     })
+  );
+}
+
+export async function getPanelSnapshots(params: { desktopId?: string; panelIds?: string[] } = {}): Promise<PanelSnapshotResponse> {
+  const search = new URLSearchParams();
+  if (params.desktopId) {
+    search.set("desktopId", params.desktopId);
+  }
+  if (params.panelIds && params.panelIds.length > 0) {
+    search.set("panelIds", params.panelIds.join(","));
+  }
+  return asJson(
+    await fetch(`/api/agi/telemetry/panels?${search.toString()}`, {
+      headers: { Accept: "application/json" },
+    }),
+  );
+}
+
+export async function getBadgeTelemetry(params: { desktopId?: string; includeRaw?: boolean } = {}): Promise<BadgeTelemetryResponse> {
+  const search = new URLSearchParams();
+  if (params.desktopId) {
+    search.set("desktopId", params.desktopId);
+  }
+  if (params.includeRaw) {
+    search.set("includeRaw", "1");
+  }
+  return asJson(
+    await fetch(`/api/agi/telemetry/badges?${search.toString()}`, {
+      headers: { Accept: "application/json" },
+    }),
   );
 }
 

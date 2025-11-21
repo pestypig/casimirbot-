@@ -3,6 +3,8 @@ import {
   __resetDebateStore,
   getDebateSnapshot,
   startDebate,
+  startDebateAndWaitForOutcome,
+  waitForDebateOutcome,
   type DebateSnapshot,
 } from "../server/services/debate/orchestrator";
 
@@ -48,5 +50,27 @@ describe("debate orchestrator", () => {
     expect(skepticTurns.length).toBeGreaterThan(0);
     expect(snapshot.outcome).not.toBeNull();
     expect(typeof snapshot.outcome?.verdict).toBe("string");
+  });
+
+  it("waits for a debate outcome via helper", async () => {
+    const { debateId } = await startDebate({
+      goal: "Will the helper resolve outcomes?",
+      persona_id: "persona:test",
+      max_rounds: 1,
+      max_wall_ms: 3000,
+      verifiers: [],
+    });
+    const outcome = await waitForDebateOutcome(debateId, 4000);
+    expect(outcome?.debate_id).toBe(debateId);
+
+    const combined = await startDebateAndWaitForOutcome({
+      goal: "Helper should return verdict payloads",
+      persona_id: "persona:test",
+      max_rounds: 1,
+      max_wall_ms: 3000,
+      verifiers: [],
+    });
+    expect(combined.debateId).toBeDefined();
+    expect(combined.outcome?.debate_id).toBe(combined.debateId);
   });
 });

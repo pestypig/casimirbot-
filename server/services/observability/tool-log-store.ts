@@ -6,6 +6,7 @@ export type ToolLogRecord = {
   tool: string;
   version: string;
   paramsHash: string;
+  promptHash?: string;
   durationMs: number;
   sessionId?: string;
   traceId?: string;
@@ -15,6 +16,7 @@ export type ToolLogRecord = {
   error?: string;
   essenceId?: string;
   text?: string;
+  debateId?: string;
 };
 
 type ToolLogListener = (entry: ToolLogRecord) => void;
@@ -39,13 +41,15 @@ type AppendEvent = Omit<ToolLogRecord, "id" | "seq" | "ts" | "version" | "text">
 
 export function appendToolLog(event: AppendEvent): ToolLogRecord {
   const seq = ++logSequence;
+  const promptHash = event.promptHash ?? event.paramsHash;
   const record: ToolLogRecord = {
     id: String(seq),
     seq,
     ts: event.ts ?? new Date().toISOString(),
     tool: event.tool,
     version: event.version ?? "unknown",
-    paramsHash: event.paramsHash,
+    paramsHash: event.paramsHash ?? (promptHash ?? "unknown"),
+    promptHash: promptHash,
     durationMs: event.durationMs,
     sessionId: event.sessionId,
     traceId: event.traceId,
@@ -55,6 +59,7 @@ export function appendToolLog(event: AppendEvent): ToolLogRecord {
     error: event.error,
     essenceId: event.essenceId,
     text: buildLogText(event.text, event.tool, event.durationMs, event.ok, event.error, event.essenceId),
+    debateId: event.debateId,
   };
   toolLogBuffer.push(record);
   if (toolLogBuffer.length > MAX_BUFFER_SIZE) {

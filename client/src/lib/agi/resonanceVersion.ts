@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 const watcherEnabled = import.meta.env?.VITE_ENABLE_LATTICE_WATCHER === "1";
+const LATTICE_WAIT_TIMEOUT_MS = 4000;
 
 export type ResonanceWatcherStats = {
   filesTouched?: number;
@@ -136,11 +137,29 @@ export async function ensureLatestLattice(): Promise<void> {
     return;
   }
   connectStream();
-  if (acknowledgedVersion >= latestVersion && !initializing) {
+  if (acknowledgedVersion >= latestVersion && !initializing && watcherState.connected) {
     return;
   }
   return new Promise((resolve) => {
-    pendingResolvers.add(resolve);
+    let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      acknowledgedVersion = latestVersion;
+      timer = null;
+      pendingResolvers.delete(settle);
+      resolve();
+    }, LATTICE_WAIT_TIMEOUT_MS);
+    const settle = () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      pendingResolvers.delete(settle);
+      resolve();
+    };
+    pendingResolvers.add(settle);
+    // If the stream failed to open immediately, don't block the UI.
+    if (!watcherState.connected && !initializing && !eventSource) {
+      settle();
+    }
   });
 }
 

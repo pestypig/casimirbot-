@@ -6,6 +6,7 @@ Warp-field research cockpit that pairs a Helix Core operations console with the 
 - **Helix Core dashboard** - Modular panels for sector duty coordination, parametric sweeps, spectrum tuning, and live warp visualisation (see `client/src/pages/helix-core.tsx`).
 - **Hull 3D renderer** - WebGL2 ray-marcher with curvature, sector, and overlay diagnostics driven by the shared hull store (`client/src/components/Hull3DRenderer.ts`).
 - **Physics + scheduling services** - Energy pipeline modelling, curvature brick generation, and instrumentation endpoints implemented in the server (`server/energy-pipeline.ts`, `server/curvature-brick.ts`, `server/instruments/`).
+- **Lifshitz-aware Casimir chain** - Ideal/Drude/plasma stacks with Hamaker fallback, χ override/supercell/fallback diagnostics, and nominal vs. realistic energy/mass bands surfaced to the UI.
 - **Static research archives** - Halobank timeline and warp ledger microsites live under `warp-web/` with shared assets in `halobank-spore-timeline.js`.
 - **Design documentation** - Patch plans, focused reports, and sweep design notes in `PATCH_PLAN.md`, `REPORT.md`, and `docs/`.
 
@@ -277,6 +278,7 @@ The dev script launches the Express server with Vite middleware. Visit [http://l
 ## Testing
 - **Unit & integration** - `npm test` executes Vitest suites co-located with the client/lib code.
 - **Python physics checks** - `tests/test_dynamic.py` targets a running simulation service at `http://localhost:5000`. Activate your Python environment (see `pyproject.toml`) and run `pytest` when the simulator is available.
+- **Ledger guard** - `npm test -- --run tests/ledger-dimension.spec.ts` locks the green-zone slopes (duty, area, geometry gain, Q_L), GR prefactors, and equality of power vs. density forms using the dev-mock contract.
 
 ## Observability
 - **Prometheus endpoint** - `GET /metrics` now exports default Node stats plus AGI task counters, tool-call histograms, queue gauges, and HTTP request latency buckets. Point Prometheus at `http://localhost:5000/metrics` when the server is running.

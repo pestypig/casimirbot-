@@ -10,6 +10,7 @@ export type ToolLogEvent = {
   text: string;
   essenceIds: string[];
   latency_ms?: number;
+  debateId?: string;
 };
 
 export function roleFromTool(tool?: string): DebateRole {
@@ -37,6 +38,7 @@ export function normalizeEvent(e: any, activeTraceId?: string): ToolLogEvent | n
     status: (e?.status === "ok" || e?.ok) ? "ok" : (e?.status === "error" ? "error" : "info"),
     text: typeof e?.text === "string" ? e.text : JSON.stringify(e),
     essenceIds: Array.isArray(e?.essenceIds) ? e.essenceIds : [],
-    latency_ms: e?.latency_ms
+    latency_ms: e?.latency_ms,
+    debateId: typeof e?.debateId === "string" ? e.debateId : undefined,
   };
 }

@@ -23,6 +23,8 @@ export interface CycleLedgerSummary {
   cycleNs: number | null;
   cycleMs: number | null;
   source: "server" | "client" | "none";
+  paybackRequired_J?: number | null;
+  paybackOk?: boolean | null;
 }
 
 const EMPTY_SUMMARY: CycleLedgerSummary = {
@@ -34,6 +36,8 @@ const EMPTY_SUMMARY: CycleLedgerSummary = {
   cycleNs: null,
   cycleMs: null,
   source: "none",
+  paybackRequired_J: null,
+  paybackOk: null,
 };
 
 export function useCycleLedger(): CycleLedgerSummary {
@@ -142,6 +146,22 @@ export function useCycleLedger(): CycleLedgerSummary {
       ratio !== null && Number.isFinite(ratio)
         ? ratio <= LEDGER_GUARD_THRESHOLD
         : null;
+    const paybackRequired_J = (() => {
+      if (!latest) return null;
+      const sink = Math.max(0, latest.sink);
+      const bus = Math.max(0, latest.bus);
+      if (sink <= bus) return 0;
+      const threshold = LEDGER_GUARD_THRESHOLD;
+      const requiredBus = (sink * (1 - threshold)) / (1 + threshold);
+      const delta = requiredBus - bus;
+      return delta > 0 ? delta : 0;
+    })();
+    const paybackOk =
+      paybackRequired_J === null
+        ? null
+        : paybackRequired_J === 0
+          ? true
+          : false;
 
     return {
       rows,
@@ -152,6 +172,8 @@ export function useCycleLedger(): CycleLedgerSummary {
       source,
       cycleNs,
       cycleMs: cycleNs ? cycleNs / 1e6 : null,
+      paybackRequired_J,
+      paybackOk,
     };
   }, [cycleBasisMs, cycleLedgerInput, ledger]);
 }

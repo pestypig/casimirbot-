@@ -53,6 +53,24 @@ export function LiveEnergyPipeline({
   const switchMode = useSwitchMode(); 
 
   const P: Partial<EnergyPipelineState> = pipelineState ?? {};
+  const mechanical = (P as any)?.mechanical as any;
+  const mechGuardGap =
+    (mechanical && Number.isFinite(mechanical.recommendedGap_nm))
+      ? Number(mechanical.recommendedGap_nm)
+      : (mechanical && Number.isFinite(mechanical.minGap_nm))
+        ? Number(mechanical.minGap_nm)
+        : undefined;
+  const mechMaxStroke =
+    mechanical && Number.isFinite(mechanical.maxStroke_pm)
+      ? Number(mechanical.maxStroke_pm)
+      : undefined;
+  const mechUnattainable =
+    mechanical?.unattainable === true ||
+    (mechGuardGap != null && Number.isFinite(P.gap_nm) && Number(P.gap_nm) < mechGuardGap) ||
+    (mechMaxStroke != null &&
+      Number.isFinite((mechanical as any)?.requestedStroke_pm) &&
+      Number((mechanical as any)?.requestedStroke_pm) > mechMaxStroke);
+  const mechNote = mechanical?.note as string | undefined;
   const live = {
     currentMode: (P.currentMode ?? selectedMode ?? "hover") as "standby"|"hover"|"nearzero"|"cruise"|"emergency",
     dutyCycle:    Number.isFinite(P.dutyCycle) ? P.dutyCycle! : duty ?? 0.14,
@@ -164,6 +182,9 @@ export function LiveEnergyPipeline({
   const qiTauMs = Number(qiStats?.tau_s_ms);
   const qiSampler = qiStats?.sampler;
   const qiSamples = Number(qiStats?.samples ?? 0);
+  const qiInterestMargin = Number(qiStats?.interestMargin);
+  const qiInterestDebt = Number(qiStats?.interestDebt);
+  const qiInterestWindow = Number(qiStats?.interestWindow_ms);
   const qiBadgeVariant = qiBadge === "violation" ? "destructive" : qiBadge === "near" ? "secondary" : "default";
   const qiToneClass =
     qiBadge === "violation"
@@ -172,6 +193,16 @@ export function LiveEnergyPipeline({
       ? "text-amber-500 dark:text-amber-400"
       : "text-emerald-500 dark:text-emerald-400";
   const qiBadgeLabel = qiBadge === "violation" ? "Violation" : qiBadge === "near" ? "Guard" : "OK";
+  const qiBadgeTitleParts = [
+    Number.isFinite(qiMargin) ? `margin ${qiMargin.toPrecision(3)}` : null,
+    Number.isFinite(qiBound) ? `bound ${qiBound.toPrecision(3)}` : null,
+    Number.isFinite(qiInterestMargin)
+      ? `interest ${qiInterestMargin.toPrecision(3)}${
+          Number.isFinite(qiInterestWindow) ? ` @ ${qiInterestWindow.toFixed(1)} ms` : ""
+        }`
+      : null,
+  ].filter(Boolean) as string[];
+  const qiBadgeTitle = qiBadgeTitleParts.join(" | ");
   const hasQi = Boolean(qiStats);
 
 
@@ -375,6 +406,49 @@ export function LiveEnergyPipeline({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Mechanical feasibility guardrail */}
+        {mechanical && (
+          <div
+            className={`rounded-lg border p-3 text-xs ${
+              mechUnattainable
+                ? "border-amber-400/60 bg-amber-500/10 text-amber-100"
+                : "border-emerald-400/50 bg-emerald-500/10 text-emerald-100"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 text-sm font-semibold">
+              <span>Mechanical feasibility (gap / stroke)</span>
+              <Badge variant={mechUnattainable ? "secondary" : "outline"}>
+                {mechUnattainable ? "off-design" : "guarded"}
+              </Badge>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-3 text-[11px] text-slate-200">
+              <div className="space-y-1">
+                <div className="uppercase tracking-wide text-slate-300/80">gap</div>
+                <div className="font-mono text-sm">
+                  req {Number(P.gap_nm ?? 0).toFixed(2)} nm
+                </div>
+                <div className="text-slate-300/80">
+                  min {mechGuardGap != null ? mechGuardGap.toFixed(2) : "—"} nm
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="uppercase tracking-wide text-slate-300/80">stroke</div>
+                <div className="font-mono text-sm">
+                  cmd {Number((mechanical as any)?.requestedStroke_pm ?? 0).toFixed(1)} pm
+                </div>
+                <div className="text-slate-300/80">
+                  max {mechMaxStroke != null ? mechMaxStroke.toFixed(1) : "—"} pm
+                </div>
+              </div>
+            </div>
+            {mechNote && (
+              <div className="mt-2 text-amber-200">
+                {mechNote}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Foundation: Cycle-Averaged Cavity Energy */}
         <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
           <Tooltip>
@@ -616,7 +690,11 @@ export function LiveEnergyPipeline({
               <span className="text-muted-foreground">QI Margin:</span>
               <div className={`font-semibold flex items-center gap-2 ${qiToneClass}`}>
                 {Number.isFinite(qiMargin) ? qiMargin.toPrecision(3) : "N/A"}
-                {hasQi ? <Badge variant={qiBadgeVariant}>{qiBadgeLabel}</Badge> : null}
+                {hasQi ? (
+                  <Badge variant={qiBadgeVariant} title={qiBadgeTitle || undefined}>
+                    {qiBadgeLabel}
+                  </Badge>
+                ) : null}
               </div>
               <div className="text-[11px] text-muted-foreground">
                 {hasQi
@@ -626,6 +704,13 @@ export function LiveEnergyPipeline({
               {hasQi ? (
                 <div className="text-[11px] text-muted-foreground">
                   avg {Number.isFinite(qiAvg) ? qiAvg.toPrecision(3) : "N/A"} / bound {Number.isFinite(qiBound) ? qiBound.toPrecision(3) : "N/A"}
+                </div>
+              ) : null}
+              {hasQi && (Number.isFinite(qiInterestMargin) || Number.isFinite(qiInterestDebt)) ? (
+                <div className="text-[11px] text-muted-foreground">
+                  interest {Number.isFinite(qiInterestMargin) ? qiInterestMargin.toPrecision(3) : "N/A"}
+                  {Number.isFinite(qiInterestDebt) ? ` (debt ${qiInterestDebt.toPrecision(3)})` : ""}
+                  {Number.isFinite(qiInterestWindow) ? ` window ${qiInterestWindow.toFixed(1)} ms` : ""}
                 </div>
               ) : null}
             </div>

@@ -12,12 +12,15 @@ export type GateKind = z.infer<typeof gateKindSchema>;
 export const gateRouteRoleSchema = z.enum(["BUS", "SINK"]);
 export type GateRouteRole = z.infer<typeof gateRouteRoleSchema>;
 
-export const samplingKindSchema = z.enum(["gaussian", "lorentzian"]);
+export const samplingKindSchema = z.enum(["gaussian", "lorentzian", "compact"]);
 export type SamplingKind = z.infer<typeof samplingKindSchema>;
+
+export const qiFieldTypeSchema = z.enum(["scalar", "em", "dirac"]);
+export type QiFieldType = z.infer<typeof qiFieldTypeSchema>;
 
 // --- Navigation / Pose -------------------------------------------------------
 
-export type NavFrame = "heliocentric-ecliptic" | "simulation" | "geocentric";
+export type NavFrame = "heliocentric-ecliptic" | "heliocentric-icrs" | "simulation" | "geocentric";
 
 /**
  * Ground-truth world-frame pose for the craft (or a simulated stand-in).
@@ -48,6 +51,7 @@ export const qiSettingsSchema = z.object({
   tau_s_ms: z.number().positive(),
   observerId: z.string(),
   guardBand: z.number().min(0).max(1).optional(),
+  fieldType: qiFieldTypeSchema.default("em"),
 });
 export type QiSettings = z.infer<typeof qiSettingsSchema>;
 
@@ -60,10 +64,24 @@ export const qiStatsSchema = z.object({
   sampler: samplingKindSchema,
   tau_s_ms: z.number().positive(),
   observerId: z.string(),
+  fieldType: qiFieldTypeSchema.optional(),
   dt_ms: z.number().positive(),
   avg: z.number(),
   bound: z.number(),
   margin: z.number(),
+  interestRate: z.number().optional(),
+  interestWindow_ms: z.number().nonnegative().optional(),
+  interestDebt: z.number().optional(),
+  interestCredit: z.number().optional(),
+  interestMargin: z.number().optional(),
+  interestNetCycle: z.number().optional(),
+  interestNeg: z.number().optional(),
+  interestPos: z.number().optional(),
+  sampledIntegral_Jm3: z.number().optional(),
+  boundTight_Jm3: z.number().optional(),
+  marginRatio: z.number().optional(),
+  marginRatioRaw: z.number().optional(),
+  policyLimit: z.number().optional(),
   window_ms: z.number().nonnegative(),
   samples: z.number().int().nonnegative(),
   varT00_lattice: z.number().min(0).optional(),
@@ -141,9 +159,6 @@ export const QI_S_THRESH = {
 } as const;
 
 // ---- QI controller + tile schema -------------------------------------------
-
-export const qiFieldTypeSchema = z.enum(["scalar", "em", "dirac"]);
-export type QiFieldType = z.infer<typeof qiFieldTypeSchema>;
 
 export const qiPulseEnvelopeSchema = z.enum(["rectangular", "gaussian", "raised_cosine"]);
 export type QiPulseEnvelope = z.infer<typeof qiPulseEnvelopeSchema>;
@@ -762,6 +777,37 @@ export interface VacuumContract {
   rule?: string;
 }
 
+// --- Material model selection for Casimir calculations --------------------
+export const materialModelSchema = z.enum(["ideal_retarded", "lifshitz_drude", "lifshitz_plasma", "auto"]);
+export type MaterialModel = z.infer<typeof materialModelSchema>;
+
+export const materialPropsSchema = z.object({
+  plasmaFrequency_eV: z.number().positive().optional(),
+  damping_eV: z.number().positive().optional(),
+  hamaker_zJ: z.number().positive().optional(),
+  roughness_nm: z.number().nonnegative().optional(),
+  temperature_K: z.number().positive().optional(),
+});
+export type MaterialProps = z.infer<typeof materialPropsSchema>;
+
+export const supercellCouplingSchema = z.object({
+  tiles: z.number().int().positive(),
+  energy_J: z.number().optional(),
+  ratio: z.number().nonnegative().max(1).optional(),
+});
+export type SupercellCoupling = z.infer<typeof supercellCouplingSchema>;
+
+export const couplingCorrectionSchema = z.object({
+  chi: z.number().min(0).max(1).optional(),
+  pitch_nm: z.number().positive().optional(),
+  pitch_um: z.number().positive().optional(),
+  pitch_m: z.number().positive().optional(),
+  frameFill: z.number().min(0).max(1).optional(),
+  packingFraction: z.number().min(0).max(1).optional(),
+  supercell: supercellCouplingSchema.optional(),
+});
+export type CouplingCorrection = z.infer<typeof couplingCorrectionSchema>;
+
 // Simulation parameter schemas - Extended for modular Casimir-Tile platform
 export const simulationParametersSchema = z.object({
   geometry: z.enum(["sphere", "parallel_plate", "bowl"]),
@@ -769,6 +815,8 @@ export const simulationParametersSchema = z.object({
   radius: z.number().positive().min(1).max(100000), // um
   sagDepth: z.number().min(0).max(1000).optional(), // nm, only for bowl geometry (0 = flat surface)
   material: z.enum(["PEC", "custom"]).default("PEC"),
+  materialModel: materialModelSchema.default("ideal_retarded"),
+  materialProps: materialPropsSchema.optional(),
   temperature: z.number().positive().min(0.1).max(1000).default(20), // K
 
   // Module system parameters (for future expansion)
@@ -796,6 +844,7 @@ export const simulationParametersSchema = z.object({
       relTol: z.number().positive().default(0.01),
     })
     .optional(),
+  coupling: couplingCorrectionSchema.optional(),
 });
 
 export const simulationResultSchema = z.object({
@@ -822,6 +871,18 @@ export const simulationResultSchema = z.object({
       xiPoints: z.number().int().optional(),
       computeTime: z.string().optional(),
       errorEstimate: z.string().optional(),
+      U_static_nominal: z.number().optional(),
+      U_static_realistic: z.number().optional(),
+      U_static_min: z.number().optional(),
+      U_static_max: z.number().optional(),
+      casimirModel: materialModelSchema.optional(),
+      casimirRatio: z.number().optional(),
+      lifshitzSweep: z.array(z.object({ gap_nm: z.number(), ratio: z.number() })).optional(),
+      couplingChi: z.number().min(0).max(1).optional(),
+      couplingMethod: z.string().optional(),
+      supercellRatio: z.number().min(0).max(1).optional(),
+      tilePitch_m: z.number().nonnegative().optional(),
+      U_static_uncoupled: z.number().optional(),
 
       // Dynamic Casimir results (when moduleType === 'dynamic')
       strokePeriodPs: z.number().optional(),

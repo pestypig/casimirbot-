@@ -64,6 +64,8 @@ During operation, per-tile drive setpoints are solved every control tick to mini
 
 These correspond to the "green-zone" guardrails already surfaced in `QiWidget`, `DriveGuardsPanel`, and the `guards` field of `EnergyPipelineState`.
 
+**HF proxy gate:** The light-crossing badge uses tau_LC in microseconds and mutes kappa_drive whenever epsilon = tau_pulse / tau_LC >> 1. Burst/TS edits that push epsilon above unity should trip the HF proxy block and resume when TS >> 1 again; dev-mock metrics expose tau_LC ~3.336 µs for deterministic checks.
+
 ---
 
 ## Repo integration notes

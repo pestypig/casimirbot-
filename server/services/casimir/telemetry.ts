@@ -46,7 +46,7 @@ export function buildCasimirTelemetryPanel(sample: CasimirTelemetrySample, times
     panelId: CASIMIR_PANEL_ID,
     instanceId: CASIMIR_INSTANCE_ID,
     title: CASIMIR_TITLE,
-    kind: "server",
+    kind: "casimir",
     metrics: {
       tilesActive: sample.tilesActive,
       totalTiles: sample.totalTiles,
@@ -54,6 +54,16 @@ export function buildCasimirTelemetryPanel(sample: CasimirTelemetrySample, times
       avgQFactor: sample.avgQFactor,
       coherence: sample.coherence,
     },
+    bands: [
+      {
+        name: "mhz",
+        q: sample.avgQFactor,
+        coherence: sample.coherence,
+        occupancy,
+        last_event: new Date(sample.lastEventTs).toISOString(),
+      },
+    ],
+    tile_sample: { total: sample.totalTiles, active: sample.tilesActive },
     flags: {
       hasActivity: sample.tilesActive > 0,
       lowQFactor: sample.avgQFactor < 0.55,

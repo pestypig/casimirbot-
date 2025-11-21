@@ -77,13 +77,14 @@ const pickNumber = (value: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const fmtSeconds = (seconds: number) => {
+const fmtSecondsUnitFirst = (seconds: number) => {
   if (!Number.isFinite(seconds)) return "-";
-  if (seconds >= 1) return `${seconds.toFixed(2)} s`;
-  if (seconds >= 1e-3) return `${(seconds * 1e3).toFixed(2)} ms`;
-  if (seconds >= 1e-6) return `${(seconds * 1e6).toFixed(2)} us`;
-  if (seconds >= 1e-9) return `${(seconds * 1e9).toFixed(2)} ns`;
-  return `${(seconds * 1e12).toFixed(2)} ps`;
+  const abs = Math.abs(seconds);
+  if (abs >= 1) return `s ${seconds.toFixed(2)}`;
+  if (abs >= 1e-3) return `ms ${(seconds * 1e3).toFixed(2)}`;
+  if (abs >= 1e-6) return `us ${(seconds * 1e6).toFixed(2)}`;
+  if (abs >= 1e-9) return `ns ${(seconds * 1e9).toFixed(2)}`;
+  return `ps ${(seconds * 1e12).toFixed(2)}`;
 };
 
 export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
@@ -302,33 +303,33 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         <div
           className="absolute top-1/2 -translate-y-1/2"
           style={{ left: pct(tauLC, tPad) }}
-          aria-label={`tauLC ${fmtSeconds(tauLC)}`}
+          aria-label={`tauLC ${fmtSecondsUnitFirst(tauLC)}`}
         >
           <div className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-yellow-300">
-            tauLC {fmtSeconds(tauLC)}
+            tauLC {fmtSecondsUnitFirst(tauLC)}
           </div>
         </div>
 
         <div
           className="absolute top-1/2 -translate-y-1/2"
           style={{ left: pct(Tm, tPad) }}
-          aria-label={`Tm ${fmtSeconds(Tm)}`}
+          aria-label={`Tm ${fmtSecondsUnitFirst(Tm)}`}
         >
           <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-cyan-300">
-            Tm {fmtSeconds(Tm)}
+            Tm {fmtSecondsUnitFirst(Tm)}
           </div>
         </div>
 
         <div
           className="absolute top-1/2 -translate-y-1/2"
           style={{ left: pct(Tsec, tPad) }}
-          aria-label={`Tsec ${fmtSeconds(Tsec)}`}
+          aria-label={`Tsec ${fmtSecondsUnitFirst(Tsec)}`}
         >
           <div className="h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-violet-300">
-            Tsec {fmtSeconds(Tsec)}
+            Tsec {fmtSecondsUnitFirst(Tsec)}
           </div>
         </div>
 
@@ -341,7 +342,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
               width: pct(window.end - window.start, tPad),
               height: "6px",
             }}
-            title={`Local FR window: ${fmtSeconds(burst)}${burstOffset ? `, phase ${fmtSeconds(burstOffset)}` : ""}`}
+            title={`Local FR window: ${fmtSecondsUnitFirst(burst)}${burstOffset ? `, phase ${fmtSecondsUnitFirst(burstOffset)}` : ""}`}
           />
         ))}
 
@@ -365,8 +366,8 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         </div>
         <div className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-white/70" />
-          Duty (FR): {(Math.max(0, dutyFR) * 100).toFixed(3)}% | burst {fmtSeconds(burst)} | dwell {fmtSeconds(Tsec)}
-          {Number.isFinite(burstOffset) && burstOffset > 0 ? ` | phase ${fmtSeconds(burstOffset)}` : ""}
+          Duty (FR): {(Math.max(0, dutyFR) * 100).toFixed(3)}% | burst {fmtSecondsUnitFirst(burst)} | dwell {fmtSecondsUnitFirst(Tsec)}
+          {Number.isFinite(burstOffset) && burstOffset > 0 ? ` | phase ${fmtSecondsUnitFirst(burstOffset)}` : ""}
         </div>
       </div>
 

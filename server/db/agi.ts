@@ -23,6 +23,14 @@ type TaskTraceRow = {
   knowledge_context: unknown;
   plan_manifest_json: unknown;
   routine_json?: unknown;
+  telemetry_bundle?: unknown;
+  telemetry_summary?: string | null;
+  resonance_bundle?: unknown;
+  resonance_selection?: unknown;
+  lattice_version?: string | null;
+  planner_prompt?: string | null;
+  prompt_hash?: string | null;
+  debate_id?: string | null;
 };
 
 export async function savePersona(profile: PersonaShape): Promise<PersonaShape> {
@@ -76,12 +84,21 @@ export async function listPersonas(): Promise<PersonaShape[]> {
 }
 
 export async function saveTaskTrace(trace: TTaskTrace): Promise<void> {
-  await ensureDatabase();
-  const pool = getPool();
+  let pool: ReturnType<typeof getPool> | null = null;
+  try {
+    await ensureDatabase();
+    pool = getPool();
+  } catch (error) {
+    console.warn("trace persistence skipped: database_unconfigured", error);
+    return;
+  }
+  if (!pool) {
+    return;
+  }
   await pool.query(
     `
-      INSERT INTO task_trace (id, persona_id, goal, created_at, plan_json, steps, approvals, result_summary, ok, knowledge_context, plan_manifest_json, routine_json)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      INSERT INTO task_trace (id, persona_id, goal, created_at, plan_json, steps, approvals, result_summary, ok, knowledge_context, plan_manifest_json, routine_json, telemetry_bundle, telemetry_summary, resonance_bundle, resonance_selection, lattice_version, planner_prompt, prompt_hash, debate_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       ON CONFLICT (id)
       DO UPDATE SET
         persona_id = excluded.persona_id,
@@ -94,7 +111,15 @@ export async function saveTaskTrace(trace: TTaskTrace): Promise<void> {
         ok = excluded.ok,
         knowledge_context = excluded.knowledge_context,
         plan_manifest_json = excluded.plan_manifest_json,
-        routine_json = excluded.routine_json;
+        routine_json = excluded.routine_json,
+        telemetry_bundle = excluded.telemetry_bundle,
+        telemetry_summary = excluded.telemetry_summary,
+        resonance_bundle = excluded.resonance_bundle,
+        resonance_selection = excluded.resonance_selection,
+        lattice_version = excluded.lattice_version,
+        planner_prompt = excluded.planner_prompt,
+        prompt_hash = excluded.prompt_hash,
+        debate_id = excluded.debate_id;
     `,
     [
       trace.id,
@@ -109,9 +134,31 @@ export async function saveTaskTrace(trace: TTaskTrace): Promise<void> {
       JSON.stringify(trace.knowledgeContext ?? []),
       JSON.stringify(trace.plan_manifest ?? []),
       JSON.stringify((trace as any).routine_json ?? null),
+      JSON.stringify(trace.telemetry_bundle ?? null),
+      JSON.stringify((trace as any).telemetry_summary ?? null),
+      JSON.stringify(trace.resonance_bundle ?? null),
+      JSON.stringify(trace.resonance_selection ?? null),
+      trace.lattice_version != null ? String(trace.lattice_version) : null,
+      trace.planner_prompt ?? null,
+      trace.prompt_hash ?? null,
+      trace.debate_id ?? null,
     ],
   );
 }
+
+const parseJsonField = <T>(value: unknown): T | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return null;
+    }
+  }
+  return value as T;
+};
 
 export async function getTaskTrace(id: string): Promise<TTaskTrace | null> {
   await ensureDatabase();
@@ -119,6 +166,7 @@ export async function getTaskTrace(id: string): Promise<TTaskTrace | null> {
   const { rows } = await pool.query<TaskTraceRow>(
     `
       SELECT id, persona_id, goal, created_at, plan_json, steps, approvals, result_summary, ok, knowledge_context, plan_manifest_json, routine_json
+      , telemetry_bundle, telemetry_summary, resonance_bundle, resonance_selection, lattice_version, planner_prompt, prompt_hash, debate_id
       FROM task_trace
       WHERE id = $1
       LIMIT 1;
@@ -139,9 +187,23 @@ export async function getTaskTrace(id: string): Promise<TTaskTrace | null> {
     approvals: Array.isArray(row.approvals) ? (row.approvals as any[]) : [],
     result_summary: row.result_summary ?? undefined,
     ok: row.ok ?? undefined,
-    knowledgeContext: Array.isArray(row.knowledge_context) ? (row.knowledge_context as any[]) : [],
-    plan_manifest: Array.isArray(row.plan_manifest_json) ? (row.plan_manifest_json as any[]) : [],
-    routine_json: row.routine_json,
+    knowledgeContext:
+      Array.isArray(row.knowledge_context) && row.knowledge_context.length > 0
+        ? (row.knowledge_context as any[])
+        : parseJsonField(row.knowledge_context) ?? [],
+    plan_manifest:
+      Array.isArray(row.plan_manifest_json) && row.plan_manifest_json.length > 0
+        ? (row.plan_manifest_json as any[])
+        : parseJsonField(row.plan_manifest_json) ?? [],
+    routine_json: parseJsonField(row.routine_json) ?? row.routine_json,
+    telemetry_bundle: parseJsonField(row.telemetry_bundle),
+    telemetry_summary: row.telemetry_summary ?? null,
+    resonance_bundle: parseJsonField(row.resonance_bundle),
+    resonance_selection: parseJsonField(row.resonance_selection),
+    lattice_version: row.lattice_version ?? undefined,
+    planner_prompt: row.planner_prompt ?? undefined,
+    prompt_hash: row.prompt_hash ?? undefined,
+    debate_id: row.debate_id ?? undefined,
   };
 }
 

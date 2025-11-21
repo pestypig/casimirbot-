@@ -7,6 +7,10 @@ export async function recordActivityEvents(
   ownerId: string | null | undefined,
   samples: TActivitySample[],
 ): Promise<number> {
+  if (ownerId == null) {
+    console.debug(`[activity-log] skip recordActivityEvents: missing ownerId (dropping ${samples.length} samples)`);
+    return 0;
+  }
   if (!samples.length) {
     return 0;
   }

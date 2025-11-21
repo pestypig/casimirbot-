@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getDevMockStatus, HELIX_DEV_MOCK_EVENT } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey, useGreens } from "@/hooks/use-energy-pipeline";
 import useTimeLapseRecorder from "@/hooks/useTimeLapseRecorder";
@@ -910,6 +910,13 @@ interface EnergyPipelineState {
   sag_nm?: number;
   overallStatus?: string; // used in "System Status"
   dutyEffectiveFR?: number;
+  mechanical?: {
+    minGap_nm?: number;
+    recommendedGap_nm?: number;
+    maxStroke_pm?: number;
+    unattainable?: boolean;
+    note?: string;
+  };
 }
 
 interface SystemMetrics {
@@ -1045,6 +1052,17 @@ export default function HelixCore() {
     }`;
     window.history.replaceState(window.history.state, "", nextUrl);
   }, [helixPanelParam]);
+
+  const [devMockStatus, setDevMockStatus] = useState(getDevMockStatus());
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onMockUsed = (event: Event) => {
+      const detail = (event as CustomEvent).detail as ReturnType<typeof getDevMockStatus> | undefined;
+      setDevMockStatus(detail ?? getDevMockStatus());
+    };
+    window.addEventListener(HELIX_DEV_MOCK_EVENT, onMockUsed as EventListener);
+    return () => window.removeEventListener(HELIX_DEV_MOCK_EVENT, onMockUsed as EventListener);
+  }, []);
 
 const [selectedSector, setSelectedSector] = useState<string | null>(null);
 const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
@@ -2761,6 +2779,21 @@ useEffect(() => {
     <LumaWhispersProvider>
       <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
+        {devMockStatus.used && (
+          <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+            <div className="select-none text-center">
+              <div className="text-5xl md:text-8xl font-black tracking-[0.35em] uppercase text-rose-500/15 rotate-[-18deg] drop-shadow-[0_0_25px_rgba(248,113,113,0.25)]">
+                MOCKED
+              </div>
+              {devMockStatus.last && (
+                <div className="mt-2 text-[11px] md:text-xs font-semibold uppercase tracking-wide text-rose-200/70">
+                  {devMockStatus.last.method} {devMockStatus.last.url} (#{devMockStatus.count})
+                  {devMockStatus.last.reason ? ` - ${devMockStatus.last.reason}` : ""}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <div className="container mx-auto p-4 text-slate-100">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">

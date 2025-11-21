@@ -210,6 +210,7 @@ export const Features = z.object({
       height: z.number().int().positive(),
       pHash: z.string().optional(),
       color_hist_url: z.string().optional(),
+      mask_uri: z.string().optional(),
     })
     .optional(),
 
@@ -260,13 +261,50 @@ export const Features = z.object({
           .partial()
           .default({}),
       }),
-      sources: z
+        sources: z
+          .object({
+            text: z.array(z.string()).optional(),
+            image: z.array(z.string()).optional(),
+            audio: z.array(z.string()).optional(),
+          })
+          .default({}),
+    })
+    .optional(),
+
+  piece: z
+    .object({
+      type: z.enum(["cape", "shirt", "pants"]),
+      template_id: z.string().optional(),
+    })
+    .optional(),
+
+  knit: z
+    .object({
+      palette_map: z
+        .array(
+          z.object({
+            yarn_id: z.string().optional(),
+            name: z.string().optional(),
+            rgb: z.array(z.number()).length(3).optional(),
+            carrier: z.string().optional(),
+            usage_pct: z.number().optional(),
+          }),
+        )
+        .optional(),
+      stitchgrid_uri: z.string().optional(),
+      gauge: z
         .object({
-          text: z.array(z.string()).optional(),
-          image: z.array(z.string()).optional(),
-          audio: z.array(z.string()).optional(),
+          gg: z.number().optional(),
+          npi: z.number().optional(),
+          cpi: z.number().optional(),
         })
-        .default({}),
+        .optional(),
+      target: z
+        .object({
+          stitches_w: z.number().int().nonnegative().optional(),
+          courses_h: z.number().int().nonnegative().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });

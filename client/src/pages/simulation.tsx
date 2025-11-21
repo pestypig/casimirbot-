@@ -175,6 +175,7 @@ export default function Simulation() {
       radius: 25000, // µm (25 mm tile radius)
       sagDepth, // nm
       material: "PEC",
+      materialModel: "ideal_retarded",
       temperature, // K
       moduleType: "dynamic",
       dynamicConfig: {

@@ -1,0 +1,18 @@
+﻿{
+  "id": "cape.short_shoulder.v1",
+  "piece": "cape",
+  "canvas": [2048, 1536],
+  "bleed": 0.05,
+  "anchors": {
+    "neck_center": [1024, 180],
+    "shoulder_L": [640, 220],
+    "shoulder_R": [1408, 220],
+    "front_center": [1024, 400],
+    "back_center": [1024, 320]
+  },
+  "regions": [
+    {"id": "cape_body", "polygon": [[300, 240], [1748, 240], [1800, 880], [248, 880]]},
+    {"id": "collar_band", "polygon": [[760, 160], [1288, 160], [1250, 220], [798, 220]]},
+    {"id": "edge_rim", "polygon": [[260, 220], [1788, 220], [1830, 900], [216, 900]]}
+  ]
+}

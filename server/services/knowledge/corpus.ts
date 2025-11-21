@@ -119,6 +119,7 @@ type FetchOptions = {
   goal: string;
   maxBytes?: number;
   maxFilesPerProject: number;
+  extraKeywords?: string[];
 };
 
 type RankedFile = {
@@ -173,6 +174,15 @@ export async function persistKnowledgeBundles(projects: KnowledgeProjectExport[]
   return { synced: payload.length, projectIds: payload.map((project) => project.id) };
 }
 
+const buildQueryText = (goal?: string, extraKeywords?: string[]): { text: string; tokens: string[] } => {
+  const combined = [goal ?? "", ...(extraKeywords ?? [])]
+    .map((entry) => entry?.trim?.() ?? "")
+    .filter(Boolean)
+    .join(" ");
+  const text = combined || goal || "";
+  return { text, tokens: dedupeTokens(tokenize(text)) };
+};
+
 export async function fetchKnowledgeForProjects(
   projectIds: string[],
   options: FetchOptions,
@@ -185,8 +195,8 @@ export async function fetchKnowledgeForProjects(
     return [];
   }
 
-  const queryTokens = dedupeTokens(tokenize(options.goal ?? ""));
-  const queryVector = hashEmbed(options.goal ?? "", EMBEDDING_DIM);
+  const { text: queryText, tokens: queryTokens } = buildQueryText(options.goal, options.extraKeywords);
+  const queryVector = hashEmbed(queryText, EMBEDDING_DIM);
   const buckets = new Map<string, RankedFile[]>();
 
   for (const row of rows) {

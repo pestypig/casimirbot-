@@ -8,6 +8,40 @@ interface ApiRequestOptions {
 type FixedTuple3 = [number, number, number];
 
 const HELIX_DEV_MOCKS_ENABLED = isFlagEnabled("HELIX_DEV_MOCKS", true);
+const C_M_PER_S = 299_792_458;
+const HELIX_MOCK_NEEDLE_PATH_M = 1007;
+const HELIX_MOCK_TAU_LC_MS = (HELIX_MOCK_NEEDLE_PATH_M / C_M_PER_S) * 1e3;
+
+export const HELIX_DEV_MOCK_EVENT = "helix:dev-mock-used";
+export type DevMockStatus = {
+  used: boolean;
+  count: number;
+  last?: {
+    url: string;
+    method: string;
+    reason?: string;
+    at: number;
+  };
+};
+
+const devMockStatus: DevMockStatus = { used: false, count: 0 };
+
+const notifyDevMockUsed = (info: { url: string; method: string; reason?: string }) => {
+  devMockStatus.used = true;
+  devMockStatus.count += 1;
+  devMockStatus.last = { ...info, at: Date.now() };
+  // Make the status inspectable for debugging and surface to listeners
+  try {
+    (globalThis as Record<string, unknown>).__HELIX_DEV_MOCK__ = { ...devMockStatus };
+  } catch { /* noop */ }
+  try {
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new CustomEvent(HELIX_DEV_MOCK_EVENT, { detail: { ...devMockStatus } }));
+    }
+  } catch { /* noop */ }
+};
+
+export const getDevMockStatus = (): DevMockStatus => ({ ...devMockStatus });
 
 const BASE64_ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -190,29 +224,58 @@ export async function apiRequest(
         return {
           currentMode: 'hover',
           dutyEffectiveFR: 0.000025,
+          __mockData: true,
+          __mockSource: 'helix-dev-defaults',
           sectorCount: 400,
           sectorsConcurrent: 1,
           gammaGeo: 26,
           qSpoilingFactor: 1,
           gammaVanDenBroeck: 134852.5967,
-          lightCrossing: { burst_ms: 10, dwell_ms: 1000 },
+          lightCrossing: {
+            tauLC_ms: HELIX_MOCK_TAU_LC_MS,
+            burst_ms: 10,
+            dwell_ms: 1000,
+          },
           hull: { a: 503.5, b: 132, c: 86.5 },
+          mock: true,
           updatedAt: now,
         };
       }
       if (method === 'GET' && normalizedPath === '/api/helix/metrics') {
+        const sectorsTotal = 400;
+        const sectorsLive = 1;
+        const strobeHz = 1000;
+        const sectorPeriod_ms = 1000 / strobeHz;
+        const tilesPerSector = 1024;
+        const totalTiles = tilesPerSector * sectorsTotal;
+        const activeTiles = tilesPerSector * sectorsLive;
+        const currentSector = Math.floor((now / 1000) * strobeHz) % sectorsTotal;
         return {
-          totalTiles: 0,
-          activeTiles: 0,
+          totalTiles,
+          activeTiles,
+          tilesPerSector,
+          totalSectors: sectorsTotal,
+          activeSectors: sectorsLive,
+          sectorStrobing: sectorsLive,
+          currentSector,
+          strobeHz,
+          sectorPeriod_ms,
+          dutyCycle: 0.01,
+          dutyEffectiveFR: 0.01 * (sectorsLive / sectorsTotal),
           currentMode: 'hover',
+          overallStatus: 'NOMINAL',
+          __mockData: true,
+          __mockSource: 'helix-dev-defaults',
           tileData: [],
           lightCrossing: {
-            tauLC_ms: 3.336,
-            sectorPeriod_ms: 1000,
-            burst_ms: 10,
-            dwell_ms: 1000,
-            sectorsTotal: 400,
-            activeSectors: 1,
+            tauLC_ms: HELIX_MOCK_TAU_LC_MS,
+            sectorPeriod_ms,
+            burst_ms: sectorPeriod_ms * 0.01,
+            dwell_ms: sectorPeriod_ms,
+            sectorIdx: currentSector,
+            sectorCount: sectorsTotal,
+            sectorsTotal,
+            activeSectors: sectorsLive,
           },
         };
       }
@@ -288,6 +351,11 @@ export async function apiRequest(
     } else {
       console.warn('[apiRequest] Using DEV mock for', method, url);
     }
+    notifyDevMockUsed({
+      url: normalizedPath || normalizedUrl || url,
+      method,
+      reason,
+    });
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

@@ -4,6 +4,7 @@ export const KNOWLEDGE_FALLBACK_ALLOWED_MIME = [
   "text/plain",
   "text/markdown",
   "application/json",
+  "application/pdf",
   "audio/wav",
   "audio/mpeg",
 ];

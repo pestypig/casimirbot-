@@ -4,10 +4,10 @@ import {
   useKnowledgeProjectsStore,
   type ProjectWithStats
 } from "@/store/useKnowledgeProjectsStore";
-import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
+import { extractKnowledgePdfText, type KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
 import { decodeLayout } from "@/lib/desktop/shareState";
 
-const ACCEPTED_FILE_TYPES = [".txt", ".md", ".json", ".mp3", ".wav", ".m4a"].join(",");
+const ACCEPTED_FILE_TYPES = [".txt", ".md", ".pdf", ".json", ".mp3", ".wav", ".m4a"].join(",");
 const PREVIEW_LIMIT = 4096;
 
 const formatBytes = (bytes: number) => {
@@ -16,6 +16,9 @@ const formatBytes = (bytes: number) => {
   if (bytes < 1_073_741_824) return `${(bytes / 1_048_576).toFixed(1)} MB`;
   return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
 };
+
+const isPdfRecord = (record: KnowledgeFileRecord) =>
+  record.mime?.includes("pdf") || record.name.toLowerCase().endsWith(".pdf");
 
 const downloadFile = (record: KnowledgeFileRecord) => {
   const url = URL.createObjectURL(record.data);
@@ -32,6 +35,13 @@ const downloadFile = (record: KnowledgeFileRecord) => {
 async function readPreview(record: KnowledgeFileRecord): Promise<string> {
   if (record.kind === "audio") {
     return `Audio track · ${record.name} · ${formatBytes(record.size)}`;
+  }
+  if (isPdfRecord(record)) {
+    const pdfText = await extractKnowledgePdfText(record);
+    if (pdfText) {
+      return pdfText.slice(0, PREVIEW_LIMIT);
+    }
+    return `PDF document · ${record.name} · ${formatBytes(record.size)}`;
   }
   try {
     const chunk = await record.data.slice(0, PREVIEW_LIMIT, record.mime).text();

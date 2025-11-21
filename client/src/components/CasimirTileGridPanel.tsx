@@ -91,7 +91,61 @@ export function CasimirTileGridPanel({
 
   const liveMetrics = metricsProp ?? metricsFromQuery ?? null;
 
-  const resolvedMetrics = liveMetrics ?? DEFAULT_METRICS;
+  const num = React.useCallback((value: unknown, fallback = 0) => {
+    const n = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }, []);
+
+  const resolvedMetrics: Metrics = React.useMemo(() => {
+    const merged = { ...DEFAULT_METRICS, ...(liveMetrics ?? {}) } as any;
+    const totalSectorsRaw = merged.totalSectors ?? merged.sectorCount ?? merged.sectorsTotal;
+    const totalSectors = Math.max(1, num(totalSectorsRaw, DEFAULT_METRICS.totalSectors));
+
+    const sectorStrobing = Math.max(
+      0,
+      num(
+        merged.sectorStrobing ??
+          merged.activeSectors ??
+          merged.sectorsConcurrent ??
+          merged.sectors ??
+          merged.S_live,
+        DEFAULT_METRICS.sectorStrobing,
+      ),
+    );
+
+    const strobeHz = Math.max(0, num(merged.strobeHz ?? merged.strobe_hz, DEFAULT_METRICS.strobeHz));
+
+    const sectorPeriod_ms = num(
+      merged.sectorPeriod_ms ?? merged.lightCrossing?.dwell_ms,
+      strobeHz > 0 ? 1000 / strobeHz : DEFAULT_METRICS.sectorPeriod_ms,
+    );
+
+    const totalTiles = num(merged.totalTiles, DEFAULT_METRICS.totalTiles);
+
+    const tilesPerSector = num(
+      merged.tilesPerSector ?? (totalTiles > 0 ? totalTiles / totalSectors : undefined),
+      DEFAULT_METRICS.tilesPerSector,
+    );
+
+    const currentSector = Math.max(
+      0,
+      Math.floor(
+        ((num(merged.currentSector ?? merged.sectorIdx, DEFAULT_METRICS.currentSector) % totalSectors) +
+          totalSectors) %
+          totalSectors,
+      ),
+    );
+
+    return {
+      ...merged,
+      totalSectors,
+      sectorStrobing,
+      strobeHz,
+      sectorPeriod_ms,
+      tilesPerSector,
+      currentSector,
+    };
+  }, [liveMetrics, num]);
 
   const totalSectors = Math.max(1, resolvedMetrics.totalSectors || 1);
 
@@ -237,6 +291,16 @@ export function CasimirTileGridPanel({
   // normalize current sector into [0, totalSectors)
 
   const sectorIndex = ((currentSector % totalSectors) + totalSectors) % totalSectors;
+
+  React.useEffect(() => {
+    if (!Number.isFinite(pulseSector as number) || pulseSector == null) return;
+    const idx = ((Math.floor(pulseSector as number) % totalSectors) + totalSectors) % totalSectors;
+    if (!pulseLevelsRef.current.length || pulseLevelsRef.current.length !== totalSectors) {
+      pulseLevelsRef.current = new Array(totalSectors).fill(0);
+    }
+    pulseLevelsRef.current[idx] = 1;
+    schedulePulseRedraw();
+  }, [pulseSector, totalSectors, schedulePulseRedraw]);
 
 
 
@@ -452,7 +516,7 @@ export function CasimirTileGridPanel({
 
     const txt = [
 
-      `Sectors: ${sectorStrobing}/${resolvedMetrics.totalSectors}`,
+      `Sectors: ${sectorStrobing}/${totalSectors}`,
 
       `Tiles/sector: ${(tilesPerSector || 0).toLocaleString()}`,
 
@@ -524,6 +588,80 @@ export function CasimirTileGridPanel({
 
 
 
+  const clearHover = React.useCallback(() => {
+
+    if (hoverIndexRef.current !== null) {
+
+      hoverIndexRef.current = null;
+
+      onSectorFocus?.(null);
+
+      setDrawNonce((value) => value + 1);
+
+    }
+
+  }, [onSectorFocus]);
+
+
+
+  const handlePointerMove = React.useCallback(
+
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+
+      const layout = layoutRef.current;
+
+      const cvs = ref.current;
+
+      if (!layout || !cvs) return;
+
+
+
+      const rect = cvs.getBoundingClientRect();
+
+      const x = event.clientX - rect.left - layout.x0;
+
+      const y = event.clientY - rect.top - layout.y0;
+
+      const outside = x < 0 || y < 0 || x > layout.usableWidth || y > layout.usableHeight;
+
+      if (outside) {
+
+        clearHover();
+
+        return;
+
+      }
+
+
+
+      const col = Math.floor(x / layout.cellW);
+
+      const row = Math.floor(y / layout.cellH);
+
+      const idx = row * layout.cols + col;
+
+      const nextHover = idx >= 0 && idx < totalSectors ? idx : null;
+
+
+
+      if (hoverIndexRef.current !== nextHover) {
+
+        hoverIndexRef.current = nextHover;
+
+        onSectorFocus?.(nextHover);
+
+        setDrawNonce((value) => value + 1);
+
+      }
+
+    },
+
+    [clearHover, onSectorFocus, totalSectors],
+
+  );
+
+
+
   // lightweight animation loop – we only redraw when sector changes.
 
   React.useEffect(() => {
@@ -580,7 +718,7 @@ export function CasimirTileGridPanel({
 
           {hasRealMetrics
 
-            ? `${sectorStrobing}/${resolvedMetrics.totalSectors} sectors @ ${(strobeHz || 0).toLocaleString()} Hz`
+            ? `${sectorStrobing}/${totalSectors} sectors @ ${(strobeHz || 0).toLocaleString()} Hz`
 
             : "Awaiting telemetry..."}
 
@@ -607,6 +745,10 @@ export function CasimirTileGridPanel({
         <canvas
 
           ref={ref}
+
+          onPointerMove={handlePointerMove}
+
+          onPointerLeave={clearHover}
 
           style={{
 

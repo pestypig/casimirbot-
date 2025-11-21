@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { KnowledgeProjectExport } from "./knowledge";
 import type { ResonanceBundle, ResonancePatchMode, ResonancePatchStats } from "./code-lattice";
+import type { ConsoleTelemetryBundle } from "./desktop";
 import { ToolRisk } from "./skills";
 import type { ToolManifestEntry } from "./skills";
 
@@ -74,8 +75,14 @@ export const TaskTrace = z.object({
   result_summary: z.string().optional(),
   ok: z.boolean().optional(),
   knowledgeContext: z.any().optional(),
+  telemetry_bundle: z.any().optional(),
+  telemetry_summary: z.any().optional(),
   resonance_bundle: z.any().optional(),
   resonance_selection: z.any().optional(),
+  lattice_version: z.union([z.string(), z.number()]).nullable().optional(),
+  planner_prompt: z.string().optional(),
+  prompt_hash: z.string().optional(),
+  debate_id: z.string().nullable().optional(),
   // Agent instructions captured alongside the trace
   routine_json: z.any().optional(),
 });
@@ -98,4 +105,10 @@ export type TTaskTrace = z.infer<typeof TaskTrace> & {
   plan_manifest?: ToolManifestEntry[];
   resonance_bundle?: ResonanceBundle | null;
   resonance_selection?: TResonanceSelectionSnapshot | null;
+  telemetry_bundle?: ConsoleTelemetryBundle | null;
+  telemetry_summary?: string | null;
+  lattice_version?: string | number | null;
+  planner_prompt?: string | null;
+  prompt_hash?: string | null;
+  debate_id?: string | null;
 };

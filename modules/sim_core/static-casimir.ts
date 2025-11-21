@@ -3,9 +3,19 @@
  * Implements scientifically accurate SCUFF-EM FSC method
  */
 
-import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
+import { PHYSICS_CONSTANTS, thermalLength } from '../core/physics-constants.js';
 import type { CasimirModule } from '../core/module-registry.js';
 import type { SimulationParameters } from '../../shared/schema.js';
+
+export type MaterialModel = 'ideal_retarded' | 'lifshitz_drude' | 'lifshitz_plasma' | 'auto';
+
+export interface MaterialModelOptions {
+  plasmaFrequency_eV?: number;
+  damping_eV?: number;
+  hamaker_zJ?: number;
+  roughness_nm?: number;
+  temperature_K?: number;
+}
 
 export interface StaticCasimirResult {
   totalEnergy: number;
@@ -19,6 +29,176 @@ export interface StaticCasimirResult {
   geometryFactor?: string;
   radiusOfCurvature?: string;
   pfaCorrection?: string;
+  // Material-model helpers
+  nominalEnergy?: number;
+  realisticEnergy?: number;
+  uncoupledEnergy?: number;
+  energyPerAreaNominal?: number;
+  model?: MaterialModel;
+  modelRatio?: number;
+  energyBand?: { min: number; max: number };
+  lifshitzSweep?: Array<{ gap_nm: number; ratio: number }>;
+  couplingChi?: number;
+  couplingMethod?: string;
+  couplingNote?: string;
+  tilePitch_m?: number;
+  supercellRatio?: number;
+}
+
+const EV_TO_J = 1.602176634e-19;
+const DEFAULT_MATERIAL: Required<MaterialModelOptions> = {
+  plasmaFrequency_eV: 9.0,  // gold-like plasma frequency
+  damping_eV: 0.035,        // typical room-temp relaxation (Drude)
+  hamaker_zJ: 40,           // Au-silica in air ballpark Hamaker constant
+  roughness_nm: 0.3,        // sub-nm polished film
+  temperature_K: 300,       // lab ambient unless overridden
+};
+const LIFSHITZ_SAMPLES_NM = [1, 2, 5, 10];
+
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  return Math.max(0, Math.min(1, x));
+}
+
+function lifshitzEnergyForGap(
+  gap_m: number,
+  effectiveArea: number,
+  retardedEnergy: number,
+  model: MaterialModel,
+  opts: MaterialModelOptions,
+  tempK: number,
+): { energy: number; ratio: number; band: { min: number; max: number } } {
+  const material = {
+    ...DEFAULT_MATERIAL,
+    ...opts,
+    temperature_K: Number.isFinite(opts.temperature_K) ? (opts.temperature_K as number) : tempK,
+  };
+
+  // Non-retarded van der Waals (Hamaker) contribution
+  const hamaker_J = material.hamaker_zJ * 1e-21;
+  const vdw_per_area = -(hamaker_J) / (12 * Math.PI * Math.pow(gap_m, 2));
+  const vdw_energy = vdw_per_area * effectiveArea;
+
+  // Characteristic plasma length sets the retardation crossover
+  const omega_p = (material.plasmaFrequency_eV * EV_TO_J) / PHYSICS_CONSTANTS.HBAR;
+  const lambda_p = 2 * Math.PI * PHYSICS_CONSTANTS.C / Math.max(omega_p, 1e-18);
+  const gap_crossover = Math.min(80e-9, Math.max(5e-9, 0.15 * lambda_p));
+  const retardedWeight = 1 / (1 + Math.pow(gap_crossover / Math.max(gap_m, 1e-12), 2));
+
+  // Conductivity and surface corrections (moderate but non-zero)
+  const conductivityFactor = 1 / (1 + (material.damping_eV / Math.max(material.plasmaFrequency_eV, 1e-6)));
+  const roughnessFactor = Math.max(
+    0.5,
+    1 - (material.roughness_nm * 1e-9) / Math.max(gap_m, 1e-12) * 0.8,
+  );
+  const thermalLen = thermalLength(material.temperature_K);
+  const thermalFactor = clamp01(1 - 0.1 * (gap_m / Math.max(thermalLen, 1e-12)));
+
+  const lifshitzEnergy =
+    ((1 - retardedWeight) * vdw_energy + retardedWeight * retardedEnergy) *
+    conductivityFactor *
+    roughnessFactor *
+    thermalFactor;
+
+  const ratio = retardedEnergy !== 0 ? lifshitzEnergy / retardedEnergy : 1;
+
+  // Uncertainty band: larger at sub-10 nm where nonlocality/roughness dominate
+  const smallGapScale = clamp01((10e-9 - gap_m) / 10e-9);
+  const bandFrac = 0.18 + 0.32 * smallGapScale; // ~50% at 0.5 nm, ~18% at >10 nm
+  const band = {
+    min: lifshitzEnergy * (1 - bandFrac),
+    max: lifshitzEnergy * (1 + bandFrac),
+  };
+
+  return { energy: lifshitzEnergy, ratio, band };
+}
+
+type CouplingInputs = {
+  chi?: number;
+  pitch_m?: number;
+  pitch_um?: number;
+  pitch_nm?: number;
+  frameFill?: number;
+  packingFraction?: number;
+  supercell?: {
+    tiles?: number;
+    energy_J?: number;
+    ratio?: number;
+  };
+};
+
+function pitchMetersFromInputs(
+  coupling: CouplingInputs | undefined,
+  effectiveArea: number,
+  arraySpacing_um?: number,
+): number | undefined {
+  const candidates = [
+    coupling?.pitch_m,
+    Number.isFinite(coupling?.pitch_um) ? (coupling!.pitch_um as number) * 1e-6 : undefined,
+    Number.isFinite(coupling?.pitch_nm) ? (coupling!.pitch_nm as number) * 1e-9 : undefined,
+    Number.isFinite(arraySpacing_um) ? (arraySpacing_um as number) * 1e-6 : undefined,
+  ].filter((v) => Number.isFinite(v) && (v as number) > 0) as number[];
+
+  if (candidates.length > 0) {
+    return candidates[0];
+  }
+
+  if (!Number.isFinite(effectiveArea) || effectiveArea <= 0) return undefined;
+  const fill = clamp01(coupling?.frameFill ?? coupling?.packingFraction ?? 1);
+  const cellArea = effectiveArea / Math.max(fill, 1e-9);
+  return Math.sqrt(Math.max(cellArea, 0));
+}
+
+function estimateCouplingChi(opts: {
+  gap_m: number;
+  effectiveArea: number;
+  singleTileEnergy: number;
+  coupling?: CouplingInputs;
+  arraySpacing_um?: number;
+}): { chi: number; method: string; note?: string; pitch_m?: number; supercellRatio?: number } {
+  const coupling = opts.coupling ?? {};
+  const frameFill = clamp01(coupling.frameFill ?? coupling.packingFraction ?? 1);
+
+  if (Number.isFinite(coupling.chi)) {
+    return {
+      chi: clamp01(coupling.chi as number),
+      method: 'override',
+      note: 'explicit chi supplied',
+      pitch_m: pitchMetersFromInputs(coupling, opts.effectiveArea, opts.arraySpacing_um),
+    };
+  }
+
+  const pitch_m = pitchMetersFromInputs(coupling, opts.effectiveArea, opts.arraySpacing_um);
+  const scTiles = coupling.supercell?.tiles;
+  const scEnergy = coupling.supercell?.energy_J;
+  const scRatio = coupling.supercell?.ratio;
+  const singleEnergy = Math.max(Math.abs(opts.singleTileEnergy), 1e-30);
+
+  if (Number.isFinite(scTiles) && Number.isFinite(scEnergy) && (scTiles as number) > 0) {
+    const ratio = (scEnergy as number) / ((scTiles as number) * singleEnergy);
+    const chi = clamp01(ratio);
+    return { chi, method: 'supercell', note: 'chi from supercell energy ratio', pitch_m, supercellRatio: chi };
+  }
+
+  if (Number.isFinite(scRatio)) {
+    const chi = clamp01(scRatio as number);
+    return { chi, method: 'supercell', note: 'chi from supercell ratio', pitch_m, supercellRatio: chi };
+  }
+
+  const gap = Math.max(opts.gap_m, 1e-12);
+  const pitchToGap = pitch_m ? pitch_m / gap : Number.POSITIVE_INFINITY;
+  const reach = 6; // gaps before edge-to-edge rescattering fades
+  const overlap = pitchToGap === Number.POSITIVE_INFINITY ? 0 : Math.max(0, (reach - pitchToGap) / reach);
+  const neighborCount = 6;
+  const penalty = neighborCount * overlap * overlap * frameFill;
+  const chi = clamp01(1 / (1 + 0.6 * penalty));
+
+  return {
+    chi,
+    method: 'analytic',
+    note: 'chi estimated from gap/pitch + packing',
+    pitch_m,
+  };
 }
 
 /**
@@ -158,9 +338,71 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
   // Placeholder hook: keep at 1.0 unless you wire finite-T Matsubara terms.
   const temperatureFactor = 1.0;
 
-  const finalEnergy = casimirEnergy * temperatureFactor;
-  const finalForce = casimirForce * temperatureFactor;
-  const energyPerArea = finalEnergy / (Math.max(1e-24, (geometry === 'sphere' ? 4 * PHYSICS_CONSTANTS.PI * radiusMeters * radiusMeters : PHYSICS_CONSTANTS.PI * radiusMeters * radiusMeters)));
+  const materialModel: MaterialModel = (params as any).materialModel ?? 'ideal_retarded';
+  const materialProps: MaterialModelOptions = (params as any).materialProps ?? {};
+  const arraySpacing_um = Number.isFinite((params as any)?.arrayConfig?.spacing)
+    ? ((params as any).arrayConfig.spacing as number)
+    : undefined;
+
+  const nominalEnergy = casimirEnergy * temperatureFactor;
+  const nominalForce = casimirForce * temperatureFactor;
+  const nominalEnergyPerArea = nominalEnergy / Math.max(
+    1e-24,
+    geometry === 'sphere'
+      ? 4 * PHYSICS_CONSTANTS.PI * radiusMeters * radiusMeters
+      : PHYSICS_CONSTANTS.PI * radiusMeters * radiusMeters,
+  );
+
+  const materialApplied =
+    materialModel === 'ideal_retarded'
+      ? { energy: nominalEnergy, ratio: 1, band: { min: nominalEnergy, max: nominalEnergy } }
+      : lifshitzEnergyForGap(
+          gapMeters,
+          effectiveArea,
+          nominalEnergy,
+          materialModel,
+          materialProps,
+          tempKelvin,
+        );
+
+  const coupling = (params as any).coupling ?? (params as any).couplingCorrection ?? undefined;
+  const couplingResult = estimateCouplingChi({
+    gap_m: gapMeters,
+    effectiveArea,
+    singleTileEnergy: materialApplied.energy,
+    coupling,
+    arraySpacing_um,
+  });
+  const couplingChi = couplingResult.chi ?? 1;
+
+  const finalEnergy = materialApplied.energy * couplingChi;
+  const finalForce = nominalForce * (materialApplied.ratio ?? 1) * couplingChi;
+  const energyPerArea = finalEnergy / Math.max(1e-24, effectiveArea);
+  const energyBand = materialApplied.band
+    ? {
+        min: materialApplied.band.min * couplingChi,
+        max: materialApplied.band.max * couplingChi,
+      }
+    : undefined;
+
+  // --- Lifshitz ratio sweep (1, 2, 5, 10 nm) for UI traces
+  const gapExponent = geometry === 'sphere' ? 2 : 3;
+  const lifshitzSweep =
+    materialModel === 'ideal_retarded'
+      ? []
+      : LIFSHITZ_SAMPLES_NM.map((g) => {
+          const g_m = g * PHYSICS_CONSTANTS.NM_TO_M;
+          const scaledRetarded = nominalEnergy * Math.pow(gapMeters / g_m, gapExponent);
+          const sample = lifshitzEnergyForGap(
+            g_m,
+            effectiveArea,
+            scaledRetarded,
+            materialModel,
+            materialProps,
+            tempKelvin,
+          );
+          return { gap_nm: g, ratio: sample.ratio };
+        });
 
   // --- Quadrature sampling for ξ (imaginary frequency) integration
   // ξ_max ~ c / a; convert to a practical node count [1e3 .. 2e4]
@@ -184,6 +426,19 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
     convergence: 'Achieved',
     computeTime: `${computeTimeMinutes.toFixed(1)} min`,
     errorEstimate: `${errorPct.toFixed(1)}%`,
+    nominalEnergy,
+    realisticEnergy: finalEnergy,
+    uncoupledEnergy: materialApplied.energy,
+    energyPerAreaNominal: nominalEnergyPerArea,
+    model: materialModel,
+    modelRatio: materialApplied.ratio ?? 1,
+    energyBand: energyBand ?? materialApplied.band,
+    lifshitzSweep,
+    couplingChi,
+    couplingMethod: couplingResult.method,
+    couplingNote: couplingResult.note,
+    tilePitch_m: couplingResult.pitch_m,
+    supercellRatio: couplingResult.supercellRatio,
     ...geometrySpecific
   };
 }

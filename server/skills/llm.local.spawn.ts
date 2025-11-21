@@ -83,6 +83,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     seed,
     stop: parsed.stop,
   });
+  const promptHash = sha256(Buffer.from(prompt, "utf8"));
   let outputText = "";
   const stderr: string[] = [];
   const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -110,6 +111,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       tool: TOOL_NAME,
       version: TOOL_VERSION,
       paramsHash: hashPayload({ prompt, maxTokens, temperature, seed, cmd, args }),
+      promptHash,
       durationMs: Date.now() - started,
       sessionId,
       ok: false,
@@ -129,7 +131,6 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   const buffer = Buffer.from(trimmedOutput, "utf8");
   const blob = await putBlob(buffer, { contentType: TEXT_MIME });
   const textHash = sha256(buffer);
-  const promptHash = sha256(Buffer.from(prompt, "utf8"));
   const essenceId = randomUUID();
   const envelope = EssenceEnvelope.parse({
     header: {
@@ -196,6 +197,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     tool: TOOL_NAME,
     version: TOOL_VERSION,
     paramsHash: hashPayload({ prompt, maxTokens, temperature, seed, cmd, args }),
+    promptHash,
     durationMs,
     sessionId,
     ok: true,

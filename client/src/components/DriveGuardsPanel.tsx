@@ -36,6 +36,7 @@ import {
   helmholtzProjectDivergenceFree,
 } from "@/lib/york-time";
 import type { AxesABC, YorkSample, Vec3 } from "@/lib/york-time";
+import { HELIX_DEV_MOCK_EVENT, getDevMockStatus, type DevMockStatus } from "@/lib/queryClient";
 
 
 import { DefinitionChip, useTermRegistry } from "@/components/DefinitionChip";
@@ -101,6 +102,14 @@ const GRAVITATIONAL_CONSTANT = 6.6743e-11; // m^3 kg^-1 s^-2
 
 
 const Q_BURST = 1e9; // storage factor used by the pipeline audit
+const HBAR = 1.054_571_817e-34; // J*s
+const BOLTZMANN = 1.380_649e-23; // J/K
+const HBAR_C = HBAR * SPEED_OF_LIGHT;
+const EV_TO_J = 1.602_176_634e-19;
+const DEFAULT_PLASMA_FREQ_EV = 9;
+const DEFAULT_DAMPING_EV = 0.035;
+const DEFAULT_HAMAKER_ZJ = 40;
+const DEFAULT_ROUGHNESS_NM = 0.3;
 
 const CM2_TO_M2 = 1e-4;
 const SOLAR_STANDARD_GRAVITATIONAL_PARAMETER = 1.32712440018e20; // m^3/s^2 for the Sun
@@ -248,6 +257,15 @@ const formatSecondsFriendly = (seconds: number) => {
 
 };
 
+const formatMsFromUs = (microseconds: number) => {
+
+  if (!Number.isFinite(microseconds)) return "n/a";
+  if (microseconds >= 1000) return `${(microseconds / 1000).toFixed(3)} ms`;
+  if (microseconds >= 1) return `${microseconds.toFixed(3)} µs`;
+  return `${(microseconds * 1000).toFixed(2)} ns`;
+
+};
+
 const describeTau = (label: string, seconds: number) => {
 
   if (!Number.isFinite(seconds)) return `${label} = n/a`;
@@ -282,6 +300,25 @@ const firstFinite = (...values: Array<unknown>): number => {
 
   return NaN;
 
+};
+
+const useHelixDevMockStatus = (): DevMockStatus => {
+  const [status, setStatus] = useState<DevMockStatus>(() => getDevMockStatus());
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as DevMockStatus | undefined;
+      if (detail) setStatus(detail);
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener(HELIX_DEV_MOCK_EVENT, handler);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(HELIX_DEV_MOCK_EVENT, handler);
+      }
+    };
+  }, []);
+  return status;
 };
 
 
@@ -402,7 +439,7 @@ function summarizeQiHeadroom(arr?: Float32Array | number[]): QISummary {
   return { hasQi: true, qiMin: min, qiP05, qiMean };
 }
 
-/** Amplitude histogram proxy for wall “steepness” from data/min/max */
+/** Amplitude histogram proxy for wall "steepness" from data/min/max */
 function summarizeAmplitude(
   data?: Float32Array | number[],
   min?: number,
@@ -443,8 +480,87 @@ function summarizeAmplitude(
   return { hasData: true, bandOccupancy, edgeMass, steepness };
 }
 
+type LifshitzEstimate = {
+  ratio: number;
+  ratioMin: number;
+  ratioMax: number;
+  retardedEnergy: number;
+};
+
+function estimateLifshitzBand(params: {
+  gap_nm?: number;
+  area_m2?: number;
+  temperature_K?: number;
+}): LifshitzEstimate | null {
+  const gap_nm = typeof params.gap_nm === "number" ? params.gap_nm : NaN;
+  const area = typeof params.area_m2 === "number" ? params.area_m2 : NaN;
+  if (!Number.isFinite(gap_nm) || !Number.isFinite(area) || gap_nm <= 0 || area <= 0) return null;
+
+  const gap_m = gap_nm * 1e-9;
+  const tempK = Number.isFinite(params.temperature_K) ? (params.temperature_K as number) : 300;
+
+  const retardedEnergy =
+    -(Math.PI ** 2 / 720) * HBAR_C * area / Math.max(Math.pow(gap_m, 3), 1e-36);
+
+  const hamaker_J = DEFAULT_HAMAKER_ZJ * 1e-21;
+  const vdw_per_area = -(hamaker_J) / (12 * Math.PI * Math.max(Math.pow(gap_m, 2), 1e-24));
+  const vdw_energy = vdw_per_area * area;
+
+  const omega_p = (DEFAULT_PLASMA_FREQ_EV * EV_TO_J) / HBAR;
+  const lambda_p = 2 * Math.PI * SPEED_OF_LIGHT / Math.max(omega_p, 1e-18);
+  const gap_crossover = Math.min(80e-9, Math.max(5e-9, 0.15 * lambda_p));
+  const retardedWeight = 1 / (1 + Math.pow(gap_crossover / Math.max(gap_m, 1e-12), 2));
+
+  const conductivityFactor = 1 / (1 + DEFAULT_DAMPING_EV / Math.max(DEFAULT_PLASMA_FREQ_EV, 1e-6));
+  const roughnessFactor = Math.max(0.5, 1 - (DEFAULT_ROUGHNESS_NM * 1e-9) / Math.max(gap_m, 1e-12) * 0.8);
+  const thermalLen = (HBAR_C) / (BOLTZMANN * Math.max(tempK, 1));
+  const thermalFactor = clamp01(1 - 0.1 * (gap_m / Math.max(thermalLen, 1e-12)));
+
+  const lifshitzEnergy =
+    ((1 - retardedWeight) * vdw_energy + retardedWeight * retardedEnergy) *
+    conductivityFactor *
+    roughnessFactor *
+    thermalFactor;
+
+  const ratio = retardedEnergy !== 0 ? lifshitzEnergy / retardedEnergy : 1;
+  const smallGapScale = clamp01((10e-9 - gap_m) / 10e-9);
+  const bandFrac = 0.18 + 0.32 * smallGapScale;
+  const ratioMin = retardedEnergy !== 0 ? (lifshitzEnergy * (1 - bandFrac)) / retardedEnergy : ratio;
+  const ratioMax = retardedEnergy !== 0 ? (lifshitzEnergy * (1 + bandFrac)) / retardedEnergy : ratio;
+
+  return {
+    ratio,
+    ratioMin,
+    ratioMax,
+    retardedEnergy,
+  };
+}
+
+function estimateSupercellChi(params: {
+  gap_nm?: number;
+  tileArea_m2?: number;
+  frameFill?: number;
+}) {
+  const gap_nm = typeof params.gap_nm === "number" ? params.gap_nm : NaN;
+  const area = typeof params.tileArea_m2 === "number" ? params.tileArea_m2 : NaN;
+  if (!Number.isFinite(gap_nm) || !Number.isFinite(area) || gap_nm <= 0 || area <= 0) return null;
+
+  const gap_m = gap_nm * 1e-9;
+  const fill = clamp01(params.frameFill ?? 0.88);
+  const pitch_m = Math.sqrt(area / Math.max(fill, 1e-6));
+
+  const reach = 6;
+  const pitchToGap = pitch_m / Math.max(gap_m, 1e-12);
+  const overlap = Math.max(0, (reach - pitchToGap) / reach);
+  const neighborCount = 6;
+  const penalty = neighborCount * overlap * overlap * fill;
+  const chi = clamp01(1 / (1 + 0.6 * penalty));
+
+  return { chi, pitch_m };
+}
+
 function fmt2(n?: number) {
-  return typeof n === "number" && Number.isFinite(n) ? n.toFixed(2) : "—";
+  return typeof n === "number" && Number.isFinite(n) ? n.toFixed(2) : "-";
 }
 const modeTitle: Record<string, string> = {
 
@@ -1070,6 +1186,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const { data: metrics } = useMetrics();
   const { sample: curv } = useCurvatureBrick();
   const cycleLedger = useCycleLedger();
+  const devMockStatus = useHelixDevMockStatus();
   const navPose = useNavPoseStore((state) => state.navPose);
   const startNavPose = useNavPoseStore((state) => state.start);
   const stopNavPose = useNavPoseStore((state) => state.stop);
@@ -1303,15 +1420,33 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     "CCS-Lite: steepness = 1 - occ([0.30..0.70] of normalized field). " +
     "Healthy if steepness >= 0.80 and, if QI present, p05 >= 0.10.";
 
+  const ledgerPayback =
+    typeof cycleLedger.paybackRequired_J === "number" && Number.isFinite(cycleLedger.paybackRequired_J)
+      ? Math.max(0, cycleLedger.paybackRequired_J as number)
+      : null;
   const ledgerRatioValue =
     typeof cycleLedger.ratio === "number" && Number.isFinite(cycleLedger.ratio)
       ? cycleLedger.ratio
       : undefined;
-  const ledgerBadgeOk = cycleLedger.ok === null ? false : cycleLedger.ok === true;
-  const ledgerValue = ledgerRatioValue !== undefined
-    ? `ΔE drift ${toPercent(ledgerRatioValue, 3)}`
-    : "Ledger drift unavailable";
-  const ledgerDescription = `Ledger safe when |ΔE|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)}.`;
+  const ledgerBadgeOk =
+    cycleLedger.paybackOk === false
+      ? false
+      : cycleLedger.ok === null
+        ? false
+        : cycleLedger.ok === true;
+  const ledgerValue = ledgerPayback && ledgerPayback > 0
+    ? `Payback +${toSci(ledgerPayback, 2)} J`
+    : ledgerRatioValue !== undefined
+      ? `ΔE drift ${toPercent(ledgerRatioValue, 3)}`
+      : "Ledger drift unavailable";
+  const paybackWindowDisplay =
+    cycleLedger.cycleMs !== null && Number.isFinite(cycleLedger.cycleMs)
+      ? `${toSci((cycleLedger.cycleMs as number) * 1e-3, 2)} s`
+      : null;
+  const ledgerDescription =
+    ledgerPayback && ledgerPayback > 0
+      ? `Negative-energy cycle needs +${toSci(ledgerPayback, 2)} J reversible energy${paybackWindowDisplay ? ` within ~${paybackWindowDisplay}` : ""} to hold |ΔE|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)}.`
+      : `Ledger safe when |ΔE|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)}.`;
   const ledgerSourceLabel =
     cycleLedger.source === "server"
       ? "server ledger"
@@ -1319,13 +1454,53 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
         ? "client aggregate"
         : "telemetry";
   const ledgerReadValue =
-    ledgerRatioValue !== undefined
-      ? `Per-cycle drift ${toPercent(ledgerRatioValue, 3)} via ${ledgerSourceLabel}.`
-      : "Awaiting ledger samples.";
+    ledgerPayback && ledgerPayback > 0
+      ? `Needs +${toSci(ledgerPayback, 2)} J reversible within one audited window (${ledgerSourceLabel}).`
+      : ledgerRatioValue !== undefined
+        ? `Per-cycle drift ${toPercent(ledgerRatioValue, 3)} via ${ledgerSourceLabel}.`
+        : "Awaiting ledger samples.";
   const ledgerReadDescription =
     ledgerRatioValue !== undefined
-      ? `|ΔE|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)} keeps curvature bookkeeping tight. Latest: ΔE ${toSci(cycleLedger.latest?.dE, 2)} J (bus ${toSci(cycleLedger.latest?.bus, 2)} J, sink ${toSci(cycleLedger.latest?.sink, 2)} J).`
+      ? `|ΔE|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)} keeps curvature bookkeeping tight. Latest: ΔE ${toSci(cycleLedger.latest?.dE, 2)} J (bus ${toSci(cycleLedger.latest?.bus, 2)} J, sink ${toSci(cycleLedger.latest?.sink, 2)} J).${ledgerPayback && ledgerPayback > 0 ? ` Requires +${toSci(ledgerPayback, 2)} J reversible credit${paybackWindowDisplay ? ` within ~${paybackWindowDisplay}` : ""}.` : ""}`
       : "Ledger guard balances reversible (bus) and sink joules once samples arrive.";
+  const mockBannerUsed =
+    devMockStatus.used ||
+    Boolean((pipe as any)?.__mockData || (metrics as any)?.__mockData);
+  const dutyEffectiveFRLive = firstFinite(
+    dEff,
+    pipe?.dutyEffectiveFR,
+    (pipe as any)?.fordRoman?.value,
+    (metrics as any)?.dutyEffectiveFR,
+  );
+  const burstMsLive = firstFinite(pipe?.burst_ms, pipe?.lightCrossing?.burst_ms, (metrics as any)?.lightCrossing?.burst_ms);
+  const dwellMsLive = firstFinite(
+    pipe?.dwell_ms,
+    pipe?.sectorPeriod_ms,
+    pipe?.lightCrossing?.dwell_ms,
+    pipe?.lightCrossing?.sectorPeriod_ms,
+    (metrics as any)?.lightCrossing?.dwell_ms,
+    (metrics as any)?.lightCrossing?.sectorPeriod_ms,
+  );
+  const ledgerBaseline = Number.isFinite(ledgerRatioValue)
+    ? (ledgerRatioValue as number)
+    : (Number.isFinite(dutyEffectiveFRLive) ? (dutyEffectiveFRLive as number) * LEDGER_GUARD_THRESHOLD : null);
+  const dutyCap = 1; // QI cap defaults to zeta<=1 unless server provides a tighter bound
+  const ledgerDutySweep = [0.25, 0.5, 1, 1.25].map((scale) => {
+    const pred = ledgerBaseline == null ? null : ledgerBaseline * scale;
+    const measured = scale === 1 && Number.isFinite(ledgerRatioValue) ? (ledgerRatioValue as number) : null;
+    const withinCap =
+      !Number.isFinite(dutyEffectiveFRLive) || (dutyEffectiveFRLive as number) * scale <= dutyCap;
+    const deviation = measured !== null && pred !== null && pred > 0 ? Math.abs(measured - pred) / pred : 0;
+    const pass = Boolean(pred !== null && pred <= LEDGER_GUARD_THRESHOLD && withinCap && (measured === null || deviation <= 0.25));
+    return {
+      scale,
+      pred,
+      measured,
+      pass,
+      withinCap,
+    };
+  });
+  const ledgerLinearOk = ledgerDutySweep.every((probe) => probe.pass || probe.pred === null);
 
   const lrlDriftValue = Number.isFinite(lrlDriftRatio ?? Number.NaN) ? (lrlDriftRatio as number) : Number.NaN;
   const lrlGuardOk = Number.isFinite(lrlDriftValue) ? lrlDriftValue < LRL_DRIFT_THRESHOLD : true;
@@ -1350,8 +1525,27 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-  const qMech = Number(pipe?.qMechanical ?? pipe?.qSpoilingFactor ?? pipe?.q);
+  const qMech = (() => {
+    const raw = firstFinite(
+      pipe?.qMechanical,
+      pipe?.qSpoilingFactor,
+      (pipe as any)?.q_mech,
+      (pipe as any)?.qMech,
+    );
+    return Number.isFinite(raw) ? (raw as number) : Number.NaN;
+  })();
 
+  const mechGuard = (pipe as any)?.mechGuard;
+  const qMechApplied = Number.isFinite(mechGuard?.qMechApplied)
+    ? (mechGuard!.qMechApplied as number)
+    : qMech;
+  const qMechDemand = Number.isFinite(mechGuard?.qMechDemand)
+    ? (mechGuard!.qMechDemand as number)
+    : qMechApplied;
+  const mechShortfallMW = Number.isFinite(mechGuard?.pShortfall_W)
+    ? (mechGuard!.pShortfall_W as number) / 1e6
+    : Number.NaN;
+  const mechMargin = Number.isFinite(qMechApplied) ? Math.max(0, 1 - qMechApplied) : Number.NaN;
 
 
 
@@ -1450,7 +1644,25 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-    latestSweep?.pumpRatio ?? latestSweep?.rho ?? latestSweep?.lambda0 ?? latestSweep?.lambdaEff,
+    firstFinite(
+
+      latestSweep?.pumpRatio,
+
+      latestSweep?.rho,
+
+      latestSweep?.lambda0,
+
+      latestSweep?.lambdaEff,
+
+      pipe?.pumpRatio,
+
+      pipe?.rho,
+
+      pipe?.lambda0,
+
+      pipe?.lambdaEff,
+
+    ),
 
 
 
@@ -1458,7 +1670,11 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-  const latestPhiDeg = Number(latestSweep?.pumpPhase_deg ?? latestSweep?.phi_deg);
+  const latestPhiDeg = Number(
+
+    firstFinite(latestSweep?.pumpPhase_deg, latestSweep?.phi_deg, pipe?.pumpPhase_deg, pipe?.phi_deg),
+
+  );
 
 
 
@@ -1478,7 +1694,17 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-  const lambdaMargin = Number.isFinite(lambdaEff) ? 1 - Math.abs(lambdaEff) : NaN;
+  const lambdaMargin = (() => {
+
+    const margin = Number.isFinite(lambdaEff) ? 1 - Math.abs(lambdaEff) : NaN;
+
+    if (Number.isFinite(margin)) return margin;
+
+    if (Number.isFinite(tileStats.minMargin)) return tileStats.minMargin;
+
+    return Number.NaN;
+
+  })();
 
 
 
@@ -1556,7 +1782,19 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
+
+  const clocking = (pipe as any)?.clocking ?? (metrics as any)?.clocking;
+  const lcMetrics = (metrics as any)?.lightCrossing ?? {};
+  const clockingProvenance = (pipe as any)?.clockingProvenance ?? (metrics as any)?.clockingProvenance;
+  const clockingDerived = clockingProvenance === "derived";
+  const clockingSimulated = clockingProvenance === "simulated";
+
   const tauPulseUs = (() => {
+
+    const c = clocking as any;
+    const fromClockMs = firstFinite(c?.tauPulse_ms, c?.burst_ms);
+    if (Number.isFinite(fromClockMs)) return (fromClockMs as number) * 1000;
+
 
     const candidateUs = firstFinite(
 
@@ -1572,11 +1810,19 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
       pipe?.lightCrossing?.pulse_us,
 
+      lcMetrics?.burst_us,
+
+      lcMetrics?.tauPulse_us,
+
+      lcMetrics?.pulse_us,
+
     );
 
     if (Number.isFinite(candidateUs)) return candidateUs;
 
     const candidateMs = firstFinite(
+
+      lcMetrics?.burst_ms,
 
       pipe?.lightCrossing?.burst_ms,
 
@@ -1587,6 +1833,10 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
       pipe?.tau_pulse_ms,
 
       pipe?.lightCrossing?.pulse_ms,
+
+      lcMetrics?.pulse_ms,
+
+      lcMetrics?.tauPulse_ms,
 
     );
 
@@ -1602,6 +1852,12 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
       pipe?.tau_pulse_ns,
 
+      lcMetrics?.burst_ns,
+
+      lcMetrics?.pulse_ns,
+
+      lcMetrics?.tauPulse_ns,
+
     );
 
     if (Number.isFinite(candidateNs)) return candidateNs / 1000;
@@ -1614,6 +1870,11 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
   const tauLCUs = (() => {
 
+    const c = clocking as any;
+    const fromClockMs = firstFinite(c?.tauLC_ms);
+    if (Number.isFinite(fromClockMs)) return (fromClockMs as number) * 1000;
+
+
     const candidateUs = firstFinite(
 
       pipe?.lightCrossing?.tauLC_us,
@@ -1623,6 +1884,10 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
       pipe?.lightCrossing_us,
 
       pipe?.lightCrossing?.lightCrossing_us,
+
+      lcMetrics?.tauLC_us,
+
+      lcMetrics?.tau_us,
 
     );
 
@@ -1638,6 +1903,10 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
       pipe?.lightCrossing?.lightCrossing_ms,
 
+      lcMetrics?.tauLC_ms,
+
+      lcMetrics?.tau_ms,
+
     );
 
     if (Number.isFinite(candidateMs)) return candidateMs * 1000;
@@ -1647,6 +1916,8 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
       pipe?.lightCrossing?.tauLC_ns,
 
       pipe?.tau_LC_ns,
+
+      lcMetrics?.tauLC_ns,
 
     );
 
@@ -1667,8 +1938,8 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
   const ts = (() => {
-
-
+    const tsFromClock = Number.isFinite((clocking as any)?.TS) ? Number((clocking as any).TS) : NaN;
+    if (Number.isFinite(tsFromClock) && tsFromClock > 0) return tsFromClock;
 
     if (Number.isFinite(tauLCUs) && Number.isFinite(tauPulseUs) && tauPulseUs > 0) {
 
@@ -1690,11 +1961,11 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-    const burst = Number(pipe?.lightCrossing?.burst_ms ?? pipe?.burst_ms);
+    const burst = Number(pipe?.lightCrossing?.burst_ms ?? pipe?.burst_ms ?? lcMetrics?.burst_ms ?? lcMetrics?.sectorPeriod_ms);
 
 
 
-    const dwell = Number(pipe?.lightCrossing?.dwell_ms ?? pipe?.dwell_ms);
+    const dwell = Number(pipe?.lightCrossing?.dwell_ms ?? pipe?.dwell_ms ?? lcMetrics?.dwell_ms ?? lcMetrics?.sectorPeriod_ms);
 
 
 
@@ -1702,7 +1973,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-      const tauLC = Number(pipe?.lightCrossing?.tauLC_ms ?? pipe?.tau_LC_ms);
+      const tauLC = Number(pipe?.lightCrossing?.tauLC_ms ?? pipe?.tau_LC_ms ?? lcMetrics?.tauLC_ms ?? lcMetrics?.tau_ms);
 
 
 
@@ -1730,9 +2001,16 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
+
+  const epsilonFromClock = Number.isFinite((clocking as any)?.epsilon) ? Number((clocking as any).epsilon) : NaN;
+
   const epsilonFromTimes =
 
-    Number.isFinite(tauPulseUs) && Number.isFinite(tauLCUs) && tauLCUs > 0
+    Number.isFinite(epsilonFromClock)
+
+      ? epsilonFromClock
+
+      : Number.isFinite(tauPulseUs) && Number.isFinite(tauLCUs) && tauLCUs > 0
 
       ? tauPulseUs / tauLCUs
 
@@ -1744,6 +2022,10 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
+  const hfProxyBlocked = clockingProvenance === "hardware" && Number.isFinite(epsilonEffective) && epsilonEffective > 1;
+
+
+
   const epsilonDisplay = Number.isFinite(epsilonEffective) ? toSci(epsilonEffective, 2) : "n/a";
 
 
@@ -1752,13 +2034,32 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
     Number.isFinite(ts) && ts > 0
 
-      ? (ts >= 100 ? ts.toFixed(0) : ts.toFixed(1))
+      ? (ts >= 100 ? ts.toFixed(0) : ts >= 0.1 ? ts.toFixed(1) : toSci(ts, 1))
 
       : "n/a";
 
 
 
   const averagingStatus = (() => {
+
+    const regime = (clocking as any)?.regime;
+    const regimeDetail =
+      typeof (clocking as any)?.detail === "string"
+        ? (clocking as any).detail
+        : undefined;
+    if (regime === "fail") {
+      return { state: "fail" as const, message: regimeDetail ?? "Clocking outside averaging regime" };
+    }
+    if (regime === "warn") {
+      return { state: "warn" as const, message: regimeDetail ?? "Borderline averaging; widen spacing" };
+    }
+    if (regime === "unknown" || clockingDerived) {
+      if (clockingSimulated) {
+        return { state: "warn" as const, message: regimeDetail ?? "Simulated timing from hull geometry" };
+      }
+      return { state: "unknown" as const, message: regimeDetail ?? "Awaiting hardware tau_pulse/tau_LC" };
+    }
+
 
     if (!Number.isFinite(ts) || !Number.isFinite(epsilonEffective)) {
 
@@ -1769,6 +2070,12 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     if (ts >= 50 && epsilonEffective <= 0.05) {
 
       return { state: "ok" as const, message: "GR sees <T_mu nu>" };
+
+    }
+
+    if (hfProxyBlocked) {
+
+      return { state: "fail" as const, message: "epsilon too large for averaging proxy" };
 
     }
 
@@ -1800,23 +2107,28 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
+  const averagingBadgeTauDetail =
+    Number.isFinite(tauPulseUs) && Number.isFinite(tauLCUs)
+      ? `; tau_pulse=${formatMsFromUs(tauPulseUs)}, tau_LC=${formatMsFromUs(tauLCUs)}`
+      : "";
+
+
   const averagingBadgeText =
-
     Number.isFinite(epsilonEffective) && Number.isFinite(ts)
-
-      ? `epsilon=${epsilonDisplay}, TS=${tsDisplay} (tau_LC/tau_pulse) -> ${averagingStatus.message}`
-
+      ? `epsilon=${epsilonDisplay}, TS=${tsDisplay}${
+          /tau/i.test(averagingStatus.message) ? "" : averagingBadgeTauDetail
+        }; ${averagingStatus.message}`
       : "Awaiting duty & light-crossing telemetry";
 
 
 
   const averagingBadgeSubtext =
-
-    Number.isFinite(tauPulseSeconds) && Number.isFinite(tauLCSeconds)
-
+    typeof (clocking as any)?.detail === "string"
+      ? (clocking as any).detail
+      : Number.isFinite(tauPulseSeconds) && Number.isFinite(tauLCSeconds)
       ? `${describeTau("tau_pulse", tauPulseSeconds)} | ${describeTau("tau_LC", tauLCSeconds)}`
-
       : "Need tau_pulse and tau_LC from Spectrum Tuner";
+
 
 
 
@@ -1905,7 +2217,21 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-  const kappaDriveDisplay = Number.isFinite(curvature.kappa) ? toSci(curvature.kappa, 2) : "n/a";
+  const kappaDriveDisplay =
+
+    kappaMuted && hfProxyBlocked
+
+      ? "HF blocked"
+
+      : kappaMuted
+
+        ? "guarded"
+
+        : Number.isFinite(curvature.kappa)
+
+          ? toSci(curvature.kappa, 2)
+
+          : "n/a";
 
 
 
@@ -2012,6 +2338,83 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     tileArea_cm2: Number.isFinite(tileAreaCm2Candidate) ? tileAreaCm2Candidate : undefined,
 
   });
+
+  const gapNm = Number(
+    pipe?.gap_nm ??
+      pipe?.gap ??
+      pipe?.gapNominal_nm ??
+      pipe?.tiles?.gap_nm ??
+      pipe?.geometry?.gap_nm,
+  );
+
+  const sagNm = Number(
+    pipe?.sag_nm ??
+      pipe?.sag ??
+      pipe?.bowlSag_nm ??
+      pipe?.geometry?.sag_nm ??
+      pipe?.geometry?.sag,
+  );
+
+  const aEffNm = Number.isFinite(gapNm)
+    ? Number.isFinite(sagNm)
+      ? Math.max(gapNm - sagNm, 0)
+      : gapNm
+    : NaN;
+
+  const lambdaCutNm = Number.isFinite(aEffNm) ? aEffNm * 2 : NaN;
+
+
+
+  const lifshitzEstimate = useMemo(
+    () =>
+      estimateLifshitzBand({
+        gap_nm: gapNm,
+        area_m2: Number.isFinite(aTile_m2) ? (aTile_m2 as number) : undefined,
+        temperature_K: Number(
+          (pipe as any)?.temperature_K ?? (pipe as any)?.temperature ?? (metrics as any)?.temperature_K ?? (metrics as any)?.temperature,
+        ),
+      }),
+    [gapNm, aTile_m2, pipe, metrics],
+  );
+
+  const lifshitzMassBand = (() => {
+    if (!lifshitzEstimate || !Number.isFinite(mass.mass)) return null;
+    const base = mass.mass as number;
+    return {
+      min: base * (lifshitzEstimate.ratioMin ?? lifshitzEstimate.ratio),
+      max: base * (lifshitzEstimate.ratioMax ?? lifshitzEstimate.ratio),
+      ratio: lifshitzEstimate.ratio,
+    };
+  })();
+
+  const lifshitzMassDisplay =
+
+    lifshitzMassBand && Number.isFinite(lifshitzMassBand.min) && Number.isFinite(lifshitzMassBand.max)
+
+      ? `${toSci(lifshitzMassBand.min, 2)}..${toSci(lifshitzMassBand.max, 2)} kg`
+
+      : "n/a";
+
+  const lifshitzRatioDisplay =
+
+    lifshitzMassBand && Number.isFinite(lifshitzMassBand.ratio)
+
+      ? `x${toSci(lifshitzMassBand.ratio, 2)}`
+
+      : "n/a";
+
+  const supercellChiEst = useMemo(
+    () =>
+      estimateSupercellChi({
+        gap_nm: gapNm,
+        tileArea_m2: Number.isFinite(aTile_m2) ? (aTile_m2 as number) : undefined,
+        frameFill: (pipe as any)?.tiles?.packing ?? (pipe as any)?.tiles?.frameFill ?? (pipe as any)?.tiles?.fill,
+      }),
+    [gapNm, aTile_m2, pipe],
+  );
+
+  const supercellChi = supercellChiEst?.chi;
+  const supercellChiDisplay = Number.isFinite(supercellChi) ? (supercellChi as number).toFixed(2) : "n/a";
 
 
 
@@ -2353,96 +2756,6 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
   };
-
-
-
-
-
-
-
-  const gapNm = Number(
-
-
-
-    pipe?.gap_nm ??
-
-
-
-      pipe?.gap ??
-
-
-
-      pipe?.gapNominal_nm ??
-
-
-
-      pipe?.tiles?.gap_nm ??
-
-
-
-      pipe?.geometry?.gap_nm,
-
-
-
-  );
-
-
-
-  const sagNm = Number(
-
-
-
-    pipe?.sag_nm ??
-
-
-
-      pipe?.sag ??
-
-
-
-      pipe?.bowlSag_nm ??
-
-
-
-      pipe?.geometry?.sag_nm ??
-
-
-
-      pipe?.geometry?.sag,
-
-
-
-  );
-
-
-
-  const aEffNm = Number.isFinite(gapNm)
-
-
-
-    ? Number.isFinite(sagNm)
-
-
-
-      ? Math.max(gapNm - sagNm, 0)
-
-
-
-      : gapNm
-
-
-
-    : NaN;
-
-
-
-  const lambdaCutNm = Number.isFinite(aEffNm) ? aEffNm * 2 : NaN;
-
-
-
-
-
-
 
   const rhoDisplay = Number.isFinite(latestRho) ? Math.abs(latestRho) : NaN;
 
@@ -3470,7 +3783,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-            {`Averaging epsilon=${epsilonDisplay}, TS=${tsDisplay}`}
+            {`Averaging ${averagingBadgeText}`}
 
 
 
@@ -3526,6 +3839,64 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2 text-xs">
+          <div className="rounded-lg border border-slate-800/80 bg-slate-950/50 p-3 space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-100">
+              <span>Ledger green-band probes</span>
+              <Badge
+                variant="outline"
+                className={mockBannerUsed ? "border-amber-400 text-amber-200 bg-amber-500/10" : "border-slate-600 text-slate-200"}
+              >
+                {mockBannerUsed ? "DEV MOCK" : ledgerBadgeOk ? "LIVE" : "CHECK"}
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              {ledgerDutySweep.map((probe) => (
+                <div
+                  key={probe.scale}
+                  className={`flex items-center justify-between rounded px-2 py-1 font-mono ${
+                    probe.pass ? "bg-emerald-500/10 text-emerald-200" : "bg-amber-500/10 text-amber-200"
+                  }`}
+                >
+                  <span>eta_d={probe.scale.toFixed(2)}</span>
+                  <span>
+                    {probe.pred !== null ? `R≈${toPercent(probe.pred, 3)}` : "R pending"}{" "}
+                    {probe.measured !== null ? `(seen ${toPercent(probe.measured, 3)})` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="text-[10px] text-slate-400">
+              Linear until the QI cap; keep R &lt;= {toPercent(LEDGER_GUARD_THRESHOLD, 2)} as η_d scales.{" "}
+              {ledgerBaseline == null ? "Awaiting ledger sample." : ledgerLinearOk ? "Projections stay green." : "Projection drift detected."}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-800/80 bg-slate-950/50 p-3 space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-cyan-100">
+              <span>Falsifiability lab</span>
+              <Badge className={`border ${averagingBadgeTone}`}>
+                {averagingStatus.state.toUpperCase()}
+              </Badge>
+            </div>
+            <ul className="space-y-1 text-[11px] text-slate-200">
+              <li>TS/ε gate: {averagingBadgeText}</li>
+              <li className="font-mono text-slate-300">
+                {Number.isFinite(burstMsLive) ? `burst=${formatSecondsFriendly((burstMsLive as number) / 1000)}` : "burst=n/a"}
+                {" | "}
+                {Number.isFinite(dwellMsLive) ? `dwell=${formatSecondsFriendly((dwellMsLive as number) / 1000)}` : "dwell=n/a"}
+              </li>
+              <li className="text-slate-300">
+                Ledger source: {ledgerSourceLabel} · {ledgerReadValue}
+              </li>
+            </ul>
+            <div className="text-[10px] text-slate-400">
+              Averaging badge flips when TS or ε exit the Isaacson/Green-Wald band; use this slot to run duty-scale falsification
+              before live hardware.
+            </div>
+          </div>
         </div>
 
 
@@ -3820,53 +4191,35 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
-
             {proofBridgeCards.map((card) => (
-
-              <a
-
+              <div
                 key={card.key}
-
-                href={card.href}
-
-                className="group rounded-lg border border-slate-800/70 bg-slate-900/40 p-3 text-left transition hover:border-cyan-500/60 hover:bg-slate-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-
+                className="group relative rounded-lg border border-slate-800/70 bg-slate-900/40 p-3 text-left transition hover:border-cyan-500/60 hover:bg-slate-900/60"
               >
-
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">{card.title}</div>
-
-                <p className="mt-2 text-xs text-slate-300">{card.observation}</p>
-
-                <p className="mt-2 text-[11px] text-slate-400">What GR sees -&gt; {card.grSees}</p>
-
-                <p className="mt-1 text-[11px] text-cyan-300">What the panel uses -&gt; {card.panel}</p>
-
-                <p className="mt-2 text-[10px] text-slate-500">
-
-                  Reference {card.reference.label}{" "}
-
-                  <a
-
-                    className="text-cyan-300 underline-offset-2 hover:text-cyan-200 hover:underline"
-
-                    href={card.reference.href}
-
-                    rel="noreferrer noopener"
-
-                    target="_blank"
-
-                  >
-
-                    {card.reference.citation}
-
-                  </a>
-
-                </p>
-
-              </a>
-
+                <a
+                  href={card.href}
+                  className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                  aria-label={`Jump to ${card.title}`}
+                />
+                <div className="relative">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-400">{card.title}</div>
+                  <p className="mt-2 text-xs text-slate-300">{card.observation}</p>
+                  <p className="mt-2 text-[11px] text-slate-400">What GR sees -&gt; {card.grSees}</p>
+                  <p className="mt-1 text-[11px] text-cyan-300">What the panel uses -&gt; {card.panel}</p>
+                  <p className="mt-2 text-[10px] text-slate-500">
+                    Reference {card.reference.label}{" "}
+                    <a
+                      className="text-cyan-300 underline-offset-2 hover:text-cyan-200 hover:underline"
+                      href={card.reference.href}
+                      rel="noreferrer noopener"
+                      target="_blank"
+                    >
+                      {card.reference.citation}
+                    </a>
+                  </p>
+                </div>
+              </div>
             ))}
-
           </div>
 
           <div className="space-y-1 text-xs text-slate-300">
@@ -6275,11 +6628,11 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-              ok={Number.isFinite(ts) && ts > 10}
+              ok={Number.isFinite(ts) && ts > 10 && !hfProxyBlocked}
 
 
 
-              value={Number.isFinite(ts) ? `TS = ${ts.toFixed(1)}` : "TS unavailable"}
+              value={Number.isFinite(ts) ? `TS = ${ts.toFixed(1)}${Number.isFinite(epsilonEffective) ? ` | \u03b5=${toSci(epsilonEffective, 2)}` : ""}` : "TS unavailable"}
 
 
 
@@ -6299,7 +6652,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                  ? `Timescale ratio ${ts.toFixed(1)}; large values mean spacetime only feels the averaged source.`
+                  ? `Timescale ratio ${ts.toFixed(1)} with epsilon ${epsilonDisplay}; large values mean spacetime only feels the averaged source.`
 
 
 
@@ -6311,7 +6664,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-              readDescription="TS too small; lengthen pulse spacing or shrink tile size until TS >> 1."
+              readDescription="TS too small or epsilon too large; widen pulse spacing or shrink tile size until TS >> 1 and epsilon << 1."
 
 
 
@@ -6323,54 +6676,42 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
+            
             <GuardBadge
-
-
 
               label="Mechanical"
 
+              ok={
+                mechGuard
+                  ? mechGuard.status !== "saturated" && Number.isFinite(qMechApplied) && qMechApplied <= 1
+                  : Number.isFinite(qMech) && qMech <= 1
+              }
 
+              value={
+                mechGuard
+                  ? mechGuard.status === "saturated"
+                    ? `clamped @1.00; shortfall ${Number.isFinite(mechShortfallMW) ? `${mechShortfallMW.toFixed(2)} MW` : "unknown"}`
+                    : `q_mech = ${toFixed(qMechApplied, 2)}`
+                  : Number.isFinite(qMech)
+                    ? `q_mech = ${toFixed(qMech, 2)}`
+                    : "q_mech unknown"
+              }
 
-              ok={Number.isFinite(qMech) && qMech <= 1}
-
-
-
-              value={Number.isFinite(qMech) ? `q_mech = ${qMech.toFixed(2)}` : "q_mech unknown"}
-
-
-
-              description="?0?50 pm stroke keeps mechanical spoilage under unity."
-
-
+              description="<=1 stroke keeps mechanical spoilage under unity."
 
               readMode={readMode}
 
-
-
               readValue={
-
-
-
-                Number.isFinite(qMech)
-
-
-
-                  ? `Mechanical spoilage ${qMech.toFixed(2)}; below 1 means actuators stay within safe stroke.`
-
-
-
-                  : "Mechanical spoilage estimate unavailable."
-
-
-
+                mechGuard
+                  ? mechGuard.status === "saturated"
+                    ? `Saturated: demand ${toFixed(qMechDemand, 2)} -> applied 1.00; power shortfall ${Number.isFinite(mechShortfallMW) ? `${mechShortfallMW.toFixed(2)} MW` : "unknown"}.`
+                    : `Stroke ${toFixed(qMechApplied, 2)} (<=1) with margin ${Number.isFinite(mechMargin) ? mechMargin.toFixed(2) : "?"}; capacity ${toSci(mechGuard.pCap_W ?? Number.NaN, 2)} W.`
+                  : Number.isFinite(qMech)
+                    ? `Mechanical spoilage ${qMech.toFixed(2)}; below 1 means actuators stay within safe stroke.`
+                    : "Mechanical spoilage estimate unavailable."
               }
 
-
-
-              readDescription="Protects ferrite stacks and prevents phase jitter from hardware backlash."
-
-
-
+              readDescription="Protects ferrite stacks and prevents phase jitter from hardware backlash; shows clamping when stroke demand exceeds safe range."
             />
 
 
@@ -6404,6 +6745,90 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
               readDescription={ccsDesc}
+
+
+
+            />
+
+
+
+            <GuardBadge
+
+
+
+              label="Lifshitz band"
+
+
+
+              ok={Boolean(lifshitzMassBand)}
+
+
+
+              value={lifshitzMassDisplay}
+
+
+
+              description="Material/finite-sigma correction on M_exotic; shows band instead of a point."
+
+
+
+              readMode={readMode}
+
+
+
+              readValue={lifshitzMassBand ? `Retarded -> Lifshitz ${lifshitzRatioDisplay}` : lifshitzMassDisplay}
+
+
+
+              readDescription={lifshitzMassBand
+
+                ? `Applies a 1 nm Lifshitz/van der Waals correction to U_static and propagates through the mass proxy (ratio ${lifshitzRatioDisplay}).`
+
+                : "Lifshitz correction unavailable (missing gap or tile area)."}
+
+
+
+            />
+
+
+
+            <GuardBadge
+
+
+
+              label="Supercell path"
+
+
+
+              ok={Number.isFinite(supercellChi) ? (supercellChi as number) >= 0.8 : false}
+
+
+
+              value={supercellChiDisplay}
+
+
+
+              description="Totals scale with cell factor; per-tile stays fixed. chi -> 1 as pitch grows."
+
+
+
+              readMode={readMode}
+
+
+
+              readValue={supercellChiDisplay}
+
+
+
+              readDescription={
+
+                Number.isFinite(supercellChi)
+
+                  ? `Estimated chi=${supercellChiDisplay}; pitch ${supercellChiEst?.pitch_m ? toSci(supercellChiEst.pitch_m, 2) + " m" : "n/a"}.`
+
+                  : "Supercell coupling unavailable (needs gap and tile area)."
+
+              }
 
 
 
@@ -7062,6 +7487,3 @@ function LRLProofStrip({ telemetry, className }: LRLProofStripProps) {
     </div>
   );
 }
-
-
-

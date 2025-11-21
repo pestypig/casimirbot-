@@ -12,9 +12,12 @@ import {
   setGlobalPipelineState,
   sampleDisplacementField,
   MODE_CONFIGS,
+  PAPER_DUTY,
   orchestrateVacuumGapSweep,
   appendSweepRows,
   getSweepHistoryTotals,
+  computeTauLcMsFromHull,
+  TAU_LC_UNIT_DRIFT_LIMIT,
 } from "./energy-pipeline";
 // Import the type on a separate line to avoid esbuild/tsx parse grief
 import type { EnergyPipelineState, ScheduleSweepRequest } from "./energy-pipeline";
@@ -27,6 +30,7 @@ import { omega0_from_gap, domega0_dd } from "../modules/sim_core/static-casimir.
 import { writePhaseCalibration, reducePhaseCalLogToLookup } from "./utils/phase-calibration.js";
 // ROBUST speed of light import: handle named/default or missing module gracefully
 import { C } from './utils/physics-const-safe';
+import { computeClocking } from "../shared/clocking.js";
 import {
   buildCurvatureBrick,
   serializeBrick,
@@ -80,6 +84,9 @@ class Mutex {
   }
 }
 const pipeMutex = new Mutex();
+
+const BASELINE_TAU_LC_MS =
+  computeTauLcMsFromHull(initializePipelineState().hull ?? null) ?? null;
 
 type HardwareBroadcast = (topic: string, payload: unknown) => void;
 let hardwareBroadcast: HardwareBroadcast | null = null;
@@ -152,6 +159,100 @@ function pick<T>(...vals: (T | undefined)[]): T | undefined {
     if (v !== undefined) return v;
   }
   return undefined;
+}
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+
+type StrobeDutySegment = { t0: number; t1: number; duty: number };
+type StrobeDutySummary = {
+  dutyAvg: number;
+  windowMs: number;
+  samples: number;
+  lastSampleAt: number;
+  lastDuty: number;
+  sLive?: number;
+  sTotal?: number;
+  source?: string;
+};
+
+const STROBE_DUTY_WINDOW_MS = 12_000;
+const STROBE_DUTY_MAX_SEGMENTS = 96;
+let strobeDutyStream: {
+  segments: StrobeDutySegment[];
+  lastTs: number;
+  lastDuty: number;
+  summary: StrobeDutySummary | null;
+} = {
+  segments: [],
+  lastTs: 0,
+  lastDuty: 0,
+  summary: null,
+};
+
+function recordStrobeDutySample(input: {
+  dutyEffective: number;
+  ts?: number;
+  sLive?: number;
+  sTotal?: number;
+  source?: string;
+  windowMs?: number;
+}): StrobeDutySummary {
+  const now = Number.isFinite(input.ts) ? (input.ts as number) : Date.now();
+  const duty = clamp01(input.dutyEffective ?? 0);
+  const windowMs =
+    input.windowMs && Number.isFinite(input.windowMs) && (input.windowMs as number) > 0
+      ? (input.windowMs as number)
+      : STROBE_DUTY_WINDOW_MS;
+
+  const cutoff = now - windowMs;
+  let segments = strobeDutyStream.segments;
+
+  const lastTs = strobeDutyStream.lastTs || now;
+  const lastDuty = Number.isFinite(strobeDutyStream.lastDuty)
+    ? clamp01(strobeDutyStream.lastDuty)
+    : duty;
+  const dt = Math.min(windowMs * 4, Math.max(0, now - lastTs));
+  if (dt > 0 || segments.length === 0) {
+    const start = segments.length === 0 && dt === 0 ? now - 1 : lastTs;
+    segments.push({ t0: start, t1: now, duty: lastDuty });
+  }
+
+  const pruned: StrobeDutySegment[] = [];
+  for (const seg of segments) {
+    if (seg.t1 <= cutoff) continue;
+    pruned.push({
+      t0: Math.max(seg.t0, cutoff),
+      t1: seg.t1,
+      duty: clamp01(seg.duty),
+    });
+  }
+  segments = pruned.slice(-STROBE_DUTY_MAX_SEGMENTS);
+
+  let area = 0;
+  let duration = 0;
+  for (const seg of segments) {
+    const start = Math.max(seg.t0, cutoff);
+    const end = Math.max(start, seg.t1);
+    const dtSeg = end - start;
+    if (dtSeg <= 0) continue;
+    area += seg.duty * dtSeg;
+    duration += dtSeg;
+  }
+  const avg = duration > 0 ? area / duration : duty;
+
+  const summary: StrobeDutySummary = {
+    dutyAvg: avg,
+    windowMs,
+    samples: (strobeDutyStream.summary?.samples ?? 0) + 1,
+    lastSampleAt: now,
+    lastDuty: duty,
+    sLive: input.sLive,
+    sTotal: input.sTotal,
+    source: input.source ?? strobeDutyStream.summary?.source ?? "hardware",
+  };
+
+  strobeDutyStream = { segments, lastTs: now, lastDuty: duty, summary };
+  return summary;
 }
 
 function toVacuumRow(payload: SweepRowInput): VacuumGapSweepRow {
@@ -835,10 +936,32 @@ const UpdateSchema = z.object({
       ratio: thetaExpected > 0 ? (thetaUsedByServer / thetaExpected) : 1
     };
 
-    // 🔁 add time-loop info needed by the viewer & charts
-    const burst_ms = dutyLocal * sectorPeriod_ms;
-    const cyclesPerBurst = (burst_ms / 1000) * f_m_Hz; // ✅ tell client exactly how many carrier cycles fit
-
+    // add time-loop info needed by the viewer & charts
+    const lc = (s as any).lightCrossing ?? {};
+    const lcBurst = Number(lc.burst_ms);
+    const lcDwell = Number(lc.dwell_ms ?? lc.sectorPeriod_ms);
+    const lcTauMs = Number(lc.tauLC_ms);
+    const burst_ms = Number.isFinite(lcBurst) && lcBurst > 0 ? lcBurst : dutyLocal * sectorPeriod_ms;
+    const dwell_ms_effective = Number.isFinite(lcDwell) && lcDwell > 0 ? lcDwell : sectorPeriod_ms;
+    const clocking = computeClocking({
+      tauLC_ms: Number.isFinite(lcTauMs) && lcTauMs > 0 ? lcTauMs : tauLC * 1000,
+      burst_ms,
+      dwell_ms: dwell_ms_effective,
+      sectorPeriod_ms,
+      hull,
+      localDuty: dutyLocal,
+    });
+    const burstForCycles = clocking.burst_ms ?? burst_ms;
+    const cyclesPerBurst = (burstForCycles / 1000) * f_m_Hz; // tell client exactly how many carrier cycles fit
+    const TS_effective = (() => {
+      const tsRaw = Number(clocking.TS);
+      if (Number.isFinite(tsRaw) && tsRaw > 0) return tsRaw;
+      const tsFallback = Number(s.TS_ratio);
+      if (Number.isFinite(tsFallback) && tsFallback > 0) return tsFallback;
+      return 1e-9;
+    })();
+    const clockingPayload = { ...clocking, TS: TS_effective };
+    const TS_modulation = (s as any)?.TS_modulation ?? s.TS_long ?? s.TS_ratio;
     res.json({
       totalTiles: Math.floor(s.N_tiles),
       activeTiles, tilesPerSector,
@@ -865,14 +988,16 @@ const UpdateSchema = z.object({
       exoticMass_kg: Math.round(s.M_exotic),
       exoticMassRaw_kg: Math.round(s.M_exotic_raw ?? s.M_exotic),
 
-      timeScaleRatio: s.TS_ratio,
+      clocking: clockingPayload,
+      timeScaleRatio: TS_effective,
       tauLC_s: tauLC, T_m_s: T_m,
       timescales: {
         f_m_Hz, T_m_s: T_m,
         L_long_m: Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m),
         T_long_s: tauLC,
-        TS_long: s.TS_long ?? s.TS_ratio,
-        TS_geom: s.TS_geom ?? s.TS_ratio
+        TS_long: TS_effective,
+        TS_geom: s.TS_geom ?? TS_effective,
+        TS_modulation,
       },
 
       dutyGlobal_UI: s.dutyCycle,
@@ -1241,6 +1366,12 @@ export function getTileStatus(req: Request, res: Response) {
 (async () => {
   const pipelineState = await calculateEnergyPipeline(initializePipelineState());
   setGlobalPipelineState(pipelineState);
+  if (BASELINE_TAU_LC_MS) {
+    console.info("[helix-core] baseline tau_LC derived from hull geometry", {
+      tauLC_ms: BASELINE_TAU_LC_MS,
+      tauLC_us: BASELINE_TAU_LC_MS * 1000,
+    });
+  }
 })();
 
 // Generate sample tiles with positions and T00 values for Green's Potential computation
@@ -1398,9 +1529,26 @@ export function getSystemMetrics(req: Request, res: Response) {
     ratio: thetaExpected > 0 ? (thetaUsedByServer / thetaExpected) : 1
   };
 
-  // 🔁 add time-loop info needed by the viewer & charts
-  const burst_ms = dutyLocal * sectorPeriod_ms;
-  const cyclesPerBurst = (burst_ms / 1000) * f_m_Hz; // ✅ tell client exactly how many carrier cycles fit
+  // add time-loop info needed by the viewer & charts
+  const lc = (s as any).lightCrossing ?? {};
+  const lcBurst = Number(lc.burst_ms);
+  const lcDwell = Number(lc.dwell_ms ?? lc.sectorPeriod_ms);
+  const lcTauMs = Number(lc.tauLC_ms);
+  const burst_ms = Number.isFinite(lcBurst) && lcBurst > 0 ? lcBurst : dutyLocal * sectorPeriod_ms;
+  const dwell_ms_effective = Number.isFinite(lcDwell) && lcDwell > 0 ? lcDwell : sectorPeriod_ms;
+  const clocking = computeClocking({
+    tauLC_ms: Number.isFinite(lcTauMs) && lcTauMs > 0 ? lcTauMs : tauLC * 1000,
+    burst_ms,
+    dwell_ms: dwell_ms_effective,
+    sectorPeriod_ms,
+    hull,
+    localDuty: dutyLocal,
+  });
+  const burstForCycles = clocking.burst_ms ?? burst_ms;
+  const cyclesPerBurst = (burstForCycles / 1000) * f_m_Hz; // tell client exactly how many carrier cycles fit
+  const TS_effective = Number.isFinite(clocking.TS) ? (clocking.TS as number) : s.TS_ratio;
+  const TS_modulation = (s as any)?.TS_modulation ?? s.TS_long ?? s.TS_ratio;
+  const clockingPayload = { ...clocking, TS: TS_effective };
   res.json({
     totalTiles: Math.floor(s.N_tiles),
     activeTiles, tilesPerSector,
@@ -1435,16 +1583,17 @@ export function getSystemMetrics(req: Request, res: Response) {
     exoticMass_kg: Math.round(s.M_exotic),
     exoticMassRaw_kg: Math.round(s.M_exotic_raw ?? s.M_exotic),
 
-    timeScaleRatio: s.TS_ratio,
+    clocking,
+    timeScaleRatio: TS_effective,
     tauLC_s: tauLC, T_m_s: T_m,
     timescales: {
       f_m_Hz, T_m_s: T_m,
       L_long_m: Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m),
       T_long_s: tauLC,
-      TS_long: s.TS_long ?? s.TS_ratio,
-      TS_geom: s.TS_geom ?? s.TS_ratio
+      TS_long: TS_effective,
+      TS_geom: s.TS_geom ?? TS_effective,
+      TS_modulation,
     },
-
     dutyGlobal_UI: s.dutyCycle,
     dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR,
 
@@ -1462,8 +1611,7 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     // Add tile data with positions and T00 values for Green's Potential computation
     tileData: generateSampleTiles(Math.min(100, activeTiles)), // Generate sample tiles for φ computation
-
-    geometry: { Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m, TS_ratio: s.TS_ratio, TS_long: s.TS_long, TS_geom: s.TS_geom },
+    geometry: { Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m, TS_ratio: TS_effective, TS_long: TS_effective, TS_geom: s.TS_geom ?? TS_effective },
 
     axes_m: [a, b, c],
     axesScene,                         // for immediate camera fit
@@ -1488,15 +1636,19 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     // ✅ strobe/time window (for dutyLocal provenance)
     lightCrossing: {
-      tauLC_ms: tauLC * 1000,
-      dwell_ms: sectorPeriod_ms,
-      burst_ms,
+      tauLC_ms: clockingPayload.tauLC_ms ?? tauLC * 1000,
+      dwell_ms: clockingPayload.dwell_ms ?? dwell_ms_effective,
+      burst_ms: clockingPayload.burst_ms ?? burst_ms,
       sectorIdx: sweepIdx,
       sectorCount: totalSectors,
       onWindowDisplay: true,
       // 👇 additions for the viewer/plots
       onWindow: true,
       freqGHz: f_m_Hz / 1e9,
+      tauPulse_ms: clockingPayload.tauPulse_ms ?? clockingPayload.burst_ms ?? null,
+      epsilon: clockingPayload.epsilon ?? null,
+      TS: clockingPayload.TS ?? null,
+      regime: clockingPayload.regime,
       cyclesPerBurst
     },
 
@@ -2223,15 +2375,86 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
 
   const payload = parsed.data as HardwareSectorState;
   const now = Date.now();
+  const currentState = getGlobalPipelineState();
+  const geometryTau_ms = computeTauLcMsFromHull(currentState?.hull ?? null) ?? BASELINE_TAU_LC_MS;
+  const geometryMs = Number.isFinite(geometryTau_ms) ? (geometryTau_ms as number) : null;
+  const candidateTau_ms = Number(payload.tauLC_ms);
+  if (
+    Number.isFinite(candidateTau_ms) &&
+    candidateTau_ms > 0 &&
+    Number.isFinite(geometryMs) &&
+    (geometryMs as number) > 0
+  ) {
+    const drift =
+      Math.max(candidateTau_ms, geometryMs as number) /
+      Math.max(1e-12, Math.min(candidateTau_ms, geometryMs as number));
+    if (drift >= TAU_LC_UNIT_DRIFT_LIMIT) {
+      console.warn("[helix-core] rejecting tauLC_ms from hardware", {
+        candidate_ms: candidateTau_ms,
+        geometry_ms: geometryMs as number,
+        limit: TAU_LC_UNIT_DRIFT_LIMIT,
+      });
+      res.status(422).json({
+        error: "tauLC-unit-mismatch",
+        expected_ms: geometryMs as number,
+        received_ms: candidateTau_ms,
+        message: "tauLC_ms differs from hull-derived light-crossing; check ms vs microseconds.",
+      });
+      return;
+    }
+  }
 
+  let strobeDuty: StrobeDutySummary | null = null;
   try {
     await pipeMutex.lock(async () => {
       const current = getGlobalPipelineState();
+      const payloadTsRaw =
+        typeof payload.timestamp === "number" || typeof payload.timestamp === "string"
+          ? Number(payload.timestamp)
+          : NaN;
+      const sampleTs = Number.isFinite(payloadTsRaw) ? payloadTsRaw : now;
+      const sectorTotalResolved =
+        pick(
+          num((payload as any).sectorCount),
+          num((current.hardwareTruth as any)?.strobeDuty?.sTotal),
+          current.sectorCount,
+          PAPER_DUTY.TOTAL_SECTORS,
+        ) ?? PAPER_DUTY.TOTAL_SECTORS;
+      const sectorTotal = Math.max(1, Math.round(sectorTotalResolved));
+      const liveConcurrent = pick(num(payload.activeSectors), num(payload.sectorsConcurrent));
+      const sLiveResolved = pick(liveConcurrent, current.activeSectors, current.concurrentSectors, 1) ?? 1;
+      const sLive = Math.max(0, sLiveResolved);
+      const burstMs = num(payload.burst_ms);
+      const dwellMs = num(payload.dwell_ms);
+      const dutyLocal = clamp01(
+        Number.isFinite(burstMs) && Number.isFinite(dwellMs) && (dwellMs as number) > 0
+          ? (burstMs as number) / (dwellMs as number)
+          : pick(current.dutyBurst, (current as any).localBurstFrac, PAPER_DUTY.BURST_DUTY_LOCAL) ??
+              PAPER_DUTY.BURST_DUTY_LOCAL,
+      );
+      const dutyEffMeasured = clamp01(dutyLocal * (sLive / Math.max(1, sectorTotal)));
+      const strobeDutyLocal = recordStrobeDutySample({
+        dutyEffective: dutyEffMeasured,
+        ts: sampleTs,
+        sLive,
+        sTotal: sectorTotal,
+        source: payload.provenance ?? "hardware",
+      });
+      strobeDuty = strobeDutyLocal;
+
       const next: EnergyPipelineState = {
         ...current,
+        dutyBurst: dutyLocal,
+        localBurstFrac: dutyLocal,
+        concurrentSectors: Math.max(0, Math.round(sLive)),
+        activeSectors: Math.max(0, Math.round(sLive)),
+        sectorCount: sectorTotal,
+        dutyEffective_FR: dutyEffMeasured,
+        dutyEffectiveFR: dutyEffMeasured as any,
         hardwareTruth: {
           ...(current.hardwareTruth ?? {}),
           sectorState: { ...payload, updatedAt: now },
+          strobeDuty: strobeDutyLocal,
           updatedAt: now,
         },
       };
@@ -2269,13 +2492,16 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
       ) {
         const duty = Math.max(0, Math.min(1, payload.burst_ms / payload.dwell_ms));
         updated.dutyBurst = duty;
-        updated.dutyEffective_FR = duty;
+        (updated as any).localBurstFrac = duty;
       }
       if (payload.sectorsConcurrent != null && Number.isFinite(payload.sectorsConcurrent)) {
-        updated.sectorCount = Math.max(1, Math.round(payload.sectorsConcurrent));
+        updated.concurrentSectors = Math.max(0, Math.round(payload.sectorsConcurrent));
       }
       if (payload.activeSectors != null && Number.isFinite(payload.activeSectors)) {
         updated.activeSectors = Math.max(0, Math.round(payload.activeSectors));
+      }
+      if (updated.hardwareTruth) {
+        updated.hardwareTruth.strobeDuty = updated.hardwareTruth.strobeDuty ?? strobeDuty;
       }
       setGlobalPipelineState(updated);
     });
@@ -2288,6 +2514,7 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
   hardwareBroadcast?.("sector-state", {
     type: "sector-state",
     payload,
+    duty: strobeDuty ?? undefined,
     ts: now,
   });
   res.status(200).json({ ok: true });
