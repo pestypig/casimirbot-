@@ -59,6 +59,8 @@ When you add a new entry to `HELIX_PANELS`, it automatically:
 
 5. **Test the launch path.**
    - `pnpm dev --filter client -- --host` (or your usual dev task) and open `http://localhost:5173/desktop`.
+   - The Vite dev server proxies `/api`, `/ws`, `/attached_assets`, and `/docs` to `http://localhost:${PORT || 5173}` (it picks up `PORT` when you override the backend port).
+   - Prefer a single port? Run `npm run dev:agi:5173` (Express+Vite on 5173 with AGI/Essence enabled). If a standalone Vite dev server is already on 5173, stop it first or pick another port.
    - Click the Helix Start button in the taskbar; the new entry should appear alphabetically with its icon.
    - Launch the panel, confirm the initial bounds and resize/drag/minimize workflows.
    - If window state needs to be reset during testing, clear `localStorage["desktop-windows-v2"]`.
@@ -86,6 +88,7 @@ Non-Helix system panels (Live Energy, Endpoints, Taskbar) are declared directly 
 
 ## Troubleshooting Checklist
 
+- **AGI/Essence 500s or “Ensure the AGI server routes are enabled”:** You’re probably hitting a standalone Vite dev server without the Express backend. Stop the stray Vite process on 5173, then run `npm run dev:agi:5173` (or set `PORT`/`API_PROXY_TARGET` consistently) so Express + Vite share the same port.
 - **Entry missing from Helix Start:** Ensure it was added to `HELIX_PANELS` (not just `panelRegistry`) and that the dev server restarted so Vite picks up the dynamic import.
 - **Search not finding a keyword:** Update the panel's `keywords` array (or add one) inside `client/src/pages/helix-core.panels.ts`. The Helix Start palette indexes `title`, `id`, `keywords`, and declared `endpoints`, so including metric symbols/IDs keeps search results aligned with what operators see inside the panel.
 - **Window opens off-screen:** Tweak `defaultPosition` and remember that `DesktopWindow` clamps values to the viewport minus the 48px taskbar height.

@@ -13,6 +13,8 @@ export async function ensureSpecialistsRegistered(): Promise<void> {
       const { mathWordSpec, mathWordHandler } = await import("./solvers/math.word");
       const { codeIsBalancedSpec, codeIsBalancedHandler } = await import("./solvers/code.isBalanced");
       const { philoSynthesisSpec, philoSynthesisHandler } = await import("./solvers/philo.synthesis");
+      const { repoIdeationSpec, repoIdeationHandler } = await import("./solvers/repo.ideation");
+      const { repoAnswerReviewSpec, repoAnswerReviewHandler } = await import("./solvers/repo.answer.review");
       const { mathSumVerifierSpec, mathSumVerifierHandler } = await import("./verifiers/math.sum.verify");
       const { mathSympyVerifierSpec, mathSympyVerifierHandler } = await import("./verifiers/math.sympy.verify");
       const { mathWordVerifierSpec, mathWordVerifierHandler } = await import("./verifiers/math.word.verify");
@@ -24,6 +26,8 @@ export async function ensureSpecialistsRegistered(): Promise<void> {
       registerSolver({ ...mathWordSpec, handler: mathWordHandler });
       registerSolver({ ...codeIsBalancedSpec, handler: codeIsBalancedHandler });
       registerSolver({ ...philoSynthesisSpec, handler: philoSynthesisHandler });
+      registerSolver({ ...repoIdeationSpec, handler: repoIdeationHandler });
+      registerSolver({ ...repoAnswerReviewSpec, handler: repoAnswerReviewHandler });
       registerVerifier({ ...mathSumVerifierSpec, handler: mathSumVerifierHandler });
       registerVerifier({ ...mathSympyVerifierSpec, handler: mathSympyVerifierHandler });
       registerVerifier({ ...mathWordVerifierSpec, handler: mathWordVerifierHandler });

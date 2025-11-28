@@ -1,12 +1,16 @@
-import type { TMemorySearchHit } from "@shared/essence-persona";
+import type { TCollapseTraceEntry, TMemorySearchHit } from "@shared/essence-persona";
 import type { ResonanceBundle, ResonanceCollapse } from "@shared/code-lattice";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { WhyBelongs } from "@shared/rationale";
 import type { ConsoleTelemetryBundle, PanelTelemetry } from "@shared/desktop";
 import type { BadgeTelemetrySnapshot } from "@shared/badge-telemetry";
+import type { EssenceProfile, EssenceProfileUpdate } from "@shared/inferenceProfile";
+import type { PromptSpec } from "@shared/prompt-spec";
 import { DEFAULT_DESKTOP_ID, pushConsoleTelemetry } from "@/lib/agi/consoleTelemetry";
 import { ensureLatestLattice } from "@/lib/agi/resonanceVersion";
 import { useResonanceStore } from "@/store/useResonanceStore";
+import type { CollapseDecision, CollapseStrategyName } from "./orchestrator";
+import type { LocalCallSpec } from "@shared/local-call-spec";
 
 export type PlanResponse = {
   traceId: string;
@@ -23,6 +27,12 @@ export type PlanResponse = {
   resonance_bundle?: ResonanceBundle | null;
   resonance_selection?: ResonanceCollapse | null;
   debate_id?: string | null;
+  strategy?: string | null;
+  strategy_notes?: string[];
+  collapse_trace?: TCollapseTraceEntry | null;
+  collapse_strategy?: string | null;
+  call_spec?: LocalCallSpec | null;
+  task_trace?: unknown;
 };
 
 export type ExecuteResponse = {
@@ -53,6 +63,7 @@ export type ToolLogEvent = {
   paramsHash?: string;
   durationMs?: number;
   stepId?: string;
+  strategy?: string;
 };
 
 export type PersonaSummary = {
@@ -77,12 +88,30 @@ export type DebateScoreboard = {
   skeptic: number;
 };
 
+export type DebateRoundMetricsPayload = {
+  round?: number;
+  verifier_pass?: number;
+  coverage?: number;
+  stability?: number;
+  novelty_gain?: number;
+  score?: number;
+  improvement?: number;
+  flags?: number;
+  tool_calls?: number;
+  time_used_ms?: number;
+  time_left_ms?: number;
+};
+
 export type DebateOutcomePayload = {
   debate_id: string;
   verdict: string;
   confidence: number;
   winning_role?: "proponent" | "skeptic";
   key_turn_ids: string[];
+  rounds?: number;
+  score?: number;
+  stop_reason?: string;
+  metrics?: DebateRoundMetricsPayload;
   created_at: string;
 };
 
@@ -94,6 +123,11 @@ export type DebateSnapshot = {
   config: {
     max_rounds: number;
     max_wall_ms: number;
+    max_tool_calls: number;
+    satisfaction_threshold: number;
+    min_improvement: number;
+    stagnation_rounds: number;
+    novelty_epsilon: number;
     verifiers: string[];
   };
   created_at: string;
@@ -118,6 +152,7 @@ export type DebateStreamEvent =
       debateId: string;
       status: DebateSnapshot["status"];
       scoreboard: DebateScoreboard;
+      metrics?: DebateRoundMetricsPayload;
     }
   | {
       type: "outcome";
@@ -125,6 +160,7 @@ export type DebateStreamEvent =
       debateId: string;
       outcome: DebateOutcomePayload;
       scoreboard: DebateScoreboard;
+      metrics?: DebateRoundMetricsPayload;
     };
 
 export type DebateStartPayload = {
@@ -216,6 +252,10 @@ async function asJson<T>(response: Response): Promise<T> {
 export type PlanRequestOptions = {
   desktopId?: string;
   includeTelemetry?: boolean;
+  promptSpec?: PromptSpec;
+  collapseTrace?: CollapseDecision;
+  collapseStrategy?: CollapseStrategyName;
+  callSpec?: LocalCallSpec | null;
 };
 
 export async function plan(
@@ -232,6 +272,18 @@ export async function plan(
   }
   if (Array.isArray(knowledgeProjects) && knowledgeProjects.length > 0) {
     body.knowledgeProjects = knowledgeProjects;
+  }
+  if (options?.promptSpec) {
+    body.prompt_spec = options.promptSpec;
+  }
+  if (options?.collapseTrace) {
+    body.collapse_trace = options.collapseTrace;
+  }
+  if (options?.collapseStrategy) {
+    body.collapse_strategy = options.collapseStrategy;
+  }
+  if (options?.callSpec) {
+    body.call_spec = options.callSpec;
   }
   const desktopId = options?.desktopId ?? DEFAULT_DESKTOP_ID;
   if (desktopId) {
@@ -425,6 +477,53 @@ export async function getBadgeTelemetry(params: { desktopId?: string; includeRaw
       headers: { Accept: "application/json" },
     }),
   );
+}
+
+export async function fetchEssenceProfile(
+  essenceId: string,
+  options?: { stateless?: boolean },
+): Promise<EssenceProfile | null> {
+  const params = new URLSearchParams();
+  if (options?.stateless) params.set("stateless", "1");
+  const res = await fetch(`/api/essence/profile/${essenceId}?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch essence profile");
+  }
+  const json = (await res.json()) as { profile?: EssenceProfile | null };
+  return json.profile ?? null;
+}
+
+export async function updateEssenceProfile(
+  essenceId: string,
+  update: EssenceProfileUpdate,
+  options?: { stateless?: boolean },
+): Promise<EssenceProfile> {
+  const params = new URLSearchParams();
+  if (options?.stateless) params.set("stateless", "1");
+  const res = await fetch(`/api/essence/profile/${essenceId}?${params.toString()}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(update ?? {}),
+  });
+  if (!res.ok) {
+    throw new Error("Failed to update essence profile");
+  }
+  const json = (await res.json()) as { profile: EssenceProfile };
+  return json.profile;
+}
+
+export async function resetEssenceProfile(
+  essenceId: string,
+  options?: { stateless?: boolean },
+): Promise<void> {
+  const params = new URLSearchParams();
+  if (options?.stateless) params.set("stateless", "1");
+  const res = await fetch(`/api/essence/profile/${essenceId}?${params.toString()}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error("Failed to reset essence profile");
+  }
 }
 
 export type DebateStreamHandlers = {

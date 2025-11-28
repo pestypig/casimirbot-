@@ -16,9 +16,11 @@ export type ToolLogEvent = {
 export function roleFromTool(tool?: string): DebateRole {
   const t = (tool || "").toLowerCase();
   // Skeptic = explicit verification / checkers
+  if (t.includes("skeptic")) return "skeptic";
   if (t.startsWith("verifier:")) return "skeptic";
   if (t.includes("verify") || t.includes("checker") || t.includes("sympy")) return "skeptic";
   // Proponent = proposing/creating/generating evidence
+  if (t.includes("proponent")) return "proponent";
   if (t.startsWith("solver:")) return "proponent";
   if (t.startsWith("llm.") || t.startsWith("luma.") || t.startsWith("docs.readme")) return "proponent";
   if (t.startsWith("stt.") || t.startsWith("ingest")) return "proponent";

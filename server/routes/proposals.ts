@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { handleProposalAction, listProposals, fetchProposal } from "../services/proposals/engine";
 import { proposalKindSchema, proposalSafetyStatusSchema, proposalStatusSchema } from "@shared/proposals";
+import { buildPatchPromptPresets } from "../services/proposals/prompt-presets";
 
 export const proposalsRouter = Router();
 
@@ -28,6 +29,27 @@ proposalsRouter.get("/", async (req, res) => {
   const ownerId = resolveOwnerId(req);
   const proposals = await listProposals(ownerId, dayParam, { kind, status, safetyStatus });
   res.json({ day: dayParam, proposals });
+});
+
+proposalsRouter.get("/:id/prompts", async (req, res) => {
+  const proposal = await fetchProposal(req.params.id);
+  if (!proposal) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  const ownerId = resolveOwnerId(req);
+  if (proposal.ownerId && ownerId && proposal.ownerId !== ownerId) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  if (proposal.patchKind !== "code-diff") {
+    return res.json({ presets: [] });
+  }
+  try {
+    const presets = await buildPatchPromptPresets(proposal, 3);
+    res.json({ presets });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: "prompt_presets_failed", message });
+  }
 });
 
 proposalsRouter.get("/:id", async (req, res) => {

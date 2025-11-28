@@ -1,19 +1,27 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import crypto from "node:crypto";
 import { z } from "zod";
 import type { ToolManifestEntry } from "@shared/skills";
-import type { TTaskTrace } from "@shared/essence-persona";
+import type { TCollapseTraceEntry, TTaskTrace } from "@shared/essence-persona";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { ConsoleTelemetryBundle, PanelTelemetry } from "@shared/desktop";
-import type { ResonanceBundle, ResonanceCollapse } from "@shared/code-lattice";
+import type { ResonanceBundle, ResonanceCollapse, ResonancePatch } from "@shared/code-lattice";
+import type { GroundingReport, GroundingSource } from "@shared/grounding";
 import { Routine, type TRoutine } from "@shared/agi-instructions";
+import { PROMPT_SPEC_SCHEMA_VERSION, type PromptSpec } from "@shared/prompt-spec";
+import { zLocalCallSpec, type LocalCallSpec } from "@shared/local-call-spec";
 import {
   DEFAULT_SUMMARY_FOCUS,
   formatPlanDsl,
   type BuildPlanArgs,
   type ExecutorStep,
+  type ExecutionRuntime,
   type PlanNode,
+  type ReasoningStrategy,
+  type IntentFlags,
   buildChatBPlan,
+  chooseReasoningStrategy,
   buildCandidatePlansFromResonance,
   compilePlan,
   executeCompiledPlan,
@@ -21,7 +29,16 @@ import {
   renderChatBPlannerPrompt,
   registerInMemoryTrace,
   collapseResonancePatches,
+  classifyIntent,
+  isWarpRelevantPath,
+  normalizeForIntent,
 } from "../services/planner/chat-b";
+import {
+  ensureGroundingReport as ensurePlannerGroundingReport,
+  recordKnowledgeSources,
+  recordResonancePatchSources,
+  seedWarpPaths,
+} from "../services/planner/grounding";
 import { saveConsoleTelemetry, getConsoleTelemetry } from "../services/console-telemetry/store";
 import { persistConsoleTelemetrySnapshot } from "../services/console-telemetry/persist";
 import { summarizeConsoleTelemetry } from "../services/console-telemetry/summarize";
@@ -56,6 +73,9 @@ import {
 } from "../skills/debate.checklist.score";
 import { experimentFalsifierProposeHandler, experimentFalsifierProposeSpec } from "../skills/experiment.falsifier.propose";
 import { telemetryCrosscheckDocsHandler, telemetryCrosscheckDocsSpec } from "../skills/telemetry.crosscheck.docs";
+import { repoGraphSearchHandler, repoGraphSearchSpec } from "../skills/repo.graph.search";
+import { repoDiffReviewHandler, repoDiffReviewSpec } from "../skills/repo.diff.review";
+import { repoPatchSimulateHandler, repoPatchSimulateSpec } from "../skills/repo.patch.simulate";
 import { getTaskTrace, saveTaskTrace } from "../db/agi";
 import { metrics, sseConnections } from "../metrics";
 import { personaPolicy } from "../auth/policy";
@@ -74,6 +94,8 @@ import { buildResonanceBundle } from "../services/code-lattice/resonance";
 import { getLatticeVersion } from "../services/code-lattice/loader";
 import { collectBadgeTelemetry } from "../services/telemetry/badges";
 import { collectPanelSnapshots } from "../services/telemetry/panels";
+import { getGlobalPipelineState } from "../energy-pipeline";
+import { smallLlmCallSpecTriage } from "../services/small-llm";
 
 const planRouter = Router();
 const LOCAL_SPAWN_TOOL_NAME = "llm.local.spawn.generate";
@@ -88,6 +110,58 @@ const TRACE_SSE_LIMIT = (() => {
   return Math.min(250, Math.max(1, clamped));
 })();
 const DEFAULT_DESKTOP_ID = "helix.desktop.main";
+const LOCAL_CALL_SPEC_URL =
+  process.env.LOCAL_CALL_SPEC_URL ??
+  process.env.VITE_LOCAL_CALL_SPEC_URL ??
+  "http://127.0.0.1:11434/api/local-call-spec";
+const LOCAL_CALL_SPEC_TIMEOUT_MS = 2500;
+const LOCAL_TTS_URL =
+  process.env.LOCAL_TTS_URL ??
+  process.env.VITE_LOCAL_TTS_URL ??
+  "http://127.0.0.1:11434/api/tts";
+const LOCAL_STT_URL =
+  process.env.LOCAL_STT_URL ??
+  process.env.VITE_LOCAL_STT_URL ??
+  "http://127.0.0.1:11434/api/stt";
+const LOCAL_TTS_TIMEOUT_MS = 5000;
+const LOCAL_STT_TIMEOUT_MS = 5000;
+
+const parseDebugSourcesFlag = (bodyValue?: boolean, queryValue?: unknown): boolean => {
+  if (typeof bodyValue === "boolean") {
+    return bodyValue;
+  }
+  const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
+  if (typeof raw === "string") {
+    const normalized = raw.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+    if (["0", "false", "no", "off"].includes(normalized)) {
+      return false;
+    }
+  }
+  return false;
+};
+
+const normalizeCollapseStrategy = (value?: string | null): string | undefined => {
+  if (!value || typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const lowered = trimmed.toLowerCase();
+  if (["off", "none", "baseline", "disabled"].includes(lowered)) {
+    return "off";
+  }
+  if (lowered.startsWith("micro") || lowered.includes("llm")) {
+    return "micro_llm_v1";
+  }
+  if (lowered.startsWith("embed")) {
+    return "embedding_v1";
+  }
+  if (lowered.startsWith("deterministic")) {
+    return "deterministic_hash_v1";
+  }
+  return undefined;
+};
 
 type PlanRecord = {
   traceId: string;
@@ -110,9 +184,60 @@ type PlanRecord = {
   resonanceSelection?: ResonanceCollapse | null;
   latticeVersion?: number | string | null;
   debateId?: string | null;
+  strategy?: ReasoningStrategy;
+  strategyNotes?: string[];
+  groundingReport?: GroundingReport;
+  debugSources?: boolean;
+  promptSpec?: PromptSpec;
+  collapseTrace?: TCollapseTraceEntry;
+  collapseStrategy?: string;
+  callSpec?: LocalCallSpec;
 };
 
 const planRecords = new Map<string, PlanRecord>();
+
+const dedupeGroundingSources = (sources?: GroundingSource[] | null): GroundingSource[] => {
+  if (!sources || sources.length === 0) return [];
+  const seen = new Set<string>();
+  const result: GroundingSource[] = [];
+  for (const source of sources) {
+    const key = `${source.kind ?? "unknown"}:${source.id ?? ""}:${source.path ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(source);
+  }
+  return result;
+};
+
+const pickResonancePatch = ({
+  bundle,
+  selection,
+}: {
+  bundle?: ResonanceBundle | null;
+  selection?: ResonanceCollapse | null;
+}): ResonancePatch | null => {
+  if (!bundle || !bundle.candidates || bundle.candidates.length === 0) {
+    return null;
+  }
+  if (selection?.primaryPatchId) {
+    const preferred = bundle.candidates.find((candidate) => candidate.id === selection.primaryPatchId);
+    if (preferred) {
+      return preferred;
+    }
+  }
+  return bundle.candidates[0] ?? null;
+};
+
+const findLatestAccessiblePlan = (claims: unknown): PlanRecord | null => {
+  let latest: PlanRecord | null = null;
+  for (const record of planRecords.values()) {
+    if (!personaPolicy.canAccess(claims as any, record.personaId, "plan")) continue;
+    if (!latest || record.createdAt > latest.createdAt) {
+      latest = record;
+    }
+  }
+  return latest;
+};
 
 async function rehydratePlanRecord(traceId: string): Promise<PlanRecord | null> {
   try {
@@ -129,11 +254,17 @@ async function rehydratePlanRecord(traceId: string): Promise<PlanRecord | null> 
       lattice_version: (trace as any).lattice_version ?? trace.lattice_version ?? null,
       planner_prompt: trace.planner_prompt ?? (trace as any).planner_prompt ?? null,
       debate_id: (trace as any).debate_id ?? trace.debate_id ?? null,
+      grounding_report: (trace as any).grounding_report ?? (trace as any).groundingReport ?? undefined,
+      debug_sources: (trace as any).debug_sources ?? undefined,
     };
     const nodes = Array.isArray(trace.plan_json) ? (trace.plan_json as PlanNode[]) : [];
     const executorSteps = nodes.length > 0 ? compilePlan(nodes) : [];
     const manifest = Array.isArray(trace.plan_manifest) ? (trace.plan_manifest as ToolManifestEntry[]) : listTools();
     const planDsl = nodes.length > 0 ? formatPlanDsl(nodes) : "";
+    const collapseStrategy = taskTrace.collapse_strategy ?? taskTrace.collapse_trace?.strategy ?? undefined;
+    if (collapseStrategy && !taskTrace.collapse_strategy) {
+      taskTrace.collapse_strategy = collapseStrategy;
+    }
     const record: PlanRecord = {
       traceId,
       createdAt: trace.created_at,
@@ -157,6 +288,14 @@ async function rehydratePlanRecord(traceId: string): Promise<PlanRecord | null> 
       resonanceSelection: taskTrace.resonance_selection ?? null,
       latticeVersion: taskTrace.lattice_version ?? null,
       debateId: taskTrace.debate_id ?? null,
+      strategy: (taskTrace as any).reasoning_strategy ?? undefined,
+      strategyNotes: Array.isArray((taskTrace as any).strategy_notes)
+        ? ((taskTrace as any).strategy_notes as string[])
+        : [],
+      groundingReport: taskTrace.grounding_report ?? undefined,
+      debugSources: taskTrace.debug_sources ?? undefined,
+      collapseTrace: taskTrace.collapse_trace ?? undefined,
+      collapseStrategy,
     };
     registerInMemoryTrace(taskTrace);
     return record;
@@ -244,6 +383,7 @@ const buildKnowledgeHints = (args: {
   resonanceBundle?: ResonanceBundle | null;
   resonanceSelection?: ResonanceCollapse | null;
   limit?: number;
+  intent?: IntentFlags;
 }): string[] => {
   const hints = new Set<string>();
   for (const panel of args.telemetry?.panels ?? []) {
@@ -255,6 +395,7 @@ const buildKnowledgeHints = (args: {
   }
   const candidates = args.resonanceBundle?.candidates ?? [];
   const primaryId = args.resonanceSelection?.primaryPatchId;
+  const wantsWarp = args.intent?.wantsWarp || args.intent?.wantsPhysics;
   const preferred =
     (primaryId && candidates.find((c) => c.id === primaryId)) ??
     (args.resonanceSelection?.ranking
@@ -265,6 +406,7 @@ const buildKnowledgeHints = (args: {
   if (preferred) {
     const nodes = preferred.nodes
       .slice()
+      .filter((node) => !wantsWarp || isWarpRelevantPath(node.filePath) || isWarpRelevantPath(node.symbol ?? ""))
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, Math.max(1, args.limit ?? 6));
     for (const node of nodes) {
@@ -456,6 +598,46 @@ const ConsoleTelemetrySchema = z.object({
   panels: z.array(PanelTelemetrySchema).max(32),
 });
 
+const PromptSpecCitationSchema = z.object({
+  source: z.enum(["trace", "memory", "knowledge", "profile"]),
+  id: z.string(),
+  snippet: z.string().max(2000).optional(),
+});
+
+const PromptSpecBudgetsSchema = z.object({
+  max_tokens_hint: z.number().int().positive().max(32768).optional(),
+  max_citations: z.number().int().positive().max(16).optional(),
+  max_chars: z.number().int().positive().max(100_000).optional(),
+});
+
+const PromptSpecSchema = z.object({
+  schema_version: z.literal(PROMPT_SPEC_SCHEMA_VERSION),
+  mode: z.enum(["plan_and_execute", "direct_answer", "profile_update", "eval", "panel_control"]),
+  target_api: z.enum(["/api/agi/plan", "/api/agi/eval/smoke", "/api/agi/eval/replay", "/api/essence/profile"]),
+  user_question: z.string(),
+  system_instructions: z.string().optional(),
+  citations: z.array(PromptSpecCitationSchema).max(16).optional(),
+  soft_goals: z.array(z.string()).optional(),
+  budgets: PromptSpecBudgetsSchema.optional(),
+});
+
+const CollapseTraceSchema = z.object({
+  timestamp: z.string(),
+  chosenId: z.string(),
+  candidates: z.array(
+    z.object({
+      id: z.string(),
+      score: z.number(),
+      tags: z.array(z.string()),
+    }),
+  ),
+  input_hash: z.string().optional(),
+  decider: z.enum(["heuristic", "local-llm", "disabled"]).optional(),
+  model: z.string().optional(),
+  note: z.string().optional(),
+  strategy: z.string().optional(),
+});
+
 type RawPanelTelemetry = z.infer<typeof PanelTelemetrySchema>;
 
 const toFiniteNumber = (value: unknown): number | undefined =>
@@ -519,6 +701,26 @@ function sanitizePanelTelemetry(panel: RawPanelTelemetry, capturedAt: string): P
   };
 }
 
+function sanitizePromptSpecForServer(ps?: PromptSpec): PromptSpec | undefined {
+  if (!ps) return undefined;
+  if (ps.schema_version !== PROMPT_SPEC_SCHEMA_VERSION) return undefined;
+
+  const citations = (ps.citations ?? []).slice(0, 16).map((c) => ({
+    ...c,
+    snippet: c.snippet?.slice(0, 2000),
+  }));
+
+  return {
+    ...ps,
+    citations,
+    budgets: {
+      max_citations: Math.min(ps.budgets?.max_citations ?? 8, 16),
+      max_tokens_hint: Math.min(ps.budgets?.max_tokens_hint ?? 4000, 32768),
+      max_chars: Math.min(ps.budgets?.max_chars ?? 20000, 100000),
+    },
+  };
+}
+
 const PlanRequest = z.object({
   goal: z.string().min(3, "goal required"),
   personaId: z.string().min(1).default("default"),
@@ -530,10 +732,16 @@ const PlanRequest = z.object({
   routineId: z.string().min(1).optional(),
   routine: Routine.optional(),
   desktopId: z.string().min(1).max(128).optional(),
+  debugSources: z.boolean().optional(),
+  prompt_spec: PromptSpecSchema.optional(),
+  collapse_trace: CollapseTraceSchema.optional(),
+  collapse_strategy: z.string().optional(),
+  call_spec: zLocalCallSpec.optional(),
 });
 
 const ExecuteRequest = z.object({
   traceId: z.string().min(8, "traceId required"),
+  debugSources: z.boolean().optional(),
 });
 
 const ToolLogsQuery = z.object({
@@ -546,6 +754,8 @@ const ToolLogsQuery = z.object({
 });
 
 const PHYSICS_TOOL_NAME = "physics.curvature.unit";
+
+const repoToolsEnabled = (): boolean => process.env.ENABLE_REPO_TOOLS === "1";
 
 async function ensureDefaultTools(): Promise<void> {
   if (!getTool(llmLocalSpec.name)) {
@@ -566,6 +776,17 @@ async function ensureDefaultTools(): Promise<void> {
   }
   if (!getTool(essenceMixSpec.name)) {
     registerTool({ ...essenceMixSpec, handler: essenceMixHandler });
+  }
+  if (!getTool(repoGraphSearchSpec.name)) {
+    registerTool({ ...repoGraphSearchSpec, handler: repoGraphSearchHandler });
+  }
+  if (repoToolsEnabled()) {
+    if (!getTool(repoDiffReviewSpec.name)) {
+      registerTool({ ...repoDiffReviewSpec, handler: repoDiffReviewHandler });
+    }
+    if (!getTool(repoPatchSimulateSpec.name)) {
+      registerTool({ ...repoPatchSimulateSpec, handler: repoPatchSimulateHandler });
+    }
   }
   if (!getTool(panelSnapshotSpec.name)) {
     registerTool({ ...panelSnapshotSpec, handler: panelSnapshotHandler });
@@ -723,6 +944,154 @@ planRouter.get("/telemetry/panels", (req, res) => {
   return res.json(snapshot);
 });
 
+// Lightweight pipeline status snapshot for grounding telemetry/status intents
+planRouter.get("/pipeline/status", (_req, res) => {
+  try {
+    const state = getGlobalPipelineState();
+    // Avoid leaking large buffers; send core physics/warp fields
+    const { warp, natario, warpUniforms, natarioConstraint, dutyEffective_FR, thetaScaleExpected, thetaScale } = state as any;
+    res.json({
+      ok: true,
+      natarioConstraint: natarioConstraint ?? warp?.isZeroExpansion ?? natario?.isZeroExpansion,
+      dutyEffective_FR,
+      thetaScaleExpected,
+      thetaScale,
+      warp: warp ?? null,
+      natario: natario ?? null,
+      warpUniforms: warpUniforms ?? null,
+      capturedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ ok: false, error: "pipeline_status_error", message });
+  }
+});
+
+planRouter.get("/pipeline/last-plan-debug", async (req, res) => {
+  const traceIdParam =
+    typeof req.query.traceId === "string" && req.query.traceId.trim().length > 0
+      ? req.query.traceId.trim()
+      : undefined;
+  let record: PlanRecord | null = null;
+  if (traceIdParam) {
+    record = planRecords.get(traceIdParam) ?? (await rehydratePlanRecord(traceIdParam));
+    if (record) {
+      planRecords.set(traceIdParam, record);
+    }
+  }
+  if (!record) {
+    record = findLatestAccessiblePlan(req.auth);
+  }
+  if (!record) {
+    return res.status(404).json({ error: "plan_debug_unavailable" });
+  }
+  if (!personaPolicy.canAccess(req.auth, record.personaId, "plan")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const groundingSources = dedupeGroundingSources(
+    record.groundingReport?.sources ?? record.taskTrace.grounding_report?.sources ?? [],
+  );
+  const patch = pickResonancePatch({ bundle: record.resonance, selection: record.resonanceSelection });
+  const resonanceNodes = patch?.nodes ?? [];
+  const resonancePatches = resonanceNodes
+    .filter((node) => node?.filePath || node?.symbol)
+    .slice(0, 16)
+    .map((node) => ({
+      id: node.id ?? node.symbol ?? patch?.id ?? "",
+      path: node.filePath ?? node.symbol ?? "",
+      kind: node.kind,
+      score: node.score,
+    }));
+  res.json({
+    ok: true,
+    traceId: record.traceId,
+    createdAt: record.createdAt,
+    goal: record.goal,
+    personaId: record.personaId,
+    planDsl: record.planDsl,
+    resonancePatchId: patch?.id ?? null,
+    resonancePatches,
+    groundingSources,
+  });
+});
+
+planRouter.post("/local-call-spec", async (req, res) => {
+  if ((process.env.ENABLE_LOCAL_CALL_SPEC ?? process.env.VITE_ENABLE_LOCAL_CALL_SPEC) !== "1") {
+    return res.status(404).json({ error: "local_call_spec_disabled" });
+  }
+  if (!LOCAL_CALL_SPEC_URL) {
+    return res.status(503).json({ error: "local_call_spec_unconfigured" });
+  }
+  try {
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), LOCAL_CALL_SPEC_TIMEOUT_MS);
+    const response = await fetch(LOCAL_CALL_SPEC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body ?? {}),
+      signal: controller.signal,
+    });
+    clearTimeout(to);
+    if (!response.ok) {
+      return res.status(502).json({ error: "local_call_spec_upstream", status: response.status });
+    }
+    const payload = await response.json();
+    return res.json(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(502).json({ error: "local_call_spec_failed", message });
+  }
+});
+
+const proxyBinaryPost = async (
+  targetUrl: string,
+  timeoutMs: number,
+  req: Request,
+  res: Response,
+  disabledError: string,
+) => {
+  if (!targetUrl) {
+    return res.status(503).json({ error: `${disabledError}_unconfigured` });
+  }
+  try {
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "content-type": req.headers["content-type"] ?? "application/octet-stream" },
+      body: req.body ? (Buffer.isBuffer(req.body) ? req.body : JSON.stringify(req.body)) : undefined,
+      signal: controller.signal,
+    });
+    clearTimeout(to);
+    if (!response.ok) {
+      return res.status(502).json({ error: `${disabledError}_upstream`, status: response.status });
+    }
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+    const buf = Buffer.from(await response.arrayBuffer());
+    res.setHeader("content-type", contentType);
+    return res.status(200).send(buf);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(502).json({ error: `${disabledError}_failed`, message });
+  }
+};
+
+planRouter.post("/tts/local", async (req, res) => {
+  const enabled = (process.env.ENABLE_LOCAL_TTS ?? process.env.VITE_ENABLE_LOCAL_TTS) === "1";
+  if (!enabled) {
+    return res.status(404).json({ error: "local_tts_disabled" });
+  }
+  return proxyBinaryPost(LOCAL_TTS_URL, LOCAL_TTS_TIMEOUT_MS, req, res, "local_tts");
+});
+
+planRouter.post("/stt/local", async (req, res) => {
+  const enabled = (process.env.ENABLE_LOCAL_STT ?? process.env.VITE_ENABLE_LOCAL_STT) === "1";
+  if (!enabled) {
+    return res.status(404).json({ error: "local_stt_disabled" });
+  }
+  return proxyBinaryPost(LOCAL_STT_URL, LOCAL_STT_TIMEOUT_MS, req, res, "local_stt");
+});
+
 planRouter.post("/plan", async (req, res) => {
   await ensureDefaultTools();
   await ensureSpecialistsRegistered();
@@ -731,6 +1100,14 @@ planRouter.post("/plan", async (req, res) => {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
 
+  const debugSources = parseDebugSourcesFlag(parsed.data.debugSources, req.query.debug_sources ?? req.query.debugSources);
+  const promptSpec = sanitizePromptSpecForServer(parsed.data.prompt_spec);
+  const collapseTrace = parsed.data.collapse_trace;
+  const collapseStrategy =
+    normalizeCollapseStrategy(parsed.data.collapse_strategy ?? collapseTrace?.strategy ?? process.env.HYBRID_COLLAPSE_MODE) ??
+    "deterministic_hash_v1";
+  let callSpec: LocalCallSpec | undefined = parsed.data.call_spec ?? undefined;
+  let groundingReport: GroundingReport | undefined;
   let { personaId } = parsed.data;
   if (personaPolicy.shouldRestrictRequest(req.auth) && (!personaId || personaId === "default") && req.auth?.sub) {
     personaId = req.auth.sub;
@@ -738,12 +1115,60 @@ planRouter.post("/plan", async (req, res) => {
   if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
     return res.status(403).json({ error: "forbidden" });
   }
-  const { goal, searchQuery, topK, summaryFocus } = parsed.data;
+  const { searchQuery, topK, summaryFocus } = parsed.data;
+  const promptGoal = (promptSpec?.user_question ?? "").trim();
+  const goal = (promptGoal.length >= 3 ? promptGoal : parsed.data.goal).slice(0, 20000);
   const desktopId = parsed.data.desktopId?.trim() || DEFAULT_DESKTOP_ID;
   const baseTelemetryBundle = getConsoleTelemetry(desktopId);
   const { bundle: telemetryBundle } = ensureCasimirTelemetry({ desktopId, base: baseTelemetryBundle });
   const telemetrySummary = summarizeConsoleTelemetry(telemetryBundle);
-  const query = (searchQuery ?? goal).trim();
+  const query = (callSpec?.premise ?? searchQuery ?? goal).trim();
+  const resonanceQuery = normalizeForIntent(query);
+  const intent = classifyIntent(goal);
+  let callSpecIntent = new Set((callSpec?.intent ?? []).map((tag) => tag.toLowerCase()));
+  if (callSpecIntent.has("warp_physics") || callSpecIntent.has("warp")) {
+    intent.wantsWarp = true;
+    intent.wantsPhysics = true;
+  }
+  if (callSpecIntent.has("implementation")) {
+    intent.wantsImplementation = true;
+  }
+  if (callSpecIntent.has("physics")) {
+    intent.wantsPhysics = true;
+  }
+  if (intent.wantsImplementation && !callSpecIntent.has("repo_deep")) {
+    callSpecIntent.add("repo_deep");
+    const baseSpec: LocalCallSpec = callSpec ?? { action: "call_remote", premise: goal, intent: [] };
+    callSpec = { ...baseSpec, intent: Array.from(callSpecIntent) };
+  }
+  if (process.env.SMALL_LLM_URL) {
+    try {
+      const existingHints = (callSpec?.resourceHints ?? [])
+        .map((hint) => hint.path || hint.id || hint.url)
+        .filter((value): value is string => typeof value === "string" && value.length > 0);
+      const triage = await smallLlmCallSpecTriage({
+        currentChat: goal,
+        currentPageContext: query,
+        existingResourceHints: existingHints,
+      });
+      if (triage.intentTags?.length) {
+        const intentSet = new Set([...(callSpec?.intent ?? []), ...triage.intentTags]);
+        const baseSpec: LocalCallSpec = callSpec ?? { action: "call_remote", premise: goal, intent: [] };
+        callSpec = { ...baseSpec, intent: Array.from(intentSet) };
+      }
+      if (triage.resourceHints?.length) {
+        const mergedHints = [
+          ...(callSpec?.resourceHints ?? []),
+          ...triage.resourceHints.map((hint) => ({ type: "repo_file" as const, path: hint })),
+        ];
+        const baseSpec: LocalCallSpec = callSpec ?? { action: "call_remote", premise: goal, intent: [] };
+        callSpec = { ...baseSpec, resourceHints: mergedHints };
+      }
+    } catch (err) {
+      console.warn("[plan] small-llm call_spec triage failed", err);
+    }
+  }
+  callSpecIntent = new Set((callSpec?.intent ?? []).map((tag) => tag.toLowerCase()));
   let baseKnowledgeContext: KnowledgeProjectExport[] | undefined;
   if (parsed.data.knowledgeContext && parsed.data.knowledgeContext.length > 0) {
     if (!knowledgeConfig.enabled) {
@@ -769,7 +1194,7 @@ planRouter.post("/plan", async (req, res) => {
     resonanceBundle = await withTimeout(
       buildResonanceBundle({
         goal,
-        query,
+        query: resonanceQuery || query,
         limit: Number(process.env.CODE_PATCH_TOPK ?? 12),
         telemetry: telemetryBundle ?? null,
       }),
@@ -787,7 +1212,35 @@ planRouter.post("/plan", async (req, res) => {
     telemetry: telemetryBundle,
     resonanceBundle,
     resonanceSelection,
+    intent,
   });
+  const resourceHintPaths: string[] = [];
+  if (callSpec?.resourceHints) {
+    for (const hint of callSpec.resourceHints) {
+      if (hint.path) {
+        knowledgeHints.push(hint.path);
+        resourceHintPaths.push(hint.path);
+      }
+      if (hint.id) {
+        knowledgeHints.push(hint.id);
+        resourceHintPaths.push(hint.id);
+      }
+      if (hint.url) {
+        resourceHintPaths.push(hint.url);
+      }
+    }
+  }
+  if (intent.wantsWarp || intent.wantsPhysics || intent.wantsImplementation) {
+    const seeded = seedWarpPaths(callSpec?.resourceHints);
+    for (const path of seeded) {
+      if (!knowledgeHints.includes(path)) {
+        knowledgeHints.push(path);
+      }
+      if (!resourceHintPaths.includes(path)) {
+        resourceHintPaths.push(path);
+      }
+    }
+  }
 
   if (knowledgeConfig.enabled && requestedProjects.length > 0) {
     const inlineBytes = estimateKnowledgeContextBytes(baseKnowledgeContext);
@@ -832,6 +1285,24 @@ planRouter.post("/plan", async (req, res) => {
     requestedProjects.length = 0;
   }
   const focus = summaryFocus?.trim() || DEFAULT_SUMMARY_FOCUS;
+  const deepIntent = intent.wantsWarp || intent.wantsPhysics || intent.wantsImplementation;
+  const resonanceEvidence = resonanceBundle?.candidates?.length ?? 0;
+  const hasKnowledgeEvidence = (baseKnowledgeContext?.length ?? 0) > 0;
+  const hasHintEvidence = resourceHintPaths.length > 0;
+  const hasEvidence = hasKnowledgeEvidence || hasHintEvidence || resonanceEvidence > 0;
+  if (deepIntent && !hasEvidence) {
+    return res.status(400).json({
+      error: "insufficient_grounding",
+      message:
+        "Deep repo/physics questions require grounded context (repo/docs/telemetry). Attach knowledge projects or provide call_spec.resourceHints.",
+    });
+  }
+  const hasRepoContext =
+    (baseKnowledgeContext?.length ?? 0) > 0 || (requestedProjects?.length ?? 0) > 0 || hasHintEvidence;
+  const { strategy, notes: strategyNotes } = chooseReasoningStrategy(goal, {
+    hasRepoContext,
+    intentTags: callSpec?.intent,
+  });
 
   const basePlanArgs: BuildPlanArgs = {
     goal,
@@ -839,6 +1310,12 @@ planRouter.post("/plan", async (req, res) => {
     topK,
     summaryFocus: focus,
     finalTool: selectedTool,
+    strategy,
+    strategyNotes,
+    intent,
+    resourceHints: callSpec?.resourceHints,
+    detailPreference: focus.toLowerCase().includes("short") ? "short" : focus.toLowerCase().includes("long") ? "long" : "medium",
+    preferReviewed: strategy !== "default",
   };
   const basePlan = buildChatBPlan(basePlanArgs);
   const primaryPatchId = resonanceSelection?.primaryPatchId ?? null;
@@ -853,6 +1330,7 @@ planRouter.post("/plan", async (req, res) => {
     telemetryBundle,
     knowledgeHints,
     telemetrySummary,
+    intent,
   });
   let knowledgeContext = baseKnowledgeContext;
   let plannerPrompt = renderChatBPlannerPrompt({
@@ -874,6 +1352,7 @@ planRouter.post("/plan", async (req, res) => {
   const winningPlan =
     (primaryPatchId && planCandidates.find((candidate) => candidate.patch.id === primaryPatchId)) ??
     planCandidates[0];
+  const warpIntent = intent.wantsWarp || intent.wantsPhysics;
   if (winningPlan) {
     knowledgeContext = winningPlan.knowledgeContext;
     plannerPrompt = winningPlan.plannerPrompt;
@@ -882,7 +1361,32 @@ planRouter.post("/plan", async (req, res) => {
   } else if (primaryPatchId) {
     const fallbackPatch = resonanceBundle?.candidates.find((patch) => patch.id === primaryPatchId);
     if (fallbackPatch) {
-      knowledgeContext = mergeKnowledgeBundles(baseKnowledgeContext, [fallbackPatch.knowledge]);
+      const filteredFallback =
+        warpIntent && fallbackPatch
+          ? {
+              ...fallbackPatch,
+              nodes: (fallbackPatch.nodes ?? []).filter(
+                (node) => isWarpRelevantPath(node.filePath) || isWarpRelevantPath(node.symbol ?? ""),
+              ),
+              knowledge: fallbackPatch.knowledge
+                ? {
+                    ...fallbackPatch.knowledge,
+                    files: (fallbackPatch.knowledge.files ?? []).filter((file) =>
+                      isWarpRelevantPath(file.path ?? file.name ?? ""),
+                    ),
+                  }
+                : fallbackPatch.knowledge,
+            }
+          : fallbackPatch;
+      if (filteredFallback && ((filteredFallback.nodes ?? []).length > 0 || (filteredFallback.knowledge?.files?.length ?? 0) > 0)) {
+        knowledgeContext = mergeKnowledgeBundles(
+          baseKnowledgeContext,
+          filteredFallback.knowledge ? [filteredFallback.knowledge] : [],
+        );
+      } else {
+        knowledgeContext = baseKnowledgeContext;
+      }
+      const primaryIdForPrompt = filteredFallback ? primaryPatchId : null;
       plannerPrompt = renderChatBPlannerPrompt({
         goal,
         personaId,
@@ -893,11 +1397,24 @@ planRouter.post("/plan", async (req, res) => {
         knowledgeContext,
         resonanceBundle,
         resonanceSelection,
-        primaryPatchId,
+        primaryPatchId: primaryIdForPrompt,
         telemetryBundle,
         knowledgeHints,
       });
     }
+  }
+  if (debugSources) {
+    const groundingHolder: { groundingReport?: GroundingReport } = { groundingReport };
+    recordResonancePatchSources(groundingHolder, {
+      bundle: resonanceBundle,
+      selection: resonanceSelection,
+      filterNode:
+        intent.wantsWarp || intent.wantsPhysics
+          ? (node) => isWarpRelevantPath(node.filePath) || isWarpRelevantPath(node.symbol ?? "")
+          : undefined,
+    });
+    recordKnowledgeSources(groundingHolder, knowledgeContext);
+    groundingReport = groundingHolder.groundingReport;
   }
   const executorStepsAll = compilePlan(nodes);
   const maxTurns = routine?.knobs?.max_turns;
@@ -927,6 +1444,12 @@ planRouter.post("/plan", async (req, res) => {
     planner_prompt: plannerPrompt,
     routine_json: routine,
     debate_id: null,
+    reasoning_strategy: strategy,
+    strategy_notes: strategyNotes,
+    grounding_report: groundingReport,
+    debug_sources: debugSources,
+    collapse_strategy: collapseStrategy,
+    collapse_trace: collapseTrace,
   };
 
   const record: PlanRecord = {
@@ -950,6 +1473,14 @@ planRouter.post("/plan", async (req, res) => {
     resonanceSelection,
     latticeVersion,
     debateId: null,
+    strategy,
+    strategyNotes,
+    groundingReport,
+    debugSources,
+    promptSpec: promptSpec ?? undefined,
+    collapseTrace: collapseTrace ?? undefined,
+    collapseStrategy,
+    callSpec: callSpec ?? undefined,
   };
 
   registerInMemoryTrace(taskTrace);
@@ -971,7 +1502,12 @@ planRouter.post("/plan", async (req, res) => {
     plan_steps: nodes,
     tool_manifest: manifest,
     executor_steps: executorSteps,
+    strategy,
+    strategy_notes: strategyNotes,
     task_trace: taskTrace,
+    collapse_trace: collapseTrace ?? taskTrace.collapse_trace ?? null,
+    collapse_strategy: collapseStrategy,
+    call_spec: callSpec ?? null,
     knowledge_context: knowledgeContext,
     knowledge_hash: knowledgeHash,
     telemetry_bundle: telemetryBundle,
@@ -1001,6 +1537,7 @@ planRouter.post("/execute", async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
+  const debugSources = parseDebugSourcesFlag(parsed.data.debugSources, req.query.debug_sources ?? req.query.debugSources);
   const { traceId } = parsed.data;
   let record: PlanRecord | null = planRecords.get(traceId) ?? null;
   if (!record) {
@@ -1025,6 +1562,15 @@ planRouter.post("/execute", async (req, res) => {
     });
   }
 
+  const effectiveDebugSources = Boolean(debugSources || record.debugSources);
+  record.debugSources = effectiveDebugSources;
+  const groundingHolder: { groundingReport?: GroundingReport } = {
+    groundingReport: record.groundingReport ?? record.taskTrace.grounding_report ?? undefined,
+  };
+  if (effectiveDebugSources) {
+    ensurePlannerGroundingReport(groundingHolder);
+  }
+
   const start = Date.now();
   const runtimeTelemetry = record.telemetry ?? null;
   const runtimeTelemetrySummary = record.telemetrySummary ?? null;
@@ -1034,7 +1580,7 @@ planRouter.post("/execute", async (req, res) => {
       message: "Execute requires a sealed telemetry snapshot from plan.",
     });
   }
-  const steps = await executeCompiledPlan(record.executorSteps, {
+  const executionRuntime: ExecutionRuntime = {
     goal: record.goal,
     personaId: record.personaId,
     sessionId: traceId,
@@ -1046,7 +1592,13 @@ planRouter.post("/execute", async (req, res) => {
     knowledgeHints: record.knowledgeHints,
     plannerPrompt: record.plannerPrompt,
     debateId: record.debateId ?? record.taskTrace.debate_id ?? null,
-  });
+    debugSources: effectiveDebugSources,
+    groundingReport: groundingHolder.groundingReport,
+  };
+  const steps = await executeCompiledPlan(record.executorSteps, executionRuntime);
+  record.groundingReport = executionRuntime.groundingReport ?? groundingHolder.groundingReport;
+  record.taskTrace.grounding_report = executionRuntime.groundingReport ?? record.taskTrace.grounding_report;
+  record.taskTrace.debug_sources = executionRuntime.debugSources ?? record.taskTrace.debug_sources;
   record.telemetry = runtimeTelemetry;
   record.telemetrySummary = runtimeTelemetrySummary;
   const duration = Date.now() - start;
@@ -1098,7 +1650,12 @@ planRouter.post("/execute", async (req, res) => {
   record.taskTrace.debate_id = record.debateId;
   const summary = record.taskTrace.result_summary ?? summarizeExecutionResults(steps);
   record.taskTrace.result_summary = summary;
-  await saveTaskTrace(record.taskTrace);
+  try {
+    await withTimeout(saveTaskTrace(record.taskTrace), SAVE_TASK_TRACE_TIMEOUT_MS, "save_task_trace");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[agi.plan] task trace persistence skipped: ${message}`);
+  }
   const whyBelongs = buildWhyBelongs({
     goal: record.goal,
     traceId,
@@ -1125,6 +1682,9 @@ planRouter.post("/execute", async (req, res) => {
     resonance_bundle: record.resonance,
     resonance_selection: record.resonanceSelection,
     debate_id: record.debateId ?? null,
+    ...(effectiveDebugSources
+      ? { groundingReport: record.groundingReport ?? executionRuntime.groundingReport ?? null }
+      : {}),
   });
 });
 

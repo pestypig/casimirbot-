@@ -7,7 +7,7 @@ import {
   type TEssenceEnvelope,
 } from "@shared/essence-schema";
 import type { TCollapseMixRecipe } from "@shared/essence-schema";
-import { collapseMix } from "../mixer/collapse";
+import { applyCollapseStrategy } from "../mixer/collapse";
 import { listEnvelopeByCreator, getEnvelope, putEnvelope } from "./store";
 import { essenceHub } from "./events";
 import { putBlob } from "../../storage";
@@ -77,16 +77,19 @@ async function mixProjectAssets(args: CreateEssenceMixArgs): Promise<EssenceMixR
   };
   const lookup = new Map(assets.map((env) => [env.header.id, env]));
   const sourceIds = [...grouped.text, ...grouped.image, ...grouped.audio];
-  const { fused, feature } = await collapseMix({
-    recipe,
-    fetchEnvelope: async (id) => {
-      const found = lookup.get(id) ?? (await getEnvelope(id));
-      if (!found) {
-        throw new Error(`Asset ${id} not found`);
-      }
-      return found;
+  const { fused, feature } = await applyCollapseStrategy(
+    {
+      recipe,
+      fetchEnvelope: async (id) => {
+        const found = lookup.get(id) ?? (await getEnvelope(id));
+        if (!found) {
+          throw new Error(`Asset ${id} not found`);
+        }
+        return found;
+      },
     },
-  });
+    process.env.HYBRID_COLLAPSE_MODE,
+  );
   const summary = args.label ?? `Identity mix for ${creatorId}`;
   return persistMixResult({
     fused,
@@ -117,16 +120,19 @@ async function mixProposalIdentity(args: CreateEssenceMixArgs): Promise<EssenceM
     knobs: buildKnobs(args.seed ?? Date.now() % 1_000_000),
   };
   const sourceIds = [...(recipe.inputs.text ?? [])];
-  const { fused, feature } = await collapseMix({
-    recipe,
-    fetchEnvelope: async (id) => {
-      const env = synthetic.get(id);
-      if (!env) {
-        throw new Error(`Synthetic proposal ${id} missing`);
-      }
-      return env;
+  const { fused, feature } = await applyCollapseStrategy(
+    {
+      recipe,
+      fetchEnvelope: async (id) => {
+        const env = synthetic.get(id);
+        if (!env) {
+          throw new Error(`Synthetic proposal ${id} missing`);
+        }
+        return env;
+      },
     },
-  });
+    process.env.HYBRID_COLLAPSE_MODE,
+  );
   const summary = args.label ?? `Project identity mix from ${proposals.length} proposals`;
   return persistMixResult({
     fused,

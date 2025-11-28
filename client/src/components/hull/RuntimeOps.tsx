@@ -13,7 +13,7 @@ type EndpointStatus = {
   allowed: boolean;
 } | null;
 
-type HullStatusResponse = {
+type RuntimeOpsResponse = {
   hull_mode: boolean;
   allow_hosts: string[];
   llm_policy: string;
@@ -28,17 +28,17 @@ type HullStatusResponse = {
   timestamp: string;
 };
 
-const fetchHullStatus = async (): Promise<HullStatusResponse> => {
+const fetchRuntimeStatus = async (): Promise<RuntimeOpsResponse> => {
   const response = await fetch("/api/hull/status");
   if (!response.ok) {
-    throw new Error(`Hull status ${response.status}`);
+    throw new Error(`Runtime status ${response.status}`);
   }
   return response.json();
 };
 
 const formatBytes = (value?: number | null): string => {
   if (!value || value <= 0) {
-    return "—";
+    return "--";
   }
   const units = ["B", "KB", "MB", "GB"];
   let idx = 0;
@@ -70,10 +70,10 @@ const endpointBadge = (label: string, endpoint: EndpointStatus) => {
   );
 };
 
-export default function HullStatus() {
+export default function RuntimeOps() {
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["hull-status"],
-    queryFn: fetchHullStatus,
+    queryKey: ["runtime-ops"],
+    queryFn: fetchRuntimeStatus,
     refetchInterval: 15000,
     retry: 2,
   });
@@ -95,10 +95,10 @@ export default function HullStatus() {
       <header className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-500">Plan B</p>
-          <h2 className="text-lg font-semibold">Hull Status</h2>
+          <h2 className="text-lg font-semibold">Runtime Ops</h2>
           <p className="text-xs text-slate-500">
             {data?.hull_mode ? "Hull Mode enforced" : "Hull Mode disabled"}
-            {timestamp ? ` • ${timestamp}` : ""}
+            {timestamp ? ` - ${timestamp}` : ""}
           </p>
         </div>
         <button
@@ -111,10 +111,10 @@ export default function HullStatus() {
         </button>
       </header>
 
-      {isLoading && <p className="text-sm text-slate-400">Loading hull telemetry…</p>}
+      {isLoading && <p className="text-sm text-slate-400">Loading runtime telemetry...</p>}
       {error && (
         <p className="text-sm text-rose-300">
-          {(error as Error).message || "Hull status unavailable"}
+          {(error as Error).message || "Runtime status unavailable"}
         </p>
       )}
 
@@ -162,7 +162,7 @@ export default function HullStatus() {
                   <span className="font-medium text-slate-200">{row.name}</span>
                   <span className="text-slate-300">
                     active {row.active}
-                    {row.pending !== null ? ` • pending ${row.pending}` : ""}
+                    {row.pending !== null ? ` - pending ${row.pending}` : ""}
                   </span>
                 </div>
               ))}
@@ -178,7 +178,7 @@ export default function HullStatus() {
                   {host}
                 </span>
               ))}
-              {allowHosts.length === 0 && <span className="text-slate-500">—</span>}
+              {allowHosts.length === 0 && <span className="text-slate-500">-</span>}
             </div>
           </section>
         </>

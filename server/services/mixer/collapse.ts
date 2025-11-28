@@ -8,6 +8,13 @@ import type {
 
 type FetchEnvelopeFn = (id: string) => Promise<TEssenceEnvelope | null>;
 
+export type CollapseStrategyName = "deterministic_hash_v1" | "embedding_v1" | "micro_llm_v1";
+
+export interface CollapseStrategy {
+  name: CollapseStrategyName;
+  apply: (params: CollapseMixParams) => Promise<{ fused: Float32Array; feature: CollapseMixerFeature }>;
+}
+
 export class MissingEssenceInputError extends Error {
   constructor(public readonly essenceId: string) {
     super(`Essence input ${essenceId} not found`);
@@ -18,6 +25,18 @@ export class MissingEssenceInputError extends Error {
 type CollapseMixParams = {
   recipe: TCollapseMixRecipe;
   fetchEnvelope: FetchEnvelopeFn;
+};
+
+const normalizeStrategy = (value?: string | null): CollapseStrategyName => {
+  if (!value || typeof value !== "string") return "deterministic_hash_v1";
+  const normalized = value.trim().toLowerCase();
+  if (normalized.startsWith("embed")) {
+    return "embedding_v1";
+  }
+  if (normalized.startsWith("micro") || normalized.includes("llm")) {
+    return "micro_llm_v1";
+  }
+  return "deterministic_hash_v1";
 };
 
 const DEFAULT_KNOBS: Required<Omit<CollapseMixerKnobs, "seed">> = {
@@ -217,4 +236,41 @@ function buildSeedMaterial(env: TEssenceEnvelope): string {
   }
 
   return sections.join("\n");
+}
+
+const deterministicHashStrategy: CollapseStrategy = {
+  name: "deterministic_hash_v1",
+  apply: collapseMix,
+};
+
+const embeddingStrategy: CollapseStrategy = {
+  name: "embedding_v1",
+  apply: async (params) => deterministicHashStrategy.apply(params),
+};
+
+const microLLMStrategy: CollapseStrategy = {
+  name: "micro_llm_v1",
+  apply: async (params) => deterministicHashStrategy.apply(params),
+};
+
+export const getCollapseStrategy = (preferred?: string | null): CollapseStrategy => {
+  const strategyName = normalizeStrategy(preferred ?? process.env.HYBRID_COLLAPSE_MODE);
+  switch (strategyName) {
+    case "embedding_v1":
+      return embeddingStrategy;
+    case "micro_llm_v1":
+      return microLLMStrategy;
+    default:
+      return deterministicHashStrategy;
+  }
+};
+
+export async function applyCollapseStrategy(
+  params: CollapseMixParams,
+  preferredStrategy?: string | null,
+): Promise<{ fused: Float32Array; feature: CollapseMixerFeature; strategy: CollapseStrategyName }> {
+  const strategy = getCollapseStrategy(preferredStrategy);
+  const result = await strategy.apply(params);
+  const feature: CollapseMixerFeature = { ...result.feature, strategy: strategy.name };
+  return { fused: result.fused, feature, strategy: strategy.name };
 }

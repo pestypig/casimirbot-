@@ -6,6 +6,7 @@ import { personaPolicy } from "../auth/policy";
 import {
   getDebateOwner,
   getDebateSnapshot,
+  getDebateTelemetry,
   listDebateEvents,
   resumeDebate,
   startDebate,
@@ -16,6 +17,10 @@ import {
 const debateRouter = Router();
 
 const StreamQuery = z.object({
+  debateId: z.string().min(4, "debateId is required"),
+});
+
+const TelemetryQuery = z.object({
   debateId: z.string().min(4, "debateId is required"),
 });
 
@@ -93,6 +98,26 @@ debateRouter.get("/stream", (req, res) => {
   req.on("close", cleanup);
   req.on("error", cleanup);
   resumeDebate(debateId);
+});
+
+debateRouter.get("/telemetry", (req, res) => {
+  const parsed = TelemetryQuery.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const { debateId } = parsed.data;
+  const ownerId = getDebateOwner(debateId);
+  if (!ownerId) {
+    return res.status(404).json({ error: "debate_not_found" });
+  }
+  if (!personaPolicy.canAccess(req.auth, ownerId, "plan")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const snapshot = getDebateTelemetry(debateId);
+  if (!snapshot) {
+    return res.status(404).json({ error: "debate_not_found" });
+  }
+  res.json(snapshot);
 });
 
 debateRouter.get("/:id", (req, res) => {

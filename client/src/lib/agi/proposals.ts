@@ -5,6 +5,7 @@ import type {
   ProposalSafetyStatus,
   ProposalStatus,
   ProposalKind,
+  ProposalPromptPreset,
 } from "@shared/proposals";
 
 type FetchParams = {
@@ -158,4 +159,16 @@ export async function synthesizeNightlyProposals(params?: {
     proposals?: EssenceProposal[];
   };
   return Array.isArray(payload?.proposals) ? payload.proposals.filter(Boolean) : [];
+}
+
+export async function fetchProposalPrompts(id: string): Promise<ProposalPromptPreset[]> {
+  const res = await fetch(`/api/proposals/${encodeURIComponent(id)}/prompts`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => res.statusText);
+    throw new Error(message || `proposal_prompts_failed:${res.status}`);
+  }
+  const payload = (await res.json()) as { presets?: ProposalPromptPreset[] };
+  return Array.isArray(payload?.presets) ? payload.presets : [];
 }

@@ -16,5 +16,6 @@ export function listTools(): ToolManifestEntry[] {
     desc: tool.desc,
     deterministic: tool.deterministic,
     rateLimit: tool.rateLimit,
+    health: tool.health,
   }));
 }

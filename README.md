@@ -249,10 +249,12 @@ These references tie the UI behavior back to concrete implementation details and
 
 ## Running locally
 ```bash
-npm run dev
+npm run dev           # Express + Vite middleware with HMR (default)
+# If you explicitly want to serve the last build without Vite/HMR:
+npm run dev:static    # requires a fresh `npm run build`
 ```
 
-The dev script launches the Express server with Vite middleware. Visit [http://localhost:5173](http://localhost:5173) for the client UI; API routes mount under the same origin via Express.
+The dev script launches the Express server with Vite middleware, so you should not need to run a separate `npx vite dev` process. Visit [http://localhost:5173](http://localhost:5173) for the client UI; API routes mount under the same origin via Express. The `dev:static` variant skips Vite and serves the prebuilt bundle, so rebuild after changes before using it.
 
 ## Offline math upgrade loop
 - **Adapter-aware inference**: Configure Luma with `LUMA_PROVIDER`, `LUMA_MODEL`, and optionally `LORA_ADAPTER` to hot-load LoRA patches. The `/api/luma/chat/self-consistency` endpoint now wraps multi-sample decoding with majority voting on the `FINAL ANSWER` line.
@@ -277,13 +279,13 @@ The dev script launches the Express server with Vite middleware. Visit [http://l
 
 ## Testing
 - **Unit & integration** - `npm test` executes Vitest suites co-located with the client/lib code.
-- **Python physics checks** - `tests/test_dynamic.py` targets a running simulation service at `http://localhost:5000`. Activate your Python environment (see `pyproject.toml`) and run `pytest` when the simulator is available.
+- **Python physics checks** - `tests/test_dynamic.py` targets a running simulation service at `http://localhost:5173`. Activate your Python environment (see `pyproject.toml`) and run `pytest` when the simulator is available.
 - **Ledger guard** - `npm test -- --run tests/ledger-dimension.spec.ts` locks the green-zone slopes (duty, area, geometry gain, Q_L), GR prefactors, and equality of power vs. density forms using the dev-mock contract.
 
 ## Observability
-- **Prometheus endpoint** - `GET /metrics` now exports default Node stats plus AGI task counters, tool-call histograms, queue gauges, and HTTP request latency buckets. Point Prometheus at `http://localhost:5000/metrics` when the server is running.
+- **Prometheus endpoint** - `GET /metrics` now exports default Node stats plus AGI task counters, tool-call histograms, queue gauges, and HTTP request latency buckets. Point Prometheus at `http://localhost:5173/metrics` when the server is running.
 - **Structured tool logs** - `GET /api/agi/tools/logs?limit=50&tool=llm.local.generate` returns the most recent tool invocations (and `/api/agi/tools/logs/stream` keeps an SSE feed open for dashboards). Records include tool name, params hash, latency, seeds, and error text when available.
-- **Local Prom/Graf stack** - Launch `docker compose -f docker-compose.observability.yml up` to spin up Prometheus (port 9090) and Grafana (port 3001, admin/admin by default). The bundled `ops/observability/prometheus.yml` scrapes `host.docker.internal:5000/metrics`, so keep the Express server running on port 5000.
+- **Local Prom/Graf stack** - Launch `docker compose -f docker-compose.observability.yml up` to spin up Prometheus (port 9090) and Grafana (port 3001, admin/admin by default). The bundled `ops/observability/prometheus.yml` scrapes `host.docker.internal:5173/metrics`, so keep the Express server running on port 5173.
 
 ## Production build
 ```bash
@@ -299,6 +301,7 @@ The build emits static client assets to `dist/public/` and bundles the server en
 - `PUMP_MOCK_SETTLE_MS`, `PUMP_MOCK_JITTER_MS` - Tune timing characteristics for the mock pump.
 - `HELIX_PHASE_CALIB_JSON` - Override the path to the phase calibration JSON (`sim_core/phase_calibration.json` by default).
 - `PHASE_CAL_DIR` - Directory for calibration logs (`.cal/phase-calibration-log.jsonl` when unset).
+- `ENABLE_REPO_TOOLS` - When `1`, exposes repo-safe helpers (`repo.diff.review`, `repo.patch.simulate`) to the AGI planner for read-only diffing and patch dry-runs.
 
 ## Static research sites
 The `warp-web/` directory contains HTML microsites (e.g. `km-scale-warp-ledger.html`) that reference the same JavaScript helpers used in the Helix Core client. Open the files directly in a browser or host them via `npm run dev` to leverage Express static serving.

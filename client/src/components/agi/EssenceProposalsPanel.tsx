@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import type { EssenceProposal, ProposalStatus } from "@shared/proposals";
-import { actOnProposal, createIdentityMix, fetchProposals, synthesizeNightlyProposals, useProposalEvents } from "@/lib/agi/proposals";
+import type { EssenceProposal, ProposalPromptPreset, ProposalStatus } from "@shared/proposals";
+import {
+  actOnProposal,
+  createIdentityMix,
+  fetchProposals,
+  fetchProposalPrompts,
+  synthesizeNightlyProposals,
+  useProposalEvents,
+} from "@/lib/agi/proposals";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { shallow } from "zustand/shallow";
 import type { TPhaseProfile } from "@shared/essence-activity";
@@ -31,6 +38,14 @@ export function EssenceProposalsPanel() {
   const [mixStatus, setMixStatus] = useState<string | null>(null);
   const [synthLoading, setSynthLoading] = useState(false);
   const [synthStatus, setSynthStatus] = useState<string | null>(null);
+  const [promptPresets, setPromptPresets] = useState<ProposalPromptPreset[]>([]);
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const openPromptPanel = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "essence-prompt-panel" } }));
+  }, []);
   const { ensureContextSession, addContextMessage } = useAgiChatStore(
     useCallback(
       (state) => ({
@@ -88,6 +103,43 @@ export function EssenceProposalsPanel() {
     if (!selected) return;
     ensureContextSession(`proposal:${selected.id}`, selected.title);
   }, [selected, ensureContextSession]);
+
+  useEffect(() => {
+    setPromptPresets([]);
+    setPromptError(null);
+    setCopyStatus(null);
+    if (!selected || selected.patchKind !== "code-diff") {
+      setPromptLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setPromptLoading(true);
+    fetchProposalPrompts(selected.id)
+      .then((presets) => {
+        if (!cancelled) {
+          setPromptPresets(presets);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setPromptError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPromptLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.id, selected?.patchKind]);
+
+  useEffect(() => {
+    if (!copyStatus) return;
+    const timer = setTimeout(() => setCopyStatus(null), 1800);
+    return () => clearTimeout(timer);
+  }, [copyStatus]);
 
   const { progress, chats } = useProposalEvents(selected?.id ?? null);
   const lastChatKeyRef = useRef<string | null>(null);
@@ -162,6 +214,24 @@ export function EssenceProposalsPanel() {
     }
   }, [loadProposals]);
 
+  const handleCopyPrompt = useCallback(
+    async (text: string) => {
+      if (!text) return;
+      try {
+        const hasClipboard = typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText;
+        if (!hasClipboard) {
+          setCopyStatus("Clipboard unavailable");
+          return;
+        }
+        await navigator.clipboard.writeText(text);
+        setCopyStatus("Prompt copied");
+      } catch (err) {
+        setCopyStatus(err instanceof Error ? err.message : "Copy failed");
+      }
+    },
+    [],
+  );
+
   return (
     <div className="flex h-full bg-[#05060c] text-white">
       <aside className="w-72 border-r border-white/5 bg-black/30">
@@ -213,6 +283,12 @@ export function EssenceProposalsPanel() {
             )}
           >
             {synthLoading ? "Synthesizing..." : "Nightly template"}
+          </button>
+          <button
+            onClick={openPromptPanel}
+            className="w-full rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1 text-[11px] text-cyan-50 hover:border-cyan-300"
+          >
+            Open prompt panel
           </button>
           {mixStatus && <div className="text-[11px] text-slate-400">{mixStatus}</div>}
           {synthStatus && <div className="text-[11px] text-slate-400">{synthStatus}</div>}
@@ -314,6 +390,45 @@ export function EssenceProposalsPanel() {
                   <div className="text-sm font-semibold text-slate-200">Target</div>
                   <TargetDetails proposal={selected} />
                 </div>
+                {selected.patchKind === "code-diff" ? (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold text-slate-200">Patch prompt presets</div>
+                      {promptLoading && <div className="text-[11px] text-slate-400">Refreshing...</div>}
+                    </div>
+                    {promptError && <div className="mt-2 text-[12px] text-rose-300">{promptError}</div>}
+                    {!promptLoading && !promptError && promptPresets.length === 0 && (
+                      <div className="mt-2 text-[12px] text-slate-400">No presets yet for this patch.</div>
+                    )}
+                    <div className="mt-3 space-y-3">
+                      {promptPresets.map((preset) => (
+                        <div key={preset.id} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-white">{preset.label}</div>
+                              {preset.context ? <div className="mt-1 text-[11px] text-slate-400">{preset.context}</div> : null}
+                              <div className="mt-2 whitespace-pre-wrap text-[12px] leading-relaxed text-slate-100">
+                                {preset.prompt}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="shrink-0 rounded border border-white/15 px-2 py-1 text-[11px] text-slate-100 hover:border-white/40"
+                              onClick={() => void handleCopyPrompt(preset.prompt)}
+                              title="Copy prompt to clipboard"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          <div className="mt-2 text-[10px] uppercase tracking-wide text-slate-500">
+                            Updated {new Date(preset.updatedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {copyStatus && <div className="mt-2 text-[11px] text-slate-400">{copyStatus}</div>}
+                  </div>
+                ) : null}
               </div>
               <div className="flex flex-col rounded-xl border border-white/10 bg-white/5">
                 <div className="border-b border-white/10 px-4 py-3">

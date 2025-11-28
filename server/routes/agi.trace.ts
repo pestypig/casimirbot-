@@ -46,6 +46,8 @@ traceRouter.get("/:id/export", async (req: AuthedRequest, res) => {
       tool_manifest: Array.isArray(trace.plan_manifest) ? trace.plan_manifest : [],
       knowledge_context: Array.isArray(trace.knowledgeContext) ? trace.knowledgeContext : [],
       routine: (trace as any).routine_json ?? null,
+      collapse_trace: (trace as any).collapse_trace ?? null,
+      collapse_strategy: (trace as any).collapse_strategy ?? null,
       env: {
         hull_mode: process.env.HULL_MODE === "1",
         llm_policy: process.env.LLM_POLICY ?? "remote",
@@ -79,18 +81,27 @@ async function resolveTrace(req: AuthedRequest, res: Response, id: string): Prom
 }
 
 async function loadTrace(id: string): Promise<TTaskTrace | null> {
-  const dal = await import("../db/agi").catch(() => null);
+  let dal: any = null;
+  try {
+    dal = await import("../db/agi");
+  } catch (error) {
+    console.warn("[agi.trace] dal import failed; falling back to in-memory trace store", error);
+  }
   if (dal) {
-    if (typeof (dal as any).getTaskTraceById === "function") {
-      const fromDal = await (dal as any).getTaskTraceById(id);
-      if (fromDal) {
-        return fromDal;
+    try {
+      if (typeof dal.getTaskTraceById === "function") {
+        const fromDal = await dal.getTaskTraceById(id);
+        if (fromDal) {
+          return fromDal;
+        }
+      } else if (typeof dal.getTaskTrace === "function") {
+        const legacyTrace = await dal.getTaskTrace(id);
+        if (legacyTrace) {
+          return legacyTrace;
+        }
       }
-    } else if (typeof (dal as any).getTaskTrace === "function") {
-      const legacyTrace = await (dal as any).getTaskTrace(id);
-      if (legacyTrace) {
-        return legacyTrace;
-      }
+    } catch (error) {
+      console.warn("[agi.trace] task trace fetch failed; falling back to in-memory trace store", error);
     }
   }
   const inMemory = ((await import("../services/planner/chat-b").catch(() => null)) as any)?.__getTaskTrace?.(id);

@@ -17,6 +17,7 @@ export type ToolLogRecord = {
   essenceId?: string;
   text?: string;
   debateId?: string;
+  strategy?: string;
 };
 
 type ToolLogListener = (entry: ToolLogRecord) => void;

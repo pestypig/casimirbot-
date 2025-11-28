@@ -145,6 +145,12 @@ export default function StartPortal() {
           <p className="hidden text-xs uppercase tracking-[0.25em] text-slate-400 sm:block">
             Helix Controls
           </p>
+          <button
+            className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-100 transition hover:bg-indigo-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+            onClick={() => requestPanelWindow("helix-phoenix")}
+          >
+            Phoenix Panel
+          </button>
           <DialogTrigger asChild>
             <button
               aria-label="Open Helix Start settings"
@@ -168,6 +174,17 @@ export default function StartPortal() {
             <p className="text-slate-300/80 text-sm mt-1">
               A quiet beginning. Same physics. Your preferred lens.
             </p>
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <button
+                className="rounded-lg bg-indigo-500/85 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500"
+                onClick={() => requestPanelWindow("helix-phoenix")}
+              >
+                Open Phoenix Averaging Panel
+              </button>
+              <p className="text-[11px] text-slate-400">
+                Opens the Desktop with the Phoenix averaging window already staged.
+              </p>
+            </div>
           </header>
 
         {/* ICONS ONLY until a choice is made */}
@@ -255,6 +272,12 @@ export default function StartPortal() {
                       Launch Energy Flux Panel
                     </button>
                     <button
+                      className="px-3.5 py-2 rounded-lg border border-cyan-300/50 bg-cyan-500/10 text-cyan-100 text-sm"
+                      onClick={() => requestPanelWindow("pipeline-proof")}
+                    >
+                      Pipeline Proof Panel
+                    </button>
+                    <button
                       className="px-3.5 py-2 rounded-lg border border-cyan-400/40 bg-cyan-400/10 text-cyan-100 text-sm"
                       onClick={() => requestPanelWindow("electron-orbital")}
                     >
@@ -265,6 +288,24 @@ export default function StartPortal() {
                       onClick={() => requestPanelWindow("star-hydrostatic")}
                     >
                       Launch Hydrostatic Panel
+                    </button>
+                      <button
+                        className="px-3.5 py-2 rounded-lg border border-sky-400/50 bg-sky-400/10 text-sky-100 text-sm"
+                        onClick={() => requestPanelWindow("star-coherence")}
+                      >
+                        Star Coherence Governor
+                    </button>
+                    <button
+                      className="px-3.5 py-2 rounded-lg border border-emerald-400/40 bg-emerald-400/10 text-emerald-100 text-sm"
+                      onClick={() => requestPanelWindow("collapse-monitor")}
+                    >
+                      Collapse Watch Panel
+                    </button>
+                    <button
+                      className="px-3.5 py-2 rounded-lg border border-indigo-300/50 bg-indigo-500/10 text-indigo-100 text-sm"
+                      onClick={() => requestPanelWindow("helix-phoenix")}
+                    >
+                      Phoenix Averaging Panel
                     </button>
                     <button
                       className="px-3.5 py-2 rounded-lg border border-slate-400/40 bg-slate-800/30 text-slate-100 text-sm"
@@ -292,6 +333,33 @@ export default function StartPortal() {
             void refetchThemes();
           }}
         />
+
+        <section className="mt-10">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-indigo-300">New panel</p>
+                <h3 className="text-lg font-semibold text-white">Phoenix Averaging — Needle Hull</h3>
+                <p className="text-sm leading-relaxed text-slate-300/80">
+                  Shows GR-proxy curvature built from Casimir tile power, Hann-averaged over local light-crossing
+                  windows in the ship frame. Includes a worldline strip, spacetime tile band, and the always-on Phoenix
+                  badge so operators remember this is a control foliation, not an outside simultaneity view.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 md:max-w-xs">
+                <button
+                  className="rounded-lg bg-indigo-500/85 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500"
+                  onClick={() => requestPanelWindow("helix-phoenix")}
+                >
+                  Open Phoenix Panel
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  Opens the Desktop and auto-starts the Phoenix Averaging window.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="mt-10">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">

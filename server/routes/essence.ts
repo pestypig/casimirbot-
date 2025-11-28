@@ -13,6 +13,9 @@ import { listUiPreferences } from "../services/essence/preferences";
 import { persistEssencePacket } from "../db/essence";
 import { queueIngestJobs } from "../services/essence/ingest-jobs";
 import { buildThemeDeckForOwner } from "../services/essence/themes";
+import type { EssenceProfile, EssenceProfileUpdate } from "@shared/inferenceProfile";
+import { deleteEssenceProfile, getEssenceProfile, ProfileRateLimitError, upsertEssenceProfile } from "../db/essenceProfile";
+import { runNightlyProposalSynthesis } from "../services/essence/nightly-proposals";
 
 export const essenceRouter = Router();
 type UploadedFile = {
@@ -80,6 +83,76 @@ essenceRouter.get("/preferences", async (req, res) => {
     ensureEssenceEnvironment(ownerId),
   ]);
   res.json({ preferences, environment });
+});
+
+essenceRouter.get("/profile/:id", async (req, res) => {
+  try {
+    const essenceId = String(req.params.id ?? "").trim();
+    if (!essenceId) {
+      return res.status(400).json({ error: "bad_request", message: "essence id required" });
+    }
+    const stateless = req.query?.stateless === "1";
+    if (stateless) {
+      return res.json({ profile: null, stateless: true });
+    }
+    const profile = await getEssenceProfile(essenceId);
+    return res.json({ profile, stateless: false });
+  } catch (err) {
+    try {
+      console.error("[essence] profile fetch failed", err);
+    } catch {}
+    return res.status(500).json({ error: "internal_error" });
+  }
+});
+
+essenceRouter.put("/profile/:id", async (req, res) => {
+  try {
+    const essenceId = String(req.params.id ?? "").trim();
+    if (!essenceId) {
+      return res.status(400).json({ error: "bad_request", message: "essence id required" });
+    }
+    const stateless = req.query?.stateless === "1";
+    const body = (req.body ?? {}) as EssenceProfileUpdate;
+    if (stateless) {
+      const now = new Date().toISOString();
+      const virtual: EssenceProfile = {
+        essence_id: essenceId,
+        created_at: now,
+        updated_at: now,
+        ...body,
+      };
+      return res.json({ profile: virtual, stateless: true });
+    }
+    const profile = await upsertEssenceProfile(essenceId, body);
+    return res.json({ profile, stateless: false });
+  } catch (err) {
+    if (err instanceof ProfileRateLimitError) {
+      return res.status(429).json({ error: "profile_rate_limited" });
+    }
+    try {
+      console.error("[essence] profile update failed", err);
+    } catch {}
+    return res.status(500).json({ error: "internal_error" });
+  }
+});
+
+essenceRouter.delete("/profile/:id", async (req, res) => {
+  try {
+    const essenceId = String(req.params.id ?? "").trim();
+    if (!essenceId) {
+      return res.status(400).json({ error: "bad_request", message: "essence id required" });
+    }
+    const stateless = req.query?.stateless === "1";
+    if (!stateless) {
+      await deleteEssenceProfile(essenceId);
+    }
+    return res.json({ ok: true, stateless });
+  } catch (err) {
+    try {
+      console.error("[essence] profile delete failed", err);
+    } catch {}
+    return res.status(500).json({ error: "internal_error" });
+  }
 });
 
 essenceRouter.get("/themes", async (req, res) => {
@@ -391,6 +464,35 @@ essenceRouter.post("/mix/create", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(400).json({ error: "mix_failed", message });
+  }
+});
+
+const SynthProposalsSchema = z.object({
+  hours: z.coerce.number().int().positive().max(72).optional(),
+  minScore: z.coerce.number().min(0).max(1).optional(),
+  limit: z.coerce.number().int().min(1).max(10).optional(),
+  dryRun: z.coerce.boolean().optional(),
+});
+
+essenceRouter.post("/proposals/synth", async (req, res) => {
+  const parsed = SynthProposalsSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_request", details: parsed.error.issues });
+  }
+  const actorId = resolveActorId(req) ?? "persona:unknown";
+  try {
+    const results = await runNightlyProposalSynthesis({
+      ownerId: actorId,
+      hours: parsed.data.hours,
+      minScore: parsed.data.minScore,
+      limit: parsed.data.limit,
+      persist: parsed.data.dryRun ? false : true,
+    });
+    const proposals = results.map((entry) => entry.proposal).filter(Boolean);
+    res.json({ proposals, synthesized: results.length, dryRun: parsed.data.dryRun ?? false });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "proposal_synth_failed", message });
   }
 });
 

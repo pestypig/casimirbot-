@@ -9,11 +9,14 @@ import { getResonanceWatcherState } from "@/lib/agi/resonanceVersion";
 export type PanelId =
   | "live-energy"
   | "helix-core"
+  | "helix-phoenix"
   | "endpoints"
   | "taskbar"
   | "docs-viewer"
   | "casimir-tiles"
   | "resonance-orchestra"
+  | "stress-map"
+  | "essence-prompt-panel"
   | HelixPanelRef["id"];
 
 export type PanelTelemetryWindowSnapshot = {
@@ -135,6 +138,30 @@ export const panelRegistry: PanelDefinition[] = [
     defaultPosition: { x: 200, y: 160 }
   },
   {
+    id: "stress-map",
+    title: "Stress Map (CSI)",
+    loader: load(() => import("@/components/desktop/StressMapPanel")),
+    defaultSize: { w: 360, h: 520 },
+    defaultPosition: { x: 160, y: 120 },
+    endpoints: ["GET /api/helix/qi/diagnostics"],
+  },
+  {
+    id: "star-coherence",
+    title: "Star Coherence Governor",
+    loader: load(() => import("@/components/agi/StarCoherencePanel"), "StarCoherencePanel"),
+    defaultSize: { w: 520, h: 520 },
+    defaultPosition: { x: 240, y: 180 },
+    endpoints: ["GET /api/agi/star/telemetry"]
+  },
+  {
+    id: "collapse-monitor",
+    title: "Collapse Watch",
+    loader: load(() => import("@/components/agi/CollapseWatcherPanel"), "CollapseWatcherPanel"),
+    defaultSize: { w: 480, h: 440 },
+    defaultPosition: { x: 260, y: 200 },
+    endpoints: ["GET /api/agi/star/telemetry"]
+  },
+  {
     id: "helix-luma",
     title: "Luma Lab",
     loader: load(() => import("@/pages/luma")),
@@ -168,6 +195,13 @@ export const panelRegistry: PanelDefinition[] = [
     loader: load(() => import("@/components/agi/EssenceProposalsPanel"), "EssenceProposalsPanel"),
     defaultSize: { w: 1100, h: 720 },
     defaultPosition: { x: 320, y: 260 }
+  },
+  {
+    id: "essence-prompt-panel",
+    title: "Essence Prompt Variations",
+    loader: load(() => import("@/components/agi/EssencePromptPanel"), "EssencePromptPanel"),
+    defaultSize: { w: 1100, h: 720 },
+    defaultPosition: { x: 360, y: 280 }
   },
   {
     id: "potato-threshold-lab",

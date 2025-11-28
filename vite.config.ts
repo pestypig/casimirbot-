@@ -19,6 +19,9 @@ const treeSitterSources = [
 const WEB_TREE_SITTER_ENTRY = "node_modules/web-tree-sitter/tree-sitter.js";
 const CODE_SNAPSHOT_ENTRY = "client/src/lib/code-index/snapshot.ts";
 const VIRTUAL_NODE_SHIM_PREFIX = "\0node-shim:";
+const defaultApiPort = process.env.PORT ?? "5173";
+const apiProxyTarget =
+  process.env.API_PROXY_TARGET ?? `http://localhost:${defaultApiPort}`;
 
 const toPosix = (value: string) => value.split(path.sep).join(path.posix.sep);
 
@@ -137,6 +140,27 @@ export default defineConfig({
         path.resolve(import.meta.dirname, "docs"),
       ],
       deny: ["**/.*"],
+    },
+    proxy: {
+      // Forward API calls to the backend; defaults to localhost:PORT (5173 unless overridden).
+      "/api": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
+      "/ws": {
+        target: apiProxyTarget,
+        ws: true,
+        changeOrigin: true,
+      },
+      // Asset/doc helpers used by Helix panels during client-only dev.
+      "/attached_assets": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
+      "/docs": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
     },
   },
 });

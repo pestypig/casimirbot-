@@ -4,8 +4,10 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "dev:agi": "cross-env ENABLE_ESSENCE=1 ENABLE_AGI=1 vite-node server/index.ts",
+    "dev": "cross-env NODE_ENV=development SKIP_VITE_MIDDLEWARE=0 tsx server/index.ts",
+    "dev:agi": "cross-env ENABLE_ESSENCE=1 ENABLE_AGI=1 SKIP_VITE_MIDDLEWARE=0 vite-node server/index.ts",
+    "dev:agi:5173": "cross-env PORT=5173 API_PROXY_TARGET=http://localhost:5173 ENABLE_ESSENCE=1 ENABLE_AGI=1 SKIP_VITE_MIDDLEWARE=0 vite-node server/index.ts",
+    "dev:static": "cross-env NODE_ENV=development SKIP_VITE_MIDDLEWARE=1 tsx server/index.ts",
     "bench": "tsx scripts/bench.ts",
     "eval:smoke": "tsx scripts/eval-smoke.ts",
     "specialists:mini": "tsx scripts/specialists-mini-loop.ts",

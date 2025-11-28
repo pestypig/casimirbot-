@@ -1,0 +1,250 @@
+    const fallbackPatch = resonanceBundle?.candidates.find((patch) => patch.id === primaryPatchId);
+    if (fallbackPatch) {
+      const filteredFallback =
+        warpIntent && fallbackPatch
+          ? {
+              ...fallbackPatch,
+              nodes: (fallbackPatch.nodes ?? []).filter(
+                (node) => isWarpRelevantPath(node.filePath) || isWarpRelevantPath(node.symbol ?? ""),
+              ),
+              knowledge: fallbackPatch.knowledge
+                ? {
+                    ...fallbackPatch.knowledge,
+                    files: (fallbackPatch.knowledge.files ?? []).filter((file) =>
+                      isWarpRelevantPath(file.path ?? file.name ?? ""),
+                    ),
+                  }
+                : fallbackPatch.knowledge,
+            }
+          : fallbackPatch;
+      if (filteredFallback && ((filteredFallback.nodes ?? []).length > 0 || (filteredFallback.knowledge?.files?.length ?? 0) > 0)) {
+        knowledgeContext = mergeKnowledgeBundles(
+          baseKnowledgeContext,
+          filteredFallback.knowledge ? [filteredFallback.knowledge] : [],
+        );
+      } else {
+        knowledgeContext = baseKnowledgeContext;
+      }
+      const primaryIdForPrompt = filteredFallback ? primaryPatchId : null;
+      plannerPrompt = renderChatBPlannerPrompt({
+        goal,
+        personaId,
+        manifest,
+        searchQuery: query,
+        topK,
+        summaryFocus: focus,
+        knowledgeContext,
+        resonanceBundle,
+        resonanceSelection,
+        primaryPatchId: primaryIdForPrompt,
+        telemetryBundle,
+        knowledgeHints,
+      });
+    }
+  }
+  if (debugSources) {
+    const groundingHolder: { groundingReport?: GroundingReport } = { groundingReport };
+    recordResonancePatchSources(groundingHolder, {
+      bundle: resonanceBundle,
+      selection: resonanceSelection,
+      filterNode:
+        intent.wantsWarp || intent.wantsPhysics
+          ? (node) => isWarpRelevantPath(node.filePath) || isWarpRelevantPath(node.symbol ?? "")
+          : undefined,
+    });
+    recordKnowledgeSources(groundingHolder, knowledgeContext);
+    groundingReport = groundingHolder.groundingReport;
+  }
+  const executorStepsAll = compilePlan(nodes);
+  const maxTurns = routine?.knobs?.max_turns;
+  const executorSteps =
+    typeof maxTurns === "number" && Number.isFinite(maxTurns)
+      ? executorStepsAll.slice(0, Math.max(1, Math.min(executorStepsAll.length, Math.floor(maxTurns))))
+      : executorStepsAll;
+  const traceId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const persistedKnowledgeContext = sanitizeKnowledgeContextForTrace(knowledgeContext) ?? [];
+  const knowledgeHash = hashKnowledgeContext(persistedKnowledgeContext);
+  const taskTrace: TTaskTrace = {
+    id: traceId,
+    persona_id: personaId,
+    created_at: createdAt,
+    goal,
+    plan_json: nodes,
+    steps: [],
+    approvals: [],
+    knowledgeContext: persistedKnowledgeContext,
+    plan_manifest: manifest,
+    resonance_bundle: resonanceBundle,
+    resonance_selection: resonanceSelection,
+    telemetry_bundle: telemetryBundle,
+    telemetry_summary: telemetrySummary,
+    lattice_version: latticeVersion != null ? String(latticeVersion) : null,
+    planner_prompt: plannerPrompt,
+    routine_json: routine,
+    debate_id: null,
+    reasoning_strategy: strategy,
+    strategy_notes: strategyNotes,
+    grounding_report: groundingReport,
+    debug_sources: debugSources,
+    collapse_strategy: collapseStrategy,
+    collapse_trace: collapseTrace,
+  };
+
+  const record: PlanRecord = {
+    traceId,
+    createdAt,
+    goal,
+    personaId,
+    planDsl,
+    nodes,
+    executorSteps,
+    manifest,
+    plannerPrompt,
+    taskTrace,
+    knowledgeContext,
+    knowledgeHash,
+    knowledgeHints,
+    desktopId,
+    telemetry: telemetryBundle ?? null,
+    telemetrySummary: telemetrySummary ?? null,
+    resonance: resonanceBundle,
+    resonanceSelection,
+    latticeVersion,
+    debateId: null,
+    strategy,
+    strategyNotes,
+    groundingReport,
+    debugSources,
+    promptSpec: promptSpec ?? undefined,
+    collapseTrace: collapseTrace ?? undefined,
+    collapseStrategy,
+    callSpec: callSpec ?? undefined,
+  };
+
+  registerInMemoryTrace(taskTrace);
+  planRecords.set(traceId, record);
+  try {
+    await withTimeout(saveTaskTrace(taskTrace), SAVE_TASK_TRACE_TIMEOUT_MS, "save_task_trace");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[agi.plan] task trace persistence skipped: ${message}`);
+  }
+
+  res.json({
+    traceId,
+    goal,
+    personaId,
+    created_at: createdAt,
+    planner_prompt: plannerPrompt,
+    plan_dsl: planDsl,
+    plan_steps: nodes,
+    tool_manifest: manifest,
+    executor_steps: executorSteps,
+    strategy,
+    strategy_notes: strategyNotes,
+    task_trace: taskTrace,
+    collapse_trace: collapseTrace ?? taskTrace.collapse_trace ?? null,
+    collapse_strategy: collapseStrategy,
+    call_spec: callSpec ?? null,
+    knowledge_context: knowledgeContext,
+    knowledge_hash: knowledgeHash,
+    telemetry_bundle: telemetryBundle,
+    telemetry_summary: telemetrySummary,
+    lattice_version: latticeVersion,
+    resonance_bundle: resonanceBundle,
+    resonance_selection: resonanceSelection,
+    debate_id: record.debateId ?? null,
+  });
+});
+
+// Lightweight manifest endpoint for quick adapter visibility checks
+planRouter.get("/tools/manifest", (_req, res) => {
+  try {
+    const manifest = listTools();
+    res.json(manifest);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "manifest_error", message });
+  }
+});
+
+planRouter.post("/execute", async (req, res) => {
+  await ensureDefaultTools();
+  await ensureSpecialistsRegistered();
+  const parsed = ExecuteRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const debugSources = parseDebugSourcesFlag(parsed.data.debugSources, req.query.debug_sources ?? req.query.debugSources);
+  const { traceId } = parsed.data;
+  let record: PlanRecord | null = planRecords.get(traceId) ?? null;
+  if (!record) {
+    record = await rehydratePlanRecord(traceId);
+    if (record) {
+      planRecords.set(traceId, record);
+    }
+  }
+  if (!record) {
+    return res.status(404).json({ error: "trace_not_found" });
+  }
+  if (!personaPolicy.canAccess(req.auth, record.personaId, "plan")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+
+  const runtimeKnowledgeHash = hashKnowledgeContext(sanitizeKnowledgeContextForTrace(record.knowledgeContext));
+  if (record.knowledgeHash && runtimeKnowledgeHash && record.knowledgeHash !== runtimeKnowledgeHash) {
+    return res.status(409).json({
+      error: "knowledge_context_mismatch",
+      expected: record.knowledgeHash,
+      got: runtimeKnowledgeHash,
+    });
+  }
+
+  const effectiveDebugSources = Boolean(debugSources || record.debugSources);
+  record.debugSources = effectiveDebugSources;
+  const groundingHolder: { groundingReport?: GroundingReport } = {
+    groundingReport: record.groundingReport ?? record.taskTrace.grounding_report ?? undefined,
+  };
+  if (effectiveDebugSources) {
+    ensurePlannerGroundingReport(groundingHolder);
+  }
+
+  const start = Date.now();
+  const runtimeTelemetry = record.telemetry ?? null;
+  const runtimeTelemetrySummary = record.telemetrySummary ?? null;
+  if (runtimeTelemetrySummary === null) {
+    return res.status(409).json({
+      error: "telemetry_snapshot_missing",
+      message: "Execute requires a sealed telemetry snapshot from plan.",
+    });
+  }
+  const executionRuntime: ExecutionRuntime = {
+    goal: record.goal,
+    personaId: record.personaId,
+    sessionId: traceId,
+    taskTrace: record.taskTrace,
+    knowledgeContext: record.knowledgeContext,
+    telemetrySummary: runtimeTelemetrySummary,
+    resonanceBundle: record.resonance,
+    resonanceSelection: record.resonanceSelection,
+    knowledgeHints: record.knowledgeHints,
+    plannerPrompt: record.plannerPrompt,
+    debateId: record.debateId ?? record.taskTrace.debate_id ?? null,
+    debugSources: effectiveDebugSources,
+    groundingReport: groundingHolder.groundingReport,
+  };
+  const steps = await executeCompiledPlan(record.executorSteps, executionRuntime);
+  record.groundingReport = executionRuntime.groundingReport ?? groundingHolder.groundingReport;
+  record.taskTrace.grounding_report = executionRuntime.groundingReport ?? record.taskTrace.grounding_report;
+  record.taskTrace.debug_sources = executionRuntime.debugSources ?? record.taskTrace.debug_sources;
+  record.telemetry = runtimeTelemetry;
+  record.telemetrySummary = runtimeTelemetrySummary;
+  const duration = Date.now() - start;
+  let ok = steps.length > 0 && steps.every((step) => step.ok);
+  // Enforce routine final_output schema if present
+  const routine = (record.taskTrace as any).routine_json as TRoutine | undefined;
+  const verdict = validateOutputSchema(steps[steps.length - 1]?.output, routine?.knobs?.final_output);
+  if (!verdict.pass) {
+    ok = false;
+    steps.push({

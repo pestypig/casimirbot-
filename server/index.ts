@@ -262,21 +262,24 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    if (process.env.SKIP_VITE_MIDDLEWARE === '1') {
-      log('dev: skipping Vite middlewares (SKIP_VITE_MIDDLEWARE=1)');
-    } else {
-      await setupVite(app, server);
-    }
+  const skipVite = process.env.SKIP_VITE_MIDDLEWARE === '1';
+  if (app.get("env") === "development" && !skipVite) {
+    log('dev: Vite middleware enabled (hot reload via Express)');
+    await setupVite(app, server);
   } else {
+    if (skipVite) {
+      log('dev: skipping Vite middlewares (SKIP_VITE_MIDDLEWARE=1); serving prebuilt client instead');
+    } else if (app.get("env") !== "development") {
+      log(`dev: NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}; serving prebuilt client instead of Vite HMR`);
+    }
     serveStatic(app);
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
+  // Other ports are firewalled. Default to 5173 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
+  const port = parseInt(process.env.PORT || '5173', 10);
   const isWin = process.platform === 'win32';
   const listenOpts: any = { port, host: '0.0.0.0' };
   if (!isWin) listenOpts.reusePort = true;

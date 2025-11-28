@@ -6,6 +6,7 @@ import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
 import { useFlightDirectorStore } from "@/store/useFlightDirectorStore";
 import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
+import { useDesktopStore } from "@/store/useDesktopStore";
 import { shallow } from "zustand/shallow";
 import { VolumeModeToggle, type VolumeViz } from "@/components/VolumeModeToggle";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
@@ -14,6 +15,7 @@ import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
 import { smoothSectorWeights } from "@/lib/sector-weights";
 import { TheoryBadge } from "./common/TheoryBadge";
 import { normalizeCurvaturePalette, type CurvaturePalette } from "@/lib/curvature-directive";
+import StressOverlay from "@/components/HullViewer/StressOverlay";
 /**
  * TheoryRefs:
  *  - vanden-broeck-1999: UI exposes gamma_VdB with provenance
@@ -733,8 +735,11 @@ export default function AlcubierrePanel({
   const [vizIntentEnabled, setVizIntentEnabled] = useState(true);
   const [vizRise, setVizRise] = useState(0);
   const [vizPlanar, setVizPlanar] = useState(0);
-  const externalVizRise = vizIntent?.rise;
-  const externalVizPlanar = vizIntent?.planar;
+const externalVizRise = vizIntent?.rise;
+const externalVizPlanar = vizIntent?.planar;
+const isStressWindowOpen = useDesktopStore((s) => Boolean(s.windows["stress-map"]?.isOpen));
+const openDesktopPanel = useDesktopStore((s) => s.open);
+const closeDesktopPanel = useDesktopStore((s) => s.close);
 
   useEffect(() => {
     if (typeof externalVizRise === "number") {
@@ -748,6 +753,7 @@ export default function AlcubierrePanel({
       );
     }
   }, [externalVizRise, externalVizPlanar]);
+
 const [hullMode, setHullMode] = useState<Hull3DRendererMode>("instant");
 const [hullBlend, setHullBlend] = useState(0);
 const [hullVolumeVizLive, setHullVolumeVizLive] = useState<Hull3DVolumeViz>("theta_drive");
@@ -3934,6 +3940,30 @@ const res = 256;
                 </div>
                 <p className="text-[0.6rem] text-slate-400">
                   Hue encodes bow/stern sign, saturation tracks |?ß| against comfort, and value reflects ß vs target. White contours mark 0.05 g steps; a red band flags 0.4 g lateral gradients.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 rounded bg-slate-900/60 px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[0.7rem] font-semibold text-slate-200">Stress map (CSI)</span>
+                  <label className="flex items-center gap-2 text-[0.65rem] uppercase tracking-wide text-slate-400">
+                    <span>Overlay</span>
+                    <input
+                      type="checkbox"
+                      checked={isStressWindowOpen}
+                      onChange={(event) => {
+                        const next = event.target.checked;
+                        if (next) {
+                          openDesktopPanel("stress-map");
+                        } else {
+                          closeDesktopPanel("stress-map");
+                        }
+                      }}
+                      className="accent-emerald-500"
+                    />
+                  </label>
+                </div>
+                <p className="text-[0.6rem] text-slate-400">
+                  Uses /api/helix/qi/diagnostics to blend grad_phi, Var[rho_C], and pi_FR with live zeta/FR duty. Toggle on to display the CSI heat overlay on the hull view.
                 </p>
               </div>
               <div className="flex items-center gap-2">

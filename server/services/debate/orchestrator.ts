@@ -1,10 +1,33 @@
 import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
-import { DebateConfig, type TDebateConfig, type TDebateOutcome, type TDebateTurn, type TDebateContext } from "@shared/essence-debate";
+import {
+  DebateConfig,
+  type TDebateConfig,
+  type TDebateOutcome,
+  type TDebateTurn,
+  type TDebateContext,
+  type TDebateRoundMetrics,
+} from "@shared/essence-debate";
 import { EssenceEnvelope } from "@shared/essence-schema";
+import { type TTelemetrySnapshot } from "@shared/star-telemetry";
 import { metrics } from "../../metrics";
 import { putEnvelope } from "../essence/store";
 import { getTool } from "../../skills";
+import { appendToolLog } from "../observability/tool-log-store";
+import {
+  isStarTelemetryEnabled,
+  sendStarDebateEvent,
+  type CoherenceAction,
+  type StarSyncResult,
+} from "./star-bridge";
+import {
+  governFromTelemetry,
+  type CoherenceGovernorDecision,
+} from "../../../modules/policies/coherence-governor";
+import {
+  persistDebateTelemetrySnapshot,
+  type DebateTelemetrySnapshot as StoreDebateTelemetrySnapshot,
+} from "./telemetry-store";
 
 type DebateStatus = "pending" | "running" | "completed" | "timeout" | "aborted";
 
@@ -33,6 +56,18 @@ type DebateRecord = {
   running: boolean;
   reason?: string;
   context?: TDebateContext;
+  metricsHistory: TDebateRoundMetrics[];
+  lastMetrics?: TDebateRoundMetrics;
+  lastScore: number;
+  stagnationStreak: number;
+  noveltyStreak: number;
+  toolCallsUsed: number;
+  noveltyTokens: Set<string>;
+  starEnabled: boolean;
+  lastTelemetry?: TTelemetrySnapshot;
+  lastCoherenceAction?: CoherenceAction;
+  lastCollapseConfidence?: number;
+  lastGovernorDecision?: CoherenceGovernorDecision;
 };
 
 export type DebateStreamEvent =
@@ -49,6 +84,7 @@ export type DebateStreamEvent =
       debateId: string;
       status: DebateStatus;
       scoreboard: DebateScoreboard;
+      metrics?: TDebateRoundMetrics;
     }
   | {
       type: "outcome";
@@ -56,6 +92,7 @@ export type DebateStreamEvent =
       debateId: string;
       outcome: TDebateOutcome;
       scoreboard: DebateScoreboard;
+      metrics?: TDebateRoundMetrics;
     };
 
 export type DebateSnapshot = {
@@ -66,6 +103,11 @@ export type DebateSnapshot = {
   config: {
     max_rounds: number;
     max_wall_ms: number;
+    max_tool_calls: number;
+    satisfaction_threshold: number;
+    min_improvement: number;
+    stagnation_rounds: number;
+    novelty_epsilon: number;
     verifiers: string[];
   };
   created_at: string;
@@ -88,17 +130,20 @@ type DebateEventPayload =
       type: "status";
       status: DebateStatus;
       scoreboard: DebateScoreboard;
+      metrics?: TDebateRoundMetrics;
     }
   | {
       type: "outcome";
       outcome: TDebateOutcome;
       scoreboard: DebateScoreboard;
+      metrics?: TDebateRoundMetrics;
     };
 
 const debates = new Map<string, DebateRecord>();
 const eventBuffers = new Map<string, DebateStreamEvent[]>();
 const listeners = new Map<string, Set<EventListener>>();
 const MAX_EVENT_BUFFER = 500;
+const USE_STAR_COLLAPSE = process.env.DEBATE_STAR_COLLAPSE === "1";
 
 export async function startDebate(rawConfig: TDebateConfig): Promise<{ debateId: string }> {
   const parsed = DebateConfig.parse(rawConfig);
@@ -120,6 +165,18 @@ export async function startDebate(rawConfig: TDebateConfig): Promise<{ debateId:
     seq: 0,
     running: false,
     context: parsed.context,
+    metricsHistory: [],
+    lastMetrics: undefined,
+    lastScore: 0,
+    stagnationStreak: 0,
+    noveltyStreak: 0,
+    toolCallsUsed: 0,
+    noveltyTokens: new Set<string>(),
+    starEnabled: isStarTelemetryEnabled(),
+    lastTelemetry: undefined,
+    lastCoherenceAction: undefined,
+    lastCollapseConfidence: undefined,
+    lastGovernorDecision: undefined,
   };
   debates.set(debateId, record);
   appendStatusEvent(record);
@@ -140,6 +197,11 @@ export function getDebateSnapshot(debateId: string): DebateSnapshot | null {
     config: {
       max_rounds: record.config.max_rounds,
       max_wall_ms: record.config.max_wall_ms,
+      max_tool_calls: record.config.max_tool_calls,
+      satisfaction_threshold: record.config.satisfaction_threshold,
+      min_improvement: record.config.min_improvement,
+      stagnation_rounds: record.config.stagnation_rounds,
+      novelty_epsilon: record.config.novelty_epsilon,
       verifiers: [...(record.config.verifiers ?? [])],
     },
     created_at: record.createdAt,
@@ -148,6 +210,25 @@ export function getDebateSnapshot(debateId: string): DebateSnapshot | null {
     scoreboard: snapshotScore(record),
     outcome: record.outcome ?? null,
     context: record.context,
+  };
+}
+
+export type DebateTelemetrySnapshot = StoreDebateTelemetrySnapshot;
+
+export function getDebateTelemetry(debateId: string): DebateTelemetrySnapshot | null {
+  const record = debates.get(debateId);
+  if (!record) {
+    return null;
+  }
+  return {
+    debateId: record.id,
+    sessionId: record.id,
+    sessionType: "debate",
+    telemetry: record.lastTelemetry,
+    action: record.lastCoherenceAction,
+    confidence: record.lastCollapseConfidence,
+    updatedAt: record.updatedAt,
+    governor: record.lastGovernorDecision,
   };
 }
 
@@ -251,37 +332,72 @@ async function advanceDebate(debateId: string): Promise<void> {
   try {
     while (!isTerminal(record.status)) {
       if (shouldTimeout(record)) {
-        finalizeDebate(record, "timeout", { verdict: "Debate exceeded wall-clock budget." });
+        finalizeDebate(record, "timeout", { verdict: "Debate exceeded wall-clock budget.", stopReason: "timeout" });
         break;
       }
       if (completedRounds(record) >= record.config.max_rounds) {
-        finalizeDebate(record, "completed", { verdict: "Max rounds reached." });
+        finalizeDebate(record, "completed", { verdict: "Max rounds reached.", stopReason: "max_rounds" });
+        break;
+      }
+      if (record.toolCallsUsed >= record.config.max_tool_calls) {
+        finalizeDebate(record, "completed", { verdict: "Tool call budget exhausted.", stopReason: "max_tool_calls" });
         break;
       }
       const round = completedRounds(record) + 1;
       const proponentTurn = await synthesizeTurn(record, "proponent", round);
       await persistTurn(record, proponentTurn);
       metrics.recordDebateRound("proponent");
+      await maybeSyncStarTelemetry(record, proponentTurn);
+      const starStopAfterProponent = maybeStarCollapseStop(record);
+      if (starStopAfterProponent) {
+        finalizeDebate(record, starStopAfterProponent.status, {
+          verdict: starStopAfterProponent.verdict,
+          stopReason: starStopAfterProponent.reason,
+          metrics: record.lastMetrics,
+        });
+        break;
+      }
       await maybeYield();
 
       if (shouldTimeout(record)) {
-        finalizeDebate(record, "timeout", { verdict: "Debate exceeded wall-clock budget." });
+        finalizeDebate(record, "timeout", { verdict: "Debate exceeded wall-clock budget.", stopReason: "timeout" });
         break;
       }
 
       const skepticTurn = await synthesizeTurn(record, "skeptic", round);
       await persistTurn(record, skepticTurn);
       metrics.recordDebateRound("skeptic");
+      await maybeSyncStarTelemetry(record, skepticTurn);
+      const starStopAfterSkeptic = maybeStarCollapseStop(record);
+      if (starStopAfterSkeptic) {
+        finalizeDebate(record, starStopAfterSkeptic.status, {
+          verdict: starStopAfterSkeptic.verdict,
+          stopReason: starStopAfterSkeptic.reason,
+          metrics: record.lastMetrics,
+        });
+        break;
+      }
 
       const verifierResults = await runVerifierSweep(record, round);
-      const refereeTurn = await synthesizeRefereeTurn(record, round, verifierResults);
+      updateScoreboard(record, verifierResults);
+      const metricsState = computeRoundMetrics(record, round, verifierResults);
+      record.lastMetrics = metricsState;
+      record.metricsHistory.push(metricsState);
+      record.lastScore = metricsState.score;
+      const refereeTurn = await synthesizeRefereeTurn(record, round, verifierResults, metricsState);
       await persistTurn(record, refereeTurn);
       metrics.recordDebateRound("referee");
 
-      updateScoreboard(record, verifierResults);
-      appendStatusEvent(record);
+      appendStatusEvent(record, metricsState);
+      await maybeSyncStarTelemetry(record, refereeTurn, metricsState);
 
-      if (checkStopRules(record, round, verifierResults)) {
+      const stopDecision = evaluateStopRules(record, round, verifierResults, metricsState);
+      if (stopDecision) {
+        finalizeDebate(record, stopDecision.status, {
+          verdict: stopDecision.verdict,
+          stopReason: stopDecision.reason,
+          metrics: metricsState,
+        });
         break;
       }
       await maybeYield();
@@ -336,9 +452,10 @@ async function synthesizeRefereeTurn(
   record: DebateRecord,
   round: number,
   verifierResults: StoredDebateTurn["verifier_results"],
+  metricsState?: TDebateRoundMetrics,
 ): Promise<StoredDebateTurn> {
   const createdAt = new Date().toISOString();
-  const summary = renderRefereeSummary(record, round, verifierResults);
+  const summary = renderRefereeSummary(record, round, verifierResults, metricsState);
   const citations = collectCitations(record);
   const turn: StoredDebateTurn = {
     id: randomUUID(),
@@ -365,13 +482,15 @@ async function persistTurn(record: DebateRecord, turn: StoredDebateTurn): Promis
     turn: { ...turn },
     scoreboard: snapshotScore(record),
   });
+  logTurnAsToolEvent(record, turn);
 }
 
-function appendStatusEvent(record: DebateRecord): void {
+function appendStatusEvent(record: DebateRecord, metricsState?: TDebateRoundMetrics): void {
   appendEvent(record, {
     type: "status",
     status: record.status,
     scoreboard: snapshotScore(record),
+    metrics: metricsState,
   });
 }
 
@@ -429,6 +548,7 @@ function renderRefereeSummary(
   record: DebateRecord,
   round: number,
   verifierResults: StoredDebateTurn["verifier_results"],
+  metricsState?: TDebateRoundMetrics,
 ): string {
   const ok = verifierResults.filter((entry) => entry.ok).length;
   const fail = verifierResults.length - ok;
@@ -436,12 +556,42 @@ function renderRefereeSummary(
     verifierResults.length === 0
       ? "No verifiers configured; referee scores qualitative momentum."
       : `Verifiers confirm ${ok} claims and flag ${fail}.`;
-  return `Referee round ${round}: ${flavor} Current score P:${record.scoreboard.proponent} vs S:${record.scoreboard.skeptic}.`;
+  const scoreLine = metricsState
+    ? ` Score ${(metricsState.score * 100).toFixed(1)}% (Δ ${(metricsState.improvement * 100).toFixed(1)}%). Novelty ${(metricsState.novelty_gain * 100).toFixed(0)}%.`
+    : "";
+  return `Referee round ${round}: ${flavor} Current score P:${record.scoreboard.proponent} vs S:${record.scoreboard.skeptic}.${scoreLine}`;
 }
 
 function collectCitations(record: DebateRecord): string[] {
   const recent = record.turns.slice(-4).map((turn) => turn.essence_id).filter(Boolean) as string[];
   return Array.from(new Set(recent));
+}
+
+function hashText(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex").slice(0, 16);
+}
+
+function logTurnAsToolEvent(record: DebateRecord, turn: StoredDebateTurn): void {
+  try {
+    const paramsHash = hashText(`${record.id}:${turn.id}:${turn.role}:${turn.round}`);
+    const promptHash = hashText(turn.text);
+    appendToolLog({
+      tool: `debate.turn.${turn.role}`,
+      version: "orchestrator",
+      paramsHash,
+      promptHash,
+      durationMs: 0,
+      sessionId: record.personaId,
+      traceId: record.id,
+      stepId: `${turn.round}`,
+      ok: true,
+      text: turn.text.slice(0, 200),
+      essenceId: turn.essence_id,
+      debateId: record.id,
+    });
+  } catch (error) {
+    console.warn("[debate] failed to append tool log for turn", error);
+  }
 }
 
 async function persistEssenceForTurn(record: DebateRecord, turn: StoredDebateTurn): Promise<string | undefined> {
@@ -556,8 +706,21 @@ async function runVerifierSweep(record: DebateRecord, round: number): Promise<Ve
   }
   const ctx = buildVerifierContext(record, round);
   const results: VerifierResult[] = [];
+  const governorHints = record.lastGovernorDecision?.toolBudgetHints;
+  const maxToolsPerRound = governorHints?.maxToolsPerRound;
+  const toolCallsAtStart = record.toolCallsUsed;
 
   for (const name of verifiers) {
+    if (record.toolCallsUsed >= record.config.max_tool_calls) {
+      break;
+    }
+    if (typeof maxToolsPerRound === "number") {
+      const usedThisRound = record.toolCallsUsed - toolCallsAtStart;
+      if (usedThisRound >= maxToolsPerRound) {
+        break;
+      }
+    }
+    record.toolCallsUsed += 1;
     let ok = true;
     let reason = "verified";
     try {
@@ -657,52 +820,360 @@ function updateScoreboard(record: DebateRecord, verifierResults: VerifierResult[
   }
 }
 
-function checkStopRules(record: DebateRecord, round: number, verifierResults: VerifierResult[]): boolean {
-  if (round >= record.config.max_rounds) {
-    finalizeDebate(record, "completed", { verdict: "Max rounds reached." });
-    return true;
+const clamp01Metric = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+};
+
+const clampRange = (value: number, min: number, max: number): number => {
+  if (!Number.isFinite(value)) return min;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+};
+
+const tokenize = (text: string): Set<string> => {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z0-9]+/gi)
+      .map((part) => part.trim())
+      .filter((part) => part.length >= 3 && part.length <= 32)
+      .slice(0, 200),
+  );
+};
+
+function computeStability(record: DebateRecord): number {
+  const turns = record.turns.filter((turn) => turn.role !== "referee");
+  const lastTwo = turns.slice(-2);
+  if (lastTwo.length < 2) {
+    return 0.5;
   }
+  const [a, b] = lastTwo;
+  const tokensA = tokenize(a.text);
+  const tokensB = tokenize(b.text);
+  const union = new Set([...tokensA, ...tokensB]);
+  if (union.size === 0) {
+    return 0.5;
+  }
+  const intersection = [...tokensA].filter((token) => tokensB.has(token));
+  return clamp01Metric(intersection.length / union.size);
+}
+
+function computeNoveltyGain(record: DebateRecord, round: number): number {
+  const roundTurns = record.turns.filter((turn) => turn.round === round && turn.role !== "referee");
+  if (roundTurns.length === 0) {
+    return 0;
+  }
+  const combined = tokenize(roundTurns.map((turn) => turn.text).join(" "));
+  const previous = record.noveltyTokens ?? new Set<string>();
+  const union = new Set([...previous, ...combined]);
+  const newTokens = [...combined].filter((token) => !previous.has(token));
+  const novelty = union.size === 0 ? 0 : clamp01Metric(newTokens.length / union.size);
+  record.noveltyTokens = union;
+  return novelty;
+}
+
+function computeRoundMetrics(
+  record: DebateRecord,
+  round: number,
+  verifierResults: VerifierResult[],
+): TDebateRoundMetrics {
+  const okCount = verifierResults.filter((entry) => entry.ok).length;
+  const failCount = verifierResults.length - okCount;
+  const verifierPass = verifierResults.length === 0 ? 0.5 : clamp01Metric(okCount / verifierResults.length);
+  const coverage = clamp01Metric(round / Math.max(record.config.max_rounds, 1));
+  const stability = computeStability(record);
+  const noveltyGain = computeNoveltyGain(record, round);
+  const score = clamp01Metric(0.5 * verifierPass + 0.3 * coverage + 0.2 * stability);
+  const improvement = score - (record.lastScore ?? 0);
+  const timeUsed = Date.now() - record.startedAt;
+  const timeLeft = Math.max(0, record.config.max_wall_ms - timeUsed);
+  return {
+    round,
+    verifier_pass: verifierPass,
+    coverage,
+    stability,
+    novelty_gain: noveltyGain,
+    score,
+    improvement,
+    flags: Math.max(0, failCount),
+    tool_calls: record.toolCallsUsed,
+    time_used_ms: timeUsed,
+    time_left_ms: timeLeft,
+  };
+}
+
+type StopDecision = { status: DebateStatus; verdict: string; reason: string };
+
+async function maybeSyncStarTelemetry(
+  record: DebateRecord,
+  turn: StoredDebateTurn,
+  metricsState?: TDebateRoundMetrics,
+): Promise<void> {
+  if (!record.starEnabled) return;
+  try {
+    const environmentTags = buildEnvironmentTags(record);
+    const alignment = estimateEnvironmentAlignment(record, environmentTags);
+    const result = await sendStarDebateEvent({
+      debateId: record.id,
+      goal: record.goal,
+      role: turn.role,
+      round: turn.round,
+      text: turn.text,
+      score: metricsState?.score,
+      improvement: metricsState?.improvement,
+      verifierPass: metricsState?.verifier_pass,
+      toolCallsUsed: record.toolCallsUsed,
+      alignment,
+      environmentTags,
+      timestamp: Date.now(),
+    });
+    if (result) {
+      record.lastTelemetry = result.snapshot;
+      record.lastCoherenceAction = result.action;
+      record.lastCollapseConfidence = result.confidence;
+       const governorDecision = governFromTelemetry(result.snapshot);
+       record.lastGovernorDecision = governorDecision;
+      record.context = {
+        ...(record.context ?? {}),
+        coherence_snapshot: result.snapshot,
+        telemetry_summary: summarizeTelemetry(result, governorDecision),
+        coherence_governor: governorDecision,
+        environment_tags: environmentTags,
+        environment_alignment: alignment,
+      };
+    }
+  } catch (error) {
+    console.warn("[debate] star telemetry sync failed", error);
+  }
+}
+
+const buildEnvironmentTags = (record: DebateRecord): string[] => {
+  const tags = new Set<string>(["debate", `persona:${record.personaId}`]);
+  if (record.goal) {
+    tags.add(`goal:${record.goal.slice(0, 48)}`);
+  }
+  if (record.context?.attachments?.length) {
+    tags.add("attachments");
+  }
+  // Active repo / project hint (coarse, non‑PII)
+  tags.add("project:casimirbot");
+  // Current route / panel – if the planner or desktop has pushed hints into context,
+  // prefer those; otherwise fall back to neutral labels.
+  const route = (record.context as any)?.current_route as string | undefined;
+  if (route && typeof route === "string") {
+    tags.add(`route:${route.slice(0, 48)}`);
+  }
+  const panel = (record.context as any)?.current_panel as string | undefined;
+  if (panel && typeof panel === "string") {
+    tags.add(`panel:${panel.slice(0, 48)}`);
+  }
+  // Persona intent or high‑level task intent, if present.
+  const intent = (record.context as any)?.persona_intent as string | undefined;
+  if (intent && typeof intent === "string") {
+    tags.add(`intent:${intent.slice(0, 48)}`);
+  }
+  // File extensions that appear in attachments can give a coarse "active file types" view.
+  const urls = (record.context?.attachments ?? []).map((att) => att.url ?? "").filter(Boolean);
+  const exts = new Set<string>();
+  for (const url of urls) {
+    const match = /\.([a-zA-Z0-9]+)$/.exec(url.split(/[?#]/)[0] ?? "");
+    if (match && match[1]) {
+      exts.add(match[1].toLowerCase());
+    }
+  }
+  for (const ext of exts) {
+    tags.add(`file:${ext}`);
+  }
+  // Tool classes used in this debate – derived from verifier names and tool log events.
+  const toolClasses = inferToolClassesForDebate(record);
+  for (const cls of toolClasses) {
+    tags.add(`tool:${cls}`);
+  }
+  return Array.from(tags).slice(0, 16);
+};
+
+const estimateEnvironmentAlignment = (record: DebateRecord, envTags: string[]): number => {
+  const goalTokens = tokenize(record.goal ?? "");
+  const tagTokens = new Set(
+    envTags
+      .flatMap((tag) => tag.split(/[:/]+/))
+      .map((part) => part.toLowerCase().trim())
+      .filter((part) => part.length >= 3 && part.length <= 32),
+  );
+  if (!goalTokens.size || !tagTokens.size) {
+    return 0;
+  }
+  const overlap = [...goalTokens].filter((token) => tagTokens.has(token));
+  const union = new Set([...goalTokens, ...tagTokens]);
+  const score = overlap.length / union.size;
+  return clampRange(score * 2 - 0.5, -1, 1);
+};
+
+const inferToolClassesForDebate = (record: DebateRecord): Set<string> => {
+  const classes = new Set<string>();
+  const verifiers = record.config.verifiers ?? [];
+  for (const name of verifiers) {
+    const label = classifyTool(name);
+    if (label) classes.add(label);
+  }
+  return classes;
+};
+
+const classifyTool = (name: string): string | null => {
+  const id = name.toLowerCase();
+  if (id.includes("code") || id.includes("lint") || id.includes("build")) return "code";
+  if (id.includes("web") || id.includes("http") || id.includes("browser")) return "web";
+  if (id.includes("docs") || id.includes("pdf") || id.includes("citation")) return "docs";
+  if (id.includes("search") || id.includes("kb") || id.includes("rag")) return "knowledge";
+  if (id.includes("math") || id.includes("numeric") || id.includes("sympy")) return "math";
+  if (id.includes("telemetry")) return "telemetry";
+  return null;
+};
+
+const summarizeTelemetry = (result: StarSyncResult, governor?: CoherenceGovernorDecision): string => {
+  const coherence = result.snapshot.global_coherence ?? 0;
+  const pressure = result.snapshot.collapse_pressure ?? 0;
+  const dispersion = result.snapshot.phase_dispersion ?? 0;
+  const starAction = result.action;
+  const governorAction = governor?.action ?? "n/a";
+  const confidence = governor?.confidence ?? result.confidence ?? 0;
+  const threshold = governor?.adjustedCollapseThreshold;
+  const thresholdPct = typeof threshold === "number" ? ` thr=${(threshold * 100).toFixed(0)}%` : "";
+  return `coh=${coherence.toFixed(2)} pressure=${pressure.toFixed(2)} disp=${dispersion.toFixed(2)} star=${starAction} gov=${governorAction} conf=${(confidence * 100).toFixed(0)}%${thresholdPct}`;
+};
+
+function maybeStarCollapseStop(record: DebateRecord): StopDecision | null {
+  if (!USE_STAR_COLLAPSE) return null;
+  if (!record.starEnabled) return null;
+  if (!record.lastTelemetry || !record.lastGovernorDecision) {
+    return null;
+  }
+  if (record.lastGovernorDecision.action !== "collapse") {
+    return null;
+  }
+  const confidence = record.lastCollapseConfidence ?? record.lastGovernorDecision.confidence ?? 0;
+  const threshold = record.lastGovernorDecision.adjustedCollapseThreshold;
+  if (confidence < threshold) return null;
+  const coherence = record.lastTelemetry.global_coherence ?? 0;
+  return {
+    status: "completed",
+    verdict: `Star coherence collapse requested (confidence ${(confidence * 100).toFixed(0)}%, thr ${(threshold * 100).toFixed(0)}%, coh ${coherence.toFixed(2)}).`,
+    reason: "star_collapse",
+  };
+}
+
+function evaluateStopRules(
+  record: DebateRecord,
+  round: number,
+  verifierResults: VerifierResult[],
+  metricsState: TDebateRoundMetrics,
+): StopDecision | null {
   if (shouldTimeout(record)) {
-    finalizeDebate(record, "timeout", { verdict: "Debate exceeded wall-clock budget." });
-    return true;
+    return { status: "timeout", verdict: "Debate exceeded wall-clock budget.", reason: "timeout" };
+  }
+  if (record.toolCallsUsed >= record.config.max_tool_calls) {
+    return { status: "completed", verdict: "Tool call budget exhausted.", reason: "max_tool_calls" };
   }
   if (verifierResults.length > 0) {
     if (verifierResults.every((entry) => entry.ok)) {
-      finalizeDebate(record, "completed", { verdict: "Agreement reached: skeptic satisfied all checks." });
-      return true;
+      return { status: "completed", verdict: "Agreement reached: skeptic satisfied all checks.", reason: "verifier_all_pass" };
     }
     if (verifierResults.every((entry) => !entry.ok)) {
-      finalizeDebate(record, "completed", { verdict: "Skeptic refuted the claim in this pass." });
-      return true;
+      return { status: "completed", verdict: "Skeptic refuted the claim in this pass.", reason: "verifier_all_fail" };
     }
   }
-  return false;
+
+  const starStop = maybeStarCollapseStop(record);
+  if (starStop) {
+    return starStop;
+  }
+
+  const satisfied =
+    metricsState.score >= record.config.satisfaction_threshold &&
+    metricsState.improvement < record.config.min_improvement;
+  record.stagnationStreak =
+    metricsState.improvement < record.config.min_improvement ? record.stagnationStreak + 1 : 0;
+  record.noveltyStreak =
+    metricsState.novelty_gain < record.config.novelty_epsilon ? record.noveltyStreak + 1 : 0;
+
+  if (satisfied) {
+    return {
+      status: "completed",
+      verdict: `Satisfied at score ${(metricsState.score * 100).toFixed(1)}%.`,
+      reason: "satisfaction_threshold",
+    };
+  }
+  if (record.stagnationStreak >= record.config.stagnation_rounds) {
+    return { status: "completed", verdict: "Stopped after stagnation across rounds.", reason: "stagnation" };
+  }
+  if (record.noveltyStreak >= record.config.stagnation_rounds) {
+    return { status: "completed", verdict: "No new evidence surfaced across recent rounds.", reason: "novelty_plateau" };
+  }
+  if (round >= record.config.max_rounds) {
+    return { status: "completed", verdict: "Max rounds reached.", reason: "max_rounds" };
+  }
+  return null;
 }
 
-function finalizeDebate(record: DebateRecord, status: DebateStatus, metadata?: { verdict?: string }): void {
+function finalizeDebate(
+  record: DebateRecord,
+  status: DebateStatus,
+  metadata?: { verdict?: string; stopReason?: string; metrics?: TDebateRoundMetrics },
+): void {
   if (isTerminal(record.status)) {
     return;
   }
   record.status = status;
   record.endedAt = Date.now();
   record.updatedAt = new Date().toISOString();
-  const outcome = buildOutcome(record, metadata?.verdict);
+  record.reason = metadata?.stopReason ?? record.reason;
+  const outcome = buildOutcome(record, metadata);
   record.outcome = outcome;
   metrics.observeDebateWall(record.endedAt - record.startedAt);
-  appendEvent(record, { type: "outcome", outcome, scoreboard: snapshotScore(record) });
-  appendStatusEvent(record);
+  if (record.lastTelemetry) {
+    const confidence =
+      record.lastCollapseConfidence ?? record.lastGovernorDecision?.confidence ?? undefined;
+    const snapshot: DebateTelemetrySnapshot = {
+      debateId: record.id,
+      sessionId: record.id,
+      sessionType: "debate",
+      telemetry: record.lastTelemetry,
+      action: record.lastCoherenceAction,
+      confidence,
+      updatedAt: record.updatedAt,
+      governor: record.lastGovernorDecision,
+    };
+    void persistDebateTelemetrySnapshot(snapshot).catch((error) => {
+      console.warn("[debate] failed to persist telemetry snapshot", error);
+    });
+  }
+  appendEvent(record, {
+    type: "outcome",
+    outcome,
+    scoreboard: snapshotScore(record),
+    metrics: metadata?.metrics ?? record.lastMetrics,
+  });
+  appendStatusEvent(record, metadata?.metrics ?? record.lastMetrics);
 }
 
-function buildOutcome(record: DebateRecord, verdictText?: string): TDebateOutcome {
+function buildOutcome(
+  record: DebateRecord,
+  metadata?: { verdict?: string; stopReason?: string; metrics?: TDebateRoundMetrics },
+): TDebateOutcome {
   const diff = record.scoreboard.proponent - record.scoreboard.skeptic;
   const total = Math.max(record.scoreboard.proponent + record.scoreboard.skeptic, 1);
   const winning_role = diff > 0 ? "proponent" : diff < 0 ? "skeptic" : undefined;
   const confidence = Math.min(0.95, 0.5 + Math.abs(diff) / total / 2);
   const verdict =
-    verdictText ??
+    metadata?.verdict ??
     (winning_role
       ? `${capitalize(winning_role)} leads ${record.scoreboard.proponent}-${record.scoreboard.skeptic}.`
       : "Referee declares stalemate after configured rounds.");
+  const metricsState = metadata?.metrics ?? record.lastMetrics;
   const key_turn_ids = record.turns
     .slice(-5)
     .map((turn) => turn.id)
@@ -713,6 +1184,10 @@ function buildOutcome(record: DebateRecord, verdictText?: string): TDebateOutcom
     confidence,
     winning_role,
     key_turn_ids,
+    rounds: completedRounds(record),
+    score: metricsState?.score ?? record.lastScore ?? 0,
+    stop_reason: metadata?.stopReason ?? record.reason,
+    metrics: metricsState,
     created_at: record.updatedAt,
   };
 }

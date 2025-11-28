@@ -2,22 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { roleFromTool, normalizeEvent, type DebateRole } from "@/lib/agi/debate";
 import {
-
   connectDebateStream,
-
   getDebateStatus,
-
   type DebateOutcomePayload,
-
   type DebateScoreboard,
-
   type DebateSnapshot,
-
   type DebateStreamEvent,
-
-  type DebateTurnPayload
-
+  type DebateTurnPayload,
 } from "@/lib/agi/api";
+import { useDebateTelemetry } from "@/hooks/useDebateTelemetry";
 
 
 
@@ -100,6 +93,8 @@ export default function DebateView({ traceId, debateId, open, onClose, variant }
   const active = isOpen;
 
   const activeDebateId = debateId ?? (trace as any)?.debate_id ?? null;
+
+  const { data: telemetryData } = useDebateTelemetry(activeDebateId ?? null, 3500);
 
 
 
@@ -383,6 +378,11 @@ export default function DebateView({ traceId, debateId, open, onClose, variant }
     outcome?.verdict ??
     (status === "running" ? "Referee: awaiting outcome..." : `Status: ${status}`);
 
+  const telemetry = telemetryData?.telemetry;
+  const collapseConfidence = telemetryData?.confidence;
+  const formatPct = (value?: number) =>
+    typeof value === "number" && Number.isFinite(value) ? `${(value * 100).toFixed(0)}%` : "–";
+
   const header = (
     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
       <div className="flex items-center gap-3 truncate">
@@ -395,6 +395,21 @@ export default function DebateView({ traceId, debateId, open, onClose, variant }
         )}
       </div>
       <div className="flex items-center gap-3 text-xs">
+        {telemetry && (
+          <div className="flex items-center gap-1">
+            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-200">
+              Coh {formatPct(telemetry.global_coherence)}
+            </span>
+            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">
+              Pressure {formatPct(telemetry.collapse_pressure)}
+            </span>
+            {collapseConfidence !== undefined && (
+              <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-sky-200">
+                Confidence {formatPct(collapseConfidence)}
+              </span>
+            )}
+          </div>
+        )}
         {scoreboard && (
           <span className="opacity-70">
             P:{scoreboard.proponent} | S:{scoreboard.skeptic}

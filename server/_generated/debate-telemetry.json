@@ -1,0 +1,175 @@
+{
+  "sessions": [
+    {
+      "sessionId": "star-lab-1a54c496-da52-4a88-a3bd-c3248d4eb463",
+      "sessionType": "lab",
+      "telemetry": {
+        "session_id": "star-lab-1a54c496-da52-4a88-a3bd-c3248d4eb463",
+        "session_type": "lab",
+        "global_coherence": 0.5,
+        "levels": {},
+        "phase_dispersion": 0.4,
+        "collapse_pressure": 0.2,
+        "energy_budget": 0,
+        "updated_at": 1764011523826
+      },
+      "action": "explore_more",
+      "confidence": 0.33,
+      "updatedAt": "2025-11-24T19:12:03.826Z"
+    },
+    {
+      "debateId": "322a6798-35f6-4832-ae84-b09dd4392c1e",
+      "sessionId": "322a6798-35f6-4832-ae84-b09dd4392c1e",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "322a6798-35f6-4832-ae84-b09dd4392c1e",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.23632690712158233,
+        "dp_tau_estimate_ms": 211.57133823224228,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.5595250985567096,
+        "levels": {
+          "micro": 0.5623571298067096,
+          "meso": 0.5495250985567096,
+          "macro": 0.5631813174281975,
+          "rope": 0.4427201796989262
+        },
+        "phase_dispersion": 0.331067193139175,
+        "collapse_pressure": 0.32591526084114275,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.6040670112370885,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.07592598823687514,
+        "notes": "tracking goal: How is the warp bubble solution made by the website?",
+        "updated_at": 1764273049397
+      },
+      "action": "explore_more",
+      "confidence": 0.4302999667577811,
+      "updatedAt": "2025-11-27T19:50:49.409Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.3802999667577811,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "6771c7c5-71be-4dd1-a543-c43458cf707f",
+      "sessionId": "6771c7c5-71be-4dd1-a543-c43458cf707f",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "6771c7c5-71be-4dd1-a543-c43458cf707f",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.19275922035784365,
+        "dp_tau_estimate_ms": 259.39096405961067,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.5645688968073498,
+        "levels": {
+          "micro": 0.5674009280573498,
+          "meso": 0.5545688968073498,
+          "macro": 0.5744459316949567,
+          "rope": 0.45252856229868643
+        },
+        "phase_dispersion": 0.560127180750945,
+        "collapse_pressure": 0.34048822779002313,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.7333226659460615,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.07500069368119254,
+        "notes": "tracking goal: How is the warp bubble solution made by the website?",
+        "updated_at": 1764291275727
+      },
+      "action": "explore_more",
+      "confidence": 0.41765088764112435,
+      "updatedAt": "2025-11-28T00:54:35.733Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.36765088764112436,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "413b0e7d-5ebe-4fae-ada5-91699e7f481e",
+      "sessionId": "413b0e7d-5ebe-4fae-ada5-91699e7f481e",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "413b0e7d-5ebe-4fae-ada5-91699e7f481e",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.2631148624294462,
+        "dp_tau_estimate_ms": 190.03107440731293,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.6102698670208401,
+        "levels": {
+          "micro": 0.61310189827084,
+          "meso": 0.6016491773656677,
+          "macro": 0.6125264662269797,
+          "rope": 0.48586490073626687
+        },
+        "phase_dispersion": 0.4014272912125157,
+        "collapse_pressure": 0.36145993445169367,
+        "multi_fractal_index": 0.3159573446547713,
+        "resonance_score": 0.5500334642798516,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.1275512905384311,
+        "notes": "tracking goal: SEARCH(\"Natario warp bubble implementation site\",k=5)->SUMMARIZE(@s1,\"Highlight ",
+        "updated_at": 1764314449624
+      },
+      "action": "explore_more",
+      "confidence": 0.4598141916560166,
+      "updatedAt": "2025-11-28T07:20:49.637Z",
+      "governor": {
+        "action": "continue",
+        "confidence": 0.4598141916560166,
+        "adjustedCollapseThreshold": 0.7080372892887755,
+        "maxAdditionalRounds": 2,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 4,
+          "branchFactor": 1
+        }
+      }
+    }
+  ],
+  "capturedAt": "2025-11-28T07:20:49.646Z"
+}

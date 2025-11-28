@@ -4,6 +4,7 @@ import type { ResonanceBundle, ResonancePatchMode, ResonancePatchStats } from ".
 import type { ConsoleTelemetryBundle } from "./desktop";
 import { ToolRisk } from "./skills";
 import type { ToolManifestEntry } from "./skills";
+import type { GroundingReport } from "./grounding";
 
 export const PersonaProfile = z.object({
   id: z.string(),
@@ -62,6 +63,27 @@ export const TaskApproval = z.object({
 
 export type TTaskApproval = z.infer<typeof TaskApproval>;
 
+export const CollapseTraceEntry = z.object({
+  timestamp: z.string(),
+  chosenId: z.string(),
+  candidates: z
+    .array(
+      z.object({
+        id: z.string(),
+        score: z.number(),
+        tags: z.array(z.string()),
+      }),
+    )
+    .default([]),
+  input_hash: z.string().optional(),
+  decider: z.enum(["heuristic", "local-llm", "disabled"]).optional(),
+  model: z.string().optional(),
+  note: z.string().optional(),
+  strategy: z.string().optional(),
+});
+
+export type TCollapseTraceEntry = z.infer<typeof CollapseTraceEntry>;
+
 export const TaskTrace = z.object({
   id: z.string(),
   persona_id: z.string(),
@@ -83,8 +105,14 @@ export const TaskTrace = z.object({
   planner_prompt: z.string().optional(),
   prompt_hash: z.string().optional(),
   debate_id: z.string().nullable().optional(),
+  reasoning_strategy: z.string().optional(),
+  strategy_notes: z.array(z.string()).optional(),
+  grounding_report: z.any().optional(),
+  debug_sources: z.boolean().optional(),
   // Agent instructions captured alongside the trace
   routine_json: z.any().optional(),
+  collapse_strategy: z.string().optional(),
+  collapse_trace: CollapseTraceEntry.optional(),
 });
 
 export type TResonanceSelectionSnapshot = {
@@ -111,4 +139,10 @@ export type TTaskTrace = z.infer<typeof TaskTrace> & {
   planner_prompt?: string | null;
   prompt_hash?: string | null;
   debate_id?: string | null;
+  reasoning_strategy?: string | null;
+  strategy_notes?: string[];
+  grounding_report?: GroundingReport;
+  debug_sources?: boolean;
+  collapse_strategy?: string;
+  collapse_trace?: TCollapseTraceEntry;
 };

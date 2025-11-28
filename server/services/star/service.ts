@@ -1,0 +1,456 @@
+import {
+  InformationEvent,
+  TelemetrySnapshot,
+  CollapseDecision,
+  type TTelemetrySnapshot,
+  type TCollapseDecision,
+} from "../../../shared/star-telemetry";
+
+type PhaseState = {
+  micro: number;
+  meso: number;
+  macro: number;
+};
+
+type StarState = {
+  snapshot: TTelemetrySnapshot;
+  lastUpdated: number;
+  phase: PhaseState;
+  recentMasses: number[];
+  prethermalLoad: number;
+  rng: () => number;
+};
+
+type HostContext = {
+  host_id?: string;
+  host_mass_norm?: number;
+  host_radius_norm?: number;
+  host_mode?: string;
+};
+
+const defaultHostContext: Required<Pick<HostContext, "host_mass_norm" | "host_radius_norm" | "host_mode">> = {
+  host_mass_norm: 1,
+  host_radius_norm: 1,
+  host_mode: "brain_like",
+};
+
+// Reference collapse timescale (ms) for dpEnergyNorm = 1.
+const TAU_REF_MS = 50;
+
+type HostEigenmode = { freq_hz: number; q: number; weight: number };
+
+const HOST_EIGENMODES: Record<string, HostEigenmode[]> = {
+  sun_like: [
+    { freq_hz: 3e-3, q: 50, weight: 1 },
+    { freq_hz: 6e-3, q: 30, weight: 0.6 },
+    { freq_hz: 1e-2, q: 20, weight: 0.4 },
+  ],
+  brain_like: [
+    { freq_hz: 4, q: 5, weight: 0.7 },
+    { freq_hz: 40, q: 10, weight: 1 },
+    { freq_hz: 10, q: 6, weight: 0.5 },
+  ],
+  lab: [
+    { freq_hz: 1, q: 20, weight: 0.6 },
+    { freq_hz: 20, q: 12, weight: 0.8 },
+  ],
+  other: [{ freq_hz: 0.5, q: 10, weight: 0.5 }],
+};
+
+type BandFrequencies = { micro: number; meso: number; macro: number };
+
+const BAND_PRESETS: Record<string, BandFrequencies> = {
+  sun_like: { micro: 5e6, meso: 5e3, macro: 3e-3 },
+  brain_like: { micro: 8e6, meso: 4e4, macro: 10 },
+  lab: { micro: 2e6, meso: 2e3, macro: 2 },
+  other: { micro: 1e6, meso: 1e3, macro: 1 },
+};
+
+const sessions = new Map<string, StarState>();
+const hostConfigBySession = new Map<string, HostContext>();
+const hostEigenmodesByHost = new Map<string, HostEigenmode[]>();
+
+const normalizeSessionType = (value?: string): string => {
+  const trimmed = (value ?? "").trim();
+  return trimmed || "debate";
+};
+
+const sessionKey = (sessionId: string, sessionType?: string): string => {
+  const normalizedId = sessionId.trim();
+  const normalizedType = normalizeSessionType(sessionType);
+  return `${normalizedType}::${normalizedId}`;
+};
+
+const clamp = (value: number, min: number, max: number): number => {
+  if (!Number.isFinite(value)) return min;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+};
+
+const hashStringToSeed = (input: string): number => {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+
+const mulberry32 = (seed: number): (() => number) => {
+  return () => {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const makeGaussian = (seed: number): (() => number) => {
+  const uniform = mulberry32(seed);
+  let spare: number | null = null;
+  return () => {
+    if (spare !== null) {
+      const val = spare;
+      spare = null;
+      return val;
+    }
+    const u = Math.max(1e-12, uniform());
+    const v = Math.max(1e-12, uniform());
+    const mag = Math.sqrt(-2 * Math.log(u));
+    const z0 = mag * Math.cos(2 * Math.PI * v);
+    const z1 = mag * Math.sin(2 * Math.PI * v);
+    spare = z1;
+    return z0;
+  };
+};
+
+const gaussianForSession = (key: string): (() => number) => makeGaussian(hashStringToSeed(key));
+
+const sdeStep = (xPrev: number, dtMs: number, drift: number, diffusion: number, rng: () => number): number => {
+  const dt = Math.max(0, dtMs) / 1000;
+  if (!Number.isFinite(xPrev)) return 0;
+  if (dt === 0) return xPrev;
+  return xPrev + drift * dt + diffusion * Math.sqrt(dt) * rng();
+};
+
+const computeMedian = (values: number[]): number => {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
+};
+
+const estimatePowerLawSlope = (values: number[]): number => {
+  const positive = values.filter((v) => Number.isFinite(v) && v > 0);
+  if (positive.length < 2) return 0;
+  const sorted = [...positive].sort((a, b) => b - a);
+  const logX = sorted.map((v) => Math.log(v));
+  const logRank = sorted.map((_, idx) => Math.log(idx + 1));
+  const meanX = logX.reduce((acc, v) => acc + v, 0) / logX.length;
+  const meanY = logRank.reduce((acc, v) => acc + v, 0) / logRank.length;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < logX.length; i += 1) {
+    num += (logX[i] - meanX) * (logRank[i] - meanY);
+    den += (logX[i] - meanX) * (logX[i] - meanX);
+  }
+  if (den === 0) return 0;
+  return num / den;
+};
+
+const classifySearchRegime = (coherence: number, dispersion: number): "ballistic" | "diffusive" | "mixed" => {
+  if (coherence > 0.6 && dispersion < 0.4) return "ballistic";
+  if (coherence < 0.4 && dispersion > 0.6) return "diffusive";
+  return "mixed";
+};
+
+const resolveBandFrequencies = (hostMode?: string): BandFrequencies => {
+  const modeKey = (hostMode ?? defaultHostContext.host_mode) as keyof typeof BAND_PRESETS;
+  return BAND_PRESETS[modeKey] ?? BAND_PRESETS.other;
+};
+
+const getHostEigenmodes = (host: HostContext): HostEigenmode[] => {
+  const hostId = host.host_id ?? host.host_mode ?? defaultHostContext.host_mode;
+  const cached = hostEigenmodesByHost.get(hostId);
+  if (cached) return cached;
+  const modes = HOST_EIGENMODES[host.host_mode ?? defaultHostContext.host_mode] ?? [];
+  hostEigenmodesByHost.set(hostId, modes);
+  return modes;
+};
+
+const computeResonanceScore = (host: HostContext, nowMs: number): number => {
+  const modes = getHostEigenmodes(host);
+  if (!modes.length) return 0.5;
+  const phaseSum = modes.reduce((acc, m) => {
+    const phase = 2 * Math.PI * m.freq_hz * (nowMs / 1000);
+    return acc + m.weight * Math.cos(phase);
+  }, 0);
+  const resonance = phaseSum / Math.max(modes.length, 1);
+  return clamp(0.5 * (resonance + 1), 0, 1);
+};
+
+const ensureSnapshot = (sessionId: string, sessionType?: string): StarState => {
+  const key = sessionKey(sessionId, sessionType);
+  const existing = sessions.get(key) ?? sessions.get(sessionId); // tolerate legacy keys
+  const ensureStateShape = (state: StarState): StarState => {
+    const bands = resolveBandFrequencies(state.snapshot.host_mode);
+    const ropeBeatHz = Math.abs(bands.meso - bands.macro);
+    const parsedSnapshot = TelemetrySnapshot.parse({
+      ...state.snapshot,
+      session_type: normalizeSessionType(state.snapshot.session_type ?? sessionType),
+      host_mass_norm: state.snapshot.host_mass_norm ?? defaultHostContext.host_mass_norm,
+      host_radius_norm: state.snapshot.host_radius_norm ?? defaultHostContext.host_radius_norm,
+      host_mode: state.snapshot.host_mode ?? defaultHostContext.host_mode,
+      bands: state.snapshot.bands ?? {
+        micro_freq_hz: bands.micro,
+        meso_freq_hz: bands.meso,
+        macro_freq_hz: bands.macro,
+        rope_beat_hz: ropeBeatHz,
+      },
+    });
+    return {
+      snapshot: parsedSnapshot,
+      lastUpdated: state.lastUpdated,
+      phase: state.phase ?? { micro: 0, meso: 0, macro: 0 },
+      recentMasses: state.recentMasses ?? [],
+      prethermalLoad: state.prethermalLoad ?? 0,
+      rng: state.rng ?? gaussianForSession(key),
+    };
+  };
+
+  if (existing) {
+    const normalized = ensureStateShape(existing);
+    sessions.set(key, normalized);
+    return normalized;
+  }
+
+  const now = Date.now();
+  const bands = resolveBandFrequencies(defaultHostContext.host_mode);
+  const base: TTelemetrySnapshot = TelemetrySnapshot.parse({
+    session_id: sessionId,
+    session_type: normalizeSessionType(sessionType),
+    host_mass_norm: defaultHostContext.host_mass_norm,
+    host_radius_norm: defaultHostContext.host_radius_norm,
+    host_mode: defaultHostContext.host_mode,
+    bands: {
+      micro_freq_hz: bands.micro,
+      meso_freq_hz: bands.meso,
+      macro_freq_hz: bands.macro,
+      rope_beat_hz: Math.abs(bands.meso - bands.macro),
+    },
+    global_coherence: 0.5,
+    levels: {},
+    collapse_pressure: 0.2,
+    phase_dispersion: 0.4,
+    energy_budget: 0,
+    updated_at: now,
+  });
+  const state: StarState = {
+    snapshot: base,
+    lastUpdated: now,
+    phase: { micro: 0, meso: 0, macro: 0 },
+    recentMasses: [],
+    prethermalLoad: 0,
+    rng: gaussianForSession(key),
+  };
+  sessions.set(key, state);
+  return state;
+};
+
+export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot {
+  const raw = eventInput as { session_type?: unknown; metadata?: { session_type?: unknown } } | null;
+  const rawSessionType = typeof raw?.session_type === "string" ? raw.session_type : undefined;
+  const metadataSessionType =
+    raw && raw.metadata && typeof raw.metadata.session_type === "string" ? raw.metadata.session_type : undefined;
+  const event = InformationEvent.parse(eventInput);
+  const sessionType = rawSessionType ?? metadataSessionType ?? event.session_type;
+  const key = sessionKey(event.session_id, sessionType);
+  const state = ensureSnapshot(event.session_id, sessionType);
+  const now = event.timestamp ?? Date.now();
+  const dt = Math.max(0, now - state.lastUpdated);
+  const dtSec = dt / 1000;
+  const mass = Math.max(0, event.bytes || 0);
+  const complexity = clamp(event.complexity_score ?? 0.5, 0, 1);
+  const alignment = clamp(event.alignment ?? 0, -1, 1);
+
+  const hostFromEvent: HostContext = {
+    host_id: event.host_id,
+    host_mass_norm: event.host_mass_norm,
+    host_radius_norm: event.host_radius_norm,
+    host_mode: event.host_mode,
+  };
+
+  const cachedHost = hostConfigBySession.get(key) ?? {};
+  const resolvedHost: HostContext = {
+    host_id: hostFromEvent.host_id ?? state.snapshot.host_id ?? cachedHost.host_id,
+    host_mass_norm:
+      hostFromEvent.host_mass_norm ??
+      state.snapshot.host_mass_norm ??
+      cachedHost.host_mass_norm ??
+      defaultHostContext.host_mass_norm,
+    host_radius_norm:
+      hostFromEvent.host_radius_norm ??
+      state.snapshot.host_radius_norm ??
+      cachedHost.host_radius_norm ??
+      defaultHostContext.host_radius_norm,
+    host_mode:
+      hostFromEvent.host_mode ??
+      state.snapshot.host_mode ??
+      cachedHost.host_mode ??
+      defaultHostContext.host_mode,
+  };
+  hostConfigBySession.set(key, resolvedHost);
+
+  const rng = state.rng ?? gaussianForSession(key);
+  state.rng = rng;
+
+  // Stochastic Ito-style updates (Euler–Maruyama)
+  const prevCoherence = state.snapshot.global_coherence ?? 0.5;
+  const prevDispersion = state.snapshot.phase_dispersion ?? 0.4;
+  const prevEnergy = state.snapshot.energy_budget ?? 0;
+
+  const coherenceDrift = (0.5 - prevCoherence) / 15;
+  const coherenceDiff = 0.05 + 0.1 * complexity;
+  let coherence = clamp(sdeStep(prevCoherence, dt, coherenceDrift, coherenceDiff, rng), 0, 1);
+  const coherenceBoost = clamp(Math.log1p(mass) / 12, 0, 0.25) * (alignment >= 0 ? 1 : 0.5) * complexity;
+  coherence = clamp(coherence + coherenceBoost, 0, 1);
+
+  const dispersionDrift = (0.4 - prevDispersion) / 12 + (alignment < 0 ? 0.05 : -0.02);
+  const dispersionDiff = 0.04 + 0.08 * (1 - alignment);
+  const dispersion = clamp(sdeStep(prevDispersion, dt, dispersionDrift, dispersionDiff, rng), 0, 1);
+
+  const energyDrift = -prevEnergy / 20 + Math.log1p(mass) / 12;
+  const energyDiff = 0.03 + 0.05 * complexity;
+  const energy = clamp(sdeStep(prevEnergy, dt, energyDrift, energyDiff, rng), 0, 1);
+
+  // Multi-scale bands and phase cascade
+  const bands = resolveBandFrequencies(resolvedHost.host_mode);
+  const ropeBeatHz = Math.abs(bands.meso - bands.macro);
+  state.phase.micro += dtSec * bands.micro * 2 * Math.PI;
+  state.phase.meso += dtSec * bands.meso * 2 * Math.PI;
+  state.phase.macro += dtSec * bands.macro * 2 * Math.PI;
+
+  const basePressure = clamp(
+    0.4 * coherence + 0.4 * energy + 0.2 * (complexity + (alignment > 0 ? 0.1 : 0)),
+    0,
+    1,
+  );
+
+  const resonance_score = computeResonanceScore(resolvedHost, now);
+  const pressure = clamp(basePressure + 0.1 * resonance_score, 0, 1);
+
+  const levels = {
+    micro: clamp(coherence + 0.05 * complexity * Math.cos(state.phase.micro), 0, 1),
+    meso: clamp(coherence + 0.02 * alignment * Math.cos(state.phase.meso), 0, 1),
+    macro: clamp(coherence - 0.03 * dispersion * Math.cos(state.phase.macro), 0, 1),
+    rope: clamp((coherence + pressure) / 2, 0, 1),
+  };
+
+  // Multi-fractal granulation proxy
+  const recentMasses = state.recentMasses ?? [];
+  recentMasses.push(mass);
+  if (recentMasses.length > 512) recentMasses.shift();
+  state.recentMasses = recentMasses;
+  const median = computeMedian(recentMasses);
+  const small = recentMasses.filter((m) => m <= median);
+  const large = recentMasses.filter((m) => m > median);
+  const slopeSmall = estimatePowerLawSlope(small);
+  const slopeLarge = estimatePowerLawSlope(large);
+  const multi_fractal_index = clamp((Math.abs(slopeSmall) - Math.abs(slopeLarge)) / 4, 0, 1);
+
+  const flare_score = clamp((energy - 0.7) * 1.2 + (dispersion - 0.5) * 0.8, 0, 1);
+  const search_regime = classifySearchRegime(coherence, dispersion);
+
+  const pump = Math.max(0, energy - 0.7) * Math.max(0, alignment);
+  state.prethermalLoad = clamp(state.prethermalLoad * Math.exp(-dt / 5000) + pump, 0, 1);
+  const singularity_score = clamp(
+    0.5 * state.prethermalLoad + 0.5 * Math.max(0, dispersion - 0.6),
+    0,
+    1,
+  );
+
+  const hostMass = resolvedHost.host_mass_norm ?? defaultHostContext.host_mass_norm;
+  const dpEnergyNorm = clamp(hostMass * (0.5 * coherence + 0.3 * energy - 0.2 * dispersion), 0, 1);
+  const dpTauEstimateMs = TAU_REF_MS / Math.max(dpEnergyNorm, 1e-3);
+
+  let recommended_action: TTelemetrySnapshot["recommended_action"] =
+    pressure > 0.72
+      ? "collapse"
+      : coherence < 0.35 && dispersion > 0.55
+        ? "ask_clarification"
+        : energy > 0.85
+          ? "branch"
+          : "explore_more";
+
+  if (flare_score > 0.6 && coherence < 0.8) {
+    recommended_action = "branch";
+  }
+  if (singularity_score > 0.7 && coherence < 0.5) {
+    recommended_action = "ask_clarification";
+  }
+
+  const next: TTelemetrySnapshot = {
+    session_id: event.session_id,
+    session_type: normalizeSessionType(sessionType),
+    host_id: resolvedHost.host_id,
+    host_mass_norm: resolvedHost.host_mass_norm,
+    host_radius_norm: resolvedHost.host_radius_norm,
+    host_mode: resolvedHost.host_mode,
+    bands: {
+      micro_freq_hz: bands.micro,
+      meso_freq_hz: bands.meso,
+      macro_freq_hz: bands.macro,
+      rope_beat_hz: ropeBeatHz,
+    },
+    global_coherence: coherence,
+    levels,
+    phase_dispersion: dispersion,
+    collapse_pressure: pressure,
+    multi_fractal_index,
+    resonance_score,
+    flare_score,
+    search_regime,
+    singularity_score,
+    dp_energy_norm: dpEnergyNorm,
+    dp_tau_estimate_ms: dpTauEstimateMs,
+    energy_budget: energy,
+    recommended_action,
+    notes: event.metadata?.goal ? `tracking goal: ${String(event.metadata.goal).slice(0, 80)}` : undefined,
+    updated_at: now,
+  };
+
+  state.snapshot = TelemetrySnapshot.parse(next);
+  state.lastUpdated = now;
+  sessions.set(key, state);
+  return state.snapshot;
+}
+
+export function getTelemetrySnapshot(sessionId: string, sessionType?: string): TTelemetrySnapshot {
+  return ensureSnapshot(sessionId, sessionType).snapshot;
+}
+
+export function forceCollapse(payload: {
+  session_id: string;
+  session_type?: string;
+  branch_id?: string;
+  reason?: string;
+}): TCollapseDecision {
+  const session_id = (payload.session_id ?? "").trim();
+  if (!session_id) {
+    throw new Error("session_id is required for collapse.");
+  }
+  const session_type = normalizeSessionType(payload.session_type);
+  const snapshot = getTelemetrySnapshot(session_id, session_type);
+  const decision = {
+    session_id,
+    session_type,
+    branch_id: payload.branch_id,
+    reason: payload.reason ?? "manual_collapse",
+    telemetry: snapshot,
+  };
+  return CollapseDecision.parse(decision);
+}

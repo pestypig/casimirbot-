@@ -19,11 +19,15 @@ import { orchestratorRouter } from "./routes/orchestrator";
 import noiseGensRouter from "./routes/noise-gens";
 import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
+import { helixQiRouter } from "./routes/helix/qi";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
 import { qiControllerRouter, startQiController } from "./modules/qi/qi-controller.js";
 import { codeLatticeRouter } from "./routes/code-lattice";
 import { stellarRouter } from "./routes/stellar";
+import { starRouter } from "./routes/star";
+import { simulate as simulateTsn, DEFAULT_QBV_SCHEDULE, DEMO_FLOWS } from "../simulations/tsn-sim";
+import type { SimConfig, SimResult, Schedule, Flow, Faults, ClockModel } from "@shared/tsn-sim";
 
 const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === "1") return true;
@@ -48,6 +52,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/orchestrator", orchestratorRouter);
   app.use(noiseGensRouter);
   app.use("/api/hull/status", hullStatusRouter);
+  if (flagEnabled(process.env.ENABLE_STAR_SERVICE ?? process.env.ENABLE_STAR, true)) {
+    app.use("/api/star", starRouter);
+  }
   if (process.env.HULL_MODE === "1" && process.env.ENABLE_CAPSULE_IMPORT === "1") {
     const { hullCapsules } = await import("./routes/hull.capsules");
     app.use("/api/hull/capsules", hullCapsules);
@@ -62,6 +69,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.use("/api/essence", essenceRouter);
     const { fashionRouter } = await import("./routes/fashion");
     app.use("/api/fashion", fashionRouter);
+    const { essencePromptsRouter } = await import("./routes/essence.prompts");
+    app.use("/api/essence/prompts", essencePromptsRouter);
   }
 
   const enableAgi = flagEnabled(process.env.ENABLE_AGI, true);
@@ -73,6 +82,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { memoryRouter } = await import("./routes/agi.memory");
     const { planRouter } = await import("./routes/agi.plan");
     const { evalRouter } = await import("./routes/agi.eval");
+    const { profileRouter } = await import("./routes/agi.profile");
+    const { starTelemetryRouter } = await import("./routes/agi.star");
     const enableDebate = flagEnabled(process.env.ENABLE_DEBATE, false);
     if (enableDebate) {
       const { debateRouter } = await import("./routes/agi.debate");
@@ -80,6 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     app.use("/api/agi/persona", personaRouter);
     app.use("/api/agi/memory", memoryRouter);
+    app.use("/api/agi/profile", profileRouter);
     if (process.env.ENABLE_AGI === "1" && process.env.ENABLE_TRACE_API === "1") {
       const { traceRouter } = await import("./routes/agi.trace");
       app.use("/api/agi/trace", traceRouter);
@@ -88,8 +100,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         app.use("/api/agi/memory", memoryTraceRouter);
       }
     }
+    app.use("/api/agi/star", starTelemetryRouter);
     app.use("/api/agi", planRouter);
     app.use("/api/agi/eval", evalRouter);
+  }
+
+  if (process.env.SMALL_LLM_URL) {
+    const { smallLlmRouter } = await import("./routes/small-llm");
+    app.use("/api/small-llm", smallLlmRouter);
+  }
+
+  if (process.env.ENABLE_PROFILE_SUMMARIZER === "1") {
+    const { startProfileSummarizerJob } = await import("./services/profile-summarizer-job");
+    startProfileSummarizerJob();
   }
 
   // Jobs + Tokens router (env-gated optional)
@@ -100,7 +123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   if (flagEnabled(process.env.ENABLE_ESSENCE_PROPOSALS, true)) {
     const { proposalsRouter } = await import("./routes/proposals");
+    const { profilePanelRouter } = await import("./routes/proposals.profile-panel");
     app.use("/api/proposals", proposalsRouter);
+    app.use("/api/proposals/profile-panel", profilePanelRouter);
     const { startProposalJobRunner } = await import("./services/proposals/job-runner");
     startProposalJobRunner();
   }
@@ -896,6 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/helix/hardware/sector-state", ingestHardwareSectorState);
   app.options("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
   app.post("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
+  app.use("/api/helix/qi", helixQiRouter);
 
   app.get("/api/qisnap/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
@@ -1080,6 +1106,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/helix/phase-bias", getPhaseBiasTable);
   app.get("/api/helix/spectrum", getSpectrumLog);
   app.post("/api/helix/spectrum", postSpectrumLog);
+
+  // TSN/Qbv simulator exposure for Helix panels (logic-only)
+  app.post("/api/sim/tsn", (req, res) => {
+    const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
+    const parseNumber = (value: unknown): number | undefined => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    const schedule = (body.schedule as Schedule) ?? DEFAULT_QBV_SCHEDULE;
+    const flows = Array.isArray(body.flows) && body.flows.length > 0 ? (body.flows as Flow[]) : DEMO_FLOWS;
+    const cycles = parseNumber(body.cycles) ?? 10;
+    const hopLatencyNs = parseNumber(body.hopLatencyNs);
+    const faults = (body.faults as Faults | undefined) ?? undefined;
+    const clock = (body.clock as ClockModel | undefined) ?? undefined;
+    const framesLimit = Math.min(parseNumber(body.framesLimit) ?? 200, 2_000);
+
+    try {
+      const result: SimResult = simulateTsn({ schedule, flows, cycles, hopLatencyNs, faults, clock });
+      res.json({
+        summary: result.summary,
+        fm: result.fm,
+        framesTotal: result.frames.length,
+        frames: result.frames.slice(0, framesLimit),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(400).json({ error: "tsn_sim_failed", message });
+    }
+  });
 
   // Ensure API requests never fall through to the Vite HTML handler.
   app.use("/api", (req, res) => {

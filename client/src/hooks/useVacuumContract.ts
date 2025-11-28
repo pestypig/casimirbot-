@@ -265,7 +265,9 @@ const buildExports = (state: EnergyPipelineState, spec: VacuumContractSpec): Vac
     dceGain_dB: dceGain,
     pumpRatio,
     qiGuards: {
-      zeta: { value: zetaVal, status: classifyStatus(zetaVal, 0.85, 1.0) },
+      // Allow slight headroom above unity so FR-baseline (~0.84) scenarios do not trip red
+      // while still flagging clearly supercritical coupling.
+      zeta: { value: zetaVal, status: classifyStatus(zetaVal, 1.05, 1.25) },
       duty: { value: dutyVal, status: classifyStatus(dutyVal, 0.2, 0.4) },
     },
   };

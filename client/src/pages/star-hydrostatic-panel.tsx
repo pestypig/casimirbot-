@@ -74,6 +74,15 @@ const defaultInputs: StarInputs = {
   drive: { powerPerArea: 1e9, duty: 0.5, gain: 1, dEff: 1 },
   ignition: { enabled: false, network: "pp", coreTemperatureK: 1.5e7 },
 };
+
+const COHERENCE_DEFAULTS = {
+  collapsePressureThreshold: 0.7,
+  lowCoherenceThreshold: 0.35,
+  highDispersionThreshold: 0.55,
+  energyBudgetCeiling: 0.85,
+  fastStopConfidence: 0.6,
+};
+
 function StarHydrostaticPanel() {
   const [inputs, setInputs] = React.useState<StarInputs>(defaultInputs);
   const [lockRadius, setLockRadius] = React.useState(true);
@@ -549,6 +558,64 @@ function StarHydrostaticPanel() {
           </Card>
           <Card>
             <CardHeader>
+              <CardTitle>Star coherence (observable proofs)</CardTitle>
+              <CardDescription>
+                Ground the coherence story in solar evidence: 5-minute p-modes protect coherent mass; flares and sunquakes
+                show rapid collapse when gravitational self-energy spikes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-slate-200">
+              <div className="rounded border border-white/10 bg-white/5 px-3 py-2 space-y-1">
+                <p className="font-semibold text-white">Core equations</p>
+                <p className="text-slate-300">
+                  Collapse time follows the Penrose OR estimate <code>tau ~ hbar / E_G</code>. For solar structures we use
+                  <code>E_G ~ G (Delta m)^2 / Delta r</code> as a proxy: more mass in superposition or tighter separation
+                  boosts self-energy and shortens tau. Protected bands (like the 3.3 mHz p-mode clock) stretch tau;
+                  detuning and stored free energy shrink it until a collapse fires.
+                </p>
+              </div>
+
+              <div className="rounded border border-white/10 bg-white/5 px-3 py-2 space-y-2">
+                <p className="font-semibold text-white">Solved solar cues (static)</p>
+                <ul className="list-disc space-y-1 pl-4 text-slate-300">
+                  <li>p-mode clock: nu ~ 3.3 mHz &rarr; P ~ 300 s (resonant protection window).</li>
+                  <li>Granule cat: Delta r ~ 1 Mm, modest Delta m &rarr; E_G stays low &rarr; minute-scale coherence survives.</li>
+                  <li>Flux-rope cat: Delta r ~ 30-100 Mm, large Delta m &rarr; E_G jumps &rarr; tau collapses to seconds (flares/sunquakes).</li>
+                </ul>
+                <p className="text-xs text-slate-400">Static teaching numbers; no live stream is shown on this page.</p>
+              </div>
+
+              <div className="rounded border border-white/10 bg-white/5 px-3 py-2 space-y-2">
+                <p className="font-semibold text-white">Telemetry thresholds (sim)</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-200">
+                  <GuardrailRow label="Collapse pressure >=" value={COHERENCE_DEFAULTS.collapsePressureThreshold} />
+                  <GuardrailRow label="Low coherence <" value={COHERENCE_DEFAULTS.lowCoherenceThreshold} />
+                  <GuardrailRow label="High dispersion >" value={COHERENCE_DEFAULTS.highDispersionThreshold} />
+                  <GuardrailRow label="Energy ceiling >" value={COHERENCE_DEFAULTS.energyBudgetCeiling} />
+                </div>
+                <p className="text-xs text-slate-400">
+                  Fast-stop uses collapse confidence &ge; {(COHERENCE_DEFAULTS.fastStopConfidence * 100).toFixed(0)}%. Star service env toggles control collapse
+                  gating and endpoint selection (STAR_COLLAPSE_ENABLE, STAR_SERVICE_URL, etc.).
+                </p>
+              </div>
+
+              <div className="rounded border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-100">
+                <div className="flex flex-col gap-2">
+                  <p className="uppercase tracking-[0.2em] text-sky-300">Docs</p>
+                  <p className="text-[11px] text-sky-200">
+                    Observational derivation: {""}
+                    <a className="underline text-white" href="/docs/stellar-consciousness-ii.md">docs/stellar-consciousness-ii.md</a>. Orch-OR bridge: {""}
+                    <a className="underline text-white" href="/docs/stellar-consciousness-orch-or-review.md">docs/stellar-consciousness-orch-or-review.md</a>.
+                  </p>
+                  <p className="text-[10px] text-sky-200/80">
+                    Live coherence streams stay in the Star Coherence Governor and Collapse Watcher panels.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
               <CardTitle>Ignition & tunneling</CardTitle>
               <CardDescription>Gamow window viewer plus quick stats.</CardDescription>
             </CardHeader>
@@ -832,6 +899,23 @@ function buildBalanceProfile(
   return points;
 }
 
+const TelemetryMetric = ({ label, value }: { label: string; value?: number }) => {
+  const display = typeof value === "number" ? `${(value * 100).toFixed(0)}%` : "—";
+  return (
+    <div className="rounded border border-slate-800 bg-slate-950 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-lg font-semibold text-slate-100">{display}</div>
+    </div>
+  );
+};
+
+const GuardrailRow = ({ label, value }: { label: string; value: number }) => (
+  <div className="flex items-center justify-between rounded border border-white/5 bg-white/5 px-2 py-1.5">
+    <span className="text-[11px] uppercase tracking-wide text-slate-500">{label}</span>
+    <span className="font-mono text-sm text-white">{value.toFixed(2)}</span>
+  </div>
+);
+
 function meanMolecularWeight(X: number, Z: number) {
   const clampedX = clamp01(X);
   const clampedZ = clamp01(Z);
@@ -853,6 +937,11 @@ function formatSci(value: number, digits = 2) {
   const exponent = Math.floor(Math.log10(Math.abs(value)));
   const mantissa = value / Math.pow(10, exponent);
   return `${mantissa.toFixed(digits)}e${exponent}`;
+}
+
+function formatPercent01(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
+  return `${(value * 100).toFixed(0)}%`;
 }
 
 function estimateLuminosity(massSolar: number) {

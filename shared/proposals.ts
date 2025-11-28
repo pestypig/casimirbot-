@@ -101,3 +101,12 @@ export const proposalListResponseSchema = z.object({
   proposals: z.array(essenceProposalSchema),
 });
 export type ProposalListResponse = z.infer<typeof proposalListResponseSchema>;
+
+export const proposalPromptPresetSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  prompt: z.string(),
+  context: z.string().optional(),
+  updatedAt: z.string(),
+});
+export type ProposalPromptPreset = z.infer<typeof proposalPromptPresetSchema>;

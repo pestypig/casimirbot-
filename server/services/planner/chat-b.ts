@@ -7,8 +7,10 @@ import type {
   ResonanceNodeKind,
   ResonanceCollapse,
 } from "@shared/code-lattice";
+import type { GroundingReport, GroundingSource } from "@shared/grounding";
 import type { TMemoryRecord, TMemorySearchHit, TTaskTrace, TTaskApproval } from "@shared/essence-persona";
-import { DebateConfig, type TDebateOutcome } from "@shared/essence-debate";
+import type { LocalResourceHint } from "@shared/local-call-spec";
+import { DebateConfig, type TDebateOutcome, type TDebateRoundMetrics } from "@shared/essence-debate";
 import type { Tool, ToolManifestEntry, ToolRiskType } from "@shared/skills";
 import { putMemoryRecord, searchMemories } from "../essence/memory-store";
 import { kvAdd, kvBudgetExceeded, kvEvictOldest } from "../llm/kv-budgeter";
@@ -21,6 +23,13 @@ import { composeKnowledgeAppendix } from "./knowledge-compositor";
 import { CASIMIR_PROMOTION_THRESHOLDS } from "../code-lattice/resonance.constants";
 import { startDebate, waitForDebateOutcome } from "../debate/orchestrator";
 import { summarizeConsoleTelemetry } from "../console-telemetry/summarize";
+import {
+  ensureGroundingReport,
+  pushGroundingSource,
+  pushGroundingSources,
+  recordKnowledgeSources,
+  recordResonancePatchSources,
+} from "./grounding";
 
 export const PLAN_DSL_CHAIN = "SEARCH→SUMMARIZE→CALL(tool)";
 export const PLAN_DSL_GUIDE = [
@@ -43,6 +52,15 @@ const DEFAULT_DEBATE_ATTACHMENTS = [
     url: "/mnt/data/Quantum Computation in Brain Microtubules The Penrose-Hameroff hameroff-1998.pdf",
   },
 ];
+
+const RESULT_SUMMARY_LIMIT = (() => {
+  const fallback = 2000;
+  const raw = Number(process.env.RESULT_SUMMARY_LIMIT ?? fallback);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return fallback;
+  }
+  return Math.min(8000, Math.max(500, Math.floor(raw)));
+})();
 
 export type PlanNode =
   | { id: string; kind: "SEARCH"; query: string; topK: number; target: "memory"; note: string }
@@ -133,6 +151,89 @@ export type ExecutionResult = ExecutionResultSuccess | ExecutionResultFailure;
 
 const isFailedResult = (result: ExecutionResult): result is ExecutionResultFailure => result.ok === false;
 
+export type ReasoningStrategy = "deep_repo_research" | "repo_design_ideation" | "design-debate" | "default";
+export type IntentFlags = { wantsStatus: boolean; wantsWarp: boolean; wantsImplementation: boolean; wantsPhysics: boolean };
+
+export const normalizeForIntent = (value: string): string =>
+  (value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+
+export const isWarpOrPhysicsIntentGoal = (goal: string): boolean => {
+  const normalized = normalizeForIntent(goal);
+  return /\b(warp|natario|alcubierre|bubble|metric|casimir|theta|qi|pipeline|target|natario constraints?)\b/.test(
+    normalized,
+  );
+};
+
+export const isImplementationIntentGoal = (goal: string): boolean => {
+  const normalized = normalizeForIntent(goal);
+  return (
+    isWarpOrPhysicsIntentGoal(goal) &&
+    /\b(implement|implementation|compute|calculation|how does|how is|where\b|which module|code|file|function|module|validate)\b/.test(
+      normalized,
+    )
+  );
+};
+
+export const classifyIntent = (goal: string): IntentFlags => {
+  const lower = goal.toLowerCase();
+  const normalized = normalizeForIntent(goal);
+  const wantsStatus = /\b(status|telemetry|panel|badge|tile|drive|hud|coherence|q\s?factor|occupancy)\b/.test(lower);
+  const wantsWarp = /\b(warp|natario|alcubierre|bubble|metric)\b/.test(normalized);
+  const wantsImplementation =
+    /\b(code|module|implement|how does|how is|pipeline|compute|calculate|calculation|engine)\b/.test(normalized) ||
+    isImplementationIntentGoal(goal);
+  const wantsPhysics =
+    /\b(casimir|qi\b|ford-roman|fr envelope|stress|energy|theta|target|duty|curvature|t00|beta|metric|divergence)\b/.test(
+      normalized,
+    ) || wantsWarp;
+  return { wantsStatus, wantsWarp, wantsImplementation, wantsPhysics };
+};
+
+export function chooseReasoningStrategy(
+  goal: string,
+  opts?: { hasRepoContext?: boolean; personaHints?: string[]; intentTags?: string[] },
+): { strategy: ReasoningStrategy; notes: string[] } {
+  const normalized = goal.toLowerCase();
+  const notes: string[] = [];
+  const repoHint =
+    /\b(code|stack|trace|error|bug|exception|component|typescript|react|test|build|lint|api|function|class|module|repo|repository|endpoint|middleware|auth|hook)\b/i;
+  const designHint = /\b(design|refactor|architecture|rewrite|restructure|redesign|plan|spec|proposal|uml|diagram|pattern)\b/i;
+  const riskHint = /\b(production|release|security|privacy|compliance|data loss|outage|incident|rollback)\b/i;
+  const personaHint = (opts?.personaHints ?? []).some((hint) => /code|repo|developer/i.test(hint));
+  const intentTags = (opts?.intentTags ?? []).map((tag) => tag.toLowerCase());
+  const intentForcesDeep = intentTags.some((tag) =>
+    ["warp_physics", "warp", "implementation", "physics", "repo_deep"].includes(tag),
+  );
+
+  const designVerb = /\b(add|implement|refactor|migrate|redesign|rewrite|restructure|introduce|extend|augment|modernize|upgrade|replace|deprecate)\b/i.test(
+    normalized,
+  );
+
+  let strategy: ReasoningStrategy = "default";
+  if (designVerb && (repoHint.test(normalized) || opts?.hasRepoContext || personaHint || intentForcesDeep)) {
+    strategy = "repo_design_ideation";
+    notes.push("Repo design/refactor intent detected");
+  } else if (designHint.test(normalized)) {
+    strategy = "design-debate";
+    notes.push("Design/refactor intent detected");
+  } else if (repoHint.test(normalized) || opts?.hasRepoContext || personaHint || intentForcesDeep) {
+    strategy = "deep_repo_research";
+    notes.push("Repo/code question detected");
+  }
+
+  if (designHint.test(normalized)) {
+    strategy = "design-debate";
+    notes.push("Design/refactor intent detected");
+  }
+  if (riskHint.test(normalized)) {
+    notes.push("High-impact/risk-sensitive request");
+  }
+  return { strategy, notes };
+}
+
 export interface PlannerPromptArgs {
   goal: string;
   personaId?: string;
@@ -154,6 +255,12 @@ export interface BuildPlanArgs {
   topK?: number;
   summaryFocus?: string;
   finalTool: string;
+  strategy?: ReasoningStrategy;
+  strategyNotes?: string[];
+  detailPreference?: "short" | "medium" | "long";
+  preferReviewed?: boolean;
+  intent?: IntentFlags;
+  resourceHints?: LocalResourceHint[];
 }
 
 export interface ExecutionRuntime {
@@ -170,6 +277,10 @@ export interface ExecutionRuntime {
   plannerPrompt?: string | null;
   debateId?: string | null;
   debateOutcome?: TDebateOutcome | null;
+  strategy?: ReasoningStrategy;
+  intent?: IntentFlags;
+  debugSources?: boolean;
+  groundingReport?: GroundingReport;
 }
 
 export type ResonantPlanCandidate = {
@@ -178,6 +289,7 @@ export type ResonantPlanCandidate = {
   plannerPrompt: string;
   nodes: PlanNode[];
   planDsl: string;
+  intent?: IntentFlags;
 };
 
 const FIX_KEYWORDS = /\b(fix|bug|broken|repair|debug|error|failing|regression)\b/;
@@ -186,6 +298,7 @@ const CASIMIR_PANEL_ID = "casimir-tiles";
 const CASIMIR_NODE_PATTERN = /casimir/i;
 
 const basename = (value: string) => value.split(/[/\\]/).pop() ?? value;
+const isDocLikePath = (value?: string): boolean => (value ?? "").toLowerCase().match(/\.mdx?$|\.txt$/i) !== null;
 
 const describePatchNodes = (patch: ResonancePatch, limit = 2): string => {
   const nodes = patch.nodes.slice(0, limit);
@@ -219,30 +332,161 @@ type ResonanceSectionArgs = {
   selection?: ResonanceCollapse | null;
   preferredPatchId?: string | null;
   hotNodeLimit?: number;
+  intent?: IntentFlags | null;
 };
 
 const pickPatchForSection = ({
   bundle,
   selection,
   preferredPatchId,
+  intent,
 }: ResonanceSectionArgs): ResonancePatch | null => {
   if (!bundle || !bundle.candidates || bundle.candidates.length === 0) {
     return null;
   }
+  const select = (candidate?: ResonancePatch | null): ResonancePatch | null => {
+    if (!candidate) return null;
+    return clampPatchForIntent(candidate, intent ?? null);
+  };
   if (preferredPatchId) {
-    const preferred = bundle.candidates.find((candidate) => candidate.id === preferredPatchId);
+    const preferred = select(bundle.candidates.find((candidate) => candidate.id === preferredPatchId));
     if (preferred) {
       return preferred;
     }
   }
   const rankingOrder = selection?.ranking?.map((entry) => entry.patchId) ?? [];
   for (const patchId of rankingOrder) {
-    const match = bundle.candidates.find((candidate) => candidate.id === patchId);
+    const match = select(bundle.candidates.find((candidate) => candidate.id === patchId));
     if (match) {
       return match;
     }
   }
-  return bundle.candidates[0] ?? null;
+  for (const candidate of bundle.candidates) {
+    const clamped = select(candidate);
+    if (clamped) {
+      return clamped;
+    }
+  }
+  return null;
+};
+
+export const isWarpRelevantPath = (value?: string): boolean => {
+  if (!value) return false;
+  const normalized = normalizeForIntent(value.replace(/\\/g, "/"));
+  return (
+    normalized.includes("modules/warp") ||
+    normalized.includes("docs/warp") ||
+    normalized.includes("warp-pulsed-power") ||
+    normalized.includes("energy-pipeline.ts") ||
+    normalized.includes("natario") ||
+    normalized.includes("alcubierre") ||
+    normalized.includes("natario-metric") ||
+    normalized.includes("target-validation") ||
+    normalized.includes("theta") ||
+    normalized.includes("casimir")
+  );
+};
+
+const hasWarpSignals = (patch: ResonancePatch): boolean =>
+  patch.nodes.some(
+    (node) =>
+      isWarpRelevantPath(node.filePath) ||
+      isWarpRelevantPath(node.symbol ?? "") ||
+      isWarpRelevantPath(node.summary ?? ""),
+  );
+
+const clampPatchForIntent = (patch: ResonancePatch, intent?: IntentFlags | null): ResonancePatch | null => {
+  if (!patch) return null;
+  const wantsWarp = intent?.wantsWarp || intent?.wantsPhysics;
+  if (!wantsWarp) {
+    return patch;
+  }
+  const filteredNodes = (patch.nodes ?? []).filter((node) => isWarpRelevantPath(node.filePath) || isWarpRelevantPath(node.symbol ?? ""));
+  const filteredKnowledge = patch.knowledge
+    ? {
+        ...patch.knowledge,
+        files: (patch.knowledge.files ?? []).filter((file) => isWarpRelevantPath(file.path ?? file.name ?? "")),
+      }
+    : patch.knowledge;
+  const hasKnowledge = Boolean(filteredKnowledge?.files && filteredKnowledge.files.length > 0);
+  if (filteredNodes.length === 0 && !hasKnowledge) {
+    return null;
+  }
+  return { ...patch, nodes: filteredNodes, knowledge: filteredKnowledge ?? patch.knowledge };
+};
+
+const needsWarpImplementationGrounding = (runtime: ExecutionRuntime): boolean => {
+  const intent = runtime.intent ?? classifyIntent(runtime.goal);
+  return (
+    intent.wantsWarp ||
+    intent.wantsPhysics ||
+    intent.wantsImplementation ||
+    isWarpOrPhysicsIntentGoal(runtime.goal) ||
+    isImplementationIntentGoal(runtime.goal)
+  );
+};
+
+const collectKnowledgePaths = (knowledge?: KnowledgeProjectExport[] | null): string[] => {
+  if (!knowledge || knowledge.length === 0) {
+    return [];
+  }
+  const paths: string[] = [];
+  for (const project of knowledge) {
+    for (const file of project.files ?? []) {
+      const p = file.path || file.name;
+      if (p) {
+        paths.push(p);
+      }
+    }
+  }
+  return paths;
+};
+
+const collectRepoGraphPathsFromOutputs = (outputs: Map<string, unknown>): string[] => {
+  const paths: string[] = [];
+  const addPath = (value?: string) => {
+    if (typeof value === "string" && value.trim().length > 0) {
+      paths.push(value);
+    }
+  };
+  for (const value of outputs.values()) {
+    if (!value || typeof value !== "object") continue;
+    const hits = Array.isArray((value as { hits?: unknown }).hits) ? ((value as any).hits as any[]) : [];
+    for (const hit of hits) {
+      addPath((hit as any).path ?? (hit as any).file_path ?? (hit as any).id);
+    }
+    const packets = Array.isArray((value as { packets?: unknown }).packets) ? ((value as any).packets as any[]) : [];
+    for (const packet of packets) {
+      addPath((packet as any).file_path ?? (packet as any).path ?? (packet as any).id);
+    }
+  }
+  return paths;
+};
+
+const collectResonancePaths = (runtime: ExecutionRuntime): string[] => {
+  const bundle = runtime.resonanceBundle ?? runtime.taskTrace?.resonance_bundle ?? null;
+  const selection = runtime.resonanceSelection ?? runtime.taskTrace?.resonance_selection ?? null;
+  const patch = pickPatchForSection({
+    bundle,
+    selection,
+    preferredPatchId: selection?.primaryPatchId ?? null,
+    intent: runtime.intent ?? classifyIntent(runtime.goal),
+  });
+  if (!patch) return [];
+  const nodes = patch.nodes ?? [];
+  return nodes.map((node) => node.filePath).filter((p): p is string => typeof p === "string" && p.trim().length > 0);
+};
+
+const hasWarpGrounding = (runtime: ExecutionRuntime, outputs: Map<string, unknown>): boolean => {
+  if (!needsWarpImplementationGrounding(runtime)) {
+    return true;
+  }
+  const paths = new Set<string>();
+  const knowledgePaths = collectKnowledgePaths(runtime.knowledgeContext ?? runtime.taskTrace?.knowledgeContext);
+  knowledgePaths.forEach((p) => paths.add(p));
+  collectResonancePaths(runtime).forEach((p) => paths.add(p));
+  collectRepoGraphPathsFromOutputs(outputs).forEach((p) => paths.add(p));
+  return Array.from(paths).some((p) => isWarpRelevantPath(p));
 };
 
 const composeResonancePatchSection = ({
@@ -250,13 +494,14 @@ const composeResonancePatchSection = ({
   selection,
   preferredPatchId,
   hotNodeLimit = 5,
+  intent,
 }: ResonanceSectionArgs): string => {
   const unavailable = (reason: string): string =>
     ["[Code Resonance Patch]", "status: unavailable", `reason: ${reason}`].join("\n");
   if (!bundle || !bundle.candidates || bundle.candidates.length === 0) {
     return unavailable("code lattice snapshot unavailable or no resonance seeds matched this goal");
   }
-  const patch = pickPatchForSection({ bundle, selection, preferredPatchId });
+  const patch = pickPatchForSection({ bundle, selection, preferredPatchId, intent });
   if (!patch) {
     return unavailable("no resonance patch ranked for this goal");
   }
@@ -783,6 +1028,19 @@ const normalizeDebateAttachments = (
     .filter(Boolean) as Array<{ title: string; url: string }>;
 };
 
+const friendlyToolLabel = (tool?: string, kind?: string): string | undefined => {
+  const name = (tool || kind || "").toLowerCase();
+  if (name.includes("repo.graph.search")) return "Repo search";
+  if (name.includes("debate.run")) return "Debate";
+  if (name.includes("debate.checklist")) return "Debate checklist";
+  if (name.includes("telemetry.badges")) return "Badge telemetry";
+  if (name.includes("telemetry.panels")) return "Panel telemetry";
+  if (name.includes("repo_ideation")) return "Repo ideation";
+  if (name.includes("repo_answer_review")) return "Answer review";
+  if (name.includes("summary.compose")) return "Sketchboard summary";
+  return undefined;
+};
+
 const buildDebateContext = (params: {
   patch: ResonancePatch;
   telemetrySummary?: string | null;
@@ -807,6 +1065,7 @@ export function buildCandidatePlansFromResonance(args: {
   telemetryBundle?: ConsoleTelemetryBundle | null;
   knowledgeHints?: string[];
   telemetrySummary?: string | null;
+  intent?: IntentFlags;
 }): ResonantPlanCandidate[] {
   const bundle = args.resonanceBundle;
   if (!bundle || !bundle.candidates || bundle.candidates.length === 0) {
@@ -819,12 +1078,20 @@ export function buildCandidatePlansFromResonance(args: {
     : args.manifest.some((tool) => tool.name === "llm.local.generate")
     ? "llm.local.generate"
     : "llm.http.generate";
+  const intentForClamp = args.intent ?? args.basePlan.intent ?? classifyIntent(args.basePlan.goal);
   const ranking = args.resonanceSelection?.ranking ?? [];
   const rankingOrder = ranking.map((entry) => entry.patchId);
   const topLimit = Math.max(1, Math.min(bundle.candidates.length, args.topPatches ?? 3));
+  const warpIntent = args.basePlan.intent?.wantsWarp || args.basePlan.intent?.wantsPhysics;
   const sortedPatches = bundle.candidates
     .slice()
     .sort((a, b) => {
+      // Prefer patches with warp/physics signals when the goal demands it.
+      const aWarp = warpIntent ? hasWarpSignals(a) : false;
+      const bWarp = warpIntent ? hasWarpSignals(b) : false;
+      if (aWarp !== bWarp) {
+        return aWarp ? -1 : 1;
+      }
       const aIndex = rankingOrder.indexOf(a.id);
       const bIndex = rankingOrder.indexOf(b.id);
       if (aIndex >= 0 || bIndex >= 0) {
@@ -838,7 +1105,14 @@ export function buildCandidatePlansFromResonance(args: {
 
   const candidates: ResonantPlanCandidate[] = [];
   for (const patch of sortedPatches) {
-    const knowledgeContext = mergeKnowledgeBundles(args.baseKnowledgeContext, [patch.knowledge]);
+    const filteredPatch = clampPatchForIntent(patch, intentForClamp);
+    if (!filteredPatch) {
+      continue;
+    }
+    const knowledgeContext = mergeKnowledgeBundles(
+      args.baseKnowledgeContext,
+      filteredPatch.knowledge ? [filteredPatch.knowledge] : [],
+    );
     const plannerPrompt = renderChatBPlannerPrompt({
       goal: args.basePlan.goal,
       personaId: args.personaId,
@@ -849,7 +1123,7 @@ export function buildCandidatePlansFromResonance(args: {
       knowledgeContext,
       resonanceBundle: args.resonanceBundle,
       resonanceSelection: args.resonanceSelection,
-      primaryPatchId: patch.id,
+      primaryPatchId: filteredPatch.id,
       telemetryBundle: args.telemetryBundle,
       knowledgeHints: args.knowledgeHints,
     });
@@ -864,7 +1138,7 @@ export function buildCandidatePlansFromResonance(args: {
       return id;
     };
 
-    const addTelemetry = args.manifest.some((tool) => tool.name === "telemetry.badges.read");
+    const addTelemetry = args.intent?.wantsStatus && args.manifest.some((tool) => tool.name === "telemetry.badges.read");
     if (addTelemetry) {
       nodes.push({
         id: nextId(),
@@ -875,9 +1149,9 @@ export function buildCandidatePlansFromResonance(args: {
       });
     }
 
-    const addChecklist = args.manifest.some(
-      (tool) => tool.name === "debate.checklist.generate" || tool.name === "checklist.method.generate",
-    );
+    const addChecklist =
+      args.intent?.wantsStatus &&
+      args.manifest.some((tool) => tool.name === "debate.checklist.generate" || tool.name === "checklist.method.generate");
     if (addChecklist) {
       nodes.push({
         id: nextId(),
@@ -893,7 +1167,7 @@ export function buildCandidatePlansFromResonance(args: {
       });
     }
 
-    const debateTriggers = computeDebateTriggers(args.basePlan.goal, patch, args.resonanceSelection);
+    const debateTriggers = computeDebateTriggers(args.basePlan.goal, filteredPatch, args.resonanceSelection);
     const shouldDebate = hasDebateTool && debateTriggers.length > 0;
     if (shouldDebate) {
       const debateStepId = nextId();
@@ -913,7 +1187,7 @@ export function buildCandidatePlansFromResonance(args: {
           topic: args.basePlan.goal,
           personaId: args.personaId ?? "default",
           context: buildDebateContext({
-            patch,
+            patch: filteredPatch,
             telemetrySummary,
             knowledgeHints: args.knowledgeHints,
             plannerPrompt,
@@ -922,18 +1196,18 @@ export function buildCandidatePlansFromResonance(args: {
           debateTriggers,
         },
       });
-      nodes.push({
-        id: nextId(),
-        kind: "CALL",
-        tool: narrationTool,
-        summaryRef: summaryId,
-        promptTemplate: buildDebateNarrationPrompt({
-          goal: args.basePlan.goal,
-          resonancePatch: patch,
-          telemetrySummary,
-          verdictFromStepId: debateStepId,
-          keyTurns: [],
-        }),
+        nodes.push({
+          id: nextId(),
+          kind: "CALL",
+          tool: narrationTool,
+          summaryRef: summaryId,
+          promptTemplate: buildDebateNarrationPrompt({
+            goal: args.basePlan.goal,
+            resonancePatch: filteredPatch,
+            telemetrySummary,
+            verdictFromStepId: debateStepId,
+            keyTurns: [],
+          }),
         extra: {
           narrationKind: "debate",
           verdictFrom: debateStepId,
@@ -953,7 +1227,7 @@ export function buildCandidatePlansFromResonance(args: {
         summaryRef: summaryId,
         promptTemplate: buildDirectNarrationPrompt({
           goal: args.basePlan.goal,
-          resonancePatch: patch,
+          resonancePatch: filteredPatch,
           telemetrySummary,
         }),
         extra: { narrationKind: "direct" },
@@ -961,7 +1235,7 @@ export function buildCandidatePlansFromResonance(args: {
     }
     const planDsl = formatPlanDsl(nodes);
     candidates.push({
-      patch,
+      patch: filteredPatch,
       knowledgeContext,
       plannerPrompt,
       nodes,
@@ -976,7 +1250,7 @@ function maybeInjectSpecialists(goal: string, planSteps: PlanNode[]): PlanNode[]
     return planSteps;
   }
   const normalized = goal.toLowerCase();
-  const mathPattern = /\b(compute|simplify|solve|calculate|derivative|integral|sum|equation|what is)\b/;
+  const mathPattern = /\b(compute|simplify|solve|calculate|derivative|integral|sum|equation|expression|formula)\b/;
   const inlineMath = /[-+*/=()\d\s]{4,}/;
   const isMath = mathPattern.test(normalized) || inlineMath.test(goal);
   if (!isMath) {
@@ -1010,28 +1284,271 @@ function maybeInjectSpecialists(goal: string, planSteps: PlanNode[]): PlanNode[]
 export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDsl: string } {
   const topK = clamp(args.topK ?? 5, 1, 10);
   const summaryFocus = args.summaryFocus?.trim() || DEFAULT_SUMMARY_FOCUS;
+  const strategy = args.strategy ?? "default";
+  const detailPref = args.detailPreference ?? "medium";
+  const intent = args.intent ?? classifyIntent(args.goal);
+  const repoQuery = normalizeForIntent(args.searchQuery || args.goal);
+  const resourceHints = args.resourceHints ?? [];
+  const seedPaths = Array.from(
+    new Set(
+      resourceHints
+        .map((hint) => hint.path)
+        .filter((p): p is string => typeof p === "string" && p.trim().length > 0),
+    ),
+  );
+  const needReview =
+    args.preferReviewed ||
+    strategy === "deep_repo_research" ||
+    strategy === "repo_design_ideation" ||
+    detailPref === "long";
   const nodes: PlanNode[] = [];
   let step = 1;
-  nodes.push({
-    id: `s${step++}`,
-    kind: "SEARCH",
-    query: args.searchQuery,
-    topK,
-    target: "memory",
-    note: `Ground goal "${args.goal}" with Essence memories`,
-  });
-  nodes.push({ id: `s${step++}`, kind: "SUMMARIZE", source: "s1", focus: summaryFocus });
+  const nextId = () => `s${step++}`;
 
-  if (process.env.ENABLE_DEBATE === "1") {
+  const addCoreSearchAndSummary = () => {
+    const searchId = nextId();
     nodes.push({
-      id: `s${step++}`,
+      id: searchId,
+      kind: "SEARCH",
+      query: args.searchQuery,
+      topK,
+      target: "memory",
+      note: `Ground goal "${args.goal}" with Essence memories`,
+    });
+    nodes.push({ id: nextId(), kind: "SUMMARIZE", source: searchId, focus: summaryFocus });
+  };
+
+  const buildDeepRepoPattern = () => {
+    addCoreSearchAndSummary();
+    const repoSearchId = nextId();
+    nodes.push({
+      id: repoSearchId,
+      kind: "CALL",
+      tool: "repo.graph.search",
+      summaryRef: "s2",
+      promptTemplate: "Explore repository graph for relations around {{goal}}. Use summary for hints: {{summary}}",
+      extra: {
+        query: repoQuery,
+        limit: Math.max(12, topK + 5),
+        intentTags: intent.wantsWarp || intent.wantsPhysics ? ["warp-physics"] : undefined,
+        seedPaths: seedPaths.length ? seedPaths : undefined,
+      },
+    });
+    const sketchId = nextId();
+    const sketchFocus =
+      "Repo sketchboard: key files/symbols, flows/calls, imports, tests, risks, and inline paths. Keep bullets tight.";
+    nodes.push({
+      id: sketchId,
+      kind: "SUMMARIZE",
+      source: repoSearchId,
+      focus: detailPref === "short" ? `${sketchFocus} Compress to short bullets.` : sketchFocus,
+    });
+    const finalCallId = nextId();
+    nodes.push({
+      id: finalCallId,
+      kind: "CALL",
+      tool: args.finalTool,
+      summaryRef: "s2",
+      promptTemplate: [
+        "You are Chat B, compiling an actionable repo answer as a tool (not a persona).",
+        "Persona: {{persona}}",
+        "Goal: {{goal}}",
+        "Grounded memory context:",
+        "{{summary}}",
+        "Use repo sketchboard for structure; cite file paths/symbols inline.",
+        "Separate 'Facts from repo' vs 'Inferred suggestions'.",
+        "Perform TIMAR review inline: Traceability, Impact, Mitigations, Alternatives, Risks.",
+        detailPref === "short" ? "Keep it concise; compress bullets and flows." : "Provide clear bullets and flow notes.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      extra: {
+        appendSummaries: ["s2", sketchId],
+        reasoningStrategy: strategy,
+        timarReview: true,
+      },
+    });
+    if (process.env.ENABLE_SPECIALISTS === "1") {
+      nodes.push({
+        id: nextId(),
+        kind: "SOLVE",
+        solver: "philo.synthesis",
+        summaryRef: finalCallId,
+        verifier: process.env.ENABLE_SYMPY_VERIFIER === "1" ? "math.sympy.verify" : undefined,
+        params: { focus: "repo-plan-verify" },
+      });
+    }
+    if (needReview && process.env.ENABLE_SPECIALISTS === "1") {
+      nodes.push({
+        id: nextId(),
+        kind: "SOLVE",
+        solver: "repo_answer_review",
+        summaryRef: finalCallId,
+        params: { concepts_from_summary: true, require_citations: true },
+      });
+    }
+  };
+
+  const buildRepoDesignIdeation = () => {
+    addCoreSearchAndSummary();
+    const repoSearchId = nextId();
+    nodes.push({
+      id: repoSearchId,
+      kind: "CALL",
+      tool: "repo.graph.search",
+      summaryRef: "s2",
+      promptTemplate: "Explore repository graph for design target. Use summary hints: {{summary}}",
+      extra: {
+        query: repoQuery,
+        limit: Math.max(14, topK + 6),
+        intentTags: intent.wantsWarp || intent.wantsPhysics ? ["warp-physics"] : undefined,
+        seedPaths: seedPaths.length ? seedPaths : undefined,
+      },
+    });
+    const archSummaryId = nextId();
+    const archFocus =
+      "Current subsystem architecture: key files/symbols, data/flow, imports, tests, risks. Extract a concept list (bullet form).";
+    nodes.push({
+      id: archSummaryId,
+      kind: "SUMMARIZE",
+      source: repoSearchId,
+      focus: detailPref === "short" ? `${archFocus} Compress bullets.` : archFocus,
+    });
+    const ideateId = process.env.ENABLE_SPECIALISTS === "1" ? nextId() : null;
+    if (ideateId) {
+      nodes.push({
+        id: ideateId,
+        kind: "SOLVE",
+        solver: "repo_ideation",
+        summaryRef: archSummaryId,
+        params: { concepts_from_summary: true, max_options: 4 },
+      });
+    }
+    if (process.env.ENABLE_DEBATE === "1" && ideateId) {
+      nodes.push({
+        id: nextId(),
+        kind: "CALL",
+        tool: "debate.run",
+        summaryRef: ideateId,
+        promptTemplate: "Run debate over the proposed repo design/refactor ideas.",
+        extra: {
+          topic: args.goal,
+          budgets: { max_rounds: 2, max_wall_ms: 90000 },
+          debateTriggers: ["design", "refactor", "architecture", "feasibility", "novelty"],
+        },
+      });
+    }
+    const finalCallId = nextId();
+    nodes.push({
+      id: finalCallId,
+      kind: "CALL",
+      tool: args.finalTool,
+      summaryRef: archSummaryId,
+      promptTemplate: [
+        "You are Chat B, turn the selected repo design idea into a plan and checklist.",
+        "Persona: {{persona}}",
+        "Goal: {{goal}}",
+        "Architecture sketch:",
+        "{{summary}}",
+        "Include ideation outcomes and debate verdict; cite file paths/symbols inline.",
+        "Separate 'Facts from repo' vs 'Plan / Suggested changes'.",
+        "Output: concise explanation + optional checklist of code changes.",
+        detailPref === "short" ? "Keep answers tight; avoid fluff." : "Be clear and specific; keep bullets short.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      extra: {
+        appendSummaries: ideateId ? [archSummaryId, ideateId, "s2"] : [archSummaryId, "s2"],
+        reasoningStrategy: strategy,
+        timarReview: true,
+      },
+    });
+    if (needReview && process.env.ENABLE_SPECIALISTS === "1") {
+      nodes.push({
+        id: nextId(),
+        kind: "SOLVE",
+        solver: "repo_answer_review",
+        summaryRef: ideateId ?? archSummaryId,
+        params: { concepts_from_summary: true, require_citations: true },
+      });
+    }
+  };
+
+  if (strategy === "deep_repo_research") {
+    buildDeepRepoPattern();
+    const enriched = maybeInjectSpecialists(args.goal, nodes);
+    return { nodes: enriched, planDsl: formatPlanDsl(enriched) };
+  }
+
+  if (strategy === "repo_design_ideation") {
+    buildRepoDesignIdeation();
+    const enriched = maybeInjectSpecialists(args.goal, nodes);
+    return { nodes: enriched, planDsl: formatPlanDsl(enriched) };
+  }
+
+  addCoreSearchAndSummary();
+
+  if (strategy === "design-debate" && process.env.ENABLE_DEBATE === "1") {
+    nodes.push({
+      id: nextId(),
+      kind: "CALL",
+      tool: "debate.checklist.generate",
+      summaryRef: "s2",
+      promptTemplate:
+        "Generate a falsifiability checklist for this design/refactor goal. Keep it concise and focused on risk and verification.",
+      extra: { goal: args.goal, frames: { observer: "operator", timescale: "session", domain: "repo" } },
+    });
+    nodes.push({
+      id: nextId(),
+      kind: "CALL",
+      tool: "debate.run",
+      summaryRef: "s2",
+      promptTemplate: "Run a lightweight debate on the proposed design/refactor plan.",
+      extra: {
+        topic: args.goal,
+        budgets: { max_rounds: 2, max_wall_ms: 120000 },
+        debateTriggers: ["design", "refactor", "architecture"],
+      },
+    });
+  }
+
+  const repoSupport = intent.wantsWarp || intent.wantsImplementation || intent.wantsPhysics;
+  let repoSummaryId: string | null = null;
+  if (repoSupport) {
+    const repoSearchId = nextId();
+    nodes.push({
+      id: repoSearchId,
+      kind: "CALL",
+      tool: "repo.graph.search",
+      summaryRef: "s2",
+      promptTemplate:
+        "Scan repo for physics/warp/pipeline context around {{goal}}. Prioritize modules/warp, modules/dynamic, energy-pipeline.ts, natario-metric, target-validation, stress-energy, casimir docs, and related papers. Use summary hints: {{summary}}",
+      extra: {
+        query: repoQuery,
+        limit: Math.max(12, topK + 6),
+        intentTags: intent.wantsWarp || intent.wantsPhysics ? ["warp-physics"] : undefined,
+      },
+    });
+    repoSummaryId = nextId();
+    nodes.push({
+      id: repoSummaryId,
+      kind: "SUMMARIZE",
+      source: repoSearchId,
+      focus:
+        "Key physics/warp/pipeline files, functions, parameters, telemetry hooks, and how the website computes or renders the solution. Keep bullets tight with file paths.",
+    });
+  }
+
+  if (process.env.ENABLE_DEBATE === "1" && intent.wantsStatus) {
+    nodes.push({
+      id: nextId(),
       kind: "CALL",
       tool: "telemetry.badges.read",
       summaryRef: "s2",
       promptTemplate: "Collect badge telemetry to ground debate context.",
     });
     nodes.push({
-      id: `s${step++}`,
+      id: nextId(),
       kind: "CALL",
       tool: "debate.checklist.generate",
       summaryRef: "s2",
@@ -1045,24 +1562,31 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
   }
 
   nodes.push({
-    id: `s${step++}`,
+    id: nextId(),
     kind: "CALL",
     tool: args.finalTool,
     summaryRef: "s2",
     promptTemplate: [
-      "You are Chat B, compiling an actionable response.",
+      "You are Chat B, compiling an actionable response as a tool (not a persona).",
       "Persona: {{persona}}",
       "Goal: {{goal}}",
-      "Grounded context:",
+      "Grounded context (memory):",
       "{{summary}}",
-      "Return the next concrete action or answer with provenance notes when possible.",
-    ].join("\n"),
+      "Perform TIMAR review inline: Traceability, Impact, Mitigations, Alternatives, Risks.",
+      "Return the next concrete action or answer with provenance notes; avoid emotions or confessional language.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    extra: {
+      appendSummaries: repoSummaryId ? ["s2", repoSummaryId] : ["s2"],
+      reasoningStrategy: strategy,
+      timarReview: true,
+    },
   });
 
   const enriched = maybeInjectSpecialists(args.goal, nodes);
   return { nodes: enriched, planDsl: formatPlanDsl(enriched) };
 }
-
 export function compilePlan(nodes: PlanNode[]): ExecutorStep[] {
   return nodes.map((node): ExecutorStep => {
     switch (node.kind) {
@@ -1128,10 +1652,32 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
   const budgetBytes = Number(process.env.KV_BUDGET_BYTES ?? DEFAULT_KV_BUDGET_BYTES);
   runtime.debateId = runtime.debateId ?? runtime.taskTrace?.debate_id ?? null;
   runtime.debateOutcome = runtime.debateOutcome ?? null;
+  runtime.strategy = (runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined) as
+    | ReasoningStrategy
+    | undefined;
   runtime.telemetrySummary = runtime.telemetrySummary ?? runtime.taskTrace?.telemetry_summary ?? null;
   runtime.resonanceBundle = runtime.resonanceBundle ?? runtime.taskTrace?.resonance_bundle ?? null;
   runtime.resonanceSelection = runtime.resonanceSelection ?? runtime.taskTrace?.resonance_selection ?? null;
   runtime.plannerPrompt = runtime.plannerPrompt ?? runtime.taskTrace?.planner_prompt ?? null;
+  runtime.intent = runtime.intent ?? classifyIntent(runtime.goal);
+  const debugSourcesEnabled = Boolean(runtime.debugSources ?? runtime.taskTrace?.debug_sources);
+  runtime.debugSources = debugSourcesEnabled;
+  if (debugSourcesEnabled) {
+    const groundingHolder: { groundingReport?: GroundingReport } = {
+      groundingReport: runtime.groundingReport ?? runtime.taskTrace?.grounding_report ?? undefined,
+    };
+    ensureGroundingReport(groundingHolder);
+    recordResonancePatchSources(groundingHolder, {
+      bundle: runtime.resonanceBundle,
+      selection: runtime.resonanceSelection,
+      filterNode:
+        runtime.intent?.wantsWarp || runtime.intent?.wantsPhysics
+          ? (node) => isWarpRelevantPath(node.filePath) || isWarpRelevantPath(node.symbol ?? "")
+          : undefined,
+    });
+    recordKnowledgeSources(groundingHolder, runtime.knowledgeContext ?? runtime.taskTrace?.knowledgeContext);
+    runtime.groundingReport = groundingHolder.groundingReport;
+  }
   const outputs = new Map<string, unknown>();
   const citationsByStep = new Map<string, string[]>();
   const results: ExecutionResult[] = [];
@@ -1146,10 +1692,35 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         const hits = await searchMemories(step.query, step.topK);
         output = hits;
         citations = hits.map((hit) => hit.id);
+        if (debugSourcesEnabled && hits.length > 0) {
+          const memorySources: GroundingSource[] = hits.map((hit) => ({
+            kind: "memory",
+            id: (hit as any).envelope_id ?? hit.id,
+            path: (hit as any).path ?? (hit as any).sourcePath,
+            extra: { score: hit.score },
+          }));
+          pushGroundingSources(runtime, memorySources);
+        }
       } else if (step.kind === "summary.compose") {
         const source = outputs.get(step.source);
-        const hits = Array.isArray(source) ? (source as TMemorySearchHit[]) : [];
+        const hits = Array.isArray(source)
+          ? (source as TMemorySearchHit[])
+          : Array.isArray((source as any)?.hits)
+            ? ((source as any).hits as TMemorySearchHit[])
+            : [];
         output = summarizeHits(hits, step.focus, runtime.goal);
+        if (debugSourcesEnabled && hits.length > 0) {
+          const paths = hits
+            .map((hit) => (hit as any).path ?? (hit as any).sourcePath)
+            .filter((p): p is string => typeof p === "string" && p.trim().length > 0);
+          if (paths.length > 0) {
+            pushGroundingSource(runtime, {
+              kind: "memory",
+              id: step.source,
+              extra: { paths: Array.from(new Set(paths)) },
+            });
+          }
+        }
         const inherited = citationsByStep.get(step.source) ?? [];
         citations = inherited.length > 0 ? [...inherited] : [step.source];
       } else if (step.kind === "debate.start") {
@@ -1197,6 +1768,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           essenceId: undefined,
           seed: undefined,
           debateId,
+          strategy: runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined,
         });
         output = { debateId, goal: topic };
         citations = [];
@@ -1213,6 +1785,13 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         if (runtime.taskTrace) {
           runtime.taskTrace.debate_id = debateId;
         }
+        if (debugSourcesEnabled && outcome) {
+          pushGroundingSource(runtime, {
+            kind: "debate",
+            id: debateId,
+            extra: { confidence: outcome.confidence, verdict: outcome.verdict, key_turn_ids: outcome.key_turn_ids },
+          });
+        }
         const duration = Date.now() - stepStart;
         appendToolLog({
           tool: "debate.consume",
@@ -1228,122 +1807,262 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           essenceId: undefined,
           seed: undefined,
           debateId,
+          strategy: runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined,
         });
         output = { debateId, outcome: outcome ?? null };
         citations = outcome?.key_turn_ids ?? [];
       } else if (step.kind === "debate.run") {
         const tool = getTool(step.tool);
         if (!tool) {
-          throw new Error(`Tool "${step.tool}" is not registered.`);
+          const duration = Date.now() - stepStart;
+          const error: ExecutionError = { message: `Tool "${step.tool}" not found`, type: "tool_unavailable" };
+          metrics.recordTool(step.tool, duration, false);
+          results.push({
+            id: step.id,
+            kind: step.kind,
+            ok: false,
+            output: null,
+            error,
+            citations: [],
+            latency_ms: duration,
+            essence_ids: [],
+          });
+          citationsByStep.set(step.id, []);
+          break;
         }
         await ensureToolApprovals(tool, runtime);
         const summary = step.summaryRef ? outputs.get(step.summaryRef) : undefined;
         const summaryText = formatSummaryForPrompt(summary);
-        const topic = (step.topic ?? "").trim() || summaryText || runtime.goal;
-        const rawContext = step.context ?? {};
-        const context = {
-          ...rawContext,
-          planner_prompt:
-            (rawContext as { planner_prompt?: string }).planner_prompt ??
-            runtime.plannerPrompt ??
-            runtime.taskTrace?.planner_prompt,
-          telemetry_summary:
-            (rawContext as { telemetry_summary?: string | null }).telemetry_summary ?? runtime.telemetrySummary,
-          knowledge_hints: (rawContext as { knowledge_hints?: string[] }).knowledge_hints ?? runtime.knowledgeHints,
-          resonance_patch:
-            (rawContext as { resonance_patch?: unknown }).resonance_patch ??
-            runtime.resonanceSelection ??
-            runtime.resonanceBundle,
-        };
-        const contextWithAttachments = {
-          ...context,
-          attachments: normalizeDebateAttachments(
-            (context as { attachments?: Array<{ title?: string; url?: string }> }).attachments,
-          ),
-        };
-        const input = {
-          topic,
-          personaId: step.personaId ?? runtime.personaId ?? "default",
-          context: contextWithAttachments,
-          budgets: step.budgets,
-        };
-        const paramsHash = hashPayload(input);
-        const toolStart = Date.now();
-        let toolError: unknown;
-        let result: any;
-        let essenceId: string | undefined;
-        try {
-          result = await tool.handler(input, {
-            sessionId,
-            goal: runtime.goal,
-            personaId: runtime.personaId ?? "default",
-          });
-          essenceId = extractEssenceId(result);
-        } catch (err) {
-          toolError = err;
-        } finally {
-          const duration = Date.now() - toolStart;
-          const ok = !toolError;
-          metrics.recordTool(step.tool, duration, ok);
-          const logDebateId =
-            result && typeof result === "object"
-              ? ((result as { debateId?: string; debate_id?: string }).debateId ??
-                (result as { debate_id?: string }).debate_id)
-              : undefined;
+        const ungroundedSummary = isUngroundedSummary(summaryText);
+        const missingGrounding = needsWarpImplementationGrounding(runtime) && !hasWarpGrounding(runtime, outputs);
+        if (ungroundedSummary || missingGrounding) {
+          const debateId: string = runtime.debateId ?? step.id;
+          const skippedOutcome: TDebateOutcome = {
+            debate_id: debateId,
+            verdict: missingGrounding ? "skipped_no_grounding" : "skipped_no_evidence",
+            confidence: 0,
+            winning_role: undefined,
+            key_turn_ids: [],
+            rounds: 0,
+            stop_reason: missingGrounding ? "no_grounding" : "no_evidence",
+            score: 0,
+            metrics: undefined,
+            created_at: new Date().toISOString(),
+          };
+          output = {
+            debateId,
+            verdict: skippedOutcome.verdict,
+            stop_reason: skippedOutcome.stop_reason,
+            confidence: 0,
+            key_turn_ids: [],
+          };
+          citations = [];
+          runtime.debateId = debateId;
+          runtime.debateOutcome = skippedOutcome;
+          if (runtime.taskTrace) {
+            runtime.taskTrace.debate_id = debateId;
+          }
+          if (debugSourcesEnabled) {
+            pushGroundingSource(runtime, {
+              kind: "debate",
+              id: debateId,
+              extra: { confidence: skippedOutcome.confidence, verdict: skippedOutcome.verdict, stop_reason: skippedOutcome.stop_reason },
+            });
+          }
+          const duration = Date.now() - stepStart;
+          metrics.recordTool(step.tool, duration, true);
           appendToolLog({
             tool: step.tool,
             version: (tool as any).version ?? "unknown",
-            paramsHash,
-            promptHash: paramsHash,
-            seed: (input as { seed?: unknown }).seed,
-            sessionId,
-            traceId: runtime.taskTrace?.id ?? sessionId,
-            durationMs: duration,
-            ok,
-            error: toolError ? formatToolError(toolError) : undefined,
-            essenceId,
-            stepId: step.id,
-            debateId: logDebateId,
-          });
-        }
-        if (toolError) {
-          throw toolError;
-        }
-        const debateId =
-          (result as { debateId?: string; debate_id?: string }).debateId ?? (result as { debate_id?: string }).debate_id ?? null;
-        const confidenceRaw = (result as { confidence?: number }).confidence;
-        const confidence = Number.isFinite(confidenceRaw ?? NaN) ? Number(confidenceRaw) : 0;
-        const keyTurnIds = Array.isArray((result as { key_turn_ids?: string[] }).key_turn_ids)
-          ? ((result as { key_turn_ids?: string[] }).key_turn_ids ?? []).filter((id) => typeof id === "string")
-          : [];
-        const verdict = (result as { verdict?: string }).verdict ?? "unknown";
-        output = { debateId, verdict, confidence, key_turn_ids: keyTurnIds };
-        citations = keyTurnIds;
-        const debateOutcome: TDebateOutcome = {
-          debate_id: debateId ?? runtime.debateId ?? step.id,
-          verdict,
-          confidence,
-          winning_role: (result as { winning_role?: TDebateOutcome["winning_role"] }).winning_role,
-          key_turn_ids: keyTurnIds,
-          created_at: new Date().toISOString(),
-        };
-        if (essenceId) {
-          stepEssenceIds = [essenceId];
-        }
-        runtime.debateId = debateOutcome.debate_id;
-        runtime.debateOutcome = debateOutcome;
-        if (runtime.taskTrace) {
-          runtime.taskTrace.debate_id = debateOutcome.debate_id;
+            paramsHash: hashPayload({ skipped: true }),
+            promptHash: hashText(summaryText || runtime.goal),
+              seed: (summary as { seed?: unknown } | undefined)?.seed,
+              sessionId,
+              traceId: runtime.taskTrace?.id ?? sessionId,
+              durationMs: duration,
+              ok: true,
+              error: undefined,
+              essenceId: undefined,
+              stepId: step.id,
+              debateId,
+              strategy: runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined,
+              text: missingGrounding ? "Debate skipped (no grounding)" : "Debate skipped (no evidence)",
+            });
+        } else {
+          const topic = (step.topic ?? "").trim() || summaryText || runtime.goal;
+          const rawContext = step.context ?? {};
+          const context = {
+            ...rawContext,
+            planner_prompt:
+              (rawContext as { planner_prompt?: string }).planner_prompt ??
+              runtime.plannerPrompt ??
+              runtime.taskTrace?.planner_prompt,
+            telemetry_summary:
+              (rawContext as { telemetry_summary?: string | null }).telemetry_summary ?? runtime.telemetrySummary,
+            knowledge_hints: (rawContext as { knowledge_hints?: string[] }).knowledge_hints ?? runtime.knowledgeHints,
+            resonance_patch:
+              (rawContext as { resonance_patch?: unknown }).resonance_patch ??
+              runtime.resonanceSelection ??
+              runtime.resonanceBundle,
+          };
+          const contextWithAttachments = {
+            ...context,
+            attachments: normalizeDebateAttachments(
+              (context as { attachments?: Array<{ title?: string; url?: string }> }).attachments,
+            ),
+          };
+          const input = {
+            topic,
+            personaId: step.personaId ?? runtime.personaId ?? "default",
+            context: contextWithAttachments,
+            budgets: step.budgets,
+          };
+          const paramsHash = hashPayload(input);
+          const toolStart = Date.now();
+          let toolError: unknown;
+          let result: any;
+          let essenceId: string | undefined;
+          try {
+            result = await tool.handler(input, {
+              sessionId,
+              goal: runtime.goal,
+              personaId: runtime.personaId ?? "default",
+            });
+            essenceId = extractEssenceId(result);
+          } catch (err) {
+            toolError = err;
+          } finally {
+            const duration = Date.now() - toolStart;
+            const ok = !toolError;
+            metrics.recordTool(step.tool, duration, ok);
+            const logDebateId =
+              result && typeof result === "object"
+                ? ((result as { debateId?: string; debate_id?: string }).debateId ??
+                  (result as { debate_id?: string }).debate_id)
+                : undefined;
+            appendToolLog({
+              tool: step.tool,
+              version: (tool as any).version ?? "unknown",
+              paramsHash,
+              promptHash: paramsHash,
+              seed: (input as { seed?: unknown }).seed,
+              sessionId,
+              traceId: runtime.taskTrace?.id ?? sessionId,
+              durationMs: duration,
+              ok,
+              error: toolError ? formatToolError(toolError) : undefined,
+              essenceId,
+              stepId: step.id,
+              debateId: logDebateId,
+              strategy: runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined,
+              text: friendlyToolLabel(step.tool, step.kind),
+            });
+          }
+          if (toolError) {
+            throw toolError;
+          }
+          const debateId =
+            (result as { debateId?: string; debate_id?: string }).debateId ?? (result as { debate_id?: string }).debate_id ?? null;
+          const confidenceRaw = (result as { confidence?: number }).confidence;
+          const confidence = Number.isFinite(confidenceRaw ?? NaN) ? Number(confidenceRaw) : 0;
+          const stopReason =
+            (result as { stop_reason?: string }).stop_reason ??
+            (result as { stopReason?: string }).stopReason ??
+            undefined;
+          const scoreRaw = (result as { score?: number }).score;
+          const score = Number.isFinite(scoreRaw ?? NaN) ? Number(scoreRaw) : undefined;
+          const roundsRaw = (result as { rounds?: number }).rounds;
+          const rounds = Number.isFinite(roundsRaw ?? NaN) ? Math.max(0, Math.floor(roundsRaw as number)) : undefined;
+          const metricsResult = (result as { metrics?: TDebateRoundMetrics }).metrics;
+          const keyTurnIds = Array.isArray((result as { key_turn_ids?: string[] }).key_turn_ids)
+            ? ((result as { key_turn_ids?: string[] }).key_turn_ids ?? []).filter((id) => typeof id === "string")
+            : [];
+          const verdict = (result as { verdict?: string }).verdict ?? "unknown";
+          output = {
+            debateId,
+            verdict,
+            confidence,
+            key_turn_ids: keyTurnIds,
+            winning_role: (result as { winning_role?: TDebateOutcome["winning_role"] }).winning_role,
+            stop_reason: stopReason,
+            score,
+            rounds,
+            metrics: metricsResult,
+          };
+          citations = keyTurnIds;
+          const debateOutcome: TDebateOutcome = {
+            debate_id: debateId ?? runtime.debateId ?? step.id,
+            verdict,
+            confidence,
+            winning_role: (result as { winning_role?: TDebateOutcome["winning_role"] }).winning_role,
+            key_turn_ids: keyTurnIds,
+            rounds: rounds ?? 0,
+            stop_reason: stopReason,
+            score: score ?? 0,
+            metrics: metricsResult,
+            created_at: new Date().toISOString(),
+          };
+          if (essenceId) {
+            stepEssenceIds = [essenceId];
+          }
+          runtime.debateId = debateOutcome.debate_id;
+          runtime.debateOutcome = debateOutcome;
+          if (runtime.taskTrace) {
+            runtime.taskTrace.debate_id = debateOutcome.debate_id;
+          }
+          if (debugSourcesEnabled) {
+            pushGroundingSource(runtime, {
+              kind: "debate",
+              id: debateOutcome.debate_id,
+              extra: { confidence: debateOutcome.confidence, verdict: debateOutcome.verdict, key_turn_ids: debateOutcome.key_turn_ids },
+            });
+          }
         }
       } else if (step.kind === "tool.call") {
         const tool = getTool(step.tool);
         if (!tool) {
-          throw new Error(`Tool "${step.tool}" is not registered.`);
+          const duration = Date.now() - stepStart;
+          const error: ExecutionError = { message: `Tool "${step.tool}" not found`, type: "tool_unavailable" };
+          metrics.recordTool(step.tool, duration, false);
+          results.push({
+            id: step.id,
+            kind: step.kind,
+            ok: false,
+            output: null,
+            error,
+            citations: [],
+            latency_ms: duration,
+            essence_ids: [],
+          });
+          citationsByStep.set(step.id, []);
+          break;
+        }
+        const toolNameLower = step.tool.toLowerCase();
+        const requiresWarpGrounding = needsWarpImplementationGrounding(runtime);
+        const missingGrounding = requiresWarpGrounding && !hasWarpGrounding(runtime, outputs);
+        if (missingGrounding && toolNameLower.startsWith("telemetry.")) {
+          const duration = Date.now() - stepStart;
+          output = { skipped: true, reason: "missing_grounding" };
+          citations = [];
+          metrics.recordTool(step.tool, duration, true);
+          results.push({
+            id: step.id,
+            kind: step.kind,
+            ok: true,
+            output,
+            citations,
+            latency_ms: duration,
+            essence_ids: [],
+          });
+          outputs.set(step.id, output);
+          citationsByStep.set(step.id, citations);
+          continue;
         }
         await ensureToolApprovals(tool, runtime);
         const summary = step.summaryRef ? outputs.get(step.summaryRef) : undefined;
         const summaryText = formatSummaryForPrompt(summary);
-        const telemetrySummary = runtime.telemetrySummary ?? runtime.taskTrace?.telemetry_summary ?? null;
+        const wantsStatus = runtime.intent?.wantsStatus ?? false;
+        const telemetrySummary = wantsStatus ? runtime.telemetrySummary ?? runtime.taskTrace?.telemetry_summary ?? null : null;
         const resonanceBundle = runtime.resonanceBundle ?? runtime.taskTrace?.resonance_bundle ?? null;
         const resonanceSelection =
           runtime.resonanceSelection ?? runtime.taskTrace?.resonance_selection ?? null;
@@ -1351,11 +2070,25 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           bundle: resonanceBundle,
           selection: resonanceSelection,
           preferredPatchId: resonanceSelection?.primaryPatchId,
+          intent: runtime.intent ?? classifyIntent(runtime.goal),
         });
         let promptTemplate = step.promptTemplate;
         const narrationKind = (step.extra as { narrationKind?: string | null } | undefined)?.narrationKind;
         const verdictFrom = (step.extra as { verdictFrom?: string | null } | undefined)?.verdictFrom;
-        if (narrationKind === "debate") {
+        const ungroundedSummary = isUngroundedSummary(summaryText);
+        const debateSkipped =
+          runtime.debateOutcome?.stop_reason === "no_evidence" ||
+          runtime.debateOutcome?.verdict === "skipped_no_evidence";
+        const effectiveNarrationKind =
+          narrationKind === "debate" && !ungroundedSummary && !debateSkipped ? "debate" : "direct";
+        if (ungroundedSummary) {
+          promptTemplate = [
+            "You are Chat B. Provide a concise, self-contained answer to the goal using general/domain knowledge.",
+            "Do not repeat that no data was found. Avoid telemetry chatter; respond directly to the question.",
+            "Keep it short and factual, with a brief definition plus 3-5 key points the operator needs to know.",
+            "Goal: {{goal}}",
+          ].join("\n");
+        } else if (effectiveNarrationKind === "debate") {
           promptTemplate = buildDebateNarrationPrompt({
             goal: runtime.goal,
             resonancePatch: patchForPrompt ?? undefined,
@@ -1363,17 +2096,18 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
             verdictFromStepId: verdictFrom ?? undefined,
             keyTurns: runtime.debateOutcome?.key_turn_ids ?? [],
           });
-        } else if (narrationKind === "direct") {
+        } else {
           promptTemplate = buildDirectNarrationPrompt({
             goal: runtime.goal,
             resonancePatch: patchForPrompt ?? undefined,
             telemetrySummary,
           });
         }
+        const summaryForPrompt = ungroundedSummary ? "" : summaryText;
         const appendixHeading = formatKnowledgeHeading("Attached knowledge", runtime.knowledgeHints);
         const appendix = composeKnowledgeAppendix({
           goal: runtime.goal,
-          summary: summaryText,
+          summary: summaryForPrompt,
           knowledgeContext: runtime.knowledgeContext,
           maxChars: 1200,
           maxSnippets: 3,
@@ -1383,26 +2117,60 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         const promptBase = renderTemplate(promptTemplate, {
           goal: runtime.goal,
           persona: runtime.personaId ?? "default",
-          summary: summaryText,
+          summary: summaryForPrompt,
           debate: debateNote ?? "",
         });
         const resonanceSection = composeResonancePatchSection({
           bundle: resonanceBundle,
           selection: resonanceSelection,
           preferredPatchId: resonanceSelection?.primaryPatchId,
+          intent: runtime.intent ?? classifyIntent(runtime.goal),
         });
+        const extraSummariesRaw =
+          Array.isArray((step.extra as { appendSummaries?: string[] } | undefined)?.appendSummaries) &&
+          (step.extra as { appendSummaries?: string[] }).appendSummaries
+            ? (step.extra as { appendSummaries?: string[] }).appendSummaries!.map((ref) =>
+                formatSummaryForPrompt(outputs.get(ref)),
+              )
+            : [];
+        const extraSummaries = ungroundedSummary
+          ? []
+          : extraSummariesRaw.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
+        const extraSummaryBlock =
+          extraSummaries.length > 0 ? ["[Additional grounded context]", ...extraSummaries].join("\n") : "";
+        const hasGrounding =
+          !ungroundedSummary &&
+          ((resonanceSection && resonanceSection.trim().length > 0) ||
+            (appendix.text && appendix.text.trim().length > 0) ||
+            extraSummaries.length > 0 ||
+            (telemetrySummary && telemetrySummary.trim().length > 0) ||
+            (debateNote && debateNote.trim().length > 0));
+
+        if (!hasGrounding) {
+          // Avoid hallucinating when no grounded repo/docs/telemetry exist.
+          promptTemplate = [
+            "You have no grounded repo/docs/telemetry for this question.",
+            "Say clearly that no grounded evidence is available from the codebase or knowledge store.",
+            "If you must answer, keep it to a one-line limitation notice; do not improvise theory.",
+            "Goal: {{goal}}",
+          ].join("\n");
+        }
+
         const sections: string[] = [];
-        if (resonanceSection) {
+        if (!ungroundedSummary && resonanceSection) {
           sections.push(resonanceSection);
         }
-        if (appendix.text) {
+        if (!ungroundedSummary && appendix.text) {
           sections.push(appendix.text);
         }
+        if (extraSummaryBlock) {
+          sections.push(extraSummaryBlock);
+        }
         sections.push(promptBase);
-        if (telemetrySummary) {
+        if (!ungroundedSummary && telemetrySummary) {
           sections.push(`[Panel snapshot]\n${telemetrySummary}`);
         }
-        if (debateNote && step.extra?.useDebate) {
+        if (!ungroundedSummary && debateNote && step.extra?.useDebate) {
           sections.push(debateNote);
         }
         const prompt = sections.filter(Boolean).join("\n\n");
@@ -1441,6 +2209,28 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         if (runtime.taskTrace) {
           runtime.taskTrace.prompt_hash = promptHash;
         }
+        const missingGroundingNow = requiresWarpGrounding && !hasWarpGrounding(runtime, outputs);
+        if (missingGroundingNow && toolNameLower.startsWith("llm.")) {
+          const duration = Date.now() - stepStart;
+          const message =
+            "Insufficient grounded repo/doc context for this warp/implementation question. Please attach modules/warp code or theory docs (e.g., docs/alcubierre-alignment.md) before retrying.";
+          output = { message, reason: "missing_grounding" };
+          citations = [];
+          metrics.recordTool(step.tool, duration, false);
+          results.push({
+            id: step.id,
+            kind: step.kind,
+            ok: false,
+            output,
+            error: { message, type: "missing_grounding" },
+            citations,
+            latency_ms: duration,
+            essence_ids: [],
+          });
+          outputs.set(step.id, output);
+          citationsByStep.set(step.id, citations);
+          continue;
+        }
         const toolStart = Date.now();
         const paramsHash = hashPayload(input);
         let toolError: unknown;
@@ -1460,6 +2250,10 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
               confidence?: number;
               key_turn_ids?: string[];
               winning_role?: TDebateOutcome["winning_role"];
+              stop_reason?: string;
+              score?: number;
+              rounds?: number;
+              metrics?: TDebateRoundMetrics;
             };
             const debateOutcome: TDebateOutcome = {
               debate_id: verdict.debate_id ?? verdict.debateId ?? runtime.debateId ?? step.id,
@@ -1467,6 +2261,10 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
               confidence: typeof verdict.confidence === "number" ? verdict.confidence : 0,
               winning_role: verdict.winning_role,
               key_turn_ids: verdict.key_turn_ids ?? [],
+              stop_reason: verdict.stop_reason,
+              score: typeof verdict.score === "number" ? verdict.score : 0,
+              rounds: typeof verdict.rounds === "number" ? Math.max(0, Math.floor(verdict.rounds)) : 0,
+              metrics: verdict.metrics,
               created_at: new Date().toISOString(),
             };
             runtime.debateId = debateOutcome.debate_id;
@@ -1495,6 +2293,8 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
             error: toolError ? formatToolError(toolError) : undefined,
             essenceId,
             stepId: step.id,
+            strategy: runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined,
+            text: friendlyToolLabel(step.tool, step.kind),
           });
         }
         const debateCitations =
@@ -1502,6 +2302,76 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
             ? runtime.debateOutcome.key_turn_ids
             : [];
         citations = step.summaryRef ? [...(citationsByStep.get(step.summaryRef) ?? [])] : [];
+        if (step.tool === "repo.graph.search" && output && Array.isArray((output as any).hits)) {
+          const hits = (output as any).hits as Array<any>;
+          const repoCites = hits
+            .map((hit: { id?: string }) => (typeof hit?.id === "string" ? hit.id : null))
+            .filter((id: string | null): id is string => !!id);
+          if (repoCites.length > 0) {
+            const citeSet = new Set([...citations, ...repoCites]);
+            citations = Array.from(citeSet);
+          }
+          if (debugSourcesEnabled) {
+            const repoSources: GroundingSource[] = [];
+            for (const hit of hits) {
+              const filePath = (hit as any).path ?? (hit as any).file_path ?? (hit as any).id;
+              const sourceKind: GroundingSource["kind"] = isDocLikePath(filePath) ? "doc" : "repo_file";
+              repoSources.push({
+                kind: sourceKind,
+                path: filePath,
+                id: (hit as any).symbol_name ?? (hit as any).name,
+                extra: { score: (hit as any).score, kind: (hit as any).kind },
+              });
+            }
+            const packets = Array.isArray((output as any).packets) ? ((output as any).packets as any[]) : [];
+            for (const packet of packets) {
+              const packetPath = (packet as any).file_path ?? (packet as any).path;
+              const packetKind: GroundingSource["kind"] = isDocLikePath(packetPath) ? "doc" : "repo_file";
+              repoSources.push({
+                kind: packetKind,
+                path: packetPath,
+                id: (packet as any).symbol_name,
+                extra: { score: (packet as any).score },
+              });
+            }
+            if (repoSources.length > 0) {
+              pushGroundingSources(runtime, repoSources);
+            }
+          }
+        }
+        if (debugSourcesEnabled) {
+          if (step.tool.startsWith("telemetry.")) {
+            const panels =
+              Array.isArray((output as any)?.entries) && (output as any).entries.length > 0
+                ? (output as any).entries
+                : Array.isArray((output as any)?.panels)
+                  ? (output as any).panels
+                  : [];
+            const panelIds =
+              Array.isArray(panels) && panels.length > 0
+                ? panels
+                    .map((panel: any) => (panel?.panelId ?? panel?.id ?? panel?.instanceId) as string | undefined)
+                    .filter((id?: string) => typeof id === "string" && id.trim().length > 0)
+                : [];
+            pushGroundingSource(runtime, {
+              kind: "telemetry",
+              id: step.tool,
+              extra: panelIds.length > 0 ? { panelIds } : undefined,
+            });
+          }
+          if (step.tool.toLowerCase().includes("pipeline")) {
+            pushGroundingSource(runtime, { kind: "pipeline", id: step.tool });
+          }
+          if (step.tool.includes("checklist")) {
+            const checklistId =
+              (output as { checklist?: { id?: string } } | undefined)?.checklist?.id ??
+              (output as { id?: string } | undefined)?.id;
+            if (checklistId) {
+              pushGroundingSource(runtime, { kind: "checklist", id: checklistId });
+            }
+          }
+          pushGroundingSource(runtime, { kind: "tool", id: step.tool });
+        }
         if (debateCitations.length > 0) {
           const citeSet = new Set([...citations, ...debateCitations]);
           citations = Array.from(citeSet);
@@ -1907,7 +2777,7 @@ export function summarizeExecutionResults(results: ExecutionResult[]): string {
   const final = results[results.length - 1];
   const readable = final.ok ? pickReadableText(final.output) : undefined;
   if (final.ok && readable) {
-    return truncate(readable, 1200);
+    return truncateWithMarker(readable, RESULT_SUMMARY_LIMIT);
   }
   return `Executed ${successCount}/${results.length} steps successfully.`;
 }
@@ -2071,7 +2941,12 @@ function formatTranscriptBlock(step: ExecutorStep, output: unknown): string {
     const confidence = (output as { confidence?: number }).confidence;
     const confidencePct =
       typeof confidence === "number" && Number.isFinite(confidence) ? ` @ ${(confidence * 100).toFixed(1)}%` : "";
-    return debateId ? `Debate.run ${debateId}: ${verdict}${confidencePct}` : `Debate.run: ${verdict}${confidencePct}`;
+    const stopReason =
+      (output as { stop_reason?: string }).stop_reason ?? (output as { stopReason?: string }).stopReason ?? "";
+    const reasonText = stopReason ? ` · stop=${stopReason}` : "";
+    return debateId
+      ? `Debate.run ${debateId}: ${verdict}${confidencePct}${reasonText}`
+      : `Debate.run: ${verdict}${confidencePct}${reasonText}`;
   }
   return safeStringify(output);
 }
@@ -2130,11 +3005,24 @@ async function summarizeEvictedBlocks(
   await putMemoryRecord(record);
 }
 
-const truncate = (value: string, limit: number): string => {
+const truncateWithMarker = (value: string, limit: number, marker = "[truncated]"): string => {
   if (value.length <= limit) {
     return value;
   }
-  return `${value.slice(0, Math.max(0, limit - 3))}...`;
+  const suffix = `... ${marker}`;
+  const sliceAt = Math.max(0, limit - suffix.length);
+  if (sliceAt <= 0) {
+    return suffix;
+  }
+  return `${value.slice(0, sliceAt)}${suffix}`;
+};
+
+const truncate = (value: string, limit: number, suffix = "..."): string => {
+  if (value.length <= limit) {
+    return value;
+  }
+  const sliceAt = Math.max(0, limit - suffix.length);
+  return `${value.slice(0, sliceAt)}${suffix}`;
 };
 
 export function pickReadableText(value: unknown): string | undefined {
@@ -2218,6 +3106,14 @@ const formatSummaryForPrompt = (value: unknown): string => {
   return limitText(String(value));
 };
 
+const isUngroundedSummary = (value?: string): boolean => {
+  if (!value) {
+    return true;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("no stored memories matched") || normalized.includes("no stored memories matched");
+};
+
 function buildSpecialistProblem(
   runtime: ExecutionRuntime,
   stepId: string,
@@ -2269,6 +3165,15 @@ function formatDebateNote(outcome?: TDebateOutcome | null, debateId?: string | n
       lines.push(`winner: ${outcome.winning_role}`);
     }
     lines.push(`confidence: ${(outcome.confidence ?? 0).toFixed(2)}`);
+    if (typeof outcome.score === "number") {
+      lines.push(`score: ${(outcome.score * 100).toFixed(1)}%`);
+    }
+    if (typeof outcome.rounds === "number" && outcome.rounds > 0) {
+      lines.push(`rounds: ${outcome.rounds}`);
+    }
+    if (outcome.stop_reason) {
+      lines.push(`stop: ${outcome.stop_reason}`);
+    }
     if (outcome.key_turn_ids?.length) {
       lines.push(`key_turns: ${outcome.key_turn_ids.join(", ")}`);
     }

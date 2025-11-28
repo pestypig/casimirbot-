@@ -27,10 +27,11 @@ export const ToolSpec = z.object({
   rateLimit: z.object({ rpm: z.number().default(60) }).default({ rpm: 60 }),
   safety: ToolSafety.default({ risks: [] }),
   risk: ToolRiskProfile.optional(),
+  health: z.enum(["ok", "degraded", "offline"]).optional(),
 });
 
 export type ToolSpecShape = z.infer<typeof ToolSpec>;
-export type ToolManifestEntry = Pick<ToolSpecShape, "name" | "desc" | "deterministic" | "rateLimit">;
+export type ToolManifestEntry = Pick<ToolSpecShape, "name" | "desc" | "deterministic" | "rateLimit" | "health">;
 export type ToolManifest = ToolManifestEntry[];
 
 export type Tool = ToolSpecShape & { handler: ToolHandler };

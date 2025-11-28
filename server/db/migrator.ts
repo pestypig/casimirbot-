@@ -12,6 +12,12 @@ import { migration010 } from "./migrations/010_knowledge_corpus";
 import { migration011 } from "./migrations/011_essence_activity";
 import { migration012 } from "./migrations/012_trace_sealed_snapshots";
 import { migration013 } from "./migrations/013_trace_prompts";
+import { migration014 } from "./migrations/014_essence_profiles";
+import { migration015 } from "./migrations/015_trace_reasoning";
+import { migration016 } from "./migrations/016_trace_collapse";
+import { migration017 } from "./migrations/017_essence_profile_guardrails";
+import { migration018 } from "./migrations/018_trace_collapse_strategy";
+import { migration019 } from "./migrations/019_profile_summaries";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -28,6 +34,12 @@ const MIGRATIONS = [
   migration011,
   migration012,
   migration013,
+  migration014,
+  migration015,
+  migration016,
+  migration017,
+  migration018,
+  migration019,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

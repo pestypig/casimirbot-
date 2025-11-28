@@ -244,6 +244,7 @@ export const Features = z.object({
     .object({
       kind: z.literal("collapse/mixer"),
       version: z.string().default("1.0"),
+      strategy: z.string().optional(),
       knobs: z.object({
         w_t: z.number().min(0).max(1),
         w_i: z.number().min(0).max(1),

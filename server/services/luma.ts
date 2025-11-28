@@ -13,7 +13,7 @@ const MODEL = process.env.LUMA_MODEL || DEFAULT_MODEL_BY_PROVIDER[PROVIDER];
 const LORA_ADAPTER = process.env.LORA_ADAPTER;
 const API_KEY = process.env.LUMA_API_KEY || "";
 const BASE_INTERNAL_URL =
-  process.env.LUMA_BASE_URL || `http://127.0.0.1:${process.env.PORT || "5000"}`;
+  process.env.LUMA_BASE_URL || `http://127.0.0.1:${process.env.PORT || "5173"}`;
 
 type ChatStreamOptions = {
   messages: ChatMsg[];

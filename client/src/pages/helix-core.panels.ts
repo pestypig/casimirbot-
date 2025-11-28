@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   Atom,
+  Bolt,
   Circle,
   Equal,
   Flame,
@@ -65,6 +66,7 @@ const API = {
 const PANEL_KEYWORDS: Record<string, string[]> = {
   "viz-diagnostics": ["viz hud", "diagnostics overlay", "shader debug", "fps meter", "render stack"],
   "energy-flux": ["flux monitor", "stability histogram", "|T_ab|", "phi_A", "R = (phi_A)/(I3 + |T|)"],
+  "helix-phoenix": ["phoenix averaging", "needle hull", "light-crossing", "kappa_drive", "casimir tile", "hann window"],
   "microscopy": ["microscopy mode", "microprobe", "phase contrast", "nm scale", "Coulomb sweep"],
   "electron-orbital": ["orbital density", "Bohr k/q/g", "toroidal packets", "Coulomb probe", "iso-surface"],
   "drive-guards": ["I3_geo", "I3_VdB", "Q_cavity", "guard bands", "sector strobing"],
@@ -103,9 +105,11 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "sector-legend": ["sector legend", "color legend", "sector key", "legend ring", "sector palette"],
   "sector-roles": ["sector roles", "sector HUD", "role badges", "sector overlay", "role legend"],
   "sweep-replay": ["sweep replay", "sweep telemetry", "recorded sweep", "sweep log", "sweep playback"],
-  "hull-status": ["hull status", "capsule stress", "hull health", "integrity", "hull capsule"],
+  "hull-status": ["runtime ops", "plan b", "runtime policy", "endpoint guard", "queue telemetry"],
   "agi-debate-view": ["AGI debate", "debate SSE", "argument stream", "multi agent debate", "debate dashboard"],
   "agi-essence-console": ["Essence console", "AGI console", "plan execute", "tools logs", "command console"],
+  "star-coherence": ["star coherence", "coherence governor", "tool budget", "collapse policy", "telemetry"],
+  "collapse-monitor": ["collapse pressure", "collapse watcher", "coherence gate", "debate collapse", "star collapse"],
   "agi-task-history": ["task history", "AGI trace", "task log", "history queue", "trace timeline"],
   "essence-proposals": ["essence proposals", "proposal queue", "jobs board", "proposal actions", "proposal mgr"],
   "fashion-lookbook": ["fashion", "garment", "cape", "shirt", "pants", "knit", "palette"],
@@ -147,6 +151,16 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     endpoints: [API.pipelineGet, API.helixMetrics]
   },
   {
+    id: "helix-phoenix",
+    title: "Phoenix Averaging",
+    icon: Flame,
+    loader: lazyPanel(() => import("@/components/PhoenixNeedlePanel")),
+    pinned: true,
+    defaultOpen: true,
+    defaultSize: { w: 1040, h: 700 },
+    defaultPosition: { x: 180, y: 140 }
+  },
+  {
     id: "microscopy",
     title: "Microscopy Mode",
     icon: Microscope,
@@ -173,6 +187,25 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 920, h: 640 },
     defaultPosition: { x: 96, y: 64 },
     endpoints: [API.pipelineGet, API.helixMetrics]
+  },
+  {
+    id: "tsn-sim",
+    title: "TSN Determinism",
+    icon: RadioTower,
+    loader: lazyPanel(() => import("@/components/HelixTsnPanel")),
+    defaultSize: { w: 980, h: 640 },
+    defaultPosition: { x: 160, y: 120 },
+    endpoints: ["POST /api/sim/tsn"],
+    keywords: ["tsn", "gptp", "qbv", "deterministic", "latency", "clock", "white rabbit"]
+  },
+  {
+    id: "pulsed-power-doc",
+    title: "Warp Pulsed Power",
+    icon: Bolt,
+    loader: lazyPanel(() => import("@/components/PulsedPowerDocPanel")),
+    defaultSize: { w: 1000, h: 680 },
+    defaultPosition: { x: 140, y: 20 },
+    keywords: ["warp", "pulsed power", "coil", "pipeline", "hardware"]
   },
   {
     id: "warp-ledger",
@@ -488,9 +521,9 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
   },
   {
     id: "hull-status",
-    title: "Hull Status",
+    title: "Runtime Ops",
     icon: Shield,
-    loader: lazyPanel(() => import("@/components/hull/HullStatus")),
+    loader: lazyPanel(() => import("@/components/hull/RuntimeOps")),
     defaultSize: { w: 520, h: 520 },
     defaultPosition: { x: 80, y: 80 },
     pinned: true
@@ -516,6 +549,34 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
       "GET /api/agi/tools/logs/stream"
     ],
     pinned: true
+  },
+  {
+    id: "star-coherence",
+    title: "Star Coherence Governor",
+    icon: Sparkles,
+    loader: lazyPanel(() => import("@/components/agi/StarCoherencePanel"), "StarCoherencePanel"),
+    defaultSize: { w: 520, h: 520 },
+    defaultPosition: { x: 220, y: 140 },
+    endpoints: ["GET /api/agi/star/telemetry"]
+  },
+  {
+    id: "pipeline-proof",
+    title: "Pipeline Proof",
+    icon: ShieldCheck,
+    loader: lazyPanel(() => import("@/components/PipelineProofPanel")),
+    defaultSize: { w: 1120, h: 720 },
+    defaultPosition: { x: 120, y: 80 },
+    keywords: ["warp", "pipeline", "grounding", "proof", "resonance"],
+    endpoints: ["GET /api/agi/pipeline/status", "GET /api/agi/pipeline/last-plan-debug"]
+  },
+  {
+    id: "collapse-monitor",
+    title: "Collapse Watch",
+    icon: GaugeCircle,
+    loader: lazyPanel(() => import("@/components/agi/CollapseWatcherPanel"), "CollapseWatcherPanel"),
+    defaultSize: { w: 520, h: 460 },
+    defaultPosition: { x: 260, y: 160 },
+    endpoints: ["GET /api/agi/star/telemetry"]
   },
   {
     id: "agi-task-history",

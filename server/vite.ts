@@ -72,16 +72,30 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-export function serveStatic(app: Express) {
+function resolveDistPath(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
-  const distPath = path.resolve(__dirname, "public");
 
-  if (!fs.existsSync(distPath)) {
+  const candidates = [
+    path.resolve(__dirname, "public"), // bundled server path (dist/public)
+    path.resolve(__dirname, "..", "dist", "public"), // running from source with a built client
+    path.resolve(process.cwd(), "dist", "public"), // fallback when cwd is repo root
+  ];
+
+  const distPath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!distPath) {
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory. Looked in: ${candidates.join(
+        ", ",
+      )}. Run "npm run build" to produce dist/public.`,
     );
   }
+
+  return distPath;
+}
+
+export function serveStatic(app: Express) {
+  const distPath = resolveDistPath();
 
   app.use(express.static(distPath));
 

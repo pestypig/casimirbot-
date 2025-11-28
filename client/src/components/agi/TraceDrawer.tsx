@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { ResonanceBundle, ResonanceCollapse } from "@shared/code-lattice";
+import type { TCollapseTraceEntry } from "@shared/essence-persona";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { useResonanceStore } from "@/store/useResonanceStore";
 import { isFlagEnabled } from "@/lib/envFlags";
@@ -71,6 +72,8 @@ type TaskTracePayload = {
       };
     }>;
   } | null;
+  collapse_strategy?: string;
+  collapse_trace?: TCollapseTraceEntry;
 };
 
 const normalizeResonanceSelection = (
@@ -197,6 +200,15 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
 
   const plannerPrompt = trace?.planner_prompt ?? "";
   const promptHash = (trace?.prompt_hash ?? (trace as any)?.promptHash) ?? null;
+  const collapseTrace = trace?.collapse_trace ?? null;
+  const collapseStrategy = (collapseTrace?.strategy as string | undefined) ?? trace?.collapse_strategy ?? undefined;
+  const collapseDeciderLabel = collapseTrace
+    ? collapseTrace.decider === "local-llm"
+      ? "Local LLM"
+      : collapseTrace.decider === "disabled"
+        ? "Collapse disabled"
+        : "Heuristic"
+    : null;
   const promptOverflow = plannerPrompt.length > PROMPT_PREVIEW_LIMIT;
 
   useEffect(() => {
@@ -545,6 +557,48 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
                   <div className="text-green-300">Prompt copied.</div>
                 )}
               </div>
+            )}
+          </div>
+        )}
+        {collapseTrace && (
+          <div className="rounded border border-white/10 bg-black/15 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-white">Client Orchestration</div>
+              <div className="text-[10px] opacity-60">{collapseTrace.timestamp}</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/70">
+              <span className="rounded border border-white/10 px-2 py-0.5">{collapseDeciderLabel ?? "Orchestrator"}</span>
+              {collapseStrategy && (
+                <span className="rounded border border-white/10 px-2 py-0.5">strategy: {collapseStrategy}</span>
+              )}
+              {collapseTrace.model && <span className="rounded border border-white/10 px-2 py-0.5">{collapseTrace.model}</span>}
+              {collapseTrace.note && <span className="opacity-80">{collapseTrace.note}</span>}
+            </div>
+            <div className="text-[11px] opacity-80">Chosen: {collapseTrace.chosenId || "(none)"}</div>
+            {collapseTrace.candidates?.length ? (
+              <div className="space-y-1">
+                {collapseTrace.candidates.slice(0, 6).map((candidate) => (
+                  <div
+                    key={candidate.id}
+                    className="flex items-center justify-between gap-2 rounded border border-white/10 bg-black/10 px-2 py-1"
+                  >
+                    <div className="text-[11px] truncate">{candidate.id}</div>
+                    <div className="text-[10px] opacity-70">
+                      score {Number(candidate.score ?? 0).toFixed(2)}
+                    </div>
+                    {candidate.tags?.length ? (
+                      <div className="text-[10px] opacity-60 truncate max-w-[180px]">
+                        {candidate.tags.join(", ")}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[10px] opacity-60">No candidates recorded.</div>
+            )}
+            {collapseTrace.input_hash && (
+              <div className="text-[10px] text-white/60">input hash: {collapseTrace.input_hash}</div>
             )}
           </div>
         )}
