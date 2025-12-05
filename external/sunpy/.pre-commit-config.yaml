@@ -1,0 +1,46 @@
+exclude: ".*(.csv|.fits|.fts|.fit|.header|.txt|tca.*|.json|.asdf)$|^CITATION.rst|tools\/|sunpy\/extern\/|sunpy\/io\/src\/ana\/"
+repos:
+    # This should be before any formatting hooks like isort
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.13.3"
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+  - repo: https://github.com/PyCQA/isort
+    rev: 6.1.0
+    hooks:
+      - id: isort
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-ast
+      - id: check-case-conflict
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: debug-statements
+      - id: check-added-large-files
+        args: ["--enforce-all", "--maxkb=1054"]
+        exclude: ""
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+  - repo: https://github.com/adhtruong/mirrors-typos
+    rev: v1.38.1
+    hooks:
+      - id: typos
+  - repo: local
+    hooks:
+      - id: generate-sunpy-net-hek-attrs
+        name: generate sunpy.net.hek.attrs
+        entry: python tools/hek_mkcls.py
+        language: system
+        pass_filenames: false
+        files: (^tools/(hek_mkcls|hektemplate)\.py$)|(^sunpy/net/hek/attrs\.py$)
+      - id: git-diff
+        name: git diff
+        entry: git diff --color --exit-code
+        language: system
+        pass_filenames: false
+        always_run: true
+ci:
+  autofix_prs: false
+  autoupdate_schedule: "quarterly"

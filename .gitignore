@@ -14,7 +14,8 @@ simulations/*/*.msh
 simulations/*/*.geo
 simulations/*/*.scuffgeo
 
-# Python caches
+# Python caches / virtual envs
+.venv/
 __pycache__/
 *.py[cod]
 

@@ -14,6 +14,7 @@ const LORA_ADAPTER = process.env.LORA_ADAPTER;
 const API_KEY = process.env.LUMA_API_KEY || "";
 const BASE_INTERNAL_URL =
   process.env.LUMA_BASE_URL || `http://127.0.0.1:${process.env.PORT || "5173"}`;
+const OLLAMA_ENDPOINT = process.env.OLLAMA_ENDPOINT || "http://127.0.0.1:11434";
 
 type ChatStreamOptions = {
   messages: ChatMsg[];
@@ -71,7 +72,7 @@ export async function* chatStream(options: ChatStreamOptions) {
     if (adapter) {
       body.adapter = adapter;
     }
-    const response = await fetch("http://127.0.0.1:11434/api/chat", {
+    const response = await fetch(`${OLLAMA_ENDPOINT}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

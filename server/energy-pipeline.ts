@@ -43,6 +43,26 @@ import {
 } from '../modules/dynamic/stress-energy-equations.js';
 import warpBubbleModule from '../modules/warp/warp-module.js';
 import { DEFAULT_GEOMETRY_SWEEP, DEFAULT_PHASE_MICRO_SWEEP } from "../shared/schema.js";
+import {
+  applyQiAutothrottleStep,
+  applyScaleToGatePulses,
+  applyScaleToPumpCommand,
+  initQiAutothrottle,
+  type QiAutothrottleState,
+} from "./controls/qi-autothrottle.js";
+import {
+  initQiAutoscaleState,
+  stepQiAutoscale,
+  type QiAutoscaleClampReason,
+  type QiAutoscaleState,
+} from "./controls/qi-autoscale.js";
+import {
+  QI_AUTOSCALE_ENABLE,
+  QI_AUTOSCALE_MIN_SCALE,
+  QI_AUTOSCALE_SLEW,
+  QI_AUTOSCALE_TARGET,
+  QI_AUTOSCALE_NO_EFFECT_SEC,
+} from "./config/env.js";
 import type {
   DynamicCasimirSweepConfig,
   DynamicConfig,
@@ -117,6 +137,12 @@ const parseEnvNumber = (value: string | undefined, fallback: number): number => 
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 };
+
+export const DEFAULT_PULSED_CURRENT_LIMITS_A = {
+  midi: parseEnvNumber(process.env.IPEAK_MAX_MIDI_A, 31_623), // 5 kJ @ 10 uH @ 10 us -> ~31.6 kA
+  sector: parseEnvNumber(process.env.IPEAK_MAX_SECTOR_A, 31_623), // Tile bank provisional cap (~31.6 kA @ 1 uH, 1 us)
+  launcher: parseEnvNumber(process.env.IPEAK_MAX_LAUNCHER_A, 14_142), // 10 kJ @ 100 uH @ 20 us -> ~14.1 kA
+} as const;
 
 export const TAU_LC_UNIT_DRIFT_LIMIT = 50; // reject >50x unit drift (ms vs µs)
 
@@ -356,6 +382,14 @@ export interface TileParams {
   sectorCount?: number;     // Number of sectors for strobing
 }
 
+export type AmpFactors = {
+  gammaGeo?: number;
+  gammaVanDenBroeck?: number;
+  qSpoilingFactor?: number;
+  qMechanical?: number;
+  qCavity?: number;
+};
+
 export type QuantumInterestBook = {
   neg_Jm3: number;        // Scheduled negative burst (window-normalized)
   pos_Jm3: number;        // Scheduled positive payback (window-normalized)
@@ -435,6 +469,11 @@ export interface EnergyPipelineState {
   qSpoilingFactor: number;
   negativeFraction: number;   // Share of sectors assigned to negative lobe (0..1)
 
+  // Pulsed-load current ceilings (enforced by command helpers)
+  iPeakMaxMidi_A?: number;
+  iPeakMaxSector_A?: number;
+  iPeakMaxLauncher_A?: number;
+
   // Physics parameters
   gammaGeo: number;
   qMechanical: number;
@@ -444,6 +483,9 @@ export interface EnergyPipelineState {
   exoticMassTarget_kg: number;  // User-configurable exotic mass target
   casimirModel?: MaterialModel;
   materialProps?: MaterialProps;
+  ampFactors?: AmpFactors;      // Amplification factors (gamma, q) surfaced for UI + warp module
+  /** @deprecated use ampFactors */
+  amps?: AmpFactors;
 
   // Calculated values
   U_static: number;         // Static Casimir energy per tile
@@ -561,6 +603,8 @@ export interface EnergyPipelineState {
   sweep?: SweepRuntime;
   gateAnalytics?: GateAnalytics | null;
   qiInterest?: QuantumInterestBook | null;
+  qiAutothrottle?: QiAutothrottleState | null;
+  qiAutoscale?: QiAutoscaleState | null;
 }
 
 // Physical constants
@@ -1746,6 +1790,11 @@ export function initializePipelineState(): EnergyPipelineState {
     qSpoilingFactor: 1,
     negativeFraction: DEFAULT_NEGATIVE_FRACTION,
 
+    // Pulsed-load ceilings (defaults mirrored in docs; override when bench data lands)
+    iPeakMaxMidi_A: DEFAULT_PULSED_CURRENT_LIMITS_A.midi,
+    iPeakMaxSector_A: DEFAULT_PULSED_CURRENT_LIMITS_A.sector,
+    iPeakMaxLauncher_A: DEFAULT_PULSED_CURRENT_LIMITS_A.launcher,
+
     // Physics defaults (paper-backed)
     gammaGeo: 26,
     qMechanical: 1,               // Set to 1 (was 5e4) - power knob only
@@ -1753,6 +1802,20 @@ export function initializePipelineState(): EnergyPipelineState {
     gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB, // Use paper-backed +¦_VdB seed
     exoticMassTarget_kg: 1405,    // Reference target (not a lock)
     casimirModel: 'ideal_retarded',
+    ampFactors: {
+      gammaGeo: 26,
+      gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB,
+      qSpoilingFactor: 1,
+      qMechanical: 1,
+      qCavity: PAPER_Q.Q_BURST,
+    },
+    amps: {
+      gammaGeo: 26,
+      gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB,
+      qSpoilingFactor: 1,
+      qMechanical: 1,
+      qCavity: PAPER_Q.Q_BURST,
+    },
 
     // Initial calculated values
     U_static: 0,
@@ -1806,6 +1869,11 @@ export function initializePipelineState(): EnergyPipelineState {
       strobeDuty: null,
     },
     gateAnalytics: null,
+    qiAutothrottle: initQiAutothrottle(),
+    qiAutoscale: initQiAutoscaleState(
+      Number.isFinite(QI_AUTOSCALE_TARGET) ? Math.max(1e-6, QI_AUTOSCALE_TARGET) : 0.9,
+      Date.now(),
+    ),
     sweep: {
       active: false,
       status: 'idle',
@@ -2541,9 +2609,12 @@ export async function calculateEnergyPipeline(
   });
   state.zeta = qiGuard.marginRatio;
   (state as any).zetaRaw = qiGuard.marginRatioRaw;
-  state.fordRomanCompliance = Number.isFinite(qiGuard.marginRatio) && qiGuard.marginRatio < 1;
-  state.curvatureLimit = state.fordRomanCompliance;
   (state as any).qiGuardrail = qiGuard;
+  const zetaForStatus = Number.isFinite(qiGuard.marginRatioRaw)
+    ? qiGuard.marginRatioRaw
+    : Number.isFinite(qiGuard.marginRatio)
+    ? qiGuard.marginRatio
+    : null;
   const guardLog = {
     margin: qiGuard.marginRatio,
     marginRaw: qiGuard.marginRatioRaw,
@@ -2552,28 +2623,93 @@ export async function calculateEnergyPipeline(
     sampler: qiGuard.sampler,
     fieldType: qiGuard.fieldType,
     window_ms: qiGuard.window_ms,
+    sumWindowDt: qiGuard.sumWindowDt,
     duty: qiGuard.duty,
     patternDuty: qiGuard.patternDuty,
     maskSum: qiGuard.maskSum,
     effectiveRho: qiGuard.effectiveRho,
+    rhoOn: qiGuard.rhoOn,
+    rhoOnDuty: qiGuard.rhoOnDuty,
     rhoSource: qiGuard.rhoSource,
     TS: state.clocking?.TS ?? state.TS_ratio ?? null,
     clockingDetail: state.clocking ?? null,
   };
-  if (!Number.isFinite(qiGuard.marginRatio) || qiGuard.marginRatio >= 1) {
+  if (!Number.isFinite(zetaForStatus) || (zetaForStatus as number) >= 1) {
     console.warn("[QI-guard] sampled integral exceeds bound", guardLog);
   } else if (DEBUG_PIPE) {
     console.log("[QI-guard]", guardLog);
   }
 
-  const P_warn = MODE_POLICY[state.currentMode].P_target_W * 1.2 / 1e6; // +20% headroom in MW
-  if (!state.fordRomanCompliance || qiGuard.marginRatio >= 1) {
-    state.overallStatus = 'CRITICAL';
-  } else if (qiGuard.marginRatio >= 0.95 || (state.currentMode !== 'emergency' && state.P_avg > P_warn)) {
-    state.overallStatus = 'WARNING';
-  } else {
-    state.overallStatus = 'NOMINAL';
+  const autoscaleTarget = Number.isFinite(QI_AUTOSCALE_TARGET)
+    ? clampNumber(QI_AUTOSCALE_TARGET, 1e-6, 1e6)
+    : 0.9;
+  const autoscaleMinScale = Number.isFinite(QI_AUTOSCALE_MIN_SCALE)
+    ? clampNumber(QI_AUTOSCALE_MIN_SCALE, 0, 1)
+    : 0.02;
+  const autoscaleSlewPerS = Number.isFinite(QI_AUTOSCALE_SLEW) ? Math.max(0, QI_AUTOSCALE_SLEW) : 0.25;
+  const autoscaleNow = Date.now();
+  const autoscaleClamps: QiAutoscaleClampReason[] = [];
+  const autoscaleState = stepQiAutoscale({
+    guard: qiGuard,
+    enableFlag: QI_AUTOSCALE_ENABLE,
+    target: autoscaleTarget,
+    minScale: autoscaleMinScale,
+    slewPerS: autoscaleSlewPerS,
+    prev: state.qiAutoscale,
+    now: autoscaleNow,
+    windowTolerance: 0.05,
+    noEffectSeconds: Number.isFinite(QI_AUTOSCALE_NO_EFFECT_SEC)
+      ? Math.max(0, QI_AUTOSCALE_NO_EFFECT_SEC)
+      : 5,
+    clamps: autoscaleClamps,
+  });
+  autoscaleState.clamps = autoscaleClamps;
+  state.qiAutoscale = autoscaleState;
+
+  const prevAutothrottle = state.qiAutothrottle ?? initQiAutothrottle();
+  state.qiAutothrottle = applyQiAutothrottleStep(prevAutothrottle, qiGuard.marginRatioRaw);
+  const qiAutothrottleChanged = state.qiAutothrottle !== prevAutothrottle;
+  const qiAutothrottleScale =
+    state.qiAutothrottle?.enabled === true && Number.isFinite(state.qiAutothrottle.scale)
+      ? clampNumber(state.qiAutothrottle.scale as number, 0, 1)
+      : 1;
+  const autoscaleRawScale = Number.isFinite(state.qiAutoscale?.appliedScale)
+    ? (state.qiAutoscale?.appliedScale as number)
+    : Number.isFinite(state.qiAutoscale?.scale)
+    ? (state.qiAutoscale?.scale as number)
+    : 1;
+  const qiAutoscaleScale =
+    Number.isFinite(autoscaleRawScale) && (autoscaleRawScale as number) > 0
+      ? clampNumber(autoscaleRawScale, 0, 1)
+      : 1;
+  const qiScale = qiAutothrottleScale * qiAutoscaleScale;
+
+  if (state.gateAnalytics && Array.isArray(state.gateAnalytics.pulses)) {
+    const pulses = applyScaleToGatePulses(state.gateAnalytics.pulses, qiScale);
+    state.gateAnalytics = {
+      ...state.gateAnalytics,
+      pulses: pulses ?? [],
+    };
   }
+
+  if (qiAutothrottleChanged && state.qiAutothrottle?.reason) {
+    console.warn("[QI-autothrottle]", {
+      scale: state.qiAutothrottle.scale,
+      reason: state.qiAutothrottle.reason,
+    });
+  }
+
+  const P_warn = MODE_POLICY[state.currentMode].P_target_W * 1.2 / 1e6; // +20% headroom in MW
+  const qiStatus = deriveQiStatus({
+    zetaRaw: qiGuard.marginRatioRaw,
+    zetaClamped: qiGuard.marginRatio,
+    pAvg: state.P_avg,
+    pWarn: P_warn,
+    mode: state.currentMode,
+  });
+  state.fordRomanCompliance = qiStatus.compliance;
+  state.curvatureLimit = state.fordRomanCompliance;
+  state.overallStatus = qiStatus.overallStatus;
 
   // UI field updates logging (after MODE_CONFIGS applied)
   if (DEBUG_PIPE) console.log("[PIPELINE_UI]", {
@@ -2877,6 +3013,16 @@ export async function calculateEnergyPipeline(
     const c_warp = hullGeomWarp.Lz_m / 2;
     const geomR_warp = Math.cbrt(a_warp * b_warp * c_warp); // meters
 
+    const ampFactors: AmpFactors = {
+      gammaGeo: state.gammaGeo ?? 26,
+      gammaVanDenBroeck: state.gammaVanDenBroeck ?? 3.83e1,
+      qSpoilingFactor: state.qSpoilingFactor ?? 1,
+      qMechanical: state.qMechanical ?? 1,
+      qCavity: state.qCavity ?? PAPER_Q.Q_BURST,
+    };
+    state.ampFactors = ampFactors;
+    (state as any).amps = ampFactors; // back-compat alias
+
     const warpParams = {
       geometry: 'bowl' as const,
       gap: state.gap_nm ?? 1,
@@ -2902,12 +3048,9 @@ export async function calculateEnergyPipeline(
         expansionTolerance: 1e-12,
         warpFieldType: 'natario' as const
       },
-      // Add amps field for validation bounds
-      amps: {
-        gammaGeo: state.gammaGeo ?? 26,
-        gammaVanDenBroeck: state.gammaVanDenBroeck ?? 3.83e1,
-        qSpoilingFactor: state.qSpoilingFactor ?? 1
-      }
+      // Amplification factors: prefer ampFactors, keep legacy amps alias
+      ampFactors,
+      amps: ampFactors
     };
 
     const warp = await warpBubbleModule.calculate(warpParams);
@@ -3005,20 +3148,42 @@ function updateQiTelemetry(state: EnergyPipelineState) {
   if (PUMP_TONE_ENABLE) {
     const cmd = getPumpCommandForQi(stats, { epoch_ms: GLOBAL_PUMP_EPOCH_MS });
     if (cmd) {
+      const autoscaleHalt = state.qiAutoscale?.gating === "no_effect";
+      const scaledCmd = applyScaleToPumpCommand(cmd, qiScale, state.qiAutoscale?.clamps) ?? cmd;
       const now = Date.now();
-      const hash = hashPumpCommand(cmd);
+      const hash = hashPumpCommand(scaledCmd);
       const since = Math.max(0, now - lastPublishedPumpAt);
       const changed = hash !== lastPublishedPumpHash;
       const pastMinInterval = since >= PUMP_CMD_MIN_INTERVAL_MS;
       const keepAliveDue = since >= PUMP_CMD_KEEPALIVE_MS;
 
       if ((changed && pastMinInterval) || (keepAliveDue && pastMinInterval)) {
-        publishPumpCommand(cmd);
+        if (autoscaleHalt) {
+          console.warn("[QI-autoscale] no_effect halt; skipping pump publish", {
+            zetaRaw: state.qiAutoscale?.rawZeta,
+            scale: state.qiAutoscale?.appliedScale,
+          });
+        } else {
+          publishPumpCommand(scaledCmd);
+        }
         lastPublishedPumpHash = hash;
         lastPublishedPumpAt = now;
       }
     }
   }
+
+  console.log("[QI-autoscale]", {
+    gating: state.qiAutoscale?.gating ?? "idle",
+    scale: state.qiAutoscale?.appliedScale ?? state.qiAutoscale?.scale ?? 1,
+    target: state.qiAutoscale?.targetZeta ?? autoscaleTarget,
+    zetaRaw: state.qiAutoscale?.rawZeta ?? null,
+    proposedScale: state.qiAutoscale?.proposedScale ?? null,
+    slewLimitedScale: state.qiAutoscale?.slewLimitedScale ?? null,
+    note: state.qiAutoscale?.note ?? null,
+    clamps: Array.isArray(state.qiAutoscale?.clamps)
+      ? (state.qiAutoscale?.clamps ?? []).slice(-2)
+      : [],
+  });
 
   const guardFrac = DEFAULT_QI_SETTINGS.guardBand ?? 0;
   const guardThreshold = Math.abs(stats.bound) * guardFrac;
@@ -3337,6 +3502,11 @@ type EffectiveRhoDebug = {
   reason?: string;
 };
 
+function resolveTileTelemetryScale(): number {
+  const scale = parseEnvNumber(process.env.QI_TILE_TELEMETRY_SCALE, 1);
+  return Math.max(0, Math.abs(scale));
+}
+
 function estimateEffectiveRhoFromState(state: EnergyPipelineState, debug?: EffectiveRhoDebug): number {
   const nowMs = Date.now();
   const tilesTelemetry = getLatestQiTileStats();
@@ -3345,12 +3515,14 @@ function estimateEffectiveRhoFromState(state: EnergyPipelineState, debug?: Effec
     tilesTelemetry.source != null &&
     tilesTelemetry.source !== "synthetic"
   ) {
+    const scale = resolveTileTelemetryScale();
+    const scaled = tilesTelemetry.avgNeg * scale;
     if (debug) {
       debug.source = "tile-telemetry";
-      debug.value = tilesTelemetry.avgNeg;
-      debug.note = tilesTelemetry.source;
+      debug.value = scaled;
+      debug.note = scale !== 1 ? `${tilesTelemetry.source} (scale ${scale})` : tilesTelemetry.source;
     }
-    return tilesTelemetry.avgNeg;
+    return scaled;
   }
   const pulses = state.gateAnalytics?.pulses;
 
@@ -3635,7 +3807,66 @@ function clampNegativeBound(value: number, fallback?: number): number {
   return -mag;
 }
 
-function evaluateQiGuardrail(
+function rhoSourceIsDutyFallback(rhoDebug: EffectiveRhoDebug): boolean {
+  const src = (rhoDebug.source ?? "").toLowerCase();
+  return src === "duty-fallback" || src === "duty" || src === "schedule";
+}
+
+type QiStatusInput = {
+  zetaRaw?: number;
+  zetaClamped?: number;
+  pAvg?: number;
+  pWarn?: number;
+  mode?: string;
+};
+
+type QiStatusColor = 'red' | 'amber' | 'green' | 'muted';
+
+export function deriveQiStatus(
+  input: QiStatusInput,
+): {
+  zetaForStatus: number | null;
+  compliance: boolean;
+  overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
+  color: QiStatusColor;
+} {
+  const raw = Number(input.zetaRaw);
+  const clamped = Number(input.zetaClamped);
+  const hasRaw = Number.isFinite(raw);
+  const hasClamped = Number.isFinite(clamped);
+  const zetaForStatus = hasRaw ? raw : hasClamped ? clamped : null;
+
+  let color: QiStatusColor = 'muted';
+  if (zetaForStatus != null) {
+    color = zetaForStatus >= 1
+      ? 'red'
+      : zetaForStatus >= 0.95
+      ? 'amber'
+      : 'green';
+  }
+
+  const compliance = Number.isFinite(zetaForStatus) && (zetaForStatus as number) < 1;
+  const guardFail = !compliance || (zetaForStatus != null && (zetaForStatus as number) >= 1);
+  const warnByZeta = Number.isFinite(zetaForStatus) && (zetaForStatus as number) >= 0.95;
+  const warnByPower =
+    (input.mode ?? "hover") !== "emergency" &&
+    Number.isFinite(input.pWarn) &&
+    Number.isFinite(input.pAvg) &&
+    (input.pAvg as number) > (input.pWarn as number);
+
+  let overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
+  if (guardFail) {
+    overallStatus = 'CRITICAL';
+  } else if (warnByZeta || warnByPower) {
+    overallStatus = 'WARNING';
+  } else {
+    overallStatus = 'NOMINAL';
+  }
+
+  return { zetaForStatus, compliance, overallStatus, color };
+}
+
+export function evaluateQiGuardrail(
   state: EnergyPipelineState,
   opts: { schedule?: PhaseSchedule; sectorPeriod_ms?: number; sampler?: SamplingKind; tau_ms?: number } = {},
 ): {
@@ -3655,6 +3886,8 @@ function evaluateQiGuardrail(
   rhoOn: number;
   rhoSource?: string;
   rhoNote?: string;
+  sumWindowDt: number;
+  rhoOnDuty?: number;
 } {
   const sampler = opts.sampler ?? state.phaseSchedule?.sampler ?? state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
   const tau_ms =
@@ -3703,10 +3936,12 @@ function evaluateQiGuardrail(
   const rhoDebug: EffectiveRhoDebug = {};
   const effectiveRho = estimateEffectiveRhoFromState(state, rhoDebug);
   const rhoOn = duty > 0 ? effectiveRho / duty : effectiveRho;
+  const dt_s = pattern.dt_s;
+  const sumWindowDt = pattern.window.reduce((acc, v) => acc + v * dt_s, 0);
   let lhs = 0;
   for (let i = 0; i < pattern.mask.length; i += 1) {
     const rho = pattern.mask[i] ? rhoOn * pattern.mask[i] : 0;
-    lhs += rho * pattern.window[i];
+    lhs += rho * pattern.window[i] * dt_s;
   }
   if (
     DEBUG_PIPE &&
@@ -3758,6 +3993,8 @@ function evaluateQiGuardrail(
     rhoOn,
     rhoSource: rhoDebug.source,
     rhoNote: rhoDebug.note ?? rhoDebug.reason,
+    sumWindowDt,
+    rhoOnDuty: rhoSourceIsDutyFallback(rhoDebug) ? rhoOn * duty : undefined,
   };
 }
 
@@ -3904,6 +4141,10 @@ export async function updateParameters(
   opts: PipelineRunOptions = {},
 ): Promise<EnergyPipelineState> {
   const nextParams: Partial<EnergyPipelineState> = { ...params };
+  const clampPulseCap = (value: unknown, fallback: number): number => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? (n as number) : fallback;
+  };
 
   if (nextParams.dynamicConfig) {
     const incoming = nextParams.dynamicConfig as MutableDynamicConfig;
@@ -3924,6 +4165,25 @@ export async function updateParameters(
 
   if (typeof nextParams.negativeFraction === "number" && Number.isFinite(nextParams.negativeFraction)) {
     nextParams.negativeFraction = Math.max(0, Math.min(1, nextParams.negativeFraction));
+  }
+
+  if ("iPeakMaxMidi_A" in nextParams) {
+    nextParams.iPeakMaxMidi_A = clampPulseCap(
+      nextParams.iPeakMaxMidi_A,
+      state.iPeakMaxMidi_A ?? DEFAULT_PULSED_CURRENT_LIMITS_A.midi,
+    );
+  }
+  if ("iPeakMaxSector_A" in nextParams) {
+    nextParams.iPeakMaxSector_A = clampPulseCap(
+      nextParams.iPeakMaxSector_A,
+      state.iPeakMaxSector_A ?? DEFAULT_PULSED_CURRENT_LIMITS_A.sector,
+    );
+  }
+  if ("iPeakMaxLauncher_A" in nextParams) {
+    nextParams.iPeakMaxLauncher_A = clampPulseCap(
+      nextParams.iPeakMaxLauncher_A,
+      state.iPeakMaxLauncher_A ?? DEFAULT_PULSED_CURRENT_LIMITS_A.launcher,
+    );
   }
 
   Object.assign(state, nextParams);
@@ -3950,6 +4210,9 @@ function arrN(a:any, k:number){ return (Array.isArray(a) && a.length>=k) ? a : u
  * Calls the central pipeline and merges outputs into shared snapshot
  */
 export async function computeEnergySnapshot(sim: any) {
+  const ampFactors = (sim as any)?.ampFactors ?? sim.amps ?? {};
+  const resolvePulseCap = (value: unknown, fallback: number): number =>
+    Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback;
   // Convert sim to pipeline state format
   const state = {
     ...initializePipelineState(),
@@ -3958,16 +4221,29 @@ export async function computeEnergySnapshot(sim: any) {
     temperature_K: sim.temperature ?? 20,
     modulationFreq_GHz: sim.dynamicConfig?.modulationFreqGHz ?? DEFAULT_MODULATION_FREQ_GHZ,
     currentMode: sim.mode ?? 'hover',
-    gammaGeo: sim.amps?.gammaGeo ?? 26,
-    qMechanical: sim.amps?.qMechanical ?? 1,
-    qCavity: sim.dynamicConfig?.cavityQ ?? 1e9,
-    gammaVanDenBroeck: sim.amps?.gammaVanDenBroeck ?? 3.83e1,
-    qSpoilingFactor: sim.amps?.qSpoilingFactor ?? 1,
+    gammaGeo: ampFactors?.gammaGeo ?? 26,
+    qMechanical: ampFactors?.qMechanical ?? 1,
+    qCavity: sim.dynamicConfig?.cavityQ ?? ampFactors?.qCavity ?? 1e9,
+    gammaVanDenBroeck: ampFactors?.gammaVanDenBroeck ?? 3.83e1,
+    qSpoilingFactor: ampFactors?.qSpoilingFactor ?? 1,
     dutyCycle: sim.dynamicConfig?.dutyCycle ?? 0.14,
     sectorCount: sim.dynamicConfig?.sectorCount ?? 400,
     exoticMassTarget_kg: sim.exoticMassTarget_kg ?? 1405,
     dynamicConfig: sim.dynamicConfig ?? null,
+    iPeakMaxMidi_A: resolvePulseCap(sim.iPeakMaxMidi_A, DEFAULT_PULSED_CURRENT_LIMITS_A.midi),
+    iPeakMaxSector_A: resolvePulseCap(sim.iPeakMaxSector_A, DEFAULT_PULSED_CURRENT_LIMITS_A.sector),
+    iPeakMaxLauncher_A: resolvePulseCap(sim.iPeakMaxLauncher_A, DEFAULT_PULSED_CURRENT_LIMITS_A.launcher),
+  } as EnergyPipelineState;
+
+  const ampFactorsSnapshot: AmpFactors = {
+    gammaGeo: state.gammaGeo,
+    gammaVanDenBroeck: state.gammaVanDenBroeck,
+    qSpoilingFactor: state.qSpoilingFactor,
+    qMechanical: state.qMechanical,
+    qCavity: state.qCavity,
   };
+  state.ampFactors = ampFactorsSnapshot;
+  (state as any).amps = ampFactorsSnapshot; // legacy alias
 
   // Run the unified pipeline calculation
   const result = await calculateEnergyPipeline(state);
@@ -4129,7 +4405,7 @@ export async function computeEnergySnapshot(sim: any) {
       dutyCycle: result.dutyCycle,
   // dutyEffectiveFR is included in thetaAudit.inputs and elsewhere; omit duplicate here to avoid overwrites
 
-      // amps and Q
+      // amp factors and Q
       gammaGeo: result.gammaGeo,
       qSpoilingFactor: result.qSpoilingFactor,
       qCavity: result.qCavity,

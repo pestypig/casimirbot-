@@ -16,6 +16,7 @@ import type {
   PhaseScheduleTelemetry,
 } from "@shared/schema";
 import type { ClockingSnapshot } from "@shared/clocking";
+import type { PipelineSnapshot, QiGuardrail } from "@/types/pipeline";
 
 /**
  * TheoryRefs:
@@ -75,6 +76,42 @@ export interface MechanicalGuard {
   status: "ok" | "saturated" | "fail";
 }
 
+export type AmpFactors = {
+  gammaGeo?: number;
+  gammaVanDenBroeck?: number;
+  qSpoilingFactor?: number;
+  qMechanical?: number;
+  qCavity?: number;
+};
+
+export type QiAutoscaleClamp = {
+  kind?: string;
+  before?: number;
+  after?: number;
+  limit?: number;
+  floor?: number;
+  ceiling?: number;
+  perSec?: number;
+  dt_s?: number;
+  toneOmegaHz?: number;
+};
+
+export type QiAutoscaleTelemetry = {
+  enabled?: boolean;
+  target?: number;
+  zetaRaw?: number | null;
+  proposedScale?: number | null;
+  slewLimitedScale?: number | null;
+  appliedScale?: number | null;
+  scale?: number | null;
+  gating?: "disabled" | "idle" | "window_bad" | "source_mismatch" | "safe" | "active" | "no_effect";
+  note?: string | null;
+  clamps?: QiAutoscaleClamp[];
+  activeSince?: number | null;
+  baselineZeta?: number | null;
+  safeSince?: number | null;
+};
+
 export interface EnergyPipelineState {
   // Input parameters
   tileArea_cm2: number;
@@ -94,6 +131,9 @@ export interface EnergyPipelineState {
   dutyCycle: number;
   sectorStrobing: number;
   qSpoilingFactor: number;
+  iPeakMaxMidi_A?: number;
+  iPeakMaxSector_A?: number;
+  iPeakMaxLauncher_A?: number;
   
   // Additional mode knobs (explicit to drive FR duty & timing)
   localBurstFrac?: number;     // sector-local burst fraction (0..1); defaults to dutyCycle
@@ -157,6 +197,9 @@ export interface EnergyPipelineState {
   exoticMassTarget_kg: number;
   geomCoupling?: number;        // χ coupling factor for parametric sweeps
   pumpEff?: number;             // η pump transduction efficiency (0..1)
+  ampFactors?: AmpFactors;      // Amplification factors (gamma, q) from pipeline
+  /** @deprecated use ampFactors */
+  amps?: AmpFactors;
   
   // Visual vs mass split (server emits both)
   gammaVanDenBroeck_vis?: number;
@@ -244,6 +287,8 @@ export interface EnergyPipelineState {
   TS_long?: number;
   TS_geom?: number;
   zeta: number;
+  zetaRaw?: number;
+  qiGuardrail?: QiGuardrail;
   N_tiles: number;
   hullArea_m2?: number;
   
@@ -261,7 +306,10 @@ export interface EnergyPipelineState {
   vacuumGapSweepRowsDropped?: number;
   sweep?: SweepRuntime | null;
   gateAnalytics?: GateAnalytics | null;
+  qiAutoscale?: QiAutoscaleTelemetry | null;
 }
+
+export type EnergyPipelineSnapshot = EnergyPipelineState & PipelineSnapshot;
 
 const MAX_SWEEP_ROWS = 2000;
 let issuedInitialMarginIntent = false;
@@ -879,9 +927,9 @@ export function useEnergyPipeline(options?: {
   refetchInterval?: number;
 }) {
   const selectPipelineState = React.useCallback(
-    (raw: EnergyPipelineState): EnergyPipelineState => {
+    (raw: EnergyPipelineSnapshot): EnergyPipelineSnapshot => {
       if (!raw) return raw;
-      let snapshot: EnergyPipelineState = raw;
+      let snapshot: EnergyPipelineSnapshot = raw;
 
       // Enforce server-provided γ_VdB green-band guard so UI solvers cannot wander outside it
       const vdbGuard =
@@ -949,19 +997,19 @@ export function useEnergyPipeline(options?: {
     [],
   );
 
-  const query = useQuery<EnergyPipelineState>({
+  const query = useQuery<EnergyPipelineSnapshot>({
     queryKey: ['/api/helix/pipeline'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/helix/pipeline');
       const json = await response.json();
-      return json as EnergyPipelineState;
+      return json as EnergyPipelineSnapshot;
     },
     select: selectPipelineState,
     refetchInterval: (queryInstance) => {
       if (typeof options?.refetchInterval === "number") {
         return options.refetchInterval;
       }
-      const snapshot = queryInstance.state?.data as EnergyPipelineState | undefined;
+      const snapshot = queryInstance.state?.data as EnergyPipelineSnapshot | undefined;
       const sweepActive = !!snapshot?.sweep?.active;
       return sweepActive ? 600 : 1000;
     },

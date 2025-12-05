@@ -15,7 +15,9 @@ export async function fetchPromptProfiles(): Promise<EssencePromptProfile[]> {
 
 export async function updatePromptProfile(
   id: string,
-  patch: Partial<Pick<EssencePromptProfile, "name" | "baseTemplate" | "baseScript" | "isActive">>,
+  patch: Partial<
+    Pick<EssencePromptProfile, "name" | "baseTemplate" | "baseScript" | "isActive" | "keywords" | "globs" | "ignore">
+  >,
 ): Promise<EssencePromptProfile> {
   const res = await fetch(`/api/essence/prompts/prompt-profiles/${encodeURIComponent(id)}`, {
     method: "PATCH",

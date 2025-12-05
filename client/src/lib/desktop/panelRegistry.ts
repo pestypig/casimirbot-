@@ -80,7 +80,7 @@ const load = <T extends Record<string, unknown>>(
     });
 };
 
-export const panelRegistry: PanelDefinition[] = [
+const BASE_PANELS: PanelDefinition[] = [
   {
     id: "live-energy",
     title: "Live Energy Pipeline",
@@ -218,6 +218,13 @@ export const panelRegistry: PanelDefinition[] = [
     defaultPosition: { x: 320, y: 220 }
   },
   {
+    id: "star-watcher",
+    title: "Star Watcher",
+    loader: load(() => import("@/pages/star-watcher-panel")),
+    defaultSize: { w: 1200, h: 740 },
+    defaultPosition: { x: 180, y: 140 }
+  },
+  {
     id: "endpoints",
     title: "Endpoints & Panels",
     loader: load(() => import("@/components/desktop/EndpointsPanel")),
@@ -277,9 +284,14 @@ export const panelRegistry: PanelDefinition[] = [
           }
         }
       ]
-    : []),
-  ...HELIX_PANELS
+    : [])
 ];
+
+// Merge HELIX_PANELS without duplicating ids that already exist in BASE_PANELS.
+const existingIds = new Set(BASE_PANELS.map((p) => p.id));
+const mergedHelix = HELIX_PANELS.filter((p) => !existingIds.has(p.id));
+
+export const panelRegistry: PanelDefinition[] = [...BASE_PANELS, ...mergedHelix];
 
 export function getPanelDef(id: PanelDefinition["id"]) {
   return panelRegistry.find((p) => p.id === id);

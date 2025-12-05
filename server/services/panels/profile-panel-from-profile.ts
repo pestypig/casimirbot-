@@ -56,7 +56,7 @@ const Gauge: React.FC<GaugeProps> = ({ label, value }) => {
             style={{ width: pct === undefined ? "12%" : \`\${(pct * 100).toFixed(0)}%\` }}
           />
         </div>
-        <span className="text-sm text-slate-200">{pct === undefined ? "∼" : (pct * 100).toFixed(0) + "%"}</span>
+        <span className="text-sm text-slate-200">{pct === undefined ? "N/A" : (pct * 100).toFixed(0) + "%"}</span>
       </div>
     </div>
   );
@@ -72,6 +72,7 @@ const Section: React.FC<{ title: string; subtitle?: string; children: React.Reac
   </section>
 );
 
+const personaLabel = ${JSON.stringify(personaId)};
 const focusAreas = ${focusJson};
 const aspirationSignals = ${aspirationJson};
 const rhythms = ${rhythmsJson};
@@ -92,8 +93,8 @@ export default function ProfileHelixPanel() {
     <div className="flex h-full flex-col gap-4 bg-gradient-to-b from-[#050915] via-[#060b1b] to-[#050915] p-5 text-slate-100">
       <header className="flex items-center justify-between rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 shadow-lg shadow-cyan-900/30">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.25em] text-cyan-200/80">Helix start · Persona</p>
-          <h1 className="text-xl font-semibold text-white">Resonance & cycles for ${personaId}</h1>
+          <p className="text-[11px] uppercase tracking-[0.25em] text-cyan-200/80">Helix start: Persona</p>
+          <h1 className="text-xl font-semibold text-white">Resonance & cycles for {personaLabel}</h1>
           <p className="text-xs text-slate-400">Updated {new Date("${updatedAt}").toLocaleString()}</p>
         </div>
         <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
@@ -140,7 +141,10 @@ export default function ProfileHelixPanel() {
           <div className="flex flex-wrap gap-2">
             {focusAreas.length === 0 && <p className="text-xs text-slate-400">No focus signals yet.</p>}
             {focusAreas.map((entry) => (
-              <Pill key={entry.key} text={\`\${friendlyLabel(entry.key)} · \${entry.value === undefined ? "—" : (entry.value * 100).toFixed(0) + "%"}\`} />
+              <Pill
+                key={entry.key}
+                text={\`\${friendlyLabel(entry.key)}: \${entry.value === undefined ? "N/A" : (entry.value * 100).toFixed(0) + "%"}\`}
+              />
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -150,11 +154,11 @@ export default function ProfileHelixPanel() {
           </div>
         </Section>
 
-        <Section title="Experiments" subtitle="premise → test → reflect">
+        <Section title="Experiments" subtitle="premise + test + reflect">
           <ul className="space-y-2 text-sm text-slate-200">
-            <li>• Pick one focus and one sustainability constraint.</li>
-            <li>• Craft a 3-step micro-experiment with a clear stop condition.</li>
-            <li>• Reflect using a single metric: effort, mood, or outcome.</li>
+            <li>Pick one focus and one sustainability constraint.</li>
+            <li>Craft a 3-step micro-experiment with a clear stop condition.</li>
+            <li>Reflect using a single metric: effort, mood, or outcome.</li>
           </ul>
         </Section>
 

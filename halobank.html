@@ -5654,7 +5654,7 @@ window.addEventListener('perihelion:ready', () => {
       if (!entry) {
         const geometry = new THREERef.SphereGeometry(0.01, 16, 16);
         const material = new THREERef.MeshBasicMaterial({
-          color: tagColor(memory.tags[0]),
+          color: memory.color || tagColor(memory.tags[0]),
           transparent: true,
           opacity: 0.92
         });
@@ -5683,7 +5683,11 @@ window.addEventListener('perihelion:ready', () => {
       } else {
         const { mesh, label } = entry;
         mesh.position.set(x, 0, z);
-        mesh.material.color.setHex(tagColor(memory.tags[0]));
+        if (memory.color) {
+          mesh.material.color.set(memory.color);
+        } else {
+          mesh.material.color.setHex(tagColor(memory.tags[0]));
+        }
         mesh.userData.tags = memory.tags;
         if (label) {
           label.position.copy(mesh.position).add(new THREERef.Vector3(0.03, 0.03, 0));

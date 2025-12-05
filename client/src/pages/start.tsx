@@ -289,11 +289,17 @@ export default function StartPortal() {
                     >
                       Launch Hydrostatic Panel
                     </button>
-                      <button
-                        className="px-3.5 py-2 rounded-lg border border-sky-400/50 bg-sky-400/10 text-sky-100 text-sm"
-                        onClick={() => requestPanelWindow("star-coherence")}
-                      >
-                        Star Coherence Governor
+                    <button
+                      className="px-3.5 py-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 text-cyan-100 text-sm"
+                      onClick={() => requestPanelWindow("star-watcher")}
+                    >
+                      Open Star Watcher
+                    </button>
+                    <button
+                      className="px-3.5 py-2 rounded-lg border border-sky-400/50 bg-sky-400/10 text-sky-100 text-sm"
+                      onClick={() => requestPanelWindow("star-coherence")}
+                    >
+                      Star Coherence Governor
                     </button>
                     <button
                       className="px-3.5 py-2 rounded-lg border border-emerald-400/40 bg-emerald-400/10 text-emerald-100 text-sm"

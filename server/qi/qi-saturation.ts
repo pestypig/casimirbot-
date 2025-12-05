@@ -63,7 +63,7 @@ export function computeS(
   let avgNeg = 0;
   for (let k = 0; k < N; k++) {
     const rho = rho_t[k];
-    if (rho < 0) avgNeg += window[k] * rho;
+    if (rho < 0) avgNeg += window[k] * rho * dt_s;
   }
   const S = Math.abs(avgNeg) / qiLimit;
   return Number.isFinite(S) ? Math.min(S, 1.5) : 0;

@@ -46,7 +46,7 @@ describe("Chat B planner", () => {
     expect(prompt).toContain("llm.local.generate");
   });
 
-  it("executes the SEARCH→SUMMARIZE→CALL(tool) plan", async () => {
+  it("executes the SEARCH->SUMMARIZE->CALL(tool) plan", async () => {
     await putMemoryRecord(baseRecord);
     const { nodes } = buildChatBPlan({
       goal: "Summarize Alpha warp status",

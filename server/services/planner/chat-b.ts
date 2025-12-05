@@ -10,7 +10,17 @@ import type {
 import type { GroundingReport, GroundingSource } from "@shared/grounding";
 import type { TMemoryRecord, TMemorySearchHit, TTaskTrace, TTaskApproval } from "@shared/essence-persona";
 import type { LocalResourceHint } from "@shared/local-call-spec";
-import { DebateConfig, type TDebateOutcome, type TDebateRoundMetrics } from "@shared/essence-debate";
+import {
+  DebateConfig,
+  ViabilityStatus,
+  type TDebateOutcome,
+  type TDebateRoundMetrics,
+  type TWarpConfig,
+  type TWarpConstraintEvidence,
+  type TWarpGroundingEvidence,
+  type TWarpSnapshot,
+  type TViabilityStatus,
+} from "@shared/essence-debate";
 import type { Tool, ToolManifestEntry, ToolRiskType } from "@shared/skills";
 import { putMemoryRecord, searchMemories } from "../essence/memory-store";
 import { kvAdd, kvBudgetExceeded, kvEvictOldest } from "../llm/kv-budgeter";
@@ -30,8 +40,16 @@ import {
   recordKnowledgeSources,
   recordResonancePatchSources,
 } from "./grounding";
+import {
+  collectSupplementsFromOutputs,
+  collectSupplementsFromResults,
+  formatSupplementForPrompt,
+  type Supplement,
+} from "./supplements";
+import type { WarpViabilityCertificate } from "../../../types/warpViability";
+import { loadWarpAgentsConfig, type WarpAgentsConfig } from "../../../modules/physics/warpAgents";
 
-export const PLAN_DSL_CHAIN = "SEARCH→SUMMARIZE→CALL(tool)";
+export const PLAN_DSL_CHAIN = "SEARCH->SUMMARIZE->CALL(tool)";
 export const PLAN_DSL_GUIDE = [
   `${PLAN_DSL_CHAIN} enforces grounding before tool use.`,
   'SEARCH("query", k=3-6)        # fetch evidence from memory or files',
@@ -151,7 +169,12 @@ export type ExecutionResult = ExecutionResultSuccess | ExecutionResultFailure;
 
 const isFailedResult = (result: ExecutionResult): result is ExecutionResultFailure => result.ok === false;
 
-export type ReasoningStrategy = "deep_repo_research" | "repo_design_ideation" | "design-debate" | "default";
+export type ReasoningStrategy =
+  | "deep_repo_research"
+  | "repo_design_ideation"
+  | "design-debate"
+  | "physics_console"
+  | "default";
 export type IntentFlags = { wantsStatus: boolean; wantsWarp: boolean; wantsImplementation: boolean; wantsPhysics: boolean };
 
 export const normalizeForIntent = (value: string): string =>
@@ -167,6 +190,13 @@ export const isWarpOrPhysicsIntentGoal = (goal: string): boolean => {
   );
 };
 
+export const isViabilityIntentGoal = (goal: string): boolean => {
+  const normalized = normalizeForIntent(goal);
+  return /\b(viab|admissible|inadmissible|marginal|certificate|guardrail|qi bound|ford-roman|verdict|safe|feasible)\b/.test(
+    normalized,
+  );
+};
+
 export const isImplementationIntentGoal = (goal: string): boolean => {
   const normalized = normalizeForIntent(goal);
   return (
@@ -175,6 +205,11 @@ export const isImplementationIntentGoal = (goal: string): boolean => {
       normalized,
     )
   );
+};
+
+export const isWarpConsoleIntent = (goal: string, essenceConsole?: boolean): boolean => {
+  const warpSignals = isWarpOrPhysicsIntentGoal(goal) || isViabilityIntentGoal(goal);
+  return Boolean(essenceConsole) || warpSignals;
 };
 
 export const classifyIntent = (goal: string): IntentFlags => {
@@ -192,9 +227,29 @@ export const classifyIntent = (goal: string): IntentFlags => {
   return { wantsStatus, wantsWarp, wantsImplementation, wantsPhysics };
 };
 
+const SERIOUS_WARP_WALL_MS = (() => {
+  const envWall = Number(process.env.DEBATE_MAX_WALL_MS ?? NaN);
+  const floor = 20 * 60 * 1000;
+  return Number.isFinite(envWall) ? Math.max(envWall, floor) : floor;
+})();
+
+const pickDebateBudgets = (
+  intent: IntentFlags | undefined,
+  fallback?: { max_rounds?: number; max_wall_ms?: number },
+): { max_rounds?: number; max_wall_ms?: number } | undefined => {
+  const isWarp = intent?.wantsWarp || intent?.wantsPhysics;
+  if (isWarp) {
+    return {
+      max_rounds: (fallback?.max_rounds ?? 3) || 3,
+      max_wall_ms: SERIOUS_WARP_WALL_MS,
+    };
+  }
+  return fallback;
+};
+
 export function chooseReasoningStrategy(
   goal: string,
-  opts?: { hasRepoContext?: boolean; personaHints?: string[]; intentTags?: string[] },
+  opts?: { hasRepoContext?: boolean; personaHints?: string[]; intentTags?: string[]; essenceConsole?: boolean; intent?: IntentFlags },
 ): { strategy: ReasoningStrategy; notes: string[] } {
   const normalized = goal.toLowerCase();
   const notes: string[] = [];
@@ -207,6 +262,11 @@ export function chooseReasoningStrategy(
   const intentForcesDeep = intentTags.some((tag) =>
     ["warp_physics", "warp", "implementation", "physics", "repo_deep"].includes(tag),
   );
+  const intent = opts?.intent ?? classifyIntent(goal);
+  if (isWarpConsoleIntent(goal, opts?.essenceConsole) || intent.wantsWarp || intent.wantsPhysics) {
+    notes.push("Warp console intent detected");
+    return { strategy: "physics_console", notes };
+  }
 
   const designVerb = /\b(add|implement|refactor|migrate|redesign|rewrite|restructure|introduce|extend|augment|modernize|upgrade|replace|deprecate)\b/i.test(
     normalized,
@@ -477,8 +537,47 @@ const collectResonancePaths = (runtime: ExecutionRuntime): string[] => {
   return nodes.map((node) => node.filePath).filter((p): p is string => typeof p === "string" && p.trim().length > 0);
 };
 
+const hasWarpMemoryGrounding = (outputs: Map<string, unknown>): boolean => {
+  for (const value of outputs.values()) {
+    if (!Array.isArray(value) || value.length === 0) continue;
+    for (const hit of value) {
+      if (!hit || typeof hit !== "object") continue;
+      const snippet = typeof (hit as { snippet?: unknown }).snippet === "string" ? (hit as { snippet: string }).snippet : null;
+      const text = typeof (hit as { text?: unknown }).text === "string" ? (hit as { text: string }).text : null;
+      const keys = Array.isArray((hit as { keys?: unknown }).keys)
+        ? ((hit as { keys: unknown[] }).keys ?? []).filter((k): k is string => typeof k === "string")
+        : [];
+      const candidates = [snippet, text, ...keys].filter((part): part is string => typeof part === "string" && part.trim().length > 0);
+      if (candidates.some((candidate) => isWarpOrPhysicsIntentGoal(candidate))) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+const hasWarpDebateEvidence = (grounding?: TWarpGroundingEvidence | null): boolean => {
+  if (!grounding) return false;
+  const status = grounding.status;
+  const hasStatus = typeof status === "string" && status.trim().length > 0;
+  const hasCertHash = typeof grounding.certificateHash === "string" && grounding.certificateHash.trim().length > 0;
+  const hasSnapshot = grounding.snapshot && Object.keys(grounding.snapshot ?? {}).length > 0;
+  const hasConstraints = Array.isArray(grounding.constraints) && grounding.constraints.length > 0;
+  const hasStructuredEvidence = hasSnapshot || hasConstraints || hasCertHash;
+  // Require structured physics evidence and a declared status; status text alone (especially NOT_CERTIFIED) is not enough.
+  return hasStatus && hasStructuredEvidence;
+};
+
 const hasWarpGrounding = (runtime: ExecutionRuntime, outputs: Map<string, unknown>): boolean => {
   if (!needsWarpImplementationGrounding(runtime)) {
+    return true;
+  }
+  const warpSupplement = collectWarpSupplement(outputs);
+  if (warpSupplement?.grounding && hasWarpDebateEvidence(warpSupplement.grounding)) {
+    return true;
+  }
+  const supplements = collectSupplementsFromOutputs(outputs.values());
+  if (supplements.some((supplement) => supplement.kind === "warp")) {
     return true;
   }
   const paths = new Set<string>();
@@ -486,8 +585,611 @@ const hasWarpGrounding = (runtime: ExecutionRuntime, outputs: Map<string, unknow
   knowledgePaths.forEach((p) => paths.add(p));
   collectResonancePaths(runtime).forEach((p) => paths.add(p));
   collectRepoGraphPathsFromOutputs(outputs).forEach((p) => paths.add(p));
+  if (hasWarpMemoryGrounding(outputs) || extractWarpAskResult(outputs)) {
+    return true;
+  }
   return Array.from(paths).some((p) => isWarpRelevantPath(p));
 };
+
+type WarpAskResult = {
+  answer?: string;
+  citations?: string[];
+  citationHints?: Record<string, unknown>;
+  pipelineSnapshot?: Record<string, unknown> | null;
+  pipelineCitations?: Record<string, string[]> | null;
+};
+
+const isWarpAskResult = (value: unknown): value is WarpAskResult =>
+  Boolean(
+    value &&
+      typeof value === "object" &&
+      typeof (value as { answer?: unknown }).answer === "string" &&
+      Array.isArray((value as { citations?: unknown }).citations),
+  );
+
+const findWarpAskResult = (value: unknown): WarpAskResult | null => {
+  if (isWarpAskResult(value)) {
+    return value;
+  }
+  if (value && typeof value === "object" && (value as { output?: unknown }).output) {
+    return findWarpAskResult((value as { output?: unknown }).output);
+  }
+  return null;
+};
+
+const extractWarpAskResult = (outputs: Map<string, unknown>): WarpAskResult | null => {
+  for (const value of outputs.values()) {
+    const result = findWarpAskResult(value);
+    if (result) {
+      return result;
+    }
+  }
+  return null;
+};
+
+const collectWarpCitationsFromResult = (warp: WarpAskResult | null): string[] => {
+  if (!warp) return [];
+  const citations: string[] = [];
+  if (Array.isArray(warp.citations)) {
+    citations.push(...warp.citations.filter((c): c is string => typeof c === "string" && c.trim().length > 0));
+  }
+  if (warp.pipelineCitations && typeof warp.pipelineCitations === "object") {
+    for (const value of Object.values(warp.pipelineCitations)) {
+      if (Array.isArray(value)) {
+        citations.push(...value.filter((c): c is string => typeof c === "string" && c.trim().length > 0));
+      }
+    }
+  }
+  return Array.from(new Set(citations));
+};
+
+type WarpConstraintLike = {
+  id?: string;
+  description?: string;
+  severity?: string;
+  passed?: boolean;
+  lhs?: number;
+  rhs?: number;
+  margin?: number | null;
+};
+
+type WarpViabilityResultForPrompt = {
+  status?: string;
+  constraints?: WarpConstraintLike[];
+  snapshot?: Record<string, unknown> | null;
+  certificate?: WarpViabilityCertificate | null;
+  citations?: string[];
+  config?: Record<string, unknown> | null;
+  certificateHash?: string | null;
+  certificateId?: string | null;
+};
+
+type WarpGroundingEvidence = TWarpGroundingEvidence;
+
+const asConstraintList = (value: unknown): WarpConstraintLike[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .map((entry) => (entry && typeof entry === "object" ? (entry as WarpConstraintLike) : null))
+    .filter((entry): entry is WarpConstraintLike => Boolean(entry));
+};
+
+const normalizeConstraintSeverity = (value?: string): TWarpConstraintEvidence["severity"] => {
+  const upper = (value ?? "").toUpperCase();
+  return upper === "SOFT" ? "SOFT" : "HARD";
+};
+
+const normalizeConstraints = (constraints?: WarpConstraintLike[]): TWarpConstraintEvidence[] => {
+  if (!constraints || constraints.length === 0) return [];
+  return constraints
+    .map((entry, idx): TWarpConstraintEvidence => {
+      const lhs = typeof entry.lhs === "number" && Number.isFinite(entry.lhs) ? entry.lhs : undefined;
+      const rhs = typeof entry.rhs === "number" && Number.isFinite(entry.rhs) ? entry.rhs : undefined;
+      const margin =
+        typeof entry.margin === "number" || entry.margin === null
+          ? entry.margin
+          : lhs !== undefined && rhs !== undefined
+            ? lhs - rhs
+            : null;
+      return {
+        id: entry.id ?? `constraint_${idx + 1}`,
+        description: entry.description ?? "",
+        severity: normalizeConstraintSeverity(entry.severity),
+        passed: entry.passed === true,
+        lhs,
+        rhs,
+        margin,
+      };
+    })
+    .filter((entry) => Boolean(entry));
+};
+
+const normalizeWarpConfig = (config?: Record<string, unknown> | null): TWarpConfig | undefined => {
+  if (!config || typeof config !== "object") return undefined;
+  const keys: Array<keyof TWarpConfig> = [
+    "bubbleRadius_m",
+    "wallThickness_m",
+    "targetVelocity_c",
+    "tileConfigId",
+    "tileCount",
+    "dutyCycle",
+    "gammaGeoOverride",
+  ];
+  const normalized: Record<string, number | string> = {};
+  for (const key of keys) {
+    const value = (config as Record<string, unknown>)[key as string];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      normalized[key] = value;
+    } else if (typeof value === "string" && value.trim().length > 0) {
+      normalized[key] = value.trim();
+    }
+  }
+  return Object.keys(normalized).length > 0 ? (normalized as TWarpConfig) : undefined;
+};
+
+const clampWarpStatus = (status?: string): TViabilityStatus => {
+  const normalized = (status ?? "").toUpperCase();
+  if (normalized && ViabilityStatus.options.includes(normalized as TViabilityStatus)) {
+    return normalized as TViabilityStatus;
+  }
+  return "NOT_CERTIFIED";
+};
+
+const findWarpViabilityResult = (value: unknown): WarpViabilityResultForPrompt | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  const certificate = candidate.certificate as WarpViabilityCertificate | undefined;
+  if (certificate && (certificate as any).header?.kind === "warp-viability") {
+    const certificateHash =
+      (certificate as { certificateHash?: string }).certificateHash ??
+      (candidate.certificateHash as string | undefined) ??
+      (candidate.payloadHash as string | undefined);
+    return {
+      status: certificate.payload?.status ?? (candidate.status as string | undefined),
+      constraints: asConstraintList(certificate.payload?.constraints) ?? asConstraintList(candidate.constraints),
+      snapshot:
+        (certificate.payload?.snapshot as Record<string, unknown>) ??
+        (candidate.snapshot as Record<string, unknown>) ??
+        null,
+      certificate,
+      certificateHash: certificateHash ?? null,
+      certificateId: certificate.header?.id ?? (candidate.certificateId as string | undefined) ?? null,
+      config: (certificate.payload?.config as Record<string, unknown>) ?? (candidate.config as Record<string, unknown>) ?? null,
+      citations: Array.isArray(certificate.payload?.citations)
+        ? (certificate.payload?.citations as string[])
+        : (candidate.citations as string[] | undefined),
+    };
+  }
+  if (typeof candidate.status === "string" && Array.isArray(candidate.constraints)) {
+    return {
+      status: candidate.status as string,
+      constraints: asConstraintList(candidate.constraints),
+      snapshot: (candidate.snapshot as Record<string, unknown>) ?? null,
+      certificateHash: (candidate.certificateHash as string | undefined) ?? null,
+      certificateId: (candidate.certificateId as string | undefined) ?? null,
+      config: (candidate.config as Record<string, unknown>) ?? null,
+      certificate: null,
+      citations: Array.isArray(candidate.citations) ? (candidate.citations as string[]) : undefined,
+    };
+  }
+  if ((candidate as { output?: unknown }).output) {
+    return findWarpViabilityResult((candidate as { output?: unknown }).output);
+  }
+  return null;
+};
+
+const extractWarpViabilityResult = (outputs: Map<string, unknown>): WarpViabilityResultForPrompt | null => {
+  for (const value of outputs.values()) {
+    const result = findWarpViabilityResult(value);
+    if (result) {
+      return result;
+    }
+  }
+  return null;
+};
+
+const collectWarpCitationsFromViability = (viability: WarpViabilityResultForPrompt | null): string[] => {
+  if (!viability) return [];
+  const citations = new Set<string>();
+  if (Array.isArray(viability.citations)) {
+    viability.citations.forEach((c) => {
+      if (typeof c === "string" && c.trim()) {
+        citations.add(c);
+      }
+    });
+  }
+  const payloadCitations = viability.certificate?.payload?.citations;
+  if (Array.isArray(payloadCitations)) {
+    payloadCitations.forEach((c) => {
+      if (typeof c === "string" && c.trim()) {
+        citations.add(c);
+      }
+    });
+  }
+  return Array.from(citations);
+};
+
+const summarizeCertificateFailure = (constraints?: WarpConstraintLike[]): string | null => {
+  if (!constraints || constraints.length === 0) return null;
+  const failing = constraints.filter((c) => c && c.passed === false);
+  if (!failing.length) return "All certificate constraints passing.";
+  const target = failing.find((c) => c.severity === "HARD") ?? failing[0];
+  if (!target) return null;
+  const margin = target.margin !== undefined ? ` margin=${target.margin}` : "";
+  const bounds =
+    target.lhs !== undefined && target.rhs !== undefined ? ` lhs=${target.lhs} rhs=${target.rhs}` : "";
+  return `Certificate failing ${target.id ?? "constraint"} (${target.severity ?? "unknown"})${margin}${bounds}`;
+};
+
+const normalizeWarpSnapshotNumbers = (
+  snapshot: Record<string, unknown> | null | undefined,
+): TWarpSnapshot | undefined => {
+  if (!snapshot || typeof snapshot !== "object") return undefined;
+  const numeric: Record<string, number> = {};
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      numeric[key] = value;
+    }
+  }
+  return Object.keys(numeric).length > 0 ? numeric : undefined;
+};
+
+const formatWarpSnapshot = (snapshot: TWarpSnapshot | null | undefined): string | null => {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  const interesting = [
+    "TS_ratio",
+    "gamma_VdB",
+    "T00_min",
+    "M_exotic",
+    "U_static",
+    "gamma_geo_cubed",
+    "d_eff",
+    "thetaCal",
+    "T00_avg",
+    "T00",
+  ];
+  const entries: string[] = [];
+  for (const key of interesting) {
+    const raw = (snapshot as Record<string, unknown>)[key];
+    if (raw === undefined || raw === null) continue;
+    if (typeof raw === "number") {
+      const abs = Math.abs(raw);
+      const formatted =
+        abs !== 0 && (abs >= 1e5 || abs < 1e-3) ? raw.toExponential(3) : Number(raw.toPrecision(6));
+      entries.push(`${key}=${formatted}`);
+    } else {
+      entries.push(`${key}=${String(raw)}`);
+    }
+  }
+  if (!entries.length) return null;
+  return `Pipeline snapshot: ${entries.join(", ")}`;
+};
+
+const collectWarpSupplement = (
+  outputs: Map<string, unknown>,
+  supplements?: Supplement[],
+): { text: string; citations: string[]; grounding?: WarpGroundingEvidence } | null => {
+  const supplementList = supplements ?? collectSupplementsFromOutputs(outputs.values());
+  const warpSupplement = supplementList.find((entry) => entry.kind === "warp");
+  const warpResult = extractWarpAskResult(outputs);
+  const viabilityResult = extractWarpViabilityResult(outputs);
+  const rawSnapshot =
+    (viabilityResult?.certificate?.payload?.snapshot as Record<string, unknown>) ??
+    viabilityResult?.snapshot ??
+    warpResult?.pipelineSnapshot ??
+    null;
+  const snapshot: TWarpSnapshot = normalizeWarpSnapshotNumbers(rawSnapshot) ?? {};
+  const snapshotLine = formatWarpSnapshot(snapshot);
+  const citationsFromResult = collectWarpCitationsFromResult(warpResult);
+  const citationsFromViability = collectWarpCitationsFromViability(viabilityResult);
+  const combinedCitations = Array.from(new Set([...citationsFromResult, ...citationsFromViability]));
+  const viabilityStatus = viabilityResult?.status ?? viabilityResult?.certificate?.payload?.status;
+  const resolvedStatus = clampWarpStatus(viabilityStatus ?? (warpResult ? "NOT_CERTIFIED" : undefined));
+  const certificateHash =
+    viabilityResult?.certificateHash ??
+    (viabilityResult?.certificate as { certificateHash?: string } | undefined)?.certificateHash ??
+    (viabilityResult?.certificate as { payloadHash?: string } | undefined)?.payloadHash ??
+    undefined;
+  const certificateId = viabilityResult?.certificateId ?? viabilityResult?.certificate?.header?.id;
+  const constraints = normalizeConstraints(
+    viabilityResult?.certificate?.payload?.constraints ?? viabilityResult?.constraints ?? undefined,
+  );
+  const config = normalizeWarpConfig(
+    (viabilityResult?.config as Record<string, unknown> | null | undefined) ??
+      (viabilityResult?.certificate?.payload?.config as Record<string, unknown> | null | undefined) ??
+      null,
+  );
+  const hasCertificate = Boolean(viabilityResult?.certificate || certificateHash);
+  const viabilityStatusLine = hasCertificate
+    ? `Warp viability certificate: ${resolvedStatus}`
+    : `Warp status: ${resolvedStatus} (no certificate attached)`;
+  const constraintLine = summarizeCertificateFailure(
+    viabilityResult?.certificate?.payload?.constraints ?? viabilityResult?.constraints,
+  );
+  const snapshotHasData = snapshot && Object.keys(snapshot).length > 0;
+  const grounding: WarpGroundingEvidence | undefined =
+    warpResult || constraints.length || snapshotHasData || certificateHash || config
+      ? {
+          status: resolvedStatus,
+          summary: (warpResult?.answer ?? warpSupplement?.detail ?? warpSupplement?.summary ?? "").trim(),
+          askAnswer: warpResult?.answer,
+          constraints,
+          snapshot,
+          certificateHash: certificateHash ?? undefined,
+          certificateId: certificateId ?? undefined,
+          citations: combinedCitations.length ? combinedCitations : undefined,
+          config,
+        }
+      : undefined;
+  if (warpSupplement) {
+    const lines: string[] = [];
+    if (warpSupplement.detail && warpSupplement.detail.trim()) {
+      lines.push(warpSupplement.detail.trim());
+    } else if (warpSupplement.summary && warpSupplement.summary.trim()) {
+      lines.push(warpSupplement.summary.trim());
+    }
+    if (viabilityStatusLine) {
+      lines.push(viabilityStatusLine);
+    }
+    if (constraintLine) {
+      lines.push(constraintLine);
+    }
+    if (!warpSupplement.detail && warpResult?.answer) {
+      lines.push(`Warp Q&A: ${warpResult.answer.trim()}`);
+    }
+    if (snapshotLine) {
+      lines.push(snapshotLine);
+    }
+    if (!lines.length) {
+      lines.push("Warp Q&A result available.");
+    }
+    const citations =
+      warpSupplement.citations && warpSupplement.citations.length > 0
+        ? warpSupplement.citations
+        : combinedCitations;
+    return { text: lines.join("\n"), citations, grounding };
+  }
+  if (!warpResult && !viabilityResult) {
+    return null;
+  }
+  const lines: string[] = [];
+  if (viabilityStatusLine) {
+    lines.push(viabilityStatusLine);
+  }
+  if (constraintLine) {
+    lines.push(constraintLine);
+  }
+  if (typeof warpResult?.answer === "string" && warpResult.answer.trim()) {
+    lines.push(`Warp Q&A: ${warpResult.answer.trim()}`);
+  }
+  if (snapshotLine) {
+    lines.push(snapshotLine);
+  }
+  if (!lines.length) {
+    lines.push("Warp Q&A result available.");
+  }
+  return { text: lines.join("\n"), citations: combinedCitations, grounding };
+};
+
+const formatWarpConstraintsForPrompt = (constraints?: TWarpConstraintEvidence[], limit = 4): string[] => {
+  if (!constraints || constraints.length === 0) return [];
+  return constraints.slice(0, Math.max(1, limit)).map((c) => {
+    const status = c.passed ? "PASS" : "FAIL";
+    const severity = c.severity ? ` ${c.severity}` : "";
+    const margin = c.margin !== undefined && c.margin !== null ? ` margin=${c.margin}` : "";
+    return `${status}${severity} ${c.id}${margin}`.trim();
+  });
+};
+
+const formatWarpNumber = (value: number): string => {
+  const abs = Math.abs(value);
+  return abs !== 0 && (abs >= 1e5 || abs < 1e-3) ? value.toExponential(3) : Number(value.toPrecision(6)).toString();
+};
+
+const formatWarpConfigForPrompt = (config?: TWarpConfig): string[] => {
+  if (!config || typeof config !== "object") return [];
+  const keys = [
+    "bubbleRadius_m",
+    "wallThickness_m",
+    "targetVelocity_c",
+    "tileCount",
+    "tileConfigId",
+    "dutyCycle",
+    "gammaGeoOverride",
+  ];
+  const lines: string[] = [];
+  for (const key of keys) {
+    const value = (config as Record<string, unknown>)[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      lines.push(`${key}=${formatWarpNumber(value)}`);
+    } else {
+      lines.push(`${key}=${String(value)}`);
+    }
+  }
+  return lines;
+};
+
+const pickFirstFailingConstraint = (
+  constraints?: TWarpConstraintEvidence[] | WarpConstraintLike[] | null,
+): TWarpConstraintEvidence | WarpConstraintLike | null => {
+  if (!constraints || constraints.length === 0) return null;
+  return (
+    constraints.find((c) => c?.passed === false && c.severity === "HARD") ??
+    constraints.find((c) => c?.passed === false) ??
+    null
+  );
+};
+
+const formatWarpGroundingBlock = (grounding?: WarpGroundingEvidence): string | null => {
+  if (!grounding) return null;
+  const status = grounding.status;
+  const lines = ["[Warp Evidence]"];
+  if (status) {
+    lines.push(`status: ${status}`);
+  }
+  if (grounding.certificateHash) {
+    lines.push(`certificate_hash: ${grounding.certificateHash}`);
+  }
+  const configLines = formatWarpConfigForPrompt(grounding.config);
+  if (configLines.length > 0) {
+    lines.push("config:");
+    configLines.forEach((line) => lines.push(`- ${line}`));
+  }
+  const constraintLines = formatWarpConstraintsForPrompt(grounding.constraints, 4);
+  if (constraintLines.length > 0) {
+    lines.push("constraints:");
+    for (const line of constraintLines) {
+      lines.push(`- ${line}`);
+    }
+  }
+  const snapshotLine = formatWarpSnapshot(grounding.snapshot ?? null);
+  if (snapshotLine) {
+    lines.push(snapshotLine);
+  }
+  const summary = grounding.summary || grounding.askAnswer;
+  if (summary) {
+    lines.push(`summary: ${limitText(summary, 400)}`);
+  }
+  return lines.filter(Boolean).join("\n");
+};
+
+const buildWarpSystemPrompt = (policy?: WarpAgentsConfig["viabilityPolicy"] | null): string => {
+  const admissible = policy?.admissibleStatus ?? "ADMISSIBLE";
+  const allowMarginal = policy?.allowMarginalAsViable ?? false;
+  const missingIsNotCertified = policy?.treatMissingCertificateAsNotCertified ?? true;
+  const allowedStatuses = allowMarginal ? `"${admissible}" or "MARGINAL"` : `"${admissible}"`;
+  return [
+    "You are a physics assistant for a warp/Casimir simulation system.",
+    "",
+    "You MUST treat the physics pipeline and its certificates as the sole authority on warp-bubble viability. Do NOT substitute your own judgment for the pipeline.",
+    "",
+    "You are given:",
+    "- The original user question.",
+    "- A warp viability certificate (if available), which includes:",
+    "  - status in {ADMISSIBLE, MARGINAL, INADMISSIBLE}",
+    "  - config (bubble radius, velocity, tile config, etc.)",
+    "  - snapshot (TS_ratio, gamma_VdB, d_eff, U_static, T00_min, M_exotic, thetaCal, ...)",
+    "  - constraints (id, severity HARD/SOFT, passed, margin)",
+    "  - certificateHash",
+    "",
+    "RULES:",
+    `1. You MUST NOT describe a configuration as \"physically viable\" or \"admissible\" unless:`,
+    "   - A certificate is present, AND",
+    `   - certificate.status == ${allowedStatuses}, AND`,
+    "   - All HARD constraints in the certificate have passed.",
+    "2. If certificate.status is \"MARGINAL\" or \"INADMISSIBLE\", you MUST:",
+    "   - Clearly state that the configuration is NOT fully admissible under the current guardrails.",
+    "   - Name at least the first failing HARD constraint (id + description) and explain briefly why it fails using the snapshot values and margin.",
+    "3. If no certificate is present for a warp configuration:",
+    missingIsNotCertified
+      ? "   - You MUST say that the configuration is NOT certified."
+      : "   - State that no certificate is present before discussing theory.",
+    "   - You MAY discuss theory in general terms, but MUST NOT claim viability.",
+    "4. When you quote numbers from the snapshot (TS_ratio, gamma_VdB, etc.), make it clear that they come from the pipeline, not from your own imagination.",
+    "5. Include the certificateHash in your answer when possible, so the user can trace the underlying pipeline run.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+};
+
+const buildWarpCertificateMessage = (
+  goal: string,
+  grounding?: WarpGroundingEvidence,
+  policy?: WarpAgentsConfig["viabilityPolicy"] | null,
+): string | null => {
+  const missingIsNotCertified = policy?.treatMissingCertificateAsNotCertified ?? true;
+  const status = grounding?.status ?? "NOT_CERTIFIED";
+  const hasSnapshot = grounding?.snapshot && Object.keys(grounding.snapshot ?? {}).length > 0;
+  const hasConstraints = Boolean(grounding?.constraints?.length);
+  const certificateMissing = !grounding || (!grounding.certificateHash && !hasSnapshot && !hasConstraints);
+  const certificatePayload = certificateMissing
+    ? {
+        status: "MISSING",
+        note: missingIsNotCertified
+          ? "No certificate present; treat as NOT certified until physics.warp.viability runs."
+          : "No certificate present; certification unknown.",
+      }
+    : {
+        status: status ?? null,
+        certificateHash: grounding?.certificateHash ?? null,
+        constraints: grounding?.constraints ?? null,
+        snapshot: grounding?.snapshot ?? null,
+        config: grounding?.config ?? null,
+      };
+  const body = {
+    question: goal,
+    certificate: certificatePayload,
+    policy: policy
+      ? {
+          admissibleStatus: policy.admissibleStatus,
+          allowMarginalAsViable: policy.allowMarginalAsViable,
+          treatMissingCertificateAsNotCertified: policy.treatMissingCertificateAsNotCertified,
+        }
+      : undefined,
+  };
+  const serialized = JSON.stringify(body, (_key, value) => (value === undefined ? null : value), 2);
+  return ["[Warp Certificate Context]", "```json", serialized, "```"].join("\n");
+};
+
+const buildWarpGuardrailBlock = (
+  viabilityIntent: boolean,
+  grounding?: WarpGroundingEvidence,
+  policy?: WarpAgentsConfig["viabilityPolicy"] | null,
+): string | null => {
+  if (!viabilityIntent) return null;
+  const failing = pickFirstFailingConstraint(grounding?.constraints);
+  const admissible = policy?.admissibleStatus ?? "ADMISSIBLE";
+  const allowMarginal = policy?.allowMarginalAsViable ?? false;
+  const status = grounding?.status ?? "NOT_CERTIFIED";
+  if (!grounding) {
+    return [
+      "[Warp Viability Guardrails]",
+      "No warp viability certificate is attached to this request.",
+      policy?.treatMissingCertificateAsNotCertified === false
+        ? "Do not claim viability without a certificate; if you speculate, label it theoretical."
+        : "Treat the configuration as NOT certified until physics.warp.viability runs. Do not claim viability.",
+      `Only declare viability with status=${admissible}${allowMarginal ? " (or MARGINAL if policy allows)" : ""} and a certificate.`,
+    ].join("\n");
+  }
+  const constraintHint = failing ? `${failing.id ?? "constraint"} (${failing.severity ?? "unknown"})` : null;
+  return [
+    "[Warp Viability Guardrails]",
+    `status: ${status}${grounding?.certificateHash ? ` (hash=${grounding.certificateHash})` : ""}`,
+    "Rules:",
+    `- Only call the configuration viable if status=${admissible}${allowMarginal ? " or MARGINAL (per policy)" : ""} and all HARD constraints pass; cite the certificate hash.`,
+    "- If status is MARGINAL or INADMISSIBLE, name the failing constraints and why using pipeline snapshot + margins.",
+    constraintHint ? `- First failing constraint to surface: ${constraintHint}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+};
+
+const buildWarpNarrationSystemPrompt = (policy?: WarpAgentsConfig["viabilityPolicy"] | null): string => {
+  const admissible = policy?.admissibleStatus ?? "ADMISSIBLE";
+  const allowMarginal = policy?.allowMarginalAsViable ?? false;
+  const header = [
+    "You are the warp-console narrator. Physics pipeline outputs outrank debate/referee confidence metrics.",
+    "Use only provided warp evidence (certificate, constraints, snapshot, config, warp Q&A). Never invent numbers.",
+    `Do NOT claim viability unless status is ${admissible}${allowMarginal ? " or MARGINAL" : ""} AND all HARD constraints pass.`,
+    "If no certificate/snapshot/constraints exist, say NOT CERTIFIED and ask to run physics.warp.viability.",
+  ];
+  return [...header, buildWarpSystemPrompt(policy)].filter(Boolean).join("\n\n");
+};
+
+const buildWarpNarrationPrompt = (goal: string): string =>
+  [
+    "Warp-console answer for operators. Use the Warp Evidence above as ground truth.",
+    `Goal: ${goal}`,
+    "",
+    "Write four short sections:",
+    '1) "How it\'s solved on the site" – implementation in this repo: Alcubierre/Natario metric in ADM 3+1 (lapse alpha, shift beta), Casimir tiles -> energy pipeline (TS_ratio ladder, gamma_geo^3, d_eff, gamma_VdB), stress-energy evaluation (T_{mu nu}, T00, M_exotic), guardrails (FordRomanQI, ThetaAudit, TS_ratio_min, VdB bands).',
+    '2) "Certificate verdict for this run" – status (ADMISSIBLE/MARGINAL/INADMISSIBLE/NOT_CERTIFIED), key HARD/SOFT constraints with pass/fail and margins, snapshot values (TS_ratio, gamma_VdB, M_exotic, T00_min, etc.), certificateHash.',
+    '3) "What this means" – plain-language consequences of the status and constraints.',
+    '4) "What to do next" – concrete operator actions (e.g., run parameter search, adjust tiles/guardrails, rerun physics.warp.viability).',
+    "",
+    'If there is no certificate or snapshot, state: "NOT CERTIFIED; no snapshot/constraints; cannot claim viability" and avoid numeric claims.',
+    "Rules: only quote numbers present in warp evidence; ignore missing-memory/coherence chatter; no speculation.",
+  ].join("\n");
 
 const composeResonancePatchSection = ({
   bundle,
@@ -1192,7 +1894,7 @@ export function buildCandidatePlansFromResonance(args: {
             knowledgeHints: args.knowledgeHints,
             plannerPrompt,
           }),
-          budgets: { max_rounds: 4, max_wall_ms: 15000 },
+          budgets: pickDebateBudgets(args.intent, { max_rounds: 4, max_wall_ms: 15000 }),
           debateTriggers,
         },
       });
@@ -1287,6 +1989,10 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
   const strategy = args.strategy ?? "default";
   const detailPref = args.detailPreference ?? "medium";
   const intent = args.intent ?? classifyIntent(args.goal);
+  const viabilityRuleLine = isViabilityIntentGoal(args.goal)
+    ? "If the user asks whether a warp configuration is viable/admissible, call physics.warp.viability to get the certificate. Base viability strictly on certificate.payload.status/constraints; never invent results. If status is MARGINAL or INADMISSIBLE, cite the first failing HARD constraint (otherwise the first failing constraint). Surface key snapshot numbers from the certificate: TS_ratio, gamma_VdB, T00_min, M_exotic."
+    : null;
+  const repoGraphAvailable = Boolean(getTool("repo.graph.search"));
   const repoQuery = normalizeForIntent(args.searchQuery || args.goal);
   const resourceHints = args.resourceHints ?? [];
   const seedPaths = Array.from(
@@ -1316,6 +2022,42 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
       note: `Ground goal "${args.goal}" with Essence memories`,
     });
     nodes.push({ id: nextId(), kind: "SUMMARIZE", source: searchId, focus: summaryFocus });
+  };
+
+  const buildPhysicsConsolePlan = () => {
+    const askId = nextId();
+    nodes.push({
+      id: askId,
+      kind: "CALL",
+      tool: "physics.warp.ask",
+      promptTemplate: "Run physics.warp.ask to unpack the warp question and capture a snapshot.",
+      extra: { question: args.goal, includeSnapshot: true },
+    });
+    const viabilityId = nextId();
+    nodes.push({
+      id: viabilityId,
+      kind: "CALL",
+      tool: "physics.warp.viability",
+      summaryRef: askId,
+      promptTemplate:
+        "Run physics.warp.viability to issue the warp certificate. Use only certificate payload for viability/status.",
+      extra: {},
+    });
+    const finalCallId = nextId();
+    nodes.push({
+      id: finalCallId,
+      kind: "CALL",
+      tool: args.finalTool,
+      summaryRef: viabilityId,
+      promptTemplate:
+        "Warp-console narration: explain implementation, cite certificate status/constraints/snapshot, then consequences and next actions.",
+      extra: {
+        appendSummaries: [askId, viabilityId],
+        narrationKind: "direct",
+        reasoningStrategy: strategy,
+      },
+    });
+    return { nodes, planDsl: formatPlanDsl(nodes) };
   };
 
   const buildDeepRepoPattern = () => {
@@ -1358,6 +2100,7 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
         "Use repo sketchboard for structure; cite file paths/symbols inline.",
         "Separate 'Facts from repo' vs 'Inferred suggestions'.",
         "Perform TIMAR review inline: Traceability, Impact, Mitigations, Alternatives, Risks.",
+        viabilityRuleLine,
         detailPref === "short" ? "Keep it concise; compress bullets and flows." : "Provide clear bullets and flow notes.",
       ]
         .filter(Boolean)
@@ -1388,6 +2131,10 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
       });
     }
   };
+
+  if (strategy === "physics_console") {
+    return buildPhysicsConsolePlan();
+  }
 
   const buildRepoDesignIdeation = () => {
     addCoreSearchAndSummary();
@@ -1433,7 +2180,7 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
         promptTemplate: "Run debate over the proposed repo design/refactor ideas.",
         extra: {
           topic: args.goal,
-          budgets: { max_rounds: 2, max_wall_ms: 90000 },
+          budgets: pickDebateBudgets(args.intent, { max_rounds: 2, max_wall_ms: 90000 }),
           debateTriggers: ["design", "refactor", "architecture", "feasibility", "novelty"],
         },
       });
@@ -1474,13 +2221,13 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
     }
   };
 
-  if (strategy === "deep_repo_research") {
+  if (strategy === "deep_repo_research" && repoGraphAvailable) {
     buildDeepRepoPattern();
     const enriched = maybeInjectSpecialists(args.goal, nodes);
     return { nodes: enriched, planDsl: formatPlanDsl(enriched) };
   }
 
-  if (strategy === "repo_design_ideation") {
+  if (strategy === "repo_design_ideation" && repoGraphAvailable) {
     buildRepoDesignIdeation();
     const enriched = maybeInjectSpecialists(args.goal, nodes);
     return { nodes: enriched, planDsl: formatPlanDsl(enriched) };
@@ -1506,13 +2253,13 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
       promptTemplate: "Run a lightweight debate on the proposed design/refactor plan.",
       extra: {
         topic: args.goal,
-        budgets: { max_rounds: 2, max_wall_ms: 120000 },
+        budgets: pickDebateBudgets(intent, { max_rounds: 2, max_wall_ms: 120000 }),
         debateTriggers: ["design", "refactor", "architecture"],
       },
     });
   }
 
-  const repoSupport = intent.wantsWarp || intent.wantsImplementation || intent.wantsPhysics;
+  const repoSupport = repoGraphAvailable && (intent.wantsWarp || intent.wantsImplementation || intent.wantsPhysics);
   let repoSummaryId: string | null = null;
   if (repoSupport) {
     const repoSearchId = nextId();
@@ -1573,6 +2320,7 @@ export function buildChatBPlan(args: BuildPlanArgs): { nodes: PlanNode[]; planDs
       "Grounded context (memory):",
       "{{summary}}",
       "Perform TIMAR review inline: Traceability, Impact, Mitigations, Alternatives, Risks.",
+      viabilityRuleLine,
       "Return the next concrete action or answer with provenance notes; avoid emotions or confessional language.",
     ]
       .filter(Boolean)
@@ -1735,9 +2483,21 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           planner_prompt: runtime.plannerPrompt ?? runtime.taskTrace?.planner_prompt,
         };
         const context = { ...contextBase, attachments: normalizeDebateAttachments(contextBase.attachments) };
+        const intent = runtime.intent ?? classifyIntent(runtime.goal);
+        const envMaxRounds = Number(process.env.DEBATE_MAX_ROUNDS ?? NaN);
+        const envMaxWallMs = Number(process.env.DEBATE_MAX_WALL_MS ?? NaN);
+        const isWarpSerious = intent.wantsWarp || intent.wantsPhysics;
         const budgets = {
-          max_rounds: Number(process.env.DEBATE_MAX_ROUNDS ?? NaN),
-          max_wall_ms: Number(process.env.DEBATE_MAX_WALL_MS ?? NaN),
+          max_rounds: isWarpSerious
+            ? (Number.isFinite(envMaxRounds) ? envMaxRounds : 3)
+            : Number.isFinite(envMaxRounds)
+              ? envMaxRounds
+              : undefined,
+          max_wall_ms: isWarpSerious
+            ? Math.max(Number.isFinite(envMaxWallMs) ? envMaxWallMs : 0, 20 * 60 * 1000)
+            : Number.isFinite(envMaxWallMs)
+              ? envMaxWallMs
+              : undefined,
         };
         const config = DebateConfig.parse({
           goal: topic,
@@ -1833,8 +2593,37 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         await ensureToolApprovals(tool, runtime);
         const summary = step.summaryRef ? outputs.get(step.summaryRef) : undefined;
         const summaryText = formatSummaryForPrompt(summary);
-        const ungroundedSummary = isUngroundedSummary(summaryText);
-        const missingGrounding = needsWarpImplementationGrounding(runtime) && !hasWarpGrounding(runtime, outputs);
+        const supplements = collectSupplementsFromOutputs(outputs.values());
+        const warpSupplement = collectWarpSupplement(outputs, supplements);
+        const rawContext = step.context ?? {};
+        const requiresWarpGrounding = needsWarpImplementationGrounding(runtime);
+        const warpGroundingForDebate: WarpGroundingEvidence | undefined =
+          (rawContext as { warp_grounding?: WarpGroundingEvidence | null }).warp_grounding ??
+          (warpSupplement?.grounding
+            ? { ...warpSupplement.grounding, citations: warpSupplement.citations }
+            : warpSupplement
+            ? {
+                status: "NOT_CERTIFIED",
+                summary: warpSupplement.text,
+                config: undefined,
+                snapshot: {} as TWarpSnapshot,
+                constraints: [],
+                certificateHash: undefined,
+                certificateId: undefined,
+                citations: warpSupplement.citations,
+                askAnswer: undefined,
+              }
+            : undefined);
+        const hasDebateEvidence = hasWarpDebateEvidence(warpGroundingForDebate);
+        const budgetIntentBase = runtime.intent ?? classifyIntent(runtime.goal);
+        const intentForBudgets =
+          hasDebateEvidence || warpSupplement
+            ? { ...budgetIntentBase, wantsWarp: true, wantsPhysics: true }
+            : budgetIntentBase;
+        const debateBudgets = pickDebateBudgets(intentForBudgets, step.budgets);
+        const ungroundedSummary = isUngroundedSummary(summaryText) && !warpSupplement && supplements.length === 0;
+        const enforceWarpEvidence = requiresWarpGrounding || Boolean(warpSupplement);
+        const missingGrounding = enforceWarpEvidence && !hasDebateEvidence;
         if (ungroundedSummary || missingGrounding) {
           const debateId: string = runtime.debateId ?? step.id;
           const skippedOutcome: TDebateOutcome = {
@@ -1875,22 +2664,21 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
             tool: step.tool,
             version: (tool as any).version ?? "unknown",
             paramsHash: hashPayload({ skipped: true }),
-            promptHash: hashText(summaryText || runtime.goal),
-              seed: (summary as { seed?: unknown } | undefined)?.seed,
-              sessionId,
-              traceId: runtime.taskTrace?.id ?? sessionId,
-              durationMs: duration,
-              ok: true,
-              error: undefined,
-              essenceId: undefined,
-              stepId: step.id,
-              debateId,
-              strategy: runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined,
-              text: missingGrounding ? "Debate skipped (no grounding)" : "Debate skipped (no evidence)",
-            });
+            promptHash: hashText(summaryText || warpSupplement?.text || runtime.goal),
+            seed: (summary as { seed?: unknown } | undefined)?.seed,
+            sessionId,
+            traceId: runtime.taskTrace?.id ?? sessionId,
+            durationMs: duration,
+            ok: true,
+            error: undefined,
+            essenceId: undefined,
+            stepId: step.id,
+            debateId,
+            strategy: runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined,
+            text: missingGrounding ? "Debate skipped (no grounding)" : "Debate skipped (no evidence)",
+          });
         } else {
-          const topic = (step.topic ?? "").trim() || summaryText || runtime.goal;
-          const rawContext = step.context ?? {};
+          const topic = (step.topic ?? "").trim() || summaryText || warpSupplement?.text || runtime.goal;
           const context = {
             ...rawContext,
             planner_prompt:
@@ -1904,6 +2692,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
               (rawContext as { resonance_patch?: unknown }).resonance_patch ??
               runtime.resonanceSelection ??
               runtime.resonanceBundle,
+            warp_grounding: warpGroundingForDebate,
           };
           const contextWithAttachments = {
             ...context,
@@ -1915,7 +2704,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
             topic,
             personaId: step.personaId ?? runtime.personaId ?? "default",
             context: contextWithAttachments,
-            budgets: step.budgets,
+            budgets: debateBudgets ?? step.budgets,
           };
           const paramsHash = hashPayload(input);
           const toolStart = Date.now();
@@ -2060,7 +2849,58 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         }
         await ensureToolApprovals(tool, runtime);
         const summary = step.summaryRef ? outputs.get(step.summaryRef) : undefined;
-        const summaryText = formatSummaryForPrompt(summary);
+        let summaryText = formatSummaryForPrompt(summary);
+        const appendSummaryIds =
+          Array.isArray((step.extra as { appendSummaries?: string[] } | undefined)?.appendSummaries) &&
+          (step.extra as { appendSummaries?: string[] }).appendSummaries
+            ? (step.extra as { appendSummaries?: string[] }).appendSummaries!.filter(
+                (ref): ref is string => typeof ref === "string" && ref.trim().length > 0,
+              )
+            : [];
+        const supplements = collectSupplementsFromOutputs(outputs.values());
+        const warpSupplement = collectWarpSupplement(outputs, supplements);
+        const warpGrounding = warpSupplement?.grounding;
+        const viabilityIntent =
+          (runtime.intent?.wantsWarp ?? false) ||
+          (runtime.intent?.wantsPhysics ?? false) ||
+          isViabilityIntentGoal(runtime.goal);
+        const warpAgentsConfig = viabilityIntent
+          ? await loadWarpAgentsConfig().catch((error) => {
+              console.warn("[chat-b] failed to load WARP_AGENTS.md", error);
+              return null;
+            })
+          : null;
+        const warpSystemPrompt = viabilityIntent
+          ? buildWarpNarrationSystemPrompt(warpAgentsConfig?.viabilityPolicy)
+          : null;
+        const warpCertificateMessage = viabilityIntent
+          ? buildWarpCertificateMessage(runtime.goal, warpGrounding, warpAgentsConfig?.viabilityPolicy)
+          : null;
+        const supplementSummaries = supplements
+          .map((supplement) => limitText((supplement.summary || supplement.detail || "").trim()))
+          .filter((entry) => entry.length > 0);
+        const supplementBlocks = supplements.map((supplement) => formatSupplementForPrompt(supplement));
+        const extraSummariesRaw = appendSummaryIds.map((ref) => formatSummaryForPrompt(outputs.get(ref)));
+        if (warpSupplement) {
+          extraSummariesRaw.push(warpSupplement.text);
+        }
+        const extraSummaries = Array.from(
+          new Set(
+            [...extraSummariesRaw, ...supplementSummaries].filter(
+              (entry) => typeof entry === "string" && entry.trim().length > 0,
+            ),
+          ),
+        );
+        const ungroundedBaseSummary = isUngroundedSummary(summaryText);
+        if (ungroundedBaseSummary && warpSupplement?.text) {
+          summaryText = warpSupplement.text;
+        }
+        const summaryStillUngrounded = isUngroundedSummary(summaryText);
+        const summaryGrounded = !summaryStillUngrounded || extraSummaries.length > 0;
+        if (!summaryText && summaryGrounded && extraSummaries.length > 0) {
+          summaryText = extraSummaries[0];
+        }
+        const summaryForPrompt = summaryGrounded ? summaryText : "";
         const wantsStatus = runtime.intent?.wantsStatus ?? false;
         const telemetrySummary = wantsStatus ? runtime.telemetrySummary ?? runtime.taskTrace?.telemetry_summary ?? null : null;
         const resonanceBundle = runtime.resonanceBundle ?? runtime.taskTrace?.resonance_bundle ?? null;
@@ -2075,7 +2915,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         let promptTemplate = step.promptTemplate;
         const narrationKind = (step.extra as { narrationKind?: string | null } | undefined)?.narrationKind;
         const verdictFrom = (step.extra as { verdictFrom?: string | null } | undefined)?.verdictFrom;
-        const ungroundedSummary = isUngroundedSummary(summaryText);
+        const ungroundedSummary = !summaryGrounded;
         const debateSkipped =
           runtime.debateOutcome?.stop_reason === "no_evidence" ||
           runtime.debateOutcome?.verdict === "skipped_no_evidence";
@@ -2088,6 +2928,8 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
             "Keep it short and factual, with a brief definition plus 3-5 key points the operator needs to know.",
             "Goal: {{goal}}",
           ].join("\n");
+        } else if (viabilityIntent && warpGrounding) {
+          promptTemplate = buildWarpNarrationPrompt(runtime.goal);
         } else if (effectiveNarrationKind === "debate") {
           promptTemplate = buildDebateNarrationPrompt({
             goal: runtime.goal,
@@ -2103,7 +2945,6 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
             telemetrySummary,
           });
         }
-        const summaryForPrompt = ungroundedSummary ? "" : summaryText;
         const appendixHeading = formatKnowledgeHeading("Attached knowledge", runtime.knowledgeHints);
         const appendix = composeKnowledgeAppendix({
           goal: runtime.goal,
@@ -2114,37 +2955,34 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           heading: appendixHeading,
         });
         const debateNote = formatDebateNote(runtime.debateOutcome, runtime.debateId);
-        const promptBase = renderTemplate(promptTemplate, {
-          goal: runtime.goal,
-          persona: runtime.personaId ?? "default",
-          summary: summaryForPrompt,
-          debate: debateNote ?? "",
-        });
         const resonanceSection = composeResonancePatchSection({
           bundle: resonanceBundle,
           selection: resonanceSelection,
           preferredPatchId: resonanceSelection?.primaryPatchId,
           intent: runtime.intent ?? classifyIntent(runtime.goal),
         });
-        const extraSummariesRaw =
-          Array.isArray((step.extra as { appendSummaries?: string[] } | undefined)?.appendSummaries) &&
-          (step.extra as { appendSummaries?: string[] }).appendSummaries
-            ? (step.extra as { appendSummaries?: string[] }).appendSummaries!.map((ref) =>
-                formatSummaryForPrompt(outputs.get(ref)),
-              )
-            : [];
-        const extraSummaries = ungroundedSummary
-          ? []
-          : extraSummariesRaw.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
+        const warpEvidenceBlock = formatWarpGroundingBlock(warpGrounding);
+        const warpGuardrail = buildWarpGuardrailBlock(
+          viabilityIntent,
+          warpGrounding,
+          warpAgentsConfig?.viabilityPolicy,
+        );
         const extraSummaryBlock =
           extraSummaries.length > 0 ? ["[Additional grounded context]", ...extraSummaries].join("\n") : "";
+        const supplementSection =
+          supplementBlocks.length > 0
+            ? supplementBlocks.map((text, index) => `[[SUPP ${index + 1}]]\n${text}`).join("\n\n")
+            : "";
         const hasGrounding =
           !ungroundedSummary &&
           ((resonanceSection && resonanceSection.trim().length > 0) ||
             (appendix.text && appendix.text.trim().length > 0) ||
             extraSummaries.length > 0 ||
+            supplementSection.length > 0 ||
             (telemetrySummary && telemetrySummary.trim().length > 0) ||
-            (debateNote && debateNote.trim().length > 0));
+            (debateNote && debateNote.trim().length > 0) ||
+            Boolean(warpEvidenceBlock) ||
+            Boolean(warpCertificateMessage));
 
         if (!hasGrounding) {
           // Avoid hallucinating when no grounded repo/docs/telemetry exist.
@@ -2156,6 +2994,12 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           ].join("\n");
         }
 
+        const promptBase = renderTemplate(promptTemplate, {
+          goal: runtime.goal,
+          persona: runtime.personaId ?? "default",
+          summary: summaryForPrompt,
+          debate: debateNote ?? "",
+        });
         const sections: string[] = [];
         if (!ungroundedSummary && resonanceSection) {
           sections.push(resonanceSection);
@@ -2166,6 +3010,12 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         if (extraSummaryBlock) {
           sections.push(extraSummaryBlock);
         }
+        if (warpEvidenceBlock) {
+          sections.push(warpEvidenceBlock);
+        }
+        if (supplementSection) {
+          sections.push(supplementSection);
+        }
         sections.push(promptBase);
         if (!ungroundedSummary && telemetrySummary) {
           sections.push(`[Panel snapshot]\n${telemetrySummary}`);
@@ -2173,8 +3023,25 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         if (!ungroundedSummary && debateNote && step.extra?.useDebate) {
           sections.push(debateNote);
         }
+        if (warpGuardrail) {
+          sections.push(warpGuardrail);
+        }
         const prompt = sections.filter(Boolean).join("\n\n");
-        const promptHash = hashText(prompt);
+        const promptWithCertificate = warpCertificateMessage
+          ? [prompt, warpCertificateMessage].filter(Boolean).join("\n\n")
+          : prompt;
+        const messages =
+          viabilityIntent && toolNameLower.startsWith("llm.")
+            ? [
+                { role: "system", content: warpSystemPrompt ?? buildWarpNarrationSystemPrompt(null) },
+                { role: "user", content: promptWithCertificate },
+              ]
+            : undefined;
+        const promptHash = hashText(
+          messages
+            ? [warpSystemPrompt, promptWithCertificate].filter((part): part is string => Boolean(part && part.trim())).join("\n\n")
+            : promptWithCertificate,
+        );
         const isNarrationCall = narrationKind === "debate" || narrationKind === "direct";
         const sealedContext = isNarrationCall
           ? {
@@ -2190,7 +3057,10 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
                 : null,
             }
           : null;
-        const input: Record<string, unknown> = { ...(step.extra ?? {}), prompt };
+        const input: Record<string, unknown> = { ...(step.extra ?? {}), prompt: promptWithCertificate };
+        if (messages) {
+          input.messages = messages;
+        }
         if (sealedContext?.telemetry_summary !== null && sealedContext?.telemetry_summary !== undefined) {
           input.telemetry_summary = sealedContext.telemetry_summary;
         }
@@ -2301,7 +3171,18 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           step.tool === "debate.run" && runtime.debateOutcome?.key_turn_ids?.length
             ? runtime.debateOutcome.key_turn_ids
             : [];
-        citations = step.summaryRef ? [...(citationsByStep.get(step.summaryRef) ?? [])] : [];
+        const baseSummaryCitations = step.summaryRef ? citationsByStep.get(step.summaryRef) ?? [] : [];
+        const appendSummaryCitations = appendSummaryIds.flatMap((ref) => citationsByStep.get(ref) ?? []);
+        const warpCitations = warpSupplement?.citations ?? [];
+        const outputCitations = collectCitationsFromOutput(output);
+        citations = Array.from(
+          new Set([
+            ...baseSummaryCitations,
+            ...appendSummaryCitations,
+            ...warpCitations,
+            ...outputCitations,
+          ].filter((c): c is string => typeof c === "string" && c.trim().length > 0)),
+        );
         if (step.tool === "repo.graph.search" && output && Array.isArray((output as any).hits)) {
           const hits = (output as any).hits as Array<any>;
           const repoCites = hits
@@ -2600,6 +3481,30 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
   return results;
 }
 
+const collectCitationsFromOutput = (output: unknown): string[] => {
+  if (!output || typeof output !== "object") {
+    return [];
+  }
+  const citations: string[] = [];
+  const direct = (output as { citations?: unknown }).citations;
+  if (Array.isArray(direct)) {
+    citations.push(...direct.filter((c): c is string => typeof c === "string" && c.trim().length > 0));
+  }
+  const pipeline = (output as { pipelineCitations?: unknown }).pipelineCitations;
+  if (pipeline && typeof pipeline === "object") {
+    for (const value of Object.values(pipeline as Record<string, unknown>)) {
+      if (Array.isArray(value)) {
+        citations.push(...value.filter((c): c is string => typeof c === "string" && c.trim().length > 0));
+      }
+    }
+  }
+  const nested = (output as { output?: unknown }).output;
+  if (nested && typeof nested === "object") {
+    citations.push(...collectCitationsFromOutput(nested));
+  }
+  return Array.from(new Set(citations));
+};
+
 const extractEssenceId = (value: unknown): string | undefined => {
   if (!value) {
     return undefined;
@@ -2755,6 +3660,14 @@ export function summarizeExecutionResults(results: ExecutionResult[]): string {
   if (results.length === 0) {
     return "No steps executed.";
   }
+  // Build an output map for quick supplements (warp ask, etc.)
+  const outputs = new Map<string, unknown>();
+  for (const step of results) {
+    outputs.set(step.id, step.output);
+  }
+  const supplements = collectSupplementsFromResults(results);
+  const warpSupplement = supplements.find((supplement) => supplement.kind === "warp");
+  const warpFallback = collectWarpSupplement(outputs, supplements);
   const failure = results.find(isFailedResult);
   if (failure) {
     if (failure.kind === "tool.call") {
@@ -2773,11 +3686,40 @@ export function summarizeExecutionResults(results: ExecutionResult[]): string {
     }
     return `Failed at ${failure.id}`;
   }
+  const warpGrounding = warpFallback?.grounding;
+  if (warpGrounding?.status) {
+    const failingConstraint =
+      warpGrounding.constraints?.find((c) => c.passed === false && c.severity === "HARD") ??
+      warpGrounding.constraints?.find((c) => c.passed === false);
+    const constraintText = failingConstraint
+      ? `failing ${failingConstraint.id ?? "constraint"} (${failingConstraint.severity ?? "unknown"})`
+      : "all constraints passing";
+    const hashText = warpGrounding.certificateHash ? ` cert=${warpGrounding.certificateHash}` : "";
+    return truncateWithMarker(
+      `Warp certificate: status=${warpGrounding.status}; ${constraintText}${hashText ? ` (${hashText})` : ""}`,
+      RESULT_SUMMARY_LIMIT,
+    );
+  }
   const successCount = results.filter((step) => step.ok).length;
   const final = results[results.length - 1];
   const readable = final.ok ? pickReadableText(final.output) : undefined;
   if (final.ok && readable) {
     return truncateWithMarker(readable, RESULT_SUMMARY_LIMIT);
+  }
+  if (warpSupplement) {
+    const text = warpSupplement.detail || warpSupplement.summary;
+    if (text) {
+      return truncateWithMarker(text, RESULT_SUMMARY_LIMIT);
+    }
+  }
+  if (warpFallback?.text) {
+    return truncateWithMarker(warpFallback.text, RESULT_SUMMARY_LIMIT);
+  }
+  if (supplements[0]) {
+    const text = supplements[0].detail || supplements[0].summary;
+    if (text) {
+      return truncateWithMarker(text, RESULT_SUMMARY_LIMIT);
+    }
   }
   return `Executed ${successCount}/${results.length} steps successfully.`;
 }
@@ -3040,14 +3982,20 @@ export function pickReadableText(value: unknown): string | undefined {
       payload.data && typeof payload.data === "object"
         ? ((payload.data as Record<string, any>).text as unknown)
         : undefined;
+    const nestedAnswer =
+      payload.output && typeof payload.output === "object"
+        ? ((payload.output as Record<string, any>).answer as unknown)
+        : undefined;
     const candidates = [
       payload.excerpt,
       payload.summary,
+      payload.answer,
       payload.text,
       payload.message,
       payload.content,
       nestedOutput,
       nestedData,
+      nestedAnswer,
     ];
     for (const candidate of candidates) {
       if (typeof candidate === "string") {

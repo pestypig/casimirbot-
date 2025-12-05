@@ -17,6 +17,7 @@ type StarState = {
   lastUpdated: number;
   phase: PhaseState;
   recentMasses: number[];
+  recentDrivers: number[];
   prethermalLoad: number;
   rng: () => number;
 };
@@ -28,11 +29,38 @@ type HostContext = {
   host_mode?: string;
 };
 
+export type SolarHekEventInput = {
+  id?: string;
+  ivorn?: string;
+  event_type?: string;
+  start_time?: string;
+  end_time?: string;
+  start?: string;
+  end?: string;
+  u?: number;
+  v?: number;
+  rho?: number;
+  goes_class?: string;
+  noaa_ar?: number;
+  ch_area?: number;
+  peak_flux?: number;
+  grid_i?: number;
+  grid_j?: number;
+  grid_n?: number;
+  grid_rsun_arcsec?: number;
+};
+
 const defaultHostContext: Required<Pick<HostContext, "host_mass_norm" | "host_radius_norm" | "host_mode">> = {
   host_mass_norm: 1,
   host_radius_norm: 1,
   host_mode: "brain_like",
 };
+
+// Simple quiet-Sun baselines (tune with empirical runs).
+const QUIET_SIGMA_PHI_MED = 0.15;
+const QUIET_SIGMA_PHI_P90 = 0.35;
+const FALLBACK_P_MODE_P90 = 0.3;
+const DRIVER_HISTORY_MIN = 8; // bins of history required before trusting dispersion/p-mode gauges
 
 // Reference collapse timescale (ms) for dpEnergyNorm = 1.
 const TAU_REF_MS = 50;
@@ -41,7 +69,7 @@ type HostEigenmode = { freq_hz: number; q: number; weight: number };
 
 const HOST_EIGENMODES: Record<string, HostEigenmode[]> = {
   sun_like: [
-    { freq_hz: 3e-3, q: 50, weight: 1 },
+    { freq_hz: 1 / 300, q: 50, weight: 1 }, // pin macro to 5-minute mode
     { freq_hz: 6e-3, q: 30, weight: 0.6 },
     { freq_hz: 1e-2, q: 20, weight: 0.4 },
   ],
@@ -60,7 +88,7 @@ const HOST_EIGENMODES: Record<string, HostEigenmode[]> = {
 type BandFrequencies = { micro: number; meso: number; macro: number };
 
 const BAND_PRESETS: Record<string, BandFrequencies> = {
-  sun_like: { micro: 5e6, meso: 5e3, macro: 3e-3 },
+  sun_like: { micro: 5e6, meso: 5e3, macro: 1 / 300 }, // exact 5-minute macro mode
   brain_like: { micro: 8e6, meso: 4e4, macro: 10 },
   lab: { micro: 2e6, meso: 2e3, macro: 2 },
   other: { micro: 1e6, meso: 1e3, macro: 1 },
@@ -144,6 +172,22 @@ const computeMedian = (values: number[]): number => {
   return sorted[mid];
 };
 
+const computePercentile = (values: number[], p: number): number => {
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (!finite.length) return 0;
+  const sorted = [...finite].sort((a, b) => a - b);
+  const idx = clamp(Math.floor(p * sorted.length), 0, sorted.length - 1);
+  return sorted[idx];
+};
+
+const computeStd = (values: number[]): number => {
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (finite.length < 2) return 0;
+  const mean = finite.reduce((acc, v) => acc + v, 0) / finite.length;
+  const variance = finite.reduce((acc, v) => acc + (v - mean) * (v - mean), 0) / finite.length;
+  return Math.sqrt(Math.max(variance, 0));
+};
+
 const estimatePowerLawSlope = (values: number[]): number => {
   const positive = values.filter((v) => Number.isFinite(v) && v > 0);
   if (positive.length < 2) return 0;
@@ -217,6 +261,7 @@ const ensureSnapshot = (sessionId: string, sessionType?: string): StarState => {
       lastUpdated: state.lastUpdated,
       phase: state.phase ?? { micro: 0, meso: 0, macro: 0 },
       recentMasses: state.recentMasses ?? [],
+      recentDrivers: state.recentDrivers ?? [],
       prethermalLoad: state.prethermalLoad ?? 0,
       rng: state.rng ?? gaussianForSession(key),
     };
@@ -254,6 +299,7 @@ const ensureSnapshot = (sessionId: string, sessionType?: string): StarState => {
     lastUpdated: now,
     phase: { micro: 0, meso: 0, macro: 0 },
     recentMasses: [],
+    recentDrivers: [],
     prethermalLoad: 0,
     rng: gaussianForSession(key),
   };
@@ -276,6 +322,34 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
   const mass = Math.max(0, event.bytes || 0);
   const complexity = clamp(event.complexity_score ?? 0.5, 0, 1);
   const alignment = clamp(event.alignment ?? 0, -1, 1);
+  const phase_5min = Number.isFinite(event.phase_5min ?? NaN) ? event.phase_5min : undefined;
+  const driver = clamp(
+    phase_5min !== undefined ? Math.cos(phase_5min) * Math.abs(alignment) : alignment,
+    -1,
+    1,
+  );
+
+  const prevCoherence = state.snapshot.global_coherence ?? 0.5;
+  const prevDispersion = state.snapshot.phase_dispersion ?? 0.4;
+  const prevEnergy = state.snapshot.energy_budget ?? 0;
+
+  // Keep a short rolling window of drivers for dispersion and normalization.
+  const recentDrivers = state.recentDrivers ?? [];
+  recentDrivers.push(driver);
+  if (recentDrivers.length > 24) recentDrivers.shift();
+  state.recentDrivers = recentDrivers;
+  const historyLen = recentDrivers.length;
+  const historyReady = historyLen >= DRIVER_HISTORY_MIN;
+
+  const sigma_phi_raw = computeStd(recentDrivers);
+  const sigma_phi_med = QUIET_SIGMA_PHI_MED;
+  const sigma_phi_p90 = Math.max(QUIET_SIGMA_PHI_P90, sigma_phi_med + 1e-3);
+  const disp_norm_raw = clamp((sigma_phi_raw - sigma_phi_med) / (sigma_phi_p90 - sigma_phi_med), 0, 1);
+  const absDrivers = recentDrivers.map((d) => Math.abs(d));
+  const driver_p90 = Math.max(computePercentile(absDrivers, 0.9), FALLBACK_P_MODE_P90);
+  const p_mode_ready = historyReady;
+  const p_mode_power_norm_raw = clamp(Math.abs(driver) / driver_p90, 0, 1);
+  const dispersion_ready = historyReady;
 
   const hostFromEvent: HostContext = {
     host_id: event.host_id,
@@ -308,24 +382,25 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
   const rng = state.rng ?? gaussianForSession(key);
   state.rng = rng;
 
-  // Stochastic Ito-style updates (Euler–Maruyama)
-  const prevCoherence = state.snapshot.global_coherence ?? 0.5;
-  const prevDispersion = state.snapshot.phase_dispersion ?? 0.4;
-  const prevEnergy = state.snapshot.energy_budget ?? 0;
-
+  // Stochastic Ito-style updates (Euler-Maruyama)
   const coherenceDrift = (0.5 - prevCoherence) / 15;
   const coherenceDiff = 0.05 + 0.1 * complexity;
   let coherence = clamp(sdeStep(prevCoherence, dt, coherenceDrift, coherenceDiff, rng), 0, 1);
-  const coherenceBoost = clamp(Math.log1p(mass) / 12, 0, 0.25) * (alignment >= 0 ? 1 : 0.5) * complexity;
+  const coherenceBoost = clamp(Math.log1p(mass) / 12, 0, 0.25) * (driver >= 0 ? 1 : 0.5) * complexity;
   coherence = clamp(coherence + coherenceBoost, 0, 1);
 
-  const dispersionDrift = (0.4 - prevDispersion) / 12 + (alignment < 0 ? 0.05 : -0.02);
-  const dispersionDiff = 0.04 + 0.08 * (1 - alignment);
-  const dispersion = clamp(sdeStep(prevDispersion, dt, dispersionDrift, dispersionDiff, rng), 0, 1);
+  const dispersionDrift = (0.4 - prevDispersion) / 12 + (driver < 0 ? 0.05 : -0.02);
+  const dispersionDiff = 0.04 + 0.08 * (1 - Math.abs(driver));
 
   const energyDrift = -prevEnergy / 20 + Math.log1p(mass) / 12;
   const energyDiff = 0.03 + 0.05 * complexity;
   const energy = clamp(sdeStep(prevEnergy, dt, energyDrift, energyDiff, rng), 0, 1);
+
+  // Normalize coherence and dispersion against the rolling driver stats.
+  const dispersionModel = clamp(sdeStep(prevDispersion, dt, dispersionDrift, dispersionDiff, rng), 0, 1);
+  const dispersion_for_dynamics = dispersion_ready ? disp_norm_raw : dispersionModel;
+  const dispersion = clamp(dispersion_for_dynamics, 0, 1);
+  const coherence_effective = clamp(coherence * (1 - dispersion), 0, 1);
 
   // Multi-scale bands and phase cascade
   const bands = resolveBandFrequencies(resolvedHost.host_mode);
@@ -334,20 +409,23 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
   state.phase.meso += dtSec * bands.meso * 2 * Math.PI;
   state.phase.macro += dtSec * bands.macro * 2 * Math.PI;
 
+  const edge_of_chaos = clamp(1 - Math.abs(complexity - 0.5) / 0.5, 0, 1);
   const basePressure = clamp(
-    0.4 * coherence + 0.4 * energy + 0.2 * (complexity + (alignment > 0 ? 0.1 : 0)),
+    0.4 * coherence_effective + 0.4 * energy + 0.2 * (complexity + (driver > 0 ? 0.1 : 0)),
     0,
     1,
   );
 
   const resonance_score = computeResonanceScore(resolvedHost, now);
-  const pressure = clamp(basePressure + 0.1 * resonance_score, 0, 1);
+  const off_resonant = 1 - Math.abs(driver);
+  const collapse_gain = clamp(off_resonant * edge_of_chaos, 0, 1);
+  const pressure = clamp(basePressure + 0.15 * collapse_gain + 0.1 * resonance_score, 0, 1);
 
   const levels = {
-    micro: clamp(coherence + 0.05 * complexity * Math.cos(state.phase.micro), 0, 1),
-    meso: clamp(coherence + 0.02 * alignment * Math.cos(state.phase.meso), 0, 1),
-    macro: clamp(coherence - 0.03 * dispersion * Math.cos(state.phase.macro), 0, 1),
-    rope: clamp((coherence + pressure) / 2, 0, 1),
+    micro: clamp(coherence_effective + 0.05 * complexity * Math.cos(state.phase.micro), 0, 1),
+    meso: clamp(coherence_effective + 0.02 * driver * Math.cos(state.phase.meso), 0, 1),
+    macro: clamp(coherence_effective - 0.03 * dispersion * Math.cos(state.phase.macro), 0, 1),
+    rope: clamp((coherence_effective + pressure) / 2, 0, 1),
   };
 
   // Multi-fractal granulation proxy
@@ -363,9 +441,9 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
   const multi_fractal_index = clamp((Math.abs(slopeSmall) - Math.abs(slopeLarge)) / 4, 0, 1);
 
   const flare_score = clamp((energy - 0.7) * 1.2 + (dispersion - 0.5) * 0.8, 0, 1);
-  const search_regime = classifySearchRegime(coherence, dispersion);
+  const search_regime = classifySearchRegime(coherence_effective, dispersion);
 
-  const pump = Math.max(0, energy - 0.7) * Math.max(0, alignment);
+  const pump = Math.max(0, energy - 0.7) * Math.max(0, driver);
   state.prethermalLoad = clamp(state.prethermalLoad * Math.exp(-dt / 5000) + pump, 0, 1);
   const singularity_score = clamp(
     0.5 * state.prethermalLoad + 0.5 * Math.max(0, dispersion - 0.6),
@@ -374,22 +452,22 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
   );
 
   const hostMass = resolvedHost.host_mass_norm ?? defaultHostContext.host_mass_norm;
-  const dpEnergyNorm = clamp(hostMass * (0.5 * coherence + 0.3 * energy - 0.2 * dispersion), 0, 1);
+  const dpEnergyNorm = clamp(hostMass * (0.5 * coherence_effective + 0.3 * energy - 0.2 * dispersion), 0, 1);
   const dpTauEstimateMs = TAU_REF_MS / Math.max(dpEnergyNorm, 1e-3);
 
   let recommended_action: TTelemetrySnapshot["recommended_action"] =
     pressure > 0.72
       ? "collapse"
-      : coherence < 0.35 && dispersion > 0.55
+      : coherence_effective < 0.35 && dispersion > 0.55
         ? "ask_clarification"
         : energy > 0.85
           ? "branch"
           : "explore_more";
 
-  if (flare_score > 0.6 && coherence < 0.8) {
+  if (flare_score > 0.6 && coherence_effective < 0.8) {
     recommended_action = "branch";
   }
-  if (singularity_score > 0.7 && coherence < 0.5) {
+  if (singularity_score > 0.7 && coherence_effective < 0.5) {
     recommended_action = "ask_clarification";
   }
 
@@ -406,7 +484,7 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
       macro_freq_hz: bands.macro,
       rope_beat_hz: ropeBeatHz,
     },
-    global_coherence: coherence,
+    global_coherence: coherence_effective,
     levels,
     phase_dispersion: dispersion,
     collapse_pressure: pressure,
@@ -415,6 +493,12 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
     flare_score,
     search_regime,
     singularity_score,
+    phase_5min,
+    p_mode_driver: p_mode_ready ? p_mode_power_norm_raw : undefined,
+    driver_history_len: historyLen,
+    driver_history_required: DRIVER_HISTORY_MIN,
+    phase_dispersion_ready: dispersion_ready,
+    p_mode_ready,
     dp_energy_norm: dpEnergyNorm,
     dp_tau_estimate_ms: dpTauEstimateMs,
     energy_budget: energy,
@@ -427,6 +511,92 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
   state.lastUpdated = now;
   sessions.set(key, state);
   return state.snapshot;
+}
+
+const parseGoesScale = (goes: string | undefined): number => {
+  if (!goes) return 1;
+  const trimmed = goes.trim().toUpperCase();
+  const match = trimmed.match(/^([A-Z])\s*([0-9.]+)?/);
+  if (!match) return 1;
+  const letter = match[1];
+  const value = Number.parseFloat(match[2] ?? "1");
+  const letterScale: Record<string, number> = {
+    A: 0.01,
+    B: 0.1,
+    C: 1,
+    M: 10,
+    X: 100,
+  };
+  const scale = letterScale[letter] ?? 1;
+  return Math.max(0.1, value * scale);
+};
+
+export function emitSolarHekEvents(
+  events: Array<SolarHekEventInput | undefined>,
+  context?: { sessionId?: string; sessionType?: string; hostMode?: string },
+): void {
+  const sessionId = context?.sessionId ?? "solar-hek";
+  const sessionType = context?.sessionType ?? "solar";
+  const hostMode = context?.hostMode ?? "sun_like";
+  if (!Array.isArray(events) || !events.length) return;
+
+  const typeWeights: Record<string, number> = {
+    FL: 6000,
+    AR: 3800,
+    CH: 2600,
+    CE: 4200,
+    EF: 2400,
+    CJ: 1800,
+    FI: 2000,
+    FE: 2000,
+  };
+
+  for (const ev of events) {
+    if (!ev) continue;
+    const typeKey = (ev.event_type ?? "").toUpperCase();
+    if (!typeKey) continue;
+    const baseMass = typeWeights[typeKey] ?? 1200;
+    const goesScale = typeKey === "FL" ? parseGoesScale(ev.goes_class) : 1;
+    const chScale = typeKey === "CH" && Number.isFinite(ev.ch_area) ? Math.log1p(ev.ch_area as number) / 20 : 1;
+    const rhoPenalty = Number.isFinite(ev.rho) ? Math.max(0.6, 1.05 - Math.min(1, Math.abs(ev.rho as number))) : 1;
+    const peakFlux = Number.isFinite(ev.peak_flux) ? Math.max(ev.peak_flux as number, 0) : null;
+    const fluxGain = peakFlux && peakFlux > 0 ? Math.max(0, Math.log10(Math.max(peakFlux, 1e-8) / 1e-7)) : 0;
+    const mass = Math.max(400, baseMass * goesScale * chScale * rhoPenalty * (1 + fluxGain));
+    const alignment =
+      typeKey === "CH" ? 0.35 : typeKey === "AR" ? 0.55 : typeKey === "FL" ? 0.7 : typeKey === "CE" ? 0.6 : 0.5;
+    const complexity = clamp(0.3 + 0.15 * Math.log10(Math.max(1, mass)), 0.3, 0.85);
+    const ts =
+      Date.parse(ev.start_time ?? ev.start ?? "") ||
+      Date.parse(ev.end_time ?? ev.end ?? "") ||
+      Date.now();
+
+    handleInformationEvent({
+      session_id: sessionId,
+      session_type: sessionType,
+      host_mode: hostMode,
+      origin: "system",
+      bytes: Math.round(mass),
+      alignment,
+      complexity_score: complexity,
+      timestamp: ts,
+      metadata: {
+        kind: "solar_hek_event",
+        event_type: typeKey,
+        goes_class: ev.goes_class,
+        peak_flux: peakFlux ?? undefined,
+        noaa_ar: ev.noaa_ar,
+        ch_area: ev.ch_area,
+        u: ev.u,
+        v: ev.v,
+        rho: ev.rho,
+        grid_i: ev.grid_i,
+        grid_j: ev.grid_j,
+        grid_n: ev.grid_n,
+        grid_rsun_arcsec: ev.grid_rsun_arcsec,
+        id: ev.id ?? ev.ivorn,
+      },
+    });
+  }
 }
 
 export function getTelemetrySnapshot(sessionId: string, sessionType?: string): TTelemetrySnapshot {

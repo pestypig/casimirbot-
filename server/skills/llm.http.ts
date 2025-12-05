@@ -40,8 +40,17 @@ const normalizeBase = (): string => {
 export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
   const fetch = await getFetch();
   const base = normalizeBase();
-  const model = (process.env.LLM_HTTP_MODEL ?? "gpt-4o-mini").trim();
-  const temperature = Number(process.env.LLM_HTTP_TEMPERATURE ?? 0.2);
+  const model =
+    (typeof input?.model === "string" && input.model.trim()) ||
+    (process.env.LLM_HTTP_MODEL ?? "gpt-4o-mini").trim();
+  const temperature =
+    typeof input?.temperature === "number" && Number.isFinite(input.temperature)
+      ? input.temperature
+      : Number(process.env.LLM_HTTP_TEMPERATURE ?? 0.2);
+  const maxTokens =
+    typeof input?.max_tokens === "number" && Number.isFinite(input.max_tokens) && input.max_tokens > 0
+      ? Math.min(32_768, Math.floor(input.max_tokens))
+      : undefined;
   const apiKey = process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("LLM_HTTP_API_KEY or OPENAI_API_KEY not set; cannot call OpenAI");
@@ -57,6 +66,7 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
     model,
     messages,
     temperature: Number.isFinite(temperature) ? temperature : 0.2,
+    max_tokens: maxTokens,
     stream: false,
   };
 

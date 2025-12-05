@@ -1,0 +1,18 @@
+{
+  "gap_nm": 1,
+  "dutyCycle": 0.14,
+  "sectorCount": 400,
+  "gammaGeo": 26,
+  "gammaVanDenBroeck": 38.3,
+  "qCavity": 1000000000,
+  "qMechanical": 1,
+  "tileArea_cm2": 25,
+  "temperature_K": 20,
+  "shipRadius_m": 86.5,
+  "hull": {
+    "Lx_m": 1007,
+    "Ly_m": 264,
+    "Lz_m": 173,
+    "wallThickness_m": 0.02
+  }
+}

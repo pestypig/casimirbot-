@@ -7,6 +7,26 @@ import { assertHullAllowed } from "../security/hull-guard";
 
 const DEFAULT_VISION_HTTP_RPM = Math.max(1, Number(process.env.VISION_HTTP_RPM ?? 60));
 
+const resolveVisionBase = (): string => {
+  const base =
+    (process.env.VISION_HTTP_BASE ?? "").trim() ||
+    (process.env.OLLAMA_ENDPOINT ?? "").trim();
+  if (!base) throw new Error("VISION_HTTP_BASE not set (you can also set OLLAMA_ENDPOINT for local vision)");
+  const normalized = base.replace(/\/+$/, "");
+  assertHullAllowed(normalized);
+  return normalized;
+};
+
+const resolveVisionModel = (): string => {
+  const explicit =
+    (process.env.VISION_HTTP_MODEL ?? "").trim() ||
+    (process.env.LLM_HTTP_MODEL ?? "").trim() ||
+    (process.env.OLLAMA_VISION_MODEL ?? "").trim();
+  if (explicit) return explicit;
+  // Sensible default for Ollama vision-capable models; OpenAI users already set VISION_HTTP_MODEL.
+  return "qwen3-vl";
+};
+
 export const visionHttpSpec: ToolSpecShape = {
   name: "vision.http.describe",
   desc: "Vision model via OpenAI-compatible Chat Completions HTTP (image caption/extract)",
@@ -26,11 +46,7 @@ async function getFetch(): Promise<typeof fetch> {
 }
 
 const normalizeBase = (): string => {
-  const base = (process.env.VISION_HTTP_BASE ?? "").trim();
-  if (!base) throw new Error("VISION_HTTP_BASE not set");
-  const normalized = base.replace(/\/+$/, "");
-  assertHullAllowed(normalized);
-  return normalized;
+  return resolveVisionBase();
 };
 
 type VisionInput = {
@@ -40,12 +56,25 @@ type VisionInput = {
   language?: string;
 };
 
+const resolvePrompt = (input?: string, goal?: string): string => {
+  const envPrompt =
+    (process.env.VISION_DEFAULT_PROMPT ?? "").trim() ||
+    (process.env.OLLAMA_VISION_PROMPT ?? "").trim();
+  if (input && input.trim()) return input.trim();
+  if (goal && goal.trim()) return goal.trim();
+  if (envPrompt) return envPrompt;
+  return "Describe this image succinctly with key entities and text.";
+};
+
 export const visionHttpHandler: ToolHandler = async (_input: any, ctx: any) => {
   const input = (_input ?? {}) as VisionInput;
   const fetch = await getFetch();
   const base = normalizeBase();
-  const model = (process.env.VISION_HTTP_MODEL ?? process.env.LLM_HTTP_MODEL ?? "gpt-4o-mini").trim();
-  const apiKey = process.env.VISION_HTTP_API_KEY?.trim() || process.env.LLM_HTTP_API_KEY?.trim();
+  const model = resolveVisionModel();
+  const apiKey =
+    process.env.VISION_HTTP_API_KEY?.trim() ||
+    process.env.LLM_HTTP_API_KEY?.trim() ||
+    process.env.OLLAMA_API_KEY?.trim();
   const personaId = ctx?.personaId ?? "persona:unknown";
   const now = new Date().toISOString();
 
@@ -54,7 +83,7 @@ export const visionHttpHandler: ToolHandler = async (_input: any, ctx: any) => {
     throw new Error("image_url or image_base64 required");
   }
 
-  const userPrompt = input.prompt ?? ctx?.goal ?? "Describe this image succinctly with key entities and text.";
+  const userPrompt = resolvePrompt(input.prompt, ctx?.goal);
 
   // OpenAI-compatible multimodal chat body
   const messages = [

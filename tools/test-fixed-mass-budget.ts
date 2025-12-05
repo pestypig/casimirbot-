@@ -26,7 +26,8 @@ const pipeline = {
   duty: 0.01,
   duty_eff: 0.01/400,  // 25 ppm nominal
   N_tiles: 1.96e9,     // Research specification
-  P_raw: 2e15          // 2 PW lattice power
+  P_raw: 2e15,         // 2 PW lattice power
+  HBARC: 1.973269804e-25 // ħc constant in J·m
 };
 
 console.log('=== Fixed Mass Budget Verification ===');
@@ -48,9 +49,6 @@ testCases.forEach(test => {
   console.log(`  Mass: ${result.m_exotic} kg (should be exactly 1400 kg)`);
   console.log(`  Power: ${(result.P_avg/1e6).toFixed(1)} MW`);
   console.log(`  N_tiles: ${result.N_tiles?.toExponential(2) || 'N/A'}`);
-  if (result.duty_auto_ppm) {
-    console.log(`  Auto duty: ${result.duty_auto_ppm} ppm`);
-  }
   console.log('');
 });
 

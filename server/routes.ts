@@ -20,6 +20,7 @@ import noiseGensRouter from "./routes/noise-gens";
 import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
 import { helixQiRouter } from "./routes/helix/qi";
+import { warpViabilityRouter } from "./routes/warp-viability";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
 import { qiControllerRouter, startQiController } from "./modules/qi/qi-controller.js";
@@ -28,6 +29,8 @@ import { stellarRouter } from "./routes/stellar";
 import { starRouter } from "./routes/star";
 import { simulate as simulateTsn, DEFAULT_QBV_SCHEDULE, DEMO_FLOWS } from "../simulations/tsn-sim";
 import type { SimConfig, SimResult, Schedule, Flow, Faults, ClockModel } from "@shared/tsn-sim";
+import { getGitFirstAppearances } from "./lib/git-first-appearance";
+import { trainStatusRouter } from "./routes/train-status";
 
 const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === "1") return true;
@@ -45,8 +48,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/knowledge", knowledgeRouter);
   app.use("/api/code-lattice", codeLatticeRouter);
+  app.use(trainStatusRouter);
   app.use("/api/stellar", stellarRouter);
   app.use("/api/ethos", ethosRouter);
+  app.use("/api/physics/warp", warpViabilityRouter);
 
 
   app.use("/api/orchestrator", orchestratorRouter);
@@ -72,6 +77,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { essencePromptsRouter } = await import("./routes/essence.prompts");
     app.use("/api/essence/prompts", essencePromptsRouter);
   }
+
+  // Star Watcher: solar video → coherence
+  const { starWatcherRouter } = await import("./routes/star-watcher");
+  app.use("/api/star-watcher", starWatcherRouter);
 
   const enableAgi = flagEnabled(process.env.ENABLE_AGI, true);
   if (enableAgi) {
@@ -623,6 +632,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         error: 'Failed to fetch orbital elements',
         details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  app.get("/api/halobank/first-appearance", async (req, res) => {
+    try {
+      const rawLimit = req.query.limit;
+      const limitParam =
+        typeof rawLimit === "string"
+          ? rawLimit
+          : Array.isArray(rawLimit)
+            ? rawLimit.filter((value): value is string => typeof value === "string")
+            : undefined;
+      const { items, total, cachedAt } = await getGitFirstAppearances({
+        limit: limitParam,
+      });
+      res.json({ items, total, cachedAt });
+    } catch (error) {
+      res.status(500).json({
+        error: "git_first_appearance_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
       });
     }
   });

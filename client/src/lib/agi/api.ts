@@ -256,6 +256,8 @@ export type PlanRequestOptions = {
   collapseTrace?: CollapseDecision;
   collapseStrategy?: CollapseStrategyName;
   callSpec?: LocalCallSpec | null;
+  essenceConsole?: boolean;
+  warpParams?: Record<string, unknown>;
 };
 
 export async function plan(
@@ -284,6 +286,12 @@ export async function plan(
   }
   if (options?.callSpec) {
     body.call_spec = options.callSpec;
+  }
+  if (options?.essenceConsole) {
+    body.essenceConsole = true;
+  }
+  if (options?.warpParams) {
+    body.warpParams = options.warpParams;
   }
   const desktopId = options?.desktopId ?? DEFAULT_DESKTOP_ID;
   if (desktopId) {

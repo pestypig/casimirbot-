@@ -4,6 +4,7 @@ import {
   Activity,
   Atom,
   Bolt,
+  Calculator,
   Circle,
   Equal,
   Flame,
@@ -74,6 +75,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "spectrum-tuner": ["spectrum tuner", "FFT", "frequency dial", "harmonics sweep", "waveform tuner"],
   "vacuum-gap-heatmap": ["vacuum gap", "Casimir gap", "nm gap map", "heatmap", "gap stress"],
   "star-hydrostatic": ["HR map", "Gamow window", "potato threshold", "polytrope", "stellar ledger"],
+  "star-watcher": ["Solar feed", "Coherence overlay", "Motion metrics"],
   "vacuum-gap-sweep": ["gap sweep", "delta gap", "scan HUD", "nm sweep", "sweep HUD"],
   "cavity-mechanism": ["cavity frame", "mechanism view", "design layers", "actuator layout", "mechanism CAD"],
   "fractional-coherence-rail": ["fractional coherence", "xi rail", "coherence rail", "phase rail", "coherence band"],
@@ -170,6 +172,15 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     endpoints: [API.pipelineGet, API.helixMetrics]
   },
   {
+    id: "needle-ipeak-worksheet",
+    title: "Needle I_peak Worksheet",
+    icon: Calculator,
+    loader: lazyPanel(() => import("@/components/NeedleIpeakWorksheetPanel")),
+    defaultSize: { w: 1120, h: 760 },
+    defaultPosition: { x: 200, y: 140 },
+    keywords: ["pulsed power", "i_peak", "worksheet", "needle hull", "blumlein", "pfn"]
+  },
+  {
     id: "electron-orbital",
     title: "Electron Orbital Simulator",
     icon: Atom,
@@ -243,6 +254,14 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/pages/star-hydrostatic-panel")),
     defaultSize: { w: 1100, h: 720 },
     defaultPosition: { x: 240, y: 140 }
+  },
+  {
+    id: "star-watcher",
+    title: "Star Watcher",
+    icon: PlayCircle,
+    loader: lazyPanel(() => import("@/pages/star-watcher-panel")),
+    defaultSize: { w: 1200, h: 740 },
+    defaultPosition: { x: 180, y: 140 }
   },
   {
     id: "vacuum-gap-sweep",

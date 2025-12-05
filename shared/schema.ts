@@ -347,6 +347,8 @@ export const hardwareSectorStateSchema = z.object({
   currentSector: z.coerce.number().int().nonnegative().optional(),
   activeSectors: z.coerce.number().int().nonnegative().optional(),
   sectorsConcurrent: z.coerce.number().int().positive().optional(),
+  load: z.enum(["sector", "midi", "launcher"]).optional(),
+  i_peak_A: z.coerce.number().optional(),
   dwell_ms: z.coerce.number().nonnegative().optional(),
   burst_ms: z.coerce.number().nonnegative().optional(),
   strobeHz: z.coerce.number().nonnegative().optional(),

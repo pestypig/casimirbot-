@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { TEssenceEnvelope } from "@shared/essence-schema";
 import { EssenceEnvelope } from "@shared/essence-schema";
 import { getEnvelope, putEnvelope } from "./store";
+import { getVisionProvider, defaultVisionPrompt } from "../vision/provider";
 import { essenceHub } from "./events";
 
 type StorageRef = { uri: string; cid?: string };
@@ -382,42 +383,12 @@ function buildImageTags(
 }
 
 async function requestVisionCaption(payload: IngestJobDescriptor): Promise<string | undefined> {
-  const base = (process.env.VISION_HTTP_BASE ?? "").trim();
-  if (!base || typeof fetch !== "function") {
-    return undefined;
-  }
+  const provider = getVisionProvider();
+  const prompt = defaultVisionPrompt();
+  const mime = payload.mime || "image/png";
+  const imageBase64 = payload.buffer.toString("base64");
   try {
-    const model = (process.env.VISION_HTTP_MODEL ?? process.env.LLM_HTTP_MODEL ?? "gpt-4o-mini").trim();
-    const apiKey = process.env.VISION_HTTP_API_KEY?.trim() || process.env.LLM_HTTP_API_KEY?.trim();
-    const mime = payload.mime || "image/png";
-    const imageBase64 = payload.buffer.toString("base64");
-    const body = {
-      model,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Describe this image and mention notable objects or text." },
-            { type: "image_url", image_url: { url: `data:${mime};base64,${imageBase64}` } },
-          ],
-        },
-      ],
-      stream: false,
-    };
-    const response = await fetch(`${base}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      return undefined;
-    }
-    const payloadJson = (await response.json()) as any;
-    const text = payloadJson?.choices?.[0]?.message?.content;
-    return typeof text === "string" ? text.trim() : undefined;
+    return await provider.describeImage(imageBase64, mime, prompt);
   } catch (error) {
     console.warn("[essence-ingest] vision caption failed", error);
     return undefined;

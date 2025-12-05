@@ -30,6 +30,9 @@ import {
   registerInMemoryTrace,
   collapseResonancePatches,
   classifyIntent,
+  isViabilityIntentGoal,
+  isWarpOrPhysicsIntentGoal,
+  isWarpConsoleIntent,
   isWarpRelevantPath,
   normalizeForIntent,
 } from "../services/planner/chat-b";
@@ -52,6 +55,8 @@ import { panelSnapshotHandler, panelSnapshotSpec } from "../skills/telemetry.pan
 import { sttWhisperHandler, sttWhisperSpec } from "../skills/stt.whisper";
 import { readmeHandler, readmeSpec } from "../skills/docs.readme";
 import { essenceMixHandler, essenceMixSpec } from "../skills/essence.mix";
+import { warpAskHandler, warpAskSpec } from "../skills/physics.warp.ask";
+import { warpViabilityHandler, warpViabilitySpec } from "../skills/physics.warp.viability";
 import { debateRunHandler, debateRunSpec } from "../skills/debate.run";
 import { docsEvidenceSearchMdHandler, docsEvidenceSearchMdSpec } from "../skills/docs.evidence.search.md";
 import { docsEvidenceSearchPdfHandler, docsEvidenceSearchPdfSpec } from "../skills/docs.evidence.search.pdf";
@@ -194,7 +199,67 @@ type PlanRecord = {
   callSpec?: LocalCallSpec;
 };
 
-const planRecords = new Map<string, PlanRecord>();
+type PlanRecordCacheEntry = { record: PlanRecord; expiresAt: number };
+
+const planRecords = new Map<string, PlanRecordCacheEntry>();
+const PLAN_RECORD_CACHE_TTL_MS = (() => {
+  const fallback = 30 * 60 * 1000;
+  const raw = Number(process.env.PLAN_RECORD_CACHE_TTL_MS ?? fallback);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return fallback;
+  }
+  return Math.min(6 * 60 * 60 * 1000, Math.floor(raw));
+})();
+const PLAN_RECORD_CACHE_MAX = (() => {
+  const fallback = 200;
+  const raw = Number(process.env.PLAN_RECORD_CACHE_MAX ?? fallback);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return fallback;
+  }
+  return Math.min(2000, Math.floor(raw));
+})();
+const PLAN_RECORD_CACHE_CLEANUP_MS = 60_000;
+
+const prunePlanRecords = (): void => {
+  const now = Date.now();
+  for (const [traceId, entry] of planRecords) {
+    if (entry.expiresAt <= now) {
+      planRecords.delete(traceId);
+    }
+  }
+  while (planRecords.size > PLAN_RECORD_CACHE_MAX) {
+    const oldestKey = planRecords.keys().next().value;
+    if (!oldestKey) break;
+    planRecords.delete(oldestKey);
+  }
+};
+
+const rememberPlanRecord = (record: PlanRecord): PlanRecord => {
+  const entry: PlanRecordCacheEntry = { record, expiresAt: Date.now() + PLAN_RECORD_CACHE_TTL_MS };
+  planRecords.delete(record.traceId);
+  planRecords.set(record.traceId, entry);
+  prunePlanRecords();
+  return record;
+};
+
+const getPlanRecord = (traceId: string): PlanRecord | null => {
+  prunePlanRecords();
+  const entry = planRecords.get(traceId);
+  if (!entry) {
+    return null;
+  }
+  if (entry.expiresAt <= Date.now()) {
+    planRecords.delete(traceId);
+    return null;
+  }
+  entry.expiresAt = Date.now() + PLAN_RECORD_CACHE_TTL_MS;
+  planRecords.delete(traceId);
+  planRecords.set(traceId, entry);
+  return entry.record;
+};
+
+const planRecordCleanup = setInterval(prunePlanRecords, PLAN_RECORD_CACHE_CLEANUP_MS);
+planRecordCleanup.unref?.();
 
 const dedupeGroundingSources = (sources?: GroundingSource[] | null): GroundingSource[] => {
   if (!sources || sources.length === 0) return [];
@@ -229,12 +294,17 @@ const pickResonancePatch = ({
 };
 
 const findLatestAccessiblePlan = (claims: unknown): PlanRecord | null => {
+  prunePlanRecords();
   let latest: PlanRecord | null = null;
-  for (const record of planRecords.values()) {
+  for (const entry of planRecords.values()) {
+    const record = entry.record;
     if (!personaPolicy.canAccess(claims as any, record.personaId, "plan")) continue;
     if (!latest || record.createdAt > latest.createdAt) {
       latest = record;
     }
+  }
+  if (latest) {
+    rememberPlanRecord(latest);
   }
   return latest;
 };
@@ -737,6 +807,8 @@ const PlanRequest = z.object({
   collapse_trace: CollapseTraceSchema.optional(),
   collapse_strategy: z.string().optional(),
   call_spec: zLocalCallSpec.optional(),
+  essenceConsole: z.boolean().optional(),
+  warpParams: z.record(z.any()).optional(),
 });
 
 const ExecuteRequest = z.object({
@@ -757,6 +829,96 @@ const PHYSICS_TOOL_NAME = "physics.curvature.unit";
 
 const repoToolsEnabled = (): boolean => process.env.ENABLE_REPO_TOOLS === "1";
 
+const addWarpAskStep = (
+  steps: ExecutorStep[],
+  goal: string,
+  warpParams?: Record<string, unknown>,
+  intent?: IntentFlags,
+): ExecutorStep[] => {
+  const existing = steps.find((step) => step.kind === "tool.call" && step.tool === warpAskSpec.name);
+  const warpIntent =
+    intent?.wantsWarp ||
+    intent?.wantsPhysics ||
+    isWarpOrPhysicsIntentGoal(goal) ||
+    isViabilityIntentGoal(goal) ||
+    (warpParams && Object.keys(warpParams).length > 0);
+  if (!warpIntent && !existing) {
+    return steps;
+  }
+  const warpStepId = existing?.id ?? `warp.ask.${crypto.randomUUID()}`;
+  const warpStep =
+    existing ??
+    ({
+      id: warpStepId,
+      kind: "tool.call",
+      tool: warpAskSpec.name,
+      summaryRef: undefined,
+      promptTemplate: "Run grounded physics.warp.ask for the user question.",
+      extra: {
+        question: goal,
+        includeSnapshot: true,
+        params: warpParams ?? undefined,
+      },
+    } as ExecutorStep);
+  const rest = steps.filter((step) => !(step.kind === "tool.call" && step.tool === warpAskSpec.name));
+  const injected = [warpStep, ...rest];
+
+  for (const step of injected) {
+    if (step.kind !== "tool.call" || step.tool === warpAskSpec.name || step.tool === warpViabilitySpec.name) {
+      continue;
+    }
+    const extra = (step.extra ?? {}) as { appendSummaries?: string[] };
+    const existingAppends = Array.isArray(extra.appendSummaries) ? extra.appendSummaries : [];
+    const appendSummaries = Array.from(new Set([...existingAppends, warpStepId]));
+    step.extra = { ...extra, appendSummaries };
+  }
+
+  return injected;
+};
+
+const addWarpViabilityStep = (
+  steps: ExecutorStep[],
+  goal: string,
+  warpParams?: Record<string, unknown>,
+  intent?: IntentFlags,
+): ExecutorStep[] => {
+  const existing = steps.find((step) => step.kind === "tool.call" && step.tool === warpViabilitySpec.name);
+  const viabilityIntent =
+    isViabilityIntentGoal(goal) ||
+    intent?.wantsWarp ||
+    intent?.wantsPhysics ||
+    (warpParams && Object.keys(warpParams).length > 0 && (intent?.wantsWarp || intent?.wantsPhysics));
+  if (!viabilityIntent && !existing) {
+    return steps;
+  }
+  const viabilityStepId = existing?.id ?? `warp.viability.${crypto.randomUUID()}`;
+  const viabilityStep =
+    existing ??
+    ({
+      id: viabilityStepId,
+      kind: "tool.call",
+      tool: warpViabilitySpec.name,
+      summaryRef: undefined,
+      promptTemplate:
+        "Run physics.warp.viability to issue a warp-viability certificate; use only the certificate payload to narrate viability.",
+      extra: { ...(warpParams ?? {}) },
+    } as ExecutorStep);
+  const rest = steps.filter((step) => !(step.kind === "tool.call" && step.tool === warpViabilitySpec.name));
+  const injected = [viabilityStep, ...rest];
+
+  for (const step of injected) {
+    if (step.kind !== "tool.call" || step.tool === warpViabilitySpec.name || step.tool === warpAskSpec.name) {
+      continue;
+    }
+    const extra = (step.extra ?? {}) as { appendSummaries?: string[] };
+    const existingAppends = Array.isArray(extra.appendSummaries) ? extra.appendSummaries : [];
+    const appendSummaries = Array.from(new Set([...existingAppends, viabilityStepId]));
+    step.extra = { ...extra, appendSummaries };
+  }
+
+  return injected;
+};
+
 async function ensureDefaultTools(): Promise<void> {
   if (!getTool(llmLocalSpec.name)) {
     registerTool({ ...llmLocalSpec, handler: llmLocalHandler });
@@ -773,6 +935,12 @@ async function ensureDefaultTools(): Promise<void> {
   }
   if (!getTool(sttWhisperSpec.name)) {
     registerTool({ ...sttWhisperSpec, handler: sttWhisperHandler });
+  }
+  if (!getTool(warpAskSpec.name)) {
+    registerTool({ ...warpAskSpec, handler: warpAskHandler });
+  }
+  if (!getTool(warpViabilitySpec.name)) {
+    registerTool({ ...warpViabilitySpec, handler: warpViabilityHandler });
   }
   if (!getTool(essenceMixSpec.name)) {
     registerTool({ ...essenceMixSpec, handler: essenceMixHandler });
@@ -974,9 +1142,9 @@ planRouter.get("/pipeline/last-plan-debug", async (req, res) => {
       : undefined;
   let record: PlanRecord | null = null;
   if (traceIdParam) {
-    record = planRecords.get(traceIdParam) ?? (await rehydratePlanRecord(traceIdParam));
+    record = getPlanRecord(traceIdParam) ?? (await rehydratePlanRecord(traceIdParam));
     if (record) {
-      planRecords.set(traceIdParam, record);
+      rememberPlanRecord(record);
     }
   }
   if (!record) {
@@ -1056,10 +1224,21 @@ const proxyBinaryPost = async (
   try {
     const controller = new AbortController();
     const to = setTimeout(() => controller.abort(), timeoutMs);
+    const body: BodyInit | undefined = (() => {
+      const payload = req.body;
+      if (payload === undefined) return undefined;
+      if (typeof payload === "string") return payload;
+      if (payload instanceof ArrayBuffer) return payload;
+      if (typeof SharedArrayBuffer !== "undefined" && payload instanceof SharedArrayBuffer) {
+        return new Uint8Array(payload).slice();
+      }
+      if (ArrayBuffer.isView(payload)) return new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength).slice();
+      return JSON.stringify(payload);
+    })();
     const response = await fetch(targetUrl, {
       method: "POST",
       headers: { "content-type": req.headers["content-type"] ?? "application/octet-stream" },
-      body: req.body ? (Buffer.isBuffer(req.body) ? req.body : JSON.stringify(req.body)) : undefined,
+      body,
       signal: controller.signal,
     });
     clearTimeout(to);
@@ -1119,12 +1298,13 @@ planRouter.post("/plan", async (req, res) => {
   const promptGoal = (promptSpec?.user_question ?? "").trim();
   const goal = (promptGoal.length >= 3 ? promptGoal : parsed.data.goal).slice(0, 20000);
   const desktopId = parsed.data.desktopId?.trim() || DEFAULT_DESKTOP_ID;
+  const warpParams = parsed.data.warpParams;
   const baseTelemetryBundle = getConsoleTelemetry(desktopId);
   const { bundle: telemetryBundle } = ensureCasimirTelemetry({ desktopId, base: baseTelemetryBundle });
   const telemetrySummary = summarizeConsoleTelemetry(telemetryBundle);
   const query = (callSpec?.premise ?? searchQuery ?? goal).trim();
   const resonanceQuery = normalizeForIntent(query);
-  const intent = classifyIntent(goal);
+  let intent = classifyIntent(goal);
   let callSpecIntent = new Set((callSpec?.intent ?? []).map((tag) => tag.toLowerCase()));
   if (callSpecIntent.has("warp_physics") || callSpecIntent.has("warp")) {
     intent.wantsWarp = true;
@@ -1135,6 +1315,9 @@ planRouter.post("/plan", async (req, res) => {
   }
   if (callSpecIntent.has("physics")) {
     intent.wantsPhysics = true;
+  }
+  if (parsed.data.essenceConsole) {
+    intent = { ...intent, wantsWarp: true, wantsPhysics: true };
   }
   if (intent.wantsImplementation && !callSpecIntent.has("repo_deep")) {
     callSpecIntent.add("repo_deep");
@@ -1285,12 +1468,13 @@ planRouter.post("/plan", async (req, res) => {
     requestedProjects.length = 0;
   }
   const focus = summaryFocus?.trim() || DEFAULT_SUMMARY_FOCUS;
+  const warpConsole = isWarpConsoleIntent(goal, parsed.data.essenceConsole);
   const deepIntent = intent.wantsWarp || intent.wantsPhysics || intent.wantsImplementation;
   const resonanceEvidence = resonanceBundle?.candidates?.length ?? 0;
   const hasKnowledgeEvidence = (baseKnowledgeContext?.length ?? 0) > 0;
   const hasHintEvidence = resourceHintPaths.length > 0;
   const hasEvidence = hasKnowledgeEvidence || hasHintEvidence || resonanceEvidence > 0;
-  if (deepIntent && !hasEvidence) {
+  if (deepIntent && !hasEvidence && !warpConsole) {
     return res.status(400).json({
       error: "insufficient_grounding",
       message:
@@ -1302,6 +1486,8 @@ planRouter.post("/plan", async (req, res) => {
   const { strategy, notes: strategyNotes } = chooseReasoningStrategy(goal, {
     hasRepoContext,
     intentTags: callSpec?.intent,
+    essenceConsole: parsed.data.essenceConsole,
+    intent,
   });
 
   const basePlanArgs: BuildPlanArgs = {
@@ -1319,19 +1505,21 @@ planRouter.post("/plan", async (req, res) => {
   };
   const basePlan = buildChatBPlan(basePlanArgs);
   const primaryPatchId = resonanceSelection?.primaryPatchId ?? null;
-  const planCandidates = buildCandidatePlansFromResonance({
-    basePlan: basePlanArgs,
-    personaId,
-    manifest,
-    baseKnowledgeContext,
-    resonanceBundle,
-    resonanceSelection,
-    topPatches: Number(process.env.RESONANCE_PLAN_BRANCHES ?? 3),
-    telemetryBundle,
-    knowledgeHints,
-    telemetrySummary,
-    intent,
-  });
+  const planCandidates = warpConsole
+    ? []
+    : buildCandidatePlansFromResonance({
+        basePlan: basePlanArgs,
+        personaId,
+        manifest,
+        baseKnowledgeContext,
+        resonanceBundle,
+        resonanceSelection,
+        topPatches: Number(process.env.RESONANCE_PLAN_BRANCHES ?? 3),
+        telemetryBundle,
+        knowledgeHints,
+        telemetrySummary,
+        intent,
+      });
   let knowledgeContext = baseKnowledgeContext;
   let plannerPrompt = renderChatBPlannerPrompt({
     goal,
@@ -1416,7 +1604,12 @@ planRouter.post("/plan", async (req, res) => {
     recordKnowledgeSources(groundingHolder, knowledgeContext);
     groundingReport = groundingHolder.groundingReport;
   }
-  const executorStepsAll = compilePlan(nodes);
+  const executorStepsAll = addWarpAskStep(
+    addWarpViabilityStep(compilePlan(nodes), goal, warpParams, intent),
+    goal,
+    warpParams,
+    intent,
+  );
   const maxTurns = routine?.knobs?.max_turns;
   const executorSteps =
     typeof maxTurns === "number" && Number.isFinite(maxTurns)
@@ -1484,7 +1677,7 @@ planRouter.post("/plan", async (req, res) => {
   };
 
   registerInMemoryTrace(taskTrace);
-  planRecords.set(traceId, record);
+  rememberPlanRecord(record);
   try {
     await withTimeout(saveTaskTrace(taskTrace), SAVE_TASK_TRACE_TIMEOUT_MS, "save_task_trace");
   } catch (error) {
@@ -1539,11 +1732,11 @@ planRouter.post("/execute", async (req, res) => {
   }
   const debugSources = parseDebugSourcesFlag(parsed.data.debugSources, req.query.debug_sources ?? req.query.debugSources);
   const { traceId } = parsed.data;
-  let record: PlanRecord | null = planRecords.get(traceId) ?? null;
+  let record: PlanRecord | null = getPlanRecord(traceId);
   if (!record) {
     record = await rehydratePlanRecord(traceId);
     if (record) {
-      planRecords.set(traceId, record);
+      rememberPlanRecord(record);
     }
   }
   if (!record) {
@@ -1595,7 +1788,21 @@ planRouter.post("/execute", async (req, res) => {
     debugSources: effectiveDebugSources,
     groundingReport: groundingHolder.groundingReport,
   };
-  const steps = await executeCompiledPlan(record.executorSteps, executionRuntime);
+  const runtimeIntent = (() => {
+    const base = classifyIntent(record.goal);
+    if (record.strategy === "physics_console") {
+      return { ...base, wantsWarp: true, wantsPhysics: true };
+    }
+    return base;
+  })();
+  const executorStepsRuntime = addWarpAskStep(
+    addWarpViabilityStep(record.executorSteps, record.goal, undefined, runtimeIntent),
+    record.goal,
+    undefined,
+    runtimeIntent,
+  );
+  record.executorSteps = executorStepsRuntime;
+  const steps = await executeCompiledPlan(executorStepsRuntime, executionRuntime);
   record.groundingReport = executionRuntime.groundingReport ?? groundingHolder.groundingReport;
   record.taskTrace.grounding_report = executionRuntime.groundingReport ?? record.taskTrace.grounding_report;
   record.taskTrace.debug_sources = executionRuntime.debugSources ?? record.taskTrace.debug_sources;

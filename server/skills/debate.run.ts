@@ -1,12 +1,13 @@
 import { z } from "zod";
-import { DebateConfig, DebateRoundMetrics, DEBATE_TOOL_NAME } from "@shared/essence-debate";
+import {
+  DebateAttachment,
+  DebateConfig,
+  DebateRoundMetrics,
+  DEBATE_TOOL_NAME,
+  WarpGroundingEvidence,
+} from "@shared/essence-debate";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import { startDebateAndWaitForOutcome } from "../services/debate/orchestrator";
-
-const Attachment = z.object({
-  title: z.string(),
-  url: z.string(),
-});
 
 const DebateRunInput = z.object({
   topic: z.string(),
@@ -16,8 +17,9 @@ const DebateRunInput = z.object({
       resonance_patch: z.any().optional(),
       telemetry_summary: z.any().optional(),
       knowledge_hints: z.any().optional(),
-      attachments: z.array(Attachment).optional(),
+      attachments: z.array(DebateAttachment).optional(),
       planner_prompt: z.string().optional(),
+      warp_grounding: WarpGroundingEvidence.optional(),
     })
     .optional(),
   budgets: z

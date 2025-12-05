@@ -28,6 +28,9 @@ import {
   persistDebateTelemetrySnapshot,
   type DebateTelemetrySnapshot as StoreDebateTelemetrySnapshot,
 } from "./telemetry-store";
+import { buildDebateTurnPrompt } from "./prompts";
+import { buildWarpMessages as buildWarpAgentMessages } from "./warpPromptHelpers";
+import type { WarpGrounding } from "./types";
 
 type DebateStatus = "pending" | "running" | "completed" | "timeout" | "aborted";
 
@@ -139,11 +142,14 @@ type DebateEventPayload =
       metrics?: TDebateRoundMetrics;
     };
 
+type LlmChatMessage = { role: string; content: string };
+
 const debates = new Map<string, DebateRecord>();
 const eventBuffers = new Map<string, DebateStreamEvent[]>();
 const listeners = new Map<string, Set<EventListener>>();
 const MAX_EVENT_BUFFER = 500;
 const USE_STAR_COLLAPSE = process.env.DEBATE_STAR_COLLAPSE === "1";
+const LLM_TOOL_NAME = "llm.http.generate";
 
 export async function startDebate(rawConfig: TDebateConfig): Promise<{ debateId: string }> {
   const parsed = DebateConfig.parse(rawConfig);
@@ -320,6 +326,107 @@ const scheduleAdvance = (debateId: string) => {
   });
 };
 
+const collectWarpCitations = (grounding?: TDebateContext["warp_grounding"]): string[] => {
+  if (!grounding) return [];
+  const citeSet = new Set<string>();
+  (grounding.citations ?? []).forEach((cite) => {
+    if (typeof cite === "string" && cite.trim()) {
+      citeSet.add(cite);
+    }
+  });
+  if (grounding.certificateHash) {
+    citeSet.add(`cert:${grounding.certificateHash}`);
+  }
+  for (const constraint of grounding.constraints ?? []) {
+    if (constraint?.id) {
+      citeSet.add(`constraint:${constraint.id}`);
+    }
+  }
+  return Array.from(citeSet);
+};
+
+const formatWarpSnapshotShort = (snapshot?: Record<string, unknown> | null): string | null => {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  const keys = ["TS_ratio", "gamma_VdB", "T00_min", "M_exotic"];
+  const parts: string[] = [];
+  for (const key of keys) {
+    const value = (snapshot as Record<string, unknown>)[key];
+    if (value === undefined || value === null) {
+      continue;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const abs = Math.abs(value);
+      const formatted = abs !== 0 && (abs >= 1e5 || abs < 1e-3) ? value.toExponential(2) : Number(value.toPrecision(5));
+      parts.push(`${key}=${formatted}`);
+    } else {
+      parts.push(`${key}=${String(value)}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
+};
+
+const formatWarpNote = (grounding?: TDebateContext["warp_grounding"]): string | null => {
+  if (!grounding) return null;
+  const parts: string[] = [];
+  const status = grounding?.status;
+  if (status) {
+    parts.push(`status=${status}`);
+  }
+  const failing =
+    grounding.constraints?.find((c) => c?.passed === false && c.severity === "HARD") ??
+    grounding.constraints?.find((c) => c?.passed === false);
+  if (failing) {
+    parts.push(`fail:${failing.id ?? "constraint"}${failing.severity ? `(${failing.severity})` : ""}`);
+  } else if (grounding.constraints && grounding.constraints.length > 0) {
+    parts.push("constraints=PASS");
+  }
+  if (grounding.certificateHash) {
+    parts.push(`hash=${grounding.certificateHash}`);
+  }
+  const snapshot = formatWarpSnapshotShort(grounding.snapshot as Record<string, unknown>);
+  if (snapshot) {
+    parts.push(`snapshot ${snapshot}`);
+  }
+  return parts.length > 0 ? parts.join("; ") : null;
+};
+
+const formatWarpDebateGuardrail = (
+  grounding?: TDebateContext["warp_grounding"],
+  role?: DebateRoleLiteral,
+): string | null => {
+  if (!grounding) return null;
+  const status = grounding?.status;
+  const statusText = status ?? "NOT_CERTIFIED";
+  const hash = grounding.certificateHash ? ` hash=${grounding.certificateHash}` : "";
+  const failing =
+    grounding.constraints?.find((c) => c?.passed === false && c.severity === "HARD") ??
+    grounding.constraints?.find((c) => c?.passed === false);
+  const missingCertText =
+    !status ? "No certificate attached; treat the configuration as NOT certified and keep claims theoretical." : null;
+  if (role === "proponent") {
+    return (
+      missingCertText ??
+      `Use certificate status=${statusText}${hash}; only claim viability if status=ADMISSIBLE and all HARD constraints pass${
+        failing ? ` (currently failing ${failing.id ?? "constraint"})` : ""
+      }. Ground arguments in the pipeline snapshot, not speculation.`
+    );
+  }
+  if (role === "skeptic") {
+    return (
+      missingCertText ??
+      `Audit certificate status=${statusText}${hash}; lean on failing or marginal constraints${
+        failing ? ` (start with ${failing.id ?? "constraint"})` : ""
+      } to argue risk, and avoid inventing failures not present in the certificate.`
+    );
+  }
+  return (
+    missingCertText ??
+    `Referee: rely on certificate status=${statusText}${hash} and judge whether roles respected HARD constraints${
+      failing ? `, especially ${failing.id ?? "constraint"}` : ""
+    } and the pipeline evidence.`
+  );
+};
+
 async function advanceDebate(debateId: string): Promise<void> {
   const record = debates.get(debateId);
   if (!record) return;
@@ -429,7 +536,7 @@ function completedRounds(record: DebateRecord): number {
 
 async function synthesizeTurn(record: DebateRecord, role: DebateRoleLiteral, round: number): Promise<StoredDebateTurn> {
   const createdAt = new Date().toISOString();
-  const text = renderTurnText(record, role, round);
+  const { text, essenceId: llmEssenceId } = await generateTurnText(record, role, round);
   const citations = collectCitations(record);
   const turn: StoredDebateTurn = {
     id: randomUUID(),
@@ -441,7 +548,7 @@ async function synthesizeTurn(record: DebateRecord, role: DebateRoleLiteral, rou
     verifier_results: [],
     created_at: createdAt,
   };
-  const essenceId = await persistEssenceForTurn(record, turn);
+  const essenceId = llmEssenceId ?? (await persistEssenceForTurn(record, turn));
   if (essenceId) {
     turn.essence_id = essenceId;
   }
@@ -455,7 +562,10 @@ async function synthesizeRefereeTurn(
   metricsState?: TDebateRoundMetrics,
 ): Promise<StoredDebateTurn> {
   const createdAt = new Date().toISOString();
-  const summary = renderRefereeSummary(record, round, verifierResults, metricsState);
+  const { text: summary, essenceId: llmEssenceId } = await generateTurnText(record, "referee", round, {
+    verifierResults,
+    metricsState,
+  });
   const citations = collectCitations(record);
   const turn: StoredDebateTurn = {
     id: randomUUID(),
@@ -467,7 +577,7 @@ async function synthesizeRefereeTurn(
     verifier_results: verifierResults,
     created_at: createdAt,
   };
-  const essenceId = await persistEssenceForTurn(record, turn);
+  const essenceId = llmEssenceId ?? (await persistEssenceForTurn(record, turn));
   if (essenceId) {
     turn.essence_id = essenceId;
   }
@@ -531,17 +641,62 @@ function appendEvent(record: DebateRecord, payload: DebateEventPayload): DebateS
   return event;
 }
 
+async function callLlmGenerate(
+  record: DebateRecord,
+  messages: LlmChatMessage[],
+): Promise<{ text: string; essenceId?: string }> {
+  const tool = getTool(LLM_TOOL_NAME);
+  if (!tool) {
+    console.warn(`[debate] tool ${LLM_TOOL_NAME} not registered; falling back to prompt text`);
+    return { text: messages.map((msg) => msg.content).join("\n\n") };
+  }
+  try {
+    const result = (await tool.handler(
+      { messages },
+      { personaId: record.personaId, goal: record.goal },
+    )) as { text?: string; essence_id?: string } | null;
+    const text =
+      typeof result?.text === "string" && result.text.trim().length > 0 ? result.text : "(no response)";
+    const essenceId = typeof result?.essence_id === "string" ? result.essence_id : undefined;
+    return { text, essenceId };
+  } catch (error) {
+    console.warn("[debate] llm.http.generate failed", error);
+    return { text: "(llm error)" };
+  }
+}
+
+async function generateTurnText(
+  record: DebateRecord,
+  role: DebateRoleLiteral,
+  round: number,
+  extras?: { verifierResults?: StoredDebateTurn["verifier_results"]; metricsState?: TDebateRoundMetrics },
+): Promise<{ text: string; essenceId?: string }> {
+  const warpMessages = buildWarpAgentMessages(role, record.goal, round, record.context?.warp_grounding);
+  if (warpMessages) {
+    return await callLlmGenerate(record, warpMessages);
+  }
+  const prompt =
+    role === "referee"
+      ? renderRefereeSummary(record, round, extras?.verifierResults ?? [], extras?.metricsState)
+      : renderTurnText(record, role, round);
+  return await callLlmGenerate(record, [{ role: "user", content: prompt }]);
+}
+
 function renderTurnText(record: DebateRecord, role: DebateRoleLiteral, round: number): string {
-  const lastTurn = record.turns.filter((turn) => turn.role !== "referee").slice(-1)[0];
-  if (role === "proponent") {
-    const scaffolding = lastTurn ? `Responding to ${lastTurn.role}#${lastTurn.round}, ` : "";
-    return `${scaffolding}Proponent round ${round}: advancing the goal "${record.goal}" with a concrete sub-claim.`;
-  }
-  if (role === "skeptic") {
-    const cite = lastTurn ? `challenge ${lastTurn.role}#${lastTurn.round}` : "surface counterpoints";
-    return `Skeptic round ${round}: ${cite} and demand evidence that the goal "${record.goal}" holds under stress.`;
-  }
-  return `Round ${round}: official update for "${record.goal}".`;
+  const turnsForPrompt = record.turns.map((turn) => ({
+    role: turn.role,
+    round: turn.round,
+    text: turn.text,
+  }));
+  return buildDebateTurnPrompt({
+    role,
+    goal: record.goal,
+    round,
+    turns: turnsForPrompt,
+    scoreboard: record.scoreboard,
+    context: record.context,
+    metrics: record.lastMetrics,
+  });
 }
 
 function renderRefereeSummary(
@@ -550,21 +705,28 @@ function renderRefereeSummary(
   verifierResults: StoredDebateTurn["verifier_results"],
   metricsState?: TDebateRoundMetrics,
 ): string {
-  const ok = verifierResults.filter((entry) => entry.ok).length;
-  const fail = verifierResults.length - ok;
-  const flavor =
-    verifierResults.length === 0
-      ? "No verifiers configured; referee scores qualitative momentum."
-      : `Verifiers confirm ${ok} claims and flag ${fail}.`;
-  const scoreLine = metricsState
-    ? ` Score ${(metricsState.score * 100).toFixed(1)}% (Δ ${(metricsState.improvement * 100).toFixed(1)}%). Novelty ${(metricsState.novelty_gain * 100).toFixed(0)}%.`
-    : "";
-  return `Referee round ${round}: ${flavor} Current score P:${record.scoreboard.proponent} vs S:${record.scoreboard.skeptic}.${scoreLine}`;
+  const turnsForPrompt = record.turns.map((turn) => ({
+    role: turn.role,
+    round: turn.round,
+    text: turn.text,
+  }));
+  return buildDebateTurnPrompt({
+    role: "referee",
+    goal: record.goal,
+    round,
+    turns: turnsForPrompt,
+    scoreboard: record.scoreboard,
+    context: record.context,
+    verifierResults,
+    metrics: metricsState ?? record.lastMetrics,
+  });
 }
 
 function collectCitations(record: DebateRecord): string[] {
   const recent = record.turns.slice(-4).map((turn) => turn.essence_id).filter(Boolean) as string[];
-  return Array.from(new Set(recent));
+  const citeSet = new Set<string>(recent);
+  collectWarpCitations(record.context?.warp_grounding).forEach((cite) => citeSet.add(cite));
+  return Array.from(citeSet);
 }
 
 function hashText(value: string): string {

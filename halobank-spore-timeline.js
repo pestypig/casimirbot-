@@ -28,6 +28,12 @@
     1 * YEAR, 2 * YEAR, 5 * YEAR, 10 * YEAR, 25 * YEAR, 50 * YEAR, 100 * YEAR, 200 * YEAR, 500 * YEAR,
   ];
 
+  const FILE_BIRTH_ENDPOINT = "/api/halobank/first-appearance";
+  const FILE_BIRTH_LIMIT = 0; // 0 = no client-side limit
+  const FILE_BIRTH_KIND = "code";
+  const FILE_BIRTH_ID_PREFIX = "birth:";
+  const FILE_BIRTH_TARGET_POINTS = 0; // 0 = no client-side simplification
+
   const state = {
     title: "Untitled project",
     items: [],
@@ -66,6 +72,15 @@
   let noteTimeInput = null;
   let noteBodyInput = null;
   let noteError = null;
+  let repoLoadBtn = null;
+  let repoStatusEl = null;
+  let repoLoadInFlight = false;
+  let repoOrbitEnabled = true;
+  let repoOrbitRange = "all";
+  let repoOrbitCheckbox = null;
+  let repoRangeSelect = null;
+  const orbitBirthIds = new Set();
+  const orbitBirthQueue = [];
 
   let resizeObserver = null;
   let dragDepth = 0;
@@ -127,6 +142,66 @@
       event.target.value = "";
     });
     uploadLabel.appendChild(uploadInput);
+
+    repoLoadBtn = makeButton("Plot repo births");
+    repoLoadBtn.title = "Load first-appearance times for tracked files";
+    repoLoadBtn.addEventListener("click", () => loadRepoBirths(false));
+    headerEl.appendChild(repoLoadBtn);
+
+    repoStatusEl = document.createElement("div");
+    repoStatusEl.style.minWidth = "180px";
+    repoStatusEl.style.color = "#8fa4d8";
+    repoStatusEl.style.fontSize = "12px";
+    repoStatusEl.style.fontFamily = "ui-monospace";
+    headerEl.appendChild(repoStatusEl);
+
+    const orbitRow = document.createElement("div");
+    orbitRow.style.display = "inline-flex";
+    orbitRow.style.alignItems = "center";
+    orbitRow.style.gap = "8px";
+    orbitRow.style.padding = "4px 10px";
+    orbitRow.style.background = "#0f162b";
+    orbitRow.style.border = "1px solid #1c2746";
+    orbitRow.style.borderRadius = "8px";
+
+    repoOrbitCheckbox = document.createElement("input");
+    repoOrbitCheckbox.type = "checkbox";
+    repoOrbitCheckbox.checked = true;
+    repoOrbitCheckbox.addEventListener("change", () => {
+      repoOrbitEnabled = repoOrbitCheckbox.checked;
+      if (repoOrbitEnabled) flushOrbitBirths();
+    });
+    const orbitLabel = document.createElement("span");
+    orbitLabel.textContent = "Show on orbit";
+    orbitLabel.style.color = "#a9b7e5";
+    orbitLabel.style.fontSize = "12px";
+    orbitRow.appendChild(repoOrbitCheckbox);
+    orbitRow.appendChild(orbitLabel);
+
+    repoRangeSelect = document.createElement("select");
+    repoRangeSelect.style.background = "#0f162b";
+    repoRangeSelect.style.color = "#e8eefc";
+    repoRangeSelect.style.border = "1px solid #1c2746";
+    repoRangeSelect.style.borderRadius = "6px";
+    repoRangeSelect.style.padding = "4px 6px";
+    repoRangeSelect.style.fontSize = "12px";
+    const ranges = [
+      { value: "all", label: "All time" },
+      { value: "180d", label: "Last 6 months" },
+      { value: "365d", label: "Last year" },
+    ];
+    for (const opt of ranges) {
+      const o = document.createElement("option");
+      o.value = opt.value;
+      o.textContent = opt.label;
+      repoRangeSelect.appendChild(o);
+    }
+    repoRangeSelect.addEventListener("change", () => {
+      repoOrbitRange = repoRangeSelect.value;
+    });
+
+    orbitRow.appendChild(repoRangeSelect);
+    headerEl.appendChild(orbitRow);
 
     addNoteBtn = makeButton("Add note");
     addNoteBtn.addEventListener("click", () => addNote());
@@ -578,6 +653,14 @@
       } catch {}
     });
 
+    const autoLoadBirths =
+      typeof window !== "undefined" &&
+      (window.__HALOBANK_AUTO_BIRTHS ?? "1") !== "0";
+    if (autoLoadBirths) {
+      setRepoStatus("Loading repo births…");
+      setTimeout(() => loadRepoBirths(true), 30);
+    }
+
     render();
   }
 
@@ -591,6 +674,240 @@
     btn.style.color = "#e8eefc";
     btn.style.cursor = "pointer";
     return btn;
+  }
+
+  function setRepoStatus(text) {
+    if (!repoStatusEl) return;
+    repoStatusEl.textContent = text || "";
+  }
+
+  function hslToHex(h, s, l) {
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => {
+      const k = (n + h / 30) % 12;
+      const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+      return Math.round(255 * color)
+        .toString(16)
+        .padStart(2, "0");
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  }
+
+  function yearColorHex(year) {
+    const palette = {
+      2022: "#28c7ff",
+      2023: "#23d2b4",
+      2024: "#38d96f",
+      2025: "#a3e048",
+      2026: "#ffd166",
+      2027: "#f5a623",
+      2028: "#f26157",
+      2029: "#f75c8d",
+      2030: "#c155e0",
+    };
+    const y = Number(year) || 0;
+    if (palette[y]) return palette[y];
+    const hue = (Math.abs(y) * 47) % 360;
+    return hslToHex(hue, 0.72, 0.56);
+  }
+
+  function applyRepoRange(items) {
+    if (!Array.isArray(items)) return [];
+    const now = Date.now();
+    let cutoff = null;
+    if (repoOrbitRange === "180d") cutoff = now - 180 * DAY;
+    else if (repoOrbitRange === "365d") cutoff = now - 365 * DAY;
+    if (!cutoff) return items;
+    return items.filter((item) => Number(item.start) >= cutoff);
+  }
+
+  function groupBirthsForOrbit(items) {
+    const filtered = applyRepoRange(items);
+    const buckets = new Map();
+    for (const item of filtered) {
+      const ts = Number(item.start);
+      if (!Number.isFinite(ts)) continue;
+      const d = new Date(ts);
+      const dateKey = d.toISOString().slice(0, 10);
+      let bucket = buckets.get(dateKey);
+      if (!bucket) {
+        bucket = { dateKey, ts, count: 0, samples: [], year: d.getUTCFullYear() };
+        buckets.set(dateKey, bucket);
+      }
+      bucket.ts = Math.min(bucket.ts, ts);
+      bucket.count += 1;
+      if (bucket.samples.length < 5 && item.name) {
+        bucket.samples.push(item.name);
+      }
+    }
+    return Array.from(buckets.values()).sort((a, b) => a.ts - b.ts);
+  }
+
+  function flushOrbitBirths() {
+    if (!repoOrbitEnabled) return;
+    const addMarker = window.addMemoryMarker;
+    if (typeof addMarker !== "function") {
+      setTimeout(flushOrbitBirths, 250);
+      return;
+    }
+    while (orbitBirthQueue.length) {
+      const group = orbitBirthQueue.shift();
+      const id = `${FILE_BIRTH_ID_PREFIX}orbit:${group.dateKey}`;
+      if (orbitBirthIds.has(id)) continue;
+      orbitBirthIds.add(id);
+      const color = yearColorHex(group.year);
+      const examples = group.samples.join(", ");
+      const name = `Repo births ${group.dateKey} (${group.count})`;
+      addMarker({
+        id,
+        name,
+        ts: group.ts,
+        tags: [`#repo-${group.year}`, "#repo", "#birth"],
+        color,
+        note: examples,
+      });
+    }
+  }
+
+  function pushBirthsToOrbit(items) {
+    if (!Array.isArray(items) || !items.length) return;
+    const groups = groupBirthsForOrbit(items);
+    orbitBirthQueue.push(...groups);
+    flushOrbitBirths();
+  }
+
+  function simplifyRepoItems(items) {
+    if (!Array.isArray(items)) return [];
+    if (FILE_BIRTH_TARGET_POINTS <= 0) return items;
+    if (items.length <= FILE_BIRTH_TARGET_POINTS) return items;
+    const min = Math.min(...items.map((i) => i.start));
+    const max = Math.max(...items.map((i) => i.start));
+    const span = Math.max(1, max - min);
+    const bucketMs = Math.max(
+      60_000,
+      Math.ceil(span / FILE_BIRTH_TARGET_POINTS)
+    );
+    const buckets = new Map();
+    for (const item of items) {
+      const bucket = Math.floor(item.start / bucketMs);
+      const key = `${bucket}`;
+      const bucketEntry = buckets.get(key) || {
+        ...item,
+        start: item.start,
+        birthCount: 0,
+        samplePaths: [],
+      };
+      bucketEntry.start = Math.min(bucketEntry.start, item.start);
+      bucketEntry.birthCount += 1;
+      if (bucketEntry.samplePaths.length < 5) {
+        bucketEntry.samplePaths.push(item.name);
+      }
+      buckets.set(key, bucketEntry);
+    }
+    const merged = [];
+    for (const entry of buckets.values()) {
+      const count = entry.birthCount || 1;
+      merged.push({
+        ...entry,
+        name:
+          count > 1
+            ? `${entry.samplePaths[0]} (+${count - 1})`
+            : entry.name,
+        note:
+          count > 1
+            ? `${count} files first committed in this window`
+            : entry.note,
+      });
+    }
+    return merged.sort((a, b) => a.start - b.start);
+  }
+
+  function buildRepoItems(births) {
+    if (!Array.isArray(births)) return [];
+    const additions = [];
+    const seen = new Set();
+    for (const birth of births) {
+      if (!birth || typeof birth !== "object") continue;
+      const path = birth.path;
+      const start = Number(birth.timestampMs);
+      if (!path || !Number.isFinite(start)) continue;
+      if (seen.has(path)) continue;
+      seen.add(path);
+      const id = `${FILE_BIRTH_ID_PREFIX}${path}`;
+      const shortSha =
+        typeof birth.commit === "string" && birth.commit.length > 0
+          ? birth.commit.slice(0, 7)
+          : "";
+      const author = birth.author || "unknown";
+      const noteParts = [`First commit by ${author}`];
+      if (shortSha) noteParts.push(`#${shortSha}`);
+      const email =
+        typeof birth.email === "string" && birth.email.includes("@")
+          ? birth.email
+          : "";
+      if (email) noteParts.push(`<${email}>`);
+      additions.push({
+        id,
+        kind: FILE_BIRTH_KIND,
+        name: path,
+        start,
+        note: noteParts.join(" "),
+      });
+    }
+    return simplifyRepoItems(additions);
+  }
+
+  async function loadRepoBirths(auto) {
+    if (repoLoadInFlight) return;
+    repoLoadInFlight = true;
+    const originalLabel = repoLoadBtn?.textContent;
+    if (repoLoadBtn) {
+      repoLoadBtn.disabled = true;
+      repoLoadBtn.textContent = "Loading...";
+    }
+    setRepoStatus(auto ? "Loading repo births..." : "Fetching all repo births...");
+
+    try {
+      const url = new URL(FILE_BIRTH_ENDPOINT, window.location.origin);
+      if (FILE_BIRTH_LIMIT > 0) {
+        url.searchParams.set("limit", String(FILE_BIRTH_LIMIT));
+      }
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`Request failed with ${response.status}`);
+      }
+      const payload = await response.json();
+      const additions = buildRepoItems(payload?.items || payload || []);
+      const keepExisting = state.items.filter(
+        (item) =>
+          typeof item?.id !== "string" ||
+          !item.id.startsWith(FILE_BIRTH_ID_PREFIX)
+      );
+      const hadItems = keepExisting.length > 0;
+      state.items = [...keepExisting, ...additions].sort(
+        (a, b) => a.start - b.start
+      );
+      const total = Number(payload?.total) || additions.length;
+      if (additions.length > 0) {
+        setRepoStatus(`Repo births ${additions.length}/${total}`);
+        pushBirthsToOrbit(additions);
+        autoCenter({ preserveZoom: hadItems, preservePan: hadItems });
+        render();
+      } else {
+        setRepoStatus("No tracked files found in git history.");
+        render();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn("[halobank] repo birth load failed", err);
+      setRepoStatus(`Load failed: ${message}`);
+    } finally {
+      repoLoadInFlight = false;
+      if (repoLoadBtn) {
+        repoLoadBtn.disabled = false;
+        repoLoadBtn.textContent = originalLabel || "Plot repo births";
+      }
+    }
   }
 
   function setDropOverlayVisible(visible) {
@@ -1067,8 +1384,13 @@ async function finishExport() {
     for (const item of state.items) {
       const x = xOf(item.start);
       const x2 = xOf(item.end ?? item.start);
+      const isBirth = item.kind === FILE_BIRTH_KIND;
       const y = 220 + ((hash(item.id) % 80) - 40);
       const color = pickColor(item.kind);
+      const selectItem = () => {
+        state.selection = item.id;
+        render();
+      };
 
       if (item.durationMs && item.durationMs > 0) {
         const rect = createSvg("rect");
@@ -1080,6 +1402,8 @@ async function finishExport() {
         rect.setAttribute("fill", `${color}33`);
         rect.setAttribute("stroke", color);
         rect.setAttribute("stroke-width", "1");
+        rect.style.cursor = "pointer";
+        rect.addEventListener("click", selectItem);
         itemsGroup.appendChild(rect);
 
         const point = createSvg("circle");
@@ -1087,6 +1411,8 @@ async function finishExport() {
         point.setAttribute("cy", String(y));
         point.setAttribute("r", "3");
         point.setAttribute("fill", color);
+        point.style.cursor = "pointer";
+        point.addEventListener("click", selectItem);
         itemsGroup.appendChild(point);
       } else {
         const point = createSvg("circle");
@@ -1096,39 +1422,47 @@ async function finishExport() {
         point.setAttribute("fill", color);
         point.setAttribute("stroke", "#0b0f18");
         point.setAttribute("stroke-width", "1");
+        point.style.cursor = "pointer";
+        point.addEventListener("click", selectItem);
         itemsGroup.appendChild(point);
       }
 
-      const label = document.createElement("div");
-      label.textContent = `${item.name} • ${formatIso(item.start)}${
-        item.durationMs ? ` • ${Math.round(item.durationMs / 1000)}s` : ""
-      }`;
-      const tooltipParts = [];
-      if (item.note) tooltipParts.push(item.note);
-      if (item.celestial?.text) tooltipParts.push(item.celestial.text);
-      label.title = tooltipParts.join("\n");
-      label.style.position = "absolute";
-      label.style.left = `${x + 8}px`;
-      label.style.top = `${y - 22}px`;
-      label.style.pointerEvents = "auto";
-      label.style.background = "#101733cc";
-      label.style.border = "1px solid #23335f";
-      label.style.borderRadius = "8px";
-      label.style.padding = "2px 6px";
-      label.style.color = "#dfe6ff";
-      label.style.fontSize = "12px";
-      label.style.whiteSpace = "nowrap";
+      const isSelected = state.selection === item.id;
+      const shouldLabel =
+        isSelected || (item.kind !== FILE_BIRTH_KIND && state.items.length < 400);
 
-      label.addEventListener("click", () => {
-        state.selection = item.id;
-        render();
-      });
+      if (shouldLabel) {
+        const label = document.createElement("div");
+        label.textContent = `${item.name} - ${formatIso(item.start)}${
+          item.durationMs ? ` - ${Math.round(item.durationMs / 1000)}s` : ""
+        }`;
+        const tooltipParts = [];
+        if (item.note) tooltipParts.push(item.note);
+        if (item.celestial?.text) tooltipParts.push(item.celestial.text);
+        label.title = tooltipParts.join("\n");
+        label.style.position = "absolute";
+        label.style.left = `${x + 8}px`;
+        label.style.top = `${y - 22}px`;
+        label.style.pointerEvents = "auto";
+        label.style.background = "#101733cc";
+        label.style.border = "1px solid #23335f";
+        label.style.borderRadius = "8px";
+        label.style.padding = "2px 6px";
+        label.style.color = "#dfe6ff";
+        label.style.fontSize = "12px";
+        label.style.whiteSpace = "nowrap";
 
-      label.addEventListener("dblclick", () => {
-        editItem(item);
-      });
+        label.addEventListener("click", () => {
+          state.selection = item.id;
+          render();
+        });
 
-      overlayEl.appendChild(label);
+        label.addEventListener("dblclick", () => {
+          editItem(item);
+        });
+
+        overlayEl.appendChild(label);
+      }
     }
 
     renderDetails();
@@ -1179,10 +1513,33 @@ async function finishExport() {
       card.appendChild(celestial);
     }
 
+    if (item.kind === FILE_BIRTH_KIND && item.birthCount > 1) {
+      const bucket = document.createElement("div");
+      bucket.style.marginTop = "10px";
+      bucket.style.color = "#9fd6ff";
+      bucket.style.lineHeight = "1.4";
+      const count = item.birthCount;
+      const samples = Array.isArray(item.samplePaths) ? item.samplePaths : [];
+      bucket.textContent =
+        `${count} files first appeared in this window.` +
+        (samples.length
+          ? ` Examples: ${samples.slice(0, 5).join(", ")}`
+          : "");
+      card.appendChild(bucket);
+    }
+
     if (item.kind === "journal" && item.note) {
       const noteBlock = document.createElement("div");
       noteBlock.style.marginTop = "10px";
       noteBlock.style.color = "#dfe6ff";
+      noteBlock.style.lineHeight = "1.4";
+      noteBlock.textContent = item.note;
+      card.appendChild(noteBlock);
+    }
+    if (item.kind !== "journal" && item.note) {
+      const noteBlock = document.createElement("div");
+      noteBlock.style.marginTop = "10px";
+      noteBlock.style.color = "#c2d1ff";
       noteBlock.style.lineHeight = "1.4";
       noteBlock.textContent = item.note;
       card.appendChild(noteBlock);
@@ -1324,6 +1681,8 @@ async function finishExport() {
         return "#c3a6ff";
       case "journal":
         return "#6699ff";
+      case "code":
+        return "#6ad29c";
       default:
         return "#bfc9e6";
     }

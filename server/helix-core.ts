@@ -18,9 +18,11 @@ import {
   getSweepHistoryTotals,
   computeTauLcMsFromHull,
   TAU_LC_UNIT_DRIFT_LIMIT,
+  DEFAULT_PULSED_CURRENT_LIMITS_A,
 } from "./energy-pipeline";
 // Import the type on a separate line to avoid esbuild/tsx parse grief
 import type { EnergyPipelineState, ScheduleSweepRequest } from "./energy-pipeline";
+import { QI_AUTOTHROTTLE_HYST, QI_AUTOTHROTTLE_TARGET } from "./config/env.js";
 import {
   computeSweepPointExtended,
   stability_check,
@@ -788,6 +790,9 @@ const UpdateSchema = z.object({
   sectorsConcurrent: z.number().int().min(1).max(10_000).optional(),
   sectorStrobing: z.number().int().min(1).max(10_000).optional(),
   qSpoilingFactor: z.number().min(0).max(10).optional(),
+  iPeakMaxMidi_A: z.number().min(0).max(1e9).optional(),
+  iPeakMaxSector_A: z.number().min(0).max(1e9).optional(),
+  iPeakMaxLauncher_A: z.number().min(0).max(1e9).optional(),
   rhoTarget: z.number().min(0).max(1).optional(),
 /* BEGIN STRAY_DUPLICATED_BLOCK - commented out to fix top-level parse errors
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
@@ -1084,7 +1089,14 @@ async function runDiagnosticsScan() {
 }
 
 // Simulate a full pulse cycle using current operational mode
-async function simulatePulseCycle(args: { frequency_GHz: number }) {
+async function simulatePulseCycle(args: { frequency_GHz: number; i_peak_A?: number; load?: PulseLoadKind }) {
+  const load: PulseLoadKind = args?.load === "midi" ? "midi" : args?.load === "launcher" ? "launcher" : "sector";
+  const i_peak_A = Number.isFinite(args?.i_peak_A) ? Number(args.i_peak_A) : undefined;
+  const guard = enforcePulseCeiling(load, i_peak_A);
+  if (!guard.ok) {
+    return guard;
+  }
+
   const s = getGlobalPipelineState();
   const frequency_Hz = args.frequency_GHz * 1e9;
 
@@ -1122,7 +1134,10 @@ async function simulatePulseCycle(args: { frequency_GHz: number }) {
       timeScaleStatus: s.TS_ratio > 100 ? "PASS" : "FAIL"
     },
     status: "CYCLE_COMPLETE",
-    log: `${s.currentMode?.toUpperCase?.() ?? "HOVER"} @${args.frequency_GHz} GHz → Peak=${(powerRaw_W/1e6).toFixed(1)} MW, Avg=${s.P_avg.toFixed(1)} MW, M_exotic=${Math.round(s.M_exotic)} kg, ζ=${s.zeta.toFixed(3)}, TS=${Math.round(s.TS_ratio)}`
+    load,
+    i_peak_A,
+    limit_A: guard.limit_A,
+    log: `${s.currentMode?.toUpperCase?.() ?? "HOVER"} @${args.frequency_GHz} GHz | Peak=${(powerRaw_W/1e6).toFixed(1)} MW, Avg=${s.P_avg.toFixed(1)} MW, M_exotic=${Math.round(s.M_exotic)} kg, zeta=${s.zeta.toFixed(3)}, TS=${Math.round(s.TS_ratio)}`
   };
 }
 
@@ -1208,23 +1223,105 @@ export const AVAILABLE_FUNCTIONS: any[] = [
 ];
 
 export const FN_SCHEMAS: Record<string, z.ZodSchema<any>> = {
-  pulse_sector: z.object({ sectorIdx: z.number().optional(), frequency_GHz: z.number().optional() }),
-  execute_auto_pulse_sequence: z.object({ steps: z.number().optional(), interval_ms: z.number().optional() }),
+  pulse_sector: z.object({
+    sectorIdx: z.number().optional(),
+    frequency_GHz: z.number().optional(),
+    i_peak_A: z.number(),
+    load: z.enum(["sector", "midi", "launcher"]).optional(),
+  }),
+  execute_auto_pulse_sequence: z.object({
+    steps: z.number().optional(),
+    interval_ms: z.number().optional(),
+    i_peak_A: z.number(),
+    load: z.enum(["sector", "midi", "launcher"]).optional(),
+  }),
   run_diagnostics_scan: z.object({}),
-  simulate_pulse_cycle: z.object({ frequency_GHz: z.number() }),
+  simulate_pulse_cycle: z.object({
+    frequency_GHz: z.number(),
+    i_peak_A: z.number(),
+    load: z.enum(["sector", "midi", "launcher"]).optional(),
+  }),
   check_metric_violation: z.object({ metricType: z.string() }),
   load_document: z.object({ docId: z.string() })
 };
 
+type PulseLoadKind = "midi" | "sector" | "launcher";
+
+function resolvePulseCeiling(load: PulseLoadKind): number {
+  const state = getGlobalPipelineState();
+  const fallback =
+    load === "midi"
+      ? DEFAULT_PULSED_CURRENT_LIMITS_A.midi
+      : load === "launcher"
+      ? DEFAULT_PULSED_CURRENT_LIMITS_A.launcher
+      : DEFAULT_PULSED_CURRENT_LIMITS_A.sector;
+  if (!state) return fallback;
+  if (load === "midi") return state.iPeakMaxMidi_A ?? fallback;
+  if (load === "launcher") return state.iPeakMaxLauncher_A ?? fallback;
+  return state.iPeakMaxSector_A ?? fallback;
+}
+
+function enforcePulseCeiling(load: PulseLoadKind, requestedA?: number) {
+  const limitA = resolvePulseCeiling(load);
+  const requested = Number.isFinite(requestedA) ? (requestedA as number) : undefined;
+   if (requested == null) {
+    return {
+      ok: false,
+      error: "i_peak_missing",
+      load,
+      requested_A: requestedA,
+      limit_A: limitA,
+      message: "Provide i_peak_A in pulse requests so caps can be enforced.",
+    };
+  }
+  if (limitA != null && requested != null && requested > limitA) {
+    return {
+      ok: false,
+      error: "i_peak_exceeds_ceiling",
+      load,
+      requested_A: requested,
+      limit_A: limitA,
+    };
+  }
+  return { ok: true, load, requested_A: requested, limit_A: limitA };
+}
+
 // Lightweight function implementations used when GPT asks to invoke server-side tasks
 export async function executePulseSector(args: any) {
+  const load: PulseLoadKind = args?.load === "midi" ? "midi" : args?.load === "launcher" ? "launcher" : "sector";
+  const i_peak_A = Number.isFinite(args?.i_peak_A) ? Number(args.i_peak_A) : undefined;
+  const guard = enforcePulseCeiling(load, i_peak_A);
+  if (!guard.ok) {
+    return guard;
+  }
   // placeholder: simulate executing a single sector pulse
-  return { ok: true, sector: args?.sectorIdx ?? 0, note: 'pulse scheduled (stub)'};
+  return {
+    ok: true,
+    sector: args?.sectorIdx ?? 0,
+    note: "pulse scheduled (stub)",
+    load,
+    i_peak_A,
+    limit_A: guard.limit_A,
+  };
 }
 
 export async function executeAutoPulseSequence(args: any) {
+  const load: PulseLoadKind = args?.load === "midi" ? "midi" : args?.load === "launcher" ? "launcher" : "sector";
+  const i_peak_A = Number.isFinite(args?.i_peak_A) ? Number(args.i_peak_A) : undefined;
+  const guard = enforcePulseCeiling(load, i_peak_A);
+  if (!guard.ok) {
+    return guard;
+  }
   // placeholder: simulate auto-pulse sequence
-  return { ok: true, steps: args?.steps ?? 1, note: 'auto sequence started (stub)'};
+  return {
+    ok: true,
+    steps: args?.steps ?? 1,
+    interval_ms: args?.interval_ms,
+    note: "auto sequence started (stub)",
+    load,
+    i_peak_A,
+    limit_A: guard.limit_A,
+  };
 }
 
 
@@ -1675,6 +1772,34 @@ export function getPipelineState(req: Request, res: Response) {
     // monotonic server-side stamps for clients to order snapshots
     seq: stampedSeq,
     __ts: stampedTs,
+    qiAutothrottle: {
+      enabled: !!s.qiAutothrottle?.enabled,
+      scale: s.qiAutothrottle?.scale ?? 1,
+      target: s.qiAutothrottle?.target ?? QI_AUTOTHROTTLE_TARGET,
+      hysteresis: s.qiAutothrottle?.hysteresis ?? QI_AUTOTHROTTLE_HYST,
+      reason: s.qiAutothrottle?.reason ?? null,
+    },
+    qiAutoscale: s.qiAutoscale
+      ? {
+          enabled: !!s.qiAutoscale.enabled,
+          target: s.qiAutoscale.targetZeta ?? 0.9,
+          zetaRaw: s.qiAutoscale.rawZeta ?? null,
+          proposedScale: s.qiAutoscale.proposedScale ?? null,
+          slewLimitedScale: s.qiAutoscale.slewLimitedScale ?? null,
+          appliedScale:
+            s.qiAutoscale.appliedScale ??
+            s.qiAutoscale.scale ??
+            1,
+          gating: s.qiAutoscale.gating ?? "idle",
+          note: s.qiAutoscale.note ?? null,
+          activeSince: s.qiAutoscale.activeSince ?? null,
+          baselineZeta: s.qiAutoscale.baselineZeta ?? null,
+          safeSince: s.qiAutoscale.safeSince ?? null,
+          clamps: Array.isArray(s.qiAutoscale.clamps)
+            ? s.qiAutoscale.clamps.slice(-6)
+            : [],
+        }
+      : null,
     dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR,
     // canonical viewer fields
     sectorCount: s.sectorCount,                 // total
@@ -2401,6 +2526,22 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
         message: "tauLC_ms differs from hull-derived light-crossing; check ms vs microseconds.",
       });
       return;
+    }
+  }
+
+  const loadKind: PulseLoadKind =
+    payload.load === "midi" ? "midi" : payload.load === "launcher" ? "launcher" : "sector";
+  const sensedPeakA = Number(payload.i_peak_A);
+  if (Number.isFinite(sensedPeakA)) {
+    const limitA = resolvePulseCeiling(loadKind);
+    if (limitA != null && sensedPeakA > limitA) {
+      return res.status(422).json({
+        error: "i_peak_over_limit",
+        load: loadKind,
+        i_peak_A: sensedPeakA,
+        limit_A: limitA,
+        message: "Hardware-reported peak current exceeds configured ceiling.",
+      });
     }
   }
 

@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { TelemetrySnapshot } from "./star-telemetry";
+import type { WarpConfig, WarpSnapshot } from "../types/warpViability";
 
 export const DebateRole = z.enum(["proponent", "skeptic", "referee"]);
+export const ViabilityStatus = z.enum(["ADMISSIBLE", "MARGINAL", "INADMISSIBLE", "NOT_CERTIFIED"]);
 
 const DEFAULT_MAX_ROUNDS = Number(process.env.DEBATE_MAX_ROUNDS ?? 6);
-const DEFAULT_MAX_WALL_MS = Number(process.env.DEBATE_MAX_WALL_MS ?? 900000);
+// Default wall-clock budget for a debate: 20 minutes unless overridden by env.
+const DEFAULT_MAX_WALL_MS = Number(process.env.DEBATE_MAX_WALL_MS ?? 20 * 60 * 1000);
 const DEFAULT_SATISFACTION_THRESHOLD = Number(process.env.DEBATE_SATISFACTION_THRESHOLD ?? 0.75);
 const DEFAULT_MIN_IMPROVEMENT = Number(process.env.DEBATE_MIN_IMPROVEMENT ?? 0.03);
 const DEFAULT_STAGNATION_ROUNDS = Number(process.env.DEBATE_STAGNATION_ROUNDS ?? 2);
@@ -34,6 +37,68 @@ export const DebateAttachment = z.object({
   url: z.string(),
 });
 
+export const WarpConstraintEvidence = z.object({
+  id: z.string(),
+  description: z.string(),
+  severity: z.enum(["HARD", "SOFT"]),
+  passed: z.boolean(),
+  lhs: z.number().optional(),
+  rhs: z.number().optional(),
+  margin: z.number().nullable().optional(),
+});
+
+const WarpConfigSchema = z.object({
+  bubbleRadius_m: z.number().optional(),
+  wallThickness_m: z.number().optional(),
+  targetVelocity_c: z.number().optional(),
+  tileConfigId: z.string().optional(),
+  tileCount: z.number().optional(),
+  dutyCycle: z.number().optional(),
+  gammaGeoOverride: z.number().optional(),
+});
+
+const WarpSnapshotSchema = z
+  .object({
+    TS_ratio: z.number().optional(),
+    gamma_VdB: z.number().optional(),
+    d_eff: z.number().optional(),
+    U_static: z.number().optional(),
+    T00_min: z.number().optional(),
+    M_exotic: z.number().optional(),
+    thetaCal: z.number().optional(),
+    gamma_geo_cubed: z.number().optional(),
+    T00_avg: z.number().optional(),
+  })
+  .catchall(z.number());
+
+const WarpGroundingBase = z.object({
+  status: ViabilityStatus.optional(),
+  viabilityStatus: ViabilityStatus.optional(), // legacy alias accepted on input
+  summary: z.string().optional(),
+  config: WarpConfigSchema.nullish().optional(),
+  snapshot: WarpSnapshotSchema.nullish().optional(),
+  constraints: z.array(WarpConstraintEvidence).optional(),
+  certificateHash: z.string().optional(),
+  certificateId: z.string().optional(),
+  citations: z.array(z.string()).optional(),
+  askAnswer: z.string().optional(),
+});
+
+export const WarpGrounding = WarpGroundingBase.transform((value) => ({
+  status: value.status ?? value.viabilityStatus ?? "NOT_CERTIFIED",
+  summary: value.summary ?? "",
+  config: value.config ?? undefined,
+  snapshot: (value.snapshot ?? {}) as WarpSnapshot,
+  constraints: value.constraints ?? [],
+  certificateHash: value.certificateHash ?? undefined,
+  certificateId: value.certificateId ?? undefined,
+  citations: value.citations ?? undefined,
+  askAnswer: value.askAnswer ?? undefined,
+}));
+
+// Backward-compatible alias
+export const WarpGroundingEvidence = WarpGrounding;
+
 export const DebateContext = z.object({
   resonance_patch: z.any().optional(),
   telemetry_summary: z.any().optional(),
@@ -44,6 +109,7 @@ export const DebateContext = z.object({
   environment_alignment: z.number().min(-1).max(1).optional(),
   planner_prompt: z.string().optional(),
   attachments: z.array(DebateAttachment).optional(),
+  warp_grounding: WarpGroundingEvidence.optional(),
 });
 export type TDebateContext = z.infer<typeof DebateContext>;
 
@@ -141,6 +207,12 @@ export const DebateOutcome = z.object({
   created_at: z.string(),
 });
 
+export type TViabilityStatus = z.infer<typeof ViabilityStatus>;
+export type TWarpConstraintEvidence = z.infer<typeof WarpConstraintEvidence>;
+export type TWarpGrounding = z.infer<typeof WarpGrounding>;
+export type TWarpGroundingEvidence = TWarpGrounding;
+export type TWarpConfig = WarpConfig;
+export type TWarpSnapshot = WarpSnapshot;
 export type TDebateConfig = z.infer<typeof DebateConfig>;
 export type TDebateTurn = z.infer<typeof DebateTurn>;
 export type TDebateOutcome = z.infer<typeof DebateOutcome>;

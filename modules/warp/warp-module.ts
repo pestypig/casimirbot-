@@ -163,24 +163,24 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   debugLog('[WarpModule] Sector/duty resolution:', { sectorCount, d_eff });
 
   // Pipeline seeds (thread through untouched if provided)
-  const amps = (params as any).amps ?? {};
-  debugLog('[WarpModule] Amps object:', amps);
+  const ampFactors = (params as any).ampFactors ?? (params as any).amps ?? {};
+  debugLog('[WarpModule] Amp factors:', ampFactors);
   
   // Amplification factors with validated ranges
   const gammaGeo = (() => {
-    const val = Number.isFinite(+amps.gammaGeo) ? +amps.gammaGeo : 
+    const val = Number.isFinite(+ampFactors.gammaGeo) ? +ampFactors.gammaGeo : 
                 (Number.isFinite(+(params as any).gammaGeo) ? +(params as any).gammaGeo : 26);
     return Math.max(1, Math.min(1000, val)); // Clamp to reasonable physics range
   })();
   
   const gammaVanDenBroeck = (() => {
-    const val = Number.isFinite(+amps.gammaVanDenBroeck) ? +amps.gammaVanDenBroeck :
+    const val = Number.isFinite(+ampFactors.gammaVanDenBroeck) ? +ampFactors.gammaVanDenBroeck :
                (Number.isFinite(+(params as any).gammaVanDenBroeck) ? +(params as any).gammaVanDenBroeck : 38.3);
     return Math.max(0.1, Math.min(1e6, val)); // Allow wide range but prevent extreme values
   })();
   
   const qSpoilingFactor = (() => {
-    const val = Number.isFinite(+amps.qSpoilingFactor) ? +amps.qSpoilingFactor :
+    const val = Number.isFinite(+ampFactors.qSpoilingFactor) ? +ampFactors.qSpoilingFactor :
                (Number.isFinite(+(dyn as any).qSpoilingFactor) ? +(dyn as any).qSpoilingFactor :
                (Number.isFinite(+(params as any).qSpoilingFactor) ? +(params as any).qSpoilingFactor : 1.0));
     return Math.max(0.001, Math.min(1000, val)); // Physical bounds for Q spoiling
@@ -312,8 +312,9 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
     warpResult: result
   });
 
-  const γ_geo = (params as any).amps?.gammaGeo ?? 26;
-  const γ_vdb = (params as any).amps?.gammaVanDenBroeck ?? 3.83e1;
+  const ampFactors = (params as any).ampFactors ?? (params as any).amps ?? {};
+  const γ_geo = ampFactors?.gammaGeo ?? 26;
+  const γ_vdb = ampFactors?.gammaVanDenBroeck ?? 3.83e1;
   const Q      = params.dynamicConfig?.cavityQ ?? 1e9;
 
   debugLog('[WarpModule] Validation parameters:', { γ_geo, γ_vdb, Q });

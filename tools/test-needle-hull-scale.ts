@@ -27,7 +27,8 @@ const pipeline = {
   duty: 0.01,
   duty_eff: 0.01/400,  // Sector strobing
   N_tiles: 1.96e9,     // Research specification
-  P_raw: 2e15          // 2 PW lattice power
+  P_raw: 2e15,         // 2 PW lattice power
+  HBARC: 1.973269804e-25 // ħc constant in J·m
 };
 
 const result1 = viability(25, 86.5, pipeline, cons);

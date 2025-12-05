@@ -20,6 +20,7 @@ export const InformationEvent = z.object({
   branch_id: z.string().optional(),
   environment_tags: z.array(z.string()).default([]),
   alignment: z.number().min(-1).max(1).default(0),
+  phase_5min: z.number().optional(),
   timestamp: z.number().int().nonnegative().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
@@ -64,6 +65,12 @@ export const TelemetrySnapshot = z.object({
   flare_score: z.number().min(0).max(1).optional(),
   search_regime: z.enum(["ballistic", "diffusive", "mixed"]).optional(),
   singularity_score: z.number().min(0).max(1).optional(),
+  phase_5min: z.number().optional(),
+  p_mode_driver: z.number().optional(),
+  driver_history_len: z.number().int().nonnegative().optional(),
+  driver_history_required: z.number().int().positive().optional(),
+  phase_dispersion_ready: z.boolean().optional(),
+  p_mode_ready: z.boolean().optional(),
   recommended_action: z
     .enum(["explore_more", "collapse", "branch", "ask_clarification"])
     .optional(),

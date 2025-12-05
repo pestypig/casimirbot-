@@ -35,18 +35,21 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 
 const args = parseArgs(process.argv.slice(2));
 const quiet = args.quiet === true || args.quiet === "true";
-const registryPath = path.resolve(
-  repoRoot,
-  typeof args.registry === "string" ? args.registry : "server/config/tokenizer-registry.json",
-);
+const registryArg = typeof args.registry === "string" ? args.registry : "server/config/tokenizer-registry.json";
+const registryPath = path.resolve(repoRoot, registryArg);
 const registry = loadRegistry(registryPath);
 const tokenizerId = typeof args["tokenizer-id"] === "string" ? args["tokenizer-id"] : undefined;
 
 const entry = tokenizerId ? registry.get(tokenizerId) : undefined;
-const tokenizerPath = resolvePath(args["tokenizer-json"] ?? entry?.tokenizerJson);
-const mergesPath = resolvePath(args.merges ?? entry?.merges ?? undefined);
-const ggufPath = resolvePath(args.gguf ?? entry?.gguf ?? undefined);
-const canaryPath = resolvePath(args.canary ?? entry?.canary ?? undefined);
+const tokenizerArg =
+  typeof args["tokenizer-json"] === "string" ? args["tokenizer-json"] : entry?.tokenizerJson;
+const tokenizerPath = resolvePath(tokenizerArg);
+const mergesArg = typeof args.merges === "string" ? args.merges : entry?.merges;
+const mergesPath = resolvePath(mergesArg);
+const ggufArg = typeof args.gguf === "string" ? args.gguf : entry?.gguf;
+const ggufPath = resolvePath(ggufArg);
+const canaryArg = typeof args.canary === "string" ? args.canary : entry?.canary;
+const canaryPath = resolvePath(canaryArg);
 
 const errors: string[] = [];
 const warnings: string[] = [];

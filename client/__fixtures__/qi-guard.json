@@ -1,0 +1,73 @@
+{
+  "green": {
+    "qiGuardrail": {
+      "lhs_Jm3": -2.5e-5,
+      "bound_Jm3": -18,
+      "marginRatioRaw": 0.2,
+      "marginRatio": 0.2,
+      "window_ms": 40,
+      "sampler": "gaussian",
+      "fieldType": "em",
+      "duty": 0.4,
+      "patternDuty": 0.4,
+      "maskSum": 6400,
+      "effectiveRho": -2.5e-5,
+      "rhoOn": -6.25e-5,
+      "rhoSource": "duty-fallback",
+      "sumWindowDt": 1.0
+    }
+  },
+  "amber": {
+    "qiGuardrail": {
+      "lhs_Jm3": -17.64,
+      "bound_Jm3": -18,
+      "marginRatioRaw": 0.98,
+      "marginRatio": 0.98,
+      "window_ms": 40,
+      "sampler": "gaussian",
+      "fieldType": "em",
+      "duty": 0.4,
+      "patternDuty": 0.4,
+      "maskSum": 6400,
+      "effectiveRho": -7.06,
+      "rhoOn": -17.66,
+      "rhoSource": "tile-telemetry",
+      "sumWindowDt": 1.0
+    }
+  },
+  "red_unclamped": {
+    "qiGuardrail": {
+      "lhs_Jm3": -47.71,
+      "bound_Jm3": -18,
+      "marginRatioRaw": 2.65,
+      "marginRatio": 1.0,
+      "window_ms": 40,
+      "sampler": "gaussian",
+      "fieldType": "em",
+      "duty": 0.4,
+      "patternDuty": 0.4,
+      "maskSum": 6400,
+      "effectiveRho": -19.08,
+      "rhoOn": -47.7,
+      "rhoSource": "tile-telemetry",
+      "sumWindowDt": 1.0
+    }
+  },
+  "clamp_only": {
+    "qiGuardrail": {
+      "lhs_Jm3": -3.6,
+      "bound_Jm3": -18,
+      "marginRatio": 0.20,
+      "window_ms": 40,
+      "sampler": "gaussian",
+      "fieldType": "em",
+      "duty": 0.4,
+      "patternDuty": 0.4,
+      "maskSum": 6400,
+      "effectiveRho": -1.44,
+      "rhoOn": -3.6,
+      "rhoSource": "pump-tones",
+      "sumWindowDt": 0.993
+    }
+  }
+}

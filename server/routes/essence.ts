@@ -171,7 +171,7 @@ essenceRouter.get("/themes", async (req, res) => {
 essenceRouter.post("/ingest", async (req, res) => {
   const { default: multer } = await import("multer");
   const MAX_MB = Number(process.env.ESSENCE_MAX_UPLOAD_MB ?? 25);
-  const ALLOW_MIME = (process.env.ESSENCE_UPLOAD_MIME ?? "text/plain,image/png,image/jpeg,audio/wav,audio/mpeg")
+  const ALLOW_MIME = (process.env.ESSENCE_UPLOAD_MIME ?? "text/plain,image/png,image/jpeg,image/gif,audio/wav,audio/mpeg,video/mp4,video/quicktime")
     .split(",")
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
@@ -506,6 +506,10 @@ essenceRouter.get("/:id([a-f0-9-]{36}|cid/.+)", async (req, res) => {
 });
 
 function detectModality(mime: string): "text" | "audio" | "image" | "video" | "multimodal" {
+  // Treat animated GIFs as video for downstream processing (frames/vision pipeline).
+  if (mime.toLowerCase() === "image/gif") {
+    return "video";
+  }
   if (mime.startsWith("image/")) {
     return "image";
   }

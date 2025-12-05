@@ -50,6 +50,38 @@ const userPromptHeading = [
 
 async function callPrimaryLlm(prompt: string): Promise<string> {
   const fetch = await getFetch();
+
+  // Prefer local Ollama if configured; otherwise use OpenAI-compatible HTTP.
+  const ollamaEndpoint = (process.env.OLLAMA_ENDPOINT ?? "").replace(/\/+$/, "");
+  if (ollamaEndpoint) {
+    const model =
+      process.env.OLLAMA_PROFILE_MODEL?.trim() ||
+      process.env.LUMA_MODEL?.trim() ||
+      "mistral:7b-instruct";
+    const response = await fetch(`${ollamaEndpoint}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      const message = await response.text().catch(() => `status=${response.status}`);
+      throw new Error(`ollama_failed:${message}`);
+    }
+    const payload = (await response.json()) as any;
+    const text = payload?.message?.content;
+    if (typeof text !== "string" || !text.trim()) {
+      throw new Error("ollama_empty_response");
+    }
+    return text.trim();
+  }
+
   const base = (process.env.LLM_HTTP_BASE ?? "").replace(/\/+$/, "");
   const apiKey = process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim();
   if (!base || !apiKey) {

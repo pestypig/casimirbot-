@@ -199,6 +199,35 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
       ? (sigmaNorm / Math.sqrt(qiSamples)).toPrecision(3)
       : null;
   const policyLimit = Number(qi.policyLimit);
+  const autoscale = data?.qiAutoscale;
+  const autoscaleGating = (autoscale?.gating as string) ?? "idle";
+  const autoscaleScale = Number(
+    autoscale?.appliedScale ?? autoscale?.scale ?? undefined,
+  );
+  const autoscaleTarget = Number(
+    (autoscale as { target?: number } | undefined)?.target ??
+      (autoscale as { targetZeta?: number } | undefined)?.targetZeta,
+  );
+  const autoscaleZetaRaw = Number(autoscale?.zetaRaw);
+  const autoscaleBadge =
+    {
+      active: { label: "Active", className: "border-amber-400/50 bg-amber-500/15 text-amber-100" },
+      safe: { label: "Safe", className: "border-emerald-400/60 bg-emerald-500/15 text-emerald-100" },
+      idle: { label: "Idle", className: "border-slate-700/70 bg-slate-900/60 text-slate-200" },
+      window_bad: { label: "Window", className: "border-rose-400/50 bg-rose-500/10 text-rose-100" },
+      source_mismatch: { label: "Source", className: "border-rose-400/50 bg-rose-500/10 text-rose-100" },
+      disabled: { label: "Disabled", className: "border-slate-700/70 bg-slate-900/60 text-slate-200" },
+      no_effect: { label: "No Effect", className: "border-rose-500/60 bg-rose-600/20 text-rose-50" },
+    }[autoscaleGating] ?? { label: "Idle", className: "border-slate-700/70 bg-slate-900/60 text-slate-200" };
+  const autoscaleScaleDisplay = Number.isFinite(autoscaleScale)
+    ? autoscaleScale.toPrecision(3)
+    : FALLBACK;
+  const autoscaleTargetDisplay = Number.isFinite(autoscaleTarget)
+    ? autoscaleTarget.toPrecision(3)
+    : "0.90";
+  const autoscaleZetaDisplay = Number.isFinite(autoscaleZetaRaw)
+    ? (autoscaleZetaRaw as number).toPrecision(3)
+    : null;
 
   return (
     <div
@@ -220,6 +249,23 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
         >
           {status.label}
         </Badge>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded border border-slate-800/70 bg-slate-900/60 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wide text-slate-400">
+            Autoscale
+          </span>
+          <Badge className={cn("px-2 py-0.5 text-[10px]", autoscaleBadge.className)}>
+            {autoscaleBadge.label}
+          </Badge>
+        </div>
+        <div className="text-[11px] text-slate-200">
+          m× {autoscaleScaleDisplay} → ζ {autoscaleTargetDisplay}
+          {autoscaleZetaDisplay ? (
+            <span className="text-slate-400"> (ζ_raw {autoscaleZetaDisplay})</span>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-3 text-[11px] text-slate-400">

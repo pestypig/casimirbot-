@@ -627,6 +627,7 @@ export default function EssenceConsole() {
           collapseTrace: decision,
           collapseStrategy: decision.strategy,
           callSpec: callSpec ?? undefined,
+          essenceConsole: true,
         },
       );
       const planLatticeVersion = planned.lattice_version ?? null;

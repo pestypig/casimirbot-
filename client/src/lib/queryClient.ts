@@ -7,7 +7,7 @@ interface ApiRequestOptions {
 
 type FixedTuple3 = [number, number, number];
 
-const HELIX_DEV_MOCKS_ENABLED = isFlagEnabled("HELIX_DEV_MOCKS", true);
+const isDevMocksEnabled = () => isFlagEnabled("HELIX_DEV_MOCKS", false);
 const C_M_PER_S = 299_792_458;
 const HELIX_MOCK_NEEDLE_PATH_M = 1007;
 const HELIX_MOCK_TAU_LC_MS = (HELIX_MOCK_NEEDLE_PATH_M / C_M_PER_S) * 1e3;
@@ -204,7 +204,7 @@ export async function apiRequest(
 
   // Helper: dev-only minimal mocks when backend isn't up.
   const shouldMock = () => {
-    if (!HELIX_DEV_MOCKS_ENABLED) return false;
+    if (!isDevMocksEnabled()) return false;
     // Vite dev environment check
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -231,6 +231,16 @@ export async function apiRequest(
           gammaGeo: 26,
           qSpoilingFactor: 1,
           gammaVanDenBroeck: 134852.5967,
+          qiAutoscale: {
+            enabled: true,
+            target: 0.9,
+            zetaRaw: 1.2,
+            proposedScale: 0.75,
+            slewLimitedScale: 0.75,
+            appliedScale: 0.75,
+            gating: "idle",
+            clamps: [],
+          },
           lightCrossing: {
             tauLC_ms: HELIX_MOCK_TAU_LC_MS,
             burst_ms: 10,

@@ -1,0 +1,25 @@
+{
+  "currentMode": "hover",
+  "zeta": 0.98,
+  "zetaRaw": 0.98,
+  "dutyEffectiveFR": 0.4,
+  "lightCrossing": { "tauLC_ms": 3.36, "burst_ms": 10, "dwell_ms": 1000 },
+  "hull": { "a": 503.5, "b": 132, "c": 86.5 },
+  "updatedAt": 1700000000000,
+  "qiGuardrail": {
+    "lhs_Jm3": -17.64,
+    "bound_Jm3": -18,
+    "marginRatioRaw": 0.98,
+    "marginRatio": 0.98,
+    "window_ms": 40,
+    "sampler": "gaussian",
+    "fieldType": "em",
+    "duty": 0.4,
+    "patternDuty": 0.4,
+    "maskSum": 6400,
+    "effectiveRho": -7.06,
+    "rhoOn": -17.66,
+    "rhoSource": "tile-telemetry",
+    "sumWindowDt": 1.0
+  }
+}

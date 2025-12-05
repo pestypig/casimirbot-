@@ -2,9 +2,11 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import multer from "multer";
+import { listKnowledgeFilesByProjects } from "../db/knowledge";
 
 const router = Router();
 const upload = multer();
+const LOCAL_TTS_URL = process.env.LOCAL_TTS_URL ?? "http://127.0.0.1:8000/api/tts";
 
 const peakSchema = z.object({
   omega: z.number(),
@@ -56,6 +58,7 @@ const coverJobRequestSchema = z
     styleInfluence: z.number().min(0).max(1).optional(),
     weirdness: z.number().min(0).max(1).optional(),
     tempo: tempoMetaSchema.optional(),
+    knowledgeFileIds: z.array(z.string().min(1)).optional(), // audio from knowledge store
   })
   .refine((value) => !value.linkHelix || Boolean(value.helix), {
     message: "helix packet required when linkHelix is true",
@@ -105,6 +108,59 @@ type CoverJob = {
 
 const jobs = new Map<string, CoverJob>();
 
+const parseProjectIds = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const isAudioMime = (mime: string | null | undefined): boolean => {
+  if (!mime) return false;
+  const lower = mime.toLowerCase();
+  if (!lower.startsWith("audio/")) return false;
+  return (
+    lower.includes("wav") ||
+    lower.includes("wave") ||
+    lower.includes("mpeg") ||
+    lower.includes("mp3") ||
+    lower.includes("flac") ||
+    lower.includes("ogg")
+  );
+};
+
+router.get("/api/noise-gens/library", async (req, res) => {
+  const projectIds = parseProjectIds(req.query?.projectId);
+  if (!projectIds.length) {
+    return res.status(400).json({ error: "project_ids_required" });
+  }
+  try {
+    const rows = await listKnowledgeFilesByProjects(projectIds);
+    const audio = rows
+      .filter((row) => isAudioMime(row.mime))
+      .map((row) => ({
+        projectId: row.project_id,
+        projectName: row.project_name,
+        fileId: row.file_id,
+        name: row.name,
+        mime: row.mime,
+        size: row.size,
+        hashSlug: row.hash_slug ?? undefined,
+        updatedAt: row.updated_at,
+      }));
+    return res.json({ files: audio });
+  } catch (error) {
+    return res.status(500).json({ error: "library_fetch_failed", message: String(error) });
+  }
+});
+
 router.post("/api/noise-gens/upload", upload.any(), (req, res) => {
   const tempoField = Array.isArray(req.body?.tempo) ? req.body.tempo[0] : req.body?.tempo;
   if (tempoField != null && typeof tempoField !== "string") {
@@ -153,6 +209,12 @@ router.post("/api/noise-gens/jobs", (req, res) => {
   job.status = "processing";
   job.updatedAt = Date.now();
 
+  void processJob(job).catch((error) => {
+    job.status = "error";
+    job.updatedAt = Date.now();
+    job.error = error instanceof Error ? error.message : String(error);
+  });
+
   return res.json({ id });
 });
 
@@ -200,5 +262,56 @@ router.put("/api/noise-gens/jobs/:id/error", (req, res) => {
       : "unknown";
   return res.json(job);
 });
+
+const buildPromptFromJob = (job: CoverJob): string => {
+  const parts: string[] = [];
+  parts.push(`cover job ${job.id}`);
+  if (job.request.knowledgeFileIds?.length) {
+    parts.push(`based on knowledge files ${job.request.knowledgeFileIds.join(", ")}`);
+  }
+  if (job.request.kbTexture) {
+    parts.push(`texture: ${job.request.kbTexture}`);
+  }
+  if (typeof job.request.weirdness === "number") {
+    parts.push(`weirdness ${job.request.weirdness}`);
+  }
+  if (job.request.tempo?.bpm) {
+    parts.push(`tempo ${job.request.tempo.bpm} bpm`);
+  }
+  return parts.join(" | ");
+};
+
+const processJob = async (job: CoverJob) => {
+  const prompt = buildPromptFromJob(job);
+  const duration = Math.max(
+    10,
+    Math.min(
+      60,
+      job.request.barWindows?.[0]
+        ? (job.request.barWindows[0].endBar - job.request.barWindows[0].startBar + 1) * 4
+        : 30,
+    ),
+  );
+
+  const payload = {
+    text: prompt,
+    duration,
+  };
+
+  const response = await fetch(LOCAL_TTS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`local_tts_failed status=${response.status}`);
+  }
+
+  const buf = Buffer.from(await response.arrayBuffer());
+  job.previewUrl = `data:audio/wav;base64,${buf.toString("base64")}`;
+  job.status = "ready";
+  job.updatedAt = Date.now();
+};
 
 export default router;

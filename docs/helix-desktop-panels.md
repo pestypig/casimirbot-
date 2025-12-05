@@ -99,8 +99,10 @@ With this guide in place, Codex can confidently add or adjust Helix panels witho
 
 ## Recent Additions
 
-- **Electron Orbital Simulator (`electron-orbital`) – Sept 2025**  
+- **Electron Orbital Simulator (`electron-orbital`) — Sept 2025**  
   Hooks into the live energy pipeline via `useElectronOrbitSim`, renders orbital iso-surfaces plus Coulomb instrumentation, and exposes DRIFT/AGI events. Launchable from Helix Start and the Start portal's "Open Orbital Panel" buttons. Default bounds: 1120×720 at (180,160).
+- **Star Watcher (`star-watcher`) — Oct 2025**  
+  Side-by-side solar feed + simulation overlay window with ingest hook to the solar coherence pipeline. Uses the pluggable vision provider (Ollama/OpenAI) for semantic labels and will consume the forthcoming `solar_video_to_coherence` outputs for live coherence/motion metrics. Default bounds: 1200×740 at (180,140).
 
 ## References
 

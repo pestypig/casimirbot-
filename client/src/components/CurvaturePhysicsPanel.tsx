@@ -137,18 +137,19 @@ export default function CurvaturePhysicsPanel({
     final_duty_FR: duty_FR
   });
 
+  const pipelineAmpFactors = (pipeline as any)?.ampFactors ?? (pipeline as any)?.amps;
   // Physics factors with enhanced pipeline integration
   const gGeo = isNum(gammaGeo) ? gammaGeo! : 
-               (pipeline as any)?.amps?.gammaGeo ?? (pipeline as any)?.gammaGeo ?? 26;
+               pipelineAmpFactors?.gammaGeo ?? (pipeline as any)?.gammaGeo ?? 26;
   const gVdB = isNum(gammaVdB) ? gammaVdB! : 
-               (pipeline as any)?.amps?.gammaVanDenBroeck ?? (pipeline as any)?.gammaVanDenBroeck ?? 1.4e5;
+               pipelineAmpFactors?.gammaVanDenBroeck ?? (pipeline as any)?.gammaVanDenBroeck ?? 1.4e5;
   const dAoA = isNum(qSpoilingFactor) ? qSpoilingFactor! : 
-               (pipeline as any)?.amps?.qSpoilingFactor ?? (pipeline as any)?.qSpoilingFactor ?? 1.0;
+               pipelineAmpFactors?.qSpoilingFactor ?? (pipeline as any)?.qSpoilingFactor ?? 1.0;
 
   // Debug physics factors
   console.log('[CurvaturePhysicsPanel] Physics factors debug:', {
     props: { gammaGeo, gammaVdB, qSpoilingFactor },
-    pipeline_amps: (pipeline as any)?.amps,
+    pipeline_ampFactors: pipelineAmpFactors,
     pipeline_direct: { 
       gammaGeo: (pipeline as any)?.gammaGeo, 
       gammaVanDenBroeck: (pipeline as any)?.gammaVanDenBroeck,
@@ -259,7 +260,7 @@ export default function CurvaturePhysicsPanel({
                 <div className="text-amber-400 text-[10px] font-mono space-y-1">
                   <div>Parity: {U.physicsParityMode ? "physics=T" : U.parityMode ? "ui=T" : "F"} | Ridge: {U.ridgeMode ?? "—"}</div>
                   <div>Sectors: {U.sectors} | θ-scale: {isNum(U.thetaScale) ? fexp(U.thetaScale, 2) : "—"}</div>
-                  <div>Mode: {mode} | Pipeline amps: {(pipeline as any)?.amps ? "✓" : "✗"}</div>
+                  <div>Mode: {mode} | Amp factors: {pipelineAmpFactors ? "✓" : "✗"}</div>
                 </div>
               </div>
 

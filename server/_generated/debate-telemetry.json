@@ -169,7 +169,1121 @@
           "branchFactor": 1
         }
       }
+    },
+    {
+      "debateId": "93f2cb68-f192-4594-93b0-100e027b48eb",
+      "sessionId": "93f2cb68-f192-4594-93b0-100e027b48eb",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "93f2cb68-f192-4594-93b0-100e027b48eb",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.05499672885266245,
+        "dp_tau_estimate_ms": 909.1449808578833,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.07071695399798615,
+        "levels": {
+          "micro": 0.07354898524798616,
+          "meso": 0.06071695399798615,
+          "macro": 0.07071695399798615,
+          "rope": 0.08367495871354769
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.09663296342910924,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.2233762727502227,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.06546083951223124,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764742494340
+      },
+      "action": "explore_more",
+      "confidence": 0.17919486425686137,
+      "updatedAt": "2025-12-03T06:14:54.347Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.12919486425686139,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "a4ee1f0d-0042-4cfd-841b-3ede9e143987",
+      "sessionId": "a4ee1f0d-0042-4cfd-841b-3ede9e143987",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "a4ee1f0d-0042-4cfd-841b-3ede9e143987",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.063354520205473,
+        "dp_tau_estimate_ms": 789.2096702467121,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.046841783052165936,
+        "levels": {
+          "micro": 0.049673814302165935,
+          "meso": 0.036841783052165934,
+          "macro": 0.046841783052165936,
+          "rope": 0.09672228615790744
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.14660278926364895,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.5479701905359585,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.13311209559796675,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764742861217
+      },
+      "action": "explore_more",
+      "confidence": 0.20201420847383916,
+      "updatedAt": "2025-12-03T06:21:01.237Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.15201420847383917,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "dc8a2c49-9b53-4add-aa29-8e0aaae1d637",
+      "sessionId": "dc8a2c49-9b53-4add-aa29-8e0aaae1d637",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "dc8a2c49-9b53-4add-aa29-8e0aaae1d637",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.05105795989243167,
+        "dp_tau_estimate_ms": 979.279236877843,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.04349543439300707,
+        "levels": {
+          "micro": 0.04632746564300707,
+          "meso": 0.03349543439300707,
+          "macro": 0.04349543439300707,
+          "rope": 0.0783579644051319
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.11322049441725673,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.3691777831548305,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.09770080898642713,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764743337558
+      },
+      "action": "explore_more",
+      "confidence": 0.18098092696825618,
+      "updatedAt": "2025-12-03T06:28:57.569Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.1309809269682562,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "dff68cd0-838c-4c5d-aaff-ee5236cccd27",
+      "sessionId": "dff68cd0-838c-4c5d-aaff-ee5236cccd27",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "dff68cd0-838c-4c5d-aaff-ee5236cccd27",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.061448040461385356,
+        "dp_tau_estimate_ms": 813.6955975255316,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.050808461758993194,
+        "levels": {
+          "micro": 0.05364049300899319,
+          "meso": 0.04080846175899319,
+          "macro": 0.050808461758993194,
+          "rope": 0.0780727059911452
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.1053369502232972,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.17130933993848246,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.12014603193962918,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764746376861
+      },
+      "action": "explore_more",
+      "confidence": 0.17844470866167628,
+      "updatedAt": "2025-12-03T07:19:36.871Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.1284447086616763,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "da1669d6-fe17-4e21-8517-d130d70a4ca4",
+      "sessionId": "da1669d6-fe17-4e21-8517-d130d70a4ca4",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "da1669d6-fe17-4e21-8517-d130d70a4ca4",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.05984725322646833,
+        "dp_tau_estimate_ms": 835.460230911429,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.06767144748392118,
+        "levels": {
+          "micro": 0.07050347873392118,
+          "meso": 0.057671447483921175,
+          "macro": 0.06767144748392118,
+          "rope": 0.10276377029744335
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.13785609311096553,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.5628125605472005,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.08670509828169248,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764746899531
+      },
+      "action": "explore_more",
+      "confidence": 0.20301509011175567,
+      "updatedAt": "2025-12-03T07:28:19.540Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.15301509011175568,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "2057e31d-8850-4097-9f0f-e286519e220a",
+      "sessionId": "2057e31d-8850-4097-9f0f-e286519e220a",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "2057e31d-8850-4097-9f0f-e286519e220a",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.0462161246736094,
+        "dp_tau_estimate_ms": 1081.8734879463248,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.05028325006471655,
+        "levels": {
+          "micro": 0.05311528131471655,
+          "meso": 0.04028325006471655,
+          "macro": 0.05028325006471655,
+          "rope": 0.07441367642234215
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.09854410277996775,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.3050725114907963,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.07024833213750377,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764747000060
+      },
+      "action": "explore_more",
+      "confidence": 0.17421143668739564,
+      "updatedAt": "2025-12-03T07:30:00.070Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.12421143668739563,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "cd53726b-85ed-48ae-82b1-9d8e8cab358c",
+      "sessionId": "cd53726b-85ed-48ae-82b1-9d8e8cab358c",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "cd53726b-85ed-48ae-82b1-9d8e8cab358c",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.06576650744840945,
+        "dp_tau_estimate_ms": 760.2653986031189,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.06596644693142063,
+        "levels": {
+          "micro": 0.06879847818142064,
+          "meso": 0.05596644693142063,
+          "macro": 0.06596644693142063,
+          "rope": 0.09861931971724874
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.13127219250307687,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.41350349670243103,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.10927761327566375,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764747829958
+      },
+      "action": "explore_more",
+      "confidence": 0.19855324958127232,
+      "updatedAt": "2025-12-03T07:43:49.968Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.1485532495812723,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "6598f15a-d501-43b8-a106-900517b964ec",
+      "sessionId": "6598f15a-d501-43b8-a106-900517b964ec",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "6598f15a-d501-43b8-a106-900517b964ec",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.05551655810261108,
+        "dp_tau_estimate_ms": 900.6322025148813,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.05066776409696715,
+        "levels": {
+          "micro": 0.053499795346967145,
+          "meso": 0.040667764096967145,
+          "macro": 0.05066776409696715,
+          "rope": 0.08216075229329212
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.11365374048961707,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.3331884802866021,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.10060892018042501,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764748139086
+      },
+      "action": "explore_more",
+      "confidence": 0.1833925735228604,
+      "updatedAt": "2025-12-03T07:48:59.094Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.13339257352286038,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "7a694934-c58f-4653-91c0-50ea53902353",
+      "sessionId": "7a694934-c58f-4653-91c0-50ea53902353",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "7a694934-c58f-4653-91c0-50ea53902353",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.04298362468160119,
+        "dp_tau_estimate_ms": 1163.233681904963,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.022024430568012142,
+        "levels": {
+          "micro": 0.02485646181801214,
+          "meso": 0.012024430568012142,
+          "macro": 0.022024430568012142,
+          "rope": 0.0663313843845196
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.11063833820102706,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.3937580136036202,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.1065713646586504,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764787667814
+      },
+      "action": "explore_more",
+      "confidence": 0.17299033209101988,
+      "updatedAt": "2025-12-03T18:47:47.825Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.12299033209101988,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "26858add-b968-456c-8af1-9f5e003178be",
+      "sessionId": "26858add-b968-456c-8af1-9f5e003178be",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "26858add-b968-456c-8af1-9f5e003178be",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.05174849456116411,
+        "dp_tau_estimate_ms": 966.2116825621376,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.05357270704241392,
+        "levels": {
+          "micro": 0.05808930860491392,
+          "meso": 0.043572707042413915,
+          "macro": 0.05357270704241392,
+          "rope": 0.07812070545795173
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.10266870387348954,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.16340555399081097,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.08320713679985718,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764790120362
+      },
+      "action": "explore_more",
+      "confidence": 0.1776730344368179,
+      "updatedAt": "2025-12-03T19:28:40.368Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.12767303443681788,
+        "adjustedCollapseThreshold": 0.7700000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "1b643a5b-0189-4046-acf3-af737a2a0de6",
+      "sessionId": "1b643a5b-0189-4046-acf3-af737a2a0de6",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "1b643a5b-0189-4046-acf3-af737a2a0de6",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.062306545139976105,
+        "dp_tau_estimate_ms": 802.4839106015496,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.07661778547593441,
+        "levels": {
+          "micro": 0.08113438703843441,
+          "meso": 0.06661778547593442,
+          "macro": 0.07661778547593441,
+          "rope": 0.11674218115503435
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.1568665768341343,
+        "multi_fractal_index": 0.5459534538021327,
+        "resonance_score": 0.6260638183691531,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 9,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "explore_more",
+        "energy_budget": 0.079992174673363,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764793310177
+      },
+      "action": "explore_more",
+      "confidence": 0.2171052817432609,
+      "updatedAt": "2025-12-03T20:21:50.185Z",
+      "governor": {
+        "action": "continue",
+        "confidence": 0.2171052817432609,
+        "adjustedCollapseThreshold": 0.7200000000000001,
+        "maxAdditionalRounds": 3,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 5,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "41b89bf4-4ece-40a2-b3d5-a7c890dc7a46",
+      "sessionId": "41b89bf4-4ece-40a2-b3d5-a7c890dc7a46",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "41b89bf4-4ece-40a2-b3d5-a7c890dc7a46",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.09999999999999998,
+        "dp_tau_estimate_ms": 500.0000000000001,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0,
+        "levels": {
+          "micro": 0.026586914062499998,
+          "meso": 0,
+          "macro": 0,
+          "rope": 0.31255797481519837
+        },
+        "phase_dispersion": 1,
+        "collapse_pressure": 0.6251159496303967,
+        "multi_fractal_index": 1,
+        "resonance_score": 0.48529035567896794,
+        "flare_score": 0.76,
+        "search_regime": "diffusive",
+        "singularity_score": 0.2,
+        "driver_history_len": 3,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": false,
+        "p_mode_ready": false,
+        "recommended_action": "branch",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764798076544
+      },
+      "action": "branch",
+      "confidence": 0.375069569778238,
+      "updatedAt": "2025-12-03T21:41:16.555Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.32506956977823803,
+        "adjustedCollapseThreshold": 0.8900000000000001,
+        "maxAdditionalRounds": 4,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 6,
+          "branchFactor": 3
+        }
+      }
+    },
+    {
+      "debateId": "a1e09587-b0a0-43a8-8b61-48f72a228c8f",
+      "sessionId": "a1e09587-b0a0-43a8-8b61-48f72a228c8f",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "a1e09587-b0a0-43a8-8b61-48f72a228c8f",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.36799867986206347,
+        "dp_tau_estimate_ms": 135.87005262829052,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.34903518694761665,
+        "levels": {
+          "micro": 0.3729609681976166,
+          "meso": 0.33903518694761664,
+          "macro": 0.35397261012687564,
+          "rope": 0.5572349414595014
+        },
+        "phase_dispersion": 0.5325945680587242,
+        "collapse_pressure": 0.765434695971386,
+        "multi_fractal_index": 0.5084171161388847,
+        "resonance_score": 0.583401524423394,
+        "flare_score": 0.3860756544469794,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "driver_history_len": 3,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": false,
+        "p_mode_ready": false,
+        "recommended_action": "collapse",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764802137769
+      },
+      "action": "collapse",
+      "confidence": 0.6107119168612442,
+      "updatedAt": "2025-12-03T22:48:57.783Z",
+      "governor": {
+        "action": "collapse",
+        "confidence": 0.6107119168612442,
+        "adjustedCollapseThreshold": 0.5358700526282906,
+        "maxAdditionalRounds": 0,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 2,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "0139cd27-b5d6-4f75-a7bd-632a090f6669",
+      "sessionId": "0139cd27-b5d6-4f75-a7bd-632a090f6669",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "0139cd27-b5d6-4f75-a7bd-632a090f6669",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.46477439521643416,
+        "dp_tau_estimate_ms": 107.57907603046036,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.4847043582802634,
+        "levels": {
+          "micro": 0.5204953739052635,
+          "meso": 0.4747043582802634,
+          "macro": 0.48830028632302,
+          "rope": 0.6626644869365373
+        },
+        "phase_dispersion": 0.38788891961848765,
+        "collapse_pressure": 0.8406246155928112,
+        "multi_fractal_index": 0,
+        "resonance_score": 0.6095185665570574,
+        "flare_score": 0.27031113569479015,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "driver_history_len": 4,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": false,
+        "p_mode_ready": false,
+        "recommended_action": "collapse",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764803983822
+      },
+      "action": "collapse",
+      "confidence": 0.710997184877917,
+      "updatedAt": "2025-12-03T23:19:43.843Z",
+      "governor": {
+        "action": "collapse",
+        "confidence": 0.710997184877917,
+        "adjustedCollapseThreshold": 0.5075790760304604,
+        "maxAdditionalRounds": 0,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 2,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "99cbfb0c-5ef2-4764-8698-498dfdaf08c8",
+      "sessionId": "99cbfb0c-5ef2-4764-8698-498dfdaf08c8",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "99cbfb0c-5ef2-4764-8698-498dfdaf08c8",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.7644477266104156,
+        "dp_tau_estimate_ms": 65.40669591850514,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.9288954532208312,
+        "levels": {
+          "micro": 0.9543104922833309,
+          "meso": 0.9188954532208312,
+          "macro": 0.9288954532208312,
+          "rope": 0.9502742396184908
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.9716530260161503,
+        "multi_fractal_index": 0,
+        "resonance_score": 0.24679805665317806,
+        "flare_score": 0,
+        "search_regime": "ballistic",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 12,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "collapse",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764805891841
+      },
+      "action": "collapse",
+      "confidence": 0.9616604515759395,
+      "updatedAt": "2025-12-03T23:51:31.854Z",
+      "governor": {
+        "action": "collapse",
+        "confidence": 0.9616604515759395,
+        "adjustedCollapseThreshold": 0.41886602632665465,
+        "maxAdditionalRounds": 0,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 2,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "4c5b9705-9840-4a37-abcc-2adf6d615f6a",
+      "sessionId": "4c5b9705-9840-4a37-abcc-2adf6d615f6a",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "4c5b9705-9840-4a37-abcc-2adf6d615f6a",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.15532231240231306,
+        "dp_tau_estimate_ms": 321.91125168476054,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.037390500066343535,
+        "levels": {
+          "micro": 0.06224401569134305,
+          "meso": 0.027390500066343533,
+          "macro": 0.013654458610338226,
+          "rope": 0.3355750005344216
+        },
+        "phase_dispersion": 0.8168646881542936,
+        "collapse_pressure": 0.6337595010024996,
+        "multi_fractal_index": 0,
+        "resonance_score": 0.44828691600962156,
+        "flare_score": 0.613491750523435,
+        "search_regime": "diffusive",
+        "singularity_score": 0.1084323440771468,
+        "driver_history_len": 6,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": false,
+        "p_mode_ready": false,
+        "recommended_action": "branch",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764806152957
+      },
+      "action": "branch",
+      "confidence": 0.40978638180597343,
+      "updatedAt": "2025-12-03T23:55:52.960Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.40978638180597343,
+        "adjustedCollapseThreshold": 0.8400000000000001,
+        "maxAdditionalRounds": 3,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 6,
+          "branchFactor": 3
+        }
+      }
+    },
+    {
+      "debateId": "52ea30a6-755d-4172-ad4e-c8e0ab038e69",
+      "sessionId": "52ea30a6-755d-4172-ad4e-c8e0ab038e69",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "52ea30a6-755d-4172-ad4e-c8e0ab038e69",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.18370654618058796,
+        "dp_tau_estimate_ms": 272.17320797511917,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.1036783849988624,
+        "levels": {
+          "micro": 0.1267252599988624,
+          "meso": 0.0936783849988624,
+          "macro": 0.12206289866062901,
+          "rope": 0.3820068308379099
+        },
+        "phase_dispersion": 0.8406632315942161,
+        "collapse_pressure": 0.6603352766769575,
+        "multi_fractal_index": 0.4607676152349085,
+        "resonance_score": 0.5753579767741259,
+        "flare_score": 0.6325305852753729,
+        "search_regime": "diffusive",
+        "singularity_score": 0.12033161579710805,
+        "driver_history_len": 3,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": false,
+        "p_mode_ready": false,
+        "recommended_action": "branch",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764814323017
+      },
+      "action": "branch",
+      "confidence": 0.44323835834641157,
+      "updatedAt": "2025-12-04T02:12:03.029Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.44323835834641157,
+        "adjustedCollapseThreshold": 0.8400000000000001,
+        "maxAdditionalRounds": 3,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 6,
+          "branchFactor": 3
+        }
+      }
+    },
+    {
+      "debateId": "a35dd6ab-ac21-4099-aca3-8bf5ab2f1e56",
+      "sessionId": "a35dd6ab-ac21-4099-aca3-8bf5ab2f1e56",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "a35dd6ab-ac21-4099-aca3-8bf5ab2f1e56",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.5678144861988714,
+        "dp_tau_estimate_ms": 88.0569291824795,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.535628972397743,
+        "levels": {
+          "micro": 0.5584561208352428,
+          "meso": 0.525628972397743,
+          "macro": 0.535628972397743,
+          "rope": 0.6743045535169347
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.8129801346361266,
+        "multi_fractal_index": 0,
+        "resonance_score": 0.3893850661452937,
+        "flare_score": 0,
+        "search_regime": "mixed",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 12,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "collapse",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764814583118
+      },
+      "action": "collapse",
+      "confidence": 0.7484767725009989,
+      "updatedAt": "2025-12-04T02:16:23.124Z",
+      "governor": {
+        "action": "collapse",
+        "confidence": 0.7484767725009989,
+        "adjustedCollapseThreshold": 0.4880569291824795,
+        "maxAdditionalRounds": 0,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 2,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "2c3807db-0daf-40b9-83b1-af453c94be63",
+      "sessionId": "2c3807db-0daf-40b9-83b1-af453c94be63",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "2c3807db-0daf-40b9-83b1-af453c94be63",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.6862587456461104,
+        "dp_tau_estimate_ms": 72.85881647005483,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.7725174912922208,
+        "levels": {
+          "micro": 0.7950760850422203,
+          "meso": 0.7625174912922208,
+          "macro": 0.7725174912922208,
+          "rope": 0.8526696051022671
+        },
+        "phase_dispersion": 0,
+        "collapse_pressure": 0.9328217189123132,
+        "multi_fractal_index": 0,
+        "resonance_score": 0.6590456614542491,
+        "flare_score": 0,
+        "search_regime": "ballistic",
+        "singularity_score": 0,
+        "p_mode_driver": 1,
+        "driver_history_len": 12,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": true,
+        "p_mode_ready": true,
+        "recommended_action": "collapse",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764816174007
+      },
+      "action": "collapse",
+      "confidence": 0.8914482787350541,
+      "updatedAt": "2025-12-04T02:42:54.009Z",
+      "governor": {
+        "action": "collapse",
+        "confidence": 0.8914482787350541,
+        "adjustedCollapseThreshold": 0.42557293482304936,
+        "maxAdditionalRounds": 0,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 2,
+          "branchFactor": 1
+        }
+      }
+    },
+    {
+      "debateId": "d0e2b054-8666-4760-9d8b-652922d5025a",
+      "sessionId": "d0e2b054-8666-4760-9d8b-652922d5025a",
+      "sessionType": "debate",
+      "telemetry": {
+        "session_id": "d0e2b054-8666-4760-9d8b-652922d5025a",
+        "session_type": "debate",
+        "host_mass_norm": 1,
+        "host_radius_norm": 1,
+        "host_mode": "brain_like",
+        "dp_energy_norm": 0.10388579884705085,
+        "dp_tau_estimate_ms": 481.2977380441968,
+        "bands": {
+          "micro_freq_hz": 8000000,
+          "meso_freq_hz": 40000,
+          "macro_freq_hz": 10,
+          "rope_beat_hz": 39990
+        },
+        "global_coherence": 0.004548266845840367,
+        "levels": {
+          "micro": 0.026618579345840367,
+          "meso": 0,
+          "macro": 0.022039727439420898,
+          "rope": 0.291231910963118
+        },
+        "phase_dispersion": 0.9919416728793468,
+        "collapse_pressure": 0.5779155550803956,
+        "multi_fractal_index": 0,
+        "resonance_score": 0.21604060842059458,
+        "flare_score": 0.7535533383034775,
+        "search_regime": "diffusive",
+        "singularity_score": 0.1959708364396734,
+        "driver_history_len": 6,
+        "driver_history_required": 8,
+        "phase_dispersion_ready": false,
+        "p_mode_ready": false,
+        "recommended_action": "branch",
+        "energy_budget": 1,
+        "notes": "tracking goal: How is the warp bubble solved on the site?",
+        "updated_at": 1764816388141
+      },
+      "action": "branch",
+      "confidence": 0.34891964581405477,
+      "updatedAt": "2025-12-04T02:46:28.152Z",
+      "governor": {
+        "action": "branch",
+        "confidence": 0.34891964581405477,
+        "adjustedCollapseThreshold": 0.8400000000000001,
+        "maxAdditionalRounds": 3,
+        "toolBudgetHints": {
+          "maxToolsPerRound": 6,
+          "branchFactor": 3
+        }
+      }
     }
   ],
-  "capturedAt": "2025-11-28T07:20:49.646Z"
+  "capturedAt": "2025-12-04T02:46:28.168Z"
 }

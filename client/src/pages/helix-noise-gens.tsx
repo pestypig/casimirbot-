@@ -34,6 +34,7 @@ import {
   type RecentUploadEntry,
 } from "@/components/noise-gens/RecentUploadsRail";
 import { MoodLegend } from "@/components/noise-gens/MoodLegend";
+import { TrainingPlan } from "@/components/noise-gens/TrainingPlan";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
 import ProjectAlbumPanel from "@/components/noise-gen/ProjectAlbumPanel";
 import { decodeLayout } from "@/lib/desktop/shareState";
@@ -724,6 +725,7 @@ export default function HelixNoiseGensPage() {
         <main className="flex-1">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 lg:px-6">
             <ProjectAlbumPanel projectSlug={externalProjectSlug} />
+            <TrainingPlan />
             {decoratedRecentUploads.length ? (
               <RecentUploadsRail
                 uploads={decoratedRecentUploads}

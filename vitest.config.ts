@@ -8,5 +8,14 @@ export default defineConfig({
       "@shared": path.resolve(__dirname, "shared"),
     },
   },
-  test: { environment: "node", include: ["tests/**/*.spec.ts", "server/**/__tests__/**/*.spec.ts"] },
+  test: {
+    environment: "node",
+    include: [
+      "tests/**/*.spec.ts",
+      "server/**/__tests__/**/*.spec.ts",
+      "client/src/**/*.{spec,test}.ts?(x)",
+    ],
+    environmentMatchGlobs: [["client/src/**/*.{spec,test}.ts?(x)", "jsdom"]],
+    setupFiles: ["./tests/setup-vitest.ts"],
+  },
 });
