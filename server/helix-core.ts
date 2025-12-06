@@ -1754,11 +1754,26 @@ export function getSystemMetrics(req: Request, res: Response) {
 }
 
 // Get full pipeline state
-export function getPipelineState(req: Request, res: Response) {
+export async function getPipelineState(req: Request, res: Response) {
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
-  const s = getGlobalPipelineState();
+  res.setHeader("X-Helix-Mock", "0");
+  res.setHeader("X-Server-PID", `${process.pid}`);
+
+  let s: EnergyPipelineState;
+  try {
+    s = await pipeMutex.lock(async () => {
+      const current = getGlobalPipelineState();
+      const refreshed = await calculateEnergyPipeline({ ...current });
+      setGlobalPipelineState(refreshed);
+      return refreshed;
+    });
+  } catch (err) {
+    console.error("[helix-core] getPipelineState failed:", err);
+    res.status(500).json({ error: "pipeline-state-compute-failed" });
+    return;
+  }
 
   // Include mode-specific configuration fields for client consumption
   const currentMode = s.currentMode || 'hover';
@@ -1766,12 +1781,32 @@ export function getPipelineState(req: Request, res: Response) {
 
   const stampedTs = Date.now();
   const stampedSeq = ++__PIPE_SEQ;
+  const uptime_ms = (s as any).__uptime_ms ?? Math.floor(process.uptime() * 1000);
+  const tick = (s as any).__tick ?? null;
 
   res.json({
     ...s,
     // monotonic server-side stamps for clients to order snapshots
     seq: stampedSeq,
     __ts: stampedTs,
+    __tick: tick,
+    __uptime_ms: uptime_ms,
+    __ts_baseBurst_ms: (s as any).__ts_baseBurst_ms ?? null,
+    __ts_baseBurst_source: (s as any).__ts_baseBurst_source ?? null,
+    __dt_wall_s: (s as any).__dt_wall_s ?? null,
+    tsAutoscale: s.tsAutoscale
+      ? {
+          engaged: !!s.tsAutoscale.engaged,
+          gating: s.tsAutoscale.gating ?? "idle",
+          appliedBurst_ns: s.tsAutoscale.appliedBurst_ns ?? null,
+          proposedBurst_ns: s.tsAutoscale.proposedBurst_ns ?? null,
+          target: (s.tsAutoscale as any).targetTS ?? (s.tsAutoscale as any).target ?? null,
+          slew: (s.tsAutoscale as any).slewPerSec ?? (s.tsAutoscale as any).slew ?? null,
+          floor_ns: (s.tsAutoscale as any).floor_ns ?? null,
+          lastTickMs: (s.tsAutoscale as any).lastTickMs ?? (s as any).__ts_lastUpdate ?? null,
+          dtLast_s: (s.tsAutoscale as any).dtLast_s ?? (s as any).__ts_dt_s ?? null,
+        }
+      : null,
     qiAutothrottle: {
       enabled: !!s.qiAutothrottle?.enabled,
       scale: s.qiAutothrottle?.scale ?? 1,
@@ -1782,19 +1817,22 @@ export function getPipelineState(req: Request, res: Response) {
     qiAutoscale: s.qiAutoscale
       ? {
           enabled: !!s.qiAutoscale.enabled,
-          target: s.qiAutoscale.targetZeta ?? 0.9,
+          engaged: !!s.qiAutoscale.engaged,
+          target: s.qiAutoscale.targetZeta ?? (s.qiAutoscale as any).target ?? 0.9,
           zetaRaw: s.qiAutoscale.rawZeta ?? null,
+          sumWindowDt: (s.qiAutoscale as any).sumWindowDt ?? null,
+          rhoSource: (s.qiAutoscale as any).rhoSource ?? null,
           proposedScale: s.qiAutoscale.proposedScale ?? null,
-          slewLimitedScale: s.qiAutoscale.slewLimitedScale ?? null,
           appliedScale:
             s.qiAutoscale.appliedScale ??
             s.qiAutoscale.scale ??
             1,
           gating: s.qiAutoscale.gating ?? "idle",
           note: s.qiAutoscale.note ?? null,
-          activeSince: s.qiAutoscale.activeSince ?? null,
-          baselineZeta: s.qiAutoscale.baselineZeta ?? null,
-          safeSince: s.qiAutoscale.safeSince ?? null,
+          minScale: (s.qiAutoscale as any).minScale ?? null,
+          slew: (s.qiAutoscale as any).slewPerSec ?? (s.qiAutoscale as any).slew ?? null,
+          lastTickMs: (s.qiAutoscale as any).lastTickMs ?? null,
+          dtLast_s: (s.qiAutoscale as any).dtLast_s ?? (s as any).__qi_dt_s ?? null,
           clamps: Array.isArray(s.qiAutoscale.clamps)
             ? s.qiAutoscale.clamps.slice(-6)
             : [],

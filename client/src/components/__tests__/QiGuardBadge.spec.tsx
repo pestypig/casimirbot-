@@ -118,4 +118,25 @@ describe("QiGuardBadge", () => {
       "Window not normalized (\u03a3 g\u00b7dt = 1.070)",
     );
   });
+
+  it("renders an autoscale chip when QI autoscale is engaged", () => {
+    setPipeline({
+      qiGuardrail: {
+        marginRatioRaw: 1.2,
+        marginRatio: 1.1,
+        sumWindowDt: 1.0,
+        rhoSource: "tile-telemetry",
+      },
+      qiAutoscale: {
+        engaged: true,
+        appliedScale: 0.42,
+        gating: "active",
+      },
+    });
+
+    render(<QiGuardBadge />);
+
+    const chip = screen.getByTestId("qi-autoscale-chip");
+    expect(chip.textContent ?? "").toMatch(/Autoscale active \(→0\.90\s*·\s*A=0\.42\)/);
+  });
 });

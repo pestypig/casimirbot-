@@ -13,6 +13,7 @@ export default defineConfig({
     include: [
       "tests/**/*.spec.ts",
       "server/**/__tests__/**/*.spec.ts",
+      "tools/**/__tests__/**/*.spec.ts",
       "client/src/**/*.{spec,test}.ts?(x)",
     ],
     environmentMatchGlobs: [["client/src/**/*.{spec,test}.ts?(x)", "jsdom"]],

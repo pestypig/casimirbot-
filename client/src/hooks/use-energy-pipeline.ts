@@ -16,7 +16,12 @@ import type {
   PhaseScheduleTelemetry,
 } from "@shared/schema";
 import type { ClockingSnapshot } from "@shared/clocking";
-import type { PipelineSnapshot, QiGuardrail } from "@/types/pipeline";
+import type {
+  PipelineSnapshot,
+  QiAutoscaleTelemetry,
+  QiAutoscaleClamp,
+  QiGuardrail,
+} from "@/types/pipeline";
 
 /**
  * TheoryRefs:
@@ -82,34 +87,6 @@ export type AmpFactors = {
   qSpoilingFactor?: number;
   qMechanical?: number;
   qCavity?: number;
-};
-
-export type QiAutoscaleClamp = {
-  kind?: string;
-  before?: number;
-  after?: number;
-  limit?: number;
-  floor?: number;
-  ceiling?: number;
-  perSec?: number;
-  dt_s?: number;
-  toneOmegaHz?: number;
-};
-
-export type QiAutoscaleTelemetry = {
-  enabled?: boolean;
-  target?: number;
-  zetaRaw?: number | null;
-  proposedScale?: number | null;
-  slewLimitedScale?: number | null;
-  appliedScale?: number | null;
-  scale?: number | null;
-  gating?: "disabled" | "idle" | "window_bad" | "source_mismatch" | "safe" | "active" | "no_effect";
-  note?: string | null;
-  clamps?: QiAutoscaleClamp[];
-  activeSince?: number | null;
-  baselineZeta?: number | null;
-  safeSince?: number | null;
 };
 
 export interface EnergyPipelineState {

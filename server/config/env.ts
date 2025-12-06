@@ -17,8 +17,7 @@ export const QI_AUTOTHROTTLE_COOLDOWN_MS = Number(
 );
 export const QI_AUTOSCALE_ENABLE = flagEnabled(process.env.QI_AUTOSCALE_ENABLE, true);
 export const QI_AUTOSCALE_TARGET = Number(process.env.QI_AUTOSCALE_TARGET ?? 0.9);
-export const QI_AUTOSCALE_MIN_SCALE = Number(process.env.QI_AUTOSCALE_MIN_SCALE ?? 0.02);
+export const QI_AUTOSCALE_MIN_SCALE = Number(process.env.QI_AUTOSCALE_MIN_SCALE ?? 0.03);
 export const QI_AUTOSCALE_SLEW = Number(process.env.QI_AUTOSCALE_SLEW ?? 0.25);
-export const QI_AUTOSCALE_NO_EFFECT_SEC = Number(
-  process.env.QI_AUTOSCALE_NO_EFFECT_SEC ?? 5,
-);
+export const QI_AUTOSCALE_WINDOW_TOL = Number(process.env.QI_AUTOSCALE_WINDOW_TOL ?? 0.05);
+export const QI_AUTOSCALE_SOURCE = process.env.QI_AUTOSCALE_SOURCE ?? "tile-telemetry";

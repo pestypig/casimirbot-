@@ -4,6 +4,8 @@
  * Operators: pull `lhs_Jm3` and `bound_Jm3` from the latest /api/helix/pipeline snapshot, then pass them here to scale |lhs| until zeta_raw <= target.
  */
 
+export {};
+
 type ParsedArgs = {
   lhs?: number;
   bound?: number;

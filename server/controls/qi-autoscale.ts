@@ -3,9 +3,8 @@ export type QiAutoscaleGating =
   | "idle"
   | "window_bad"
   | "source_mismatch"
-  | "safe"
-  | "active"
-  | "no_effect";
+  | "zeta_safe"
+  | "active";
 
 export type QiAutoscaleClampReason = {
   kind:
@@ -13,230 +12,160 @@ export type QiAutoscaleClampReason = {
     | "max_scale"
     | "slew_limit"
     | "depth_floor"
-    | "depth_ceiling"
-    | "stroke_floor"
-    | "stroke_ceiling";
+    | "depth_ceiling";
   before?: number;
   after?: number;
   limit?: number;
-  floor?: number;
-  ceiling?: number;
   perSec?: number;
   dt_s?: number;
+  floor?: number;
+  ceiling?: number;
   toneOmegaHz?: number;
 };
 
 export type QiAutoscaleState = {
   enabled: boolean;
   targetZeta: number;
-  rawZeta?: number | null;
-  scale: number;
+  /** Optional alias for UI/test surfaces */
+  target?: number;
+  rawZeta: number | null;
+  sumWindowDt?: number | null;
+  rhoSource?: string | null;
+  source?: string | null;
+  minScale: number;
+  slewPerSec: number;
+  /** Optional alias for UI/test surfaces */
+  slew?: number;
+  engaged: boolean;
+  gating: string;
+  proposedScale: number;
   appliedScale: number;
-  proposedScale?: number | null;
-  slewLimitedScale?: number | null;
-  gating: QiAutoscaleGating;
+  scale?: number; // legacy alias
   note?: string;
   at: number;
   clamps?: QiAutoscaleClampReason[];
-  activeSince?: number | null;
-  baselineZeta?: number | null;
-  safeSince?: number | null;
-};
-
-const clamp = (value: number, min: number, max: number): number => {
-  if (!Number.isFinite(value)) return min;
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
-};
-
-export type QiAutoscaleGuardView = {
-  sumWindowDt?: number;
-  marginRatioRaw?: number;
-  rhoSource?: string;
+  /** Telemetry: cached wall-time delta for the last step */
+  dt_s?: number;
+  dtLast_s?: number;
+  /** Telemetry: when this servo last stepped (ms since epoch) */
+  lastTickMs?: number;
 };
 
 export type StepQiAutoscaleInput = {
-  guard: QiAutoscaleGuardView;
-  enableFlag: boolean;
+  enable: boolean;
   target: number;
   minScale: number;
-  slewPerS: number;
+  slewPerSec: number;
+  windowTol: number;
+  zetaRaw: number | null;
+  sumWindowDt: number | null;
+  rhoSource: string | null;
+  dt_s: number;
   now?: number;
-  windowTolerance?: number;
-  noEffectSeconds?: number;
   prev?: QiAutoscaleState | null;
   clamps?: QiAutoscaleClampReason[];
+  expectedSource?: string | null;
 };
 
 export const initQiAutoscaleState = (
-  target: number,
+  target = 0.9,
   now: number = Date.now(),
 ): QiAutoscaleState => ({
   enabled: true,
-  targetZeta: Math.max(1e-6, Number.isFinite(target) ? target : 0.9),
+  targetZeta: Math.max(1e-6, target),
   rawZeta: null,
-  scale: 1,
-  appliedScale: 1,
-  proposedScale: null,
-  slewLimitedScale: null,
+  sumWindowDt: null,
+  rhoSource: null,
+  minScale: 1,
+  slewPerSec: 0,
+  engaged: false,
   gating: "idle",
+  proposedScale: 1,
+  appliedScale: 1,
+  scale: 1,
   note: "idle",
   at: now,
   clamps: [],
-  activeSince: null,
-  baselineZeta: null,
-  safeSince: null,
 });
 
-const relaxTowardsUnity = (
-  prevScale: number,
-  slewPerS: number,
-  dt_s: number,
-): { applied: number; slewLimited: number } => {
-  const maxUp = prevScale * (1 + slewPerS * dt_s);
-  const slewed = Math.min(1, maxUp);
-  return {
-    applied: slewed,
-    slewLimited: slewed,
-  };
-};
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 export function stepQiAutoscale(input: StepQiAutoscaleInput): QiAutoscaleState {
-  const {
-    guard,
-    enableFlag,
-    target,
-    minScale,
-    slewPerS,
-    now = Date.now(),
-    windowTolerance = 0.05,
-    noEffectSeconds = 5,
-  } = input;
+  const now = input.now ?? Date.now();
+  const prev = input.prev ?? initQiAutoscaleState(input.target, now);
   const clampLog = Array.isArray(input.clamps) ? input.clamps : [];
-  const safeTarget = Math.max(1e-6, Number.isFinite(target) ? target : 0.9);
-  const scaleFloor = clamp(minScale, 0, 1);
-  const slew = Math.max(0, Number.isFinite(slewPerS) ? slewPerS : 0.25);
-  const prev = input.prev ?? initQiAutoscaleState(safeTarget, now);
-  const prevScale = Number.isFinite(prev.appliedScale)
+
+  const prevApplied = Number.isFinite(prev.appliedScale)
     ? (prev.appliedScale as number)
     : Number.isFinite(prev.scale)
     ? (prev.scale as number)
     : 1;
-  const prevAt = Number.isFinite(prev.at) ? prev.at : now;
-  const dt_s = Math.max(0.001, (now - prevAt) / 1000);
-  const rawZeta = Number(guard?.marginRatioRaw);
-  const windowDt = Number(guard?.sumWindowDt);
-  const windowOk = Number.isFinite(windowDt) && Math.abs(windowDt - 1) <= windowTolerance;
-  const hasRaw = Number.isFinite(rawZeta);
-  const scaleForReturn = (scale: number, gating: QiAutoscaleGating, note: string): QiAutoscaleState => ({
-    enabled: !!enableFlag,
-    targetZeta: safeTarget,
-    rawZeta: hasRaw ? (rawZeta as number) : prev.rawZeta ?? null,
-    scale,
-    appliedScale: scale,
-    proposedScale: gating === "active" ? scale : 1,
-    slewLimitedScale: scale,
-    gating,
-    note,
-    at: now,
-    clamps: clampLog,
-    activeSince: null,
-    baselineZeta: null,
-    safeSince: gating === "safe" ? now : null,
-  });
 
-  if (!enableFlag) {
-    const relaxed = relaxTowardsUnity(prevScale, slew, dt_s);
-    return scaleForReturn(relaxed.applied, "disabled", "disabled");
-  }
-  if (!windowOk) {
-    const relaxed = relaxTowardsUnity(prevScale, slew, dt_s);
-    return scaleForReturn(relaxed.applied, "window_bad", "sumWindowDt out of band");
-  }
-  if (guard?.rhoSource !== "tile-telemetry") {
-    const relaxed = relaxTowardsUnity(prevScale, slew, dt_s);
-    return scaleForReturn(relaxed.applied, "source_mismatch", `rhoSource=${guard?.rhoSource ?? "unknown"}`);
-  }
-  if (!hasRaw) {
-    const relaxed = relaxTowardsUnity(prevScale, slew, dt_s);
-    return scaleForReturn(relaxed.applied, "idle", "missing zetaRaw");
-  }
-  if ((rawZeta as number) <= safeTarget) {
-    const relaxed = relaxTowardsUnity(prevScale, slew, dt_s);
-    return {
-      ...scaleForReturn(relaxed.applied, "safe", "zeta within target"),
-      safeSince: prev.safeSince ?? now,
-    };
+  const dt_s =
+    Number.isFinite(input.dt_s) && (input.dt_s as number) > 0
+      ? (input.dt_s as number)
+      : Math.max(0, (now - (Number(prev.at) || now)) / 1000);
+
+  const targetZeta = Math.max(1e-6, Number.isFinite(input.target) ? input.target : 0.9);
+  const minScale = Math.max(0, Math.min(1, input.minScale));
+  const slewPerSec = Math.max(0, Number.isFinite(input.slewPerSec) ? input.slewPerSec : 0.25);
+  const windowTol = Number.isFinite(input.windowTol) ? Math.max(0, input.windowTol) : 0.05;
+  const expectedSource = input.expectedSource ?? "tile-telemetry";
+
+  const windowOk =
+    Number.isFinite(input.sumWindowDt) &&
+    Math.abs((input.sumWindowDt as number) - 1) <= windowTol;
+  const zetaOk = Number.isFinite(input.zetaRaw) && (input.zetaRaw as number) > targetZeta;
+  const sourceOk = (input.rhoSource ?? "") === expectedSource;
+
+  const gating: QiAutoscaleGating[] = [];
+  if (!input.enable) gating.push("disabled");
+  if (!sourceOk) gating.push("source_mismatch");
+  if (!windowOk) gating.push("window_bad");
+  if (!zetaOk) gating.push("zeta_safe");
+
+  const engaged = gating.length === 0;
+  const proposedScale = engaged
+    ? Math.max(minScale, Math.min(1, targetZeta / (input.zetaRaw as number)))
+    : 1;
+
+  if (engaged && proposedScale === minScale) {
+    clampLog.push({ kind: "min_scale", before: targetZeta / (input.zetaRaw as number), after: minScale, limit: minScale });
   }
 
-  const idealScale = safeTarget / (rawZeta as number);
-  let clampedScale = clamp(idealScale, scaleFloor, 1);
-  if (clampedScale !== idealScale) {
-    clampLog.push({
-      kind: clampedScale < idealScale ? "min_scale" : "max_scale",
-      before: idealScale,
-      after: clampedScale,
-      limit: clampedScale < idealScale ? scaleFloor : 1,
-    });
-  }
+  const alpha = clamp01(slewPerSec * dt_s);
+  const appliedScale = engaged
+    ? prevApplied + (proposedScale - prevApplied) * alpha
+    : Math.min(1, prevApplied + (1 - prevApplied) * alpha);
 
-  const maxUp = prevScale * (1 + slew * dt_s);
-  const maxDown = prevScale * (1 - slew * dt_s);
-  let slewLimited = clamp(clampedScale, maxDown, maxUp);
-  if (slewLimited !== clampedScale) {
+  if (engaged && appliedScale !== proposedScale) {
     clampLog.push({
       kind: "slew_limit",
-      before: clampedScale,
-      after: slewLimited,
-      perSec: slew,
+      before: proposedScale,
+      after: appliedScale,
+      perSec: slewPerSec,
       dt_s,
     });
   }
 
-  let appliedScale = clamp(slewLimited, 0, 1);
-  if (appliedScale !== slewLimited) {
-    clampLog.push({
-      kind: appliedScale < slewLimited ? "min_scale" : "max_scale",
-      before: slewLimited,
-      after: appliedScale,
-      limit: appliedScale < slewLimited ? 0 : 1,
-    });
-  }
-
-  const activeSince = prev.activeSince ?? now;
-  const baselineZeta = prev.baselineZeta ?? (hasRaw ? (rawZeta as number) : null);
-  let gating: QiAutoscaleGating = "active";
-  let note = "tile-telemetry autoscale";
-
-  if (
-    baselineZeta &&
-    baselineZeta > 0 &&
-    noEffectSeconds > 0 &&
-    hasRaw &&
-    (now - activeSince) / 1000 >= noEffectSeconds
-  ) {
-    const dropFraction = 1 - (rawZeta as number) / baselineZeta;
-    if (!(dropFraction >= 0.2)) {
-      gating = "no_effect";
-      note = "no_effect halt";
-    }
-  }
-
   return {
-    enabled: !!enableFlag,
-    targetZeta: safeTarget,
-    rawZeta: hasRaw ? (rawZeta as number) : prev.rawZeta ?? null,
-    scale: appliedScale,
+    enabled: !!input.enable,
+    targetZeta,
+    rawZeta: Number.isFinite(input.zetaRaw) ? (input.zetaRaw as number) : null,
+    sumWindowDt: Number.isFinite(input.sumWindowDt) ? (input.sumWindowDt as number) : null,
+    rhoSource: input.rhoSource ?? null,
+    minScale,
+    slewPerSec,
+    engaged,
+    gating: engaged ? "active" : (gating.join(",") || "idle"),
+    proposedScale,
     appliedScale,
-    proposedScale: clampedScale,
-    slewLimitedScale: slewLimited,
-    gating,
-    note,
+    scale: appliedScale,
+    note: engaged ? "tile-telemetry autoscale" : (gating.join(",") || "idle"),
     at: now,
     clamps: clampLog,
-    activeSince,
-    baselineZeta,
-    safeSince: null,
+    dt_s,
+    dtLast_s: dt_s,
+    lastTickMs: now,
   };
 }

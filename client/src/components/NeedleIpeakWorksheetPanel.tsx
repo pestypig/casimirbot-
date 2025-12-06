@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
-import defaultWorksheetCsv from "../../../data/needle_Ipeak_worksheet.csv?raw";
+import defaultWorksheetCsv from "@/data/needle_Ipeak_worksheet.csv?raw";
 
 type ParsedList = {
   values: number[];

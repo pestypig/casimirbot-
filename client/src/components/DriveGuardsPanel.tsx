@@ -2020,6 +2020,23 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
   const epsilonEffective = Number.isFinite(epsilonFromTimes) ? epsilonFromTimes : epsilonQL;
 
+  // TS autoscale telemetry (defaults to target=100, idle)
+  const tsAutoscale = (pipe?.ts as any)?.autoscale ?? (pipe as any)?.tsAutoscale ?? null;
+  const tsTarget = (() => {
+    const t = Number(tsAutoscale?.target);
+    if (Number.isFinite(t) && t > 0) return t;
+    const envTarget = Number((pipe as any)?.TS_target);
+    if (Number.isFinite(envTarget) && envTarget > 0) return envTarget;
+    return 100;
+  })();
+  const tsAutoscaleNote = typeof tsAutoscale?.note === "string" ? tsAutoscale.note : null;
+  const tsAutoscaleGating = typeof tsAutoscale?.gating === "string" ? tsAutoscale.gating : "idle";
+  const tsAutoscaleLabel = (() => {
+    if (tsAutoscaleGating === "active") return `auto:shrinking (→${tsTarget.toFixed(0)})`;
+    if (Number.isFinite(ts) && ts >= tsTarget && tsAutoscaleGating === "idle") return "auto:idle";
+    return null;
+  })();
+
 
 
   const hfProxyBlocked = clockingProvenance === "hardware" && Number.isFinite(epsilonEffective) && epsilonEffective > 1;
@@ -2053,7 +2070,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     if (regime === "warn") {
       return { state: "warn" as const, message: regimeDetail ?? "Borderline averaging; widen spacing" };
     }
-    if (regime === "unknown" || clockingDerived) {
+    if (regime === "unknown") {
       if (clockingSimulated) {
         return { state: "warn" as const, message: regimeDetail ?? "Simulated timing from hull geometry" };
       }
@@ -2067,9 +2084,17 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
     }
 
-    if (ts >= 50 && epsilonEffective <= 0.05) {
+    const tsHigh =
+      Number.isFinite(tsTarget) && tsTarget > 0
+        ? ts >= tsTarget * 0.995 // allow tiny rounding jitter near target
+        : ts >= 50;
+    const tsBorderline = ts >= Math.max(10, Number.isFinite(tsTarget) ? tsTarget * 0.5 : 25);
+    const epsTight = epsilonEffective <= 0.05;
+    const epsLoose = epsilonEffective <= 0.2;
 
-      return { state: "ok" as const, message: "GR sees <T_mu nu>" };
+    if (tsHigh && epsTight) {
+
+      return { state: "ok" as const, message: `TS ≥ ${tsTarget.toFixed(0)}; GR sees <T_mu nu>` };
 
     }
 
@@ -2079,9 +2104,9 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
     }
 
-    if (ts >= 10 && epsilonEffective <= 0.2) {
+    if (tsBorderline && epsLoose) {
 
-      return { state: "warn" as const, message: "Borderline; widen spacing" };
+      return { state: "warn" as const, message: `TS below target ${tsTarget.toFixed(0)}; widen spacing` };
 
     }
 
@@ -2115,9 +2140,9 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
   const averagingBadgeText =
     Number.isFinite(epsilonEffective) && Number.isFinite(ts)
-      ? `epsilon=${epsilonDisplay}, TS=${tsDisplay}${
+      ? `TS=${tsDisplay}/${tsTarget.toFixed(0)}, epsilon=${epsilonDisplay}${tsAutoscaleLabel ? ` (${tsAutoscaleLabel})` : ""}${
           /tau/i.test(averagingStatus.message) ? "" : averagingBadgeTauDetail
-        }; ${averagingStatus.message}`
+        }; ${averagingStatus.message}${tsAutoscaleNote ? ` (${tsAutoscaleNote})` : ""}`
       : "Awaiting duty & light-crossing telemetry";
 
 
@@ -6628,11 +6653,17 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-              ok={Number.isFinite(ts) && ts > 10 && !hfProxyBlocked}
+              ok={averagingStatus.state === "ok"}
 
 
 
-              value={Number.isFinite(ts) ? `TS = ${ts.toFixed(1)}${Number.isFinite(epsilonEffective) ? ` | \u03b5=${toSci(epsilonEffective, 2)}` : ""}` : "TS unavailable"}
+              value={
+                Number.isFinite(ts)
+                  ? `TS=${ts.toFixed(1)}/${tsTarget.toFixed(0)}${
+                    Number.isFinite(epsilonEffective) ? ` | \u03b5=${toSci(epsilonEffective, 2)}` : ""
+                  }${tsAutoscaleLabel ? ` | ${tsAutoscaleLabel}` : ""}`
+                  : "TS unavailable"
+              }
 
 
 

@@ -22,7 +22,15 @@ export interface ViabilityConstraint {
   rhs?: number;
   margin?: number | null;
   details?: string;
+  note?: string;
 }
+
+export type TsSnapshot = {
+  TS_ratio?: number;
+  tauLC_ms?: number;
+  tauPulse_ns?: number;
+  autoscale?: Record<string, unknown> | null;
+};
 
 export interface WarpSnapshot {
   TS_ratio?: number;
@@ -34,7 +42,11 @@ export interface WarpSnapshot {
   thetaCal?: number;
   gamma_geo_cubed?: number;
   T00_avg?: number;
-  [k: string]: number | undefined;
+  sectorPeriod_ms?: number;
+  dwell_ms?: number;
+  burst_ms?: number;
+  ts?: TsSnapshot | null;
+  [k: string]: unknown;
 }
 
 export interface WarpViabilityPayload {
@@ -43,6 +55,7 @@ export interface WarpViabilityPayload {
   constraints: ViabilityConstraint[];
   snapshot: WarpSnapshot;
   citations?: string[];
+  mitigation?: string[];
 }
 
 export interface ViabilityResult {
@@ -55,6 +68,7 @@ export interface ViabilityResult {
   integrityOk?: boolean;
   certificateHash?: string;
   certificateId?: string;
+  mitigation?: string[];
 }
 
 export type ConstraintResult = ViabilityConstraint;

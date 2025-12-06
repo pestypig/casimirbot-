@@ -61,7 +61,8 @@ import {
   QI_AUTOSCALE_MIN_SCALE,
   QI_AUTOSCALE_SLEW,
   QI_AUTOSCALE_TARGET,
-  QI_AUTOSCALE_NO_EFFECT_SEC,
+  QI_AUTOSCALE_WINDOW_TOL,
+  QI_AUTOSCALE_SOURCE,
 } from "./config/env.js";
 import type {
   DynamicCasimirSweepConfig,
@@ -92,6 +93,7 @@ import { QiMonitor } from "./qi/qi-monitor.js";
 import { configuredQiScalarBound, qiBound_Jm3 } from "./qi/qi-bounds.js";
 import { buildWindow, type RawTileInput } from "./qi/qi-saturation.js";
 import { updatePipelineQiTiles, getLatestQiTileStats } from "./qi/pipeline-qi-stream.js";
+import { stepTsAutoscale, type TsAutoscaleState } from "./ts/ts-autoscale.js";
 
 export type MutableDynamicConfig = DynamicConfigLike;
 
@@ -390,6 +392,13 @@ export type AmpFactors = {
   qCavity?: number;
 };
 
+export type TsTelemetry = {
+  TS_ratio?: number;
+  tauLC_ms?: number;
+  tauPulse_ns?: number;
+  autoscale?: TsAutoscaleState;
+};
+
 export type QuantumInterestBook = {
   neg_Jm3: number;        // Scheduled negative burst (window-normalized)
   pos_Jm3: number;        // Scheduled positive payback (window-normalized)
@@ -535,6 +544,8 @@ export interface EnergyPipelineState {
   TS_ratio: number;         // Time-scale separation ratio (conservative)
   TS_long?: number;         // Time-scale using longest dimension
   TS_geom?: number;         // Time-scale using geometric mean
+  tsAutoscale?: TsAutoscaleState; // Averaging guard servo telemetry
+  ts?: TsTelemetry;         // TS guard snapshot for UI/certs
   zeta: number;             // Quantum inequality parameter
   hullArea?: SurfaceAreaEstimate; // Detailed surface area estimate with uncertainty
   N_tiles: number;          // Total number of tiles
@@ -1902,6 +1913,13 @@ export async function calculateEnergyPipeline(
   state: EnergyPipelineState,
   opts: PipelineRunOptions = {},
 ): Promise<EnergyPipelineState> {
+  // Monotonic tick + uptime telemetry for pipeline snapshots
+  const nowMs = Date.now();
+  const prevTick = Number.isFinite((state as any).__tick) ? Number((state as any).__tick) : -1;
+  (state as any).__tick = prevTick + 1;
+  (state as any).__uptime_ms = Math.floor(process.uptime() * 1000);
+  (state as any).__last_calc_ms = nowMs;
+
   // --- Surface area & tile count from actual hull dims ---
   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
 
@@ -2546,179 +2564,6 @@ export async function calculateEnergyPipeline(
   if (!(sectorPeriodMs > 0)) {
     sectorPeriodMs = fallbackPeriod > 0 ? fallbackPeriod : DEFAULT_SECTOR_PERIOD_MS;
   }
-  state.sectorPeriod_ms = sectorPeriodMs;
-  const normalizePhase01 = (value: number) => ((value % 1) + 1) % 1;
-  const derivedPhase01 =
-    sectorPeriodMs > 0 ? ((Date.now() % sectorPeriodMs) / sectorPeriodMs) : 0;
-  const hwPhase01 = Number(hw?.phase01);
-  const phase01 = Number.isFinite(hwPhase01) ? normalizePhase01(hwPhase01) : derivedPhase01;
-  const tauMs = Number.isFinite(state.qi?.tau_s_ms)
-    ? Number(state.qi!.tau_s_ms)
-    : DEFAULT_QI_SETTINGS.tau_s_ms;
-  const sampler = state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
-  const negativeFraction =
-    Number.isFinite(state.negativeFraction)
-      ? Math.max(0, Math.min(1, state.negativeFraction))
-      : DEFAULT_NEGATIVE_FRACTION;
-
-  const phaseSchedule = computeSectorPhaseOffsets({
-    N: totalSectors,
-    sectorPeriod_ms: sectorPeriodMs,
-    phase01,
-    tau_s_ms: tauMs,
-    sampler,
-    negativeFraction,
-    deltaPos_deg: 90,
-    neutral_deg: 45,
-  });
-
-  const roleSets = {
-    neg: new Set(phaseSchedule.negSectors),
-    pos: new Set(phaseSchedule.posSectors),
-  };
-
-  if (state.gateAnalytics && Array.isArray(state.gateAnalytics.pulses)) {
-    const scheduled = applyPhaseScheduleToPulses(
-      state.gateAnalytics.pulses,
-      phaseSchedule.phi_deg_by_sector,
-      roleSets,
-    );
-    state.gateAnalytics = {
-      ...state.gateAnalytics,
-      pulses: scheduled,
-    };
-  }
-
-  state.phaseSchedule = {
-    N: totalSectors,
-    sectorPeriod_ms: sectorPeriodMs,
-    phase01,
-    phi_deg_by_sector: phaseSchedule.phi_deg_by_sector,
-    negSectors: phaseSchedule.negSectors,
-    posSectors: phaseSchedule.posSectors,
-    sampler,
-    tau_s_ms: tauMs,
-    weights: phaseSchedule.weights,
-  };
-
-  const qiGuard = evaluateQiGuardrail(state, {
-    schedule: phaseSchedule,
-    sectorPeriod_ms: sectorPeriodMs,
-    sampler,
-    tau_ms: tauMs,
-  });
-  state.zeta = qiGuard.marginRatio;
-  (state as any).zetaRaw = qiGuard.marginRatioRaw;
-  (state as any).qiGuardrail = qiGuard;
-  const zetaForStatus = Number.isFinite(qiGuard.marginRatioRaw)
-    ? qiGuard.marginRatioRaw
-    : Number.isFinite(qiGuard.marginRatio)
-    ? qiGuard.marginRatio
-    : null;
-  const guardLog = {
-    margin: qiGuard.marginRatio,
-    marginRaw: qiGuard.marginRatioRaw,
-    lhs_Jm3: qiGuard.lhs_Jm3,
-    bound_Jm3: qiGuard.bound_Jm3,
-    sampler: qiGuard.sampler,
-    fieldType: qiGuard.fieldType,
-    window_ms: qiGuard.window_ms,
-    sumWindowDt: qiGuard.sumWindowDt,
-    duty: qiGuard.duty,
-    patternDuty: qiGuard.patternDuty,
-    maskSum: qiGuard.maskSum,
-    effectiveRho: qiGuard.effectiveRho,
-    rhoOn: qiGuard.rhoOn,
-    rhoOnDuty: qiGuard.rhoOnDuty,
-    rhoSource: qiGuard.rhoSource,
-    TS: state.clocking?.TS ?? state.TS_ratio ?? null,
-    clockingDetail: state.clocking ?? null,
-  };
-  if (!Number.isFinite(zetaForStatus) || (zetaForStatus as number) >= 1) {
-    console.warn("[QI-guard] sampled integral exceeds bound", guardLog);
-  } else if (DEBUG_PIPE) {
-    console.log("[QI-guard]", guardLog);
-  }
-
-  const autoscaleTarget = Number.isFinite(QI_AUTOSCALE_TARGET)
-    ? clampNumber(QI_AUTOSCALE_TARGET, 1e-6, 1e6)
-    : 0.9;
-  const autoscaleMinScale = Number.isFinite(QI_AUTOSCALE_MIN_SCALE)
-    ? clampNumber(QI_AUTOSCALE_MIN_SCALE, 0, 1)
-    : 0.02;
-  const autoscaleSlewPerS = Number.isFinite(QI_AUTOSCALE_SLEW) ? Math.max(0, QI_AUTOSCALE_SLEW) : 0.25;
-  const autoscaleNow = Date.now();
-  const autoscaleClamps: QiAutoscaleClampReason[] = [];
-  const autoscaleState = stepQiAutoscale({
-    guard: qiGuard,
-    enableFlag: QI_AUTOSCALE_ENABLE,
-    target: autoscaleTarget,
-    minScale: autoscaleMinScale,
-    slewPerS: autoscaleSlewPerS,
-    prev: state.qiAutoscale,
-    now: autoscaleNow,
-    windowTolerance: 0.05,
-    noEffectSeconds: Number.isFinite(QI_AUTOSCALE_NO_EFFECT_SEC)
-      ? Math.max(0, QI_AUTOSCALE_NO_EFFECT_SEC)
-      : 5,
-    clamps: autoscaleClamps,
-  });
-  autoscaleState.clamps = autoscaleClamps;
-  state.qiAutoscale = autoscaleState;
-
-  const prevAutothrottle = state.qiAutothrottle ?? initQiAutothrottle();
-  state.qiAutothrottle = applyQiAutothrottleStep(prevAutothrottle, qiGuard.marginRatioRaw);
-  const qiAutothrottleChanged = state.qiAutothrottle !== prevAutothrottle;
-  const qiAutothrottleScale =
-    state.qiAutothrottle?.enabled === true && Number.isFinite(state.qiAutothrottle.scale)
-      ? clampNumber(state.qiAutothrottle.scale as number, 0, 1)
-      : 1;
-  const autoscaleRawScale = Number.isFinite(state.qiAutoscale?.appliedScale)
-    ? (state.qiAutoscale?.appliedScale as number)
-    : Number.isFinite(state.qiAutoscale?.scale)
-    ? (state.qiAutoscale?.scale as number)
-    : 1;
-  const qiAutoscaleScale =
-    Number.isFinite(autoscaleRawScale) && (autoscaleRawScale as number) > 0
-      ? clampNumber(autoscaleRawScale, 0, 1)
-      : 1;
-  const qiScale = qiAutothrottleScale * qiAutoscaleScale;
-
-  if (state.gateAnalytics && Array.isArray(state.gateAnalytics.pulses)) {
-    const pulses = applyScaleToGatePulses(state.gateAnalytics.pulses, qiScale);
-    state.gateAnalytics = {
-      ...state.gateAnalytics,
-      pulses: pulses ?? [],
-    };
-  }
-
-  if (qiAutothrottleChanged && state.qiAutothrottle?.reason) {
-    console.warn("[QI-autothrottle]", {
-      scale: state.qiAutothrottle.scale,
-      reason: state.qiAutothrottle.reason,
-    });
-  }
-
-  const P_warn = MODE_POLICY[state.currentMode].P_target_W * 1.2 / 1e6; // +20% headroom in MW
-  const qiStatus = deriveQiStatus({
-    zetaRaw: qiGuard.marginRatioRaw,
-    zetaClamped: qiGuard.marginRatio,
-    pAvg: state.P_avg,
-    pWarn: P_warn,
-    mode: state.currentMode,
-  });
-  state.fordRomanCompliance = qiStatus.compliance;
-  state.curvatureLimit = state.fordRomanCompliance;
-  state.overallStatus = qiStatus.overallStatus;
-
-  // UI field updates logging (after MODE_CONFIGS applied)
-  if (DEBUG_PIPE) console.log("[PIPELINE_UI]", {
-    dutyUI_after: state.dutyCycle, 
-    sectorCount: state.sectorCount,
-    concurrentSectors: state.concurrentSectors,
-    sectorStrobing: state.sectorStrobing,
-    qSpoilingFactor: state.qSpoilingFactor
-  });
 
   // --- Construct light-crossing packet (single source of truth) ---
   const baseDwell_ms = Number.isFinite(hwDwellMs) && hwDwellMs > 0 ? hwDwellMs : sectorPeriodMs;
@@ -2746,19 +2591,105 @@ export async function calculateEnergyPipeline(
   } else if (Number.isFinite(geometryTau_ms)) {
     baseTauLC_ms = geometryTau_ms as number;
   }
-  const baseBurst_ms = Number.isFinite(hwBurstMs)
-    ? hwBurstMs
-    : baseDwell_ms *
-      (Number.isFinite(state.dutyBurst) ? Number(state.dutyBurst) : PAPER_DUTY.BURST_DUTY_LOCAL);
+  // Prefer the previous autoscaled burst (persisted on state) when hardware does not supply one;
+  // otherwise we snap back to the duty-based default each request and TS jumps between 100/50.
+  const prevBurstNs =
+    Number.isFinite((state as any).__ts_lastBurst_ns) && (state as any).__ts_lastBurst_ns > 0
+      ? (state as any).__ts_lastBurst_ns
+      : Number.isFinite(state.tsAutoscale?.appliedBurst_ns)
+      ? state.tsAutoscale!.appliedBurst_ns!
+      : Number.isFinite(state.lightCrossing?.burst_ns)
+      ? state.lightCrossing!.burst_ns!
+      : undefined;
+  const prevBurstMs = Number.isFinite(prevBurstNs) ? (prevBurstNs as number) / 1e6 : undefined;
+
+  const dutyBurst = Number.isFinite(state.dutyBurst) ? Number(state.dutyBurst) : PAPER_DUTY.BURST_DUTY_LOCAL;
+  let baseBurst_ms: number;
+  let baseBurstSource: string;
+  if (Number.isFinite(hwBurstMs)) {
+    baseBurst_ms = hwBurstMs as number;
+    baseBurstSource = "hardware";
+  } else if (Number.isFinite(prevBurstMs) && (prevBurstMs as number) > 0) {
+    baseBurst_ms = prevBurstMs as number;
+    baseBurstSource = "autoscale_prev";
+  } else {
+    baseBurst_ms = baseDwell_ms * dutyBurst;
+    baseBurstSource = "duty_fallback";
+  }
+  (state as any).__ts_baseBurst_ms = baseBurst_ms;
+  (state as any).__ts_baseBurst_source = baseBurstSource;
 
   const lightCrossing = {
     tauLC_ms: baseTauLC_ms,
     burst_ms: baseBurst_ms,
+    burst_ns: Number.isFinite(baseBurst_ms) ? (baseBurst_ms as number) * 1e6 : undefined,
     dwell_ms: baseDwell_ms,
   };
+  const wallNow = nowMs;
+  const wallPrev = Number.isFinite((state as any).__wall_ts) ? ((state as any).__wall_ts as number) : null;
+  const wallDt_s = wallPrev != null ? Math.max(0, (wallNow - wallPrev) / 1000) : 0;
+  (state as any).__wall_prev_ms = wallPrev;
+  (state as any).__wall_ts = wallNow;
+  (state as any).__dt_wall_s = wallDt_s;
   const tauLC_s = Number.isFinite(lightCrossing.tauLC_ms)
     ? (lightCrossing.tauLC_ms as number) / 1000
     : 0;
+  const tauPulse_s = Number.isFinite(lightCrossing.burst_ms)
+    ? Math.max(1e-12, (lightCrossing.burst_ms as number) / 1000)
+    : 1e-12;
+  const tsCurrent = tauPulse_s > 0 ? tauLC_s / tauPulse_s : Number.NaN;
+  const tsCfg = {
+    enabled: process.env.TS_AUTOSCALE_ENABLE !== "false",
+    target: parseEnvNumber(process.env.TS_AUTOSCALE_TARGET, 100),
+    slewPerSec: Math.max(0, parseEnvNumber(process.env.TS_AUTOSCALE_SLEW, 0.25)),
+    floor_ns: Math.max(
+      0,
+      parseEnvNumber(
+        process.env.TS_AUTOSCALE_FLOOR_NS ?? process.env.TS_AUTOSCALE_MIN_PULSE_NS,
+        20,
+      ),
+    ),
+    windowTol: Math.max(0, parseEnvNumber(process.env.TS_AUTOSCALE_WINDOW_TOL, 0.05)),
+  };
+  const tsNow = wallNow;
+  const tsDt_s = Number.isFinite((state as any).__ts_lastUpdate)
+    ? Math.max(0, (tsNow - (state as any).__ts_lastUpdate) / 1000)
+    : 0;
+  let tsAuto: TsAutoscaleState | undefined;
+  try {
+    const prevBurst_ns = Number.isFinite(lightCrossing.burst_ns)
+      ? (lightCrossing.burst_ns as number)
+      : Math.max(1, tauPulse_s * 1e9);
+    tsAuto = stepTsAutoscale({
+      enable: tsCfg.enabled,
+      targetTS: tsCfg.target,
+      slewPerSec: tsCfg.slewPerSec,
+      floor_ns: tsCfg.floor_ns,
+      windowTol: tsCfg.windowTol,
+      TS_ratio: tsCurrent,
+      tauPulse_ns: prevBurst_ns,
+      dt_s: tsDt_s,
+      prevBurst_ns,
+    });
+    if (tsAuto) {
+      tsAuto.lastTickMs = tsNow;
+      tsAuto.dtLast_s = tsDt_s;
+    }
+    (state as any).__ts_lastUpdate = tsNow;
+    (state as any).__ts_lastBurst_ns = tsAuto.appliedBurst_ns;
+    (state as any).__ts_dt_s = tsDt_s;
+    (state as any).tsAutoscale = tsAuto;
+    const scale = prevBurst_ns > 0 ? tsAuto.appliedBurst_ns / prevBurst_ns : 1;
+    lightCrossing.burst_ns = tsAuto.appliedBurst_ns;
+    lightCrossing.burst_ms = tsAuto.appliedBurst_ns / 1e6;
+    if (Number.isFinite(scale) && scale > 0) {
+      sectorPeriodMs = Math.max(0.01, sectorPeriodMs * scale);
+      lightCrossing.dwell_ms = sectorPeriodMs;
+    }
+  } catch (err) {
+    if (DEBUG_PIPE) console.warn("[TS-autoscale][error]", err);
+  }
+
   // Build clocking snapshot (TS, epsilon) from the best timing data we have.
   // If we are operating purely on derived defaults (no hardware tau_LC or burst),
   // treat the result as tentative so the UI doesn't hard-fail before telemetry arrives.
@@ -2851,7 +2782,271 @@ export async function calculateEnergyPipeline(
   state.TS_ratio = tsEffective;
   (state as any).lightCrossing.TS = tsEffective;
 
-  // Calculate Nat+írio metrics using pipeline state
+  state.sectorPeriod_ms = sectorPeriodMs;
+  const normalizePhase01 = (value: number) => ((value % 1) + 1) % 1;
+  const derivedPhase01 =
+    sectorPeriodMs > 0 ? ((Date.now() % sectorPeriodMs) / sectorPeriodMs) : 0;
+  const hwPhase01 = Number(hw?.phase01);
+  const phase01 = Number.isFinite(hwPhase01) ? normalizePhase01(hwPhase01) : derivedPhase01;
+  const tauMs = Number.isFinite(state.qi?.tau_s_ms)
+    ? Number(state.qi!.tau_s_ms)
+    : DEFAULT_QI_SETTINGS.tau_s_ms;
+  const sampler = state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
+  const negativeFraction =
+    Number.isFinite(state.negativeFraction)
+      ? Math.max(0, Math.min(1, state.negativeFraction))
+      : DEFAULT_NEGATIVE_FRACTION;
+
+  const phaseSchedule = computeSectorPhaseOffsets({
+    N: totalSectors,
+    sectorPeriod_ms: sectorPeriodMs,
+    phase01,
+    tau_s_ms: tauMs,
+    sampler,
+    negativeFraction,
+    deltaPos_deg: 90,
+    neutral_deg: 45,
+  });
+
+  const roleSets = {
+    neg: new Set(phaseSchedule.negSectors),
+    pos: new Set(phaseSchedule.posSectors),
+  };
+
+  if (state.gateAnalytics && Array.isArray(state.gateAnalytics.pulses)) {
+    const scheduled = applyPhaseScheduleToPulses(
+      state.gateAnalytics.pulses,
+      phaseSchedule.phi_deg_by_sector,
+      roleSets,
+    );
+    state.gateAnalytics = {
+      ...state.gateAnalytics,
+      pulses: scheduled,
+    };
+  }
+
+  state.phaseSchedule = {
+    N: totalSectors,
+    sectorPeriod_ms: sectorPeriodMs,
+    phase01,
+    phi_deg_by_sector: phaseSchedule.phi_deg_by_sector,
+    negSectors: phaseSchedule.negSectors,
+    posSectors: phaseSchedule.posSectors,
+    sampler,
+    tau_s_ms: tauMs,
+    weights: phaseSchedule.weights,
+  };
+
+  const qiGuardPre = evaluateQiGuardrail(state, {
+    schedule: phaseSchedule,
+    sectorPeriod_ms: sectorPeriodMs,
+    sampler,
+    tau_ms: tauMs,
+  });
+  let qiGuard = qiGuardPre;
+  const tsTelemetry: TsTelemetry = {
+    TS_ratio: Number.isFinite(state.TS_ratio) ? state.TS_ratio : tsCurrent,
+    tauLC_ms: lightCrossing.tauLC_ms,
+    tauPulse_ns: lightCrossing.burst_ns,
+    autoscale: tsAuto
+      ? {
+          ...tsAuto,
+          target: tsCfg.target,
+          slew: tsCfg.slewPerSec,
+          floor_ns: tsCfg.floor_ns,
+          lastTickMs: tsNow,
+          dtLast_s: tsDt_s,
+        }
+      : undefined,
+  };
+  state.tsAutoscale = tsTelemetry.autoscale;
+  state.ts = tsTelemetry;
+  (state as any).ts = tsTelemetry;
+  const autoscaleTarget = Number.isFinite(QI_AUTOSCALE_TARGET)
+    ? clampNumber(QI_AUTOSCALE_TARGET, 1e-6, 1e6)
+    : 0.9;
+  const autoscaleMinScale = Number.isFinite(QI_AUTOSCALE_MIN_SCALE)
+    ? clampNumber(QI_AUTOSCALE_MIN_SCALE, 0, 1)
+    : 0.02;
+  const autoscaleSlewPerS = Number.isFinite(QI_AUTOSCALE_SLEW) ? Math.max(0, QI_AUTOSCALE_SLEW) : 0.25;
+  const autoscaleWindowTol =
+    Number.isFinite(QI_AUTOSCALE_WINDOW_TOL) && (QI_AUTOSCALE_WINDOW_TOL as number) >= 0
+      ? (QI_AUTOSCALE_WINDOW_TOL as number)
+      : 0.05;
+  const autoscaleSource = QI_AUTOSCALE_SOURCE ?? "tile-telemetry";
+  const autoscaleNow = wallNow;
+  const autoscaleClamps: QiAutoscaleClampReason[] = [];
+  const autoscaleState = stepQiAutoscale({
+    enable: QI_AUTOSCALE_ENABLE,
+    target: autoscaleTarget,
+    minScale: autoscaleMinScale,
+    slewPerSec: autoscaleSlewPerS,
+    windowTol: autoscaleWindowTol,
+    zetaRaw: qiGuard.marginRatioRaw ?? null,
+    sumWindowDt: qiGuard.sumWindowDt ?? null,
+    rhoSource: qiGuard.rhoSource ?? null,
+    dt_s: wallDt_s,
+    now: autoscaleNow,
+    prev: state.qiAutoscale,
+    expectedSource: autoscaleSource,
+    clamps: autoscaleClamps,
+  });
+  autoscaleState.clamps = autoscaleClamps;
+  const qiDt_s =
+    Number.isFinite(autoscaleState.dtLast_s) && (autoscaleState.dtLast_s as number) >= 0
+      ? (autoscaleState.dtLast_s as number)
+      : wallDt_s;
+  const qiLastTickMs = Number.isFinite(autoscaleState.lastTickMs)
+    ? (autoscaleState.lastTickMs as number)
+    : autoscaleNow;
+  autoscaleState.dt_s = qiDt_s;
+  autoscaleState.dtLast_s = qiDt_s;
+  autoscaleState.lastTickMs = qiLastTickMs;
+  state.qiAutoscale = {
+    ...autoscaleState,
+    target: autoscaleTarget,
+    slew: autoscaleSlewPerS,
+    minScale: autoscaleMinScale,
+    source: autoscaleSource,
+    dt_s: qiDt_s,
+    dtLast_s: qiDt_s,
+    lastTickMs: qiLastTickMs,
+  };
+  (state as any).__qi_dt_s = qiDt_s;
+
+  const prevAutothrottle = state.qiAutothrottle ?? initQiAutothrottle();
+  state.qiAutothrottle = applyQiAutothrottleStep(prevAutothrottle, qiGuard.marginRatioRaw);
+  const qiAutothrottleChanged = state.qiAutothrottle !== prevAutothrottle;
+  const qiAutothrottleScale =
+    state.qiAutothrottle?.enabled === true && Number.isFinite(state.qiAutothrottle.scale)
+      ? clampNumber(state.qiAutothrottle.scale as number, 0, 1)
+      : 1;
+  const autoscaleRawScale = Number.isFinite(state.qiAutoscale?.appliedScale)
+    ? (state.qiAutoscale?.appliedScale as number)
+    : Number.isFinite(state.qiAutoscale?.scale)
+    ? (state.qiAutoscale?.scale as number)
+    : 1;
+  const qiAutoscaleScale =
+    Number.isFinite(autoscaleRawScale) && (autoscaleRawScale as number) > 0
+      ? clampNumber(autoscaleRawScale, 0, 1)
+      : 1;
+  const qiScale = qiAutothrottleScale * qiAutoscaleScale;
+
+  if (state.gateAnalytics && Array.isArray(state.gateAnalytics.pulses)) {
+    const pulses = applyScaleToGatePulses(state.gateAnalytics.pulses, qiScale);
+    state.gateAnalytics = {
+      ...state.gateAnalytics,
+      pulses: pulses ?? [],
+    };
+  }
+
+  const qiGuardPost = evaluateQiGuardrail(state, {
+    schedule: phaseSchedule,
+    sectorPeriod_ms: sectorPeriodMs,
+    sampler,
+    tau_ms: tauMs,
+  });
+  qiGuard = qiGuardPost ?? qiGuard;
+  state.zeta = qiGuard.marginRatio;
+  (state as any).zetaRaw = qiGuard.marginRatioRaw;
+  (state as any).qiGuardrail = qiGuard;
+
+  const zetaForStatus = Number.isFinite(qiGuard.marginRatioRaw)
+    ? qiGuard.marginRatioRaw
+    : Number.isFinite(qiGuard.marginRatio)
+    ? qiGuard.marginRatio
+    : null;
+  const guardLog = {
+    margin: qiGuard.marginRatio,
+    marginRaw: qiGuard.marginRatioRaw,
+    lhs_Jm3: qiGuard.lhs_Jm3,
+    bound_Jm3: qiGuard.bound_Jm3,
+    sampler: qiGuard.sampler,
+    fieldType: qiGuard.fieldType,
+    window_ms: qiGuard.window_ms,
+    sumWindowDt: qiGuard.sumWindowDt,
+    duty: qiGuard.duty,
+    patternDuty: qiGuard.patternDuty,
+    maskSum: qiGuard.maskSum,
+    effectiveRho: qiGuard.effectiveRho,
+    rhoOn: qiGuard.rhoOn,
+    rhoOnDuty: qiGuard.rhoOnDuty,
+    rhoSource: qiGuard.rhoSource,
+    TS: state.clocking?.TS ?? state.TS_ratio ?? null,
+    clockingDetail: state.clocking ?? null,
+  };
+  const tsLog = {
+    TS_ratio: state.TS_ratio,
+    target: tsCfg.target,
+    tauLC_us: Number.isFinite(lightCrossing.tauLC_ms) ? +(Number(lightCrossing.tauLC_ms) * 1000).toFixed(3) : null,
+    tauPulse_ns: Number.isFinite(lightCrossing.burst_ms) ? +(Number(lightCrossing.burst_ms) * 1e6).toFixed(3) : null,
+    engaged: tsAuto?.engaged ?? false,
+    appliedBurst_ns: tsAuto?.appliedBurst_ns ?? null,
+    proposedBurst_ns: tsAuto?.proposedBurst_ns ?? null,
+    gating: tsAuto?.gating ?? "idle",
+  };
+  const tsAutoLog = {
+    engaged: tsAuto?.engaged ?? false,
+    gating: tsAuto?.gating ?? "idle",
+    appliedBurst_ns: tsAuto?.appliedBurst_ns ?? null,
+    proposedBurst_ns: tsAuto?.proposedBurst_ns ?? null,
+    target: tsCfg.target,
+    slew: tsCfg.slewPerSec,
+    floor_ns: tsCfg.floor_ns,
+  };
+  const qiAutoLog = {
+    engaged: state.qiAutoscale?.engaged ?? false,
+    gating: state.qiAutoscale?.gating ?? "idle",
+    appliedScale:
+      state.qiAutoscale?.appliedScale ??
+      state.qiAutoscale?.scale ??
+      1,
+    proposedScale: state.qiAutoscale?.proposedScale ?? null,
+    target: autoscaleTarget,
+    slew: autoscaleSlewPerS,
+    floor: autoscaleMinScale,
+  };
+
+  if (!Number.isFinite(zetaForStatus) || (zetaForStatus as number) >= 1) {
+    console.warn("[QI-guard] sampled integral exceeds bound", guardLog);
+  } else if (DEBUG_PIPE) {
+    console.log("[QI-guard]", guardLog);
+  }
+  if (DEBUG_PIPE) {
+    console.log("[TS-guard]", tsLog);
+    console.log("[TS-autoscale]", tsAutoLog);
+    console.log("[QI-autoscale]", qiAutoLog);
+  }
+
+  if (qiAutothrottleChanged && state.qiAutothrottle?.reason) {
+    console.warn("[QI-autothrottle]", {
+      scale: state.qiAutothrottle.scale,
+      reason: state.qiAutothrottle.reason,
+    });
+  }
+
+  const P_warn = MODE_POLICY[state.currentMode].P_target_W * 1.2 / 1e6; // +20% headroom in MW
+  const qiStatus = deriveQiStatus({
+    zetaRaw: qiGuard.marginRatioRaw,
+    zetaClamped: qiGuard.marginRatio,
+    pAvg: state.P_avg,
+    pWarn: P_warn,
+    mode: state.currentMode,
+  });
+  state.fordRomanCompliance = qiStatus.compliance;
+  state.curvatureLimit = state.fordRomanCompliance;
+  state.overallStatus = qiStatus.overallStatus;
+
+  // UI field updates logging (after MODE_CONFIGS applied)
+  if (DEBUG_PIPE) console.log("[PIPELINE_UI]", {
+    dutyUI_after: state.dutyCycle, 
+    sectorCount: state.sectorCount,
+    concurrentSectors: state.concurrentSectors,
+    sectorStrobing: state.sectorStrobing,
+    qSpoilingFactor: state.qSpoilingFactor
+  });
+
+  // Calculate Natario metrics using pipeline state
   const natario = calculateNatarioMetric({
       gap: state.gap_nm,
       hull: state.hull ? { a: state.hull.Lx_m / 2, b: state.hull.Ly_m / 2, c: state.hull.Lz_m / 2 } : { a: 503.5, b: 132, c: 86.5 },
@@ -3145,10 +3340,32 @@ function updateQiTelemetry(state: EnergyPipelineState) {
     updatePipelineQiTiles([], { source: "synthetic" });
   }
 
+  const qiAutothrottleScale =
+    state.qiAutothrottle?.enabled === true && Number.isFinite(state.qiAutothrottle.scale)
+      ? clampNumber(state.qiAutothrottle.scale as number, 0, 1)
+      : 1;
+  const autoscaleRawScale = Number.isFinite(state.qiAutoscale?.appliedScale)
+    ? (state.qiAutoscale?.appliedScale as number)
+    : Number.isFinite(state.qiAutoscale?.scale)
+    ? (state.qiAutoscale?.scale as number)
+    : 1;
+  const qiAutoscaleScale =
+    Number.isFinite(autoscaleRawScale) && (autoscaleRawScale as number) > 0
+      ? clampNumber(autoscaleRawScale, 0, 1)
+      : 1;
+  const qiScale = qiAutothrottleScale * qiAutoscaleScale;
+
+  const autoscaleTarget = Number.isFinite(state.qiAutoscale?.targetZeta)
+    ? clampNumber(state.qiAutoscale?.targetZeta as number, 1e-6, 1e6)
+    : Number.isFinite(QI_AUTOSCALE_TARGET)
+    ? clampNumber(QI_AUTOSCALE_TARGET, 1e-6, 1e6)
+    : 0.9;
+  const autoscaleSlewPerS =
+    Number.isFinite(QI_AUTOSCALE_SLEW) ? Math.max(0, QI_AUTOSCALE_SLEW) : 0.25;
+
   if (PUMP_TONE_ENABLE) {
     const cmd = getPumpCommandForQi(stats, { epoch_ms: GLOBAL_PUMP_EPOCH_MS });
     if (cmd) {
-      const autoscaleHalt = state.qiAutoscale?.gating === "no_effect";
       const scaledCmd = applyScaleToPumpCommand(cmd, qiScale, state.qiAutoscale?.clamps) ?? cmd;
       const now = Date.now();
       const hash = hashPumpCommand(scaledCmd);
@@ -3158,32 +3375,43 @@ function updateQiTelemetry(state: EnergyPipelineState) {
       const keepAliveDue = since >= PUMP_CMD_KEEPALIVE_MS;
 
       if ((changed && pastMinInterval) || (keepAliveDue && pastMinInterval)) {
-        if (autoscaleHalt) {
-          console.warn("[QI-autoscale] no_effect halt; skipping pump publish", {
-            zetaRaw: state.qiAutoscale?.rawZeta,
-            scale: state.qiAutoscale?.appliedScale,
-          });
-        } else {
-          publishPumpCommand(scaledCmd);
-        }
+        publishPumpCommand(scaledCmd);
         lastPublishedPumpHash = hash;
         lastPublishedPumpAt = now;
       }
     }
   }
 
-  console.log("[QI-autoscale]", {
-    gating: state.qiAutoscale?.gating ?? "idle",
-    scale: state.qiAutoscale?.appliedScale ?? state.qiAutoscale?.scale ?? 1,
-    target: state.qiAutoscale?.targetZeta ?? autoscaleTarget,
-    zetaRaw: state.qiAutoscale?.rawZeta ?? null,
-    proposedScale: state.qiAutoscale?.proposedScale ?? null,
-    slewLimitedScale: state.qiAutoscale?.slewLimitedScale ?? null,
-    note: state.qiAutoscale?.note ?? null,
-    clamps: Array.isArray(state.qiAutoscale?.clamps)
-      ? (state.qiAutoscale?.clamps ?? []).slice(-2)
-      : [],
-  });
+  if (DEBUG_PIPE) {
+    const qiAutoMin =
+      Number.isFinite(state.qiAutoscale?.minScale) && (state.qiAutoscale?.minScale as number) > 0
+        ? (state.qiAutoscale?.minScale as number)
+        : Number.isFinite(QI_AUTOSCALE_MIN_SCALE)
+        ? (QI_AUTOSCALE_MIN_SCALE as number)
+        : 0.02;
+    const qiAutoSlew =
+      Number.isFinite(state.qiAutoscale?.slewPerSec)
+        ? (state.qiAutoscale?.slewPerSec as number)
+        : Number.isFinite(state.qiAutoscale?.slew)
+        ? (state.qiAutoscale?.slew as number)
+        : autoscaleSlewPerS;
+    console.log("[QI-autoscale]", {
+      gating: state.qiAutoscale?.gating ?? "idle",
+      engaged: state.qiAutoscale?.engaged ?? false,
+      scale: state.qiAutoscale?.appliedScale ?? state.qiAutoscale?.scale ?? 1,
+      proposedScale: state.qiAutoscale?.proposedScale ?? null,
+      target: state.qiAutoscale?.targetZeta ?? autoscaleTarget,
+      slew: qiAutoSlew,
+      floor: qiAutoMin,
+      zetaRaw: state.qiAutoscale?.rawZeta ?? null,
+      sumWindowDt: state.qiAutoscale?.sumWindowDt ?? null,
+      source: state.qiAutoscale?.rhoSource ?? null,
+      note: state.qiAutoscale?.note ?? null,
+      clamps: Array.isArray(state.qiAutoscale?.clamps)
+        ? (state.qiAutoscale?.clamps ?? []).slice(-2)
+        : [],
+    });
+  }
 
   const guardFrac = DEFAULT_QI_SETTINGS.guardBand ?? 0;
   const guardThreshold = Math.abs(stats.bound) * guardFrac;

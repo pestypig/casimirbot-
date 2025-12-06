@@ -28,7 +28,17 @@ const ConstraintResultSchema = z.object({
   rhs: z.number().optional(),
   margin: z.number().nullable().optional(),
   details: z.string().optional(),
+  note: z.string().optional(),
 });
+
+const TsSnapshotSchema = z
+  .object({
+    TS_ratio: z.number().optional(),
+    tauLC_ms: z.number().optional(),
+    tauPulse_ns: z.number().optional(),
+    autoscale: z.record(z.any()).nullable().optional(),
+  })
+  .partial();
 
 const WarpViabilitySnapshotSchema = z
   .object({
@@ -40,8 +50,12 @@ const WarpViabilitySnapshotSchema = z
     M_exotic: z.number().optional(),
     T00_min: z.number().optional(),
     thetaCal: z.number().optional(),
+    sectorPeriod_ms: z.number().optional(),
+    dwell_ms: z.number().optional(),
+    burst_ms: z.number().optional(),
+    ts: TsSnapshotSchema.optional().nullable(),
   })
-  .catchall(z.number().optional());
+  .catchall(z.unknown().optional());
 
 const WarpViabilityPayloadSchema = z.object({
   status: z.enum(["ADMISSIBLE", "MARGINAL", "INADMISSIBLE", "NOT_CERTIFIED"]),

@@ -15,6 +15,8 @@
  *   npx tsx tools/pulsed-power-calculator.ts --label launcher --L-uH 2 --U 200 --tr-us 100 --area-mm2 120 --jc 1.4e9 --json
  */
 
+export {};
+
 type ParsedArgs = {
   label?: string;
   L_H?: number;

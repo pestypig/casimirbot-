@@ -55,6 +55,20 @@ export function QiGuardBadge({ className, onClick, title = "QI" }: QiGuardBadgeP
   const pipelineZetaRaw = pipeline?.zetaRaw;
   const pipelineZeta = pipeline?.zeta;
 
+  const qiAutoscale = (pipeline as any)?.qiAutoscale;
+  const autoscaleScaleRaw = Number(
+    qiAutoscale?.appliedScale ?? qiAutoscale?.scale,
+  );
+  const autoscaleScale =
+    Number.isFinite(autoscaleScaleRaw) && autoscaleScaleRaw > 0
+      ? autoscaleScaleRaw
+      : null;
+  const autoscaleGating = typeof qiAutoscale?.gating === "string" ? qiAutoscale.gating : null;
+  const autoscaleActive = autoscaleGating === "active";
+  const autoscaleTarget = isFiniteNumber((qiAutoscale as any)?.target ?? (qiAutoscale as any)?.targetZeta)
+    ? Number((qiAutoscale as any)?.target ?? (qiAutoscale as any)?.targetZeta)
+    : 0.9;
+
   const zetaForStatus =
     (isFiniteNumber(guardZetaRaw) ? guardZetaRaw : null) ??
     (isFiniteNumber(pipelineZetaRaw) ? pipelineZetaRaw : null) ??
@@ -164,6 +178,23 @@ export function QiGuardBadge({ className, onClick, title = "QI" }: QiGuardBadgeP
           <span style={{ opacity: 0.6, fontVariantNumeric: "tabular-nums" }}>{`window:${windowLabel}`}</span>
           <span style={{ opacity: 0.55, fontVariantNumeric: "tabular-nums" }}>{`sampler:${samplerLabel}`}</span>
           <span style={{ opacity: 0.5, fontVariantNumeric: "tabular-nums" }}>{`d_eff:${dEffLabel}`}</span>
+          {autoscaleActive && autoscaleScale != null ? (
+            <span
+              data-testid="qi-autoscale-chip"
+              style={{
+                color: "#22c55e",
+                opacity: 0.92,
+                fontSize: 11,
+                fontVariantNumeric: "tabular-nums",
+                padding: "2px 8px",
+                borderRadius: 999,
+                background: "rgba(34, 197, 94, 0.12)",
+                border: "1px solid rgba(34, 197, 94, 0.35)",
+              }}
+            >
+              {`Autoscale active (→${autoscaleTarget.toFixed(2)}${autoscaleScale != null ? ` · A=${autoscaleScale.toFixed(2)}` : ""})`}
+            </span>
+          ) : null}
           {dtGuardHint ? (
             <span
               title={dtGuardHint}

@@ -179,6 +179,21 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     if (Number.isFinite(fromLive) && fromLive > 0) return Math.floor(fromLive);
     return 400;
   }, [systemMetrics, live]);
+  const tsTelemetry = (live as any)?.ts ?? null;
+  const tsAutoscaleState =
+    (tsTelemetry as any)?.autoscale ?? (live as any)?.tsAutoscale ?? null;
+  const tsAutoscaleEngaged = Boolean(tsAutoscaleState?.engaged);
+  const tsTarget = useMemo(() => {
+    const target = Number(tsAutoscaleState?.target);
+    if (Number.isFinite(target) && target > 0) return target;
+    const envTarget = Number((live as any)?.TS_target);
+    if (Number.isFinite(envTarget) && envTarget > 0) return envTarget;
+    return 100;
+  }, [tsAutoscaleState, live]);
+  const epsilon = (() => {
+    const e = Number((live as any)?.clocking?.epsilon ?? (live as any)?.averaging?.epsilon);
+    return Number.isFinite(e) ? e : null;
+  })();
   const nearZeroGuards = useMemo(
     () => ({
       q: isFiniteNum((live as any)?.qSpoilingFactor) ? Number((live as any).qSpoilingFactor) : NaN,
@@ -268,7 +283,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     U_cycle: true,
     m_exotic: true,
     P_total: true,
-    TS_ratio: isFiniteNum(TS_ratio) ? TS_ratio > 1 : false
+    TS_ratio: isFiniteNum(TS_ratio) ? TS_ratio >= tsTarget : false
   };
 
   // --- Share derived values globally for other panels (unchanged) ---
@@ -604,10 +619,27 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
               <div className="bg-muted rounded-lg p-4">
                 <div className="text-sm text-muted-foreground">TS = τ_long / τ_LC</div>
                 <div className="font-mono text-lg">{isFiniteNum(TS_ratio) ? TS_ratio.toExponential(2) : "—"}</div>
+                
+
                 <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                  Should be ≫ 1
+
+                  Target ≥ {tsTarget.toFixed(0)}
+
+                  {epsilon !== null ? (
+
+                    <Badge variant="outline">ε={Number(epsilon).toExponential(2)}</Badge>
+
+                  ) : null}
+
+                  <Badge variant={tsAutoscaleEngaged ? "secondary" : "outline"}>
+                    TS autoscale {tsAutoscaleEngaged ? `active (\u2192${tsTarget.toFixed(0)})` : "idle"}
+                  </Badge>
+
                   <StatusIcon ok={validation.TS_ratio} />
+
                 </div>
+
+
               </div>
             </div>
 

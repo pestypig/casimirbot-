@@ -49,6 +49,7 @@ export async function issueWarpViabilityCertificate(config: WarpConfig): Promise
     constraints: viability.constraints,
     snapshot: viability.snapshot,
     citations: viability.citations,
+    mitigation: viability.mitigation,
   };
 
   // 2. Build header and hashes.

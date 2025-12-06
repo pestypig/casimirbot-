@@ -12,6 +12,9 @@ function hashString(s: string): string {
   return crypto.createHash("sha256").update(s, "utf8").digest("hex");
 }
 
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
 export function verifyCertificateIntegrity(cert: WarpViabilityCertificate): boolean {
   const payloadStr = canonicalJson(cert.payload);
   const expectedPayloadHash = hashString(payloadStr);
@@ -52,7 +55,17 @@ export async function recheckWarpViabilityCertificate(cert: WarpViabilityCertifi
   for (const k of keys) {
     const a = (oldSnap as any)[k];
     const b = (newSnap as any)[k];
-    if (a !== b) {
+    const same =
+      a === b ||
+      (a && b && typeof a === "object" && typeof b === "object" && canonicalJson(a) === canonicalJson(b));
+    if (!same) {
+      if (k === "TS_ratio" && isFiniteNumber(a) && isFiniteNumber(b)) {
+        const rel = Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1);
+        if (rel < 0.01) {
+          diffs.push({ field: "warning.ts_ratio_jitter", oldValue: a, newValue: b });
+          continue;
+        }
+      }
       diffs.push({ field: `snapshot.${k}`, oldValue: a, newValue: b });
     }
   }
@@ -86,7 +99,17 @@ export async function recheckWarpViabilityCertificate(cert: WarpViabilityCertifi
     }
   }
 
-  const physicsOk = diffs.length === 0;
+  // mitigation hints
+  if (canonicalJson(cert.payload.mitigation ?? null) !== canonicalJson(fresh.mitigation ?? null)) {
+    diffs.push({
+      field: "mitigation",
+      oldValue: cert.payload.mitigation,
+      newValue: fresh.mitigation,
+    });
+  }
+
+  const nonWarningDiffs = diffs.filter((d) => !String(d.field).startsWith("warning."));
+  const physicsOk = nonWarningDiffs.length === 0;
 
   return { integrityOk, physicsOk, differences: diffs.length ? diffs : undefined };
 }

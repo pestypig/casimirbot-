@@ -16,8 +16,40 @@ export interface QiGuardrail {
   sumWindowDt?: number; // Sigma g*dt check (~1)
 }
 
+export type QiAutoscaleClamp = {
+  kind?: string;
+  before?: number;
+  after?: number;
+  limit?: number;
+  floor?: number;
+  ceiling?: number;
+  perSec?: number;
+  dt_s?: number;
+  toneOmegaHz?: number;
+};
+
+export interface QiAutoscaleTelemetry {
+  enabled?: boolean;
+  target?: number;
+  zetaRaw?: number | null;
+  proposedScale?: number | null;
+  appliedScale?: number | null;
+  scale?: number | null;
+  engaged?: boolean;
+  minScale?: number | null;
+  slew?: number | null;
+  slewPerSec?: number | null;
+  source?: string | null;
+  rhoSource?: string | null;
+  sumWindowDt?: number | null;
+  gating?: string;
+  note?: string | null;
+  clamps?: QiAutoscaleClamp[];
+}
+
 export type PipelineSnapshot = {
   zeta?: number;
   zetaRaw?: number;
   qiGuardrail?: QiGuardrail;
+  qiAutoscale?: QiAutoscaleTelemetry | null;
 };
