@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { evaluateWarpViability } from "./warpViability";
+import { pullSettledSnapshot, type LivePullOpts } from "./liveSnapshot";
 import type { PhysicsCertificateHeader } from "../types/physicsCertificate";
 import type {
   WarpConfig,
@@ -39,9 +40,28 @@ function makeHeader(kind: "warp-viability"): PhysicsCertificateHeader {
   };
 }
 
-export async function issueWarpViabilityCertificate(config: WarpConfig): Promise<WarpViabilityCertificate> {
-  // 1. Compute the viability payload (this runs the live physics).
-  const viability = await evaluateWarpViability(config);
+type CertOpts = {
+  useLiveSnapshot?: boolean;
+  livePull?: LivePullOpts;
+};
+
+const envUseLiveSnapshot = () => {
+  const raw = process.env.WARP_CERT_USE_LIVE ?? process.env.HELIX_CERT_USE_LIVE;
+  if (!raw) return true;
+  return raw !== "0" && raw.toLowerCase() !== "false";
+};
+
+export async function issueWarpViabilityCertificate(
+  config: WarpConfig,
+  opts: CertOpts = {},
+): Promise<WarpViabilityCertificate> {
+  const shouldUseLive = opts.useLiveSnapshot ?? envUseLiveSnapshot();
+  const live = shouldUseLive ? await pullSettledSnapshot(opts.livePull) : null;
+  const viability = await evaluateWarpViability(config, {
+    snapshot: live?.snap,
+    telemetrySource: live ? "pipeline-live" : "solver",
+    telemetryHeaders: live?.meta,
+  });
 
   const payload: WarpViabilityPayload = {
     status: viability.status,

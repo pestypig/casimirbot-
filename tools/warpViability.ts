@@ -13,6 +13,7 @@ import type {
   WarpConfig,
   WarpViabilitySnapshot,
 } from "../types/warpViability";
+import type { PipelineSnapshot } from "../types/pipeline";
 import { findWarpConstraint, loadWarpAgentsConfig, resolveConstraintSeverity } from "../modules/physics/warpAgents";
 
 export type { ConstraintResult, ConstraintSeverity, ViabilityResult, ViabilityStatus, WarpConfig };
@@ -101,7 +102,17 @@ const extractDutyEffective = (state: EnergyPipelineState): number | undefined =>
   return typeof dEff === "number" && Number.isFinite(dEff) ? dEff : undefined;
 };
 
-export async function evaluateWarpViability(config: WarpConfig): Promise<ViabilityResult> {
+type EvaluateOpts = {
+  snapshot?: PipelineSnapshot;
+  telemetrySource?: string;
+  telemetryHeaders?: Record<string, string | number | undefined>;
+};
+
+export async function evaluateWarpViability(
+  config: WarpConfig,
+  opts: EvaluateOpts = {},
+): Promise<ViabilityResult> {
+  const liveSnapshot = opts.snapshot;
   const agentsConfig = await loadWarpAgentsConfig().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to load WARP_AGENTS.md: ${message}`);
@@ -124,7 +135,7 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
   const dutyEffective = extractDutyEffective(pipeline);
   const gammaGeoCubed = Math.pow(pipeline.gammaGeo ?? 0, 3);
   const gammaVdB = (pipeline as any).gammaVanDenBroeck_mass ?? pipeline.gammaVanDenBroeck;
-  const qiGuard = (pipeline as any).qiGuardrail;
+  const qiGuard = (liveSnapshot?.qiGuardrail as any) ?? (pipeline as any).qiGuardrail;
   const modeConfig = MODE_CONFIGS[pipeline.currentMode] as { zeta_max?: number } | undefined;
   const zetaMax = modeConfig?.zeta_max ?? 1;
   const theta = (pipeline as any).thetaCal ?? (pipeline as any).thetaScaleExpected;
@@ -133,34 +144,40 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
     (pipeline as any).warp?.stressEnergyTensor?.T00 ??
     (pipeline as any).stressEnergy?.T00 ??
     (pipeline as any).T00_avg;
-  const rebuildTsTelemetry = (pipe: any) => {
+  const rebuildTsTelemetry = (pipe: any, override?: PipelineSnapshot) => {
     const lc = pipe?.lightCrossing ?? {};
+    const liveTs = override?.ts;
     const tauLC_ms_val = Number.isFinite(lc.tauLC_ms)
       ? Number(lc.tauLC_ms)
       : Number.isFinite(pipe?.tauLC_ms)
       ? Number(pipe.tauLC_ms)
+      : Number.isFinite(liveTs?.tauLC_ms)
+      ? Number(liveTs?.tauLC_ms)
       : undefined;
     const tauPulse_ms_val = Number.isFinite(lc.burst_ms)
       ? Number(lc.burst_ms)
       : Number.isFinite(pipe?.burst_ms)
       ? Number(pipe.burst_ms)
+      : Number.isFinite(liveTs?.tauPulse_ns)
+      ? Number(liveTs?.tauPulse_ns) / 1e6
       : undefined;
     const tauPulse_ns_val =
       Number.isFinite(tauPulse_ms_val) && tauPulse_ms_val !== undefined
         ? tauPulse_ms_val * 1e6
-        : undefined;
-    const telemetry =
-      (pipe as any)?.ts ?? {
-        TS_ratio: (pipe as any)?.TS_ratio,
-        tauLC_ms: tauLC_ms_val,
-        tauPulse_ns: tauPulse_ns_val,
-        autoscale: (pipe as any)?.tsAutoscale,
-      };
+      : undefined;
+    const baseTelemetry = (pipe as any)?.ts ?? {};
+    const telemetry = {
+      ...baseTelemetry,
+      TS_ratio: liveTs?.ratio ?? baseTelemetry?.TS_ratio ?? (pipe as any)?.TS_ratio,
+      tauLC_ms: liveTs?.tauLC_ms ?? baseTelemetry?.tauLC_ms ?? tauLC_ms_val,
+      tauPulse_ns: liveTs?.tauPulse_ns ?? baseTelemetry?.tauPulse_ns ?? tauPulse_ns_val,
+      autoscale: liveTs?.autoscale ?? baseTelemetry?.autoscale ?? (pipe as any)?.tsAutoscale,
+    };
     return { telemetry, lc, tauLC_ms: tauLC_ms_val, tauPulse_ms: tauPulse_ms_val };
   };
 
-  const deriveTsParts = (pipe: any) => {
-    const { telemetry, lc, tauLC_ms, tauPulse_ms } = rebuildTsTelemetry(pipe);
+  const deriveTsParts = (pipe: any, override?: PipelineSnapshot) => {
+    const { telemetry, lc, tauLC_ms, tauPulse_ms } = rebuildTsTelemetry(pipe, override);
     const tauLC_s =
       Number.isFinite(telemetry?.tauLC_ms) && (telemetry as any).tauLC_ms > 0
         ? ((telemetry as any).tauLC_ms as number) / 1000
@@ -169,7 +186,7 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
         : undefined;
     const tauPulse_s =
       Number.isFinite(telemetry?.tauPulse_ns) && (telemetry as any).tauPulse_ns > 0
-        ? ((telemetry as any).tauPulse_ns as number) / 1e9
+      ? ((telemetry as any).tauPulse_ns as number) / 1e9
         : Number.isFinite(tauPulse_ms) && (tauPulse_ms as number) > 0
         ? (tauPulse_ms as number) / 1000
         : undefined;
@@ -179,7 +196,7 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
         : Number.isFinite(tauLC_ms) && (tauLC_ms as number) > 0
         ? (tauLC_ms as number) * 1e6
         : undefined;
-    const tsAutoscale = (pipe as any).tsAutoscale ?? (telemetry as any).autoscale;
+    const tsAutoscale = liveSnapshot?.ts?.autoscale ?? (pipe as any).tsAutoscale ?? (telemetry as any).autoscale;
     const appliedBurst_ns =
       Number.isFinite((tsAutoscale as any)?.appliedBurst_ns) && (tsAutoscale as any).appliedBurst_ns > 0
         ? Number((tsAutoscale as any).appliedBurst_ns)
@@ -196,7 +213,8 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
         ? (tauLC_ns as number) / (appliedBurst_ns as number)
         : undefined;
 
-    const tsValue = tsFromRatio ?? tsFromTimes ?? pipeline.TS_ratio;
+    const tsOverride = Number.isFinite(liveSnapshot?.ts?.ratio) ? Number(liveSnapshot?.ts?.ratio) : undefined;
+    const tsValue = tsOverride ?? tsFromRatio ?? tsFromTimes ?? pipeline.TS_ratio;
 
     return {
       telemetry,
@@ -213,7 +231,7 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
     };
   };
 
-  let tsParts = deriveTsParts(pipeline);
+  let tsParts = deriveTsParts(pipeline, liveSnapshot);
   let tsAutoscale = tsParts.tsAutoscale;
   const tsAutoscaleEngagedInitial = Boolean((tsAutoscale as any)?.engaged);
   const tsAutoscaleGatingInitial = (tsAutoscale as any)?.gating ?? "idle";
@@ -225,7 +243,7 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
   while (tsAutoscaleEngagedInitial && (tsAutoscale as any)?.gating === "active" && resampleCount < 2) {
     await sleep(settleWaitMs);
     pipeline = await calculateEnergyPipeline(pipeline);
-    tsParts = deriveTsParts(pipeline);
+    tsParts = deriveTsParts(pipeline, liveSnapshot);
     tsAutoscale = tsParts.tsAutoscale;
     resampleCount += 1;
     if ((tsAutoscale as any)?.gating !== "active") break;
@@ -236,7 +254,12 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
     tsAutoscaleGating === "active"
       ? tsParts.tsFromRatio ?? tsParts.tsFromApplied ?? tsParts.tsFromTimes ?? pipeline.TS_ratio
       : tsParts.tsFromRatio ?? tsParts.tsFromTimes ?? tsParts.tsFromApplied ?? pipeline.TS_ratio;
-  const TS = Number.isFinite(tsResolved) ? (tsResolved as number) : pipeline.TS_ratio;
+  const tsOverride = Number.isFinite(liveSnapshot?.ts?.ratio) ? Number(liveSnapshot?.ts?.ratio) : undefined;
+  const TS = Number.isFinite(tsOverride)
+    ? (tsOverride as number)
+    : Number.isFinite(tsResolved)
+    ? (tsResolved as number)
+    : pipeline.TS_ratio;
   const tsAutoscaleResampled =
     tsAutoscaleEngagedInitial && tsAutoscaleGatingInitial === "active" && resampleCount > 0;
   const tsTelemetry = tsParts.telemetry;
@@ -266,6 +289,8 @@ export async function evaluateWarpViability(config: WarpConfig): Promise<Viabili
     dwell_ms: Number.isFinite(lightCrossing.dwell_ms) ? Number(lightCrossing.dwell_ms) : undefined,
     burst_ms: Number.isFinite(tauPulse_ms) ? Number(tauPulse_ms) : undefined,
     ts: tsTelemetry,
+    telemetrySource: liveSnapshot ? opts.telemetrySource ?? "pipeline-live" : opts.telemetrySource ?? "solver",
+    pipelineHeaders: opts.telemetryHeaders,
   };
 
   const results: ConstraintResult[] = [];

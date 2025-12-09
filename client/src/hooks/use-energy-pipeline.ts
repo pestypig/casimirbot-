@@ -192,6 +192,8 @@ export interface EnergyPipelineState {
   warp?: unknown;
   stressEnergy?: unknown;
   P_avg_W?: number;             // alias for power in watts
+  busVoltage_kV?: number;       // ship HV bus setpoint (per-mode policy)
+  busCurrent_A?: number;        // derived ship-side bus current
   qi?: QiStats;
   qiBadge?: "ok" | "near" | "violation";
   qiInterest?: QuantumInterestBook | null;

@@ -9,9 +9,11 @@ type Heatmap = {
   height: number;
   min: number;
   max: number;
+  timeHorizon_s?: number;
+  tauLC_s?: number;
 };
 
-type DemoConfig = {
+type HeatmapConfig = {
   logScale: boolean;
   overlayBand: boolean;
 };
@@ -27,12 +29,20 @@ type PhoenixInputs = {
   dutyEffective: number;
   geometryGain: number;
   powerDensityBase: number;
-  powerDensityWiggle: number;
   hullLength_m: number;
   wallThickness_m: number;
-  sectorBeatHz: number;
-  focalSigmaFrac: number;
-  focalDriftFrac: number;
+  sectorCount?: number;
+  sectorsConcurrent?: number;
+  tauLC_s?: number;
+  burst_s?: number;
+  dwell_s?: number;
+  sectorPeriod_s?: number;
+  tsRatio?: number;
+  activeTiles?: number;
+  totalTiles?: number;
+  tileArea_m2?: number;
+  hullArea_m2?: number;
+  autoscaleGating?: string | null;
 };
 
 type PhoenixInputRow = {
@@ -44,7 +54,19 @@ type PhoenixInputRow = {
   fallback?: boolean;
 };
 
-type PhoenixInputsBundle = { inputs: PhoenixInputs; rows: PhoenixInputRow[] };
+type PhoenixLiveFlags = {
+  tauLC: boolean;
+  burst: boolean;
+  dwell: boolean;
+  sectorPeriod: boolean;
+  tsRatio: boolean;
+  powerDensity: boolean;
+  sectorTiming: boolean;
+  autoscaleGating?: string | null;
+  shellLive: boolean;
+};
+
+type PhoenixInputsBundle = { inputs: PhoenixInputs; rows: PhoenixInputRow[]; live: PhoenixLiveFlags };
 
 type CavitySpectrum = {
   wavelengths: Float64Array;
@@ -65,7 +87,7 @@ function PhoenixNeedlePanelInner() {
   const spectrum = useMemo(() => buildCavityFilter(pipeline), [pipeline]);
   const shell = useMemo(() => buildHullShell(pipeline), [pipeline]);
   const heatmaps = useMemo(
-    () => buildDemoHeatmaps({ logScale, overlayBand }, phoenixInputs.inputs),
+    () => buildHeatmaps({ logScale, overlayBand }, phoenixInputs.inputs),
     [logScale, overlayBand, phoenixInputs.inputs],
   );
 
@@ -109,6 +131,9 @@ function PhoenixNeedlePanelInner() {
             Show Phoenix band hint (light-crossing averaging band)
           </label>
         </div>
+        <div className="mt-1">
+          <LiveStatusBadge live={phoenixInputs.live} />
+        </div>
       </header>
 
       <div className="grid flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-2">
@@ -116,14 +141,35 @@ function PhoenixNeedlePanelInner() {
           title="Worldline strip (x vs ship time)"
           subtitle="Each pixel is kappa_drive (curvature proxy) averaged over one local L/c window."
         >
-          <HeatmapCanvas heatmap={heatmaps.worldline} overlayBand={overlayBand} />
+          <HeatmapCanvas
+            heatmap={heatmaps.worldline}
+            overlayBand={overlayBand}
+            overlayDuty={
+              phoenixInputs.inputs.burst_s && phoenixInputs.inputs.sectorPeriod_s
+                ? phoenixInputs.inputs.burst_s / Math.max(1e-6, phoenixInputs.inputs.sectorPeriod_s)
+                : phoenixInputs.inputs.dutyEffective
+            }
+            coneTau_s={heatmaps.worldline.tauLC_s}
+            timeHorizon_s={heatmaps.worldline.timeHorizon_s}
+          />
           <Legend min={heatmaps.worldline.min} max={heatmaps.worldline.max} logScale={logScale} />
         </PanelCard>
         <PanelCard
           title="Spacetime slice with tile band"
           subtitle="Activation band shaded; cones imply causal smear (light-cone reach inside the Phoenix window)."
         >
-          <HeatmapCanvas heatmap={heatmaps.spacetime} overlayBand={overlayBand} withCones />
+          <HeatmapCanvas
+            heatmap={heatmaps.spacetime}
+            overlayBand={overlayBand}
+            overlayDuty={
+              phoenixInputs.inputs.burst_s && phoenixInputs.inputs.sectorPeriod_s
+                ? phoenixInputs.inputs.burst_s / Math.max(1e-6, phoenixInputs.inputs.sectorPeriod_s)
+                : phoenixInputs.inputs.dutyEffective
+            }
+            withCones
+            coneTau_s={heatmaps.spacetime.tauLC_s}
+            timeHorizon_s={heatmaps.spacetime.timeHorizon_s}
+          />
           <Legend min={heatmaps.spacetime.min} max={heatmaps.spacetime.max} logScale={logScale} />
         </PanelCard>
       </div>
@@ -230,11 +276,17 @@ function PanelCard({
 function HeatmapCanvas({
   heatmap,
   overlayBand,
+  overlayDuty,
   withCones = false,
+  coneTau_s,
+  timeHorizon_s,
 }: {
   heatmap: Heatmap;
   overlayBand?: boolean;
+  overlayDuty?: number;
   withCones?: boolean;
+  coneTau_s?: number;
+  timeHorizon_s?: number;
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
 
@@ -249,12 +301,12 @@ function HeatmapCanvas({
     ctx.putImageData(img, 0, 0);
     if (overlayBand) {
       ctx.save();
-      ctx.globalAlpha = 0.2;
+      ctx.globalAlpha = 0.24;
       ctx.fillStyle = "#8dd3ff";
-      const band = Math.max(4, Math.floor(height * 0.02));
-      for (let y = 0; y < height; y += Math.max(16, Math.floor(height / 28))) {
-        ctx.fillRect(0, y, width, band);
-      }
+      const frac = overlayDuty != null && Number.isFinite(overlayDuty) ? Math.max(0.01, Math.min(1, overlayDuty)) : 0.02;
+      const band = Math.max(2, Math.floor(height * frac));
+      const y0 = Math.max(0, Math.floor((height - band) / 2));
+      ctx.fillRect(0, y0, width, band);
       ctx.restore();
     }
     if (withCones) {
@@ -262,20 +314,26 @@ function HeatmapCanvas({
       ctx.globalAlpha = 0.22;
       ctx.strokeStyle = "#9ad1ff";
       ctx.lineWidth = 1;
+      const timeSpan = Number.isFinite(timeHorizon_s) ? (timeHorizon_s as number) : 0;
+      const tau = Number.isFinite(coneTau_s) ? (coneTau_s as number) : timeSpan > 0 ? timeSpan / 6 : undefined;
+      const tauFrac =
+        timeSpan > 0 && tau != null ? Math.max(0.02, Math.min(1, tau / Math.max(1e-9, timeSpan))) : 0.18;
+      const yReach = Math.max(4, Math.floor(height * tauFrac));
+      const halfSpan = width * (0.2 + 0.6 * tauFrac);
       const anchors = [Math.round(width * 0.25), Math.round(width * 0.5), Math.round(width * 0.75)];
       for (const x0 of anchors) {
         ctx.beginPath();
         ctx.moveTo(x0, 0);
-        ctx.lineTo(0, x0);
+        ctx.lineTo(Math.max(0, x0 - halfSpan), yReach);
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x0, 0);
-        ctx.lineTo(width, width - x0);
+        ctx.lineTo(Math.min(width, x0 + halfSpan), yReach);
         ctx.stroke();
       }
       ctx.restore();
     }
-  }, [heatmap, overlayBand, withCones]);
+  }, [heatmap, overlayBand, overlayDuty, withCones, coneTau_s, timeHorizon_s]);
 
   return (
     <canvas
@@ -298,26 +356,26 @@ function Legend({ min, max, logScale }: { min: number; max: number; logScale: bo
   );
 }
 
-function buildDemoHeatmaps(cfg: DemoConfig, inputs: PhoenixInputs): { worldline: Heatmap; spacetime: Heatmap } {
-  const times = new Array(T_STEPS).fill(0).map((_, i) => i * DT);
+function buildHeatmaps(cfg: HeatmapConfig, inputs: PhoenixInputs): { worldline: Heatmap; spacetime: Heatmap } {
   const hullLength = inputs.hullLength_m || L_X;
   const xs = new Array(N_X).fill(0).map((_, i) => (i / (N_X - 1)) * hullLength - hullLength / 2);
+  const { times, span } = buildTimeline(inputs);
   const dutyEff = inputs.dutyEffective;
   const geometryGain = inputs.geometryGain;
 
-  const rawGrid = new Float64Array(N_X * T_STEPS);
+  const rawGrid = new Float64Array(xs.length * times.length);
   let write = 0;
   for (let ix = 0; ix < xs.length; ix++) {
     const x = xs[ix];
-    const series = new Float64Array(T_STEPS);
+    const series = new Float64Array(times.length);
     for (let it = 0; it < times.length; it++) {
       series[it] = kappaDrive({
-        powerDensityWPerM2: tileFluxDemo(x, times[it], inputs),
+        powerDensityWPerM2: tileFluxFromPipeline(x, times[it], inputs),
         dutyEffective: dutyEff,
         geometryGain,
       });
     }
-    const tau = tauLCDemo(x, inputs);
+    const tau = tauLCForX(x, inputs);
     const averaged = lightCrossingAverage(series, times, tau);
     for (let it = 0; it < averaged.length; it++) {
       rawGrid[write++] = averaged[it];
@@ -325,39 +383,76 @@ function buildDemoHeatmaps(cfg: DemoConfig, inputs: PhoenixInputs): { worldline:
   }
 
   const norm = normalizeSeries(rawGrid, cfg.logScale);
-  const mask = cfg.overlayBand ? activationMask(xs.length, times.length) : undefined;
-  const worldlineImage = toImage(norm.values, N_X, T_STEPS, mask);
-  const spacetimeImage = toImage(norm.values, N_X, T_STEPS, mask);
+  const mask = cfg.overlayBand ? activationMaskLive(xs, times, inputs) : undefined;
+  const worldlineImage = toImage(norm.values, xs.length, times.length, mask);
+  const spacetimeImage = toImage(norm.values, xs.length, times.length, mask);
+  const tauUsed = inputs.tauLC_s ?? tauLCForX(0, inputs);
 
   return {
     worldline: {
       image: worldlineImage,
-      width: N_X,
-      height: T_STEPS,
+      width: xs.length,
+      height: times.length,
       min: norm.min,
       max: norm.max,
+      timeHorizon_s: span,
+      tauLC_s: tauUsed,
     },
     spacetime: {
       image: spacetimeImage,
-      width: N_X,
-      height: T_STEPS,
+      width: xs.length,
+      height: times.length,
       min: norm.min,
       max: norm.max,
+      timeHorizon_s: span,
+      tauLC_s: tauUsed,
     },
   };
 }
 
-function tileFluxDemo(x: number, t: number, inputs: PhoenixInputs): number {
-  const base = inputs.powerDensityBase * (1 + inputs.powerDensityWiggle * Math.sin(2 * Math.PI * 0.18 * t));
-  const focalSigma = inputs.hullLength_m * inputs.focalSigmaFrac;
-  const focalCenter = inputs.focalDriftFrac * inputs.hullLength_m * Math.sin(0.6 * t);
-  const focal = Math.exp(-Math.pow(x - focalCenter, 2) / (2 * Math.pow(focalSigma, 2)));
-  const sectorBeat = 0.6 + 0.4 * Math.sin(2 * Math.PI * inputs.sectorBeatHz * t + x * 0.002);
-  return Math.max(1e5, base * (1 + 0.5 * focal) * sectorBeat);
+function buildTimeline(inputs: PhoenixInputs): { times: number[]; span: number } {
+  const dwell = inputs.sectorPeriod_s ?? inputs.dwell_s ?? DT;
+  const tau = inputs.tauLC_s ?? tauLCForX(0, inputs);
+  const span = Math.max(dwell * 6, tau * 14, 3);
+  const dt = span / Math.max(1, T_STEPS - 1);
+  const times = new Array(T_STEPS).fill(0).map((_, i) => i * dt);
+  return { times, span };
 }
 
-function tauLCDemo(x: number, inputs: PhoenixInputs): number {
-  const wall = inputs.wallThickness_m * (1 + 0.06 * Math.tanh(Math.abs(x) / (inputs.hullLength_m * 0.3)));
+function tileFluxFromPipeline(x: number, t: number, inputs: PhoenixInputs): number {
+  const base = Math.max(1e3, inputs.powerDensityBase);
+  const sectorCount = Math.max(1, Math.round(inputs.sectorCount ?? 200));
+  const sectorsLive = Math.max(1, Math.round(inputs.sectorsConcurrent ?? 1));
+  const period = Math.max(1e-6, inputs.sectorPeriod_s ?? inputs.dwell_s ?? 1);
+  const burst = Math.max(1e-6, inputs.burst_s ?? period * inputs.dutyEffective);
+  const duty = Math.max(0, Math.min(1, burst / period));
+  const sweep = (t / period) * sectorCount;
+  const sectorHead = ((sweep % sectorCount) + sectorCount) % sectorCount;
+  const burstPhase = sweep - Math.floor(sweep);
+  const onBurst = burstPhase <= duty;
+  const xNorm = clamp01((x + inputs.hullLength_m / 2) / Math.max(1e-9, inputs.hullLength_m));
+  const sectorForX = Math.min(sectorCount - 1, Math.floor(xNorm * sectorCount));
+  let active = false;
+  for (let k = 0; k < sectorsLive; k++) {
+    const idx = (Math.floor(sectorHead) + k) % sectorCount;
+    if (idx === sectorForX) {
+      active = true;
+      break;
+    }
+  }
+  const tileFill =
+    inputs.activeTiles != null && inputs.totalTiles
+      ? clamp01(inputs.activeTiles / Math.max(1, inputs.totalTiles))
+      : undefined;
+  const tileScale = tileFill != null ? lerp(0.35, 1, tileFill) : 1;
+  const tsScale = inputs.tsRatio != null ? clamp01(Math.tanh(inputs.tsRatio / 80)) : 1;
+  const envelope = active && onBurst ? 1 : active ? 0.35 : 0.08;
+  return base * envelope * tileScale * tsScale;
+}
+
+function tauLCForX(x: number, inputs: PhoenixInputs): number {
+  if (inputs.tauLC_s != null) return inputs.tauLC_s;
+  const wall = inputs.wallThickness_m * (1 + 0.06 * Math.tanh(Math.abs(x) / Math.max(1e-9, inputs.hullLength_m * 0.3)));
   return wall / LIGHT_SPEED;
 }
 
@@ -384,15 +479,33 @@ function viridisLite(t: number): [number, number, number] {
   return [r, g, b];
 }
 
-function activationMask(width: number, height: number): Uint8Array {
+function activationMaskLive(xs: number[], times: number[], inputs: PhoenixInputs): Uint8Array {
+  const width = xs.length;
+  const height = times.length;
   const mask = new Uint8Array(width * height);
+  const sectorCount = Math.max(1, Math.round(inputs.sectorCount ?? 200));
+  const sectorsLive = Math.max(1, Math.round(inputs.sectorsConcurrent ?? 1));
+  const period = Math.max(1e-6, inputs.sectorPeriod_s ?? inputs.dwell_s ?? 1);
+  const burst = Math.max(1e-6, inputs.burst_s ?? period * inputs.dutyEffective);
+  const duty = clamp01(burst / period);
   for (let y = 0; y < height; y++) {
-    const t = y / Math.max(1, height - 1);
-    const activeBand = 0.35 + 0.2 * Math.sin(2 * Math.PI * t);
-    for (let x = 0; x < width; x++) {
-      const normalizedX = x / Math.max(1, width - 1);
-      const on = Math.sin(2 * Math.PI * (normalizedX + t)) > activeBand - 0.5;
-      mask[y * width + x] = on ? 255 : 170;
+    const t = times[y];
+    const sweep = (t / period) * sectorCount;
+    const sectorHead = ((sweep % sectorCount) + sectorCount) % sectorCount;
+    const burstPhase = sweep - Math.floor(sweep);
+    const onBurst = burstPhase <= duty;
+    for (let xIdx = 0; xIdx < width; xIdx++) {
+      const xNorm = width > 1 ? xIdx / (width - 1) : 0;
+      const sectorForX = Math.min(sectorCount - 1, Math.floor(xNorm * sectorCount));
+      let active = false;
+      for (let k = 0; k < sectorsLive; k++) {
+        if (((Math.floor(sectorHead) + k) % sectorCount) === sectorForX) {
+          active = true;
+          break;
+        }
+      }
+      const alphaBase = active ? 210 : 150;
+      mask[y * width + xIdx] = onBurst && active ? 255 : alphaBase;
     }
   }
   return mask;
@@ -434,6 +547,37 @@ function PhoenixInputsCard({ rows }: { rows: PhoenixInputRow[] }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function LiveStatusBadge({ live }: { live: PhoenixLiveFlags }) {
+  const liveList = [
+    live.tauLC && "tauLC",
+    (live.burst || live.dwell || live.sectorPeriod) && "burst/dwell",
+    live.sectorTiming && "sector sweep",
+    live.powerDensity && "power",
+    live.tsRatio && "TS_ratio",
+  ].filter(Boolean) as string[];
+  const fallbackList: string[] = [];
+  if (!live.tauLC) fallbackList.push("tauLC");
+  if (!live.burst && !live.dwell && !live.sectorPeriod) fallbackList.push("burst/dwell");
+  if (!live.sectorTiming) fallbackList.push("sector timing");
+  if (!live.powerDensity) fallbackList.push("power density");
+  if (!live.tsRatio) fallbackList.push("TS_ratio");
+  const badgeTone = liveList.length ? "text-emerald-200" : "text-amber-200";
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-200">
+      <span className={`font-semibold ${badgeTone}`}>Live: {liveList.length ? liveList.join(", ") : "none"}</span>
+      {fallbackList.length ? <span className="text-slate-400">Fallback: {fallbackList.join(", ")}</span> : null}
+      {live.autoscaleGating ? (
+        <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-[1px] text-amber-100">
+          TS autoscale {live.autoscaleGating}
+        </span>
+      ) : null}
+      {live.shellLive ? (
+        <span className="rounded border border-sky-500/50 bg-sky-500/10 px-1.5 py-[1px] text-sky-100">shell map</span>
+      ) : null}
     </div>
   );
 }
@@ -487,50 +631,147 @@ function computePhoenixInputs(pipeline?: EnergyPipelineState | null): PhoenixInp
     finiteNumber((p as any).hull?.Lx_m) != null
       ? "hull.Lx_m"
       : finiteNumber((p as any).hull?.a) != null
-        ? "2 × hull.a"
+        ? "2 x hull.a"
         : finiteNumber((p as any).Lx_m) != null
           ? "Lx_m"
           : "fallback 1007 m";
 
-  const powerAvgW =
-    finiteNumber((p as any).P_avg_W) ??
-    finiteNumber((p as any).P_avg);
+  const powerAvgW = finiteNumber((p as any).P_avg_W) ?? finiteNumber((p as any).P_avg);
   const powerSource =
     finiteNumber((p as any).P_avg_W) != null
       ? "P_avg_W"
       : finiteNumber((p as any).P_avg) != null
         ? "P_avg"
-        : "fallback 5e7 W/m²";
+        : "fallback 5e7 W/m2";
+  const powerPerTile =
+    finiteNumber((p as any)?.tiles?.power_W_per_tile) ??
+    finiteNumber((p as any)?.tiles?.power_per_tile_W) ??
+    finiteNumber((p as any)?.tiles?.P_tile_W);
+
+  const lcBlock = (p as any).lightCrossing ?? (p as any).lc ?? (p as any).clocking ?? (p as any).ts;
+  const tauLC_ms =
+    finiteNumber(lcBlock?.tauLC_ms) ??
+    finiteNumber((p as any).tau_LC_ms) ??
+    finiteNumber((p as any).tauLC_ms) ??
+    (lcBlock?.tauLC_ns != null ? finiteNumber(lcBlock.tauLC_ns / 1e6) : undefined);
+  const tauLC_s_live = tauLC_ms != null ? tauLC_ms / 1000 : undefined;
+  const burst_ms =
+    finiteNumber(lcBlock?.burst_ms) ??
+    (lcBlock?.burst_us != null ? finiteNumber(lcBlock.burst_us / 1000) : undefined) ??
+    finiteNumber((p as any).burst_ms);
+  const dwell_ms =
+    finiteNumber(lcBlock?.dwell_ms) ??
+    (lcBlock?.dwell_us != null ? finiteNumber(lcBlock.dwell_us / 1000) : undefined) ??
+    finiteNumber((p as any).dwell_ms);
+  const sectorPeriod_ms = finiteNumber(lcBlock?.sectorPeriod_ms ?? (p as any).sectorPeriod_ms ?? dwell_ms);
+  const sectorCount =
+    finiteNumber((p as any).sectorCount) ??
+    finiteNumber((p as any).sectorsTotal) ??
+    finiteNumber((p as any).sectors) ??
+    finiteNumber((p as any)?.phaseSchedule?.sectorCount);
+  const sectorsConcurrent =
+    finiteNumber((p as any).sectorsConcurrent) ??
+    finiteNumber((p as any).concurrentSectors) ??
+    finiteNumber((p as any)?.phaseSchedule?.sectorsConcurrent) ??
+    finiteNumber((p as any)?.phaseSchedule?.sectorsLive);
+
+  const tsBlock = (p as any).ts ?? (p as any).clocking ?? (p as any).lc ?? (p as any).lightCrossing;
+  const tsRatio = finiteNumber((p as any).TS_ratio ?? tsBlock?.TS_ratio ?? tsBlock?.TS);
+  const autoscaleTelemetry = (tsBlock as any)?.autoscale ?? (p as any)?.tsAutoscale;
+  const autoscaleGating = typeof autoscaleTelemetry?.gating === "string" ? autoscaleTelemetry.gating : undefined;
+  const tauSource =
+    lcBlock?.tauLC_ms != null
+      ? "lightCrossing.tauLC_ms"
+      : (p as any).tau_LC_ms != null
+        ? "tau_LC_ms"
+        : (p as any).tauLC_ms != null
+          ? "tauLC_ms"
+          : lcBlock?.tauLC_ns != null
+            ? "lightCrossing.tauLC_ns"
+            : "wallThickness/c (fallback)";
 
   const tileArea_cm2 = finiteNumber((p as any).tileArea_cm2 ?? (p as any).tiles?.tileArea_cm2);
-  const activeTiles = finiteNumber((p as any).tiles?.active ?? (p as any).tiles?.total);
-  const tileAreaTotal = tileArea_cm2 && activeTiles ? (tileArea_cm2 / 1e4) * activeTiles : undefined;
+  const tileArea_m2 = tileArea_cm2 != null ? tileArea_cm2 / 1e4 : undefined;
+  const activeTiles = finiteNumber((p as any).tiles?.active);
+  const totalTiles = finiteNumber((p as any).tiles?.total);
+  const tileAreaTotal = tileArea_m2 && activeTiles ? tileArea_m2 * activeTiles : undefined;
   const hullArea =
     finiteNumber((p as any).tiles?.hullArea_m2) ??
     ((p as any).hull?.wallWidth_m && (p as any).hull?.Lx_m ? (p as any).hull.wallWidth_m * (p as any).hull.Lx_m : undefined);
   const area = tileAreaTotal ?? hullArea;
   const areaSource =
     tileAreaTotal != null
-      ? "tileArea_cm2 × activeTiles"
+      ? "tileArea_cm2 x activeTiles"
       : hullArea != null
-        ? "hull.wallWidth_m × hullLength"
+        ? "hull.wallWidth_m x hullLength"
         : undefined;
 
-  const powerDensityBase = powerAvgW && area ? powerAvgW / Math.max(1e-6, area) : 5e7;
+  let powerDensityBase = 5e7;
+  let powerDensitySource = "fallback 5e7 W/m2";
+  if (powerPerTile != null && tileArea_m2) {
+    powerDensityBase = powerPerTile / Math.max(1e-9, tileArea_m2);
+    powerDensitySource = "tiles.power_W_per_tile / tileArea";
+  } else if (powerAvgW && area) {
+    powerDensityBase = powerAvgW / Math.max(1e-6, area);
+    powerDensitySource = areaSource ? `${powerSource} / (${areaSource})` : powerSource;
+  } else if (powerAvgW) {
+    powerDensityBase = powerAvgW;
+    powerDensitySource = powerSource;
+  }
 
   const inputs: PhoenixInputs = {
     dutyEffective: Math.max(0, Math.min(1, dutyEffective)),
     geometryGain: Math.max(0, geometryGain),
     powerDensityBase,
-    powerDensityWiggle: 0.3,
     hullLength_m: hullLength,
     wallThickness_m: wallThickness,
-    sectorBeatHz: 0.6,
-    focalSigmaFrac: 0.08,
-    focalDriftFrac: 0.12,
+    sectorCount,
+    sectorsConcurrent,
+    tauLC_s: tauLC_s_live,
+    burst_s: burst_ms != null ? burst_ms / 1000 : undefined,
+    dwell_s: dwell_ms != null ? dwell_ms / 1000 : undefined,
+    sectorPeriod_s: sectorPeriod_ms != null ? sectorPeriod_ms / 1000 : undefined,
+    tsRatio,
+    activeTiles,
+    totalTiles,
+    tileArea_m2,
+    hullArea_m2: hullArea,
+    autoscaleGating: autoscaleGating ?? null,
   };
 
   const rows: PhoenixInputRow[] = [
+    {
+      key: "tauLC",
+      label: "tau_LC (light-crossing)",
+      value: inputs.tauLC_s != null ? inputs.tauLC_s : wallThickness / LIGHT_SPEED,
+      unit: "s",
+      source: tauSource,
+      fallback: inputs.tauLC_s == null,
+    },
+    {
+      key: "burst",
+      label: "Burst window",
+      value: inputs.burst_s != null ? inputs.burst_s : (inputs.dutyEffective || 0) * (inputs.sectorPeriod_s ?? 0),
+      unit: "s",
+      source: burst_ms != null ? "lightCrossing/sector burst_ms" : "derived from duty",
+      fallback: burst_ms == null,
+    },
+    {
+      key: "dwell",
+      label: "Dwell / sector period",
+      value: inputs.sectorPeriod_s ?? inputs.dwell_s ?? 0,
+      unit: "s",
+      source: sectorPeriod_ms != null ? "sectorPeriod_ms" : dwell_ms != null ? "dwell_ms" : "fallback",
+      fallback: sectorPeriod_ms == null && dwell_ms == null,
+    },
+    {
+      key: "tsRatio",
+      label: "TS_ratio",
+      value: inputs.tsRatio ?? 0,
+      unit: "",
+      source: inputs.tsRatio != null ? "pipeline TS_ratio" : "not available",
+      fallback: inputs.tsRatio == null,
+    },
     {
       key: "duty",
       label: "Duty (effective)",
@@ -543,7 +784,7 @@ function computePhoenixInputs(pipeline?: EnergyPipelineState | null): PhoenixInp
       key: "geometryGain",
       label: "Geometry gain",
       value: inputs.geometryGain,
-      unit: "×",
+      unit: "x",
       source: geometrySource,
       fallback: geometrySource.startsWith("fallback"),
     },
@@ -567,18 +808,25 @@ function computePhoenixInputs(pipeline?: EnergyPipelineState | null): PhoenixInp
       key: "powerDensity",
       label: "Base power density",
       value: inputs.powerDensityBase,
-      unit: "W/m²",
-      source:
-        powerSource === "fallback 5e7 W/m²"
-          ? "fallback 5e7 W/m²"
-          : areaSource
-            ? `${powerSource} / (${areaSource})`
-            : powerSource,
-      fallback: powerSource.startsWith("fallback") || !areaSource || inputs.powerDensityBase === 5e7,
+      unit: "W/m2",
+      source: powerDensitySource,
+      fallback: powerDensitySource.startsWith("fallback") || inputs.powerDensityBase === 5e7 || (!area && powerPerTile == null),
     },
   ];
 
-  return { inputs, rows };
+  const live: PhoenixLiveFlags = {
+    tauLC: inputs.tauLC_s != null,
+    burst: burst_ms != null,
+    dwell: dwell_ms != null,
+    sectorPeriod: sectorPeriod_ms != null,
+    tsRatio: inputs.tsRatio != null,
+    powerDensity: !(powerDensitySource.startsWith("fallback") || (!area && powerPerTile == null)),
+    sectorTiming: sectorCount != null || sectorsConcurrent != null,
+    autoscaleGating: inputs.autoscaleGating ?? undefined,
+    shellLive: Boolean((p as any)?.shellMap?.data || (p as any)?.stressEnergy),
+  };
+
+  return { inputs, rows, live };
 }
 
 function finiteNumber(value: unknown): number | undefined {

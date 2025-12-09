@@ -48,6 +48,8 @@ import SweepReplayControls from "@/components/SweepReplayControls";
 import MetricAmplificationPocket from "../components/MetricAmplificationPocket";
 import VacuumContractBadge from "@/components/VacuumContractBadge";
 import DriveGuardsPanel from "@/components/DriveGuardsPanel";
+import PhoenixNeedlePanel from "@/components/PhoenixNeedlePanel";
+import WarpProofPanel from "@/components/WarpProofPanel";
 import DirectionPad from "@/components/DirectionPad";
 import NavPageSection from "@/components/NavPageSection";
 import { LumaWhispersProvider } from "@/lib/luma-whispers";
@@ -2900,47 +2902,50 @@ useEffect(() => {
               })}
             </div>
           </div>
-
           <VacuumContractBadge contract={vacuumContract} className="mb-4" />
 
-        {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">Alcubierre Metric Viewer</h2>
-          <div className="relative">
-            <AlcubierrePanel
-              onCanvasReady={(canvas, overlay, overlayDom) => {
-                setTimeLapseCanvas(canvas ?? null);
-                setTimeLapseOverlayCanvas(overlay ?? null);
-                setTimeLapseOverlayDom(overlayDom ?? null);
-              }}
-              overlayHudEnabled={showSweepHud}
-              onPlanarVizModeChange={handlePlanarVizModeChange}
-              vizIntent={vizIntent}
-            />
-            {(timeLapseRecorder.isRecording || timeLapseRecorder.isProcessing) && (
-              <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-cyan-500/40 bg-slate-950/80 px-3 py-2 shadow-lg">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
-                  {timeLapseRecorder.currentFrame?.segment ?? "Time-Lapse"}
-                </div>
-                <div className="mt-1 whitespace-pre-line font-mono text-[11px] leading-tight text-slate-200">
-                  {(timeLapseRecorder.currentFrame?.overlayText ?? "Preparing telemetry...")
-                    .split(" | ")
-                    .join("\n")}
-                </div>
-                <div className="mt-1 text-[10px] text-slate-400">
-                  {timeLapseRecorder.isProcessing
-                    ? "Finalizing videoâ€¦"
-                    : `Capturing ${Math.round(timeLapseRecorder.progress * 100)}%`}
-                </div>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-2 lg:col-span-2 xl:col-span-2">
+              {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
+              <h2 className="text-lg font-semibold">Alcubierre Metric Viewer</h2>
+              <div className="relative">
+                <AlcubierrePanel
+                  onCanvasReady={(canvas, overlay, overlayDom) => {
+                    setTimeLapseCanvas(canvas ?? null);
+                    setTimeLapseOverlayCanvas(overlay ?? null);
+                    setTimeLapseOverlayDom(overlayDom ?? null);
+                  }}
+                  overlayHudEnabled={showSweepHud}
+                  onPlanarVizModeChange={handlePlanarVizModeChange}
+                  vizIntent={vizIntent}
+                />
+                {(timeLapseRecorder.isRecording || timeLapseRecorder.isProcessing) && (
+                  <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-cyan-500/40 bg-slate-950/80 px-3 py-2 shadow-lg">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                      {timeLapseRecorder.currentFrame?.segment ?? "Time-Lapse"}
+                    </div>
+                    <div className="mt-1 whitespace-pre-line font-mono text-[11px] leading-tight text-slate-200">
+                      {(timeLapseRecorder.currentFrame?.overlayText ?? "Preparing telemetry...")
+                        .split(" | ")
+                        .join("\n")}
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400">
+                      {timeLapseRecorder.isProcessing
+                        ? "Finalizing video…"
+                        : `Capturing ${Math.round(timeLapseRecorder.progress * 100)}%`}
+                    </div>
+                  </div>
+                )}
+                {timeLapseRecorder.status === "error" && timeLapseRecorder.error && (
+                  <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-rose-500/40 bg-slate-950/80 px-3 py-2 text-[11px] text-rose-200">
+                    {timeLapseRecorder.error}
+                  </div>
+                )}
               </div>
-            )}
-            {timeLapseRecorder.status === "error" && timeLapseRecorder.error && (
-              <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-rose-500/40 bg-slate-950/80 px-3 py-2 text-[11px] text-rose-200">
-                {timeLapseRecorder.error}
-              </div>
-            )}
-        </div>
-      </div>
+            </div>
+            <PhoenixNeedlePanel />
+            <WarpProofPanel />
+          </div>
 
           <Card className="mt-4 border border-slate-800 bg-slate-900/60">
             <CardHeader className="pb-2">

@@ -95,7 +95,7 @@ return { normalized: warped.image, mask: warped.mask };
   - Loads selected look for active project.
   - Gauge wizard -> Palette wizard -> Stitch grid -> Export pack.
   - Each action writes an Essence envelope carrying `features.piece.template_id`.
-- Helix entry: add `fashion-lookbook` in `client/src/pages/helix-core.panels.ts` pointing to `client/src/components/essence/FashionLookbook.tsx`. Declare endpoints: `/pieces/:piece/looks`, `/pieces/:piece/normalize`, `/palette`, `/stitchgrid`, `/export-pack`.
+- Helix entry: add `dresscode` in `client/src/pages/helix-core.panels.ts` pointing to `client/src/components/essence/DresscodePanel.tsx`. Use it as the data->drawing drafting board; clip textured looks later.
 
 ## Gauge and stitch mapping
 - User inputs swatch counts: e.g., `40 stitches = 10 cm`, `56 courses = 10 cm`.
@@ -134,4 +134,4 @@ curl -X POST http://localhost:3000/api/fashion/export-pack \
 - Routes: add `server/routes/fashion.ts` mounting `/api/fashion/pieces/:piece/looks` and `/normalize`, plus palette/stitch/export wrappers that stamp piece/template into features. Use `putBlob`, `putEnvelope`, `essenceHub.emit("created")`.
 - Tools: register AGI tool `image.openai.looks` in `server/routes/agi.plan.ts` (mirrors `vision.http.describe` and `luma.generate` pattern).
 - Env: add `IMAGE_LOOKS_MODEL=gpt-image-1` to `.env.example`; rely on `OPENAI_API_KEY`.
-- UI: add `fashion-lookbook` panel and wire the Garment panel; include a gauge helper util to compute NPI/CPI and store in envelopes.
+- UI: add `dresscode` panel and wire the Garment panel; include a gauge helper util to compute NPI/CPI and store in envelopes.

@@ -6,6 +6,7 @@ import {
   Bolt,
   Calculator,
   Circle,
+  ClipboardList,
   Equal,
   Flame,
   Gauge,
@@ -73,6 +74,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "drive-guards": ["I3_geo", "I3_VdB", "Q_cavity", "guard bands", "sector strobing"],
   "warp-ledger": ["km-scale ledger", "warp ledger", "bubble log", "warp km", "ledger bands"],
   "spectrum-tuner": ["spectrum tuner", "FFT", "frequency dial", "harmonics sweep", "waveform tuner"],
+  "experiment-ladder": ["experiment ladder", "casimir", "phoenix", "ford-roman", "natario", "sector gating"],
   "vacuum-gap-heatmap": ["vacuum gap", "Casimir gap", "nm gap map", "heatmap", "gap stress"],
   "star-hydrostatic": ["HR map", "Gamow window", "potato threshold", "polytrope", "stellar ledger"],
   "star-watcher": ["Solar feed", "Coherence overlay", "Motion metrics"],
@@ -83,6 +85,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "near-zero": ["near zero widget", "delta H", "null detection", "near-zero pocket", "anomaly finder"],
   "direction-pad": ["direction pad", "flight director", "vector pad", "nav pad", "pose nudge"],
   "nav-system": ["nav system", "nav pose", "waypoints", "navigation hud", "pose tracking"],
+  "needle-world-roadmap": ["needle roadmap", "partner map", "timeline", "capex", "opex", "world map"],
   "deepmix-solar": ["deep mix solar", "mixing bands", "sector solver", "solar telemetry", "mix heuristics"],
   "solar-globe": ["solar globe", "synoptic globe", "field lines", "magnetogram", "solar surface"],
   "deepmix-sweetspot": ["sweet spot", "deep mix target", "isoline", "mix optimization", "duty sweet spot"],
@@ -107,6 +110,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "sector-legend": ["sector legend", "color legend", "sector key", "legend ring", "sector palette"],
   "sector-roles": ["sector roles", "sector HUD", "role badges", "sector overlay", "role legend"],
   "sweep-replay": ["sweep replay", "sweep telemetry", "recorded sweep", "sweep log", "sweep playback"],
+  "bus-voltage": ["bus voltage", "hv rail", "power policy", "amps", "setpoint"],
   "hull-status": ["runtime ops", "plan b", "runtime policy", "endpoint guard", "queue telemetry"],
   "agi-debate-view": ["AGI debate", "debate SSE", "argument stream", "multi agent debate", "debate dashboard"],
   "agi-essence-console": ["Essence console", "AGI console", "plan execute", "tools logs", "command console"],
@@ -114,7 +118,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "collapse-monitor": ["collapse pressure", "collapse watcher", "coherence gate", "debate collapse", "star collapse"],
   "agi-task-history": ["task history", "AGI trace", "task log", "history queue", "trace timeline"],
   "essence-proposals": ["essence proposals", "proposal queue", "jobs board", "proposal actions", "proposal mgr"],
-  "fashion-lookbook": ["fashion", "garment", "cape", "shirt", "pants", "knit", "palette"],
+  "dresscode": ["dresscode", "pattern", "draft", "garment", "svg", "grid", "clip mask"],
   "stellar-lsr": ["stars", "lsr", "local standard of rest", "catalog", "nav", "stellar"]
 };
 
@@ -181,6 +185,14 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     keywords: ["pulsed power", "i_peak", "worksheet", "needle hull", "blumlein", "pfn"]
   },
   {
+    id: "needle-world-roadmap",
+    title: "Needle World Roadmap",
+    icon: Globe2,
+    loader: lazyPanel(() => import("@/components/NeedleWorldRoadmap")),
+    defaultSize: { w: 1100, h: 720 },
+    defaultPosition: { x: 220, y: 180 }
+  },
+  {
     id: "electron-orbital",
     title: "Electron Orbital Simulator",
     icon: Atom,
@@ -219,6 +231,16 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     keywords: ["warp", "pulsed power", "coil", "pipeline", "hardware"]
   },
   {
+    id: "bus-voltage",
+    title: "Bus Voltage Program",
+    icon: GaugeCircle,
+    loader: lazyPanel(() => import("@/components/BusVoltagePanel")),
+    defaultSize: { w: 920, h: 620 },
+    defaultPosition: { x: 160, y: 80 },
+    endpoints: [API.pipelineGet],
+    keywords: PANEL_KEYWORDS["bus-voltage"]
+  },
+  {
     id: "warp-ledger",
     title: "KM-Scale Warp Ledger",
     icon: ScrollText,
@@ -227,6 +249,15 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 1080, h: 720 },
     defaultPosition: { x: 140, y: 32 },
     endpoints: ["GET /km-scale-warp-ledger"]
+  },
+  {
+    id: "experiment-ladder",
+    title: "Warp Experiment Ladder",
+    icon: ClipboardList,
+    loader: lazyPanel(() => import("@/components/WarpExperimentLadderPanel")),
+    defaultSize: { w: 1120, h: 780 },
+    defaultPosition: { x: 200, y: 140 },
+    endpoints: [API.pipelineGet, API.helixMetrics]
   },
   {
     id: "spectrum-tuner",
@@ -607,19 +638,12 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     pinned: true
   },
   {
-    id: "fashion-lookbook",
-    title: "Fashion Lookbook",
+    id: "dresscode",
+    title: "Dresscode Drafting",
     icon: Sparkles,
-    loader: lazyPanel(() => import("@/components/essence/FashionLookbook")),
-    defaultSize: { w: 1040, h: 820 },
-    defaultPosition: { x: 220, y: 160 },
-    endpoints: [
-      "POST /api/fashion/pieces/:piece/looks",
-      "POST /api/fashion/pieces/:piece/normalize",
-      "POST /api/fashion/palette",
-      "POST /api/fashion/stitchgrid",
-      "POST /api/fashion/export-pack"
-    ]
+    loader: lazyPanel(() => import("@/components/essence/DresscodePanel")),
+    defaultSize: { w: 1120, h: 880 },
+    defaultPosition: { x: 200, y: 140 }
   },
   {
     id: "stellar-lsr",

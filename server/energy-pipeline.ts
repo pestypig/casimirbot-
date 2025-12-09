@@ -597,6 +597,8 @@ export interface EnergyPipelineState {
   dutyEff?: number;
   natario?: any;
   P_avg_W?: number;
+  busVoltage_kV?: number;
+  busCurrent_A?: number;
 
   // Model mode for client consistency
   modelMode?: 'calibrated' | 'raw';
@@ -1581,6 +1583,16 @@ const MODE_POLICY = {
   standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
 } as const;
 
+// Ship HV bus voltage policy (per mode), in kilovolts
+const BUS_VOLTAGE_POLICY_KV = {
+  hover:     17,
+  taxi:      17,
+  nearzero:  17,
+  cruise:    17,
+  emergency: 30,
+  standby:   0,
+} as const;
+
 // Runtime assert in dev to prevent unit confusion
 if (process.env.NODE_ENV !== 'production') {
   const bad = Object.entries(MODE_POLICY)
@@ -1845,6 +1857,8 @@ export function initializePipelineState(): EnergyPipelineState {
     U_cycle: 0,
     P_loss_raw: 0,
     P_avg: 0,
+    busVoltage_kV: 0,
+    busCurrent_A: 0,
     M_exotic: 0,
     M_exotic_raw: 0,
     massCalibration: 1,
@@ -2260,6 +2274,18 @@ export async function calculateEnergyPipeline(
   state.P_loss_raw = Math.abs(state.U_Q) * omega / Q;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
   (state as any).P_avg_W = P_total_W; // W (explicit)
+
+  // Derive HV bus voltage/current from per-mode policy and live power
+  const busMode = (state.currentMode ?? 'hover') as keyof typeof BUS_VOLTAGE_POLICY_KV;
+  const V_bus_kV = BUS_VOLTAGE_POLICY_KV[busMode] ?? BUS_VOLTAGE_POLICY_KV.hover;
+  const P_bus_W = Number.isFinite((state as any).P_avg_W)
+    ? Number((state as any).P_avg_W)
+    : MODE_POLICY[busMode].P_target_W;
+  const I_bus_A = V_bus_kV > 0 ? P_bus_W / (V_bus_kV * 1e3) : 0;
+  state.busVoltage_kV = V_bus_kV;
+  state.busCurrent_A = I_bus_A;
+  (state as any).busVoltage_kV = V_bus_kV;
+  (state as any).busCurrent_A = I_bus_A;
 
   // Expose labeled electrical power for dual-bar dashboards
   (state as any).P_elec_MW = state.P_avg;  // Electrical power (same as P_avg, but clearly labeled)

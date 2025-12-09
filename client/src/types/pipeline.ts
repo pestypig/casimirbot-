@@ -52,4 +52,6 @@ export type PipelineSnapshot = {
   zetaRaw?: number;
   qiGuardrail?: QiGuardrail;
   qiAutoscale?: QiAutoscaleTelemetry | null;
+  busVoltage_kV?: number;
+  busCurrent_A?: number;
 };

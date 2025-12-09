@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { FrontProofsLedger } from "./FrontProofsLedger";
 import { openDocPanel } from "@/lib/docs/openDocPanel";
 
 type PipelineStatus = {
@@ -117,6 +118,9 @@ export default function PipelineProofPanel() {
       </header>
 
       <div className="flex-1 overflow-auto p-5">
+        <div className="mb-4">
+          <FrontProofsLedger />
+        </div>
         <div className="grid gap-4 xl:grid-cols-2">
           <InfoCard title="Pipeline Status" subtitle={status?.capturedAt ? `Captured ${status.capturedAt}` : undefined}>
             {statusError ? (

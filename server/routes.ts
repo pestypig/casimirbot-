@@ -22,6 +22,7 @@ import { ethosRouter } from "./routes/ethos";
 import { helixQiRouter } from "./routes/helix/qi";
 import { warpViabilityRouter } from "./routes/warp-viability";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
+import { vectorizerRouter } from "./routes/vectorizer";
 import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
 import { qiControllerRouter, startQiController } from "./modules/qi/qi-controller.js";
 import { codeLatticeRouter } from "./routes/code-lattice";
@@ -52,6 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/stellar", stellarRouter);
   app.use("/api/ethos", ethosRouter);
   app.use("/api/physics/warp", warpViabilityRouter);
+  app.use("/api/vectorizer", vectorizerRouter);
 
 
   app.use("/api/orchestrator", orchestratorRouter);

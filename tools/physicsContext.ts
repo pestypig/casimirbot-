@@ -29,6 +29,11 @@ export interface AssembledPrompt {
   systemPrompt: string;
   userPrompt: string;
   contextBlocks: ContextBlock[];
+  auditBlocks?: PhysicsAuditBlock[];
+  auditMeta?: {
+    enabled: boolean;
+    reason?: string;
+  };
   citationHints: {
     [blockId: string]: {
       sourcePath: string;
@@ -36,6 +41,14 @@ export interface AssembledPrompt {
       tag: AnchorTag;
     };
   };
+}
+
+export interface PhysicsAuditBlock {
+  id: string;
+  label: string;
+  kind: "audit" | "formula" | "env" | "safety" | "frontier";
+  text: string;
+  source?: string;
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -102,6 +115,11 @@ interface FileCacheEntry {
 
 let fileCache: FileCacheEntry[] | null = null;
 
+const DEFAULT_CHAR_BUDGET = 15_000;
+const DEFAULT_AUDIT_BUDGET = 3_500;
+const DEFAULT_AUDIT_CODE_BUDGET = 4_000;
+const isAuditEnabled = () => String(process.env.PHYSICS_AUDIT_ENABLE ?? "").toLowerCase() === "true";
+
 async function loadAnchors(): Promise<FileCacheEntry[]> {
   if (fileCache) return fileCache;
 
@@ -130,6 +148,12 @@ async function loadAnchors(): Promise<FileCacheEntry[]> {
 
   fileCache = entries;
   return entries;
+}
+
+function parseBudget(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
 }
 
 function collectSlices(
@@ -184,10 +208,11 @@ function collectSlices(
   });
 }
 
-export async function buildPhysicsPrompt(query: string): Promise<AssembledPrompt> {
-  const anchors = await loadAnchors();
-  const queryTokens = tokenize(query).filter((token) => token.length > 2);
-
+async function buildAnchorContext(
+  anchors: FileCacheEntry[],
+  queryTokens: string[],
+  charBudget: number,
+): Promise<{ blocks: ContextBlock[]; citationHints: AssembledPrompt["citationHints"] }> {
   const scored = anchors
     .map((entry) => ({
       entry,
@@ -198,7 +223,6 @@ export async function buildPhysicsPrompt(query: string): Promise<AssembledPrompt
 
   const blocks: ContextBlock[] = [];
   const citationHints: AssembledPrompt["citationHints"] = {};
-  let charBudget = 15_000;
 
   for (const { entry } of scored) {
     if (charBudget <= 0) break;
@@ -219,6 +243,107 @@ export async function buildPhysicsPrompt(query: string): Promise<AssembledPrompt
     }
   }
 
+  return { blocks, citationHints };
+}
+
+type AuditResult = { blocks: PhysicsAuditBlock[]; meta: { enabled: boolean; reason?: string } };
+
+function seedFrontierFromQuery(queryTokens: string[], anchors: FileCacheEntry[]): string[] {
+  const seeds = new Set<string>();
+  for (const token of queryTokens) {
+    for (const entry of anchors) {
+      if (entry.path.toLowerCase().includes(token)) {
+        seeds.add(entry.path);
+      }
+    }
+  }
+  return Array.from(seeds);
+}
+
+function clampText(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return text.slice(0, Math.max(0, limit - 120)) + "\n...[truncated]...";
+}
+
+async function runSubjectAudit(
+  query: string,
+  queryTokens: string[],
+  anchors: FileCacheEntry[],
+  textBudget: number,
+  codeBudget: number,
+): Promise<AuditResult> {
+  if (!isAuditEnabled()) {
+    return { blocks: [], meta: { enabled: false, reason: "PHYSICS_AUDIT_ENABLE is not true" } };
+  }
+
+  const frontier = seedFrontierFromQuery(queryTokens, anchors);
+  if (!frontier.length) {
+    return { blocks: [], meta: { enabled: true, reason: "No frontier seeds derived from query tokens" } };
+  }
+
+  const chosen = frontier.slice(0, 6);
+  let remainingCode = codeBudget;
+  const snippets: string[] = [];
+
+  for (const seed of chosen) {
+    const entry = anchors.find((a) => a.path === seed);
+    if (!entry || remainingCode <= 0) continue;
+    const excerpt = entry.lines.slice(0, 40).join("\n");
+    const clamped = clampText(excerpt, Math.min(remainingCode, 1200));
+    remainingCode -= clamped.length;
+    snippets.push(`[[${seed}]]\n${clamped}`);
+  }
+
+  const auditTextParts = [
+    `Subject query: ${query}`,
+    `Seeds (${chosen.length}/${frontier.length} frontier entries):`,
+    ...chosen.map((p) => `- ${p}`),
+    "",
+    "Code excerpts (non-citable, audit helper only):",
+    clampText(snippets.join("\n\n"), textBudget),
+    "",
+    "Note: This audit summary is deterministic and non-citable; core citations remain tied to anchor slices.",
+  ];
+
+  const block: PhysicsAuditBlock = {
+    id: "audit:subject-frontier",
+    label: "Subject audit frontier (deterministic)",
+    kind: "audit",
+    text: auditTextParts.join("\n"),
+    source: "physicsContext.audit",
+  };
+
+  return { blocks: [block], meta: { enabled: true } };
+}
+
+export async function assemblePhysicsContext(query: string): Promise<{
+  blocks: ContextBlock[];
+  citationHints: AssembledPrompt["citationHints"];
+  auditBlocks: PhysicsAuditBlock[];
+  auditMeta: { enabled: boolean; reason?: string };
+}> {
+  const anchors = await loadAnchors();
+  const queryTokens = tokenize(query).filter((token) => token.length > 2);
+  const charBudget = parseBudget(process.env.PHYSICS_CONTEXT_CHAR_BUDGET, DEFAULT_CHAR_BUDGET);
+
+  const { blocks, citationHints } = await buildAnchorContext(anchors, queryTokens, charBudget);
+
+  const auditTextBudget = parseBudget(process.env.PHYSICS_AUDIT_BUDGET, DEFAULT_AUDIT_BUDGET);
+  const auditCodeBudget = parseBudget(process.env.PHYSICS_AUDIT_CODE_BUDGET, DEFAULT_AUDIT_CODE_BUDGET);
+  const { blocks: auditBlocks, meta: auditMeta } = await runSubjectAudit(
+    query,
+    queryTokens,
+    anchors,
+    auditTextBudget,
+    auditCodeBudget,
+  );
+
+  return { blocks, citationHints, auditBlocks, auditMeta };
+}
+
+export async function buildPhysicsPrompt(query: string): Promise<AssembledPrompt> {
+  const { blocks, citationHints, auditBlocks, auditMeta } = await assemblePhysicsContext(query);
+
   const systemPrompt = [
     "You are a GR/Casimir/warp-bubble copilot grounded to this repository.",
     "You MUST:",
@@ -235,12 +360,27 @@ export async function buildPhysicsPrompt(query: string): Promise<AssembledPrompt
     )
     .join("\n");
 
+  const auditText =
+    auditBlocks && auditBlocks.length
+      ? auditBlocks
+          .map(
+            (block, idx) =>
+              `[[AUDIT ${idx + 1}: ${block.label}]]\n${block.text}\n(Non-citable; derived audit summary)\n`,
+          )
+          .join("\n")
+      : auditMeta?.enabled === false
+      ? `Subject audit: disabled (${auditMeta?.reason ?? "no reason provided"})`
+      : `Subject audit: ${auditMeta?.reason ?? "no additional audit context available."}`;
+
   const userPrompt = [
     "Question:",
     query,
     "",
     "Context blocks (for reference, do not restate verbatim unless needed):",
     contextText,
+    "",
+    "Subject audit blocks (non-citable helper context):",
+    auditText,
     "",
     "When answering:",
     "- Use concise, technical language.",
@@ -252,6 +392,8 @@ export async function buildPhysicsPrompt(query: string): Promise<AssembledPrompt
     systemPrompt,
     userPrompt,
     contextBlocks: blocks,
+    auditBlocks,
+    auditMeta,
     citationHints,
   };
 }
