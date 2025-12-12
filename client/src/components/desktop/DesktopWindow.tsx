@@ -79,6 +79,9 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
   const dragDisabled = Boolean(w?.isMaximized || w?.isFullscreen);
   const [dragging, setDragging] = useState(false);
   const dragSession = useRef<{ lastX: number; lastY: number } | null>(null);
+  const dragFrame = useRef<number | null>(null);
+  const pendingDelta = useRef<{ dx: number; dy: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const [viewport, setViewport] = useState<ViewportMetrics | null>(() => readViewportMetrics());
   const [showFullscreenExitHint, setShowFullscreenExitHint] = useState(false);
   const fullscreenHintTimeoutRef = useRef<number | null>(null);
@@ -234,9 +237,22 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
       const { lastX, lastY } = dragSession.current;
       const dx = event.clientX - lastX;
       const dy = event.clientY - lastY;
-      if (dx || dy) {
-        moveByDelta(id, dx, dy);
-        dragSession.current = { lastX: event.clientX, lastY: event.clientY };
+      if (!dx && !dy) return;
+      // Update pointer immediately to avoid drift; apply move on next animation frame.
+      dragSession.current = { lastX: event.clientX, lastY: event.clientY };
+      const current = pendingDelta.current ?? { dx: 0, dy: 0 };
+      pendingDelta.current = { dx: current.dx + dx, dy: current.dy + dy };
+      setDragOffset((prev) => ({ dx: prev.dx + dx, dy: prev.dy + dy }));
+      if (dragFrame.current === null) {
+        dragFrame.current = requestAnimationFrame(() => {
+          dragFrame.current = null;
+          const delta = pendingDelta.current;
+          pendingDelta.current = null;
+          if (delta && (delta.dx || delta.dy)) {
+            moveByDelta(id, delta.dx, delta.dy);
+            setDragOffset({ dx: 0, dy: 0 });
+          }
+        });
       }
     },
     [id, moveByDelta]
@@ -248,7 +264,17 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
     setDragging(false);
     window.removeEventListener("mousemove", handleDragMove);
     window.removeEventListener("mouseup", handleDragEnd);
-  }, [handleDragMove]);
+    if (dragFrame.current !== null) {
+      cancelAnimationFrame(dragFrame.current);
+      dragFrame.current = null;
+    }
+    const delta = pendingDelta.current;
+    pendingDelta.current = null;
+    if (delta && (delta.dx || delta.dy)) {
+      moveByDelta(id, delta.dx, delta.dy);
+    }
+    setDragOffset({ dx: 0, dy: 0 });
+  }, [handleDragMove, id, moveByDelta]);
 
   const handleDragStart = useCallback(
     (event: React.MouseEvent) => {
@@ -295,6 +321,12 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
     return () => {
       window.removeEventListener("mousemove", handleDragMove);
       window.removeEventListener("mouseup", handleDragEnd);
+      if (dragFrame.current !== null) {
+        cancelAnimationFrame(dragFrame.current);
+        dragFrame.current = null;
+      }
+      pendingDelta.current = null;
+      setDragOffset({ dx: 0, dy: 0 });
     };
   }, [handleDragEnd, handleDragMove]);
 
@@ -344,7 +376,12 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
           style={{ ...style, zIndex: w.z }}
           onMouseDown={() => focus(id)}
           initial={{ x: safePosition.x, y: safePosition.y, scale: 0.98, opacity: 0.95 }}
-          animate={{ x: safePosition.x, y: safePosition.y, scale: 1, opacity: 1 }}
+          animate={{
+            x: safePosition.x + dragOffset.dx,
+            y: safePosition.y + dragOffset.dy,
+            scale: 1,
+            opacity: 1
+          }}
           exit={{ x: safePosition.x, y: safePosition.y, scale: 0.98, opacity: 0.95 }}
           transition={{ type: "spring", stiffness: 320, damping: 28 }}
         >

@@ -12,6 +12,16 @@ const C_M_PER_S = 299_792_458;
 const HELIX_MOCK_NEEDLE_PATH_M = 1007;
 const HELIX_MOCK_TAU_LC_MS = (HELIX_MOCK_NEEDLE_PATH_M / C_M_PER_S) * 1e3;
 
+const RESOURCE_ERR_PATTERNS = [
+  "ERR_INSUFFICIENT_RESOURCES",
+  "ERR_FAILED",
+  "ENOBUFS",
+  "ERR_CONNECTION_RESET",
+];
+const RESOURCE_ERR_WINDOW_MS = 10_000;
+const RESOURCE_ERR_CIRCUIT_MS = 5_000;
+const MAX_FETCH_INFLIGHT = 32;
+
 export const HELIX_DEV_MOCK_EVENT = "helix:dev-mock-used";
 export type DevMockStatus = {
   used: boolean;
@@ -176,6 +186,45 @@ async function throwIfResNotOk(res: Response) {
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
+}
+
+type ResourceErrState = { timestamps: number[]; circuitUntil: number };
+const getResourceErrState = (): ResourceErrState => {
+  const globalState = (globalThis as any).__HELIX_RESOURCE_ERR__ as ResourceErrState | undefined;
+  const fallback: ResourceErrState = { timestamps: [], circuitUntil: 0 };
+  if (globalState && Array.isArray(globalState.timestamps)) {
+    return globalState;
+  }
+  (globalThis as any).__HELIX_RESOURCE_ERR__ = fallback;
+  return fallback;
+};
+
+const isResourceCircuitOpen = (state: ResourceErrState): boolean => state.circuitUntil > Date.now();
+
+const noteResourceError = (state: ResourceErrState, message: string): void => {
+  const now = Date.now();
+  state.timestamps.push(now);
+  const cutoff = now - RESOURCE_ERR_WINDOW_MS;
+  state.timestamps = state.timestamps.filter((t) => t >= cutoff);
+  if (state.timestamps.length >= 3) {
+    state.circuitUntil = now + RESOURCE_ERR_CIRCUIT_MS;
+    // eslint-disable-next-line no-console
+    console.warn("[apiRequest] Circuit open after resource errors:", message);
+  }
+  (globalThis as any).__HELIX_RESOURCE_ERR__ = state;
+};
+
+async function waitForFetchSlot(): Promise<() => void> {
+  const state: { inflight: number } = (globalThis as any).__HELIX_FETCH_SLOTS__ ?? { inflight: 0 };
+  (globalThis as any).__HELIX_FETCH_SLOTS__ = state;
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  while (state.inflight >= MAX_FETCH_INFLIGHT) {
+    await sleep(25);
+  }
+  state.inflight += 1;
+  return () => {
+    state.inflight = Math.max(0, state.inflight - 1);
+  };
 }
 
 export async function apiRequest(
@@ -385,7 +434,17 @@ export async function apiRequest(
     });
   };
 
+  const resourceErrState = getResourceErrState();
+  if (isResourceCircuitOpen(resourceErrState)) {
+    const mocked = makeMock("circuit-open");
+    if (mocked) return mocked;
+    throw new Error("helix-api circuit breaker open after recent resource errors; pausing requests");
+  }
+
+  let releaseSlot: (() => void) | null = null;
   try {
+    releaseSlot = await waitForFetchSlot();
+
     const res = await fetch(url, {
       method,
       headers: data ? { "Content-Type": "application/json" } : {},
@@ -408,9 +467,14 @@ export async function apiRequest(
   } catch (err) {
     // Network or other error: try dev mock
     const message = err instanceof Error ? err.message : String(err);
+    if (RESOURCE_ERR_PATTERNS.some((pat) => message.includes(pat))) {
+      noteResourceError(resourceErrState, message);
+    }
     const mocked = makeMock(message);
     if (mocked) return mocked;
     throw err;
+  } finally {
+    if (releaseSlot) releaseSlot();
   }
 }
 

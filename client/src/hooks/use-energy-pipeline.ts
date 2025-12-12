@@ -1000,15 +1000,19 @@ export function useEnergyPipeline(options?: {
       return json as EnergyPipelineSnapshot;
     },
     select: selectPipelineState,
+    // Keep dev/browser load low when many tabs are open
+    refetchIntervalInBackground: false, // stop polling when tab is hidden
+    gcTime: 5 * 60 * 1000, // let cache be collected after 5 minutes
     refetchInterval: (queryInstance) => {
       if (typeof options?.refetchInterval === "number") {
         return options.refetchInterval;
       }
       const snapshot = queryInstance.state?.data as EnergyPipelineSnapshot | undefined;
       const sweepActive = !!snapshot?.sweep?.active;
-      return sweepActive ? 600 : 1000;
+      // Relax polling to reduce long-lived dev socket pressure; sweep gets modestly faster cadence.
+      return sweepActive ? 1200 : 2500;
     },
-    staleTime: options?.staleTime,
+    staleTime: options?.staleTime ?? 5000,
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
   });
 

@@ -1,6 +1,8 @@
 // @ts-nocheck
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const LOG_SPLASH = true;
 
 function SplashCursor({
   SIM_RESOLUTION = 128,
@@ -18,11 +20,18 @@ function SplashCursor({
   BACK_COLOR = { r: 0.5, g: 0, b: 0 },
   TRANSPARENT = true
 }) {
+  const [retryTick, setRetryTick] = useState(0); // reinit WebGL if context unavailable/lost
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    let retryHandle: number | null = null;
+    const scheduleRetry = (delay = 800) => {
+      if (retryHandle !== null) return;
+      retryHandle = window.setTimeout(() => setRetryTick(v => v + 1), delay);
+    };
 
     function pointerPrototype() {
       this.id = -1;
@@ -61,8 +70,11 @@ function SplashCursor({
 
     const context = getWebGLContext(canvas);
     if (!context) {
-      console.warn('[SplashCursor] WebGL context unavailable; disabling splash cursor.');
-      return undefined;
+      if (LOG_SPLASH) console.warn('[SplashCursor] WebGL context unavailable; retrying...');
+      scheduleRetry();
+      return () => {
+        if (retryHandle !== null) clearTimeout(retryHandle);
+      };
     }
     const { gl, ext } = context;
     if (!ext.supportLinearFiltering) {
@@ -1049,6 +1061,18 @@ function SplashCursor({
       }
     };
 
+    const handleContextLost = e => {
+      e.preventDefault();
+      destroyed = true;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      if (LOG_SPLASH) console.warn('[SplashCursor] WebGL context lost; retrying...');
+      scheduleRetry();
+    };
+
+    canvas.addEventListener('webglcontextlost', handleContextLost, false);
+
     window.addEventListener('mousedown', handleMouseDown);
     document.body.addEventListener('mousemove', handleFirstMouseMove);
     window.addEventListener('mousemove', handleMouseMove);
@@ -1071,10 +1095,13 @@ function SplashCursor({
       window.removeEventListener('touchend', handleTouchEnd);
       document.body.removeEventListener('mousemove', handleFirstMouseMove);
       document.body.removeEventListener('touchstart', handleFirstTouchStart);
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      if (retryHandle !== null) clearTimeout(retryHandle);
       pointers = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    retryTick,
     SIM_RESOLUTION,
     DYE_RESOLUTION,
     CAPTURE_RESOLUTION,
