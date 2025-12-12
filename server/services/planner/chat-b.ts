@@ -3687,6 +3687,9 @@ export function summarizeExecutionResults(results: ExecutionResult[]): string {
     return `Failed at ${failure.id}`;
   }
   const warpGrounding = warpFallback?.grounding;
+  if (warpFallback?.text) {
+    return truncateWithMarker(warpFallback.text, RESULT_SUMMARY_LIMIT);
+  }
   if (warpGrounding?.status) {
     const failingConstraint =
       warpGrounding.constraints?.find((c) => c.passed === false && c.severity === "HARD") ??

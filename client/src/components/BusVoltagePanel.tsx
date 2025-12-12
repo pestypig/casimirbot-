@@ -18,8 +18,8 @@ type ModeKey = "hover" | "taxi" | "nearzero" | "cruise" | "emergency" | "standby
 const BUS_POLICY: Record<ModeKey, { V_bus_kV: number; P_target_W: number; label: string }> = {
   hover:     { V_bus_kV: 17, P_target_W: 83.3e6, label: "hover" },
   taxi:      { V_bus_kV: 17, P_target_W: 83.3e6, label: "taxi" },
-  nearzero:  { V_bus_kV: 17, P_target_W: 83.3e6, label: "nearzero" },
-  cruise:    { V_bus_kV: 17, P_target_W: 83.3e6, label: "cruise" },
+  nearzero:  { V_bus_kV: 17, P_target_W: 5e6,    label: "nearzero" },
+  cruise:    { V_bus_kV: 17, P_target_W: 40e6,   label: "cruise" },
   emergency: { V_bus_kV: 30, P_target_W: 297.5e6, label: "emergency" },
   standby:   { V_bus_kV: 0,  P_target_W: 0,       label: "standby" }
 };
@@ -58,8 +58,6 @@ export default function BusVoltagePanel() {
     const mode = (pipeline?.currentMode ?? "hover") as ModeKey;
     const policy = BUS_POLICY[mode] ?? BUS_POLICY.hover;
     const policyCurrent_A = policy.V_bus_kV > 0 ? policy.P_target_W / (policy.V_bus_kV * 1e3) : 0;
-    const minPowerUseful_W = policy.P_target_W * 0.01; // treat sub-1% as "no signal" and fall back to policy
-    const minCurrentUseful_A = policyCurrent_A * 0.01;
 
     const V_kV = positive(pipeline?.busVoltage_kV) ?? policy.V_bus_kV;
 
@@ -72,19 +70,15 @@ export default function BusVoltagePanel() {
       (() => {
         const I = positive((pipeline as any)?.busCurrent_A);
         return I !== undefined && V_kV > 0 ? I * V_kV * 1e3 : undefined;
-      })() ??
-      positive((pipeline as any)?.P_target_W) ??
-      policy.P_target_W;
+      })();
 
-    const P_W =
-      P_raw_W !== undefined && P_raw_W >= minPowerUseful_W ? P_raw_W : policy.P_target_W;
+    const P_W = P_raw_W ?? policy.P_target_W;
 
     const I_raw_A =
       positive((pipeline as any)?.busCurrent_A) ??
       (V_kV > 0 && P_W > 0 ? P_W / (V_kV * 1e3) : undefined);
 
-    const I_A =
-      I_raw_A !== undefined && I_raw_A >= minCurrentUseful_A ? I_raw_A : policyCurrent_A;
+    const I_A = I_raw_A ?? policyCurrent_A;
 
     return {
       mode,

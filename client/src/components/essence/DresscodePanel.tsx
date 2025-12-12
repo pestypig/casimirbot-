@@ -12,6 +12,14 @@ import {
   type WarpPatternInputs as WarpInputs
 } from "@/lib/essence/warp-patterns";
 import { fetchVectorizerHealth, vectorizeImage, type VectorizeResponse, type VectorizerHealth } from "@/lib/vectorizer-client";
+import {
+  DESIGN_RECIPE_VERSION,
+  type ComplexityBudget,
+  type DesignRecipe,
+  type NeedleSkipRegion,
+  type PreviewHooks,
+  validateDesignRecipe
+} from "@shared/design-recipe";
 
 type Point = [number, number];
 
@@ -1820,6 +1828,15 @@ export default function DresscodePanel() {
   const [meanderParams, setMeanderParams] = useState<MeanderParams>({
     ...(LOOK_LIBRARY[0].meanderDefaults ?? FALLBACK_MEANDER_PARAMS)
   });
+  const [complexityBudget, setComplexityBudget] = useState<ComplexityBudget>({
+    targetMinutes: 60,
+    maxSpecialRegions: 4
+  });
+  const [previewHooks, setPreviewHooks] = useState<PreviewHooks>({
+    apexFiz: { requested: true },
+    knitPaintOnline: { requested: true },
+    knitManager: { requested: false }
+  });
   const [vectorizerHealth, setVectorizerHealth] = useState<VectorizerHealth | null>(null);
   const [vectorizerResult, setVectorizerResult] = useState<VectorizeResponse | null>(null);
   const [vectorizerOutline, setVectorizerOutline] = useState<VectorizerOutline | null>(null);
@@ -1831,6 +1848,56 @@ export default function DresscodePanel() {
     () => LOOK_LIBRARY.find((look) => look.id === selectedId) ?? LOOK_LIBRARY[0],
     [selectedId]
   );
+  const designRecipe = useMemo<DesignRecipe>(() => {
+    const needleSkipRegions: NeedleSkipRegion[] = [];
+    return {
+      version: DESIGN_RECIPE_VERSION,
+      templateId: selectedLook.id,
+      templateName: selectedLook.name,
+      description: selectedLook.description,
+      measurements: selectedLook.measurements,
+      gauge: selectedLook.gauge
+        ? {
+            machine: selectedLook.gauge.machine,
+            gaugeNumber: selectedLook.gauge.gaugeNumber
+          }
+        : undefined,
+      colorPlan: {
+        palette: meanderParams.palette,
+        maxColors: meanderParams.palette.length || undefined
+      },
+      ornament: {
+        meanders: {
+          rule: meanderParams.rule,
+          seedSpacingCm: meanderParams.seedSpacingCm,
+          maxLengthCm: meanderParams.maxLengthCm,
+          bendiness: meanderParams.bendiness,
+          lineThicknessPx: meanderParams.lineThicknessPx,
+          palette: meanderParams.palette,
+          seedEdges: meanderParams.seedEdges,
+          showPatterns,
+          showEdgeMeanders
+        }
+      },
+      structuralDirectives: { needleSkipRegions },
+      complexityBudget,
+      previewHooks,
+      metadata: {
+        gridEvery: selectedLook.gridEvery,
+        marginUnits: selectedLook.marginUnits,
+        scalePxPerUnit: selectedLook.scalePxPerUnit
+      }
+    };
+  }, [complexityBudget, meanderParams, previewHooks, selectedLook, showEdgeMeanders, showPatterns]);
+  const exportSpec = useMemo(
+    () => ({
+      version: DESIGN_RECIPE_VERSION,
+      recipe: designRecipe,
+      look: selectedLook
+    }),
+    [designRecipe, selectedLook]
+  );
+  const recipeIssues = useMemo(() => validateDesignRecipe(designRecipe), [designRecipe]);
 
   useEffect(() => {
     fetchVectorizerHealth()
@@ -1853,6 +1920,15 @@ export default function DresscodePanel() {
       selectedLook.meanderDefaults ? { ...selectedLook.meanderDefaults } : { ...FALLBACK_MEANDER_PARAMS }
     );
   }, [selectedLook.id, selectedLook.meanderDefaults]);
+
+  useEffect(() => {
+    setComplexityBudget({ targetMinutes: 60, maxSpecialRegions: 4 });
+    setPreviewHooks({
+      apexFiz: { requested: true },
+      knitPaintOnline: { requested: true },
+      knitManager: { requested: false }
+    });
+  }, [selectedLook.id]);
 
   const warpInputs = useMemo(() => buildWarpPatternInputs(pipeline), [pipeline]);
   const warpRecipe = useMemo(() => buildPatternRecipe(warpInputs), [warpInputs]);
@@ -2021,12 +2097,12 @@ export default function DresscodePanel() {
 
   const copyJson = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(selectedLook, null, 2));
-      setFeedback(`Copied ${selectedLook.id} data to clipboard`);
+      await navigator.clipboard.writeText(JSON.stringify(exportSpec, null, 2));
+      setFeedback(`Copied ${selectedLook.id} design recipe to clipboard`);
     } catch {
       setFeedback("Could not copy JSON");
     }
-  }, [selectedLook]);
+  }, [exportSpec, selectedLook.id]);
 
   const randomizePalette = useCallback(() => {
     const rand = () => `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0")}`;
@@ -2862,6 +2938,98 @@ export default function DresscodePanel() {
 
       <Card className="bg-slate-900/70 border-slate-800">
         <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Design recipe / Shima handoff</CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            Exports a DesignRecipe (front-end “style receipt”) for KnitPaint / APEXFiz / KnitManager. Not machine code.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-xs text-slate-200">
+          <div className="flex items-center justify-between">
+            <div className="text-slate-300">Recipe version</div>
+            <div className="rounded border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-[11px] text-emerald-200">
+              {DESIGN_RECIPE_VERSION}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300">Target knit time</span>
+              <span className="text-amber-100">{complexityBudget.targetMinutes.toFixed(0)} min</span>
+            </div>
+            <input
+              type="range"
+              min={10}
+              max={180}
+              step={5}
+              value={complexityBudget.targetMinutes}
+              onChange={(e) =>
+                setComplexityBudget((p) => ({
+                  ...p,
+                  targetMinutes: Number(e.target.value)
+                }))
+              }
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300">Max special regions</span>
+              <span className="text-amber-100">{complexityBudget.maxSpecialRegions ?? 0}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={12}
+              step={1}
+              value={complexityBudget.maxSpecialRegions ?? 0}
+              onChange={(e) =>
+                setComplexityBudget((p) => ({
+                  ...p,
+                  maxSpecialRegions: Number(e.target.value)
+                }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-slate-300">Preview / API hooks</div>
+            <div className="flex flex-wrap gap-3">
+              {(["apexFiz", "knitPaintOnline", "knitManager"] as const).map((key) => (
+                <label key={key} className="flex items-center gap-2 rounded border border-slate-700 px-2 py-1">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(previewHooks[key]?.requested)}
+                    onChange={(e) =>
+                      setPreviewHooks((prev) => ({
+                        ...prev,
+                        [key]: { requested: e.target.checked }
+                      }))
+                    }
+                  />
+                  <span className="capitalize text-slate-200">{key === "apexFiz" ? "APEXFiz" : key}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {recipeIssues.length ? (
+            <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-50">
+              <div className="font-semibold text-amber-100">Recipe validation</div>
+              <ul className="list-disc pl-4">
+                {recipeIssues.map((issue, idx) => (
+                  <li key={idx}>
+                    <span className="text-amber-200">{issue.field}</span>: {issue.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="rounded border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-emerald-100">
+              Passes basic recipe checks (template, palette, gauge, time &gt; 0).
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-slate-900/70 border-slate-800">
+        <CardHeader className="pb-2">
           <CardTitle className="text-sm">JSON pattern spec</CardTitle>
           <CardDescription className="text-xs text-slate-500">
             Paste into pipelines or prompts. Each piece has polygon coords + an offset on the layout grid.
@@ -2869,7 +3037,7 @@ export default function DresscodePanel() {
         </CardHeader>
         <CardContent>
           <Textarea
-            value={JSON.stringify(selectedLook, null, 2)}
+            value={JSON.stringify(exportSpec, null, 2)}
             readOnly
             className="font-mono text-xs bg-slate-950 border-slate-800 h-64"
           />

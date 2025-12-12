@@ -63,9 +63,17 @@ export interface MechanicalFeasibility {
   restoringPressure_Pa: number;
   roughnessGuard_nm: number;
   margin_Pa: number;
+  safetyFactorMin?: number;
+  mechSafetyFactor?: number;
+  sigmaYield_Pa?: number;
+  sigmaAllow_Pa?: number;
+  loadPressure_Pa?: number;
+  safetyFeasible?: boolean;
   feasible: boolean;
   strokeFeasible: boolean;
   constrainedGap_nm?: number;
+  casimirGap_nm?: number;
+  modelMode?: 'calibrated' | 'raw';
   unattainable?: boolean;
   note?: string;
   sweep?: Array<{ gap_nm: number; margin_Pa: number; feasible: boolean }>;
@@ -228,6 +236,14 @@ export interface EnergyPipelineState {
 
   // Optional: targets if you want to show them
   P_target_W?: number;
+  P_cap_W?: number;
+  physicsCap_W?: number;
+  P_applied_W?: number;
+  beta_trans_power?: number;
+  beta_policy?: number;
+  shipBeta?: number;
+  vShip_mps?: number;
+  speedClosure?: "policyA" | "proxyB";
   
   // Calculated values
   U_static: number;
@@ -1278,6 +1294,7 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     ...GUARDED_SWEEP_DEFAULTS,
     dutyCycle: 0.12,
     localBurstFrac: 0.0075,
+    powerTarget_W: 5e6,
     qSpoilingFactor: 1,
     envCaps: {
       rho_pad: 0.1,
@@ -1298,7 +1315,7 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     color: "text-cyan-300",
     description: "Coherent 400× sweep; FR duty mostly from averaging",
     ...GUARDED_SWEEP_DEFAULTS,
-    dutyCycle: 0.12,
+    dutyCycle: 0.005,
     powerTarget_W: 40e6,
     qSpoilingFactor: 0.625,
   },
@@ -1306,12 +1323,12 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     name: "Emergency",
     color: "text-rose-300",
     description: "Max response window; fewer averages",
-    dutyCycle: 0.2,
+    dutyCycle: 0.50,
     sectorsTotal: 400,
-    sectorsConcurrent: 2,        // still widens the live window but stays within guarded defaults
-    localBurstFrac: 0.1,         // bigger than hover yet far from continuous
-    powerTarget_W: 120e6,
-    sectorStrobing: 2,
+    sectorsConcurrent: 8,        // aligned with Mk1 emergency posture
+    localBurstFrac: 0.50,        // emergency burst fraction per MODE_POLICY
+    powerTarget_W: 297.5e6,
+    sectorStrobing: 8,
     qSpoilingFactor: 1,
   },
 };

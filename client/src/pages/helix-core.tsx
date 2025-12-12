@@ -50,6 +50,7 @@ import VacuumContractBadge from "@/components/VacuumContractBadge";
 import DriveGuardsPanel from "@/components/DriveGuardsPanel";
 import PhoenixNeedlePanel from "@/components/PhoenixNeedlePanel";
 import WarpProofPanel from "@/components/WarpProofPanel";
+import SpeedCapabilityPanel from "@/components/SpeedCapabilityPanel";
 import DirectionPad from "@/components/DirectionPad";
 import NavPageSection from "@/components/NavPageSection";
 import { LumaWhispersProvider } from "@/lib/luma-whispers";
@@ -125,6 +126,7 @@ const PANEL_HASHES = {
   warpShell: "warp-shell",
   lightSpeed: "light-speed-timeline",
   timeLapse: "time-lapse-demo",
+  speedCapability: "speed-capability",
   driveGuards: "drive-guards",
   energyControl: "energy-control",
   complianceHud: "compliance-hud",
@@ -138,6 +140,9 @@ const HASH_ALIASES: Record<string, string> = {
   "ledger-averaging": PANEL_HASHES.driveGuards,
   "ledger-shift": PANEL_HASHES.driveGuards,
   "ledger-step-b": PANEL_HASHES.driveGuards,
+  "speed": PANEL_HASHES.speedCapability,
+  "speed-capability": PANEL_HASHES.speedCapability,
+  "beta-speed": PANEL_HASHES.speedCapability,
 };
 
 const clampPhaseBiasDeg = (value: number) => {
@@ -2852,6 +2857,14 @@ useEffect(() => {
                   Bridge
                 </Button>
               </Link>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="border-cyan-500 text-cyan-200 hover:bg-cyan-500/10"
+              >
+                <a href={`#${PANEL_HASHES.speedCapability}`}>Speed Capability</a>
+              </Button>
             </div>
           </div>
 
@@ -2945,6 +2958,7 @@ useEffect(() => {
             </div>
             <PhoenixNeedlePanel />
             <WarpProofPanel />
+            <SpeedCapabilityPanel panelHash={PANEL_HASHES.speedCapability} />
           </div>
 
           <Card className="mt-4 border border-slate-800 bg-slate-900/60">
@@ -4904,12 +4918,6 @@ useEffect(() => {
     </LumaWhispersProvider>
   );
 }
-
-
-
-
-
-
 
 
 

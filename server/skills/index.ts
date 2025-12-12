@@ -10,6 +10,10 @@ export function getTool(name: string): Tool | undefined {
   return REGISTRY.get(name);
 }
 
+export function unregisterTool(name: string): void {
+  REGISTRY.delete(name);
+}
+
 export function listTools(): ToolManifestEntry[] {
   return [...REGISTRY.values()].map((tool) => ({
     name: tool.name,

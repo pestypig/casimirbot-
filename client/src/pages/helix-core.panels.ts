@@ -98,6 +98,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "operational-mode": ["operational mode", "station vs desktop", "mode toggle", "profile switch", "mission view"],
   "casimir-tile-grid": ["Casimir tile grid", "tile spectrum", "grid view", "tile ledger", "Casimir tiles"],
   "light-speed-strobe": ["light speed strobe", "c strobe", "strobes", "speed scale", "strobe ladder"],
+  "speed-capability": ["speed capability", "beta", "v/c", "translation speed", "power envelope", "mode envelope"],
   "helix-casimir-amplifier": ["Helix amplifier", "Casimir amplifier", "gain stack", "amplifier tile", "Casimir gain"],
   "resonance-scheduler": ["resonance scheduler", "duty planner", "phase scheduler", "auto duty", "resonance bands"],
   "trip-player": ["trip player", "timeline playback", "recording", "session replay", "trip log"],
@@ -462,6 +463,15 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 740, h: 520 },
     defaultPosition: { x: 420, y: 540 },
     endpoints: [API.pipelineGet, API.helixMetrics]
+  },
+  {
+    id: "speed-capability",
+    title: "Speed Capability",
+    icon: Gauge,
+    loader: lazyPanel(() => import("@/components/SpeedCapabilityPanel")),
+    defaultSize: { w: 780, h: 520 },
+    defaultPosition: { x: 220, y: 160 },
+    endpoints: [API.pipelineGet]
   },
   {
     id: "helix-casimir-amplifier",

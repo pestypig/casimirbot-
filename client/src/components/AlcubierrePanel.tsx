@@ -161,7 +161,7 @@ const hullVizFromVolumeMode = (mode: VolumeViz): Hull3DVolumeViz => {
 
 // Resolve beta from live pipeline or reasonable mode defaults
 function resolveBeta(live: any): number {
-  const cands = [Number(live?.shipBeta), Number(live?.vShip), Number(live?.beta)];
+  const cands = [Number(live?.shipBeta), Number(live?.beta_avg), Number(live?.vShip), Number(live?.beta)];
   for (const v of cands) {
     if (Number.isFinite(v) && Math.abs(v as number) > 1e-6) {
       const b = Math.max(0, Math.min(0.99, v as number));
@@ -4236,7 +4236,6 @@ const res = 256;
   </CurvatureVoxProvider>
   );
 }
-
 
 
 

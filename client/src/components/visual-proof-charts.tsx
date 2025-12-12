@@ -117,7 +117,7 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
   const powerTargetW =
     isFiniteNumber(serverCons?.P_target_W) ? (serverCons.P_target_W as number) :
     mode === "hover"     ? 83.3e6  :
-    mode === "cruise"    ? 7.4e6   : // fixed units (previously 7.437)
+    mode === "cruise"    ? 40e6    : // Mk1 cruise policy
     mode === "emergency" ? 297.5e6 :
     mode === "standby"   ? 0       :
     num(targets.powerTarget, 83e6);

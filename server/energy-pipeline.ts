@@ -415,15 +415,23 @@ export interface MechanicalFeasibility {
   requestedStroke_pm: number;
   recommendedGap_nm: number;
   minGap_nm: number;
+  safetyFactorMin: number;
+  mechSafetyFactor: number;
+  sigmaYield_Pa: number;
+  sigmaAllow_Pa: number;
+  loadPressure_Pa: number;
   maxStroke_pm: number;
   casimirPressure_Pa: number;
   electrostaticPressure_Pa: number;
   restoringPressure_Pa: number;
   roughnessGuard_nm: number;
   margin_Pa: number;
+  safetyFeasible: boolean;
   feasible: boolean;
   strokeFeasible: boolean;
   constrainedGap_nm?: number;
+  casimirGap_nm?: number;
+  modelMode?: 'calibrated' | 'raw';
   unattainable?: boolean;
   note?: string;
   sweep?: Array<{ gap_nm: number; margin_Pa: number; feasible: boolean }>;
@@ -513,6 +521,16 @@ export interface EnergyPipelineState {
   U_cycle: number;          // Duty-cycled energy
   P_loss_raw: number;       // Raw power loss per tile
   P_avg: number;            // Average power (throttled)
+  P_target_W?: number;      // Mode policy target (ship-average, W)
+  P_cap_W?: number;         // Mode policy cap (ship-average, W)
+  physicsCap_W?: number;    // Ship-average cap at q_mech=1 (no policy cap)
+  P_applied_W?: number;     // Applied ship-average power after caps/guards (W)
+  // Speed/beta closure (derived)
+  beta_trans_power?: number; // Power throttle fraction (0..1)
+  beta_policy?: number;      // β from policy throttle
+  shipBeta?: number;         // Effective β (v/c proxy)
+  vShip_mps?: number;        // Outside-frame coordinate speed
+  speedClosure?: 'policyA' | 'proxyB';
   M_exotic: number;         // Exotic mass generated
   M_exotic_raw: number;     // Raw physics exotic mass (before calibration)
   massCalibration: number;  // Mass calibration factor
@@ -663,6 +681,14 @@ const MECH_ROUGHNESS_RMS_NM = parseEnvNumber(process.env.MECH_ROUGHNESS_RMS_NM, 
 const MECH_ROUGHNESS_SIGMA = parseEnvNumber(process.env.MECH_ROUGHNESS_SIGMA, 5); // 5σ separation guard
 const MECH_PATCH_V_RMS = parseEnvNumber(process.env.MECH_PATCH_V_RMS, 0.05); // volts (50 mV patch noise)
 const MECH_GAP_SWEEP = { min_nm: 0.5, max_nm: 200, step_nm: 0.5 } as const;
+const MECH_SPAN_SCALE_RAW = parseEnvNumber(process.env.MECH_SPAN_SCALE_RAW, 0.2); // compress effective span to represent ribbed sub-tiles (raw)
+const MECH_SPAN_SCALE_CAL = parseEnvNumber(process.env.MECH_SPAN_SCALE_CAL, 1);   // calibrated keeps full tile span
+const MECH_TILE_THICKNESS_RAW_M = parseEnvNumber(process.env.MECH_TILE_THICKNESS_RAW_M, 0.004); // 4 mm diamond backbone
+const MECH_ELASTIC_MODULUS_RAW_PA = parseEnvNumber(process.env.MECH_YOUNG_MODULUS_RAW_PA, 900e9); // diamond-class stiffness for raw
+const MECH_YIELD_STRESS_PA = parseEnvNumber(process.env.MECH_YIELD_STRESS_PA, 60e9); // CNT/DNT frame design target
+const MECH_SAFETY_FACTOR_DESIGN = parseEnvNumber(process.env.MECH_SAFETY_FACTOR_DESIGN ?? process.env.MECH_SAFETY_FACTOR, 10);
+const MECH_SAFETY_MIN_RAW = parseEnvNumber(process.env.MECH_SAFETY_MIN_RAW, 3);
+const MECH_SAFETY_MIN_CAL = parseEnvNumber(process.env.MECH_SAFETY_MIN_CAL, 1);
 
 const ACTIVE_SLEW_LIMITS = {
   gaps: 12,
@@ -873,6 +899,12 @@ function dedupeNumericList(values: number[], digits = 4): number[] {
 function mechanicalFeasibility(
   state: EnergyPipelineState,
   tileArea_m2: number,
+  safetyFactorMin: number,
+  opts?: {
+    elasticModulus_Pa?: number;
+    thickness_m?: number;
+    spanScale?: number;
+  },
 ): MechanicalFeasibility {
   const requestedGap_nm = Number.isFinite(state.gap_nm) ? Number(state.gap_nm) : 1;
   const requestedStroke_pm = Number.isFinite((state as any).strokeAmplitude_pm)
@@ -884,49 +916,84 @@ function mechanicalFeasibility(
         : 0;
 
   const area_m2 = Math.max(1e-9, tileArea_m2);
-  const span_m = Math.sqrt(area_m2); // treat tile as square plate for stiffness budget
-  const gap_m = Math.max(1e-12, requestedGap_nm * NM_TO_M);
+  const spanScale = Number.isFinite(opts?.spanScale) ? Math.max(1e-3, opts!.spanScale as number) : 1;
+  const span_m = Math.sqrt(area_m2) * spanScale; // treat tile as square plate for stiffness budget
   const stroke_m = Math.max(0, requestedStroke_pm * 1e-12);
   const roughnessGuard_nm = Math.max(0, MECH_ROUGHNESS_RMS_NM * MECH_ROUGHNESS_SIGMA);
   const roughnessGuard_m = roughnessGuard_nm * NM_TO_M;
 
+  const thickness_m = Number.isFinite(opts?.thickness_m) ? Math.max(1e-9, opts!.thickness_m as number) : MECH_TILE_THICKNESS_M;
+  const elasticModulus_Pa = Number.isFinite(opts?.elasticModulus_Pa)
+    ? Math.max(1e6, opts!.elasticModulus_Pa as number)
+    : MECH_ELASTIC_MODULUS_PA;
   const D =
-    MECH_ELASTIC_MODULUS_PA *
-    Math.pow(Math.max(1e-9, MECH_TILE_THICKNESS_M), 3) /
+    elasticModulus_Pa *
+    Math.pow(Math.max(1e-9, thickness_m), 3) /
     (12 * (1 - MECH_POISSON * MECH_POISSON));
 
-  const casimirPressure_Pa = (Math.PI * Math.PI * HBAR_C) / (240 * Math.pow(gap_m, 4));
-  const electrostaticPressure_Pa = 0.5 * EPSILON_0 * Math.pow(MECH_PATCH_V_RMS / gap_m, 2);
-  const totalLoad_Pa = casimirPressure_Pa + electrostaticPressure_Pa;
+  const sigmaAllow_Pa = MECH_YIELD_STRESS_PA / Math.max(1e-6, MECH_SAFETY_FACTOR_DESIGN);
+  const safetyFloor = Math.max(1e-6, safetyFactorMin);
 
-  const clearance_m = Math.max(0, gap_m - roughnessGuard_m - stroke_m);
-  const restoringPressure_Pa =
-    clearance_m > 0 && D > 0
-      ? (D * clearance_m) / (MECH_DEFLECTION_COEFF * Math.pow(span_m, 4))
-      : 0;
-  const margin_Pa = restoringPressure_Pa - totalLoad_Pa;
+  const calcForGap = (gap_nm: number) => {
+    const gap_m = Math.max(1e-12, gap_nm * NM_TO_M);
+    const casimirPressure_Pa = (Math.PI * Math.PI * HBAR_C) / (240 * Math.pow(gap_m, 4));
+    const electrostaticPressure_Pa = 0.5 * EPSILON_0 * Math.pow(MECH_PATCH_V_RMS / gap_m, 2);
+    const totalLoad_Pa = casimirPressure_Pa + electrostaticPressure_Pa;
+    const mechSafetyFactor = sigmaAllow_Pa / Math.max(totalLoad_Pa, 1e-12);
+    const safetyFeasible = mechSafetyFactor >= safetyFloor;
 
-  const deflectionForLoad_m =
-    (totalLoad_Pa * MECH_DEFLECTION_COEFF * Math.pow(span_m, 4)) / Math.max(D, 1e-30);
-  const strokeBudget_m = Math.max(0, gap_m - roughnessGuard_m - deflectionForLoad_m);
-  const maxStroke_pm = strokeBudget_m * 1e12;
-  const strokeFeasible = requestedStroke_pm <= maxStroke_pm + 1e-9;
+    const clearance_m = Math.max(0, gap_m - roughnessGuard_m - stroke_m);
+    const restoringPressure_Pa =
+      clearance_m > 0 && D > 0
+        ? (D * clearance_m) / (MECH_DEFLECTION_COEFF * Math.pow(span_m, 4))
+        : 0;
+    const margin_Pa = restoringPressure_Pa - totalLoad_Pa;
+
+    const deflectionForLoad_m =
+      (totalLoad_Pa * MECH_DEFLECTION_COEFF * Math.pow(span_m, 4)) / Math.max(D, 1e-30);
+    const strokeBudget_m = Math.max(0, gap_m - roughnessGuard_m - deflectionForLoad_m);
+    const maxStroke_pm = strokeBudget_m * 1e12;
+    const strokeFeasible = requestedStroke_pm <= maxStroke_pm + 1e-9;
+
+    let note: string | undefined;
+    if (!safetyFeasible) {
+      note = "Casimir load exceeds allowable stress budget";
+    } else if (clearance_m <= 0) {
+      note = "Stroke + roughness exceed available gap";
+    } else if (margin_Pa <= 0) {
+      note = "Restoring stiffness is below Casimir + patch load";
+    } else if (!strokeFeasible) {
+      note = "Commanded stroke exceeds stiffness budget";
+    }
+
+    const feasible = clearance_m > 0 && safetyFeasible && strokeFeasible && margin_Pa >= 0;
+
+    return {
+      gap_nm,
+      casimirPressure_Pa,
+      electrostaticPressure_Pa,
+      totalLoad_Pa,
+      mechSafetyFactor,
+      safetyFeasible,
+      clearance_m,
+      restoringPressure_Pa,
+      margin_Pa,
+      deflectionForLoad_m,
+      maxStroke_pm,
+      strokeFeasible,
+      feasible,
+      note,
+    };
+  };
+
   const sweep: NonNullable<MechanicalFeasibility["sweep"]> = [];
   for (
     let g = MECH_GAP_SWEEP.min_nm;
     g <= MECH_GAP_SWEEP.max_nm + 1e-9;
     g += MECH_GAP_SWEEP.step_nm
   ) {
-    const g_m = Math.max(1e-12, g * NM_TO_M);
-    const cas = (Math.PI * Math.PI * HBAR_C) / (240 * Math.pow(g_m, 4));
-    const elec = 0.5 * EPSILON_0 * Math.pow(MECH_PATCH_V_RMS / g_m, 2);
-    const clearance = Math.max(0, g_m - roughnessGuard_m - stroke_m);
-    const restore =
-      clearance > 0 && D > 0
-        ? (D * clearance) / (MECH_DEFLECTION_COEFF * Math.pow(span_m, 4))
-        : 0;
-    const m = restore - (cas + elec);
-    sweep.push({ gap_nm: g, margin_Pa: m, feasible: clearance > 0 && m > 0 });
+    const calc = calcForGap(g);
+    sweep.push({ gap_nm: g, margin_Pa: calc.margin_Pa, feasible: calc.feasible });
   }
 
   const firstFeasible = sweep.find((row) => row.feasible);
@@ -935,30 +1002,28 @@ function mechanicalFeasibility(
     firstFeasible ? firstFeasible.gap_nm : requestedGap_nm,
   );
   const recommendedGap_nm = Math.max(requestedGap_nm, minGap_nm);
-
-  let note: string | undefined;
-  if (clearance_m <= 0) {
-    note = "Stroke + roughness exceed available gap";
-  } else if (margin_Pa <= 0) {
-    note = "Casimir + patch load overwhelms restoring stiffness";
-  } else if (!strokeFeasible) {
-    note = "Commanded stroke exceeds stiffness budget";
-  }
+  const applied = calcForGap(recommendedGap_nm);
 
   return {
     requestedGap_nm,
     requestedStroke_pm,
     recommendedGap_nm,
     minGap_nm,
-    maxStroke_pm,
-    casimirPressure_Pa,
-    electrostaticPressure_Pa,
-    restoringPressure_Pa,
+    maxStroke_pm: applied.maxStroke_pm,
+    casimirPressure_Pa: applied.casimirPressure_Pa,
+    electrostaticPressure_Pa: applied.electrostaticPressure_Pa,
+    restoringPressure_Pa: applied.restoringPressure_Pa,
     roughnessGuard_nm,
-    margin_Pa,
-    feasible: clearance_m > 0 && margin_Pa > 0,
-    strokeFeasible,
-    note,
+    margin_Pa: applied.margin_Pa,
+    safetyFactorMin,
+    mechSafetyFactor: applied.mechSafetyFactor,
+    sigmaYield_Pa: MECH_YIELD_STRESS_PA,
+    sigmaAllow_Pa,
+    loadPressure_Pa: applied.totalLoad_Pa,
+    safetyFeasible: applied.safetyFeasible,
+    feasible: applied.feasible,
+    strokeFeasible: applied.strokeFeasible,
+    note: applied.note,
     sweep,
   };
 }
@@ -1575,12 +1640,12 @@ import { firstFundamentalForm } from "../src/metric.js";
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +¦_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
-  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
-  taxi:      { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
-  nearzero:  { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
-  cruise:    { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
-  emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  M_target_kg: 1405 },
-  standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
+  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405 },
+  taxi:      { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405 },
+  nearzero:  { S_live: 1 as const,     P_target_W: 5e6,      P_cap_W: 5e6,      M_target_kg: 1405 },
+  cruise:    { S_live: 1 as const,     P_target_W: 40e6,     P_cap_W: 40e6,     M_target_kg: 1405 },
+  emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  P_cap_W: 300e6,    M_target_kg: 1405 },
+  standby:   { S_live: 0 as const,     P_target_W: 0,        P_cap_W: 0,        M_target_kg: 0     },
 } as const;
 
 // Ship HV bus voltage policy (per mode), in kilovolts
@@ -1803,6 +1868,18 @@ export function initializePipelineState(): EnergyPipelineState {
       wallThickness_m: DEFAULT_WALL_THICKNESS_M  // Matches 15 GHz dwell (~0.02 m); override for paper 1 m stack
     },
 
+    // Natário / warp-bubble defaults (ensures nonzero snapshot solves)
+    bubble: {
+      beta: 0.15,   // translation fraction (0..1)
+      sigma: 35,    // wall width (m)
+      R: 280,       // bubble radius (m)
+      dutyGate: undefined,
+    },
+    // Top-level mirrors for legacy clients
+    beta: 0.15,
+    sigma: 35,
+    R: 280,
+
     // Mode defaults (hover)
     currentMode: 'hover',
     dutyCycle: 0.14,
@@ -1857,6 +1934,15 @@ export function initializePipelineState(): EnergyPipelineState {
     U_cycle: 0,
     P_loss_raw: 0,
     P_avg: 0,
+    P_target_W: 0,
+    P_cap_W: 0,
+    physicsCap_W: 0,
+    P_applied_W: 0,
+    beta_trans_power: 0,
+    beta_policy: 0,
+    shipBeta: 0,
+    vShip_mps: 0,
+    speedClosure: 'policyA',
     busVoltage_kV: 0,
     busCurrent_A: 0,
     M_exotic: 0,
@@ -1934,6 +2020,12 @@ export async function calculateEnergyPipeline(
   (state as any).__uptime_ms = Math.floor(process.uptime() * 1000);
   (state as any).__last_calc_ms = nowMs;
 
+  // Allow callers to override MODEL_MODE for paper/raw profiles (falls back to env default)
+  const modelMode: 'calibrated' | 'raw' =
+    state.modelMode === 'raw' || state.modelMode === 'calibrated'
+      ? state.modelMode
+      : MODEL_MODE;
+
   // --- Surface area & tile count from actual hull dims ---
   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
 
@@ -1989,17 +2081,34 @@ export async function calculateEnergyPipeline(
   // Mechanical feasibility budget (stiction / buckling guard)
   const requestedGap_nm = Number.isFinite(state.gap_nm) ? Number(state.gap_nm) : 1;
   state.gap_nm = requestedGap_nm;
-  const mech = mechanicalFeasibility(state, tileArea_m2);
+  const safetyFloor = modelMode === 'raw' ? MECH_SAFETY_MIN_RAW : MECH_SAFETY_MIN_CAL;
+  const mechConfig =
+    modelMode === 'raw'
+      ? {
+          elasticModulus_Pa: MECH_ELASTIC_MODULUS_RAW_PA,
+          thickness_m: MECH_TILE_THICKNESS_RAW_M,
+          spanScale: MECH_SPAN_SCALE_RAW,
+        }
+      : {
+          elasticModulus_Pa: MECH_ELASTIC_MODULUS_PA,
+          thickness_m: MECH_TILE_THICKNESS_M,
+          spanScale: MECH_SPAN_SCALE_CAL,
+        };
+  const mech = mechanicalFeasibility(state, tileArea_m2, safetyFloor, mechConfig);
   const constrainedGap_nm = Number.isFinite(mech.recommendedGap_nm)
     ? Math.max(requestedGap_nm, mech.recommendedGap_nm)
     : requestedGap_nm;
-  state.gap_nm = constrainedGap_nm;
+  const gapForCasimir_nm = modelMode === 'calibrated' ? constrainedGap_nm : requestedGap_nm;
+  state.gap_nm = gapForCasimir_nm;
   (state as any).mechanical = {
     ...mech,
     constrainedGap_nm,
+    casimirGap_nm: gapForCasimir_nm,
+    modelMode,
     unattainable:
       mech.recommendedGap_nm > requestedGap_nm + 1e-9 ||
       !mech.feasible ||
+      !mech.safetyFeasible ||
       !mech.strokeFeasible,
     requestedGap_nm,
   };
@@ -2039,13 +2148,22 @@ export async function calculateEnergyPipeline(
       coupling: couplingSpec,
     } as any);
 
+    const energyNominal = casimir.nominalEnergy ?? casimir.totalEnergy;
+    const energyRealistic = casimir.realisticEnergy ?? casimir.totalEnergy;
+    const energyUncoupled = casimir.uncoupledEnergy ?? energyRealistic ?? casimir.totalEnergy;
+    const baseBand = casimir.energyBand ?? {
+      min: energyRealistic ?? casimir.totalEnergy,
+      max: energyRealistic ?? casimir.totalEnergy,
+    };
+    const modeScale = modelMode === 'raw' ? 2 : 1;
+
     state.casimirModel = casimir.model ?? state.casimirModel;
-    state.U_static_nominal = casimir.nominalEnergy ?? casimir.totalEnergy;
-    state.U_static_realistic = casimir.realisticEnergy ?? casimir.totalEnergy;
-    state.U_static_uncoupled = casimir.uncoupledEnergy ?? state.U_static_realistic ?? casimir.totalEnergy;
-    state.U_static_band = casimir.energyBand ?? {
-      min: state.U_static_realistic ?? casimir.totalEnergy,
-      max: state.U_static_realistic ?? casimir.totalEnergy,
+    state.U_static_nominal = energyNominal;
+    state.U_static_realistic = energyRealistic;
+    state.U_static_uncoupled = energyUncoupled;
+    state.U_static_band = {
+      min: baseBand.min * modeScale,
+      max: baseBand.max * modeScale,
     };
     state.casimirRatio = casimir.modelRatio ?? 1;
     state.lifshitzSweep = casimir.lifshitzSweep ?? state.lifshitzSweep;
@@ -2053,7 +2171,7 @@ export async function calculateEnergyPipeline(
     state.couplingMethod = casimir.couplingMethod ?? state.couplingMethod;
     state.couplingNote = casimir.couplingNote ?? state.couplingNote;
     state.supercellRatio = casimir.supercellRatio ?? state.supercellRatio;
-    state.U_static = state.U_static_realistic ?? casimir.totalEnergy;
+    state.U_static = (energyRealistic ?? casimir.totalEnergy) * modeScale;
   } catch (err) {
     if (DEBUG_PIPE) console.warn("[PIPELINE] Casimir material model fell back to PEC", err);
     const fallback = calculateStaticCasimir(state.gap_nm, tileArea_m2);
@@ -2219,10 +2337,15 @@ export async function calculateEnergyPipeline(
   const Q = state.qCavity ?? PAPER_Q.Q_BURST;
   const perTilePower = (qMech: number) => Math.abs(state.U_geo * qMech) * omega / Q; // J/s per tile during ON
 
-  const CALIBRATED = (MODEL_MODE === 'calibrated');
+  const CALIBRATED = (modelMode === 'calibrated');
   const P_target_W = MODE_POLICY[state.currentMode].P_target_W;
 
-  const P_cap_W = perTilePower(1) * state.N_tiles * d_eff; // Deliverable with q_mech=1
+  const modeCap_W = MODE_POLICY[state.currentMode]?.P_cap_W ?? Infinity;
+  const physicsCap_W = perTilePower(1) * state.N_tiles * d_eff; // Deliverable with q_mech=1, no policy cap
+  const P_cap_W = Math.min(physicsCap_W, modeCap_W); // Deliverable with q_mech=1, capped per mode
+  state.P_target_W = P_target_W;
+  state.physicsCap_W = physicsCap_W;
+  state.P_cap_W = P_cap_W;
 
   let qMechDemand = state.qMechanical;
   let qMechApplied = state.qMechanical;
@@ -2250,6 +2373,15 @@ export async function calculateEnergyPipeline(
     P_total_W         = perTilePower(qMechApplied) * state.N_tiles * d_eff;
   }
 
+  // Enforce per-mode power cap by scaling qMechanical if needed
+  if (P_cap_W > 0 && P_total_W > P_cap_W) {
+    const scaleToCap = P_cap_W / Math.max(P_total_W, 1e-12);
+    qMechApplied = Math.min(1, Math.max(1e-6, qMechApplied * scaleToCap));
+    state.qMechanical = qMechApplied;
+    state.U_Q = state.U_geo * state.qMechanical;
+    P_total_W = perTilePower(qMechApplied) * state.N_tiles * d_eff;
+  }
+
   // Post-calibration clamping check for qMechanical
   const qMech_before = state.qMechanical;
   if (!isStandby) {
@@ -2261,6 +2393,7 @@ export async function calculateEnergyPipeline(
   const appliedSafe = Math.max(1e-12, state.qMechanical);
   const mechSpoilage = qMechDemand > 0 ? qMechDemand / appliedSafe : 1;
   const pShortfall_W = Math.max(0, P_target_W - P_total_W);
+  const mechanicalSafe = (state as any)?.mechanical?.safetyFeasible !== false;
   state.mechGuard = {
     qMechDemand,
     qMechApplied: state.qMechanical,
@@ -2268,8 +2401,14 @@ export async function calculateEnergyPipeline(
     pCap_W: P_cap_W,
     pApplied_W: P_total_W,
     pShortfall_W,
-    status: (P_target_W > 0 && qMechDemand > 1 && !isStandby) ? 'saturated' : 'ok',
+    status: (!mechanicalSafe && !isStandby)
+      ? 'saturated'
+      : (P_target_W > 0 && (qMechDemand > 1 || P_total_W >= P_cap_W) && !isStandby) ? 'saturated' : 'ok',
   };
+
+  // Applied ship-average power after caps/guards
+  state.P_applied_W = P_total_W;
+  (state as any).P_applied_W = P_total_W;
 
   state.P_loss_raw = Math.abs(state.U_Q) * omega / Q;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
@@ -2431,7 +2570,7 @@ export async function calculateEnergyPipeline(
   (state as any).thetaScaleExpected = thetaCal;
 
   // Store model mode for UI fallback
-  (state as any).modelMode = MODEL_MODE;
+  (state as any).modelMode = modelMode;
 
   // Store both values for audit
   (state as any).thetaRaw = thetaRaw;
@@ -2440,7 +2579,7 @@ export async function calculateEnergyPipeline(
   // Publish compact thetaAudit for UI consumption
   (state as any).uniformsExplain ??= {};
   (state as any).uniformsExplain.thetaAudit = {
-    mode: MODEL_MODE,
+    mode: modelMode,
     eq: "++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff",
     inputs: {
       gammaGeo: state.gammaGeo,
@@ -2453,7 +2592,7 @@ export async function calculateEnergyPipeline(
   };
 
   console.log('=öì ++-Scale Field Strength Audit (Raw vs Calibrated):', {
-    mode: MODEL_MODE,
+    mode: modelMode,
     formula: '++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff',
     components: thetaComponents,
     results: {
@@ -2484,7 +2623,7 @@ export async function calculateEnergyPipeline(
 
   // Physics logging for debugging (before UI field updates)
   if (DEBUG_PIPE) console.log("[PIPELINE]", {
-    mode: state.currentMode, model: MODEL_MODE,
+    mode: state.currentMode, model: modelMode,
     dutyShip: d_eff, dutyUI_before: state.dutyCycle, S_live, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
@@ -2537,7 +2676,7 @@ export async function calculateEnergyPipeline(
   // Expose timing details for metrics API (corrected naming)
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 1000); // sectors/sec (1ms macro-tick)
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
-  state.modelMode           = MODEL_MODE; // for client consistency
+  state.modelMode           = modelMode; // for client consistency
 
   // Compliance flags (physics-based safety)
   state.natarioConstraint   = true;
@@ -3278,9 +3417,39 @@ export async function calculateEnergyPipeline(
 
     // Store warp results in state for API access
     (state as any).warp = warp;
+    (state as any).beta_avg = warp?.betaAvg ?? warp?.natarioShiftAmplitude ?? (state as any).beta_avg;
   } catch (e) {
     if (DEBUG_PIPE) console.warn('Warp bubble calculation failed:', e);
   }
+
+  // Speed/beta closure: derive effective translation from power and warp proxy
+  const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+  const clampBeta = (b: number) => Math.max(0, Math.min(0.99, b));
+  const BETA_BASE_BY_MODE: Record<string, number> = {
+    standby: 0.0,
+    taxi: 0.0,
+    nearzero: 0.02,
+    hover: 0.1,
+    cruise: 0.6,
+    emergency: 0.95,
+  };
+
+  const betaBase = BETA_BASE_BY_MODE[String(state.currentMode).toLowerCase()] ?? 0.3;
+  const beta_trans_power = P_target_W > 0 ? clamp01(P_total_W / P_target_W) : 0;
+  const beta_policy = clampBeta(betaBase * beta_trans_power);
+  const beta_proxy = Number((state as any)?.warp?.betaAvg ?? (state as any)?.warp?.natarioShiftAmplitude ?? (state as any).beta_avg);
+  const useProxy = Number.isFinite(beta_proxy) && Math.abs(beta_proxy) > 1e-6;
+  const shipBeta = useProxy ? clampBeta(beta_proxy) : beta_policy;
+
+  state.beta_trans_power = beta_trans_power;
+  state.beta_policy = beta_policy;
+  state.shipBeta = shipBeta;
+  state.speedClosure = useProxy ? 'proxyB' : 'policyA';
+  state.vShip_mps = shipBeta * C;
+  // Surface the closure inputs for downstream panels/scripts
+  state.P_target_W = P_target_W;
+  state.P_cap_W = P_cap_W;
+  state.physicsCap_W = physicsCap_W;
 
   flushPendingPumpCommand();
   updateQiTelemetry(state);
@@ -4566,7 +4735,12 @@ export async function computeEnergySnapshot(sim: any) {
   // Merge compat back into result for downstream consumers
   const normalizedResult = { ...(result as any), lc, duty, natario, ...compat } as any;
 
-
+  // Ensure warp.stressEnergyTensor is always populated (fallback to root stressEnergy)
+  const warpStress = (result as any).warp?.stressEnergyTensor ?? (result as any).stressEnergy;
+  const warpOut = {
+    ...(result as any).warp,
+    ...(warpStress ? { stressEnergyTensor: warpStress } : {}),
+  };
 
   const warpUniforms = {
     // physics (visual) GÇö mass stays split and separate
@@ -4634,7 +4808,7 @@ export async function computeEnergySnapshot(sim: any) {
     thetaAudit: {
       note: "++ audit GÇö raw vs calibrated VdB",
       equation: "++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff", 
-      mode: MODEL_MODE, // "raw" | "calibrated"
+      mode: (result as any).modelMode ?? MODEL_MODE, // "raw" | "calibrated"
       inputs: {
         gammaGeo: result.gammaGeo,
         q: result.qSpoilingFactor,
@@ -4724,6 +4898,18 @@ export async function computeEnergySnapshot(sim: any) {
     T11_avg: (result as any).warp?.stressEnergyTensor?.T11 ?? (result as any).stressEnergy?.T11,
     T22_avg: (result as any).warp?.stressEnergyTensor?.T22 ?? (result as any).stressEnergy?.T22,
     T33_avg: (result as any).warp?.stressEnergyTensor?.T33 ?? (result as any).stressEnergy?.T33,
+    // Explicit stress-energy projection for clients that only read root fields
+    stressEnergy: {
+      ...(result as any).stressEnergy,
+      ...(result as any).warp?.stressEnergyTensor
+        ? {
+            T00: (result as any).warp.stressEnergyTensor.T00,
+            T11: (result as any).warp.stressEnergyTensor.T11,
+            T22: (result as any).warp.stressEnergyTensor.T22,
+            T33: (result as any).warp.stressEnergyTensor.T33,
+          }
+        : {},
+    },
     beta_avg: (result as any).warp?.betaAvg ?? (result as any).warp?.natarioShiftAmplitude ?? (result as any).stressEnergy?.beta_avg,
     gr_ok: (result as any).warp?.validationSummary?.warpFieldStable ?? true,
     natarioConstraint: (result as any).warp?.isZeroExpansion ?? result.natarioConstraint,
@@ -4733,6 +4919,8 @@ export async function computeEnergySnapshot(sim: any) {
       timeMs: (result as any).warp.calculationTime ?? 0,
       status: (result as any).warp.validationSummary?.overallStatus ?? 'optimal'
     } : { timeMs: 0, status: 'optimal' },
+    // Ensure warp tensor emitted for clients
+    warp: warpOut,
 
     // Normalized, renderer-ready data structures
     lc,
@@ -4862,14 +5050,3 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
     dA: sampleDA.subarray(0, idx),
   };
 }
-
-
-
-
-
-
-
-
-
-
-

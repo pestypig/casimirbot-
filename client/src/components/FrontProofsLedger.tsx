@@ -205,22 +205,43 @@ function buildLedgerRows(snap?: EnergyPipelineSnapshot | null): LedgerRow[] {
 
   // Mechanical feasibility (single tile)
   if (mech) {
+    const hasMarginDeficit = Number.isFinite(mech.margin_Pa) && (mech.margin_Pa as number) < 0;
+    let guardStatus: "pass" | "fail" | "warn";
+    let guardLabel: string;
+    if (mech.feasible && mech.strokeFeasible) {
+      guardStatus = "pass";
+      guardLabel = "OK";
+    } else if (mech.safetyFeasible === false) {
+      guardStatus = "fail";
+      guardLabel = "overload";
+    } else if (hasMarginDeficit) {
+      guardStatus = "fail";
+      guardLabel = "stiffness";
+    } else if (mech.strokeFeasible === false) {
+      guardStatus = "warn";
+      guardLabel = "stroke";
+    } else {
+      guardStatus = "warn";
+      guardLabel = "clearance";
+    }
+
     rows.push({
       id: "mech_guard",
       label: "Mechanical tile guard",
-      equation: "margin_P = P_restore - (P_Casimir + P_ES),  require margin_P >= 0 and stroke <= maxStroke",
+      equation: "S_mech = sigma_allow / P_load, require S_mech >= S_min and stroke <= maxStroke",
       value: [
         `gap_req = ${fmtFixed(mech.requestedGap_nm, 1)} nm`,
         `gap_eff = ${fmtFixed(mech.constrainedGap_nm ?? mech.requestedGap_nm, 1)} nm`,
+        `S_mech = ${fmtExp(mech.mechSafetyFactor ?? NaN, 3)}${Number.isFinite(mech.safetyFactorMin) ? ` (min ${fmtFixed(mech.safetyFactorMin as number, 2)})` : ""}`,
+        `P_load = ${fmtExp(mech.loadPressure_Pa ?? NaN, 3)} Pa`,
+        `sigma_allow = ${fmtExp(mech.sigmaAllow_Pa ?? NaN, 3)} Pa`,
         `P_Casimir = ${fmtExp(mech.casimirPressure_Pa, 3)} Pa`,
         `P_ES = ${fmtExp(mech.electrostaticPressure_Pa, 3)} Pa`,
-        `P_restore = ${fmtExp(mech.restoringPressure_Pa, 3)} Pa`,
-        `margin = ${fmtExp(mech.margin_Pa, 3)} Pa`,
         `maxStroke = ${fmtFixed(mech.maxStroke_pm, 1)} pm`,
         `strokeFeasible = ${mech.strokeFeasible ? "yes" : "no"}`,
-      ].join("  ·  "),
-      guard: mech.feasible && mech.strokeFeasible ? "pass" : mech.margin_Pa > 0 ? "warn" : "fail",
-      guardLabel: mech.feasible && mech.strokeFeasible ? "OK" : mech.margin_Pa > 0 ? "stroke" : "overload",
+      ].join("  |  "),
+      guard: guardStatus,
+      guardLabel,
     });
   }
 

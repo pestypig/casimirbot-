@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { getTool } from "../server/skills";
 
 export type AnchorTag =
   | "casimir"
@@ -33,6 +35,9 @@ export interface AssembledPrompt {
   auditMeta?: {
     enabled: boolean;
     reason?: string;
+    mode?: "disabled" | "fallback" | "llm";
+    cacheKey?: string;
+    cached?: boolean;
   };
   citationHints: {
     [blockId: string]: {
@@ -119,6 +124,14 @@ const DEFAULT_CHAR_BUDGET = 15_000;
 const DEFAULT_AUDIT_BUDGET = 3_500;
 const DEFAULT_AUDIT_CODE_BUDGET = 4_000;
 const isAuditEnabled = () => String(process.env.PHYSICS_AUDIT_ENABLE ?? "").toLowerCase() === "true";
+
+const auditCache = new Map<
+  string,
+  {
+    blocks: PhysicsAuditBlock[];
+    meta: { enabled: boolean; reason?: string; mode?: "fallback" | "llm" };
+  }
+>();
 
 async function loadAnchors(): Promise<FileCacheEntry[]> {
   if (fileCache) return fileCache;
@@ -246,7 +259,7 @@ async function buildAnchorContext(
   return { blocks, citationHints };
 }
 
-type AuditResult = { blocks: PhysicsAuditBlock[]; meta: { enabled: boolean; reason?: string } };
+type AuditResult = { blocks: PhysicsAuditBlock[]; meta: { enabled: boolean; reason?: string; mode?: "fallback" | "llm" | "disabled" } };
 
 function seedFrontierFromQuery(queryTokens: string[], anchors: FileCacheEntry[]): string[] {
   const seeds = new Set<string>();
@@ -265,22 +278,27 @@ function clampText(text: string, limit: number): string {
   return text.slice(0, Math.max(0, limit - 120)) + "\n...[truncated]...";
 }
 
-async function runSubjectAudit(
-  query: string,
-  queryTokens: string[],
+function safeJsonParse<T = any>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    const fenced = raw.match(/```(?:json)?\s*([\s\S]+?)```/);
+    if (fenced && fenced[1]) {
+      try {
+        return JSON.parse(fenced[1]) as T;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+function collectFrontierSnippets(
+  frontier: string[],
   anchors: FileCacheEntry[],
-  textBudget: number,
   codeBudget: number,
-): Promise<AuditResult> {
-  if (!isAuditEnabled()) {
-    return { blocks: [], meta: { enabled: false, reason: "PHYSICS_AUDIT_ENABLE is not true" } };
-  }
-
-  const frontier = seedFrontierFromQuery(queryTokens, anchors);
-  if (!frontier.length) {
-    return { blocks: [], meta: { enabled: true, reason: "No frontier seeds derived from query tokens" } };
-  }
-
+): { snippets: string[]; remainingCode: number } {
   const chosen = frontier.slice(0, 6);
   let remainingCode = codeBudget;
   const snippets: string[] = [];
@@ -294,10 +312,19 @@ async function runSubjectAudit(
     snippets.push(`[[${seed}]]\n${clamped}`);
   }
 
+  return { snippets, remainingCode };
+}
+
+function formatFrontierBlock(
+  query: string,
+  frontier: string[],
+  snippets: string[],
+  textBudget: number,
+): PhysicsAuditBlock {
   const auditTextParts = [
     `Subject query: ${query}`,
-    `Seeds (${chosen.length}/${frontier.length} frontier entries):`,
-    ...chosen.map((p) => `- ${p}`),
+    `Seeds (${frontier.length} frontier entries):`,
+    ...frontier.map((p) => `- ${p}`),
     "",
     "Code excerpts (non-citable, audit helper only):",
     clampText(snippets.join("\n\n"), textBudget),
@@ -305,22 +332,186 @@ async function runSubjectAudit(
     "Note: This audit summary is deterministic and non-citable; core citations remain tied to anchor slices.",
   ];
 
-  const block: PhysicsAuditBlock = {
+  return {
     id: "audit:subject-frontier",
     label: "Subject audit frontier (deterministic)",
-    kind: "audit",
+    kind: "frontier",
     text: auditTextParts.join("\n"),
     source: "physicsContext.audit",
   };
+}
 
-  return { blocks: [block], meta: { enabled: true } };
+function makeAuditBlocksFromPayload(payload: any, textBudget: number): PhysicsAuditBlock[] {
+  const typedPayload =
+    payload && typeof payload === "object"
+      ? payload
+      : { audit: ["Audit output unavailable"], formula: [], env: [], safety: [] };
+
+  const fields: Array<{ key: string; kind: PhysicsAuditBlock["kind"]; label: string }> = [
+    { key: "audit", kind: "audit", label: "Subject audit" },
+    { key: "formula", kind: "formula", label: "Formula trace" },
+    { key: "formulas", kind: "formula", label: "Formula trace" },
+    { key: "env", kind: "env", label: "Environment / assumptions" },
+    { key: "environment", kind: "env", label: "Environment / assumptions" },
+    { key: "safety", kind: "safety", label: "Safety / guardrails" },
+    { key: "frontier", kind: "frontier", label: "Frontier exploration" },
+  ];
+
+  const blocks: PhysicsAuditBlock[] = [];
+  for (const field of fields) {
+    if (!(field.key in typedPayload)) continue;
+    const raw = (typedPayload as Record<string, unknown>)[field.key];
+    const entries = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    for (let i = 0; i < entries.length; i += 1) {
+      const text = clampText(String(entries[i] ?? ""), textBudget);
+      if (!text.trim()) continue;
+      blocks.push({
+        id: `audit:${field.key}:${i}`,
+        label: field.label,
+        kind: field.kind,
+        text,
+        source: "physicsContext.audit.llm",
+      });
+    }
+  }
+  return blocks;
+}
+
+async function runLlmAudit(
+  query: string,
+  frontier: string[],
+  snippets: string[],
+  textBudget: number,
+): Promise<{ blocks: PhysicsAuditBlock[]; meta: { enabled: boolean; reason?: string; mode: "llm" | "fallback" } }> {
+  const llm =
+    getTool("llm.http.generate") ??
+    getTool("llm.local.generate") ??
+    getTool("llm.local.spawn.generate");
+
+  if (!llm) {
+    return { blocks: [], meta: { enabled: true, reason: "No LLM tool registered", mode: "fallback" } };
+  }
+
+  const maxTokens =
+    typeof process.env.PHYSICS_AUDIT_MAX_TOKENS === "string"
+      ? Number(process.env.PHYSICS_AUDIT_MAX_TOKENS)
+      : undefined;
+
+  const promptSections = [
+    "You are the subject auditor for GR/Casimir/warp questions.",
+    "Given the subject and the deterministic frontier seeds + excerpts, produce a concise JSON summary with these fields:",
+    '- "audit": high-level subject audit bullets (1-3 items)',
+    '- "formula": key equations or variables to watch (1-3 items)',
+    '- "env": environment/assumptions/units to respect (1-3 items)',
+    '- "safety": safety/guardrail checks to enforce (1-3 items)',
+    '- "frontier": optional follow-up probes (0-3 items)',
+    "Constraints: keep each string under 300 characters; keep total output under the provided budget; DO NOT include citations.",
+    "",
+    `Subject: ${query}`,
+    "",
+    "Frontier seeds:",
+    ...frontier.map((p) => `- ${p}`),
+    "",
+    "Code excerpts (non-citable helpers):",
+    clampText(snippets.join("\n\n"), textBudget),
+    "",
+    'Return ONLY JSON. Example: {"audit":["..."],"formula":["..."],"env":["..."],"safety":["..."]}',
+  ];
+
+  const messages = [
+    { role: "system", content: "You are a precise, terse physics subject auditor. Return JSON only." },
+    { role: "user", content: promptSections.join("\n") },
+  ];
+
+  try {
+    const result = await llm.handler(
+      {
+        model:
+          process.env.PHYSICS_AUDIT_MODEL ??
+          process.env.PHYSICS_MODEL ??
+          process.env.LLM_HTTP_MODEL ??
+          process.env.LLM_LOCAL_MODEL,
+        messages,
+        prompt: promptSections.join("\n"),
+        temperature: 0.2,
+        max_tokens: Number.isFinite(maxTokens) ? maxTokens : undefined,
+      },
+      {},
+    );
+
+    const text =
+      (result as { text?: string })?.text ??
+      (result as { answer?: string })?.answer ??
+      (result as { content?: string })?.content ??
+      "";
+
+    if (!text) {
+      return { blocks: [], meta: { enabled: true, reason: "LLM returned empty text", mode: "fallback" } };
+    }
+
+    const payload = safeJsonParse(text);
+    if (!payload) {
+      return {
+        blocks: [
+          {
+            id: "audit:raw",
+            label: "Audit (raw LLM text, unparsed)",
+            kind: "audit",
+            text: clampText(text, textBudget),
+            source: "physicsContext.audit.llm",
+          },
+        ],
+        meta: { enabled: true, mode: "llm", reason: "LLM output returned but JSON parse failed" },
+      };
+    }
+
+    const blocks = makeAuditBlocksFromPayload(payload, textBudget);
+    if (!blocks.length) {
+      return { blocks: [], meta: { enabled: true, reason: "LLM output had no usable blocks", mode: "fallback" } };
+    }
+
+    return { blocks, meta: { enabled: true, mode: "llm" } };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { blocks: [], meta: { enabled: true, reason: `LLM audit error: ${reason}`, mode: "fallback" } };
+  }
+}
+
+async function runSubjectAudit(
+  query: string,
+  queryTokens: string[],
+  anchors: FileCacheEntry[],
+  textBudget: number,
+  codeBudget: number,
+): Promise<AuditResult> {
+  if (!isAuditEnabled()) {
+    return { blocks: [], meta: { enabled: false, reason: "PHYSICS_AUDIT_ENABLE is not true", mode: "disabled" } };
+  }
+
+  const frontier = seedFrontierFromQuery(queryTokens, anchors);
+  if (!frontier.length) {
+    return { blocks: [], meta: { enabled: true, reason: "No frontier seeds derived from query tokens", mode: "fallback" } };
+  }
+
+  const { snippets } = collectFrontierSnippets(frontier, anchors, codeBudget);
+  const frontierBlock = formatFrontierBlock(query, frontier, snippets, textBudget);
+
+  const llmResult = await runLlmAudit(query, frontier, snippets, textBudget);
+  if (llmResult.meta.mode === "llm" && llmResult.blocks.length) {
+    return { blocks: [frontierBlock, ...llmResult.blocks], meta: llmResult.meta };
+  }
+
+  return {
+    blocks: [frontierBlock, ...(llmResult.blocks ?? [])],
+    meta: { enabled: true, reason: llmResult.meta.reason, mode: "fallback" },
+  };
 }
 
 export async function assemblePhysicsContext(query: string): Promise<{
   blocks: ContextBlock[];
   citationHints: AssembledPrompt["citationHints"];
   auditBlocks: PhysicsAuditBlock[];
-  auditMeta: { enabled: boolean; reason?: string };
+  auditMeta: { enabled: boolean; reason?: string; mode?: "fallback" | "llm" | "disabled"; cacheKey?: string; cached?: boolean };
 }> {
   const anchors = await loadAnchors();
   const queryTokens = tokenize(query).filter((token) => token.length > 2);
@@ -330,6 +521,31 @@ export async function assemblePhysicsContext(query: string): Promise<{
 
   const auditTextBudget = parseBudget(process.env.PHYSICS_AUDIT_BUDGET, DEFAULT_AUDIT_BUDGET);
   const auditCodeBudget = parseBudget(process.env.PHYSICS_AUDIT_CODE_BUDGET, DEFAULT_AUDIT_CODE_BUDGET);
+
+  const cacheKey = (() => {
+    const subjectKey = query.trim().toLowerCase();
+    const override = (process.env.PHYSICS_AUDIT_CACHE_KEY ?? "").trim();
+    if (override) return `${subjectKey}:${override}`;
+    try {
+      const hash = execSync("git rev-parse HEAD", { cwd: PROJECT_ROOT, stdio: ["ignore", "pipe", "ignore"] })
+        .toString()
+        .trim();
+      return `${subjectKey}:${hash}`;
+    } catch {
+      return `${subjectKey}:unknown`;
+    }
+  })();
+
+  const cached = auditCache.get(cacheKey);
+  if (cached) {
+    return {
+      blocks,
+      citationHints,
+      auditBlocks: cached.blocks,
+      auditMeta: { ...cached.meta, cacheKey, cached: true },
+    };
+  }
+
   const { blocks: auditBlocks, meta: auditMeta } = await runSubjectAudit(
     query,
     queryTokens,
@@ -338,7 +554,11 @@ export async function assemblePhysicsContext(query: string): Promise<{
     auditCodeBudget,
   );
 
-  return { blocks, citationHints, auditBlocks, auditMeta };
+  if (auditMeta.enabled !== false) {
+    auditCache.set(cacheKey, { blocks: auditBlocks, meta: { ...auditMeta } });
+  }
+
+  return { blocks, citationHints, auditBlocks, auditMeta: { ...auditMeta, cacheKey, cached: false } };
 }
 
 export async function buildPhysicsPrompt(query: string): Promise<AssembledPrompt> {

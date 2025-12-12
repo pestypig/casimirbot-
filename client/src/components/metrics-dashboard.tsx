@@ -62,7 +62,8 @@ const deriveActiveTiles = (
 // Mode-aware fallback using pipeline targets
 const MODE_TARGET = {
   hover:     { P_W: 83.3e6,   M_kg: 1000 },
-  cruise:    { P_W: 7.437e3,  M_kg: 1000 }, // 7.437 kW
+  nearzero:  { P_W: 5e6,      M_kg: 1000 },
+  cruise:    { P_W: 40e6,     M_kg: 1000 },
   emergency: { P_W: 297.5e6,  M_kg: 1000 },
   standby:   { P_W: 0,        M_kg: 0 }
 } as const;
