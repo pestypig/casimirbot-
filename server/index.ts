@@ -142,16 +142,35 @@ app.use('/warp-engine*.js', (req, res, next) => {
   next();
 });
 
-const redirectToDesktop = (_req: Request, res: Response) => {
+const desktopRedirectHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="0; url=/desktop">
+    <title>CasimirBot</title>
+  </head>
+  <body>
+    <p>Redirecting to <a href="/desktop">/desktop</a>...</p>
+  </body>
+</html>`;
+
+const rootHandler = (req: Request, res: Response) => {
   if (!appReady) {
     res.status(200).send("starting");
     return;
   }
-  res.redirect(302, "/desktop");
+  const wantsHtml = Boolean(req.accepts(["html"]));
+  if (wantsHtml) {
+    res.status(200).type("html").send(desktopRedirectHtml);
+    return;
+  }
+  res.status(200).json({ status: "ok", redirect: "/desktop" });
 };
 
-app.get("/", redirectToDesktop);
-app.head("/", redirectToDesktop);
+app.get("/", rootHandler);
+app.head("/", (_req, res) => {
+  res.status(200).end();
+});
 
 const previewResponseBody = (body: unknown, maxLength = 80): string | undefined => {
   if (body === undefined) return undefined;
