@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer, type Server } from "http";
+import { createServer, type Server, type ServerResponse } from "http";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
 
@@ -10,10 +10,13 @@ type LatticeWatcherHandle = {
   getVersion(): number;
 };
 
+type HealthCheckRequest = {
+  method?: string;
+  url?: string;
+  headers: Record<string, string | string[] | undefined>;
+};
+
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-registerMetricsEndpoint(app);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,8 +50,48 @@ app.head("/healthz", (_req, res) => {
   res.status(200).end();
 });
 
-const isPublicHealthRoute = (req: Request): boolean =>
-  req.path === "/" || req.path === "/healthz";
+const headerValue = (value: string | string[] | undefined): string => {
+  if (!value) return "";
+  return Array.isArray(value) ? value.join(",") : value;
+};
+
+const normalizeHealthPath = (value?: string): string => {
+  if (!value) return "/";
+  const base = value.split("?")[0] || "/";
+  if (base.length > 1 && base.endsWith("/")) {
+    return base.slice(0, -1);
+  }
+  return base;
+};
+
+const isPublicHealthRoute = (req: Request): boolean => {
+  const normalized = normalizeHealthPath(req.path || req.originalUrl);
+  return normalized === "/" || normalized === "/healthz";
+};
+
+const isHealthCheckRequest = (req: HealthCheckRequest): boolean => {
+  const userAgent = headerValue(req.headers["user-agent"]).toLowerCase();
+  const accept = headerValue(req.headers.accept).trim().toLowerCase();
+  const acceptTokens = accept
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+  const acceptsAny =
+    acceptTokens.length === 0 ||
+    (acceptTokens.length === 1 && acceptTokens[0].startsWith("*/*"));
+  return (
+    req.method === "HEAD" ||
+    req.headers["x-health-check"] !== undefined ||
+    userAgent.includes("health") ||
+    userAgent.includes("kube-probe") ||
+    userAgent.includes("elb-healthchecker") ||
+    acceptsAny
+  );
+};
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+registerMetricsEndpoint(app);
 
 app.use((req, res, next) => {
   if (isPublicHealthRoute(req)) {
@@ -165,10 +208,7 @@ const desktopRedirectHtml = `<!doctype html>
 const rootHandler = (req: Request, res: Response) => {
   // Health check: respond immediately with 200 for fastest possible response
   // This ensures deployment health checks pass quickly
-  const isHealthCheck = req.headers['user-agent']?.includes('health') || 
-                        req.headers['x-health-check'] || 
-                        !req.headers.accept ||
-                        req.headers.accept === '*/*';
+  const isHealthCheck = isHealthCheckRequest(req);
   
   if (isHealthCheck) {
     res.status(200).send("ok");
@@ -185,6 +225,40 @@ const rootHandler = (req: Request, res: Response) => {
     return;
   }
   res.status(200).json({ status: "ok", redirect: "/desktop" });
+};
+
+const handleHealthCheck = (req: HealthCheckRequest, res: ServerResponse): boolean => {
+  const method = (req.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    return false;
+  }
+
+  const path = normalizeHealthPath(req.url);
+  if (path === "/healthz") {
+    if (method === "HEAD") {
+      res.statusCode = 200;
+      res.end();
+      return true;
+    }
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(JSON.stringify(healthPayload()));
+    return true;
+  }
+
+  if (path === "/" && isHealthCheckRequest(req)) {
+    if (method === "HEAD") {
+      res.statusCode = 200;
+      res.end();
+      return true;
+    }
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.end("ok");
+    return true;
+  }
+
+  return false;
 };
 
 // Register root health check handler FIRST for immediate response
@@ -306,7 +380,12 @@ app.use((req, res, next) => {
   const listenOpts: any = { port, host: "0.0.0.0" };
   if (!isWin) listenOpts.reusePort = true;
 
-  const server = createServer(app);
+  const server = createServer((req, res) => {
+    if (handleHealthCheck(req, res)) {
+      return;
+    }
+    app(req, res);
+  });
   serverInstance = server;
 
   server.on("error", (err: NodeJS.ErrnoException) => {
