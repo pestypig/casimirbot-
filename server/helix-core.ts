@@ -1607,17 +1607,29 @@ export function getTileStatus(req: Request, res: Response) {
   res.json(tileData);
 }
 
-// Initialize the global pipeline state
-(async () => {
-  const pipelineState = await calculateEnergyPipeline(initializePipelineState());
-  setGlobalPipelineState(pipelineState);
-  if (BASELINE_TAU_LC_MS) {
-    console.info("[helix-core] baseline tau_LC derived from hull geometry", {
-      tauLC_ms: BASELINE_TAU_LC_MS,
-      tauLC_us: BASELINE_TAU_LC_MS * 1000,
-    });
-  }
-})();
+const shouldPrewarmPipeline =
+  process.env.HELIX_PREWARM_PIPELINE === "1" ||
+  (process.env.NODE_ENV !== "production" && process.env.HELIX_SKIP_PREWARM !== "1");
+
+// Initialize the global pipeline state (skip in prod to keep health checks fast)
+if (shouldPrewarmPipeline) {
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const pipelineState = await calculateEnergyPipeline(initializePipelineState());
+        setGlobalPipelineState(pipelineState);
+        if (BASELINE_TAU_LC_MS) {
+          console.info("[helix-core] baseline tau_LC derived from hull geometry", {
+            tauLC_ms: BASELINE_TAU_LC_MS,
+            tauLC_us: BASELINE_TAU_LC_MS * 1000,
+          });
+        }
+      } catch (error) {
+        console.error("[helix-core] pipeline prewarm failed:", error);
+      }
+    })();
+  }, 0);
+}
 
 // Generate sample tiles with positions and T00 values for Green's Potential computation
 function generateSampleTiles(count: number): Array<{ pos: [number, number, number]; t00: number }> {
