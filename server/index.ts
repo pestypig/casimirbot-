@@ -23,6 +23,7 @@ const __dirname = path.dirname(__filename);
 const docsDir = path.resolve(__dirname, "..", "docs");
 
 let appReady = false;
+let healthReady = false;
 let serverInstance: Server | null = null;
 let latticeWatcher: LatticeWatcherHandle | null = null;
 let shuttingDown = false;
@@ -41,11 +42,14 @@ const log = (message: string, source = "express") => {
   console.log(`${formattedTime} [${source}] ${message}`);
 };
 
-const healthPayload = () => ({
-  status: appReady ? "ok" : "starting",
-  ready: appReady,
-  timestamp: new Date().toISOString(),
-});
+const healthPayload = () => {
+  const ready = appReady || healthReady;
+  return {
+    status: ready ? "ok" : "starting",
+    ready,
+    timestamp: new Date().toISOString(),
+  };
+};
 
 app.get("/healthz", (_req, res) => {
   res.status(200).json(healthPayload());
@@ -413,6 +417,9 @@ app.use((req, res, next) => {
           ? `${address.address}:${address.port}`
           : `0.0.0.0:${port}`;
     log(`serving on ${addressLabel}`);
+    if (fastBoot) {
+      healthReady = true;
+    }
   });
 
   const bootstrap = async () => {
@@ -473,6 +480,7 @@ app.use((req, res, next) => {
     }
 
     appReady = true;
+    healthReady = true;
     log("app ready");
   };
 
