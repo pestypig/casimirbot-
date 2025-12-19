@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import type { Server } from "http";
+import { createServer, type Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { registerMetricsEndpoint, metrics } from "./metrics";
@@ -225,12 +225,38 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize physics modules
-  const { initializeModules } = await import('./modules/module-loader.js');
-  await initializeModules();
-  
-  const server = await registerRoutes(app);
+  // ALWAYS serve the app on the port specified in the environment variable PORT
+  // Other ports are firewalled. Default to 5173 if not specified.
+  // this serves both the API and the client.
+  // It is the only port that is not firewalled.
+  const port = parseInt(process.env.PORT || "5173", 10);
+  const isWin = process.platform === "win32";
+  const listenOpts: any = { port, host: "0.0.0.0" };
+  if (!isWin) listenOpts.reusePort = true;
+
+  const server = createServer(app);
   serverInstance = server;
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err?.code === "EADDRINUSE") {
+      console.error(`[server] port ${port} is already in use. Another Casimir server is still running or the OS has not released the socket yet.`);
+      console.error("[server] stop the other process or set PORT to an open value before retrying.");
+      process.exit(1);
+      return;
+    }
+    console.error("[server] unexpected listen error:", err);
+  });
+
+  // Start listening early so health checks succeed while routes finish initializing.
+  server.listen(listenOpts, () => {
+    log(`serving on port ${port}`);
+  });
+
+  // Initialize physics modules
+  const { initializeModules } = await import("./modules/module-loader.js");
+  await initializeModules();
+
+  await registerRoutes(app, server);
 
   if (process.env.ENABLE_LATTICE_WATCHER === "1") {
     const debounceMs = Number(process.env.LATTICE_WATCHER_DEBOUNCE_MS);
@@ -249,8 +275,8 @@ app.use((req, res, next) => {
     // Log the error but do not crash the server; this keeps dev server alive
     // and avoids connection refusals after a first route error.
     try {
-      console.error('[express] error handler:', status, message);
-      if (process.env.NODE_ENV !== 'production') {
+      console.error("[express] error handler:", status, message);
+      if (process.env.NODE_ENV !== "production") {
         console.error(err?.stack || err);
       }
     } catch {}
@@ -262,39 +288,16 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  const skipVite = process.env.SKIP_VITE_MIDDLEWARE === '1';
+  const skipVite = process.env.SKIP_VITE_MIDDLEWARE === "1";
   if (app.get("env") === "development" && !skipVite) {
-    log('dev: Vite middleware enabled (hot reload via Express)');
+    log("dev: Vite middleware enabled (hot reload via Express)");
     await setupVite(app, server);
   } else {
     if (skipVite) {
-      log('dev: skipping Vite middlewares (SKIP_VITE_MIDDLEWARE=1); serving prebuilt client instead');
+      log("dev: skipping Vite middlewares (SKIP_VITE_MIDDLEWARE=1); serving prebuilt client instead");
     } else if (app.get("env") !== "development") {
-      log(`dev: NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}; serving prebuilt client instead of Vite HMR`);
+      log(`dev: NODE_ENV=${process.env.NODE_ENV ?? "undefined"}; serving prebuilt client instead of Vite HMR`);
     }
     serveStatic(app);
   }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5173 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5173', 10);
-  const isWin = process.platform === 'win32';
-  const listenOpts: any = { port, host: '0.0.0.0' };
-  if (!isWin) listenOpts.reusePort = true;
-
-  server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err?.code === 'EADDRINUSE') {
-      console.error(`[server] port ${port} is already in use. Another Casimir server is still running or the OS has not released the socket yet.`);
-      console.error('[server] stop the other process or set PORT to an open value before retrying.');
-      process.exit(1);
-      return;
-    }
-    console.error('[server] unexpected listen error:', err);
-  });
-
-  server.listen(listenOpts, () => {
-    log(`serving on port ${port}`);
-  });
 })();

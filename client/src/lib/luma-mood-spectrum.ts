@@ -42,7 +42,7 @@ export const LUMA_MOOD_BINS: MoodBin[] = [
   {
     mood: "friend",
     keywords: ["friend", "buddy", "team", "thanks", "appreciate", "grateful", "support"],
-    tags: ["ally", "friend", "support"],
+    tags: ["ally", "friend", "support", "panel"],
     reason: "Friendly or collaborative tone",
   },
   {

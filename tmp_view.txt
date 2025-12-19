@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "rootId": "mission-ethos",
+  "nodes": [
+    {
+      "id": "mission-ethos",
+      "slug": "mission-ethos",
+      "title": "Mission Ethos",
+      "excerpt": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.",
+      "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.",
+      "tags": ["stewardship", "compassion"],
+      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course"],
+      "links": [
+        { "rel": "see-also", "to": "bodhisattva-craft" },
+        { "rel": "see-also", "to": "beginners-mind" }
+      ],
+      "references": [
+        { "kind": "doc", "title": "Mission Ethos Seeds", "path": "docs/ethos/why.md" }
+      ],
+      "actions": [
+        { "label": "Read Source Essay", "action": { "kind": "openPanel", "panelId": "mission-ethos-source" } }
+      ]
+    },
+    {
+      "id": "bodhisattva-craft",
+      "slug": "bodhisattva-craft",
+      "title": "Bodhisattva Craft",
+      "excerpt": "Logistics of compassion: move fuel from distant novae back to Sol to keep balance.",
+      "bodyMD": "Transport is our meditation. Every convoy is a mudra aligning engineering, attention, and relief.\n\nLedger discipline matters: duty, TS, and curvature budgets — each metric is a moral accounting entry.",
+      "tags": ["logistics", "ledger"],
+      "children": ["stewardship-ledger"],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "child", "to": "stewardship-ledger" }
+      ],
+      "references": [
+        { "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }
+      ],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Dive into Stewardship Ledger", "action": { "kind": "gotoNode", "to": "stewardship-ledger" } }
+      ]
+    },
+    {
+      "id": "stewardship-ledger",
+      "slug": "stewardship-ledger",
+      "title": "Stewardship Ledger",
+      "excerpt": "Duty stays green; TS stays high; compare kappa_drive vs kappa_body to prove average safety.",
+      "bodyMD": "Hold zeta \u2264 1 to keep curvature from cracking the hull or the vow.\n\nLight-crossing cadence (TS \u2265 1) is how relativity hears the average promise rather than the spikes.",
+      "tags": ["metrics", "discipline"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "bodhisattva-craft" }
+      ],
+      "references": [
+        { "kind": "panel", "title": "Vacuum Gap Heatmap", "panelId": "vacuum-gap-heatmap" }
+      ],
+      "actions": [
+        { "label": "Open Vacuum Gap Heatmap", "action": { "kind": "openPanel", "panelId": "vacuum-gap-heatmap" } },
+        { "label": "Return to Bodhisattva Craft", "action": { "kind": "gotoNode", "to": "bodhisattva-craft" } }
+      ]
+    },
+    {
+      "id": "beginners-mind",
+      "slug": "beginners-mind",
+      "title": "Beginner's Mind",
+      "excerpt": "Shoshin resists stagnation; we tune geometry so the vacuum keeps breathing cleanly.",
+      "bodyMD": "Gamma_geo \u2265 20 with a_eff near 0.984 nm: not just math, but a breathing space for attention.\n\nPort polishing, Q preservation, and healthy duty cycles are the same as protecting wonder.",
+      "tags": ["shoshin", "geometry"],
+      "children": ["inner-spark"],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "child", "to": "inner-spark" }
+      ],
+      "references": [
+        { "kind": "panel", "title": "Spectrum Tuner", "panelId": "spectrum-tuner" }
+      ],
+      "actions": [
+        { "label": "Open Spectrum Tuner", "action": { "kind": "openPanel", "panelId": "spectrum-tuner" } },
+        { "label": "Explore Inner Spark", "action": { "kind": "gotoNode", "to": "inner-spark" } }
+      ]
+    },
+    {
+      "id": "inner-spark",
+      "slug": "inner-spark",
+      "title": "Inner Spark",
+      "excerpt": "Preserve wonder so real partnership — between humans or with spacetime — is possible.",
+      "bodyMD": "A child's drive to stay whole mirrors our need to keep the warp bubble coherent.\n\nPresence is an engineering control loop: if you cannot stabilize your own signal, you cannot stabilize spacetime.",
+      "tags": ["presence", "psychology"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "beginners-mind" }
+      ],
+      "actions": [
+        {
+          "label": "Open Zen Mantra Settings",
+          "action": { "kind": "openSettings", "tab": "preferences" }
+        },
+        { "label": "Return to Beginner's Mind", "action": { "kind": "gotoNode", "to": "beginners-mind" } }
+      ]
+    },
+    {
+      "id": "struggle-testament",
+      "slug": "struggle-testament",
+      "title": "Struggle as Testament",
+      "excerpt": "Sweat, tears, and humor are artifacts; they prove we earn each coordinate.",
+      "bodyMD": "Every challenge logged in the ledger is a calibration point for compassion.\n\nWhen dreams are questioned, understanding bridges the distance better than thrust does.",
+      "tags": ["resilience"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" }
+      ],
+      "references": [
+        { "kind": "panel", "title": "AGI Task History", "panelId": "agi-task-history" }
+      ],
+      "actions": [
+        { "label": "Trace Trials in Task History", "action": { "kind": "openPanel", "panelId": "agi-task-history" } },
+        { "label": "Return to Mission Ethos", "action": { "kind": "gotoNode", "to": "mission-ethos" } }
+      ]
+    },
+    {
+      "id": "devotion-course",
+      "slug": "devotion-course",
+      "title": "Devotion as Course Plotting",
+      "excerpt": "Navigation is devotional math: the course is set by what we choose to protect.",
+      "bodyMD": "Project the pledge onto the stars — keep them shining and wonder unbroken.\n\nZen and spacetime meet when physics is wielded as compassion instead of conquest.",
+      "tags": ["navigation", "devotion"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" }
+      ],
+      "references": [
+        { "kind": "panel", "title": "Solar Navigation", "panelId": "nav-system" }
+      ],
+      "actions": [
+        { "label": "Open Solar Navigation", "action": { "kind": "openPanel", "panelId": "nav-system" } },
+        { "label": "Return Home", "action": { "kind": "gotoNode", "to": "mission-ethos" } }
+      ]
+    }
+  ]
+}
+

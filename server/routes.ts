@@ -43,8 +43,8 @@ const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean 
   return defaultValue;
 };
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  const httpServer = createServer(app);
+export async function registerRoutes(app: Express, existingServer?: Server): Promise<Server> {
+  const httpServer = existingServer ?? createServer(app);
   app.use("/api/luma/ops", lumaHceRouter);
   app.use("/api/luma", lumaRouter);
   registerLumaWhisperRoute(app);
