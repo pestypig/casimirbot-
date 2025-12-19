@@ -1,5 +1,7 @@
 // client/src/lib/warp-proof-math.ts
 
+import { kappa_drive } from "@shared/curvature-proxy";
+
 // Core physical constants
 const PI = Math.PI;
 const HBAR_C = 3.16152677e-26; // ħc [J·m] (matches pipeline)
@@ -173,8 +175,6 @@ export function computeMechanicalGuard(
 
 // Optional: Phoenix curvature proxy (kappa_drive) for display only
 // kappa_drive ~ (8*pi*G/c^5) * (P/A) * d_eff * G_geom
-const G_NEWTON = 6.67430e-11;
-const C_LIGHT = 299_792_458;
 
 export function kappaDriveProxy(params: {
   power_W: number;
@@ -185,8 +185,7 @@ export function kappaDriveProxy(params: {
   const { power_W, area_m2, d_eff, gammaGeo } = params;
   const PbyA = power_W / Math.max(1e-9, area_m2);
   const geomGain = Math.max(1e-12, gammaGeo);
-  const prefactor = (8 * PI * G_NEWTON) / Math.pow(C_LIGHT, 5);
-  return prefactor * PbyA * d_eff * geomGain;
+  return kappa_drive(PbyA, d_eff, geomGain);
 }
 
 // Small helpers

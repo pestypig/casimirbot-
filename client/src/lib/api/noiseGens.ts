@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/queryClient";
+import { readCoverFlowPayload } from "@/lib/noise/cover-flow";
 import type {
   Generation,
   MoodPreset,
@@ -19,6 +20,23 @@ const endpoints = {
   upload: `${BASE}/upload`,
   jobStatus: (jobId: string) => `${BASE}/jobs/${encodeURIComponent(jobId)}`,
 } as const;
+
+export type CreateCoverJobPayload = CoverJobRequest & {
+  forceRemote?: boolean;
+};
+
+const mergeKnowledgeFileIds = (...sources: Array<readonly string[] | null | undefined>): string[] => {
+  const ids = new Set<string>();
+  for (const list of sources) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      if (typeof entry !== "string") continue;
+      const trimmed = entry.trim();
+      if (trimmed) ids.add(trimmed);
+    }
+  }
+  return Array.from(ids);
+};
 
 const withSearch = (endpoint: string, q?: string) =>
   q ? `${endpoint}?search=${encodeURIComponent(q)}` : endpoint;
@@ -71,10 +89,31 @@ export async function requestGeneration(payload: {
 }
 
 export async function createCoverJob(
-  payload: CoverJobRequest,
+  payload: CreateCoverJobPayload,
   signal?: AbortSignal,
 ): Promise<{ id: string }> {
-  const res = await apiRequest("POST", `${BASE}/jobs`, payload, signal);
+  const coverFlowPayload = readCoverFlowPayload();
+  const mergedKnowledgeFileIds = mergeKnowledgeFileIds(
+    payload.knowledgeFileIds,
+    coverFlowPayload?.knowledgeFileIds,
+  );
+  const body: CreateCoverJobPayload = { ...payload };
+
+  if (mergedKnowledgeFileIds.length) {
+    body.knowledgeFileIds = mergedKnowledgeFileIds;
+  } else {
+    delete body.knowledgeFileIds;
+  }
+
+  if (body.kbTexture == null && coverFlowPayload?.kbTexture) {
+    body.kbTexture = coverFlowPayload.kbTexture;
+  }
+
+  if (typeof body.forceRemote !== "boolean" && typeof coverFlowPayload?.forceRemote === "boolean") {
+    body.forceRemote = coverFlowPayload.forceRemote;
+  }
+
+  const res = await apiRequest("POST", `${BASE}/jobs`, body, signal);
   return parseJson<{ id: string }>(res);
 }
 

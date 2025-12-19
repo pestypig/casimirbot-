@@ -1075,7 +1075,7 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
                   {flightEnabled ? "Disable" : "Enable"}
                 </Button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
                     Mode
@@ -1095,7 +1095,7 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
                   </ToggleGroup>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
                 <div>
                   <div className="flex items-center justify-between text-muted-foreground">
                     <span>Max yaw rate</span>
@@ -1162,7 +1162,7 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                   <span>sigma (sectors)</span>

@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "./collapse-benchmark*.spec.ts",
+    "./lattice-golden-hashes.spec.ts",
+    "./lattice-parity-probes.spec.ts",
+    "./warpfield-lattice.integration.spec.ts",
+    "./warpfield-alignment*.spec.ts",
+    "./physics-contract.gate0.spec.ts",
+    "../types/**/*.d.ts",
+    "../client/src/types/**/*.d.ts"
+  ],
+  "exclude": ["../node_modules", "../dist", "../build"]
+}

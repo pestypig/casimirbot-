@@ -18,6 +18,458 @@ export type SamplingKind = z.infer<typeof samplingKindSchema>;
 export const qiFieldTypeSchema = z.enum(["scalar", "em", "dirac"]);
 export type QiFieldType = z.infer<typeof qiFieldTypeSchema>;
 
+// --- Hull geometry ----------------------------------------------------------
+
+export const hullSchema = z.object({
+  Lx_m: z.number().positive(),
+  Ly_m: z.number().positive(),
+  Lz_m: z.number().positive(),
+  wallThickness_m: z.number().positive().optional(),
+});
+export type HullSchema = z.infer<typeof hullSchema>;
+
+export const hullAreaOverrideSchema = z.object({
+  hullAreaOverride_m2: z.number().positive().optional(),
+  hullAreaOverride_uncertainty_m2: z.number().nonnegative().optional(),
+});
+
+// Optional per-sector surface area map (m^2 per sector)
+export const hullAreaPerSectorSchema = z
+  .array(z.number().nonnegative())
+  .min(1)
+  .max(10_000)
+  .optional();
+
+const vec3Schema = z.tuple([z.number(), z.number(), z.number()]);
+
+export const axisLabelSchema = z.enum(["x", "y", "z"]);
+export type AxisLabel = z.infer<typeof axisLabelSchema>;
+
+export const basisTransformSchema = z.object({
+  swap: z
+    .object({
+      x: axisLabelSchema.optional(),
+      y: axisLabelSchema.optional(),
+      z: axisLabelSchema.optional(),
+    })
+    .optional(),
+  flip: z
+    .object({
+      x: z.boolean().optional(),
+      y: z.boolean().optional(),
+      z: z.boolean().optional(),
+    })
+    .optional(),
+  scale: vec3Schema.optional(),
+});
+export type BasisTransform = z.infer<typeof basisTransformSchema>;
+
+export const hullBasisResolvedSchema = z.object({
+  swap: z.object({
+    x: axisLabelSchema,
+    y: axisLabelSchema,
+    z: axisLabelSchema,
+  }),
+  flip: z.object({
+    x: z.boolean(),
+    y: z.boolean(),
+    z: z.boolean(),
+  }),
+  scale: vec3Schema,
+  forward: vec3Schema,
+  up: vec3Schema,
+  right: vec3Schema,
+});
+export type HullBasisResolved = z.infer<typeof hullBasisResolvedSchema>;
+
+export const hullPreviewObbSchema = z.object({
+  center: vec3Schema,
+  halfSize: vec3Schema,
+  axes: z.tuple([vec3Schema, vec3Schema, vec3Schema]).optional(),
+});
+export type HullPreviewOBB = z.infer<typeof hullPreviewObbSchema>;
+
+export const hullPreviewIndexedGeometrySchema = z.object({
+  positions: z.array(z.number()).optional(),
+  indices: z.array(z.number().int().nonnegative()).optional(),
+  normals: z.array(z.number()).optional(),
+  tangents: z.array(z.number()).optional(),
+  bounds: z
+    .object({
+      min: vec3Schema,
+      max: vec3Schema,
+    })
+    .optional(),
+  boundingBox: z
+    .object({
+      min: vec3Schema,
+      max: vec3Schema,
+    })
+    .optional(),
+  vertexCount: z.number().int().nonnegative().optional(),
+  triangleCount: z.number().int().nonnegative().optional(),
+  byteLength: z.number().int().nonnegative().optional(),
+});
+export type HullPreviewIndexedGeometry = z.infer<typeof hullPreviewIndexedGeometrySchema>;
+
+export const hullPreviewLodSchema = z.object({
+  tag: z.enum(["coarse", "full"]).optional(),
+  glbUrl: z.string().optional(),
+  meshHash: z.string().optional(),
+  triangleCount: z.number().int().nonnegative().optional(),
+  vertexCount: z.number().int().nonnegative().optional(),
+  byteLength: z.number().int().nonnegative().optional(),
+  indexedGeometry: hullPreviewIndexedGeometrySchema.optional(),
+  decimation: z
+    .object({
+      targetTris: z.number().int().positive().optional(),
+      targetRatio: z.number().positive().max(1).optional(),
+      achievedTris: z.number().int().positive().optional(),
+      errorMetric: z.number().nonnegative().optional(),
+      method: z.string().optional(),
+    })
+    .optional(),
+  fitBounds: z
+    .object({
+      min: vec3Schema,
+      max: vec3Schema,
+    })
+    .optional(),
+});
+export type HullPreviewLOD = z.infer<typeof hullPreviewLodSchema>;
+
+export const hullPreviewMeshArtifactSchema = z.object({
+  glbUrl: z.string().optional(),
+  meshHash: z.string().optional(),
+  basis: basisTransformSchema.optional(),
+  obb: hullPreviewObbSchema.optional(),
+  lods: z.array(hullPreviewLodSchema).optional(),
+  coarseLod: hullPreviewLodSchema.optional(),
+  fullLod: hullPreviewLodSchema.optional(),
+  provenance: z.enum(["preview", "pipeline"]).optional(),
+  clampReasons: z.array(z.string()).optional(),
+});
+export type HullPreviewMeshArtifact = z.infer<typeof hullPreviewMeshArtifactSchema>;
+
+export const hullPreviewMetricsSchema = z.object({
+  dims_m: z.object({
+    Lx_m: z.number().positive(),
+    Ly_m: z.number().positive(),
+    Lz_m: z.number().positive(),
+  }),
+  area_m2: z.number().positive(),
+  areaUnc_m2: z.number().nonnegative().optional(),
+  method: z.string().optional(),
+  triangleCount: z.number().int().nonnegative().optional(),
+  vertexCount: z.number().int().nonnegative().optional(),
+});
+export type HullPreviewMetrics = z.infer<typeof hullPreviewMetricsSchema>;
+
+const hullPreviewPayloadVersionSchema = z.enum(["v1"]);
+export type HullPreviewPayloadVersion = z.infer<typeof hullPreviewPayloadVersionSchema>;
+
+const hullPreviewPayloadBaseSchema = z.object({
+  glbUrl: z.string().optional(),
+  meshHash: z.string().optional(),
+  mesh: hullPreviewMeshArtifactSchema.optional(),
+  basis: basisTransformSchema.optional(),
+  obb: hullPreviewObbSchema.optional(),
+  scale: vec3Schema.optional(),
+  targetDims: z
+    .object({
+      Lx_m: z.number().positive(),
+      Ly_m: z.number().positive(),
+      Lz_m: z.number().positive(),
+    })
+    .optional(),
+  hullMetrics: hullPreviewMetricsSchema.nullable().optional(),
+  area_m2: z.number().nonnegative().optional(),
+  areaUnc_m2: z.number().nonnegative().optional(),
+  updatedAt: z.number().nonnegative().optional(),
+  provenance: z.enum(["preview", "pipeline"]).optional(),
+  clampReasons: z.array(z.string()).optional(),
+  lodCoarse: hullPreviewLodSchema.optional(),
+  lodFull: hullPreviewLodSchema.optional(),
+  lods: z.array(hullPreviewLodSchema).optional(),
+});
+
+export const warpGeometryKindSchema = z.enum(["ellipsoid", "radial", "sdf"]);
+export type WarpGeometryKind = z.infer<typeof warpGeometryKindSchema>;
+export const warpFallbackModeSchema = z.enum(["allow", "warn", "block"]);
+export type WarpFallbackMode = z.infer<typeof warpFallbackModeSchema>;
+export const warpGeometryFallbackSchema = z.object({
+  mode: warpFallbackModeSchema,
+  applied: z.boolean(),
+  reasons: z.array(z.string()).default([]),
+  requestedKind: warpGeometryKindSchema.nullable().optional(),
+  resolvedKind: warpGeometryKindSchema.optional(),
+  blocked: z.boolean().optional(),
+});
+export type WarpGeometryFallback = z.infer<typeof warpGeometryFallbackSchema>;
+
+export const warpRadialSampleSchema = z.object({
+  theta: z.number().optional(),
+  phi: z.number().optional(),
+  r: z.number(),
+  n: vec3Schema.optional(),
+  dA: z.number().positive().optional(),
+});
+export type WarpRadialSample = z.infer<typeof warpRadialSampleSchema>;
+
+export const warpSurfaceSampleSchema = z.object({
+  p: vec3Schema,
+  n: vec3Schema.optional(),
+  dA: z.number().positive().optional(),
+  signedDistance_m: z.number().optional(),
+});
+export type WarpSurfaceSample = z.infer<typeof warpSurfaceSampleSchema>;
+
+export const warpGeometrySchema = z.object({
+  kind: warpGeometryKindSchema.default("ellipsoid"),
+  assetId: z.string().optional(),
+  resolution: z.number().int().positive().max(256).optional(),
+  wallThickness_m: z.number().positive().optional(),
+  driveDirection: vec3Schema.optional(),
+  radial: z
+    .object({
+      samples: z.array(warpRadialSampleSchema).optional(),
+      nTheta: z.number().int().positive().max(1024).optional(),
+      nPhi: z.number().int().positive().max(1024).optional(),
+    })
+    .optional(),
+  sdf: z
+    .object({
+      samples: z.array(warpSurfaceSampleSchema).optional(),
+      dims: z
+        .tuple([
+          z.number().int().positive(),
+          z.number().int().positive(),
+          z.number().int().positive(),
+        ])
+        .optional(),
+      bounds_m: vec3Schema.optional(),
+      band_m: z.number().positive().optional(),
+      format: z.enum(["float", "byte"]).optional(),
+    })
+    .optional(),
+});
+export type WarpGeometry = z.infer<typeof warpGeometrySchema>;
+
+export const warpFieldTypeSchema = z.enum(["natario", "natario_sdf", "alcubierre"]);
+export type WarpFieldType = z.infer<typeof warpFieldTypeSchema>;
+
+const cardGateSourceSchema = z.enum(["schedule", "blanket", "combined"]);
+const cardVolumeVizSchema = z.enum(["theta_drive", "theta_gr", "rho_gr"]);
+const cardVolumeDomainSchema = z.enum(["wallBand", "bubbleBox"]);
+export const cardCameraPresetSchema = z.enum(["threeQuarterFront", "broadside", "topDown"]);
+export type CardCameraPreset = z.infer<typeof cardCameraPresetSchema>;
+const cardCameraSchema = z
+  .object({
+    eye: vec3Schema.optional(),
+    target: vec3Schema.optional(),
+    up: vec3Schema.optional(),
+    fov_deg: z.number().positive().max(180).optional(),
+    radius_m: z.number().nonnegative().optional(),
+    yaw_deg: z.number().optional(),
+    pitch_deg: z.number().optional(),
+    preset: cardCameraPresetSchema.optional(),
+  })
+  .optional();
+
+const cardMeshBudgetSchema = z.object({
+  maxPreviewTriangles: z.number().int().positive().optional(),
+  maxHighTriangles: z.number().int().positive().optional(),
+  maxEdges: z.number().int().positive().optional(),
+});
+export type CardMeshBudget = z.infer<typeof cardMeshBudgetSchema>;
+
+export const cardMeshMetadataSchema = z.object({
+  meshHash: z.string().optional(),
+  provenance: z.enum(["preview", "pipeline"]).optional(),
+  geometrySource: z.enum(["preview", "pipeline", "fallback", "geometric"]).optional(),
+  lod: z.enum(["preview", "high"]).optional(),
+  lodTag: hullPreviewLodSchema.shape.tag.optional(),
+  triangleCount: z.number().int().nonnegative().optional(),
+  vertexCount: z.number().int().nonnegative().optional(),
+  decimation: hullPreviewLodSchema.shape.decimation.optional(),
+  budgets: cardMeshBudgetSchema.optional(),
+  basis: basisTransformSchema.optional(),
+  basisTags: basisTransformSchema.optional(),
+  basisResolved: hullBasisResolvedSchema.optional(),
+  clampReasons: z.array(z.string()).optional(),
+  wireframeEnabled: z.boolean().optional(),
+  updatedAt: z.number().nonnegative().optional(),
+});
+export type CardMeshMetadata = z.infer<typeof cardMeshMetadataSchema>;
+
+export const CARD_RECIPE_SCHEMA_VERSION = 1 as const;
+
+// --- Card lattice persistence ----------------------------------------------
+
+const latticeDimsSchema = z.tuple([
+  z.number().int().positive(),
+  z.number().int().positive(),
+  z.number().int().positive(),
+]);
+
+const mat4Schema = z.array(z.number()).length(16);
+
+const cardLatticePresetSchema = z.enum(["low", "medium", "high", "card"]);
+const cardLatticeProfileTagSchema = z.enum(["preview", "card"]);
+const cardLatticeBoundsProfileSchema = z.enum(["tight", "wide"]);
+
+export const cardLatticeFrameSchema = z.object({
+  preset: cardLatticePresetSchema.optional(),
+  profileTag: cardLatticeProfileTagSchema.optional(),
+  boundsProfile: cardLatticeBoundsProfileSchema.optional(),
+  dims: latticeDimsSchema,
+  voxelSize_m: z.number().positive(),
+  latticeMin: vec3Schema,
+  latticeSize: vec3Schema,
+  worldToLattice: mat4Schema,
+  latticeToWorld: mat4Schema.optional(),
+  clampReasons: z.array(z.string()).optional(),
+});
+export type CardLatticeFrame = z.infer<typeof cardLatticeFrameSchema>;
+
+export const cardLatticeDriveLadderScalarsSchema = z.object({
+  R: z.number(),
+  sigma: z.number(),
+  beta: z.number(),
+  gate: z.number(),
+  ampChain: z.number(),
+});
+export type CardLatticeDriveLadderScalars = z.infer<typeof cardLatticeDriveLadderScalarsSchema>;
+
+export const cardLatticeMetadataSchema = z.object({
+  enabled: z.boolean().optional(),
+  updatedAt: z.number().nonnegative().optional(),
+  band_m: z.number().positive().optional(),
+  frame: cardLatticeFrameSchema.optional(),
+  hashes: z
+    .object({
+      strobe: z.string().optional(),
+      weights: z.string().optional(),
+      volume: z.string().optional(),
+      sdf: z.string().optional(),
+    })
+    .optional(),
+  driveLadder: z
+    .object({
+      scalars: cardLatticeDriveLadderScalarsSchema.nullable().optional(),
+      signature: z.string().optional(),
+      hash: z.string().optional(),
+    })
+    .optional(),
+  stats: z
+    .object({
+      coverage: z.number().min(0).max(1).optional(),
+      maxGate: z.number().optional(),
+      maxDfdr: z.number().optional(),
+      maxDrive: z.number().optional(),
+    })
+    .optional(),
+});
+export type CardLatticeMetadata = z.infer<typeof cardLatticeMetadataSchema>;
+
+export const latticeAssetRefSchema = z.object({
+  filename: z.string(),
+  byteLength: z.number().int().nonnegative(),
+  sha256: z.string(),
+  encoding: z.enum(["rg16f-le", "r8"]),
+});
+export type LatticeAssetRef = z.infer<typeof latticeAssetRefSchema>;
+
+const latticePrecomputedAssetsSchema = z.object({
+  volumeRG16F: latticeAssetRefSchema.optional(),
+  sdfR8: latticeAssetRefSchema.optional(),
+});
+export type LatticePrecomputedAssets = z.infer<typeof latticePrecomputedAssetsSchema>;
+
+export const latticePrecomputeAttachmentSchema = z.object({
+  meshHash: z.string().optional(),
+  basisSignature: z.string().optional(),
+  profileTag: z.string().optional(),
+  preset: z.string().optional(),
+  rejectionReasons: z.array(z.string()).optional(),
+  meta: cardLatticeMetadataSchema.optional(),
+  frame: cardLatticeFrameSchema.optional(),
+  assets: latticePrecomputedAssetsSchema.optional(),
+  updatedAt: z.number().nonnegative().optional(),
+  sourcePath: z.string().optional(),
+});
+export type LatticePrecomputeAttachment = z.infer<typeof latticePrecomputeAttachmentSchema>;
+
+export const hullPreviewPayloadSchema = hullPreviewPayloadBaseSchema
+  .extend({
+    version: hullPreviewPayloadVersionSchema.optional(),
+    precomputed: latticePrecomputeAttachmentSchema.nullable().optional(),
+  })
+  .transform((payload) => ({
+    ...payload,
+    version: payload.version ?? "v1",
+  }));
+export type HullPreviewPayload = z.infer<typeof hullPreviewPayloadSchema>;
+
+const cardRecipeSignaturesSchema = z.object({
+  meshHash: z.string().optional(),
+  meshSignature: z.string().optional(),
+  basisSignature: z.string().optional(),
+  hullSignature: z.string().optional(),
+  blanketSignature: z.string().optional(),
+  vizSignature: z.string().optional(),
+  profileSignature: z.string().optional(),
+  geometrySignature: z.string().optional(),
+});
+export type CardRecipeSignatures = z.infer<typeof cardRecipeSignaturesSchema>;
+
+export const spacetimeGridPrefsSchema = z.object({
+  enabled: z.boolean(),
+  mode: z.enum(["slice", "surface", "volume"]),
+  spacing_m: z.number().positive(),
+  warpStrength: z.number().nonnegative(),
+  falloff_m: z.number().positive(),
+  colorBy: z.enum(["thetaSign", "thetaMagnitude", "warpStrength"]),
+  useSdf: z.boolean(),
+  warpStrengthMode: z.enum(["manual", "autoThetaPk", "autoThetaScaleExpected"]),
+});
+export type SpacetimeGridPrefs = z.infer<typeof spacetimeGridPrefsSchema>;
+
+export const cardRecipeSchema = z.object({
+  schemaVersion: z.number().int().positive().default(CARD_RECIPE_SCHEMA_VERSION),
+  hull: hullSchema,
+  area: z.object({
+    hullAreaOverride_m2: hullAreaOverrideSchema.shape.hullAreaOverride_m2,
+    hullAreaOverride_uncertainty_m2: hullAreaOverrideSchema.shape.hullAreaOverride_uncertainty_m2,
+    hullArea_m2: z.number().positive().optional(),
+    __hullAreaSource: z.enum(["override", "ellipsoid"]).optional(),
+  }),
+  blanket: z.object({
+    tilesPerSectorVector: z.array(z.number().nonnegative()).min(1).max(10_000).optional(),
+    activeFraction: z.number().min(0).max(1).optional(),
+  }),
+  viz: z.object({
+    volumeViz: cardVolumeVizSchema.default("theta_drive"),
+    volumeDomain: cardVolumeDomainSchema.default("wallBand"),
+    gateSource: cardGateSourceSchema.default("schedule"),
+    gateView: z.boolean().default(true),
+    forceFlatGate: z.boolean().optional(),
+    opacityWindow: z.tuple([z.number(), z.number()]).optional(),
+    spacetimeGrid: spacetimeGridPrefsSchema.optional(),
+  }),
+  geometry: z.object({
+    warpFieldType: warpFieldTypeSchema.optional(),
+    warpGeometryKind: warpGeometryKindSchema.optional(),
+    warpGeometryAssetId: z.string().optional(),
+    warpGeometry: warpGeometrySchema.optional(),
+  }),
+  camera: cardCameraSchema,
+  mesh: cardMeshMetadataSchema.optional(),
+  lattice: cardLatticeMetadataSchema.optional(),
+  signatures: cardRecipeSignaturesSchema.optional(),
+});
+export type CardRecipe = z.infer<typeof cardRecipeSchema>;
+
 // --- Navigation / Pose -------------------------------------------------------
 
 export type NavFrame = "heliocentric-ecliptic" | "heliocentric-icrs" | "simulation" | "geocentric";
@@ -553,7 +1005,8 @@ export const dynamicConfigSchema = z.object({
   // Warp field parameters
   shiftAmplitude: z.number().positive().min(1e-15).max(1e-9).default(50e-12), // m (shift amplitude)
   expansionTolerance: z.number().positive().min(1e-15).max(1e-6).default(1e-12), // Zero-expansion tolerance
-  warpFieldType: z.enum(["natario", "alcubierre"]).default("natario"), // Warp field type
+  warpFieldType: warpFieldTypeSchema.default("natario"), // Warp field type
+  warpGeometry: warpGeometrySchema.optional(),
   // Optional sweep controls (single point or arrays)
   gap_nm: z.union([z.number().positive(), z.array(z.number().positive())]).optional(),
   mod_depth_pct: z.union([z.number().positive().max(100), z.array(z.number().positive().max(100))]).optional(),
@@ -835,6 +1288,9 @@ export const simulationParametersSchema = z.object({
 
   // Dynamic module parameters (based on math-gpt.org formulation)
   dynamicConfig: dynamicConfigSchema.optional(),
+  warpGeometry: warpGeometrySchema.optional(),
+  warpGeometryKind: warpGeometryKindSchema.optional(),
+  warpGeometryAssetId: z.string().optional(),
 
   // Advanced computational parameters
   advanced: z

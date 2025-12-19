@@ -1,12 +1,23 @@
-﻿import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
+import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { subscribeDriveIntent, type DriveIntentState } from "@/lib/drive-intent-channel";
 import { queryClient } from "@/lib/queryClient";
-import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
+import {
+  useHull3DSharedStore,
+  type HullCameraState,
+  type HullSpacetimeGridPrefs,
+  type HullVolumeDomain,
+} from "@/store/useHull3DSharedStore";
 import {
   curvaturePaletteIndex,
   isCurvatureDirectiveEnabled,
   type CurvatureDirective,
 } from "@/lib/curvature-directive";
+import { colorizeWireframeOverlay, type WireframeContactPatch, type WireframeOverlayBuffers } from "@/lib/resolve-wireframe-overlay";
+import { divergeThetaColor, resolveSpacetimeGridThetaNorm } from "@/lib/spacetime-grid";
+import { encodeHullDistanceBandWeightsR8, type HullDistanceGrid } from "@/lib/lattice-sdf";
+import type { HullSurfaceVoxelVolume } from "@/lib/lattice-surface";
+import type { LatticeFrame, LatticeProfileTag, LatticeQualityPreset } from "@/lib/lattice-frame";
+import { LATTICE_PROFILE_PERF, estimateLatticeUploadBytes } from "@/lib/lattice-perf";
 
 
 
@@ -66,6 +77,10 @@ const DEFAULT_DOMAIN_SCALE = 1.3;
 
 
 
+const DEFAULT_OPACITY_WINDOW: [number, number] = [0.05, 0.35];
+
+
+
 const DEFAULT_EMA_ALPHA = 0.12;
 
 
@@ -79,6 +94,19 @@ const INV16PI = 1 / (16 * Math.PI);
 const CURVATURE_GAIN_MAX = 6;
 
 const CURVATURE_BOOST_MAX = 40;
+
+const LATTICE_UPLOAD_BUDGET_MBPS: Record<LatticeProfileTag, number> = Object.freeze({
+  preview: 64,
+  card: 256,
+});
+
+// Prefer half-float uploads once the float32 packed volume crosses this size.
+const LATTICE_PREFER_HALF_FLOAT_UPLOAD_BYTES = 64 * 1024 * 1024;
+
+const LATTICE_UPLOAD_MAX_DT_SEC = 0.25;
+
+const latticeRailsForProfile = (tag?: LatticeProfileTag) =>
+  LATTICE_PROFILE_PERF[tag ?? "preview"] ?? LATTICE_PROFILE_PERF.preview;
 
 const wrapPhase01 = (value: number) => {
   const wrapped = value % 1;
@@ -268,6 +296,10 @@ export type Hull3DVolumeViz = "theta_gr" | "rho_gr" | "theta_drive";
 
 
 
+export type Hull3DVolumeDomain = HullVolumeDomain;
+
+
+
 const VOLUME_VIZ_TO_INDEX: Record<Hull3DVolumeViz, 0 | 1 | 2> = {
 
 
@@ -288,9 +320,29 @@ const VOLUME_VIZ_TO_INDEX: Record<Hull3DVolumeViz, 0 | 1 | 2> = {
 
 
 
+const VOLUME_DOMAIN_TO_INDEX: Record<HullVolumeDomain, 0 | 1> = {
 
 
 
+  wallBand: 0,
+
+
+
+  bubbleBox: 1,
+
+
+
+};
+
+
+
+
+
+
+
+export type HullGeometryMode = "ellipsoid" | "radial" | "sdf";
+
+export type HullGateSource = "schedule" | "blanket" | "combined";
 
 export interface Hull3DQualityOverrides {
 
@@ -506,6 +558,8 @@ export interface Hull3DOverlayState {
 
 
 
+  spacetimeGrid?: HullSpacetimeGridPrefs;
+
 }
 
 
@@ -563,11 +617,90 @@ type CurvatureBrickMessage = {
 
 };
 
+type LatticeStrobeHist = {
+  vertices: Float32Array;
+  triangles: Float32Array;
+  triangleArea: Float32Array;
+  triangleAreaTotal: number;
+  triangleArea01: Float32Array;
+  sectorCount: number;
+};
+
+type LatticeStrobeCoverage = {
+  area: Float32Array;
+  area01: Float32Array;
+  vertices: Float32Array;
+  vertices01: Float32Array;
+  triangles: Float32Array;
+  triangles01: Float32Array;
+};
+
+type LatticeStrobeState = {
+  hash: string;
+  source: "preview" | "fallback";
+  lod: "preview" | "high";
+  meshHash?: string;
+  sectorCount?: number;
+  triangleCount?: number;
+  vertexCount?: number;
+  clampReasons?: string[];
+  hist?: LatticeStrobeHist | null;
+  weights?: Float32Array | null;
+  coverage?: LatticeStrobeCoverage | null;
+} | null;
+
+type PreviewMeshTextureSource = TexImageSource;
+
+export type HullPreviewMeshPayload = {
+  key: string;
+  positions: Float32Array;
+  indices?: Uint32Array | Uint16Array | null;
+  uvs?: Float32Array | null;
+  texture?: PreviewMeshTextureSource | null;
+  color?: [number, number, number, number];
+};
+
 export interface Hull3DRendererState {
 
 
 
   axes: [number, number, number];
+
+
+
+  geometry?: HullGeometryMode;
+
+
+
+  hullRadiusLUT?: Float32Array | null;
+
+
+
+  hullRadiusLUTSize?: [number, number] | null;
+
+
+
+  hullRadiusMax?: number;
+
+
+
+  hullSDF?: Float32Array | Uint8Array | null;
+
+
+
+  hullSDFDims?: [number, number, number] | null;
+
+
+
+  hullSDFBounds?: [number, number, number] | undefined;
+
+
+
+  hullSDFBand?: number;
+
+
+
+  hullSDFFormat?: "float" | "byte";
 
 
 
@@ -592,6 +725,14 @@ export interface Hull3DRendererState {
 
 
   gateView: number;
+
+
+
+  gateSource?: HullGateSource;
+
+
+
+  tilesPerSectorVector?: ArrayLike<number> | null;
 
 
 
@@ -675,6 +816,26 @@ export interface Hull3DRendererState {
 
 
 
+  volumeDomain?: Hull3DVolumeDomain;
+
+
+
+  domainScale?: number;
+
+
+
+  opacityWindow?: [number, number];
+
+
+
+  camera?: HullCameraState | null;
+
+
+
+  boundsProfile?: "tight" | "wide";
+
+
+
   blendFactor: number; // 0 = instant, 1 = average
 
 
@@ -747,7 +908,28 @@ export interface Hull3DRendererState {
 
 
 
+  wireframeOverlay?: WireframeOverlayBuffers | null;
+  previewMesh?: HullPreviewMeshPayload | null;
+
+
+
   overlays?: Hull3DOverlayState;
+
+  latticeFrame?: LatticeFrame | null;
+
+  latticePreset?: LatticeQualityPreset;
+
+  latticeProfileTag?: LatticeProfileTag;
+
+  latticeClampReasons?: string[];
+
+  latticeStrobe?: LatticeStrobeState;
+  latticeSdf?: HullDistanceGrid | null;
+  latticeVolume?: HullSurfaceVoxelVolume | null;
+  latticeWeightMode?: "dynamic" | "baked";
+  latticeWorldToLattice?: Float32Array | null;
+  latticeMin?: [number, number, number] | null;
+  latticeSize?: [number, number, number] | null;
 
 
 
@@ -803,7 +985,27 @@ type QualityProfile = {
 
 
 
+type QualityBudget = {
 
+
+
+  maxDims: [number, number, number];
+
+
+
+  minDims: [number, number, number];
+
+
+
+  maxSteps: number;
+
+
+
+  minSteps: number;
+
+
+
+};
 
 
 
@@ -828,6 +1030,30 @@ const QUALITY_PROFILES: Record<Exclude<Hull3DQualityPreset, "auto">, QualityProf
 
 
 
+
+
+
+const QUALITY_BUDGETS: Record<Exclude<Hull3DQualityPreset, "auto">, QualityBudget> = {
+
+
+
+  low:    { maxDims: [160, 128, 160], minDims: [96, 72, 96], maxSteps: 72, minSteps: 24 },
+
+
+
+  medium: { maxDims: [208, 156, 208], minDims: [112, 84, 112], maxSteps: 96, minSteps: 32 },
+
+
+
+  high:   { maxDims: [256, 192, 256], minDims: [128, 96, 128], maxSteps: 128, minSteps: 40 },
+
+
+
+};
+
+
+
+const AUTO_QUALITY_BUDGET: QualityBudget = QUALITY_BUDGETS.medium;
 
 
 
@@ -1598,6 +1824,132 @@ const createTexture3D = (gl: WebGL2RenderingContext) => {
 
 };
 
+const clearGlErrors = (gl: WebGL2RenderingContext) => {
+  // Drain any previously-raised errors so subsequent checks are meaningful.
+  // WebGL returns one error at a time.
+  for (let i = 0; i < 32; i++) {
+    const err = gl.getError();
+    if (err === gl.NO_ERROR) return;
+  }
+};
+
+type LatticeAtlasLayout = {
+  tilesX: number;
+  tilesY: number;
+  width: number;
+  height: number;
+};
+
+const computeLatticeAtlasLayout = (
+  dims: [number, number, number],
+  maxTextureSize: number,
+): LatticeAtlasLayout | null => {
+  const [nx, ny, nz] = dims;
+  if (nx <= 0 || ny <= 0 || nz <= 0) return null;
+  const maxTilesX = Math.max(1, Math.floor(maxTextureSize / nx));
+  const maxTilesY = Math.max(1, Math.floor(maxTextureSize / ny));
+  if (maxTilesX <= 0 || maxTilesY <= 0) return null;
+
+  let tilesX = Math.max(1, Math.min(maxTilesX, Math.ceil(Math.sqrt(nz))));
+  let tilesY = Math.ceil(nz / tilesX);
+  if (tilesY > maxTilesY) {
+    tilesX = maxTilesX;
+    tilesY = Math.ceil(nz / tilesX);
+    if (tilesY > maxTilesY) return null;
+  }
+  return { tilesX, tilesY, width: tilesX * nx, height: tilesY * ny };
+};
+
+const float32BitsToFloat16Bits = (bits: number) => {
+  const sign = (bits >>> 16) & 0x8000;
+  const exp = (bits >>> 23) & 0xff;
+  const frac = bits & 0x7fffff;
+
+  if (exp === 0) {
+    // Flush float32 subnormals to zero (sufficient for our fields)
+    return sign;
+  }
+  if (exp === 0xff) {
+    if (frac === 0) return sign | 0x7c00; // inf
+    const payload = frac >>> 13;
+    return sign | 0x7c00 | (payload ? payload : 1); // NaN (ensure mantissa != 0)
+  }
+
+  const halfExp = exp - 127 + 15;
+  if (halfExp >= 0x1f) {
+    return sign | 0x7c00; // overflow -> inf
+  }
+  if (halfExp <= 0) {
+    if (halfExp < -10) return sign; // underflow -> 0
+    const mantissa = frac | 0x800000;
+    const shift = 1 - halfExp;
+    let halfFrac = mantissa >>> (shift + 13);
+    const roundBit = (mantissa >>> (shift + 12)) & 1;
+    const restMask = (1 << (shift + 12)) - 1;
+    const rest = mantissa & restMask;
+    if (roundBit && (rest || (halfFrac & 1))) halfFrac++;
+    return sign | (halfFrac & 0x3ff);
+  }
+
+  let halfFrac = frac >>> 13;
+  const roundBit = (frac >>> 12) & 1;
+  const rest = frac & 0xfff;
+  if (roundBit && (rest || (halfFrac & 1))) halfFrac++;
+  let halfExpBits = halfExp << 10;
+  if (halfFrac === 0x400) {
+    halfFrac = 0;
+    halfExpBits += 1 << 10;
+    if (halfExpBits >= 0x7c00) return sign | 0x7c00;
+  }
+  return sign | halfExpBits | (halfFrac & 0x3ff);
+};
+
+type LatticeVolumeUploadBackend = "tex3d" | "atlas2d";
+
+type LatticeVolumeUploadFormat = {
+  backend: LatticeVolumeUploadBackend;
+  packedRG: boolean;
+  internalFormat: number;
+  format: number;
+  type: number;
+  filter: number;
+  label: string;
+  atlas?: LatticeAtlasLayout;
+};
+
+type LatticeVolumeUploadState = {
+  hash: string;
+  dims: [number, number, number];
+  format: LatticeVolumeUploadFormat;
+  nextSlice: number;
+  lastUploadAtMs: number;
+  scratchF32?: Float32Array;
+  scratchU16?: Uint16Array;
+};
+
+type LatticeUploadTelemetry = {
+  profileTag: LatticeProfileTag;
+  voxelCount: number;
+  bytes: number;
+  budgetBytes: number;
+  budgetVoxels: number;
+  formatLabel: string | null;
+  backend: LatticeVolumeUploadBackend | null;
+  uploadedAtMs: number;
+  skippedReason?: string | null;
+  downgradeReason?: string | null;
+};
+
+type LatticeSdfUploadState = {
+  key: string;
+  dims: [number, number, number];
+  backend: LatticeVolumeUploadBackend;
+  nextSlice: number;
+  lastUploadAtMs: number;
+  atlas?: LatticeAtlasLayout;
+  data?: Uint8Array;
+};
+
 
 
 
@@ -1754,38 +2106,19 @@ const linkProgram = (gl: WebGL2RenderingContext, label: string, vsSrc: string, f
 
 const RAYMARCH_VS = `#version 300 es
 
-
-
 layout(location=0) in vec2 a_pos;
-
-
 
 out vec2 v_ndc;
 
-
-
 void main() {
-
-
 
   v_ndc = a_pos;
 
-
-
   gl_Position = vec4(a_pos, 0.0, 1.0);
-
-
 
 }
 
-
-
 `;
-
-
-
-
-
 
 
 const RAYMARCH_FS = `#version 300 es
@@ -1821,6 +2154,7 @@ layout(location=1) out vec4 outAux;
 
 
 uniform sampler3D u_volume;
+uniform sampler3D u_gateVolume;
 
 
 
@@ -1833,6 +2167,7 @@ uniform sampler2D u_ringAverage;
 
 
 uniform sampler2D u_radialLUT;
+uniform sampler2D u_volumeAtlas;
 
 
 
@@ -1897,6 +2232,83 @@ uniform float u_fActive;
 
 
 uniform float u_lumpExp;
+
+
+
+uniform bool u_hasLatticeVolume;
+uniform mat4 u_worldToLattice;
+uniform vec3 u_latticeMin;
+uniform vec3 u_latticeSize;
+uniform bool u_latticePacked;
+uniform bool u_latticeUseAtlas;
+uniform int u_latticeDynamicWeights;
+uniform vec3 u_latticeDims;
+uniform vec2 u_latticeAtlasTiles;
+uniform vec2 u_latticeSliceInvSize;
+uniform bool u_hasLatticeSdf;
+uniform sampler3D u_latticeSdf;
+uniform sampler2D u_latticeSdfAtlas;
+
+vec2 sampleLatticeAtlas(vec3 uvw) {
+  vec2 tileCount = max(u_latticeAtlasTiles, vec2(1.0));
+  vec2 invTile = 1.0 / tileCount;
+  float depth = max(u_latticeDims.z, 1.0);
+  float zf = clamp(uvw.z, 0.0, 1.0) * (depth - 1.0);
+  float z0 = floor(zf);
+  float z1 = min(z0 + 1.0, depth - 1.0);
+  float t = zf - z0;
+
+  vec2 uv = clamp(
+    uvw.xy,
+    u_latticeSliceInvSize * 0.5,
+    vec2(1.0) - u_latticeSliceInvSize * 0.5
+  );
+
+  vec2 tile0 = vec2(mod(z0, tileCount.x), floor(z0 / tileCount.x));
+  vec2 tile1 = vec2(mod(z1, tileCount.x), floor(z1 / tileCount.x));
+  vec2 uv0 = (tile0 + uv) * invTile;
+  vec2 uv1 = (tile1 + uv) * invTile;
+  vec4 s0 = texture(u_volumeAtlas, uv0);
+  vec4 s1 = texture(u_volumeAtlas, uv1);
+  return mix(s0.rg, s1.rg, t);
+}
+
+vec2 sampleLattice(vec3 uvw) {
+  if (!u_hasLatticeVolume) return vec2(0.0);
+  if (u_latticeUseAtlas) return sampleLatticeAtlas(uvw);
+  if (u_latticePacked) return texture(u_volume, uvw).rg;
+  return vec2(texture(u_volume, uvw).r, texture(u_gateVolume, uvw).r);
+}
+
+float sampleLatticeSdfAtlas(vec3 uvw) {
+  vec2 tileCount = max(u_latticeAtlasTiles, vec2(1.0));
+  vec2 invTile = 1.0 / tileCount;
+  float depth = max(u_latticeDims.z, 1.0);
+  float zf = clamp(uvw.z, 0.0, 1.0) * (depth - 1.0);
+  float z0 = floor(zf);
+  float z1 = min(z0 + 1.0, depth - 1.0);
+  float t = zf - z0;
+
+  vec2 uv = clamp(
+    uvw.xy,
+    u_latticeSliceInvSize * 0.5,
+    vec2(1.0) - u_latticeSliceInvSize * 0.5
+  );
+
+  vec2 tile0 = vec2(mod(z0, tileCount.x), floor(z0 / tileCount.x));
+  vec2 tile1 = vec2(mod(z1, tileCount.x), floor(z1 / tileCount.x));
+  vec2 uv0 = (tile0 + uv) * invTile;
+  vec2 uv1 = (tile1 + uv) * invTile;
+  float s0 = texture(u_latticeSdfAtlas, uv0).r;
+  float s1 = texture(u_latticeSdfAtlas, uv1).r;
+  return mix(s0, s1, t);
+}
+
+float sampleLatticeSdf(vec3 uvw) {
+  if (!u_hasLatticeSdf) return 0.0;
+  if (u_latticeUseAtlas) return sampleLatticeSdfAtlas(uvw);
+  return texture(u_latticeSdf, uvw).r;
+}
 
 
 
@@ -2052,6 +2464,14 @@ uniform int u_volumeViz;      // 0 theta_GR, 1 rho_GR, 2 theta_Drive
 
 
 
+uniform int u_volumeDomain;   // 0=wallBand, 1=bubbleBox
+
+
+
+uniform vec2 u_opacityWindow; // [min,max] opacity window for bubble domain
+
+
+
 // Distribution-aware ring overlay controls
 
 
@@ -2085,6 +2505,9 @@ uniform vec3 u_cameraPos;
 
 
 uniform mat4 u_invViewProj;
+
+
+
 
 
 
@@ -2938,6 +3361,15 @@ void main() {
 
 
     vec3 gridCentered = pos / bounds;
+    vec3 latticeUVW = clamp(gridCentered * 0.5 + 0.5, 0.0, 1.0);
+    if (u_hasLatticeVolume) {
+      vec4 lp = u_worldToLattice * vec4(pos, 1.0);
+      latticeUVW = clamp((lp.xyz - u_latticeMin) / u_latticeSize, 0.0, 1.0);
+    }
+    vec2 latticeSample = sampleLattice(latticeUVW);
+    float driveSample = latticeSample.x;
+    float gateSample = latticeSample.y;
+    float sdfBand = sampleLatticeSdf(latticeUVW);
 
 
 
@@ -3013,27 +3445,18 @@ void main() {
 
 
 
-        float a01Base = a01_metric(pMetric);
-
-
-
-        float aInstant = fract(a01Base + u_phaseSign * u_phase01);
-
-
-
-        float wInstant = fetchRingWeight(u_ringInstant, aInstant);
-
-
-
-        float wAverage = fetchRingWeight(u_ringAverage, a01Base);
-
-
-
         float blendT = clamp(u_ringOverlayBlend, 0.0, 1.0);
 
 
 
-        float wMix = mix(wInstant, wAverage, blendT);
+        float wMix = gateSample;
+        if (!u_hasLatticeVolume || u_latticeDynamicWeights != 0) {
+          float a01Base = a01_metric(pMetric);
+          float aInstant = fract(a01Base + u_phaseSign * u_phase01);
+          float wInstant = fetchRingWeight(u_ringInstant, aInstant);
+          float wAverage = fetchRingWeight(u_ringAverage, a01Base);
+          wMix = mix(wInstant, wAverage, blendT);
+        }
 
 
 
@@ -3105,7 +3528,13 @@ void main() {
 
 
 
-          float gateWF = pow(activeScale * sqrt(max(wMix, 0.0)), gateExponent);
+          float gateWF = 1.0;
+          if (u_forceFlatGate == 0) {
+            gateWF = pow(activeScale * sqrt(max(wMix, 0.0)), gateExponent);
+          }
+
+          float gateMask = u_hasLatticeVolume ? max(gateSample, 0.0) : 1.0;
+          float gateWeight = (!u_hasLatticeVolume || u_latticeDynamicWeights != 0) ? gateMask * gateWF : gateMask;
 
 
 
@@ -3117,19 +3546,20 @@ void main() {
 
 
 
-          float thetaGR = u_beta * base;
+          float gateGR = (u_hasLatticeVolume && u_latticeDynamicWeights == 0) ? gateMask : 1.0;
+          float thetaGR = u_beta * base * gateGR;
 
 
 
-          float Kxx = -u_beta * base;
+          float Kxx = -u_beta * base * gateGR;
 
 
 
-          float Kxy = -0.5 * u_beta * dfy;
+          float Kxy = -0.5 * u_beta * dfy * gateGR;
 
 
 
-          float Kxz = -0.5 * u_beta * dfz;
+          float Kxz = -0.5 * u_beta * dfz * gateGR;
 
 
 
@@ -3145,7 +3575,19 @@ void main() {
 
 
 
-          float thetaDrive = thetaGR * u_ampChain * u_gate_view * gateWF;
+          float sdfBlend = clamp(sdfBand, 0.0, 1.0);
+          sdfBlend *= sdfBlend;
+          float driveAnalytic = thetaGR * u_ampChain * gateWeight;
+          float thetaDrive = driveAnalytic * u_gate_view;
+
+          if (u_hasLatticeVolume) {
+            float driveWeighted = driveSample;
+            if (u_latticeDynamicWeights != 0 && u_forceFlatGate == 0) {
+              driveWeighted *= gateWF;
+            }
+            float driveSharpened = mix(driveWeighted, driveAnalytic, sdfBlend);
+            thetaDrive = driveSharpened * max(u_gate_view, 0.0);
+          }
 
 
 
@@ -3229,55 +3671,25 @@ void main() {
 
 
 
-    float a01Base = a01_metric(pMetric);
-
-
-
-    float aInstant = fract(a01Base + u_phaseSign * u_phase01);
-
-
-
-    float wInstant = fetchRingWeight(u_ringInstant, aInstant);
-
-
-
-    float wAvg = fetchRingWeight(u_ringAverage, a01Base);
-
-
-
-    float wNorm = mix(wInstant, wAvg, clamp(u_blend, 0.0, 1.0));
-
-
-
-    if (u_forceFlatGate == 1) {
-
-
-
-      wNorm = 1.0;
-
-
-
+    float wSafe = 1.0;
+    if (u_forceFlatGate == 0 && (!u_hasLatticeVolume || u_latticeDynamicWeights != 0)) {
+      float a01Base = a01_metric(pMetric);
+      float aInstant = fract(a01Base + u_phaseSign * u_phase01);
+      float wInstant = fetchRingWeight(u_ringInstant, aInstant);
+      float wAvg = fetchRingWeight(u_ringAverage, a01Base);
+      float wNorm = mix(wInstant, wAvg, clamp(u_blend, 0.0, 1.0));
+      wSafe = max(wNorm, 0.0);
     }
 
-
-
-    float wSafe = max(wNorm, 0.0);
-
-
-
-    float fActiveSafe = max(u_fActive, 1e-6);
-
-
-
-    float activeScale = inversesqrt(fActiveSafe);
-
-
-
-    float gateLump = max(0.5, u_lumpExp);
-
-
-
-    float gateWF = pow(activeScale * sqrt(wSafe), gateLump);
+    float gateWF = 1.0;
+    if (u_forceFlatGate == 0 && (!u_hasLatticeVolume || u_latticeDynamicWeights != 0)) {
+      float fActiveSafe = max(u_fActive, 1e-6);
+      float activeScale = inversesqrt(fActiveSafe);
+      float gateLump = max(0.5, u_lumpExp);
+      gateWF = pow(activeScale * sqrt(wSafe), gateLump);
+    }
+    float gateMask = u_hasLatticeVolume ? max(gateSample, 0.0) : 1.0;
+    float gateWeight = (!u_hasLatticeVolume || u_latticeDynamicWeights != 0) ? gateMask * gateWF : gateMask;
 
 
 
@@ -3289,7 +3701,18 @@ void main() {
 
 
 
-    float thetaDrive = thetaGR * u_ampChain * u_gate_view * gateWF;
+    float thetaDrive = thetaGR * u_ampChain * u_gate_view * gateWeight;
+    if (u_hasLatticeVolume) {
+      float sdfBlend = clamp(sdfBand, 0.0, 1.0);
+      sdfBlend *= sdfBlend;
+      float driveAnalytic = thetaGR * u_ampChain * gateWeight;
+      float driveWeighted = driveSample;
+      if (u_latticeDynamicWeights != 0 && u_forceFlatGate == 0) {
+        driveWeighted *= gateWF;
+      }
+      float driveSharpened = mix(driveWeighted, driveAnalytic, sdfBlend);
+      thetaDrive = driveSharpened * max(u_gate_view, 0.0);
+    }
 
 
 
@@ -3393,6 +3816,22 @@ void main() {
 
 
 
+    if (u_volumeDomain == 1) {
+
+
+
+      fieldValue = thetaDrive;
+
+
+
+      clampedValue = thetaDrive;
+
+
+
+    }
+
+
+
     sampleCount += 1.0;
 
 
@@ -3437,7 +3876,7 @@ void main() {
 
 
 
-    if (u_volumeViz == 0) {
+    if (u_volumeDomain != 1 && u_volumeViz == 0) {
 
 
 
@@ -3449,7 +3888,7 @@ void main() {
 
 
 
-    } else if (u_volumeViz == 1) {
+    } else if (u_volumeDomain != 1 && u_volumeViz == 1) {
 
 
 
@@ -3601,15 +4040,44 @@ void main() {
 
 
 
-    vec3 color = (u_volumeViz == 1)
+    float opacityGate = 1.0;
+
+    float a01Overlay = a01_metric(pMetric);
+    float aInstant = fract(a01Overlay + u_phaseSign * u_phase01);
+    float wInstant = fetchRingWeight(u_ringInstant, aInstant);
+    float wAvg = fetchRingWeight(u_ringAverage, a01Overlay);
 
 
 
-      ? purpleMap(vis)
+    if (u_volumeDomain == 1) {
 
 
 
-      : diverge(vis);
+      float owMin = max(1e-6, u_opacityWindow.x);
+
+
+
+      float owMax = max(owMin + 1e-4, u_opacityWindow.y);
+
+
+
+      opacityGate = smoothstep(owMin, owMax, abs(vis));
+
+
+
+    }
+
+
+
+    vec3 color = (u_volumeDomain == 1 || u_volumeViz != 1)
+
+
+
+      ? diverge(vis)
+
+
+
+      : purpleMap(vis);
 
 
 
@@ -3635,7 +4103,7 @@ void main() {
 
 
 
-    float alpha = 1.0 - exp(-density * 1.6);
+    float alpha = (1.0 - exp(-density * 1.6)) * opacityGate;
 
     // T00 overlay: sample |T00| field and tint as fog based on transfer
     if (u_t00Alpha > 1e-5) {
@@ -3647,7 +4115,7 @@ void main() {
       vec3 t00Tint = mix(vec3(0.1, 0.2, 0.8), vec3(1.0, 0.9, 0.3), unit);
       float fog = clamp(unit * max(0.0, u_t00Gain), 0.0, 1.0) * clamp(u_t00Alpha, 0.0, 1.0);
       color = mix(color, t00Tint, fog);
-      alpha = clamp(alpha + fog * 0.35, 0.0, 1.0);
+      alpha = clamp(alpha + fog * 0.35 * opacityGate, 0.0, 1.0);
     }
 
 
@@ -3659,7 +4127,7 @@ void main() {
         float wBlend = clamp(mix(wInstant, wAvg, mixT), 0.0, 1.0);
         float sectorWeight = mix(0.18, 1.0, pow(wBlend, 0.55));
         float gain = clamp(u_overlayGain, 0.0, 16.0);
-        float overlayAlpha = clamp(u_overlayAlpha, 0.0, 1.0);
+        float overlayAlpha = clamp(u_overlayAlpha, 0.0, 1.0) * opacityGate;
         float baseStrength = overlayShell * sectorWeight * gain;
         if (baseStrength > 1e-5 && overlayAlpha > 0.0) {
           if (u_overlayMode == 1) {
@@ -3723,6 +4191,14 @@ void main() {
   if (curvOverlayActive && curvAacc > 1e-5) {
     float overlayAlpha = clamp(curvAacc, 0.0, 1.0);
     accum.rgb = mix(accum.rgb, curvRgbAcc, overlayAlpha);
+  }
+
+  if (u_hasLatticeVolume) {
+    vec2 latticeProbe = sampleLattice(vec3(0.5));
+    float driveProbe = latticeProbe.x;
+    float gateProbe = latticeProbe.y;
+    auxMixPeak = max(auxMixPeak, gateProbe);
+    diagDriveMax = max(diagDriveMax, driveProbe);
   }
 
   if (u_debugMode == 4) {
@@ -3965,15 +4441,15 @@ const POST_VS = RAYMARCH_VS;
 
 
 
-const POST_FS = `#version 300 es
-
-
+const buildPostFs = (enableSpaceGrid: boolean) => `#version 300 es
+#define ENABLE_SPACETIME_GRID ${enableSpaceGrid ? 1 : 0}
 
 precision highp float;
 
-
-
 precision highp sampler2D;
+#if ENABLE_SPACETIME_GRID
+precision highp sampler3D;
+#endif
 
 
 
@@ -4010,6 +4486,14 @@ uniform sampler2D u_ringAverageTex;
 
 
 uniform sampler2D u_greensTex;
+
+#if ENABLE_SPACETIME_GRID
+uniform sampler3D u_spaceGridSdf;
+
+
+
+uniform sampler2D u_spaceGridSdfAtlas;
+#endif
 
 
 
@@ -4135,6 +4619,8 @@ uniform vec2 u_tiltDir;
 
 uniform float u_tiltMag;
 
+uniform float u_tiltAlpha;
+
 
 
 uniform int u_showGreens;
@@ -4155,12 +4641,155 @@ uniform vec2 u_greensRange;
 
 uniform float u_greensAlpha;
 
+vec3 diverge(float t);
+
+#if ENABLE_SPACETIME_GRID
+uniform int   u_spaceGridEnabled;
+uniform int   u_spaceGridMode; // 0 slice, 1 surface, 2 volume
+uniform int   u_spaceGridHasSdf;
+uniform int   u_spaceGridColorBy; // 0 thetaSign, 1 thetaMag, 2 warpStrength
+uniform float u_spaceGridSpacing;
+uniform float u_spaceGridWarp;
+uniform float u_spaceGridFalloff;
+uniform float u_spaceGridThetaNorm;
+uniform float u_spaceGridDomainScale;
+uniform mat4  u_spaceGridWorldToLattice;
+uniform vec3  u_spaceGridLatticeMin;
+uniform vec3  u_spaceGridLatticeSize;
+uniform vec3  u_spaceGridDims;
+uniform vec2  u_spaceGridAtlasTiles;
+uniform vec2  u_spaceGridSliceInvSize;
+uniform int   u_spaceGridUseAtlas;
+#endif
 
 
 
 
 
 
+
+
+
+
+#if ENABLE_SPACETIME_GRID
+float aaGrid(vec2 coord, vec2 fwidthScale) {
+  vec2 dist = abs(fract(coord) - 0.5);
+  vec2 fw = fwidthScale * 1.5;
+  float gx = 1.0 - smoothstep(0.0, fw.x, dist.x);
+  float gy = 1.0 - smoothstep(0.0, fw.y, dist.y);
+  return clamp(max(gx, gy), 0.0, 1.0);
+}
+
+vec3 spaceGridDiverge(float t) {
+  float u = clamp(0.5 + 0.5 * t, 0.0, 1.0);
+  vec3 cold = vec3(0.20, 0.42, 0.85);
+  vec3 mid = vec3(0.92, 0.95, 0.96);
+  vec3 warm = vec3(0.95, 0.52, 0.18);
+  if (u < 0.5) {
+    float f = u / 0.5;
+    return mix(cold, mid, f);
+  } else {
+    float f = (u - 0.5) / 0.5;
+    return mix(mid, warm, f);
+  }
+}
+
+float sampleSpaceGridSdfAtlas(vec3 uvw) {
+  vec2 tileCount = max(u_spaceGridAtlasTiles, vec2(1.0));
+  vec2 invTile = 1.0 / tileCount;
+  float depth = max(u_spaceGridDims.z, 1.0);
+  float zf = clamp(uvw.z, 0.0, 1.0) * (depth - 1.0);
+  float z0 = floor(zf);
+  float z1 = min(z0 + 1.0, depth - 1.0);
+  float t = zf - z0;
+
+  vec2 uv = clamp(uvw.xy, u_spaceGridSliceInvSize * 0.5, vec2(1.0) - u_spaceGridSliceInvSize * 0.5);
+  vec2 tile0 = vec2(mod(z0, tileCount.x), floor(z0 / tileCount.x));
+  vec2 tile1 = vec2(mod(z1, tileCount.x), floor(z1 / tileCount.x));
+  vec2 uv0 = (tile0 + uv) * invTile;
+  vec2 uv1 = (tile1 + uv) * invTile;
+  float s0 = texture(u_spaceGridSdfAtlas, uv0).r;
+  float s1 = texture(u_spaceGridSdfAtlas, uv1).r;
+  return mix(s0, s1, t);
+}
+
+float sampleSpaceGridSdf(vec3 uvw) {
+  if (u_spaceGridHasSdf == 0) return 1e9;
+  if (u_spaceGridUseAtlas != 0) return sampleSpaceGridSdfAtlas(uvw);
+  return texture(u_spaceGridSdf, uvw).r;
+}
+
+vec3 applySpacetimeGrid(
+  vec3 baseColor,
+  vec2 uv,
+  vec2 resolution,
+  float theta,
+  int colorBy,
+  float spacing,
+  float warpStrength,
+  float falloff,
+  float thetaNorm,
+  int hasSdf,
+  int mode
+) {
+  float norm = max(thetaNorm, 1e-6);
+  float thetaScaled = theta / norm;
+  float thetaMag = clamp(abs(thetaScaled), 0.0, 4.0);
+  float thetaSat = clamp(thetaScaled, -2.0, 2.0);
+  float thetaWarp = clamp(thetaScaled, -1.0, 1.0);
+  vec2 dirFlow = normalize(vec2(0.82, 0.38));
+  vec2 px = 1.0 / max(resolution, vec2(1.0));
+
+  vec3 pWorld = vec3(v_ndc.x, v_ndc.y, 0.0) * u_spaceGridDomainScale;
+  vec4 lp = u_spaceGridWorldToLattice * vec4(pWorld, 1.0);
+  vec3 pLocal = lp.xyz;
+  vec2 absP = abs(pLocal.xy);
+  float analyticSigned = max(absP.x, absP.y) - (0.45 * u_spaceGridDomainScale);
+  float sdfSigned = analyticSigned;
+  float sdfAbs = abs(analyticSigned);
+
+  if (hasSdf != 0) {
+    vec3 uvw = (pLocal - u_spaceGridLatticeMin) / u_spaceGridLatticeSize;
+    bool inBounds = all(greaterThanEqual(uvw, vec3(0.0))) && all(lessThanEqual(uvw, vec3(1.0)));
+    if (inBounds) {
+      float s = sampleSpaceGridSdf(uvw);
+      sdfSigned = s;
+      sdfAbs = abs(s);
+    } else {
+      hasSdf = 0;
+    }
+  }
+
+  float targetOffset = spacing;
+  float distForFall = (mode == 1) ? abs(sdfSigned - targetOffset) : sdfAbs;
+  float fall = exp(-distForFall / max(falloff, 1e-3));
+  if (hasSdf == 0) {
+    fall *= 0.85;
+  }
+
+  vec2 pWarp = (uv - 0.5) + warpStrength * fall * dirFlow * thetaWarp;
+  float spacingNorm = max(1e-4, spacing * 0.25);
+  vec2 gridUV = pWarp / spacingNorm;
+  vec2 fw = fwidth(gridUV) + px * 0.5;
+  float gridMask = aaGrid(gridUV, fw) * fall;
+
+  if (mode == 1) {
+    float shellBand = max(spacing * 0.35, falloff * 0.25);
+    shellBand = max(shellBand, 1e-3);
+    float shellMask = 1.0 - smoothstep(shellBand, shellBand * 2.0, distForFall);
+    gridMask *= shellMask;
+  }
+
+  float colorParam = (colorBy == 2) ? thetaMag * warpStrength : (colorBy == 1 ? thetaMag : thetaSat);
+  vec3 gridColor = spaceGridDiverge(colorParam);
+  float blend = gridMask * 0.75;
+  if (mode == 1) {
+    vec3 additive = baseColor + gridColor * blend;
+    return min(additive, vec3(1.0));
+  }
+  return mix(baseColor, gridColor, blend);
+}
+#endif
 const float INV_TAU = 0.15915494309189535;
 
 
@@ -4515,9 +5144,11 @@ void main() {
 
   }
 
-
-
-
+#if ENABLE_SPACETIME_GRID
+  if (u_spaceGridEnabled != 0 && (u_spaceGridMode == 0 || u_spaceGridMode == 1)) {
+    color = applySpacetimeGrid(color, uv, u_resolution, thetaPeak, u_spaceGridColorBy, u_spaceGridSpacing, u_spaceGridWarp, u_spaceGridFalloff, u_spaceGridThetaNorm, u_spaceGridHasSdf, u_spaceGridMode);
+  }
+#endif
 
 
 
@@ -4955,6 +5586,9 @@ void main() {
 
 `;
 
+const POST_FS = buildPostFs(true);
+const POST_FS_NO_SPACEGRID = buildPostFs(false);
+
 
 
 
@@ -5197,89 +5831,82 @@ void main() {
 
 const OVERLAY_VS = `#version 300 es
 
-
-
 layout(location=0) in vec3 a_pos;
 
-
+layout(location=1) in vec3 a_color;
 
 uniform mat4 u_mvp;
 
-
-
 uniform float u_alpha;
 
+uniform vec3 u_color;
 
+uniform int u_useColor;
 
 out float v_alpha;
-
-
+out vec3 v_color;
 
 void main() {
-
-
-
   v_alpha = u_alpha;
-
-
-
+  v_color = (u_useColor != 0) ? a_color : u_color;
   gl_Position = u_mvp * vec4(a_pos, 1.0);
-
-
-
 }
-
-
-
 `;
-
-
-
-
 
 
 
 const OVERLAY_FS = `#version 300 es
 
-
-
 precision highp float;
-
-
 
 in float v_alpha;
 
-
-
-uniform vec3 u_color;
-
-
+in vec3 v_color;
 
 out vec4 outColor;
 
-
-
 void main() {
-
-
-
-  outColor = vec4(u_color, v_alpha);
-
-
-
+  outColor = vec4(v_color, v_alpha);
 }
-
-
-
 `;
 
 
 
+const PREVIEW_MESH_VS = `#version 300 es
 
+layout(location=0) in vec3 a_pos;
+layout(location=1) in vec2 a_uv;
 
+uniform mat4 u_mvp;
 
+out vec2 v_uv;
 
-// 2D Surface overlay pass (ported from AlcubierrePanel.tsx VERT/FRAG, with alpha uniform)
+void main() {
+  v_uv = a_uv;
+  gl_Position = u_mvp * vec4(a_pos, 1.0);
+}
+`;
+
+const PREVIEW_MESH_FS = `#version 300 es
+precision highp float;
+
+in vec2 v_uv;
+
+uniform sampler2D u_tex;
+uniform vec4 u_color;
+uniform int u_hasTex;
+
+out vec4 outColor;
+
+void main() {
+  vec4 base = u_color;
+  if (u_hasTex != 0) {
+    base *= texture(u_tex, v_uv);
+  }
+  if (base.a <= 0.001) discard;
+  outColor = base;
+}
+`;
 
 
 
@@ -5300,6 +5927,8 @@ uniform float u_sigma;                  // wall thickness sigma
 
 
 uniform float u_R;                      // bubble radius R
+
+uniform float u_domainScale;            // bounds scale relative to hull axes (viewer domain)
 
 
 
@@ -5599,7 +6228,7 @@ void main(){
 
 
 
-  float domainScale = u_R * 1.3;
+  float domainScale = max(u_domainScale, 0.01);
 
 
 
@@ -6462,6 +7091,7 @@ type RendererResources = {
 
 
   overlayProgram: WebGLProgram | null;
+  previewMeshProgram: WebGLProgram | null;
 
 
 
@@ -6558,6 +7188,14 @@ type RayUniformParams = {
 
 
   volumeVizIndex: 0 | 1 | 2;
+
+
+
+  volumeDomainIndex: 0 | 1;
+
+
+
+  opacityWindow: [number, number];
 
 
 
@@ -6665,6 +7303,14 @@ export class Hull3DRenderer {
 
 
 
+  private volumeDomain: HullVolumeDomain = "wallBand";
+
+
+
+  private opacityWindow: [number, number] = DEFAULT_OPACITY_WINDOW;
+
+
+
   private volumeViz: Hull3DVolumeViz = "theta_drive";
 
 
@@ -6716,7 +7362,75 @@ export class Hull3DRenderer {
 
   private intentBusUnsub: (() => void) | null = null;
 
+  private spacetimeGridState: {
+    enabled: boolean;
+    mode: HullSpacetimeGridPrefs["mode"];
+    spacing_m: number;
+    spacingUsed_m: number;
+    warpStrength: number;
+    falloff_m: number;
+    colorBy: HullSpacetimeGridPrefs["colorBy"];
+    warpStrengthMode: HullSpacetimeGridPrefs["warpStrengthMode"];
+    hasSdf: boolean;
+    useSdf: boolean;
+    boundsMin: [number, number, number];
+    boundsSize: [number, number, number];
+    boundsExpanded_m: number;
+    reason: string | null;
+    degradedReasons: string[];
+  } = {
+    enabled: false,
+    mode: "surface",
+    spacing_m: 0.55,
+    spacingUsed_m: 0.55,
+    warpStrength: 1.0,
+    falloff_m: 0.9,
+    colorBy: "thetaSign",
+    warpStrengthMode: "autoThetaPk",
+    hasSdf: false,
+    useSdf: false,
+    boundsMin: [0, 0, 0],
+    boundsSize: [0, 0, 0],
+    boundsExpanded_m: 0,
+    reason: null,
+    degradedReasons: [],
+  };
 
+  private spacetimeGridTelemetry = {
+    enabled: false,
+    mode: "surface" as HullSpacetimeGridPrefs["mode"],
+    spacing_m: 0.55,
+    spacingUsed_m: 0.55,
+    falloff_m: 0.9,
+    thetaNorm: 1,
+    sdf: {
+      present: false,
+      key: null as string | null,
+    },
+    postEnabled: false,
+    postMode: "none" as "none" | "slice" | "surface",
+    volumeEnabled: false,
+    surfaceEnabled: false,
+    bounds: {
+      min: [0, 0, 0] as [number, number, number],
+      size: [0, 0, 0] as [number, number, number],
+      expandedBy_m: 0,
+    },
+    gpu: {
+      formatReason: null as string | null,
+    },
+    degraded: {
+      reasons: [] as string[],
+      spacingRequested_m: 0.55,
+      spacingUsed_m: 0.55,
+      sdfMissing: false,
+      analyticOnly: false,
+    },
+  };
+  private postSpaceGridEnabled = false;
+  private postSpaceGridAttempted = false;
+  private postSpaceGridAttemptKey: string | null = null;
+  private postSpaceGridAttemptAt = 0;
 
   private phaseFeedActive = false;
 
@@ -6814,7 +7528,20 @@ export class Hull3DRenderer {
 
 
 
+  private gateVolumeTex: WebGLTexture | null = null;
   private volumeTex: WebGLTexture | null = null;
+  private latticeAtlasTex: WebGLTexture | null = null;
+  private latticeUpload: LatticeVolumeUploadState | null = null;
+  private latticeUploadFailedHash: string | null = null;
+  private latticeUploadFailedReason: string | null = null;
+  private latticeUploadTelemetry: LatticeUploadTelemetry | null = null;
+  private latticeUploadFormatReason: string | null = null;
+  private latticeSdfTex: WebGLTexture | null = null;
+  private latticeSdfAtlasTex: WebGLTexture | null = null;
+  private latticeSdfUpload: LatticeSdfUploadState | null = null;
+  private latticeSdfUploadFailedKey: string | null = null;
+  private latticeSdfUploadFailedReason: string | null = null;
+  private latticeSdfReadyKey: string | null = null;
 
 
 
@@ -6905,6 +7632,10 @@ export class Hull3DRenderer {
 
 
   private supportsColorFloat = false;
+  private supportsFloatLinear = false;
+  private supportsHalfFloatLinear = false;
+  private maxTextureSize = 0;
+  private max3DTextureSize = 0;
 
 
 
@@ -6985,6 +7716,7 @@ export class Hull3DRenderer {
 
 
     overlayProgram: null,
+    previewMeshProgram: null,
 
 
 
@@ -7073,6 +7805,8 @@ export class Hull3DRenderer {
 
 
     u_R: WebGLUniformLocation | null;
+
+    u_domainScale: WebGLUniformLocation | null;
 
 
 
@@ -7270,6 +8004,78 @@ export class Hull3DRenderer {
 
 
 
+    meshWireVao: null as WebGLVertexArrayObject | null,
+
+
+
+    meshWireVbo: null as WebGLBuffer | null,
+
+
+
+    meshWireColorVbo: null as WebGLBuffer | null,
+
+    meshWireColors: null as Float32Array | null,
+
+    meshWirePatches: [] as WireframeContactPatch[],
+
+    meshWireCount: 0,
+
+    spaceGridVao: null as WebGLVertexArrayObject | null,
+
+    spaceGridVbo: null as WebGLBuffer | null,
+
+    spaceGridColorVbo: null as WebGLBuffer | null,
+
+    spaceGridCount: 0,
+
+
+
+
+
+
+
+
+
+    previewVao: null as WebGLVertexArrayObject | null,
+
+
+
+    previewVbo: null as WebGLBuffer | null,
+
+
+
+    previewUvVbo: null as WebGLBuffer | null,
+
+
+
+    previewIbo: null as WebGLBuffer | null,
+
+
+
+    previewTexture: null as WebGLTexture | null,
+
+
+
+    previewIndexType: 0,
+
+
+
+    previewCount: 0,
+
+
+
+    previewIndexed: false,
+
+
+
+    previewHasUv: false,
+
+
+
+    previewColor: new Float32Array([0.82, 0.88, 0.96, 0.95]),
+
+
+
     fallbackProgram: null as WebGLProgram | null,
 
 
@@ -7294,6 +8100,22 @@ export class Hull3DRenderer {
 
 
 
+    meshWireKey: "",
+
+
+
+    meshWireColorKey: "",
+
+
+
+    spaceGridKey: "",
+
+
+
+    previewMeshKey: "",
+
+
+
   };
 
 
@@ -7314,7 +8136,19 @@ export class Hull3DRenderer {
 
 
 
+    fallbackFrames: 0,
+
+
+
   };
+
+
+
+  private perfFallbackMs = 70;
+
+
+
+  private perfFallbackHold = 90;
 
 
 
@@ -7954,6 +8788,7 @@ export class Hull3DRenderer {
       gain: this.overlay3D.gain,
       hue: overlayHue,
       phase01: this.overlay3D.phase01,
+      spacetimeGrid: this.spacetimeGridTelemetry,
     });
   }
 
@@ -7963,6 +8798,30 @@ export class Hull3DRenderer {
 
 
     const profile = preset === "auto" ? QUALITY_PROFILES.high : QUALITY_PROFILES[preset];
+
+
+
+    const budget = preset === "auto" ? AUTO_QUALITY_BUDGET : QUALITY_BUDGETS[preset];
+
+
+
+    const clampVec = (vec: [number, number, number]) => ([
+
+
+
+      clamp(Math.round(vec[0]), budget.minDims[0], budget.maxDims[0]),
+
+
+
+      clamp(Math.round(vec[1]), budget.minDims[1], budget.maxDims[1]),
+
+
+
+      clamp(Math.round(vec[2]), budget.minDims[2], budget.maxDims[2]),
+
+
+
+    ] as [number, number, number]);
 
 
 
@@ -7982,11 +8841,19 @@ export class Hull3DRenderer {
 
 
 
-    const maxSteps = overrides?.raySteps ? Math.max(16, overrides.raySteps) : profile.maxSteps;
+    dims = clampVec(dims);
 
 
 
-    const stepBias = overrides?.stepBias ?? profile.stepBias;
+    const maxStepsRaw = overrides?.raySteps ? Math.max(16, overrides.raySteps) : profile.maxSteps;
+
+
+
+    const maxSteps = clamp(Math.round(maxStepsRaw), budget.minSteps, budget.maxSteps);
+
+
+
+    const stepBias = clamp(overrides?.stepBias ?? profile.stepBias, 0.3, 1.25);
 
 
 
@@ -7998,6 +8865,25 @@ export class Hull3DRenderer {
 
 
 
+
+
+
+  private tryEnablePostSpaceGrid(gl: WebGL2RenderingContext) {
+    if (this.postSpaceGridEnabled || this.postSpaceGridAttempted) return;
+    this.postSpaceGridAttempted = true;
+    try {
+      const next = linkProgram(gl, "Hull3D::post:grid", POST_VS, POST_FS);
+      if (this.resources.postProgram) {
+        gl.deleteProgram(this.resources.postProgram);
+      }
+      this.resources.postProgram = next;
+      this.postSpaceGridEnabled = true;
+      console.info("[Hull3DRenderer] Post shader upgraded: spacetime grid enabled");
+    } catch (err) {
+      console.error("[Hull3DRenderer] Post shader upgrade failed", err);
+      this.postSpaceGridEnabled = false;
+    }
+  }
 
 
 
@@ -8019,6 +8905,16 @@ export class Hull3DRenderer {
 
 
     this.supportsColorFloat = !!(extFloat || extHalf);
+
+    this.supportsFloatLinear = !!gl.getExtension("OES_texture_float_linear");
+    this.supportsHalfFloatLinear = !!gl.getExtension("OES_texture_half_float_linear");
+    try {
+      this.maxTextureSize = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE) ?? 0) || 0;
+      this.max3DTextureSize = Number(gl.getParameter(gl.MAX_3D_TEXTURE_SIZE) ?? 0) || 0;
+    } catch {
+      this.maxTextureSize = 0;
+      this.max3DTextureSize = 0;
+    }
 
 
 
@@ -8142,6 +9038,30 @@ export class Hull3DRenderer {
 
 
 
+      this.resources.previewMeshProgram = linkProgram(gl, "Hull3D::previewMesh", PREVIEW_MESH_VS, PREVIEW_MESH_FS);
+
+
+
+    } catch (err) {
+
+
+
+      console.error("[Hull3DRenderer] Preview mesh shader failed", err);
+
+
+
+      this.resources.previewMeshProgram = null;
+
+
+
+    }
+
+
+
+    try {
+
+
+
       this.resources.ringOverlayProgram = linkProgram(gl, "Hull3D::ringOverlay", RING_OVERLAY_VS, RING_OVERLAY_FS);
 
 
@@ -8166,7 +9086,9 @@ export class Hull3DRenderer {
 
 
 
-      this.resources.postProgram = linkProgram(gl, "Hull3D::post", POST_VS, POST_FS);
+      this.resources.postProgram = linkProgram(gl, "Hull3D::post:nogrid", POST_VS, POST_FS_NO_SPACEGRID);
+      this.postSpaceGridEnabled = false;
+      this.postSpaceGridAttempted = false;
 
 
 
@@ -8174,11 +9096,10 @@ export class Hull3DRenderer {
 
 
 
-      console.error("[Hull3DRenderer] Post shader failed", err);
-
-
-
+      console.error("[Hull3DRenderer] Post shader (no-grid) failed", err);
       this.resources.postProgram = null;
+      this.postSpaceGridEnabled = false;
+      this.postSpaceGridAttempted = true;
 
 
 
@@ -8243,6 +9164,8 @@ export class Hull3DRenderer {
 
 
           u_R: gl.getUniformLocation(prog, "u_R"),
+
+          u_domainScale: gl.getUniformLocation(prog, "u_domainScale"),
 
 
 
@@ -8482,7 +9405,7 @@ export class Hull3DRenderer {
 
 
 
-      this.radialTex = this.ringInstantTex = this.ringAverageTex = this.volumeTex = null;
+      this.radialTex = this.ringInstantTex = this.ringAverageTex = this.volumeTex = this.gateVolumeTex = null;
 
 
 
@@ -8531,6 +9454,8 @@ export class Hull3DRenderer {
 
 
     this.lastVolumeKey = "";
+    this.latticeUploadFailedHash = null;
+    this.latticeUploadFailedReason = null;
 
 
 
@@ -8590,6 +9515,68 @@ export class Hull3DRenderer {
 
 
 
+    const clampReasons = Array.isArray(this.state.latticeClampReasons)
+      ? this.state.latticeClampReasons
+      : Array.isArray(this.state.latticeFrame?.clampReasons)
+        ? this.state.latticeFrame.clampReasons
+        : [];
+    const strobe = this.state.latticeStrobe;
+    const sdfGrid = this.state.latticeSdf;
+    let latticeDiagMsg =
+      clampReasons.length > 0 ? `Lattice clamp: ${clampReasons.join(', ')}` : null;
+    const latticeVolume = this.state.latticeVolume;
+    const latticeUpload =
+      latticeVolume && this.latticeUpload && this.latticeUpload.hash === latticeVolume.hash
+        ? this.latticeUpload
+        : null;
+    if (!latticeDiagMsg && latticeVolume) {
+      if (this.latticeUploadFailedHash === latticeVolume.hash && !latticeUpload) {
+        latticeDiagMsg = "Lattice volume fallback (GPU upload unavailable)";
+      } else if (latticeUpload && latticeUpload.nextSlice < latticeUpload.dims[2]) {
+        const pct = (latticeUpload.nextSlice / Math.max(1, latticeUpload.dims[2])) * 100;
+        latticeDiagMsg = `Uploading lattice volume (${pct.toFixed(0)}%, ${latticeUpload.format.label})`;
+      }
+    }
+    if (!latticeDiagMsg && strobe?.coverage?.area01) {
+      let maxArea = 0;
+      for (let i = 0; i < strobe.coverage.area01.length; i++) {
+        const v = strobe.coverage.area01[i] ?? 0;
+        if (v > maxArea) maxArea = v;
+      }
+      if (maxArea < 0.02) {
+        latticeDiagMsg = `Strobe coverage low (peak ${(maxArea * 100).toFixed(1)}%)`;
+      }
+    }
+    if (!latticeDiagMsg && latticeVolume?.stats) {
+      const cov = Math.max(0, Math.min(1, latticeVolume.stats.coverage)) * 100;
+      const maxGate = latticeVolume.stats.maxGate ?? 0;
+      if (cov < 15) {
+        latticeDiagMsg = `Lattice volume coverage low (${cov.toFixed(1)}%, max gate ${maxGate.toFixed(3)})`;
+      } else if (maxGate < 1e-4) {
+        latticeDiagMsg = `Lattice volume dark (max gate ${maxGate.toFixed(4)})`;
+      }
+    }
+    if (!latticeDiagMsg && sdfGrid?.stats) {
+      const voxPct = Math.max(0, Math.min(1, sdfGrid.stats.voxelCoverage)) * 100;
+      const triPct = Math.max(0, Math.min(1, sdfGrid.stats.triangleCoverage)) * 100;
+      const band = Math.max(1e-6, sdfGrid.band);
+      if (voxPct < 20 || triPct < 50) {
+        latticeDiagMsg = `Hull SDF coverage low (vox ${voxPct.toFixed(1)}%, tris ${triPct.toFixed(1)}%)`;
+      } else if (sdfGrid.stats.maxAbsDistance > band * 0.95) {
+        latticeDiagMsg = `Hull SDF band saturated (|d|max ${(sdfGrid.stats.maxAbsDistance).toFixed(3)} m, band ${band.toFixed(3)} m)`;
+      }
+    }
+    if (typeof window !== "undefined") {
+      if (latticeDiagMsg) {
+        (window as any).__hullDiagMessage = { message: latticeDiagMsg, status: "lattice" };
+      } else if ((window as any).__hullDiagMessage?.status === "lattice") {
+        (window as any).__hullDiagMessage = null;
+      }
+      (window as any).__hullStrobe = this.state.latticeStrobe ?? null;
+      (window as any).__hullLatticeSdf = sdfGrid ?? null;
+      (window as any).__hullLatticeVolume = latticeVolume ?? null;
+    }
+
     this.state.vizFloorThetaGR = Math.max(0, this.state.vizFloorThetaGR ?? 1e-9);
 
 
@@ -8642,6 +9629,10 @@ export class Hull3DRenderer {
 
 
 
+    this.volumeDomain = this.resolveVolumeDomain(nextState);
+
+
+
     const wantFreeze = nextState.freeze || nextState.bubbleStatus === "CRITICAL";
 
 
@@ -8650,7 +9641,23 @@ export class Hull3DRenderer {
 
 
 
-    this.domainScale = DEFAULT_DOMAIN_SCALE * safeR;
+    const domainOverride = Number(nextState.domainScale);
+
+
+
+    this.domainScale = Number.isFinite(domainOverride) && (domainOverride as number) > 0
+
+
+
+      ? Math.max(0.1, domainOverride as number)
+
+
+
+      : DEFAULT_DOMAIN_SCALE * safeR;
+
+
+
+    this.opacityWindow = this.normalizeOpacityWindow(nextState.opacityWindow);
 
 
 
@@ -8679,6 +9686,7 @@ export class Hull3DRenderer {
 
 
       this.updateVolume(nextState);
+      this.updateLatticeSdf(nextState);
 
 
 
@@ -8708,6 +9716,87 @@ export class Hull3DRenderer {
 
   }
 
+  getLatticeGpuStatus(expected?: { volumeHash?: string | null; sdfKey?: string | null } | null) {
+    const state = this.state;
+    const expectedVolumeHash =
+      expected?.volumeHash === undefined ? state?.latticeVolume?.hash ?? null : (expected.volumeHash ?? null);
+    const expectedSdfKey =
+      expected?.sdfKey === undefined ? state?.latticeSdf?.key ?? null : (expected.sdfKey ?? null);
+
+    const activeVolumeUpload =
+      expectedVolumeHash && this.latticeUpload && this.latticeUpload.hash === expectedVolumeHash
+        ? this.latticeUpload
+        : null;
+    const volumeFailed =
+      expectedVolumeHash != null && this.latticeUploadFailedHash === expectedVolumeHash && !activeVolumeUpload;
+    const volumeReady =
+      expectedVolumeHash == null
+        ? true
+        : Boolean(activeVolumeUpload && activeVolumeUpload.nextSlice >= activeVolumeUpload.dims[2]);
+
+    const activeSdfUpload =
+      expectedSdfKey && this.latticeSdfUpload && this.latticeSdfUpload.key === expectedSdfKey
+        ? this.latticeSdfUpload
+        : null;
+    const sdfReady = expectedSdfKey == null ? true : this.latticeSdfReadyKey === expectedSdfKey;
+    const sdfFailed =
+      expectedSdfKey != null && this.latticeSdfUploadFailedKey === expectedSdfKey && !sdfReady;
+
+    const activeLattice =
+      state?.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
+        ? this.latticeUpload
+        : null;
+    const runtimeBackend = activeLattice?.format.backend ?? null;
+    const runtimeUseAtlas = runtimeBackend === "atlas2d";
+    const runtimeHasLatticeVolume = !!activeLattice;
+    const runtimeHasLatticeSdf = !!(
+      runtimeHasLatticeVolume &&
+      state?.latticeSdf &&
+      this.latticeSdfReadyKey &&
+      this.latticeSdfReadyKey === state.latticeSdf.key
+    );
+
+    return {
+      expectedVolumeHash,
+      expectedSdfKey,
+      volumeReady,
+      volumeFailed,
+      volumeFailedReason: volumeFailed ? this.latticeUploadFailedReason : null,
+      volumeUploadProgress: activeVolumeUpload
+        ? {
+            nextSlice: activeVolumeUpload.nextSlice,
+            totalSlices: activeVolumeUpload.dims[2],
+          }
+        : null,
+      sdfReady,
+      sdfFailed,
+      sdfFailedReason: sdfFailed ? this.latticeSdfUploadFailedReason : null,
+      sdfUploadProgress: activeSdfUpload
+        ? {
+            nextSlice: activeSdfUpload.nextSlice,
+            totalSlices: activeSdfUpload.dims[2],
+          }
+        : null,
+      caps: {
+        maxTextureSize: this.maxTextureSize,
+        max3DTextureSize: this.max3DTextureSize,
+        supportsColorFloat: this.supportsColorFloat,
+        supportsFloatLinear: this.supportsFloatLinear,
+        supportsHalfFloatLinear: this.supportsHalfFloatLinear,
+      },
+      runtime: {
+        hasLatticeVolume: runtimeHasLatticeVolume,
+        backend: runtimeBackend,
+        formatLabel: activeLattice?.format.label ?? null,
+        formatReason: this.latticeUploadFormatReason ?? null,
+        packedRG: activeLattice?.format.packedRG ?? null,
+        useAtlas: runtimeUseAtlas,
+        hasLatticeSdf: runtimeHasLatticeSdf,
+        telemetry: this.latticeUploadTelemetry ?? null,
+      },
+    };
+  }
+
 
 
 
@@ -8726,7 +9815,43 @@ export class Hull3DRenderer {
 
 
 
-    const metricR = RADIAL_METRIC_RADIUS; // normalized radius = 1
+    const axes = state.axes ?? [1, 1, 1];
+
+
+
+    const boundRadius = state.hullSDFBounds
+
+      ? Math.max(
+
+          Math.abs(state.hullSDFBounds[0] ?? 0),
+
+          Math.abs(state.hullSDFBounds[1] ?? 0),
+
+          Math.abs(state.hullSDFBounds[2] ?? 0),
+
+        )
+
+      : null;
+
+
+
+    const providedRadius = Number.isFinite(state.hullRadiusMax as number)
+
+      ? Math.abs(state.hullRadiusMax as number)
+
+      : null;
+
+
+
+    const axesRadius = Math.max(Math.abs(axes[0] ?? 0), Math.abs(axes[1] ?? 0), Math.abs(axes[2] ?? 0));
+
+
+
+    this.radialMaxR = Math.max(1e-3, providedRadius ?? boundRadius ?? axesRadius ?? RADIAL_SAMPLE_R_MAX);
+
+
+
+    const metricR = Math.max(state.R, 1e-6); // normalized radius uses resolved R
 
 
 
@@ -9195,61 +10320,508 @@ export class Hull3DRenderer {
 
 
   private updateVolume(state: Hull3DRendererState) {
-
-
-
-    // PERFORMANCE: shader is analytic via radial LUT; keep a tiny placeholder texture once.
-
-
-
     if (this.skipVolumeUpdate) return;
 
+    const volume = state.latticeVolume;
+    if (volume) {
+      if (this.lastVolumeKey === volume.hash) return;
 
-
-    if (this.hasVolume && this.lastVolumeKey === "ANALYTIC") return;
-
-
-
-    if (this.volumeTex) {
-
-
-
+      const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
       const { gl } = this;
+      const profileTag = state.latticeProfileTag ?? "preview";
+      const rails = latticeRailsForProfile(profileTag);
+      const dims: [number, number, number] = [
+        Math.max(1, volume.dims[0]),
+        Math.max(1, volume.dims[1]),
+        Math.max(1, volume.dims[2]),
+      ];
 
+      const voxelCount = dims[0] * dims[1] * dims[2];
+      if (voxelCount > rails.maxVoxels) {
+        this.hasVolume = false;
+        this.latticeUpload = null;
+        this.latticeUploadFailedHash = volume.hash;
+        this.latticeUploadFailedReason = "budget:voxels";
+        this.latticeUploadFormatReason = null;
+        this.latticeUploadTelemetry = {
+          profileTag,
+          voxelCount,
+          bytes: 0,
+          budgetBytes: rails.maxBytes,
+          budgetVoxels: rails.maxVoxels,
+          formatLabel: null,
+          backend: null,
+          uploadedAtMs: nowMs,
+          skippedReason: "budget:voxels",
+        };
+        return;
+      }
 
+      const shouldRestart =
+        !this.latticeUpload ||
+        this.latticeUpload.hash !== volume.hash ||
+        this.latticeUpload.dims[0] !== dims[0] ||
+        this.latticeUpload.dims[1] !== dims[1] ||
+        this.latticeUpload.dims[2] !== dims[2];
 
-      gl.bindTexture(gl.TEXTURE_3D, this.volumeTex);
+      if (shouldRestart) {
+        if (this.latticeUploadFailedHash === volume.hash) return;
 
+        const floatBytes = voxelCount * 8; // RG32F packed
+        const preferHalfForCaps =
+          !this.supportsColorFloat || (!this.supportsFloatLinear && this.supportsHalfFloatLinear);
+        const preferHalfForBudget = floatBytes >= LATTICE_PREFER_HALF_FLOAT_UPLOAD_BYTES;
+        const preferHalf = preferHalfForBudget || preferHalfForCaps;
+        const filterF32 = this.supportsFloatLinear ? gl.LINEAR : gl.NEAREST;
+        const filterF16 = this.supportsHalfFloatLinear ? gl.LINEAR : gl.NEAREST;
+        const atlas =
+          this.maxTextureSize > 0 ? computeLatticeAtlasLayout(dims, this.maxTextureSize) : null;
+        const allowTexture3D = this.max3DTextureSize > 0;
+        const tex3DDimsExceeded =
+          allowTexture3D &&
+          (dims[0] > this.max3DTextureSize ||
+            dims[1] > this.max3DTextureSize ||
+            dims[2] > this.max3DTextureSize);
 
+        const candidates: LatticeVolumeUploadFormat[] = [];
+        const rg16f3D: LatticeVolumeUploadFormat = {
+          backend: "tex3d",
+          packedRG: true,
+          internalFormat: gl.RG16F,
+          format: gl.RG,
+          type: gl.HALF_FLOAT,
+          filter: filterF16,
+          label: "3D RG16F",
+        };
+        const rg32f3D: LatticeVolumeUploadFormat = {
+          backend: "tex3d",
+          packedRG: true,
+          internalFormat: gl.RG32F,
+          format: gl.RG,
+          type: gl.FLOAT,
+          filter: filterF32,
+          label: "3D RG32F",
+        };
+        const r32f3D: LatticeVolumeUploadFormat = {
+          backend: "tex3d",
+          packedRG: false,
+          internalFormat: gl.R32F,
+          format: gl.RED,
+          type: gl.FLOAT,
+          filter: filterF32,
+          label: "3D R32F×2",
+        };
+        const rg16fAtlas: LatticeVolumeUploadFormat | null =
+          atlas
+            ? {
+                backend: "atlas2d",
+                packedRG: true,
+                internalFormat: gl.RG16F,
+                format: gl.RG,
+                type: gl.HALF_FLOAT,
+                filter: filterF16,
+                label: "Atlas RG16F",
+                atlas,
+              }
+            : null;
+        const rg32fAtlas: LatticeVolumeUploadFormat | null =
+          atlas
+            ? {
+                backend: "atlas2d",
+                packedRG: true,
+                internalFormat: gl.RG32F,
+                format: gl.RG,
+                type: gl.FLOAT,
+                filter: filterF32,
+                label: "Atlas RG32F",
+                atlas,
+              }
+            : null;
 
-      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        if (allowTexture3D) {
+          if (preferHalf) candidates.push(rg16f3D);
+          candidates.push(rg32f3D);
+          if (!preferHalf) candidates.push(rg16f3D);
+          candidates.push(r32f3D);
+        }
+        if (preferHalf && rg16fAtlas) candidates.push(rg16fAtlas);
+        if (rg32fAtlas) candidates.push(rg32fAtlas);
+        if (!preferHalf && rg16fAtlas) candidates.push(rg16fAtlas);
 
+        let budgetFiltered = false;
+        let formatReason: string | null = null;
+        let tex3DRejectedReason: string | null = null;
+        const allocateCandidate = (candidate: LatticeVolumeUploadFormat) => {
+          const formatBytes = estimateLatticeUploadBytes(dims, {
+            packedRG: candidate.packedRG,
+            bytesPerComponent: candidate.type === gl.HALF_FLOAT ? 2 : 4,
+          });
+          if (formatBytes > rails.maxBytes) {
+            budgetFiltered = true;
+            return false;
+          }
 
+          if (candidate.backend === "tex3d") {
+            if (!allowTexture3D) {
+              tex3DRejectedReason = "caps:texture3d-unsupported";
+              return false;
+            }
+            if (tex3DDimsExceeded) {
+              tex3DRejectedReason = "caps:max3dTextureSize";
+              return false;
+            }
 
-      const data = new Float32Array([0]);
+            if (!this.volumeTex) this.volumeTex = createTexture3D(gl);
+            if (!this.volumeTex) return false;
+            if (!candidate.packedRG && !this.gateVolumeTex) this.gateVolumeTex = createTexture3D(gl);
+            if (!candidate.packedRG && !this.gateVolumeTex) return false;
 
+            clearGlErrors(gl);
+            gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
+            gl.bindTexture(gl.TEXTURE_3D, this.volumeTex);
+            gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, candidate.filter);
+            gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, candidate.filter);
+            gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+            gl.texImage3D(
+              gl.TEXTURE_3D,
+              0,
+              candidate.internalFormat,
+              dims[0],
+              dims[1],
+              dims[2],
+              0,
+              candidate.format,
+              candidate.type,
+              null,
+            );
 
-      gl.texImage3D(gl.TEXTURE_3D, 0, gl.R32F, 1, 1, 1, 0, gl.RED, gl.FLOAT, data);
+            if (!candidate.packedRG && this.gateVolumeTex) {
+              gl.bindTexture(gl.TEXTURE_3D, this.gateVolumeTex);
+              gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, candidate.filter);
+              gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, candidate.filter);
+              gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+              gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+              gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+              gl.texImage3D(
+                gl.TEXTURE_3D,
+                0,
+                candidate.internalFormat,
+                dims[0],
+                dims[1],
+                dims[2],
+                0,
+                candidate.format,
+                candidate.type,
+                null,
+              );
+            }
 
+            gl.bindTexture(gl.TEXTURE_3D, null);
+            return gl.getError() === gl.NO_ERROR;
+          }
 
+          const atlasLayout = candidate.atlas;
+          if (!atlasLayout) return false;
+          if (this.maxTextureSize > 0 && (atlasLayout.width > this.maxTextureSize || atlasLayout.height > this.maxTextureSize)) {
+            return false;
+          }
 
-      gl.bindTexture(gl.TEXTURE_3D, null);
+          if (!this.latticeAtlasTex) {
+            const tex = gl.createTexture();
+            if (!tex) return false;
+            this.latticeAtlasTex = tex;
+          }
 
+          clearGlErrors(gl);
+          gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+          gl.bindTexture(gl.TEXTURE_2D, this.latticeAtlasTex);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, candidate.filter);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, candidate.filter);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            candidate.internalFormat,
+            atlasLayout.width,
+            atlasLayout.height,
+            0,
+            candidate.format,
+            candidate.type,
+            null,
+          );
+          gl.bindTexture(gl.TEXTURE_2D, null);
+          if (gl.getError() !== gl.NO_ERROR) return false;
 
+          if (!this.volumeTex) this.volumeTex = createTexture3D(gl);
+          return !!this.volumeTex;
+        };
 
+        let chosen: LatticeVolumeUploadFormat | null = null;
+        for (const candidate of candidates) {
+          if (allocateCandidate(candidate)) {
+            chosen = candidate;
+            break;
+          }
+        }
+
+        if (!chosen) {
+          this.latticeUpload = null;
+          this.latticeUploadFailedHash = volume.hash;
+          this.latticeUploadFormatReason = null;
+          const dimsExceed3D =
+            this.max3DTextureSize > 0 &&
+            (dims[0] > this.max3DTextureSize ||
+              dims[1] > this.max3DTextureSize ||
+              dims[2] > this.max3DTextureSize);
+          this.latticeUploadFailedReason = budgetFiltered
+            ? "budget:bytes"
+            : dimsExceed3D && !atlas
+              ? "caps:max3dTextureSize"
+              : !atlas
+                ? "caps:maxTextureSize"
+                : "format:unsupported";
+          this.latticeUploadTelemetry = {
+            profileTag,
+            voxelCount,
+            bytes: 0,
+            budgetBytes: rails.maxBytes,
+            budgetVoxels: rails.maxVoxels,
+            formatLabel: null,
+            backend: null,
+            uploadedAtMs: nowMs,
+            skippedReason: this.latticeUploadFailedReason ?? "format:unsupported",
+            downgradeReason: null,
+          };
+          return;
+        }
+
+        if (!formatReason) {
+          if (chosen.backend === "atlas2d") {
+            formatReason =
+              tex3DRejectedReason ??
+              (!allowTexture3D
+                ? "caps:texture3d-unsupported"
+                : tex3DDimsExceeded
+                  ? "caps:max3dTextureSize"
+                  : null);
+          } else if (chosen.type === gl.HALF_FLOAT && preferHalfForCaps) {
+            if (!this.supportsColorFloat) formatReason = "caps:color-buffer-float";
+            else if (!this.supportsFloatLinear && this.supportsHalfFloatLinear) formatReason = "caps:float-linear";
+          }
+        }
+
+        this.latticeUploadFailedHash = null;
+        this.latticeUploadFailedReason = null;
+        const sliceVoxels = dims[0] * dims[1];
+        const scratchLen = sliceVoxels * (chosen.packedRG ? 2 : 1);
+        const nextUpload: LatticeVolumeUploadState = {
+          hash: volume.hash,
+          dims,
+          format: chosen,
+          nextSlice: 0,
+          lastUploadAtMs: nowMs,
+        };
+        if (chosen.packedRG) {
+          if (chosen.type === gl.HALF_FLOAT) nextUpload.scratchU16 = new Uint16Array(scratchLen);
+          else nextUpload.scratchF32 = new Float32Array(scratchLen);
+        }
+        this.latticeUpload = nextUpload;
+        this.latticeUploadFormatReason = formatReason ?? null;
+        this.hasVolume = true;
+        const chosenBytes = estimateLatticeUploadBytes(dims, {
+          packedRG: chosen.packedRG,
+          bytesPerComponent: chosen.type === gl.HALF_FLOAT ? 2 : 4,
+        });
+        this.latticeUploadTelemetry = {
+          profileTag,
+          voxelCount,
+          bytes: chosenBytes,
+          budgetBytes: rails.maxBytes,
+          budgetVoxels: rails.maxVoxels,
+          formatLabel: chosen.label,
+          backend: chosen.backend,
+          uploadedAtMs: nowMs,
+          downgradeReason: this.latticeUploadFormatReason ?? null,
+        };
+      }
+
+      const upload = this.latticeUpload;
+      if (!upload || upload.hash !== volume.hash) return;
+
+      // Upload slices incrementally to stay within bandwidth budget.
+      if (upload.nextSlice < upload.dims[2]) {
+        const sliceVoxels = dims[0] * dims[1];
+        const bytesPerComponent = upload.format.type === gl.HALF_FLOAT ? 2 : 4;
+        const channels = upload.format.packedRG ? 2 : 1;
+        const textureFactor = upload.format.packedRG ? 1 : 2;
+        const sliceBytes = Math.max(1, sliceVoxels * bytesPerComponent * channels * textureFactor);
+        const mbps = LATTICE_UPLOAD_BUDGET_MBPS[profileTag] ?? LATTICE_UPLOAD_BUDGET_MBPS.preview;
+        const bytesPerSec = mbps * 1024 * 1024;
+        const dtRaw = (nowMs - upload.lastUploadAtMs) / 1000;
+        const dtSec = Math.min(
+          LATTICE_UPLOAD_MAX_DT_SEC,
+          Math.max(1 / 240, Number.isFinite(dtRaw) && dtRaw > 0 ? dtRaw : 1 / 60),
+        );
+        upload.lastUploadAtMs = nowMs;
+
+        let budgetBytes = bytesPerSec * dtSec;
+        if (!Number.isFinite(budgetBytes) || budgetBytes <= 0) budgetBytes = sliceBytes;
+        if (budgetBytes < sliceBytes) budgetBytes = sliceBytes;
+
+        const maxSlicesPerTick = rails.maxSlicesPerTickVolume;
+        const slicesThisTick = Math.min(
+          maxSlicesPerTick,
+          Math.max(1, Math.floor(budgetBytes / sliceBytes) || 1),
+          upload.dims[2] - upload.nextSlice,
+        );
+
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+        if (upload.format.backend === "tex3d") {
+          if (upload.format.packedRG) {
+            if (!this.volumeTex) return;
+            gl.bindTexture(gl.TEXTURE_3D, this.volumeTex);
+            for (let step = 0; step < slicesThisTick; step++) {
+              const z = upload.nextSlice;
+              const base = z * sliceVoxels;
+              if (upload.format.type === gl.HALF_FLOAT) {
+                if (!upload.scratchU16 || upload.scratchU16.length !== sliceVoxels * 2) {
+                  upload.scratchU16 = new Uint16Array(sliceVoxels * 2);
+                }
+                const out = upload.scratchU16;
+                const driveBits = new Uint32Array(volume.drive3D.buffer, volume.drive3D.byteOffset + base * 4, sliceVoxels);
+                const gateBits = new Uint32Array(volume.gate3D.buffer, volume.gate3D.byteOffset + base * 4, sliceVoxels);
+                for (let i = 0, j = 0; i < sliceVoxels; i++) {
+                  out[j++] = float32BitsToFloat16Bits(driveBits[i] ?? 0);
+                  out[j++] = float32BitsToFloat16Bits(gateBits[i] ?? 0);
+                }
+                gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, z, dims[0], dims[1], 1, gl.RG, gl.HALF_FLOAT, out);
+              } else {
+                if (!upload.scratchF32 || upload.scratchF32.length !== sliceVoxels * 2) {
+                  upload.scratchF32 = new Float32Array(sliceVoxels * 2);
+                }
+                const out = upload.scratchF32;
+                for (let i = 0, j = 0; i < sliceVoxels; i++) {
+                  const dv = volume.drive3D[base + i];
+                  const gv = volume.gate3D[base + i];
+                  out[j++] = Number.isFinite(dv) ? dv : 0;
+                  out[j++] = Number.isFinite(gv) ? gv : 0;
+                }
+                gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, z, dims[0], dims[1], 1, gl.RG, gl.FLOAT, out);
+              }
+              upload.nextSlice++;
+            }
+            gl.bindTexture(gl.TEXTURE_3D, null);
+          } else {
+            if (!this.volumeTex || !this.gateVolumeTex) return;
+            for (let step = 0; step < slicesThisTick; step++) {
+              const z = upload.nextSlice;
+              const base = z * sliceVoxels;
+              const end = base + sliceVoxels;
+              gl.bindTexture(gl.TEXTURE_3D, this.volumeTex);
+              gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, z, dims[0], dims[1], 1, gl.RED, gl.FLOAT, volume.drive3D.subarray(base, end));
+              gl.bindTexture(gl.TEXTURE_3D, this.gateVolumeTex);
+              gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, z, dims[0], dims[1], 1, gl.RED, gl.FLOAT, volume.gate3D.subarray(base, end));
+              upload.nextSlice++;
+            }
+            gl.bindTexture(gl.TEXTURE_3D, null);
+          }
+        } else if (upload.format.backend === "atlas2d") {
+          const atlasLayout = upload.format.atlas;
+          if (!atlasLayout || !this.latticeAtlasTex) return;
+          if (!upload.format.packedRG) return;
+
+          gl.bindTexture(gl.TEXTURE_2D, this.latticeAtlasTex);
+          for (let step = 0; step < slicesThisTick; step++) {
+            const z = upload.nextSlice;
+            const base = z * sliceVoxels;
+            const tileX = z % atlasLayout.tilesX;
+            const tileY = Math.floor(z / atlasLayout.tilesX);
+            const x0 = tileX * dims[0];
+            const y0 = tileY * dims[1];
+            if (upload.format.type === gl.HALF_FLOAT) {
+              if (!upload.scratchU16 || upload.scratchU16.length !== sliceVoxels * 2) {
+                upload.scratchU16 = new Uint16Array(sliceVoxels * 2);
+              }
+              const out = upload.scratchU16;
+              const driveBits = new Uint32Array(volume.drive3D.buffer, volume.drive3D.byteOffset + base * 4, sliceVoxels);
+              const gateBits = new Uint32Array(volume.gate3D.buffer, volume.gate3D.byteOffset + base * 4, sliceVoxels);
+              for (let i = 0, j = 0; i < sliceVoxels; i++) {
+                out[j++] = float32BitsToFloat16Bits(driveBits[i] ?? 0);
+                out[j++] = float32BitsToFloat16Bits(gateBits[i] ?? 0);
+              }
+              gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, y0, dims[0], dims[1], gl.RG, gl.HALF_FLOAT, out);
+            } else {
+              if (!upload.scratchF32 || upload.scratchF32.length !== sliceVoxels * 2) {
+                upload.scratchF32 = new Float32Array(sliceVoxels * 2);
+              }
+              const out = upload.scratchF32;
+              for (let i = 0, j = 0; i < sliceVoxels; i++) {
+                const dv = volume.drive3D[base + i];
+                const gv = volume.gate3D[base + i];
+                out[j++] = Number.isFinite(dv) ? dv : 0;
+                out[j++] = Number.isFinite(gv) ? gv : 0;
+              }
+              gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, y0, dims[0], dims[1], gl.RG, gl.FLOAT, out);
+            }
+            upload.nextSlice++;
+          }
+          gl.bindTexture(gl.TEXTURE_2D, null);
+        }
+      }
+
+      if (upload.nextSlice >= upload.dims[2]) {
+        this.lastVolumeKey = volume.hash;
+        this.hasVolume = true;
+        upload.scratchF32 = undefined;
+        upload.scratchU16 = undefined;
+      }
+
+      return;
     }
 
+    this.latticeUpload = null;
+    this.latticeUploadFailedHash = null;
+    this.latticeUploadFailedReason = null;
+    this.latticeUploadFormatReason = null;
+    this.latticeUploadTelemetry = null;
 
+    // PERFORMANCE: shader is analytic via radial LUT; keep a tiny placeholder texture once.
+    if (this.hasVolume && this.lastVolumeKey === "ANALYTIC") return;
+
+    const { gl } = this;
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    const data = new Float32Array([0]);
+
+    if (this.volumeTex) {
+      gl.bindTexture(gl.TEXTURE_3D, this.volumeTex);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texImage3D(gl.TEXTURE_3D, 0, gl.R32F, 1, 1, 1, 0, gl.RED, gl.FLOAT, data);
+      gl.bindTexture(gl.TEXTURE_3D, null);
+    }
+
+    if (this.gateVolumeTex) {
+      gl.bindTexture(gl.TEXTURE_3D, this.gateVolumeTex);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texImage3D(gl.TEXTURE_3D, 0, gl.R32F, 1, 1, 1, 0, gl.RED, gl.FLOAT, data);
+      gl.bindTexture(gl.TEXTURE_3D, null);
+    }
+
+    if (this.latticeAtlasTex) {
+      try {
+        gl.deleteTexture(this.latticeAtlasTex);
+      } catch {}
+      this.latticeAtlasTex = null;
+    }
 
     this.lastVolumeKey = "ANALYTIC";
-
-
-
     this.hasVolume = true;
-
-
-
   }
 
 
@@ -9257,6 +10829,219 @@ export class Hull3DRenderer {
 
 
 
+
+  private updateLatticeSdf(state: Hull3DRendererState) {
+    const sdfGrid = state.latticeSdf;
+    const latticeVolume = state.latticeVolume;
+    const activeLattice =
+      latticeVolume && this.latticeUpload && this.latticeUpload.hash === latticeVolume.hash
+        ? this.latticeUpload
+        : null;
+
+    if (!sdfGrid || !activeLattice) {
+      this.latticeSdfUpload = null;
+      this.latticeSdfUploadFailedKey = null;
+      this.latticeSdfUploadFailedReason = null;
+      this.latticeSdfReadyKey = null;
+      return;
+    }
+
+    const key = sdfGrid.key;
+    const dims: [number, number, number] = [
+      Math.max(1, activeLattice.dims[0]),
+      Math.max(1, activeLattice.dims[1]),
+      Math.max(1, activeLattice.dims[2]),
+    ];
+    if (sdfGrid.dims[0] !== dims[0] || sdfGrid.dims[1] !== dims[1] || sdfGrid.dims[2] !== dims[2]) {
+      this.latticeSdfUpload = null;
+      this.latticeSdfUploadFailedKey = null;
+      this.latticeSdfUploadFailedReason = null;
+      this.latticeSdfReadyKey = null;
+      return;
+    }
+
+    const backend = activeLattice.format.backend;
+    const atlasLayout = activeLattice.format.atlas;
+
+    const shouldRestart =
+      !this.latticeSdfUpload ||
+      this.latticeSdfUpload.key !== key ||
+      this.latticeSdfUpload.backend !== backend ||
+      this.latticeSdfUpload.dims[0] !== dims[0] ||
+      this.latticeSdfUpload.dims[1] !== dims[1] ||
+      this.latticeSdfUpload.dims[2] !== dims[2];
+
+    const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const { gl } = this;
+
+    if (shouldRestart) {
+      if (this.latticeSdfUploadFailedKey === key) return;
+
+      const data = encodeHullDistanceBandWeightsR8(sdfGrid);
+
+      let allocated = false;
+      if (backend === "tex3d") {
+        if (!this.latticeSdfTex) this.latticeSdfTex = createTexture3D(gl);
+        clearGlErrors(gl);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        gl.bindTexture(gl.TEXTURE_3D, this.latticeSdfTex);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.R8, dims[0], dims[1], dims[2], 0, gl.RED, gl.UNSIGNED_BYTE, null);
+        gl.bindTexture(gl.TEXTURE_3D, null);
+        allocated = gl.getError() === gl.NO_ERROR;
+      } else {
+        if (!atlasLayout) {
+          this.latticeSdfUpload = null;
+          this.latticeSdfUploadFailedKey = key;
+          this.latticeSdfUploadFailedReason = "caps:maxTextureSize";
+          this.latticeSdfReadyKey = null;
+          return;
+        }
+        if (!this.latticeSdfAtlasTex) {
+          const tex = gl.createTexture();
+          if (!tex) {
+            this.latticeSdfUpload = null;
+            this.latticeSdfUploadFailedKey = key;
+            this.latticeSdfUploadFailedReason = "alloc-failed";
+            this.latticeSdfReadyKey = null;
+            return;
+          }
+          this.latticeSdfAtlasTex = tex;
+        }
+        clearGlErrors(gl);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        gl.bindTexture(gl.TEXTURE_2D, this.latticeSdfAtlasTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.R8,
+          atlasLayout.width,
+          atlasLayout.height,
+          0,
+          gl.RED,
+          gl.UNSIGNED_BYTE,
+          null,
+        );
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        allocated = gl.getError() === gl.NO_ERROR;
+      }
+
+      if (!allocated) {
+        this.latticeSdfUpload = null;
+        this.latticeSdfUploadFailedKey = key;
+        this.latticeSdfUploadFailedReason = "format:unsupported";
+        this.latticeSdfReadyKey = null;
+        return;
+      }
+
+      this.latticeSdfUploadFailedKey = null;
+      this.latticeSdfUploadFailedReason = null;
+      this.latticeSdfReadyKey = null;
+      this.latticeSdfUpload = {
+        key,
+        dims,
+        backend,
+        nextSlice: 0,
+        lastUploadAtMs: nowMs,
+        atlas: atlasLayout,
+        data,
+      };
+    }
+
+    const upload = this.latticeSdfUpload;
+    if (!upload || upload.key !== key || !upload.data) return;
+    if (upload.nextSlice >= upload.dims[2]) return;
+
+    const sliceVoxels = dims[0] * dims[1];
+    const sliceBytes = Math.max(1, sliceVoxels); // R8
+    const profileTag = state.latticeProfileTag ?? "preview";
+    const rails = latticeRailsForProfile(profileTag);
+    const mbps = LATTICE_UPLOAD_BUDGET_MBPS[profileTag] ?? LATTICE_UPLOAD_BUDGET_MBPS.preview;
+    const bytesPerSec = mbps * 1024 * 1024;
+    const dtRaw = (nowMs - upload.lastUploadAtMs) / 1000;
+    const dtSec = Math.min(
+      LATTICE_UPLOAD_MAX_DT_SEC,
+      Math.max(1 / 240, Number.isFinite(dtRaw) && dtRaw > 0 ? dtRaw : 1 / 60),
+    );
+    upload.lastUploadAtMs = nowMs;
+
+    let budgetBytes = bytesPerSec * dtSec;
+    if (!Number.isFinite(budgetBytes) || budgetBytes <= 0) budgetBytes = sliceBytes;
+    if (budgetBytes < sliceBytes) budgetBytes = sliceBytes;
+
+    const maxSlicesPerTick = rails.maxSlicesPerTickSdf;
+    const slicesThisTick = Math.min(
+      maxSlicesPerTick,
+      Math.max(1, Math.floor(budgetBytes / sliceBytes) || 1),
+      upload.dims[2] - upload.nextSlice,
+    );
+
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+    if (backend === "tex3d") {
+      if (!this.latticeSdfTex) return;
+      gl.bindTexture(gl.TEXTURE_3D, this.latticeSdfTex);
+      for (let step = 0; step < slicesThisTick; step++) {
+        const z = upload.nextSlice;
+        const base = z * sliceVoxels;
+        const end = base + sliceVoxels;
+        gl.texSubImage3D(
+          gl.TEXTURE_3D,
+          0,
+          0,
+          0,
+          z,
+          dims[0],
+          dims[1],
+          1,
+          gl.RED,
+          gl.UNSIGNED_BYTE,
+          upload.data.subarray(base, end),
+        );
+        upload.nextSlice++;
+      }
+      gl.bindTexture(gl.TEXTURE_3D, null);
+    } else {
+      const atlas = upload.atlas;
+      if (!atlas || !this.latticeSdfAtlasTex) return;
+      gl.bindTexture(gl.TEXTURE_2D, this.latticeSdfAtlasTex);
+      for (let step = 0; step < slicesThisTick; step++) {
+        const z = upload.nextSlice;
+        const base = z * sliceVoxels;
+        const end = base + sliceVoxels;
+        const tileX = z % atlas.tilesX;
+        const tileY = Math.floor(z / atlas.tilesX);
+        const x0 = tileX * dims[0];
+        const y0 = tileY * dims[1];
+        gl.texSubImage2D(
+          gl.TEXTURE_2D,
+          0,
+          x0,
+          y0,
+          dims[0],
+          dims[1],
+          gl.RED,
+          gl.UNSIGNED_BYTE,
+          upload.data.subarray(base, end),
+        );
+        upload.nextSlice++;
+      }
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    if (upload.nextSlice >= upload.dims[2]) {
+      this.latticeSdfReadyKey = upload.key;
+      upload.data = undefined;
+    }
+  }
 
   private updateRingAverage(state: Hull3DRendererState) {
 
@@ -9650,7 +11435,9 @@ export class Hull3DRenderer {
 
 
 
-    const sliceKey = keyFrom(state.R, state.axes[0], state.axes[2]);
+    const sliceScale = Math.max(1.05, this.domainScale);
+
+    const sliceKey = keyFrom(state.R, state.axes[0], state.axes[2], sliceScale);
 
 
 
@@ -9686,11 +11473,11 @@ export class Hull3DRenderer {
 
 
 
-      const w = Math.max(Math.abs(state.axes[0]) * state.R, 1e-3) * 1.1;
+      const w = Math.max(Math.abs(state.axes[0]) * state.R, 1e-3) * sliceScale;
 
 
 
-      const h = Math.max(Math.abs(state.axes[2]) * state.R, 1e-3) * 1.1;
+      const h = Math.max(Math.abs(state.axes[2]) * state.R, 1e-3) * sliceScale;
 
 
 
@@ -9942,6 +11729,176 @@ export class Hull3DRenderer {
 
 
 
+    const meshWire = state.wireframeOverlay;
+
+
+
+    const meshWireKey = meshWire?.key ?? "";
+
+
+
+    if (this.overlayCache.meshWireKey !== meshWireKey) {
+
+
+
+      if (this.overlay.meshWireVao) gl.deleteVertexArray(this.overlay.meshWireVao);
+
+
+
+      if (this.overlay.meshWireVbo) gl.deleteBuffer(this.overlay.meshWireVbo);
+
+
+
+      if (this.overlay.meshWireColorVbo) gl.deleteBuffer(this.overlay.meshWireColorVbo);
+
+
+
+      this.overlay.meshWireVao = null;
+
+
+
+      this.overlay.meshWireVbo = null;
+
+
+
+      this.overlay.meshWireColorVbo = null;
+
+
+
+      this.overlay.meshWireColors = null;
+
+
+
+      this.overlay.meshWirePatches = [];
+
+
+
+      this.overlay.meshWireCount = 0;
+
+
+
+      this.overlayCache.meshWireColorKey = "";
+
+
+
+      if (meshWire && meshWire.positions?.length >= 6) {
+
+
+
+        const vao = gl.createVertexArray();
+
+
+
+        const vbo = gl.createBuffer();
+
+
+
+        const cbo = gl.createBuffer();
+
+
+
+        if (vao && vbo && cbo) {
+
+
+
+          gl.bindVertexArray(vao);
+
+
+
+          gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+
+
+
+          gl.bufferData(gl.ARRAY_BUFFER, meshWire.positions, gl.STATIC_DRAW);
+
+
+
+          gl.enableVertexAttribArray(0);
+
+
+
+          gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+
+
+          gl.bindBuffer(gl.ARRAY_BUFFER, cbo);
+
+
+
+          const colorStub =
+
+
+
+            meshWire.colors && meshWire.colors.length === meshWire.positions.length
+
+
+
+              ? meshWire.colors
+
+
+
+              : new Float32Array(meshWire.positions.length);
+
+
+
+          gl.bufferData(gl.ARRAY_BUFFER, colorStub, gl.DYNAMIC_DRAW);
+
+
+
+          gl.enableVertexAttribArray(1);
+
+
+
+          gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+
+
+          gl.bindVertexArray(null);
+
+
+
+          this.overlay.meshWireVao = vao;
+
+
+
+          this.overlay.meshWireVbo = vbo;
+
+
+
+          this.overlay.meshWireColorVbo = cbo;
+
+
+
+          this.overlay.meshWireCount = meshWire.positions.length / 3;
+
+
+
+          this.overlayCache.meshWireKey = meshWireKey;
+
+
+
+        }
+
+
+
+      } else {
+
+
+
+        this.overlayCache.meshWireKey = meshWireKey;
+
+
+
+      }
+
+
+
+    }
+
+
+
+    this.ensurePreviewMesh(state);
+
   }
 
 
@@ -9950,6 +11907,191 @@ export class Hull3DRenderer {
 
 
 
+
+
+
+  private updateMeshWireColors(state: Hull3DRendererState, meshWire: WireframeOverlayBuffers) {
+    const { gl } = this;
+    if (!this.overlay.meshWireColorVbo) return;
+
+    const colorMode = meshWire.colorMode ?? "gate";
+    if (colorMode === "field" && meshWire.colors && meshWire.colors.length === meshWire.positions.length) {
+      const colorKeyField = meshWire.colorSignature ?? `${meshWire.key}|field`;
+      if (this.overlayCache.meshWireColorKey !== colorKeyField) {
+        this.overlay.meshWireColors = meshWire.colors;
+        this.overlay.meshWirePatches = meshWire.patches ?? [];
+        this.overlayCache.meshWireColorKey = colorKeyField;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.overlay.meshWireColorVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, meshWire.colors, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      }
+      return;
+    }
+
+    const params = {
+      phase01: state.phase01 ?? 0,
+      sectorCenter01: state.sectorCenter01,
+      gaussianSigma: state.gaussianSigma,
+      totalSectors: state.totalSectors,
+      liveSectors: state.liveSectors,
+      sectorFloor: state.sectorFloor,
+      lumpExp: state.lumpExp,
+      duty: state.duty,
+      gateView: Number.isFinite(state.gateView) ? state.gateView : state.gate,
+      splitEnabled: state.splitEnabled,
+      splitFrac: state.splitFrac,
+      syncMode: state.syncMode,
+      tilesPerSectorVector: state.tilesPerSectorVector,
+      fieldThreshold: meshWire.fieldThreshold,
+      gradientThreshold: meshWire.gradientThreshold,
+    };
+
+    const blanketKey = meshWire.blanketSignature ?? "";
+    const colorKey = [
+      meshWire.key,
+      meshWire.colorSignature ?? "",
+      Math.round((params.phase01 ?? 0) * 1000),
+      Math.round((params.sectorCenter01 ?? 0) * 1000),
+      Math.round((params.gaussianSigma ?? 0) * 1000),
+      params.totalSectors ?? 0,
+      params.liveSectors ?? 0,
+      Math.round((params.sectorFloor ?? 0) * 1000),
+      Math.round((params.lumpExp ?? 0) * 1000),
+      params.syncMode ?? 0,
+      params.splitEnabled ? 1 : 0,
+      Math.round((params.splitFrac ?? 0) * 1000),
+      Math.round((params.duty ?? 0) * 1000),
+      Math.round((params.gateView ?? 0) * 1000),
+      blanketKey,
+    ].join("|");
+
+    if (this.overlayCache.meshWireColorKey === colorKey && meshWire.colors && meshWire.colors.length) {
+      return;
+    }
+
+    const { colors, patches } = colorizeWireframeOverlay(meshWire, params);
+    this.overlay.meshWireColors = colors;
+    this.overlay.meshWirePatches = patches ?? [];
+    this.overlayCache.meshWireColorKey = colorKey;
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.overlay.meshWireColorVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, colors, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  }
+
+  private ensurePreviewMesh(state: Hull3DRendererState) {
+    const { gl } = this;
+    const payload = state.previewMesh;
+    const key =
+      payload && payload.positions && payload.positions.length >= 3
+        ? payload.key || `preview|${payload.positions.length}`
+        : "";
+
+    const disposePreview = () => {
+      if (this.overlay.previewVao) gl.deleteVertexArray(this.overlay.previewVao);
+      if (this.overlay.previewVbo) gl.deleteBuffer(this.overlay.previewVbo);
+      if (this.overlay.previewUvVbo) gl.deleteBuffer(this.overlay.previewUvVbo);
+      if (this.overlay.previewIbo) gl.deleteBuffer(this.overlay.previewIbo);
+      if (this.overlay.previewTexture) gl.deleteTexture(this.overlay.previewTexture);
+      this.overlay.previewVao = null;
+      this.overlay.previewVbo = null;
+      this.overlay.previewUvVbo = null;
+      this.overlay.previewIbo = null;
+      this.overlay.previewTexture = null;
+      this.overlay.previewCount = 0;
+      this.overlay.previewIndexed = false;
+      this.overlay.previewIndexType = 0;
+      this.overlay.previewHasUv = false;
+      this.overlay.previewColor = new Float32Array([0.82, 0.88, 0.96, 0.95]);
+      this.overlayCache.previewMeshKey = "";
+    };
+
+    if (!payload || !payload.positions || payload.positions.length < 3) {
+      if (this.overlayCache.previewMeshKey) {
+        disposePreview();
+      }
+      return;
+    }
+
+    if (this.overlayCache.previewMeshKey === key) return;
+
+    disposePreview();
+
+    const vao = gl.createVertexArray();
+    const vbo = gl.createBuffer();
+    const uvbo = gl.createBuffer();
+    const ibo = payload.indices && payload.indices.length >= 3 ? gl.createBuffer() : null;
+
+    if (!vao || !vbo || !uvbo) {
+      return;
+    }
+
+    gl.bindVertexArray(vao);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, payload.positions, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+    const vertexCount = Math.floor(payload.positions.length / 3);
+    const hasUv = !!(payload.uvs && payload.uvs.length >= vertexCount * 2);
+    const uvData = hasUv ? payload.uvs! : new Float32Array(vertexCount * 2);
+    gl.bindBuffer(gl.ARRAY_BUFFER, uvbo);
+    gl.bufferData(gl.ARRAY_BUFFER, uvData, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
+
+    let count = vertexCount;
+    let indexed = false;
+    let indexType: number | null = null;
+    if (ibo && payload.indices && payload.indices.length >= 3) {
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, payload.indices, gl.STATIC_DRAW);
+      count = payload.indices.length;
+      indexed = true;
+      indexType = payload.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+    } else {
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    }
+
+    gl.bindVertexArray(null);
+
+    let tex: WebGLTexture | null = null;
+    if (payload.texture) {
+      tex = gl.createTexture();
+      if (tex) {
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        try {
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, payload.texture);
+        } catch (err) {
+          console.warn("[Hull3DRenderer] Preview mesh texture upload failed", err);
+          gl.deleteTexture(tex);
+          tex = null;
+        }
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+      }
+    }
+
+    const color = payload.color ?? [0.82, 0.88, 0.96, 0.95];
+
+    this.overlay.previewVao = vao;
+    this.overlay.previewVbo = vbo;
+    this.overlay.previewUvVbo = uvbo;
+    this.overlay.previewIbo = ibo;
+    this.overlay.previewTexture = tex;
+    this.overlay.previewCount = count;
+    this.overlay.previewIndexed = indexed;
+    this.overlay.previewIndexType = indexType ?? 0;
+    this.overlay.previewHasUv = hasUv;
+    this.overlay.previewColor = new Float32Array(color);
+    this.overlayCache.previewMeshKey = key;
+  }
   private ensureSurfaceGrid() {
 
 
@@ -10280,6 +12422,279 @@ export class Hull3DRenderer {
 
   }
 
+  private rebuildSpacetimeGridCage(state: Hull3DRendererState, spacing: number, warpStrength: number, falloff: number) {
+    const { gl } = this;
+    const domainScale = Number.isFinite(state.domainScale) ? (state.domainScale as number) : this.domainScale;
+    const profile = state.latticeProfileTag ?? "preview";
+    const qualityScale =
+      this.qualityPreset === "low" ? 1.6 : this.qualityPreset === "medium" ? 1.25 : 1.0;
+    const spacingScale = (profile === "preview" ? 1.2 : 1.0) * qualityScale;
+    let spacingUsed = Math.max(1e-4, spacing * spacingScale);
+    const maxLines = profile === "card" ? 900 : 650;
+    const degradedReasons: string[] = [];
+    const spacingRequested = Math.max(1e-6, spacing);
+    const latticeToWorld = state.latticeFrame?.latticeToWorld ?? null;
+    const spaceCfg = state.overlays?.spacetimeGrid ?? null;
+    const useSdf = this.spacetimeGridState.useSdf;
+
+    const fallbackHalf = [
+      Math.max(1e-3, Math.abs(state.axes[0]) * Math.max(state.R, 1e-3) * domainScale),
+      Math.max(1e-3, Math.abs(state.axes[1]) * Math.max(state.R, 1e-3) * domainScale),
+      Math.max(1e-3, Math.abs(state.axes[2]) * Math.max(state.R, 1e-3) * domainScale),
+    ] as [number, number, number];
+    const fallbackSize: [number, number, number] = [fallbackHalf[0] * 2, fallbackHalf[1] * 2, fallbackHalf[2] * 2];
+    const fallbackMin: [number, number, number] = [-fallbackHalf[0], -fallbackHalf[1], -fallbackHalf[2]];
+
+    const boundsBaseMin = state.latticeMin ?? fallbackMin;
+    const boundsBaseSize = state.latticeSize ?? fallbackSize;
+    const expandRaw = Math.max(spacingRequested * 4.0, Math.max(0.0, falloff) * 3.5);
+    const boundsExpand = Number.isFinite(expandRaw) ? expandRaw : 0;
+    const boundsMin: [number, number, number] = [
+      boundsBaseMin[0] - boundsExpand,
+      boundsBaseMin[1] - boundsExpand,
+      boundsBaseMin[2] - boundsExpand,
+    ];
+    const boundsSize: [number, number, number] = [
+      boundsBaseSize[0] + boundsExpand * 2,
+      boundsBaseSize[1] + boundsExpand * 2,
+      boundsBaseSize[2] + boundsExpand * 2,
+    ];
+    const basis = state.latticeFrame?.bounds?.basis;
+    const basisKey = basis
+      ? [
+          basis.forward.map((n) => n.toFixed(3)).join(","),
+          basis.up.map((n) => n.toFixed(3)).join(","),
+          basis.right.map((n) => n.toFixed(3)).join(","),
+        ].join("|")
+      : "basis:none";
+    const boundsKey = `${basisKey}:${boundsMin.map((n) => n.toFixed(3)).join(",")}::${boundsSize
+      .map((n) => n.toFixed(3))
+      .join(",")}:pad${boundsExpand.toFixed(3)}`;
+
+    const colorParam =
+      spaceCfg?.colorBy === "warpStrength"
+        ? Math.max(-2, Math.min(2, (spaceCfg?.warpStrength ?? warpStrength) * 0.25))
+        : 0;
+    const baseColor = this.divergeColor(colorParam);
+    const latticeMin = state.latticeMin ?? boundsMin;
+    const latticeSize = state.latticeSize ?? boundsSize;
+    const sdfData = useSdf ? state.latticeSdf ?? null : null;
+    const sdfDistances = sdfData?.distances ?? null;
+    const sdfDims = sdfData?.dims ?? null;
+    const sdfReady =
+      !!sdfDistances &&
+      !!sdfDims &&
+      sdfDims.length === 3 &&
+      sdfDims[0] > 0 &&
+      sdfDims[1] > 0 &&
+      sdfDims[2] > 0;
+
+    const frameBounds = state.latticeFrame?.bounds;
+    const framePad = state.latticeFrame?.padding_m;
+    const hullHalf: [number, number, number] = frameBounds?.halfSize && framePad
+      ? [
+          Math.max(1e-3, frameBounds.halfSize[0] - framePad[0]),
+          Math.max(1e-3, frameBounds.halfSize[1] - framePad[1]),
+          Math.max(1e-3, frameBounds.halfSize[2] - framePad[2]),
+        ]
+      : state.hullDims
+        ? [
+            Math.max(1e-3, Math.abs(state.hullDims[0]) * 0.5),
+            Math.max(1e-3, Math.abs(state.hullDims[1]) * 0.5),
+            Math.max(1e-3, Math.abs(state.hullDims[2]) * 0.5),
+          ]
+        : [
+            Math.max(1e-3, boundsSize[0] * 0.45),
+            Math.max(1e-3, boundsSize[1] * 0.45),
+            Math.max(1e-3, boundsSize[2] * 0.45),
+          ];
+
+    const invLatticeSize = [
+      latticeSize[0] !== 0 ? 1 / latticeSize[0] : 0,
+      latticeSize[1] !== 0 ? 1 / latticeSize[1] : 0,
+      latticeSize[2] !== 0 ? 1 / latticeSize[2] : 0,
+    ] as [number, number, number];
+
+    const analyticSdf = (x: number, y: number, z: number) => {
+      const dx = Math.abs(x) - hullHalf[0];
+      const dy = Math.abs(y) - hullHalf[1];
+      const dz = Math.abs(z) - hullHalf[2];
+      const ox = Math.max(dx, 0);
+      const oy = Math.max(dy, 0);
+      const oz = Math.max(dz, 0);
+      const outside = Math.hypot(ox, oy, oz);
+      const inside = Math.min(Math.max(dx, Math.max(dy, dz)), 0);
+      return outside + inside;
+    };
+
+    const sampleSdf = (x: number, y: number, z: number) => {
+      if (!sdfReady || !sdfDims || !sdfDistances) return null;
+      const ux = (x - latticeMin[0]) * invLatticeSize[0];
+      const uy = (y - latticeMin[1]) * invLatticeSize[1];
+      const uz = (z - latticeMin[2]) * invLatticeSize[2];
+      if (ux < 0 || ux > 1 || uy < 0 || uy > 1 || uz < 0 || uz > 1) return null;
+      const nx = sdfDims[0];
+      const ny = sdfDims[1];
+      const nz = sdfDims[2];
+      const ix = Math.min(nx - 1, Math.max(0, Math.round(ux * (nx - 1))));
+      const iy = Math.min(ny - 1, Math.max(0, Math.round(uy * (ny - 1))));
+      const iz = Math.min(nz - 1, Math.max(0, Math.round(uz * (nz - 1))));
+      const idx = ix + nx * (iy + ny * iz);
+      const val = sdfDistances[idx];
+      return Number.isFinite(val) ? val : null;
+    };
+
+    const computeCounts = (sp: number) => {
+      const nx = Math.max(2, Math.floor(boundsSize[0] / sp) + 1);
+      const ny = Math.max(2, Math.floor(boundsSize[1] / sp) + 1);
+      const nz = Math.max(2, Math.floor(boundsSize[2] / sp) + 1);
+      const total = ny * nz + nx * nz + nx * ny;
+      return { nx, ny, nz, total };
+    };
+
+    let counts = computeCounts(spacingUsed);
+    let guard = 0;
+    let lineCapAdjusted = false;
+    while (counts.total > maxLines && guard < 8) {
+      const factor = Math.max(1.2, Math.sqrt(counts.total / Math.max(1, maxLines)));
+      spacingUsed *= factor;
+      counts = computeCounts(spacingUsed);
+      guard += 1;
+      lineCapAdjusted = true;
+    }
+    if (spacingUsed > spacingRequested * 1.01) degradedReasons.push("coarse-spacing");
+    if (boundsExpand > 1e-6) degradedReasons.push("expanded-bounds");
+    if (lineCapAdjusted) degradedReasons.push("line-cap");
+
+    const stepX = boundsSize[0] / Math.max(1, counts.nx - 1);
+    const stepY = boundsSize[1] / Math.max(1, counts.ny - 1);
+    const stepZ = boundsSize[2] / Math.max(1, counts.nz - 1);
+
+    const xs = new Array(counts.nx).fill(0).map((_, i) => boundsMin[0] + stepX * i);
+    const ys = new Array(counts.ny).fill(0).map((_, i) => boundsMin[1] + stepY * i);
+    const zs = new Array(counts.nz).fill(0).map((_, i) => boundsMin[2] + stepZ * i);
+
+    const verts: number[] = [];
+    for (const y of ys) {
+      for (const z of zs) {
+        verts.push(boundsMin[0], y, z, boundsMin[0] + boundsSize[0], y, z);
+      }
+    }
+    for (const x of xs) {
+      for (const z of zs) {
+        verts.push(x, boundsMin[1], z, x, boundsMin[1] + boundsSize[1], z);
+      }
+    }
+    for (const x of xs) {
+      for (const y of ys) {
+        verts.push(x, y, boundsMin[2], x, y, boundsMin[2] + boundsSize[2]);
+      }
+    }
+
+    const vertCount = verts.length / 3;
+    let colors: Float32Array | null = null;
+    if (vertCount > 0) {
+      const dirFlow: [number, number] = [0.82, 0.38];
+      const dirNorm = Math.max(1e-6, Math.hypot(dirFlow[0], dirFlow[1]));
+      const dir = [dirFlow[0] / dirNorm, dirFlow[1] / dirNorm];
+      const falloffSafe = Math.max(1e-3, falloff);
+      const intensityFloor = sdfReady ? 0.4 : 0.5;
+      colors = new Float32Array(verts.length);
+      for (let i = 0; i < verts.length; i += 3) {
+        const x = verts[i];
+        const y = verts[i + 1];
+        const z = verts[i + 2];
+        const sdfSigned = sampleSdf(x, y, z) ?? analyticSdf(x, y, z);
+        const fallRaw = Math.exp(-Math.abs(sdfSigned) / falloffSafe);
+        const fall = sdfReady ? fallRaw : fallRaw * 0.85;
+        const offset = warpStrength * fall;
+        verts[i] = x + offset * dir[0];
+        verts[i + 1] = y;
+        verts[i + 2] = z + offset * dir[1];
+        const intensity = intensityFloor + (1 - intensityFloor) * fall;
+        colors[i] = baseColor[0] * intensity;
+        colors[i + 1] = baseColor[1] * intensity;
+        colors[i + 2] = baseColor[2] * intensity;
+      }
+      if (latticeToWorld) {
+        for (let i = 0; i < verts.length; i += 3) {
+          const x = verts[i];
+          const y = verts[i + 1];
+          const z = verts[i + 2];
+          verts[i] = latticeToWorld[0] * x + latticeToWorld[4] * y + latticeToWorld[8] * z + latticeToWorld[12];
+          verts[i + 1] = latticeToWorld[1] * x + latticeToWorld[5] * y + latticeToWorld[9] * z + latticeToWorld[13];
+          verts[i + 2] = latticeToWorld[2] * x + latticeToWorld[6] * y + latticeToWorld[10] * z + latticeToWorld[14];
+        }
+      }
+    }
+    this.spacetimeGridState.spacingUsed_m = spacingUsed;
+    this.spacetimeGridState.degradedReasons = degradedReasons;
+    this.spacetimeGridState.boundsMin = boundsMin;
+    this.spacetimeGridState.boundsSize = boundsSize;
+    this.spacetimeGridState.boundsExpanded_m = boundsExpand;
+
+    if (vertCount === 0) {
+      if (this.overlay.spaceGridVao) gl.deleteVertexArray(this.overlay.spaceGridVao);
+      if (this.overlay.spaceGridVbo) gl.deleteBuffer(this.overlay.spaceGridVbo);
+      if (this.overlay.spaceGridColorVbo) gl.deleteBuffer(this.overlay.spaceGridColorVbo);
+      this.overlay.spaceGridVao = null;
+      this.overlay.spaceGridVbo = null;
+      this.overlay.spaceGridColorVbo = null;
+      this.overlay.spaceGridCount = 0;
+      this.overlayCache.spaceGridKey = "";
+      return;
+    }
+
+    const colorKey = `${spaceCfg?.colorBy ?? "thetaSign"}:${colorParam.toFixed(3)}`;
+    const sdfKey = useSdf ? (state.latticeSdf?.key ?? "sdf:none") : "sdf:off";
+    const key = `${boundsKey}:s${spacingUsed.toFixed(4)}:w${warpStrength.toFixed(3)}:f${falloff.toFixed(
+      3,
+    )}:p${profile}:c${colorKey}:sdf${sdfKey}`;
+    if (
+      this.overlayCache.spaceGridKey === key &&
+      this.overlay.spaceGridVao &&
+      this.overlay.spaceGridVbo &&
+      this.overlay.spaceGridColorVbo
+    ) {
+      this.overlay.spaceGridCount = vertCount;
+      return;
+    }
+
+    if (this.overlay.spaceGridVao) gl.deleteVertexArray(this.overlay.spaceGridVao);
+    if (this.overlay.spaceGridVbo) gl.deleteBuffer(this.overlay.spaceGridVbo);
+    if (this.overlay.spaceGridColorVbo) gl.deleteBuffer(this.overlay.spaceGridColorVbo);
+    this.overlay.spaceGridVao = null;
+    this.overlay.spaceGridVbo = null;
+    this.overlay.spaceGridColorVbo = null;
+    this.overlay.spaceGridCount = 0;
+
+    const vao = gl.createVertexArray();
+    const vbo = gl.createBuffer();
+    const cbo = gl.createBuffer();
+    if (!vao || !vbo || !cbo) return;
+
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, cbo);
+    gl.bufferData(gl.ARRAY_BUFFER, colors ?? new Float32Array(verts.length), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+
+    this.overlay.spaceGridVao = vao;
+    this.overlay.spaceGridVbo = vbo;
+    this.overlay.spaceGridColorVbo = cbo;
+    this.overlay.spaceGridCount = vertCount;
+    this.overlayCache.spaceGridKey = key;
+  }
+
+  private divergeColor(t: number): [number, number, number] {
+    return divergeThetaColor(t);
+  }
+
 
 
 
@@ -10560,6 +12975,18 @@ export class Hull3DRenderer {
 
     const floorThetaDrive = Math.max(0, state.vizFloorThetaDrive ?? 1e-6);
 
+
+
+    const opacityWindow = params.opacityWindow ?? DEFAULT_OPACITY_WINDOW;
+
+
+
+    const opacityMin = Math.max(1e-6, opacityWindow[0]);
+
+
+
+    const opacityMax = Math.max(opacityMin + 1e-4, opacityWindow[1]);
+
     const tiltCfg = state.overlays?.tilt;
     const tiltEnabled = Boolean(tiltCfg?.enabled && tiltCfg?.dir);
     const tiltDir = (tiltCfg?.dir ?? [0, 0]) as [number, number];
@@ -10657,6 +13084,14 @@ export class Hull3DRenderer {
 
 
     if (loc.u_vizFloorThetaDrive) gl.uniform1f(loc.u_vizFloorThetaDrive, floorThetaDrive);
+
+
+
+    if (loc.u_volumeDomain) gl.uniform1i(loc.u_volumeDomain, params.volumeDomainIndex);
+
+
+
+    if (loc.u_opacityWindow) gl.uniform2f(loc.u_opacityWindow, opacityMin, opacityMax);
     this.uniformCache.set1i(gl, loc.u_showTilt, tiltEnabled ? 1 : 0);
     if (loc.u_tiltDir) gl.uniform2f(loc.u_tiltDir, tiltDir[0], tiltDir[1]);
     this.uniformCache.set1f(gl, loc.u_tiltMag, tiltMag);
@@ -10802,6 +13237,10 @@ export class Hull3DRenderer {
 
 
       win.__hullVolumeVizIndex = params.volumeVizIndex;
+
+
+
+      win.__hullVolumeDomainIndex = params.volumeDomainIndex;
 
 
 
@@ -11008,7 +13447,67 @@ export class Hull3DRenderer {
 
 
 
+    if (this.framePerf.movingAvg > this.perfFallbackMs) {
 
+
+
+      this.framePerf.fallbackFrames = this.perfFallbackHold;
+
+
+
+    } else if (this.framePerf.fallbackFrames > 0 && this.framePerf.movingAvg < this.perfFallbackMs * 0.85) {
+
+
+
+      this.framePerf.fallbackFrames -= 1;
+
+
+
+    }
+
+
+
+    const diagClamped = this.diagnosticsEnabled && !this._diag.lastOk;
+
+
+
+    const forceFallback = diagClamped || this.framePerf.fallbackFrames > 0;
+
+
+
+    if (forceFallback && typeof window !== "undefined") {
+
+
+
+      const fallbackMessage = this._diag.message && this._diag.message.length
+
+
+
+        ? this._diag.message
+
+
+
+        : "Volume fallback to slices/wireframe (perf clamp)";
+
+
+
+      (window as any).__hullDiagMessage = { message: fallbackMessage, status: "fallback" };
+
+
+
+    }
+
+
+
+    else if (typeof window !== "undefined" && (window as any).__hullDiagMessage?.status === "fallback") {
+
+
+
+      (window as any).__hullDiagMessage = null;
+
+
+
+    }
 
 
 
@@ -11040,7 +13539,11 @@ export class Hull3DRenderer {
 
 
 
-      && !!this.resources.postProgram;
+      && !!this.resources.postProgram
+
+
+
+      && !forceFallback;
 
 
 
@@ -11240,7 +13743,7 @@ export class Hull3DRenderer {
 
 
 
-    const view = lookAt(identity(), camera.eye, camera.center, [0, 1, 0]);
+    const view = lookAt(identity(), camera.eye, camera.center, (camera as any).up ?? [0, 1, 0]);
 
 
 
@@ -11293,6 +13796,7 @@ export class Hull3DRenderer {
 
 
         u_volume: gl.getUniformLocation(this.resources.rayProgram, "u_volume"),
+        u_gateVolume: gl.getUniformLocation(this.resources.rayProgram, "u_gateVolume"),
 
 
 
@@ -11305,6 +13809,7 @@ export class Hull3DRenderer {
 
 
         u_radialLUT: gl.getUniformLocation(this.resources.rayProgram, "u_radialLUT"),
+        u_volumeAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_volumeAtlas"),
 
 
 
@@ -11373,6 +13878,22 @@ export class Hull3DRenderer {
 
 
         u_lumpExp: gl.getUniformLocation(this.resources.rayProgram, "u_lumpExp"),
+
+
+
+        u_hasLatticeVolume: gl.getUniformLocation(this.resources.rayProgram, "u_hasLatticeVolume"),
+        u_worldToLattice: gl.getUniformLocation(this.resources.rayProgram, "u_worldToLattice"),
+        u_latticeMin: gl.getUniformLocation(this.resources.rayProgram, "u_latticeMin"),
+        u_latticeSize: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSize"),
+        u_latticePacked: gl.getUniformLocation(this.resources.rayProgram, "u_latticePacked"),
+        u_latticeUseAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_latticeUseAtlas"),
+        u_latticeDynamicWeights: gl.getUniformLocation(this.resources.rayProgram, "u_latticeDynamicWeights"),
+        u_latticeDims: gl.getUniformLocation(this.resources.rayProgram, "u_latticeDims"),
+        u_latticeAtlasTiles: gl.getUniformLocation(this.resources.rayProgram, "u_latticeAtlasTiles"),
+        u_latticeSliceInvSize: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSliceInvSize"),
+        u_hasLatticeSdf: gl.getUniformLocation(this.resources.rayProgram, "u_hasLatticeSdf"),
+        u_latticeSdf: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSdf"),
+        u_latticeSdfAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSdfAtlas"),
 
 
 
@@ -11453,6 +13974,14 @@ export class Hull3DRenderer {
 
 
         u_volumeViz: gl.getUniformLocation(this.resources.rayProgram, "u_volumeViz"),
+
+
+
+        u_volumeDomain: gl.getUniformLocation(this.resources.rayProgram, "u_volumeDomain"),
+
+
+
+        u_opacityWindow: gl.getUniformLocation(this.resources.rayProgram, "u_opacityWindow"),
 
 
 
@@ -11564,6 +14093,85 @@ export class Hull3DRenderer {
 
 
 
+      const gateTex = this.gateVolumeTex ?? this.ensureDummy3D();
+
+
+
+      gl.activeTexture(gl.TEXTURE6);
+
+
+
+      gl.bindTexture(gl.TEXTURE_3D, gateTex);
+
+
+
+      if (loc.u_gateVolume) gl.uniform1i(loc.u_gateVolume, 6);
+
+
+
+      const activeLattice =
+        state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
+          ? this.latticeUpload
+          : null;
+      const hasLattice = !!activeLattice;
+      const latticePacked = !!activeLattice?.format.packedRG;
+      const latticeUseAtlas = !!activeLattice && activeLattice.format.backend === "atlas2d";
+      const latticeDynamicWeights = state.latticeWeightMode === "dynamic";
+      const latticeDims = activeLattice?.dims ?? [1, 1, 1];
+      const atlas = activeLattice?.format.atlas;
+
+      if (loc.u_hasLatticeVolume) gl.uniform1i(loc.u_hasLatticeVolume, hasLattice ? 1 : 0);
+      if (loc.u_latticePacked) gl.uniform1i(loc.u_latticePacked, latticePacked ? 1 : 0);
+      if (loc.u_latticeUseAtlas) gl.uniform1i(loc.u_latticeUseAtlas, latticeUseAtlas ? 1 : 0);
+      if (loc.u_latticeDynamicWeights) gl.uniform1i(loc.u_latticeDynamicWeights, latticeDynamicWeights ? 1 : 0);
+      if (loc.u_latticeDims) gl.uniform3f(loc.u_latticeDims, latticeDims[0], latticeDims[1], latticeDims[2]);
+      if (loc.u_latticeAtlasTiles) {
+        gl.uniform2f(loc.u_latticeAtlasTiles, atlas?.tilesX ?? 1, atlas?.tilesY ?? 1);
+      }
+      if (loc.u_latticeSliceInvSize) {
+        gl.uniform2f(
+          loc.u_latticeSliceInvSize,
+          1 / Math.max(1, latticeDims[0]),
+          1 / Math.max(1, latticeDims[1]),
+        );
+      }
+      if (loc.u_volumeAtlas) {
+        const atlasTex =
+          latticeUseAtlas && this.latticeAtlasTex ? this.latticeAtlasTex : this.ensureFallback2D();
+        gl.activeTexture(gl.TEXTURE7);
+        gl.bindTexture(gl.TEXTURE_2D, atlasTex);
+        gl.uniform1i(loc.u_volumeAtlas, 7);
+      }
+
+      const hasLatticeSdf = !!(
+        hasLattice &&
+        state.latticeSdf &&
+        this.latticeSdfReadyKey &&
+        this.latticeSdfReadyKey === state.latticeSdf.key
+      );
+
+      if (loc.u_hasLatticeSdf) gl.uniform1i(loc.u_hasLatticeSdf, hasLatticeSdf ? 1 : 0);
+
+      if (loc.u_latticeSdf) {
+        const sdfTex3D =
+          hasLatticeSdf && !latticeUseAtlas && this.latticeSdfTex ? this.latticeSdfTex : this.ensureDummy3D();
+        gl.activeTexture(gl.TEXTURE8);
+        gl.bindTexture(gl.TEXTURE_3D, sdfTex3D);
+        gl.uniform1i(loc.u_latticeSdf, 8);
+      }
+
+      if (loc.u_latticeSdfAtlas) {
+        const sdfAtlas =
+          hasLatticeSdf && latticeUseAtlas && this.latticeSdfAtlasTex
+            ? this.latticeSdfAtlasTex
+            : this.ensureFallback2D();
+        gl.activeTexture(gl.TEXTURE9);
+        gl.bindTexture(gl.TEXTURE_2D, sdfAtlas);
+        gl.uniform1i(loc.u_latticeSdfAtlas, 9);
+      }
+
+
+
       gl.activeTexture(gl.TEXTURE1);
 
 
@@ -11606,34 +14214,32 @@ export class Hull3DRenderer {
 
       gl.bindTexture(gl.TEXTURE_3D, curvTex);
       this.maybeStampCurvatureTexture(curvTex);
-      this.maybeStampCurvatureTexture(curvTex);
-      this.maybeStampCurvatureTexture(curvTex);
 
 
 
       if (loc.u_curvTex) gl.uniform1i(loc.u_curvTex, 4);
-      // Bind T00 for test path
-      const t00TexC = this.t00.hasData ? this.getActiveT00Texture() : this.ensureT00Fallback();
-      gl.activeTexture(gl.TEXTURE5);
-      gl.bindTexture(gl.TEXTURE_3D, t00TexC);
-      if (loc.u_t00Tex) gl.uniform1i(loc.u_t00Tex, 5);
-      // Bind T00 volume (|T00|) at unit 5
-      const t00TexB = this.t00.hasData ? this.getActiveT00Texture() : this.ensureT00Fallback();
-      gl.activeTexture(gl.TEXTURE5);
-      gl.bindTexture(gl.TEXTURE_3D, t00TexB);
-      if (loc.u_t00Tex) gl.uniform1i(loc.u_t00Tex, 5);
-      // Bind T00 volume (|T00|) at unit 5
-      const t00TexA = this.t00.hasData ? this.getActiveT00Texture() : this.ensureT00Fallback();
-      gl.activeTexture(gl.TEXTURE5);
-      gl.bindTexture(gl.TEXTURE_3D, t00TexA);
-      if (loc.u_t00Tex) gl.uniform1i(loc.u_t00Tex, 5);
-
-      // Bind T00 volume (|T00|) at unit 5
       const t00Tex = this.t00.hasData ? this.getActiveT00Texture() : this.ensureT00Fallback();
       gl.activeTexture(gl.TEXTURE5);
       gl.bindTexture(gl.TEXTURE_3D, t00Tex);
       this.maybeStampT00Texture(t00Tex);
       if (loc.u_t00Tex) gl.uniform1i(loc.u_t00Tex, 5);
+      if (loc.u_worldToLattice) {
+        const mat = state.latticeWorldToLattice ?? new Float32Array([
+          1, 0, 0, 0,
+          0, 1, 0, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+        ]);
+        gl.uniformMatrix4fv(loc.u_worldToLattice, false, mat);
+      }
+      if (loc.u_latticeMin) {
+        const min = state.latticeMin ?? [0, 0, 0];
+        gl.uniform3fv(loc.u_latticeMin, min as any);
+      }
+      if (loc.u_latticeSize) {
+        const size = state.latticeSize ?? [1, 1, 1];
+        gl.uniform3fv(loc.u_latticeSize, size as any);
+      }
 
 
 
@@ -11785,6 +14391,14 @@ export class Hull3DRenderer {
 
 
 
+      const volumeDomainIndex = this.resolveVolumeDomainIndex(state);
+
+
+
+      const opacityWindow = this.opacityWindow ?? DEFAULT_OPACITY_WINDOW;
+
+
+
       const dbg = (typeof window !== "undefined") ? (window as any) : {};
 
 
@@ -11918,6 +14532,14 @@ export class Hull3DRenderer {
 
 
         volumeVizIndex,
+
+
+
+        volumeDomainIndex,
+
+
+
+        opacityWindow,
 
 
 
@@ -12088,6 +14710,11 @@ export class Hull3DRenderer {
 
 
 
+    this.drawPreviewMesh(viewProj, state);
+
+    // Spacetime grid (stub): keep volume + grid coexistence; falls back when SDF unavailable
+    this.drawSpacetimeGrid(viewProj, state);
+
     // 2D surface overlay pass (composed on top with transparency)
 
 
@@ -12229,7 +14856,11 @@ export class Hull3DRenderer {
 
 
 
-    gl.useProgram(this.surfaceProgram);
+    const program = this.surfaceProgram;
+
+
+
+    gl.useProgram(program);
 
 
 
@@ -12237,120 +14868,145 @@ export class Hull3DRenderer {
 
 
 
-      u_axes: gl.getUniformLocation(this.surfaceProgram, "u_axes"),
+      u_axes: gl.getUniformLocation(program, "u_axes"),
 
 
 
-      u_sigma: gl.getUniformLocation(this.surfaceProgram, "u_sigma"),
+      u_sigma: gl.getUniformLocation(program, "u_sigma"),
 
 
 
-      u_R: gl.getUniformLocation(this.surfaceProgram, "u_R"),
+      u_R: gl.getUniformLocation(program, "u_R"),
 
+      u_domainScale: gl.getUniformLocation(program, "u_domainScale"),
 
 
-      u_beta: gl.getUniformLocation(this.surfaceProgram, "u_beta"),
 
+      u_beta: gl.getUniformLocation(program, "u_beta"),
 
 
-      u_viz: gl.getUniformLocation(this.surfaceProgram, "u_viz"),
 
+      u_viz: gl.getUniformLocation(program, "u_viz"),
 
 
-      u_ampChain: gl.getUniformLocation(this.surfaceProgram, "u_ampChain"),
 
+      u_ampChain: gl.getUniformLocation(program, "u_ampChain"),
 
 
-      u_gate: gl.getUniformLocation(this.surfaceProgram, "u_gate"),
 
+      u_gate: gl.getUniformLocation(program, "u_gate"),
 
 
-      u_gate_view: gl.getUniformLocation(this.surfaceProgram, "u_gate_view"),
 
+      u_gate_view: gl.getUniformLocation(program, "u_gate_view"),
 
 
-      u_duty: gl.getUniformLocation(this.surfaceProgram, "u_duty"),
 
+      u_duty: gl.getUniformLocation(program, "u_duty"),
 
 
-      u_yGain: gl.getUniformLocation(this.surfaceProgram, "u_yGain"),
 
+      u_yGain: gl.getUniformLocation(program, "u_yGain"),
 
 
-      u_yBias: gl.getUniformLocation(this.surfaceProgram, "u_yBias"),
 
+      u_yBias: gl.getUniformLocation(program, "u_yBias"),
 
 
-      u_kColor: gl.getUniformLocation(this.surfaceProgram, "u_kColor"),
 
+      u_kColor: gl.getUniformLocation(program, "u_kColor"),
 
 
-      u_mvp: gl.getUniformLocation(this.surfaceProgram, "u_mvp"),
 
+      u_mvp: gl.getUniformLocation(program, "u_mvp"),
 
 
-      u_totalSectors: gl.getUniformLocation(this.surfaceProgram, "u_totalSectors"),
 
+      u_color: gl.getUniformLocation(program, "u_color"),
 
 
-      u_liveSectors: gl.getUniformLocation(this.surfaceProgram, "u_liveSectors"),
 
+      u_alpha: gl.getUniformLocation(program, "u_alpha"),
 
 
-      u_lumpExp: gl.getUniformLocation(this.surfaceProgram, "u_lumpExp"),
 
+      u_useColor: gl.getUniformLocation(program, "u_useColor"),
 
 
-      u_sectorCenter: gl.getUniformLocation(this.surfaceProgram, "u_sectorCenter"),
 
+      u_totalSectors: gl.getUniformLocation(program, "u_totalSectors"),
 
 
-      u_sectorSigma: gl.getUniformLocation(this.surfaceProgram, "u_sectorSigma"),
 
+      u_liveSectors: gl.getUniformLocation(program, "u_liveSectors"),
 
 
-      u_sectorFloor: gl.getUniformLocation(this.surfaceProgram, "u_sectorFloor"),
 
+      u_lumpExp: gl.getUniformLocation(program, "u_lumpExp"),
 
 
-      u_syncMode: gl.getUniformLocation(this.surfaceProgram, "u_syncMode"),
 
+      u_sectorCenter: gl.getUniformLocation(program, "u_sectorCenter"),
 
 
-      u_phase01: gl.getUniformLocation(this.surfaceProgram, "u_phase01"),
 
+      u_sectorSigma: gl.getUniformLocation(program, "u_sectorSigma"),
 
 
-      u_splitEnabled: gl.getUniformLocation(this.surfaceProgram, "u_splitEnabled"),
 
+      u_sectorFloor: gl.getUniformLocation(program, "u_sectorFloor"),
 
 
-      u_splitFrac: gl.getUniformLocation(this.surfaceProgram, "u_splitFrac"),
 
+      u_syncMode: gl.getUniformLocation(program, "u_syncMode"),
 
 
-      u_alpha: gl.getUniformLocation(this.surfaceProgram, "u_alpha"),
 
+      u_phase01: gl.getUniformLocation(program, "u_phase01"),
 
 
-      u_vizFloorThetaGR: gl.getUniformLocation(this.surfaceProgram, "u_vizFloorThetaGR"),
 
+      u_splitEnabled: gl.getUniformLocation(program, "u_splitEnabled"),
 
 
-      u_vizFloorRhoGR: gl.getUniformLocation(this.surfaceProgram, "u_vizFloorRhoGR"),
 
+      u_splitFrac: gl.getUniformLocation(program, "u_splitFrac"),
 
 
-      u_vizFloorThetaDrive: gl.getUniformLocation(this.surfaceProgram, "u_vizFloorThetaDrive"),
-      u_showTilt: gl.getUniformLocation(this.surfaceProgram, "u_showTilt"),
-      u_tiltDir: gl.getUniformLocation(this.surfaceProgram, "u_tiltDir"),
-      u_tiltMag: gl.getUniformLocation(this.surfaceProgram, "u_tiltMag"),
-      u_tiltAlpha: gl.getUniformLocation(this.surfaceProgram, "u_tiltAlpha"),
 
+      u_vizFloorThetaGR: gl.getUniformLocation(program, "u_vizFloorThetaGR"),
 
 
-      u_tiltGain: gl.getUniformLocation(this.surfaceProgram, "u_tiltGain"), // [tilt-gain]
-      u_debugTiltEcho: gl.getUniformLocation(this.surfaceProgram, "u_debugTiltEcho"),
+
+      u_vizFloorRhoGR: gl.getUniformLocation(program, "u_vizFloorRhoGR"),
+
+
+
+      u_vizFloorThetaDrive: gl.getUniformLocation(program, "u_vizFloorThetaDrive"),
+
+
+
+      u_showTilt: gl.getUniformLocation(program, "u_showTilt"),
+
+
+
+      u_tiltDir: gl.getUniformLocation(program, "u_tiltDir"),
+
+
+
+      u_tiltMag: gl.getUniformLocation(program, "u_tiltMag"),
+
+
+
+      u_tiltAlpha: gl.getUniformLocation(program, "u_tiltAlpha"),
+
+
+
+      u_tiltGain: gl.getUniformLocation(program, "u_tiltGain"),
+
+
+
+      u_debugTiltEcho: gl.getUniformLocation(program, "u_debugTiltEcho"),
 
 
 
@@ -12561,6 +15217,8 @@ export class Hull3DRenderer {
 
     if (loc.u_R) gl.uniform1f(loc.u_R, Math.max(0.1, state.R));
 
+    if (loc.u_domainScale) gl.uniform1f(loc.u_domainScale, this.domainScale);
+
 
 
     if (loc.u_beta) gl.uniform1f(loc.u_beta, state.beta);
@@ -12616,6 +15274,94 @@ export class Hull3DRenderer {
 
 
     if (loc.u_mvp) gl.uniformMatrix4fv(loc.u_mvp, false, mvp);
+
+
+
+    const meshWire = state.wireframeOverlay;
+
+
+
+    const meshWireReady = meshWire && this.overlay.meshWireVao && this.overlay.meshWireCount > 0;
+
+
+
+    if (meshWireReady) {
+
+
+
+      this.updateMeshWireColors(state, meshWire as WireframeOverlayBuffers);
+
+
+
+      const prevDepth = gl.isEnabled(gl.DEPTH_TEST);
+
+
+
+      const prevBlend = gl.isEnabled(gl.BLEND);
+
+
+
+      gl.enable(gl.DEPTH_TEST);
+
+
+
+      gl.depthMask(true);
+
+
+
+      gl.enable(gl.BLEND);
+
+
+
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+
+
+      if (loc.u_color) gl.uniform3f(loc.u_color, meshWire!.color[0], meshWire!.color[1], meshWire!.color[2]);
+
+
+
+      if (loc.u_alpha) gl.uniform1f(loc.u_alpha, meshWire!.alpha);
+
+
+
+      if (loc.u_useColor) gl.uniform1i(loc.u_useColor, meshWire?.colors ? 1 : 0);
+
+
+
+      gl.bindVertexArray(this.overlay.meshWireVao);
+
+
+
+      gl.lineWidth(meshWire!.lineWidth);
+
+
+
+      gl.drawArrays(gl.LINES, 0, this.overlay.meshWireCount);
+
+
+
+      gl.lineWidth(1);
+
+
+
+      gl.bindVertexArray(null);
+
+
+
+      gl.depthMask(false);
+
+
+
+      if (!prevBlend) gl.disable(gl.BLEND);
+
+
+
+      if (!prevDepth) gl.disable(gl.DEPTH_TEST);
+
+
+
+    }
 
 
 
@@ -12887,7 +15633,24 @@ export class Hull3DRenderer {
 
       u_greensAlpha: gl.getUniformLocation(this.resources.postProgram, "u_greensAlpha"),
 
-
+      u_spaceGridEnabled: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridEnabled"),
+      u_spaceGridMode: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridMode"),
+      u_spaceGridHasSdf: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridHasSdf"),
+      u_spaceGridColorBy: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridColorBy"),
+      u_spaceGridSpacing: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridSpacing"),
+      u_spaceGridWarp: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridWarp"),
+      u_spaceGridFalloff: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridFalloff"),
+      u_spaceGridThetaNorm: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridThetaNorm"),
+      u_spaceGridDomainScale: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridDomainScale"),
+      u_spaceGridWorldToLattice: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridWorldToLattice"),
+      u_spaceGridLatticeMin: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridLatticeMin"),
+      u_spaceGridLatticeSize: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridLatticeSize"),
+      u_spaceGridDims: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridDims"),
+      u_spaceGridAtlasTiles: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridAtlasTiles"),
+      u_spaceGridSliceInvSize: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridSliceInvSize"),
+      u_spaceGridUseAtlas: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridUseAtlas"),
+      u_spaceGridSdf: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridSdf"),
+      u_spaceGridSdfAtlas: gl.getUniformLocation(this.resources.postProgram, "u_spaceGridSdfAtlas"),
 
     } as const;
 
@@ -13081,6 +15844,124 @@ export class Hull3DRenderer {
 
 
 
+    const spaceGrid = overlays?.spacetimeGrid;
+    const spaceModeRaw = (spaceGrid?.mode ?? this.spacetimeGridState.mode) as HullSpacetimeGridPrefs["mode"];
+    const spaceWantsPost =
+      !!spaceGrid?.enabled &&
+      (spaceModeRaw === "slice" || spaceModeRaw === "surface" || spaceModeRaw === "volume");
+    if (spaceWantsPost && !this.postSpaceGridEnabled) {
+      const attemptKey = [
+        spaceGrid?.enabled ? 1 : 0,
+        spaceModeRaw,
+        (spaceGrid?.spacing_m ?? 0).toFixed(3),
+        (spaceGrid?.warpStrength ?? 0).toFixed(3),
+        (spaceGrid?.falloff_m ?? 0).toFixed(3),
+        spaceGrid?.useSdf ? 1 : 0,
+      ].join("|");
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const keyChanged = this.postSpaceGridAttemptKey !== attemptKey;
+      if (!this.postSpaceGridAttempted || keyChanged) {
+        if (now - this.postSpaceGridAttemptAt > 1200) {
+          this.postSpaceGridAttempted = false;
+          this.postSpaceGridAttemptKey = attemptKey;
+          this.postSpaceGridAttemptAt = now;
+          this.tryEnablePostSpaceGrid(gl);
+        }
+      }
+    }
+    const spacePostEnabled = this.postSpaceGridEnabled && !!spaceGrid?.enabled && spaceWantsPost;
+    const spacePostMode = spaceModeRaw === "slice" ? 0 : 1;
+    const spacePostModeLabel: "slice" | "surface" | "none" = spacePostEnabled
+      ? (spacePostMode === 0 ? "slice" : "surface")
+      : "none";
+    const spaceEnabled = spacePostEnabled ? 1 : 0;
+    const spaceMode = spacePostEnabled ? spacePostMode : 0;
+    const spaceColorBy = spaceGrid?.colorBy === "warpStrength" ? 2 : spaceGrid?.colorBy === "thetaMagnitude" ? 1 : 0;
+    const spaceWarp = spaceGrid?.warpStrength ?? 0.0;
+    const spaceSpacing = spaceGrid?.spacing_m ?? 0.3;
+    const spaceFalloff = spaceGrid?.falloff_m ?? 0.45;
+    const thetaFloorGR = Math.max(1e-9, state.vizFloorThetaGR ?? 1e-9);
+    const thetaFloorDrive = Math.max(1e-9, state.vizFloorThetaDrive ?? thetaFloorGR);
+    const spaceThetaNorm = resolveSpacetimeGridThetaNorm({
+      warpStrengthMode: spaceGrid?.warpStrengthMode,
+      thetaFloorGR,
+      thetaFloorDrive,
+    });
+    const domainCandidate = Number.isFinite(state.domainScale) ? (state.domainScale as number) : this.domainScale;
+    const spaceDomainScale = Math.max(1e-3, Number.isFinite(domainCandidate) ? (domainCandidate as number) : 1.0);
+    const latticeUpload = this.latticeSdfUpload;
+    const latticeUseAtlas = Boolean(latticeUpload?.atlas);
+    const latticeAtlas = latticeUpload?.atlas;
+    const spaceLatticeDims = latticeUpload?.dims ?? [1, 1, 1];
+    const spaceAtlasTiles = latticeAtlas ? [latticeAtlas.tilesX, latticeAtlas.tilesY] : [1, 1];
+    const spaceSliceInvSize = latticeAtlas
+      ? [1 / Math.max(1, latticeAtlas.width), 1 / Math.max(1, latticeAtlas.height)]
+      : [1, 1];
+    const spaceSdfReady = Boolean(
+      state.latticeSdf &&
+      this.latticeSdfReadyKey &&
+      this.latticeSdfReadyKey === state.latticeSdf.key &&
+      state.latticeWorldToLattice
+    );
+    const spaceHasSdf = spacePostEnabled && spaceGrid?.useSdf && spaceSdfReady ? 1 : 0;
+    const spaceUseAtlas = spaceHasSdf && latticeUseAtlas ? 1 : 0;
+    const spaceWorldToLattice = state.latticeWorldToLattice ?? new Float32Array([
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ]);
+    const spaceLatticeMin = state.latticeMin ?? [0, 0, 0];
+    const spaceLatticeSize = state.latticeSize ?? [1, 1, 1];
+    const spaceSdfKey = state.latticeSdf?.key ?? null;
+    const spacingUsed = Number.isFinite(this.spacetimeGridState.spacingUsed_m)
+      ? this.spacetimeGridState.spacingUsed_m
+      : spaceSpacing;
+    const sdfMissing = Boolean(spaceGrid?.useSdf && !spaceSdfReady);
+    const analyticOnly = Boolean(spacePostEnabled && (!spaceGrid?.useSdf || !spaceSdfReady));
+    const spaceSurfaceEnabled = spacePostEnabled && spacePostMode === 1;
+    const spaceVolumeEnabled = !!spaceGrid?.enabled && spaceModeRaw === "volume";
+    const degradedSet = new Set<string>(this.spacetimeGridState.degradedReasons ?? []);
+    if (spacingUsed > spaceSpacing * 1.01) degradedSet.add("coarse-spacing");
+    if (sdfMissing) degradedSet.add("sdf-missing");
+    else if (analyticOnly) degradedSet.add("analytic-only");
+    const degradedReasons = Array.from(degradedSet);
+    const spaceDbg = {
+      enabled: spaceEnabled === 1,
+      mode: spaceModeRaw,
+      spacing_m: spaceSpacing,
+      spacingUsed_m: spacingUsed,
+      falloff_m: spaceFalloff,
+      thetaNorm: spaceThetaNorm,
+      sdf: {
+        present: Boolean(spaceSdfReady),
+        key: spaceSdfKey,
+      },
+      postEnabled: spacePostEnabled,
+      postMode: spacePostModeLabel,
+      volumeEnabled: spaceVolumeEnabled,
+      surfaceEnabled: spaceSurfaceEnabled,
+      bounds: {
+        min: this.spacetimeGridState.boundsMin,
+        size: this.spacetimeGridState.boundsSize,
+        expandedBy_m: this.spacetimeGridState.boundsExpanded_m,
+      },
+      gpu: {
+        formatReason: this.latticeUploadFormatReason ?? null,
+      },
+      degraded: {
+        reasons: degradedReasons,
+        spacingRequested_m: spaceSpacing,
+        spacingUsed_m: spacingUsed,
+        sdfMissing,
+        analyticOnly,
+      },
+    };
+    this.spacetimeGridTelemetry = spaceDbg;
+    if (typeof window !== "undefined") {
+      (window as any).__spacetimeGridDbg = spaceDbg;
+    }
+
     if (loc.u_resolution) gl.uniform2f(loc.u_resolution, this.canvas.width, this.canvas.height);
 
 
@@ -13203,9 +16084,22 @@ export class Hull3DRenderer {
 
     if (loc.u_greensAlpha) gl.uniform1f(loc.u_greensAlpha, greensAlpha);
 
-
-
-
+    if (loc.u_spaceGridEnabled) gl.uniform1i(loc.u_spaceGridEnabled, spaceEnabled);
+    if (loc.u_spaceGridMode) gl.uniform1i(loc.u_spaceGridMode, spaceMode);
+    if (loc.u_spaceGridHasSdf) gl.uniform1i(loc.u_spaceGridHasSdf, spaceHasSdf);
+    if (loc.u_spaceGridColorBy) gl.uniform1i(loc.u_spaceGridColorBy, spaceColorBy);
+    if (loc.u_spaceGridSpacing) gl.uniform1f(loc.u_spaceGridSpacing, spaceSpacing);
+    if (loc.u_spaceGridWarp) gl.uniform1f(loc.u_spaceGridWarp, spaceWarp);
+    if (loc.u_spaceGridFalloff) gl.uniform1f(loc.u_spaceGridFalloff, spaceFalloff);
+    if (loc.u_spaceGridThetaNorm) gl.uniform1f(loc.u_spaceGridThetaNorm, spaceThetaNorm);
+    if (loc.u_spaceGridDomainScale) gl.uniform1f(loc.u_spaceGridDomainScale, spaceDomainScale);
+    if (loc.u_spaceGridWorldToLattice) gl.uniformMatrix4fv(loc.u_spaceGridWorldToLattice, false, spaceWorldToLattice);
+    if (loc.u_spaceGridLatticeMin) gl.uniform3f(loc.u_spaceGridLatticeMin, spaceLatticeMin[0], spaceLatticeMin[1], spaceLatticeMin[2]);
+    if (loc.u_spaceGridLatticeSize) gl.uniform3f(loc.u_spaceGridLatticeSize, spaceLatticeSize[0], spaceLatticeSize[1], spaceLatticeSize[2]);
+    if (loc.u_spaceGridDims) gl.uniform3f(loc.u_spaceGridDims, spaceLatticeDims[0], spaceLatticeDims[1], spaceLatticeDims[2]);
+    if (loc.u_spaceGridAtlasTiles) gl.uniform2f(loc.u_spaceGridAtlasTiles, spaceAtlasTiles[0], spaceAtlasTiles[1]);
+    if (loc.u_spaceGridSliceInvSize) gl.uniform2f(loc.u_spaceGridSliceInvSize, spaceSliceInvSize[0], spaceSliceInvSize[1]);
+    if (loc.u_spaceGridUseAtlas) gl.uniform1i(loc.u_spaceGridUseAtlas, spaceUseAtlas);
 
 
 
@@ -13292,6 +16186,23 @@ export class Hull3DRenderer {
     if (loc.u_greensTex) gl.uniform1i(loc.u_greensTex, 4);
 
 
+    if (this.postSpaceGridEnabled) {
+      gl.activeTexture(gl.TEXTURE5);
+      const spaceGridSdfTex =
+        spaceHasSdf && !spaceUseAtlas && this.latticeSdfTex ? this.latticeSdfTex : this.ensureDummy3D();
+      gl.bindTexture(gl.TEXTURE_3D, spaceGridSdfTex);
+      if (loc.u_spaceGridSdf) gl.uniform1i(loc.u_spaceGridSdf, 5);
+
+      gl.activeTexture(gl.TEXTURE6);
+      const spaceGridSdfAtlasTex =
+        spaceHasSdf && spaceUseAtlas && this.latticeSdfAtlasTex
+          ? this.latticeSdfAtlasTex
+          : this.ensureFallback2D();
+      gl.bindTexture(gl.TEXTURE_2D, spaceGridSdfAtlasTex);
+      if (loc.u_spaceGridSdfAtlas) gl.uniform1i(loc.u_spaceGridSdfAtlas, 6);
+    }
+
+
 
 
 
@@ -13306,6 +16217,22 @@ export class Hull3DRenderer {
 
 
     gl.bindVertexArray(null);
+
+
+
+    gl.activeTexture(gl.TEXTURE6);
+
+
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+
+
+    gl.activeTexture(gl.TEXTURE5);
+
+
+
+    gl.bindTexture(gl.TEXTURE_3D, null);
 
 
 
@@ -13454,6 +16381,8 @@ export class Hull3DRenderer {
 
 
     if (u.u_R) gl.uniform1f(u.u_R, Math.max(0.1, state.R));
+
+    if (u.u_domainScale) gl.uniform1f(u.u_domainScale, this.domainScale);
 
 
 
@@ -14554,6 +17483,7 @@ export class Hull3DRenderer {
 
 
         u_volume: gl.getUniformLocation(this.resources.rayProgram, "u_volume"),
+        u_gateVolume: gl.getUniformLocation(this.resources.rayProgram, "u_gateVolume"),
 
 
 
@@ -14566,6 +17496,10 @@ export class Hull3DRenderer {
 
 
         u_radialLUT: gl.getUniformLocation(this.resources.rayProgram, "u_radialLUT"),
+
+
+
+        u_volumeAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_volumeAtlas"),
 
 
 
@@ -14610,6 +17544,25 @@ export class Hull3DRenderer {
 
 
         u_lumpExp: gl.getUniformLocation(this.resources.rayProgram, "u_lumpExp"),
+
+
+
+        u_hasLatticeVolume: gl.getUniformLocation(this.resources.rayProgram, "u_hasLatticeVolume"),
+        u_worldToLattice: gl.getUniformLocation(this.resources.rayProgram, "u_worldToLattice"),
+        u_latticeMin: gl.getUniformLocation(this.resources.rayProgram, "u_latticeMin"),
+        u_latticeSize: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSize"),
+
+
+
+        u_latticePacked: gl.getUniformLocation(this.resources.rayProgram, "u_latticePacked"),
+        u_latticeUseAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_latticeUseAtlas"),
+        u_latticeDynamicWeights: gl.getUniformLocation(this.resources.rayProgram, "u_latticeDynamicWeights"),
+        u_latticeDims: gl.getUniformLocation(this.resources.rayProgram, "u_latticeDims"),
+        u_latticeAtlasTiles: gl.getUniformLocation(this.resources.rayProgram, "u_latticeAtlasTiles"),
+        u_latticeSliceInvSize: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSliceInvSize"),
+        u_hasLatticeSdf: gl.getUniformLocation(this.resources.rayProgram, "u_hasLatticeSdf"),
+        u_latticeSdf: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSdf"),
+        u_latticeSdfAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSdfAtlas"),
 
 
 
@@ -14693,6 +17646,14 @@ export class Hull3DRenderer {
 
 
 
+        u_volumeDomain: gl.getUniformLocation(this.resources.rayProgram, "u_volumeDomain"),
+
+
+
+        u_opacityWindow: gl.getUniformLocation(this.resources.rayProgram, "u_opacityWindow"),
+
+
+
         u_grThetaGain: gl.getUniformLocation(this.resources.rayProgram, "u_grThetaGain"),
 
 
@@ -14744,6 +17705,89 @@ export class Hull3DRenderer {
       gl.uniform1i(loc.u_volume, 0);
 
 
+
+      const gateTex = this.gateVolumeTex ?? this.ensureDummy3D();
+      gl.activeTexture(gl.TEXTURE6);
+      gl.bindTexture(gl.TEXTURE_3D, gateTex);
+      if (loc.u_gateVolume) gl.uniform1i(loc.u_gateVolume, 6);
+      const activeLattice =
+        state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
+          ? this.latticeUpload
+          : null;
+      const hasLattice = !!activeLattice;
+      const latticePacked = !!activeLattice?.format.packedRG;
+      const latticeUseAtlas = !!activeLattice && activeLattice.format.backend === "atlas2d";
+      const latticeDynamicWeights = state.latticeWeightMode === "dynamic";
+      const latticeDims = activeLattice?.dims ?? [1, 1, 1];
+      const atlas = activeLattice?.format.atlas;
+
+      if (loc.u_hasLatticeVolume) gl.uniform1i(loc.u_hasLatticeVolume, hasLattice ? 1 : 0);
+      if (loc.u_latticePacked) gl.uniform1i(loc.u_latticePacked, latticePacked ? 1 : 0);
+      if (loc.u_latticeUseAtlas) gl.uniform1i(loc.u_latticeUseAtlas, latticeUseAtlas ? 1 : 0);
+      if (loc.u_latticeDynamicWeights) gl.uniform1i(loc.u_latticeDynamicWeights, latticeDynamicWeights ? 1 : 0);
+      if (loc.u_latticeDims) gl.uniform3f(loc.u_latticeDims, latticeDims[0], latticeDims[1], latticeDims[2]);
+      if (loc.u_latticeAtlasTiles) {
+        gl.uniform2f(loc.u_latticeAtlasTiles, atlas?.tilesX ?? 1, atlas?.tilesY ?? 1);
+      }
+      if (loc.u_latticeSliceInvSize) {
+        gl.uniform2f(
+          loc.u_latticeSliceInvSize,
+          1 / Math.max(1, latticeDims[0]),
+          1 / Math.max(1, latticeDims[1]),
+        );
+      }
+      if (loc.u_volumeAtlas) {
+        const atlasTex =
+          latticeUseAtlas && this.latticeAtlasTex ? this.latticeAtlasTex : this.ensureFallback2D();
+        gl.activeTexture(gl.TEXTURE7);
+        gl.bindTexture(gl.TEXTURE_2D, atlasTex);
+        gl.uniform1i(loc.u_volumeAtlas, 7);
+      }
+
+      const hasLatticeSdf = !!(
+        hasLattice &&
+        state.latticeSdf &&
+        this.latticeSdfReadyKey &&
+        this.latticeSdfReadyKey === state.latticeSdf.key
+      );
+
+      if (loc.u_hasLatticeSdf) gl.uniform1i(loc.u_hasLatticeSdf, hasLatticeSdf ? 1 : 0);
+
+      if (loc.u_latticeSdf) {
+        const sdfTex3D =
+          hasLatticeSdf && !latticeUseAtlas && this.latticeSdfTex ? this.latticeSdfTex : this.ensureDummy3D();
+        gl.activeTexture(gl.TEXTURE8);
+        gl.bindTexture(gl.TEXTURE_3D, sdfTex3D);
+        gl.uniform1i(loc.u_latticeSdf, 8);
+      }
+
+      if (loc.u_latticeSdfAtlas) {
+        const sdfAtlas =
+          hasLatticeSdf && latticeUseAtlas && this.latticeSdfAtlasTex
+            ? this.latticeSdfAtlasTex
+            : this.ensureFallback2D();
+        gl.activeTexture(gl.TEXTURE9);
+        gl.bindTexture(gl.TEXTURE_2D, sdfAtlas);
+        gl.uniform1i(loc.u_latticeSdfAtlas, 9);
+      }
+
+      if (loc.u_worldToLattice) {
+        const mat = state.latticeWorldToLattice ?? new Float32Array([
+          1, 0, 0, 0,
+          0, 1, 0, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+        ]);
+        gl.uniformMatrix4fv(loc.u_worldToLattice, false, mat);
+      }
+      if (loc.u_latticeMin) {
+        const min = state.latticeMin ?? [0, 0, 0];
+        gl.uniform3fv(loc.u_latticeMin, min as any);
+      }
+      if (loc.u_latticeSize) {
+        const size = state.latticeSize ?? [1, 1, 1];
+        gl.uniform3fv(loc.u_latticeSize, size as any);
+      }
 
       gl.activeTexture(gl.TEXTURE1);
 
@@ -14833,6 +17877,14 @@ export class Hull3DRenderer {
 
 
 
+      const volumeDomainIndex = this.resolveVolumeDomainIndex(state);
+
+
+
+      const opacityWindow = this.opacityWindow ?? DEFAULT_OPACITY_WINDOW;
+
+
+
       const gateForGain = Number.isFinite(state.gateView) ? state.gateView : state.gate;
 
 
@@ -14906,6 +17958,14 @@ export class Hull3DRenderer {
 
 
         volumeVizIndex,
+
+
+
+        volumeDomainIndex,
+
+
+
+        opacityWindow,
 
 
 
@@ -15789,7 +18849,7 @@ export class Hull3DRenderer {
 
 
 
-      const view = lookAt(identity(), camera.eye, camera.center, [0, 1, 0]);
+      const view = lookAt(identity(), camera.eye, camera.center, (camera as any).up ?? [0, 1, 0]);
 
 
 
@@ -15953,11 +19013,20 @@ export class Hull3DRenderer {
 
 
 
+      const volumeDomainIndex = this.resolveVolumeDomainIndex(testState);
+
+
+
+      const opacityWindow = this.normalizeOpacityWindow(testState.opacityWindow ?? this.opacityWindow);
+
+
+
       loc = {
 
 
 
         u_volume: gl.getUniformLocation(this.resources.rayProgram, "u_volume"),
+        u_gateVolume: gl.getUniformLocation(this.resources.rayProgram, "u_gateVolume"),
 
 
 
@@ -15970,6 +19039,10 @@ export class Hull3DRenderer {
 
 
         u_radialLUT: gl.getUniformLocation(this.resources.rayProgram, "u_radialLUT"),
+
+
+
+        u_volumeAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_volumeAtlas"),
 
 
 
@@ -16014,6 +19087,22 @@ export class Hull3DRenderer {
 
 
         u_lumpExp: gl.getUniformLocation(this.resources.rayProgram, "u_lumpExp"),
+
+
+
+        u_hasLatticeVolume: gl.getUniformLocation(this.resources.rayProgram, "u_hasLatticeVolume"),
+        u_worldToLattice: gl.getUniformLocation(this.resources.rayProgram, "u_worldToLattice"),
+        u_latticeMin: gl.getUniformLocation(this.resources.rayProgram, "u_latticeMin"),
+        u_latticeSize: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSize"),
+        u_latticePacked: gl.getUniformLocation(this.resources.rayProgram, "u_latticePacked"),
+        u_latticeUseAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_latticeUseAtlas"),
+        u_latticeDynamicWeights: gl.getUniformLocation(this.resources.rayProgram, "u_latticeDynamicWeights"),
+        u_latticeDims: gl.getUniformLocation(this.resources.rayProgram, "u_latticeDims"),
+        u_latticeAtlasTiles: gl.getUniformLocation(this.resources.rayProgram, "u_latticeAtlasTiles"),
+        u_latticeSliceInvSize: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSliceInvSize"),
+        u_hasLatticeSdf: gl.getUniformLocation(this.resources.rayProgram, "u_hasLatticeSdf"),
+        u_latticeSdf: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSdf"),
+        u_latticeSdfAtlas: gl.getUniformLocation(this.resources.rayProgram, "u_latticeSdfAtlas"),
 
 
 
@@ -16097,6 +19186,14 @@ export class Hull3DRenderer {
 
 
 
+        u_volumeDomain: gl.getUniformLocation(this.resources.rayProgram, "u_volumeDomain"),
+
+
+
+        u_opacityWindow: gl.getUniformLocation(this.resources.rayProgram, "u_opacityWindow"),
+
+
+
         u_grThetaGain: gl.getUniformLocation(this.resources.rayProgram, "u_grThetaGain"),
 
 
@@ -16152,6 +19249,89 @@ export class Hull3DRenderer {
       gl.uniform1i(loc.u_volume, 0);
 
 
+
+      const gateTex = this.gateVolumeTex ?? this.ensureDummy3D();
+      gl.activeTexture(gl.TEXTURE6);
+      gl.bindTexture(gl.TEXTURE_3D, gateTex);
+      if (loc.u_gateVolume) gl.uniform1i(loc.u_gateVolume, 6);
+      const activeLattice =
+        state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
+          ? this.latticeUpload
+          : null;
+      const hasLattice = !!activeLattice;
+      const latticePacked = !!activeLattice?.format.packedRG;
+      const latticeUseAtlas = !!activeLattice && activeLattice.format.backend === "atlas2d";
+      const latticeDynamicWeights = state.latticeWeightMode === "dynamic";
+      const latticeDims = activeLattice?.dims ?? [1, 1, 1];
+      const atlas = activeLattice?.format.atlas;
+
+      if (loc.u_hasLatticeVolume) gl.uniform1i(loc.u_hasLatticeVolume, hasLattice ? 1 : 0);
+      if (loc.u_latticePacked) gl.uniform1i(loc.u_latticePacked, latticePacked ? 1 : 0);
+      if (loc.u_latticeUseAtlas) gl.uniform1i(loc.u_latticeUseAtlas, latticeUseAtlas ? 1 : 0);
+      if (loc.u_latticeDynamicWeights) gl.uniform1i(loc.u_latticeDynamicWeights, latticeDynamicWeights ? 1 : 0);
+      if (loc.u_latticeDims) gl.uniform3f(loc.u_latticeDims, latticeDims[0], latticeDims[1], latticeDims[2]);
+      if (loc.u_latticeAtlasTiles) {
+        gl.uniform2f(loc.u_latticeAtlasTiles, atlas?.tilesX ?? 1, atlas?.tilesY ?? 1);
+      }
+      if (loc.u_latticeSliceInvSize) {
+        gl.uniform2f(
+          loc.u_latticeSliceInvSize,
+          1 / Math.max(1, latticeDims[0]),
+          1 / Math.max(1, latticeDims[1]),
+        );
+      }
+      if (loc.u_volumeAtlas) {
+        const atlasTex =
+          latticeUseAtlas && this.latticeAtlasTex ? this.latticeAtlasTex : this.ensureFallback2D();
+        gl.activeTexture(gl.TEXTURE7);
+        gl.bindTexture(gl.TEXTURE_2D, atlasTex);
+        gl.uniform1i(loc.u_volumeAtlas, 7);
+      }
+
+      const hasLatticeSdf = !!(
+        hasLattice &&
+        state.latticeSdf &&
+        this.latticeSdfReadyKey &&
+        this.latticeSdfReadyKey === state.latticeSdf.key
+      );
+
+      if (loc.u_hasLatticeSdf) gl.uniform1i(loc.u_hasLatticeSdf, hasLatticeSdf ? 1 : 0);
+
+      if (loc.u_latticeSdf) {
+        const sdfTex3D =
+          hasLatticeSdf && !latticeUseAtlas && this.latticeSdfTex ? this.latticeSdfTex : this.ensureDummy3D();
+        gl.activeTexture(gl.TEXTURE8);
+        gl.bindTexture(gl.TEXTURE_3D, sdfTex3D);
+        gl.uniform1i(loc.u_latticeSdf, 8);
+      }
+
+      if (loc.u_latticeSdfAtlas) {
+        const sdfAtlas =
+          hasLatticeSdf && latticeUseAtlas && this.latticeSdfAtlasTex
+            ? this.latticeSdfAtlasTex
+            : this.ensureFallback2D();
+        gl.activeTexture(gl.TEXTURE9);
+        gl.bindTexture(gl.TEXTURE_2D, sdfAtlas);
+        gl.uniform1i(loc.u_latticeSdfAtlas, 9);
+      }
+
+      if (loc.u_worldToLattice) {
+        const mat = state.latticeWorldToLattice ?? new Float32Array([
+          1, 0, 0, 0,
+          0, 1, 0, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+        ]);
+        gl.uniformMatrix4fv(loc.u_worldToLattice, false, mat);
+      }
+      if (loc.u_latticeMin) {
+        const min = state.latticeMin ?? [0, 0, 0];
+        gl.uniform3fv(loc.u_latticeMin, min as any);
+      }
+      if (loc.u_latticeSize) {
+        const size = state.latticeSize ?? [1, 1, 1];
+        gl.uniform3fv(loc.u_latticeSize, size as any);
+      }
 
       gl.activeTexture(gl.TEXTURE1);
 
@@ -16282,6 +19462,14 @@ export class Hull3DRenderer {
 
 
         volumeVizIndex,
+
+
+
+        volumeDomainIndex,
+
+
+
+        opacityWindow,
 
 
 
@@ -16867,6 +20055,16 @@ export class Hull3DRenderer {
 
   private computeCamera(state: Hull3DRendererState) {
 
+    if (state.camera?.eye) {
+      const eye = state.camera.eye as Vec3;
+      const center = (state.camera.target as Vec3) ?? ([0, 0, 0] as Vec3);
+      const fov = Math.max(5, Math.min(170, state.camera.fov_deg ?? 45)) * (Math.PI / 180);
+      const upRaw = (state.camera.up as Vec3 | undefined) ?? ([0, 1, 0] as Vec3);
+      const upLen = Math.hypot(upRaw[0], upRaw[1], upRaw[2]);
+      const up = upLen > 1e-6 ? ([upRaw[0] / upLen, upRaw[1] / upLen, upRaw[2] / upLen] as Vec3) : ([0, 1, 0] as Vec3);
+      return { eye, center, fov, up };
+    }
+
 
 
     const baseYaw = 0.65 * Math.PI;
@@ -17179,6 +20377,96 @@ export class Hull3DRenderer {
 
 
 
+
+
+  private drawSpacetimeGrid(_mvp: Float32Array, state: Hull3DRendererState) {
+
+    const cfg = state.overlays?.spacetimeGrid;
+    const { gl } = this;
+    const latticeReady = Boolean(
+      state.latticeSdf &&
+      state.latticeWorldToLattice &&
+      this.latticeSdfReadyKey &&
+      this.latticeSdfReadyKey === state.latticeSdf.key
+    );
+    const hasSdf = latticeReady;
+
+    if (!cfg) {
+      this.spacetimeGridState = {
+        ...this.spacetimeGridState,
+        enabled: false,
+        hasSdf,
+        useSdf: false,
+        boundsMin: [0, 0, 0],
+        boundsSize: [0, 0, 0],
+        boundsExpanded_m: 0,
+        reason: 'missing-config',
+        degradedReasons: [],
+      };
+      return;
+    }
+
+    const enabled = !!cfg.enabled;
+    const useSdf = enabled && cfg.useSdf && hasSdf;
+    const reason = enabled
+      ? cfg.useSdf && !hasSdf
+        ? 'sdf-unavailable'
+        : null
+      : 'disabled';
+
+    this.spacetimeGridState = {
+      enabled,
+      mode: cfg.mode ?? this.spacetimeGridState.mode,
+      spacing_m: Number.isFinite(cfg.spacing_m) ? cfg.spacing_m : this.spacetimeGridState.spacing_m,
+      spacingUsed_m: Number.isFinite(cfg.spacing_m) ? cfg.spacing_m : this.spacetimeGridState.spacing_m,
+      warpStrength: Number.isFinite(cfg.warpStrength) ? cfg.warpStrength : this.spacetimeGridState.warpStrength,
+      falloff_m: Number.isFinite(cfg.falloff_m) ? cfg.falloff_m : this.spacetimeGridState.falloff_m,
+      colorBy: cfg.colorBy ?? this.spacetimeGridState.colorBy,
+      warpStrengthMode: cfg.warpStrengthMode ?? this.spacetimeGridState.warpStrengthMode,
+      hasSdf,
+      useSdf,
+      boundsMin: this.spacetimeGridState.boundsMin,
+      boundsSize: this.spacetimeGridState.boundsSize,
+      boundsExpanded_m: this.spacetimeGridState.boundsExpanded_m,
+      reason,
+      degradedReasons: [],
+    };
+
+    if (!enabled) {
+      this.spacetimeGridState.boundsMin = [0, 0, 0];
+      this.spacetimeGridState.boundsSize = [0, 0, 0];
+      this.spacetimeGridState.boundsExpanded_m = 0;
+      if (this.overlay.spaceGridVao) gl.deleteVertexArray(this.overlay.spaceGridVao);
+      if (this.overlay.spaceGridVbo) gl.deleteBuffer(this.overlay.spaceGridVbo);
+      if (this.overlay.spaceGridColorVbo) gl.deleteBuffer(this.overlay.spaceGridColorVbo);
+      this.overlay.spaceGridVao = null;
+      this.overlay.spaceGridVbo = null;
+      this.overlay.spaceGridColorVbo = null;
+      this.overlay.spaceGridCount = 0;
+      this.overlayCache.spaceGridKey = "";
+      return;
+    }
+
+    if (cfg.mode === "volume") {
+      const spacing = Number.isFinite(cfg.spacing_m) ? Math.max(1e-4, cfg.spacing_m) : this.spacetimeGridState.spacing_m;
+      const warpStrength = Number.isFinite(cfg.warpStrength) ? cfg.warpStrength : this.spacetimeGridState.warpStrength;
+      const falloff = Number.isFinite(cfg.falloff_m) ? cfg.falloff_m : this.spacetimeGridState.falloff_m;
+      this.rebuildSpacetimeGridCage(state, spacing, warpStrength, falloff);
+    } else {
+      this.spacetimeGridState.boundsMin = [0, 0, 0];
+      this.spacetimeGridState.boundsSize = [0, 0, 0];
+      this.spacetimeGridState.boundsExpanded_m = 0;
+      if (this.overlay.spaceGridVao) gl.deleteVertexArray(this.overlay.spaceGridVao);
+      if (this.overlay.spaceGridVbo) gl.deleteBuffer(this.overlay.spaceGridVbo);
+      if (this.overlay.spaceGridColorVbo) gl.deleteBuffer(this.overlay.spaceGridColorVbo);
+      this.overlay.spaceGridVao = null;
+      this.overlay.spaceGridVbo = null;
+      this.overlay.spaceGridColorVbo = null;
+      this.overlay.spaceGridCount = 0;
+      this.overlayCache.spaceGridKey = "";
+    }
+    // Slice and surface modes are handled in the post shader.
+  }
 
 
   private drawOverlays(mvp: Float32Array, state: Hull3DRendererState) {
@@ -17523,6 +20811,10 @@ export class Hull3DRenderer {
 
 
 
+      u_useColor: gl.getUniformLocation(simpleProgram, "u_useColor"),
+
+
+
     } as const;
 
 
@@ -17531,6 +20823,10 @@ export class Hull3DRenderer {
 
 
 
+
+
+
+    if (loc.u_useColor) gl.uniform1i(loc.u_useColor, 0);
     if (state.showGhostSlice && this.overlay.sliceVao) {
 
 
@@ -17564,6 +20860,86 @@ export class Hull3DRenderer {
 
 
       gl.drawArrays(gl.LINE_LOOP, 0, 4);
+
+
+
+      gl.bindVertexArray(null);
+
+
+
+      gl.disable(gl.BLEND);
+
+
+
+    }
+
+
+
+    
+
+
+
+    const spaceCageActive =
+      this.spacetimeGridState.enabled &&
+      this.spacetimeGridState.mode === "volume" &&
+      this.overlay.spaceGridVao &&
+      this.overlay.spaceGridCount > 0;
+
+
+
+    if (spaceCageActive) {
+
+
+
+      const spaceCfg = state.overlays?.spacetimeGrid;
+
+
+
+      const colorParam =
+
+
+
+        spaceCfg?.colorBy === "warpStrength"
+
+
+
+          ? Math.max(-2, Math.min(2, (spaceCfg?.warpStrength ?? 0) * 0.25))
+
+
+
+          : 0;
+
+
+
+      const [rc, gc, bc] = this.divergeColor(colorParam);
+      const useColor = !!this.overlay.spaceGridColorVbo;
+
+
+
+      gl.enable(gl.BLEND);
+
+
+
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+
+
+      if (loc.u_useColor) gl.uniform1i(loc.u_useColor, useColor ? 1 : 0);
+      if (loc.u_color && !useColor) gl.uniform3f(loc.u_color, rc, gc, bc);
+
+
+
+      const warpBoost = typeof spaceCfg?.warpStrength === "number" ? spaceCfg.warpStrength : 0;
+      const gridAlpha = clamp(0.65 + 0.12 * warpBoost, 0.6, 0.9);
+      if (loc.u_alpha) gl.uniform1f(loc.u_alpha, gridAlpha);
+
+
+
+      gl.bindVertexArray(this.overlay.spaceGridVao);
+
+
+
+      gl.drawArrays(gl.LINES, 0, this.overlay.spaceGridCount);
 
 
 
@@ -17754,6 +21130,39 @@ export class Hull3DRenderer {
 
 
 
+
+
+
+  private normalizeOpacityWindow(window?: [number, number]): [number, number] {
+
+    const base = Array.isArray(window) && window.length >= 2 ? window : (this.opacityWindow ?? DEFAULT_OPACITY_WINDOW);
+
+    let lo = Number((base as any)[0]);
+    let hi = Number((base as any)[1]);
+    if (!Number.isFinite(lo)) lo = DEFAULT_OPACITY_WINDOW[0];
+    if (!Number.isFinite(hi)) hi = DEFAULT_OPACITY_WINDOW[1];
+    lo = Math.max(1e-6, lo);
+    hi = Math.max(lo + 1e-4, hi);
+    return [lo, hi];
+
+  }
+
+
+
+  private resolveVolumeDomain(state: Hull3DRendererState): Hull3DVolumeDomain {
+
+    const mode = state.volumeDomain ?? this.volumeDomain;
+    return mode === "bubbleBox" ? "bubbleBox" : "wallBand";
+
+  }
+
+
+
+  private resolveVolumeDomainIndex(state: Hull3DRendererState): 0 | 1 {
+
+    return VOLUME_DOMAIN_TO_INDEX[this.resolveVolumeDomain(state)];
+
+  }
 
   setVolumeViz(mode: Hull3DVolumeViz) {
 
@@ -18331,6 +21740,57 @@ export class Hull3DRenderer {
 
 
 
+  private drawPreviewMesh(mvp: Float32Array, _state: Hull3DRendererState) {
+    const program = this.resources.previewMeshProgram;
+    if (!program) return;
+    if (!this.overlay.previewVao || this.overlay.previewCount <= 0) return;
+
+    const { gl } = this;
+    gl.useProgram(program);
+
+    const prevBlend = gl.isEnabled(gl.BLEND);
+    const prevDepth = gl.isEnabled(gl.DEPTH_TEST);
+
+    const loc = {
+      u_mvp: gl.getUniformLocation(program, "u_mvp"),
+      u_color: gl.getUniformLocation(program, "u_color"),
+      u_tex: gl.getUniformLocation(program, "u_tex"),
+      u_hasTex: gl.getUniformLocation(program, "u_hasTex"),
+    } as const;
+
+    if (loc.u_mvp) gl.uniformMatrix4fv(loc.u_mvp, false, mvp);
+    const color = this.overlay.previewColor ?? new Float32Array([0.82, 0.88, 0.96, 0.95]);
+    if (loc.u_color) gl.uniform4fv(loc.u_color, color);
+
+    const hasTex = !!(this.overlay.previewTexture && this.overlay.previewHasUv);
+    if (loc.u_hasTex) gl.uniform1i(loc.u_hasTex, hasTex ? 1 : 0);
+    if (hasTex && loc.u_tex) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.overlay.previewTexture);
+      gl.uniform1i(loc.u_tex, 0);
+    }
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.DEPTH_TEST);
+
+    gl.bindVertexArray(this.overlay.previewVao);
+    if (this.overlay.previewIndexed && this.overlay.previewIbo && this.overlay.previewIndexType) {
+      gl.drawElements(gl.TRIANGLES, this.overlay.previewCount, this.overlay.previewIndexType, 0);
+    } else {
+      gl.drawArrays(gl.TRIANGLES, 0, this.overlay.previewCount);
+    }
+    gl.bindVertexArray(null);
+    if (hasTex) {
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    if (!prevBlend) gl.disable(gl.BLEND);
+    if (prevDepth) gl.enable(gl.DEPTH_TEST);
+  }
+
+
+
   private drawWireframeFallback(mvp: Float32Array) {
 
 
@@ -18367,6 +21827,10 @@ export class Hull3DRenderer {
 
 
 
+      u_useColor: gl.getUniformLocation(this.overlay.fallbackProgram, "u_useColorAttr"),
+
+
+
     };
 
 
@@ -18380,6 +21844,10 @@ export class Hull3DRenderer {
 
 
     gl.uniform1f(loc.u_alpha, 0.65);
+
+
+
+    if (loc.u_useColor) gl.uniform1i(loc.u_useColor, 0);
 
 
 
@@ -18416,6 +21884,10 @@ export class Hull3DRenderer {
 
 
     if (this.resources.overlayProgram) gl.deleteProgram(this.resources.overlayProgram);
+
+
+
+    if (this.resources.previewMeshProgram) gl.deleteProgram(this.resources.previewMeshProgram);
 
 
 
@@ -18492,6 +21964,27 @@ export class Hull3DRenderer {
 
 
     if (this.volumeTex) gl.deleteTexture(this.volumeTex);
+    if (this.gateVolumeTex) gl.deleteTexture(this.gateVolumeTex);
+    if (this.latticeAtlasTex) {
+      gl.deleteTexture(this.latticeAtlasTex);
+      this.latticeAtlasTex = null;
+    }
+    this.latticeUpload = null;
+    this.latticeUploadFailedHash = null;
+    this.latticeUploadFailedReason = null;
+
+    if (this.latticeSdfTex) {
+      gl.deleteTexture(this.latticeSdfTex);
+      this.latticeSdfTex = null;
+    }
+    if (this.latticeSdfAtlasTex) {
+      gl.deleteTexture(this.latticeSdfAtlasTex);
+      this.latticeSdfAtlasTex = null;
+    }
+    this.latticeSdfUpload = null;
+    this.latticeSdfUploadFailedKey = null;
+    this.latticeSdfUploadFailedReason = null;
+    this.latticeSdfReadyKey = null;
 
 
 
@@ -18653,6 +22146,47 @@ export class Hull3DRenderer {
 
 
     if (this.overlay.wireframeVbo) gl.deleteBuffer(this.overlay.wireframeVbo);
+
+
+
+    if (this.overlay.meshWireVao) gl.deleteVertexArray(this.overlay.meshWireVao);
+
+
+
+    if (this.overlay.meshWireVbo) gl.deleteBuffer(this.overlay.meshWireVbo);
+
+
+
+    if (this.overlay.meshWireColorVbo) gl.deleteBuffer(this.overlay.meshWireColorVbo);
+
+
+
+    if (this.overlay.spaceGridVao) gl.deleteVertexArray(this.overlay.spaceGridVao);
+
+
+
+    if (this.overlay.spaceGridVbo) gl.deleteBuffer(this.overlay.spaceGridVbo);
+    if (this.overlay.spaceGridColorVbo) gl.deleteBuffer(this.overlay.spaceGridColorVbo);
+
+
+
+    if (this.overlay.previewVao) gl.deleteVertexArray(this.overlay.previewVao);
+
+
+
+    if (this.overlay.previewVbo) gl.deleteBuffer(this.overlay.previewVbo);
+
+
+
+    if (this.overlay.previewUvVbo) gl.deleteBuffer(this.overlay.previewUvVbo);
+
+
+
+    if (this.overlay.previewIbo) gl.deleteBuffer(this.overlay.previewIbo);
+
+
+
+    if (this.overlay.previewTexture) gl.deleteTexture(this.overlay.previewTexture);
 
 
 
@@ -18886,9 +22420,7 @@ export class Hull3DRenderer {
 
 
       overlayProgram: null,
-
-
-
+      previewMeshProgram: null,
       postProgram: null,
 
 

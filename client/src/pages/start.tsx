@@ -372,6 +372,32 @@ export default function StartPortal() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
                 <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">New panel</p>
+                <h3 className="text-lg font-semibold text-white">Fleet Hull Cards</h3>
+                <p className="text-sm leading-relaxed text-slate-300/80">
+                  Pick a ship hull card (Needle, Clipper, Courier, Heavy Lancer) and apply its dimensions directly into
+                  the pipeline. Mirrors the Helix Start card flow so hull swaps stay simple and falsifiable.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 md:max-w-xs">
+                <button
+                  className="rounded-lg bg-cyan-500/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition hover:bg-cyan-500"
+                  onClick={() => setLocation("/helix-core#hull-cards")}
+                >
+                  Open Hull Cards in Station
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  Jumps to Helix Core with the hull card panel in view; applying a card updates pipeline.hull.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">New panel</p>
                 <h3 className="text-lg font-semibold text-white">Energy Flux Stability Monitor</h3>
                 <p className="text-sm leading-relaxed text-slate-300/80">
                   Real-time |T⁰⁰| and ∇·S slices with a stability histogram for

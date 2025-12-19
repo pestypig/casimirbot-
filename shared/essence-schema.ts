@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { InformationBoundary } from "./information-boundary";
 
 export const COLLAPSE_SPACE = "collapse/unified-1024" as const;
 
@@ -323,6 +324,7 @@ export const Provenance = z.object({
   merkle_root: Hash,
   previous: z.string().nullable().default(null),
   signatures: z.array(Signature).default([]),
+  information_boundary: InformationBoundary.optional(),
 });
 
 export const EssenceEnvelope = z.object({

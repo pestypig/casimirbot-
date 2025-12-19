@@ -22,6 +22,13 @@ const debugLog = (...args: unknown[]) => {
 const debugWarn = (...args: unknown[]) => {
   if (DEBUG_WARP) console.warn(...args);
 };
+const logError = (...args: unknown[]) => {
+  if (DEBUG_WARP) {
+    console.error(...args);
+  } else {
+    console.warn(...args);
+  }
+};
 
 export interface WarpBubbleResult extends NatarioWarpResult {
   // Module-specific additions
@@ -39,7 +46,7 @@ export interface WarpBubbleResult extends NatarioWarpResult {
 /**
  * Resolve effective duty from pipeline parameters (no double division)
  */
-function resolveDutyEff(params: SimulationParameters): number {
+export function resolveDutyEff(params: SimulationParameters): number {
   debugLog('[WarpModule] resolveDutyEff input params:', {
     dynamicConfig: params.dynamicConfig,
     dutyEffectiveFR: (params as any).dutyEffectiveFR,
@@ -155,6 +162,14 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   const R_geom_um = R_geom_m * 1e6;                     // Natário expects µm
   
   debugLog('[WarpModule] Hull geometry:', { hull, R_geom_m, R_geom_um });
+
+  // Geometry-aware warp controls
+  const warpFieldType = dyn?.warpFieldType ?? (params as any).warpFieldType ?? 'natario';
+  const warpGeometry = (params as any).warpGeometry ?? dyn?.warpGeometry ?? null;
+  const warpGeometryKind = (params as any).warpGeometryKind ?? (dyn as any)?.warpGeometryKind ?? (warpGeometry as any)?.kind;
+  const warpGeometryAssetId = (params as any).warpGeometryAssetId ?? (warpGeometry as any)?.assetId;
+  const warpGridResolution = (params as any).warpGridResolution ?? (warpGeometry as any)?.resolution;
+  const warpDriveDirection = (warpGeometry as any)?.driveDirection ?? (params as any).warpDriveDirection;
 
   // Sector counts / duty
   const sectorCount = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
@@ -283,6 +298,13 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
 
     // Tolerance
     expansionTolerance: dyn?.expansionTolerance ?? 1e-12,
+    warpFieldType,
+    warpGeometry: warpGeometry ?? null,
+    warpGeometryKind,
+    warpGeometryAssetId,
+    warpGridResolution: Number.isFinite(+warpGridResolution) ? +warpGridResolution : undefined,
+    warpDriveDirection: Array.isArray(warpDriveDirection) ? (warpDriveDirection as [number, number, number]) : undefined,
+    hullAxes: hull,
 
     // --- Pipeline seeds (threaded through) ---
     gammaGeo,
@@ -404,6 +426,8 @@ export const warpBubbleModule: CasimirModule = {
       // Convert simulation parameters to warp parameters
       const warpParams = convertToWarpParams(params);
       debugLog('[WarpModule] Converted warp parameters:', warpParams);
+      const warpFieldType = warpParams.warpFieldType ?? 'natario';
+      debugLog('[WarpModule] warpFieldType selected:', warpFieldType);
 
       // Validate critical warp parameters
       if (!Number.isFinite(warpParams.bowlRadius) || warpParams.bowlRadius <= 0) {
@@ -418,12 +442,18 @@ export const warpBubbleModule: CasimirModule = {
           }
 
       // Perform Natário warp bubble calculations
-      const warpResult = calculateNatarioWarpBubble(warpParams);
+      let warpResult: NatarioWarpResult;
+      if (warpFieldType === 'natario' || warpFieldType === 'natario_sdf') {
+        warpResult = calculateNatarioWarpBubble(warpParams);
+      } else {
+        debugWarn(`[WarpModule] Unsupported warpFieldType "${warpFieldType}", falling back to Natário solver`);
+        warpResult = calculateNatarioWarpBubble({ ...warpParams, warpFieldType: 'natario' });
+      }
       debugLog('[WarpModule] Warp calculation result:', warpResult);
 
       // Validate critical results
       if (!Number.isFinite(warpResult.totalAmplificationFactor)) {
-        console.error('[WarpModule] Invalid amplification factor result');
+        logError('[WarpModule] Invalid amplification factor result');
         throw new Error('Calculation produced invalid amplification factor');
       }
 
@@ -467,8 +497,8 @@ export const warpBubbleModule: CasimirModule = {
       return finalResult;
 
     } catch (error) {
-      console.error('[WarpModule] Calculation failed:', error);
-      console.error('[WarpModule] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      logError('[WarpModule] Calculation failed:', error);
+      logError('[WarpModule] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       throw new Error(`Warp bubble calculation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

@@ -296,7 +296,7 @@ function buildSyntheticProposalEnvelopes(
           id,
           version: "essence/1.0",
           modality: "text",
-          created_at: proposal.createdAt,
+          created_at: new Date(proposal.createdAt).toISOString(),
           source: {
             uri: `proposal://${proposal.id}`,
             original_hash: { algo: "sha256", value: textHash },

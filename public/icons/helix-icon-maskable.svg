@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Helix Start maskable icon">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="80" fill="#0b1220" />
+  <path d="M96 168c80-64 240-64 320 0" fill="none" stroke="url(#g)" stroke-width="32" stroke-linecap="round" />
+  <path d="M96 344c80 64 240 64 320 0" fill="none" stroke="url(#g)" stroke-width="32" stroke-linecap="round" />
+  <circle cx="152" cy="256" r="26" fill="#38bdf8" />
+  <circle cx="360" cy="256" r="26" fill="#38bdf8" />
+</svg>

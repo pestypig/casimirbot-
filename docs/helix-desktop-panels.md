@@ -14,6 +14,7 @@ When you add a new entry to `HELIX_PANELS`, it automatically:
 
 1. Appears as a launchable item inside the Helix Start popover.
 2. Becomes available to `/desktop` (because `panelRegistry` spreads `...HELIX_PANELS`).
+3. Shows up in Helix Start/taskbar (the primary entry point for `/desktop`).
 3. Shows endpoint metadata inside `EndpointsPanel` if `endpoints` are declared.
 
 ## Workflow For New Panels
@@ -63,7 +64,8 @@ When you add a new entry to `HELIX_PANELS`, it automatically:
    - Prefer a single port? Run `npm run dev:agi:5173` (Express+Vite on 5173 with AGI/Essence enabled). If a standalone Vite dev server is already on 5173, stop it first or pick another port.
    - Click the Helix Start button in the taskbar; the new entry should appear alphabetically with its icon.
    - Launch the panel, confirm the initial bounds and resize/drag/minimize workflows.
-   - If window state needs to be reset during testing, clear `localStorage["desktop-windows-v2"]`.
+- If window state needs to be reset during testing, clear `localStorage["desktop-windows-v2"]`.
+- HUDs/overlays that also need to appear in Helix Start (e.g., collapse benchmark HUDs) must be wrapped in a panel component and registered in `helix-core.panels.ts`; mounting them inline in `helix-core.tsx` alone will not surface them on `/desktop`.
 
 6. **Document special requirements.**
    - If the panel expects certain hardware streams or feature flags, append a note in its `HELIX_PANELS` comment block or reference that in `docs/sweeps.md`/`docs/AGI-ROADMAP.md` as appropriate.

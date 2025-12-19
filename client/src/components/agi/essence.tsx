@@ -1863,7 +1863,7 @@ function InferenceDrawer({
               </div>
             </div>
             {profileError && <div className="text-[11px] text-rose-300">{profileError}</div>}
-            <div className="grid grid-cols-2 gap-3 text-xs text-slate-100">
+            <div className="grid grid-cols-1 gap-3 text-xs text-slate-100 sm:grid-cols-2">
               <label className="space-y-1">
                 <span className="text-[11px] text-slate-400">Detail level</span>
                 <select
@@ -1906,7 +1906,7 @@ function InferenceDrawer({
                 <span>Prefers code/structured</span>
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-xs text-slate-100">
+            <div className="grid grid-cols-1 gap-3 text-xs text-slate-100 sm:grid-cols-2">
               {["learning", "creative_work", "execution_ops", "health", "relationships"].map((key) => (
                 <label key={key} className="space-y-1">
                   <span className="text-[11px] text-slate-400">{key.replace("_", " ")}</span>
@@ -1927,7 +1927,7 @@ function InferenceDrawer({
                 </label>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-3 text-xs text-slate-100">
+            <div className="grid grid-cols-1 gap-3 text-xs text-slate-100 sm:grid-cols-2">
               {["craftsmanship", "autonomy", "stability", "exploration"].map((key) => (
                 <label key={key} className="space-y-1">
                   <span className="text-[11px] text-slate-400">{key}</span>

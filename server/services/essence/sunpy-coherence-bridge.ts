@@ -6,6 +6,12 @@
  * - Emits one InformationEvent per bin with phase-modulated alignment + entropy proxy
  */
 import { emitSolarHekEvents, handleInformationEvent, type SolarHekEventInput } from "../star/service";
+import type { TInformationBoundary } from "@shared/information-boundary";
+import {
+  assertDerivedArtifactInformationBoundaryAudit,
+  withDerivedArtifactInformationBoundary,
+} from "@shared/information-boundary-derived";
+import { buildInformationBoundary } from "../../utils/information-boundary";
 
 const BIN_SECONDS = 300;
 const BIN_MS = BIN_SECONDS * 1000;
@@ -13,6 +19,8 @@ const BIN_MS = BIN_SECONDS * 1000;
 export interface SunpyExportFrame {
   index: number;
   obstime: string;
+  map_b64?: string | null;
+  grid_size?: number | null;
   fits_path?: string | null;
   png_path?: string | null;
 }
@@ -175,6 +183,10 @@ export interface SunpyBridgeBinSummary {
   flareFluxNorm?: number;
   sharpFlux?: number;
   goesFlux?: number;
+  data_cutoff_iso: string;
+  inputs_hash: string;
+  features_hash?: string;
+  information_boundary: TInformationBoundary;
 }
 
 export interface SunpyBridgeSummary {
@@ -183,6 +195,10 @@ export interface SunpyBridgeSummary {
   frameCount: number;
   eventCount: number;
   bins: SunpyBridgeBinSummary[];
+  data_cutoff_iso: string;
+  inputs_hash: string;
+  features_hash?: string;
+  information_boundary: TInformationBoundary;
 }
 
 const clamp = (v: number, min = 0, max = 1) => {
@@ -312,7 +328,7 @@ const normalizeGoesBins = (block?: SunpyGoesXrsBlock | null): GoesXrsBinMs[] => 
     .sort((a, b) => (a.startMs as number) - (b.startMs as number));
 };
 
-const buildBins = (payload: SunpyExportPayload, t0Ms: Ms): CoherenceBin[] => {
+const buildBins = (payload: SunpyExportPayload, t0Ms: Ms, opts?: { includeEvents?: boolean }): CoherenceBin[] => {
   const map = new Map<number, CoherenceBin>();
   const ensure = (idx: number): CoherenceBin => {
     let bin = map.get(idx);
@@ -341,12 +357,14 @@ const buildBins = (payload: SunpyExportPayload, t0Ms: Ms): CoherenceBin[] => {
     ensure(idx).frames.push(frame);
   }
 
-  for (const ev of payload.events ?? []) {
-    const tMs = parseMs(ev.start_time ?? ev.start ?? ev.end_time ?? ev.end);
-    if (tMs === null) continue;
-    const idx = Math.floor((tMs - t0Ms) / BIN_MS);
-    if (idx < 0) continue;
-    ensure(idx).events.push(ev);
+  if (opts?.includeEvents ?? true) {
+    for (const ev of payload.events ?? []) {
+      const tMs = parseMs(ev.start_time ?? ev.start ?? ev.end_time ?? ev.end);
+      if (tMs === null) continue;
+      const idx = Math.floor((tMs - t0Ms) / BIN_MS);
+      if (idx < 0) continue;
+      ensure(idx).events.push(ev);
+    }
   }
 
   return [...map.values()].sort((a, b) => a.startMs - b.startMs);
@@ -356,14 +374,17 @@ const computeHeuristicCoherence = (
   bin: CoherenceBin,
   cadenceS: number | null | undefined,
   extra?: ExternalSignals,
+  opts?: { includeEventFeatures?: boolean },
 ): HeuristicStats => {
-  const totalMass = bin.events.reduce((acc, ev) => acc + estimateEventMass(ev), 0);
+  const includeEventFeatures = opts?.includeEventFeatures ?? true;
+  const totalMass = includeEventFeatures ? bin.events.reduce((acc, ev) => acc + estimateEventMass(ev), 0) : 0;
   const expectedFrames = cadenceS && cadenceS > 0 ? Math.max(1, Math.round(BIN_SECONDS / cadenceS)) : 10;
   const frameFill = clamp(bin.frames.length / expectedFrames, 0, 1);
-  const massNorm = clamp(Math.log1p(totalMass) / Math.log(1 + 20_000), 0, 1);
+  const massNormFromEvents = clamp(Math.log1p(totalMass) / Math.log(1 + 20_000), 0, 1);
   const frameNorm = frameFill;
   const turbulence = clamp(extra?.turbulence ?? 0, 0, 1);
   const flareFluxNorm = clamp(extra?.flareFluxNorm ?? 0, 0, 1);
+  const massNorm = includeEventFeatures ? massNormFromEvents : Math.max(massNormFromEvents, flareFluxNorm);
   const sharpFluxNorm = clamp(
     extra?.sharpFlux !== undefined ? Math.log1p(Math.max(0, extra.sharpFlux)) / Math.log(1 + 5_000) : 0,
     0,
@@ -394,6 +415,7 @@ const resolveExternalSignals = (
   cdawebBins: CdawebBinMs[],
   goesBins: GoesXrsBinMs[],
   sharpFlux?: number | null,
+  includeEventFeatures: boolean = true,
 ): ExternalSignals => {
   const cdaMatch = cdawebBins.find(
     (b) =>
@@ -409,7 +431,7 @@ const resolveExternalSignals = (
       bin.startMs < (b.endMs as number) &&
       bin.endMs > (b.startMs as number),
   );
-  const eventsFlux = bin.events.reduce((acc, ev) => acc + eventPeakFluxWm2(ev), 0);
+  const eventsFlux = includeEventFeatures ? bin.events.reduce((acc, ev) => acc + eventPeakFluxWm2(ev), 0) : 0;
   const goesFlux = Math.max(0, goesMatch?.max_long ?? goesMatch?.mean_long ?? 0);
   const flareFlux = eventsFlux + goesFlux;
   const flareFluxNorm = clamp(Math.log10(1 + Math.max(0, flareFlux) * 1e8) / 8, 0, 1);
@@ -424,18 +446,26 @@ const resolveExternalSignals = (
 
 export async function ingestSunpyCoherenceBridge(
   payload: SunpyExportPayload,
-  opts?: { sessionId?: string; sessionType?: string; hostMode?: string; emitEvents?: boolean; phaseGainAmp?: number },
+  opts?: {
+    sessionId?: string;
+    sessionType?: string;
+    hostMode?: string;
+    emitEvents?: boolean;
+    includeEventFeatures?: boolean;
+    phaseGainAmp?: number;
+  },
 ): Promise<SunpyBridgeSummary | null> {
   if (!payload || !Array.isArray(payload.frames)) return null;
 
   const sessionId = opts?.sessionId ?? "solar-hek";
   const sessionType = opts?.sessionType ?? "solar";
   const hostMode = opts?.hostMode ?? "sun_like";
-  const emitEvents = opts?.emitEvents ?? true;
+  const includeEventFeatures = opts?.includeEventFeatures ?? true;
+  const emitEvents = (opts?.emitEvents ?? true) && includeEventFeatures;
   const t0Ms = chooseReferenceT0(payload);
   if (t0Ms === null) return null;
 
-  const bins = buildBins(payload, t0Ms);
+  const bins = buildBins(payload, t0Ms, { includeEvents: includeEventFeatures });
   const cadenceS = payload.meta?.cadence_s ?? null;
   const cdawebBins = normalizeCdawebBins(payload.cdaweb);
   const goesBins = normalizeGoesBins(payload.goes_xrs);
@@ -452,12 +482,135 @@ export async function ingestSunpyCoherenceBridge(
       emitSolarHekEvents(bin.events as SolarHekEventInput[], { sessionId, sessionType, hostMode });
     }
 
-    const externalSignals = resolveExternalSignals(bin, cdawebBins, goesBins, sharpFlux);
-    const stats = computeHeuristicCoherence(bin, cadenceS, externalSignals);
+    const externalSignals = resolveExternalSignals(bin, cdawebBins, goesBins, sharpFlux, includeEventFeatures);
+    const stats = computeHeuristicCoherence(bin, cadenceS, externalSignals, { includeEventFeatures });
     const turbPenalty = clamp(externalSignals.turbulence ?? 0, 0, 1);
     const alignment = clamp(stats.globalCoherence * phaseGainFor(bin.phaseRad, opts?.phaseGainAmp) * (1 - 0.35 * turbPenalty), 0, 1);
-    const bytes = Math.max(400, Math.round(stats.eventMass * 0.8 + bin.frames.length * 500));
+    const fluxMass = includeEventFeatures ? 0 : Math.round(8_000 * (stats.flareFluxNorm ?? 0));
+    const bytes = Math.max(400, Math.round(stats.eventMass * 0.8 + bin.frames.length * 500 + fluxMass));
     const timestamp = bin.centerMs ?? Date.now();
+    const startIso = new Date(bin.startMs).toISOString();
+    const endIso = new Date(bin.endMs).toISOString();
+
+    if (!includeEventFeatures && bin.events.length) {
+      throw new Error("sunpy_bridge_invariant_failed: observables mode must not include label events in bins");
+    }
+
+    const inputsForHash = {
+      kind: "sunpy_bridge/bin_inputs",
+      v: 1,
+      instrument: payload.instrument,
+      wavelength_A: payload.wavelength_A,
+      cadence_s: cadenceS ?? null,
+      bin: {
+        start_iso: startIso,
+        end_iso: endIso,
+        phase_rad: bin.phaseRad,
+      },
+      observables: {
+        frame_times: bin.frames.map((f) => f.obstime).filter(Boolean).slice().sort(),
+        frame_count: bin.frames.length,
+        turbulence_index: externalSignals.turbulence ?? null,
+        sharp_mean_abs_flux: externalSignals.sharpFlux ?? null,
+        goes_xrs_long_wm2: externalSignals.goesFlux ?? null,
+        flare_flux_wm2: externalSignals.flareFlux ?? null,
+        flare_flux_norm: externalSignals.flareFluxNorm ?? null,
+      },
+      labels: includeEventFeatures
+        ? {
+            event_count: bin.events.length,
+            events: bin.events
+              .map((ev) => ({
+                event_type: (ev.event_type ?? "").toUpperCase() || null,
+                start_time: ev.start_time ?? ev.start ?? null,
+                end_time: ev.end_time ?? ev.end ?? null,
+                goes_class: ev.goes_class ?? null,
+                peak_flux: Number.isFinite(ev.peak_flux ?? NaN) ? (ev.peak_flux as number) : null,
+                noaa_ar: Number.isFinite(ev.noaa_ar ?? NaN) ? (ev.noaa_ar as number) : null,
+                ch_area: Number.isFinite(ev.ch_area ?? NaN) ? (ev.ch_area as number) : null,
+              }))
+              .sort((a, b) => `${a.event_type ?? ""}:${a.start_time ?? ""}`.localeCompare(`${b.event_type ?? ""}:${b.start_time ?? ""}`)),
+          }
+        : null,
+      config: {
+        bin_seconds: BIN_SECONDS,
+        include_event_features: includeEventFeatures,
+      },
+    };
+
+    const featuresForHash = {
+      kind: "sunpy_bridge/bin_features",
+      v: 1,
+      alignment,
+      entropy: stats.entropy,
+      energy: stats.energy,
+      dispersion: stats.dispersion,
+      components: {
+        global_coherence: stats.globalCoherence,
+        event_mass: stats.eventMass,
+        frame_count: bin.frames.length,
+        turbulence_index: externalSignals.turbulence ?? null,
+        flare_flux_norm: externalSignals.flareFluxNorm ?? null,
+        sharp_flux: externalSignals.sharpFlux ?? null,
+        goes_flux: externalSignals.goesFlux ?? null,
+      },
+      config: {
+        bin_seconds: BIN_SECONDS,
+        include_event_features: includeEventFeatures,
+      },
+    };
+
+    const informationBoundary = buildInformationBoundary({
+      data_cutoff_iso: endIso,
+      mode: includeEventFeatures ? "mixed" : "observables",
+      labels_used_as_features: includeEventFeatures,
+      event_features_included: includeEventFeatures,
+      inputs: inputsForHash,
+      features: featuresForHash,
+    });
+
+    if (!includeEventFeatures && process.env.SUNPY_LEAKAGE_SENTINEL === "1") {
+      const injectedBin: CoherenceBin = {
+        ...bin,
+        events: [
+          {
+            event_type: "FL",
+            start_time: startIso,
+            end_time: endIso,
+            goes_class: "X9.3",
+            peak_flux: 9.3e-4,
+          },
+        ],
+      };
+      const injectedSignals = resolveExternalSignals(injectedBin, cdawebBins, goesBins, sharpFlux, false);
+      const injectedStats = computeHeuristicCoherence(injectedBin, cadenceS, injectedSignals, { includeEventFeatures: false });
+      const injectedFeaturesForHash = {
+        ...featuresForHash,
+        entropy: injectedStats.entropy,
+        energy: injectedStats.energy,
+        dispersion: injectedStats.dispersion,
+        components: {
+          ...featuresForHash.components,
+          global_coherence: injectedStats.globalCoherence,
+          event_mass: injectedStats.eventMass,
+          flare_flux_norm: injectedSignals.flareFluxNorm ?? null,
+        },
+      };
+      const injectedIb = buildInformationBoundary({
+        data_cutoff_iso: endIso,
+        mode: "observables",
+        labels_used_as_features: false,
+        event_features_included: false,
+        inputs: inputsForHash,
+        features: injectedFeaturesForHash,
+      });
+      if (injectedIb.features_hash !== informationBoundary.features_hash) {
+        throw new Error("sunpy_bridge_leakage_sentinel_failed: features_hash changed after label mutation (observables mode)");
+      }
+      if (injectedIb.inputs_hash !== informationBoundary.inputs_hash) {
+        throw new Error("sunpy_bridge_leakage_sentinel_failed: inputs_hash changed after label mutation (observables mode)");
+      }
+    }
 
     handleInformationEvent({
       session_id: sessionId,
@@ -470,8 +623,17 @@ export async function ingestSunpyCoherenceBridge(
       timestamp,
       metadata: {
         kind: "sunpy_coherence_bin",
-        bin_start: new Date(bin.startMs).toISOString(),
-        bin_end: new Date(bin.endMs).toISOString(),
+        schema_version: informationBoundary.schema_version,
+        data_cutoff_iso: informationBoundary.data_cutoff_iso,
+        data_cutoff: informationBoundary.data_cutoff_iso,
+        inputs_hash: informationBoundary.inputs_hash,
+        features_hash: informationBoundary.features_hash,
+        mode: informationBoundary.mode,
+        labels_used_as_features: informationBoundary.labels_used_as_features,
+        event_features_included: informationBoundary.event_features_included,
+        information_boundary: informationBoundary,
+        bin_start: startIso,
+        bin_end: endIso,
         phase_rad: bin.phaseRad,
         frame_count: bin.frames.length,
         event_count: bin.events.length,
@@ -486,29 +648,66 @@ export async function ingestSunpyCoherenceBridge(
       },
     });
 
-    binSummaries.push({
-      startIso: new Date(bin.startMs).toISOString(),
-      endIso: new Date(bin.endMs).toISOString(),
-      phaseRad: bin.phaseRad,
-      frameCount: bin.frames.length,
-      eventCount: bin.events.length,
-      alignment,
-      entropy: stats.entropy,
-      energy: stats.energy,
-      dispersion: stats.dispersion,
-      turbulence: externalSignals.turbulence,
-      flareFlux: externalSignals.flareFlux,
-      flareFluxNorm: externalSignals.flareFluxNorm,
-      sharpFlux: externalSignals.sharpFlux ?? undefined,
-      goesFlux: externalSignals.goesFlux,
-    });
+    const binSummary = withDerivedArtifactInformationBoundary(
+      {
+        startIso,
+        endIso,
+        phaseRad: bin.phaseRad,
+        frameCount: bin.frames.length,
+        eventCount: bin.events.length,
+        alignment,
+        entropy: stats.entropy,
+        energy: stats.energy,
+        dispersion: stats.dispersion,
+        turbulence: externalSignals.turbulence,
+        flareFlux: externalSignals.flareFlux,
+        flareFluxNorm: externalSignals.flareFluxNorm,
+        sharpFlux: externalSignals.sharpFlux ?? undefined,
+        goesFlux: externalSignals.goesFlux,
+      },
+      informationBoundary,
+    );
+    assertDerivedArtifactInformationBoundaryAudit(binSummary, "sunpy_bridge/bin_summary");
+    binSummaries.push(binSummary);
   }
 
-  return {
-    t0Iso: new Date(t0Ms).toISOString(),
-    binCount: bins.length,
-    frameCount: totalFrames,
-    eventCount: totalEvents,
-    bins: binSummaries,
-  };
+  const t0Iso = new Date(t0Ms).toISOString();
+  const dataCutoffIso =
+    binSummaries.length > 0 ? binSummaries[binSummaries.length - 1].data_cutoff_iso : payload.meta?.end ?? t0Iso;
+
+  const runInformationBoundary = buildInformationBoundary({
+    data_cutoff_iso: dataCutoffIso,
+    mode: includeEventFeatures ? "mixed" : "observables",
+    labels_used_as_features: includeEventFeatures,
+    event_features_included: includeEventFeatures,
+    inputs: {
+      kind: "sunpy_bridge/run_inputs",
+      v: 1,
+      instrument: payload.instrument,
+      wavelength_A: payload.wavelength_A,
+      cadence_s: cadenceS ?? null,
+      t0_iso: t0Iso,
+      bin_seconds: BIN_SECONDS,
+      include_event_features: includeEventFeatures,
+      bins_inputs_hash: binSummaries.map((b) => b.inputs_hash),
+    },
+    features: {
+      kind: "sunpy_bridge/run_features",
+      v: 1,
+      bins_features_hash: binSummaries.map((b) => b.features_hash ?? null),
+    },
+  });
+
+  const runSummary = withDerivedArtifactInformationBoundary(
+    {
+      t0Iso,
+      binCount: bins.length,
+      frameCount: totalFrames,
+      eventCount: totalEvents,
+      bins: binSummaries,
+    },
+    runInformationBoundary,
+  );
+  assertDerivedArtifactInformationBoundaryAudit(runSummary, "sunpy_bridge/run_summary");
+  return runSummary;
 }

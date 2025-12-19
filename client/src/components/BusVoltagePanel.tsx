@@ -105,7 +105,7 @@ export default function BusVoltagePanel() {
 
   return (
     <div className="flex h-full flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+      <header className="flex flex-col gap-3 border-b border-white/10 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div className="space-y-1">
           <p className="text-[10px] uppercase tracking-[0.28em] text-slate-400">Helix start: bus program</p>
           <h1 className="text-2xl font-semibold text-white">Bus Voltage</h1>
@@ -117,7 +117,7 @@ export default function BusVoltagePanel() {
             <span className="rounded-full bg-white/5 px-2 py-1">Ceilings: 31.6 kA (sector/midi), 14.1 kA (launcher)</span>
           </div>
         </div>
-        <Badge className="border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-xs font-semibold uppercase text-emerald-100">
+        <Badge className="w-fit border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-xs font-semibold uppercase text-emerald-100">
           Live mode: {live.mode}
         </Badge>
       </header>
@@ -139,7 +139,7 @@ export default function BusVoltagePanel() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-3">
             <Card className="lg:col-span-2 border-white/10 bg-slate-900/60">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-white">

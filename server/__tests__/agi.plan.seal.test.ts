@@ -8,7 +8,10 @@ describe("Plan->Execute sealed context", () => {
       panels: [
         {
           panelId: "near-zero",
-          metrics: { mode: "yellow" },
+          metrics: { mode: 1 },
+          instanceId: "near-zero-1",
+          title: "Near Zero Widget",
+          lastUpdated: new Date().toISOString(),
           sourceIds: ["client/src/components/NearZeroWidget.tsx"],
         },
       ],

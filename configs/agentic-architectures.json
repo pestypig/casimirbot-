@@ -1,0 +1,11 @@
+{
+  "//": "Config stub for LangGraph agentic repo harness; adjust paths/env as needed.",
+  "repoPath": "external/agentic-architectures",
+  "dataDir": "data/essence/tmp/agentic",
+  "defaultDevice": "cpu",
+  "defaultArch": "reflection",
+  "env": {
+    "TOKEN_LIMIT": 32768,
+    "TEMPERATURE": 0.2
+  }
+}

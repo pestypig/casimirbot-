@@ -12,6 +12,12 @@
 import sharp from "sharp";
 import { handleInformationEvent } from "../star/service";
 import { getVisionProvider, defaultVisionPrompt } from "../vision/provider";
+import type { TInformationBoundary } from "@shared/information-boundary";
+import {
+  assertDerivedArtifactInformationBoundaryAudit,
+  withDerivedArtifactInformationBoundary,
+} from "@shared/information-boundary-derived";
+import { buildInformationBoundaryFromHashes, sha256Prefixed } from "../../utils/information-boundary";
 
 // Reduce sharp/libvips memory pressure: disable caching and keep concurrency low.
 sharp.cache({ files: 0, memory: 32, items: 16 });
@@ -101,6 +107,10 @@ export interface SolarCoherenceResult {
     dispersion: number;
     energy: number;
   };
+  data_cutoff_iso: string;
+  inputs_hash: string;
+  features_hash?: string;
+  information_boundary: TInformationBoundary;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -150,7 +160,15 @@ export async function runSolarVideoCoherenceJob(job: SolarVideoCoherenceJob): Pr
     return null;
   });
 
-  const frames = await decodeFramesToGrid(buffer, effectiveGrid, tMs ?? undefined, maxFrames, sampleStride, budgetDeadline);
+  const frames = await decodeFramesToGrid(
+    buffer,
+    effectiveGrid,
+    tMs ?? undefined,
+    maxFrames,
+    sampleStride,
+    budgetDeadline,
+    timestampMs,
+  );
   console.info("[solar-coherence] decoded frames", {
     frames: frames.length,
     gridSize: effectiveGrid,
@@ -173,6 +191,24 @@ export async function runSolarVideoCoherenceJob(job: SolarVideoCoherenceJob): Pr
   }
 
   const global = summarizeMap(map);
+  const dataCutoffMs = frames.length ? Math.max(...frames.map((f) => (Number.isFinite(f.t) ? f.t : 0))) : timestampMs;
+  const dataCutoffIso = new Date(Math.max(0, dataCutoffMs)).toISOString();
+  const inputHash = sha256Prefixed(buffer);
+  const mapToBuffer = (arr: Float32Array) => Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength);
+  const featureHash = sha256Prefixed(Buffer.concat([
+    Buffer.from(`grid:${map.gridSize};v1;`, "utf8"),
+    mapToBuffer(map.coherence),
+    mapToBuffer(map.phaseDispersion),
+    mapToBuffer(map.energy),
+  ]));
+  const informationBoundary = buildInformationBoundaryFromHashes({
+    data_cutoff_iso: dataCutoffIso,
+    mode: "observables",
+    labels_used_as_features: false,
+    event_features_included: false,
+    inputs_hash: inputHash,
+    features_hash: featureHash,
+  });
 
   // Emit into star coherence loop as an InformationEvent.
   handleInformationEvent({
@@ -193,6 +229,15 @@ export async function runSolarVideoCoherenceJob(job: SolarVideoCoherenceJob): Pr
       global_dispersion: global.dispersion,
       global_energy: global.energy,
       kind: "solar_video_coherence",
+      schema_version: informationBoundary.schema_version,
+      data_cutoff_iso: informationBoundary.data_cutoff_iso,
+      data_cutoff: informationBoundary.data_cutoff_iso,
+      inputs_hash: informationBoundary.inputs_hash,
+      features_hash: informationBoundary.features_hash,
+      mode: informationBoundary.mode,
+      labels_used_as_features: informationBoundary.labels_used_as_features,
+      event_features_included: informationBoundary.event_features_included,
+      information_boundary: informationBoundary,
     },
   });
 
@@ -205,7 +250,9 @@ export async function runSolarVideoCoherenceJob(job: SolarVideoCoherenceJob): Pr
     energy: global.energy,
   });
 
-  return { frames, map, caption, global };
+  const result = withDerivedArtifactInformationBoundary({ frames, map, caption, global }, informationBoundary);
+  assertDerivedArtifactInformationBoundaryAudit(result, "solar_video_coherence/result");
+  return result;
 }
 
 async function decodeFramesToGrid(
@@ -215,6 +262,7 @@ async function decodeFramesToGrid(
   maxFrames?: number,
   sampleStride?: number,
   budgetDeadline?: number,
+  fallbackStartMs?: number,
 ): Promise<FrameSample[]> {
   checkBudget(budgetDeadline ?? null, "start");
   // Read metadata without an aggressive pixel guard; we'll enforce our own limits after inspecting dimensions.
@@ -298,7 +346,7 @@ async function decodeFramesToGrid(
   // Always include last frame to cover end timestamp if skipped by stride.
   if (frameIndices[frameIndices.length - 1] !== pages - 1) frameIndices.push(pages - 1);
   const firstIndex = frameIndices[0] ?? 0;
-  const t0 = Date.now();
+  const t0 = Number.isFinite(fallbackStartMs ?? NaN) ? Math.max(0, fallbackStartMs as number) : Date.now();
   const frameDurationMs =
     typeof meta.delay === "number" && meta.delay > 0 ? meta.delay * 10 : 240_000; // GIF delay is 1/100s
   const resizeOpts: sharp.ResizeOptions = { fit: "fill", withoutEnlargement: true, fastShrinkOnLoad: true };

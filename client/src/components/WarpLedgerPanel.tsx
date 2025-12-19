@@ -28,7 +28,7 @@ export default function WarpLedgerPanel() {
       data-panel-hash="#ledger"
       className="flex h-full flex-col bg-[#040a17] p-4 text-slate-100"
     >
-      <header className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <header className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-200/80">
             Curvature Ledger
@@ -38,7 +38,7 @@ export default function WarpLedgerPanel() {
             Potato-threshold band notes and ledger proof fragments from the warp narrative site.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto sm:justify-end">
           <Button
             type="button"
             variant="outline"
@@ -73,4 +73,3 @@ export default function WarpLedgerPanel() {
     </section>
   );
 }
-

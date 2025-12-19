@@ -1,5 +1,20 @@
+import { type CardCameraPreset, type CardMeshMetadata } from "@shared/schema";
+import type { HullBasisResolved } from "@shared/hull-basis";
+import type { HullDistanceGrid } from "@/lib/lattice-sdf";
+import type { HullSurfaceVoxelVolume } from "@/lib/lattice-surface";
+import type { LatticeFrame, LatticeProfileTag, LatticeQualityPreset } from "@/lib/lattice-frame";
 import { type StateCreator } from "zustand";
 import { createWithEqualityFn } from "zustand/traditional";
+
+export type HullGateSource = "schedule" | "blanket" | "combined";
+export type HullVolumeViz = "theta_gr" | "rho_gr" | "theta_drive";
+export type HullVolumeDomain = "wallBand" | "bubbleBox";
+export type HullQualityPreset = "auto" | "low" | "medium" | "high";
+export interface HullQualityOverrides {
+  voxelDensity?: "low" | "medium" | "high";
+  raySteps?: number;
+  stepBias?: number;
+}
 
 export type HullSamplingWindowKey = "instant" | "tauLC" | "burst" | "sector";
 
@@ -96,6 +111,121 @@ export interface HullOverlayConfig {
   sectorGrid3D: SectorGrid3DConfig;
 }
 
+export type HullSpacetimeGridMode = "slice" | "surface" | "volume";
+export type HullSpacetimeGridColorBy = "thetaSign" | "thetaMagnitude" | "warpStrength";
+export type HullSpacetimeGridStrengthMode =
+  | "manual"
+  | "autoThetaPk"
+  | "autoThetaScaleExpected";
+
+export interface HullSpacetimeGridPrefs {
+  enabled: boolean;
+  mode: HullSpacetimeGridMode;
+  spacing_m: number;
+  warpStrength: number;
+  falloff_m: number;
+  colorBy: HullSpacetimeGridColorBy;
+  useSdf: boolean;
+  warpStrengthMode: HullSpacetimeGridStrengthMode;
+}
+
+export type HullVoxelSliceAxis = "x" | "y" | "z";
+export type HullOverlayPrefProfile = HullQualityPreset | "card";
+export interface HullOverlayPrefs {
+  slicesEnabled: boolean;
+  sliceAxis: HullVoxelSliceAxis;
+  sliceMin: number;
+  sliceMax: number;
+  coverageHeatmap: boolean;
+  spacetimeGrid: HullSpacetimeGridPrefs;
+}
+
+export interface HullVizFloors {
+  thetaGR?: number;
+  rhoGR?: number;
+  thetaDrive?: number;
+}
+
+export interface HullViewerBounds {
+  axes?: [number, number, number];
+  aspect?: number;
+  domainScale?: number;
+  basis?: HullBasisResolved;
+}
+
+export interface HullCameraState {
+  eye?: [number, number, number];
+  target?: [number, number, number];
+  up?: [number, number, number];
+  fov_deg?: number;
+  radius_m?: number;
+  yaw_deg?: number;
+  pitch_deg?: number;
+  preset?: CardCameraPreset;
+}
+
+export interface HullViewerState {
+  planarVizMode?: number;
+  volumeViz?: HullVolumeViz;
+  volumeDomain?: HullVolumeDomain;
+  vizFloors?: HullVizFloors;
+  qualityPreset?: HullQualityPreset;
+  qualityOverrides?: HullQualityOverrides;
+  profileTag?: string;
+  gateSource?: HullGateSource;
+  gateView?: boolean;
+  forceFlatGate?: boolean;
+  opacityWindow?: [number, number];
+  boundsProfile?: "tight" | "wide";
+  bounds?: HullViewerBounds;
+  palette?: HullPaletteState;
+  camera?: HullCameraState;
+}
+
+export interface HullLatticeStrobeState {
+  hash: string;
+  source: "preview" | "fallback";
+  lod: "preview" | "high";
+  meshHash?: string;
+  basisSignature?: string;
+  handedness?: 1 | -1;
+  sectorCount?: number;
+  triangleCount?: number;
+  vertexCount?: number;
+  clampReasons?: string[];
+  weightHash?: string;
+  weightCacheHit?: boolean;
+  hist?: {
+    vertices: Float32Array;
+    triangles: Float32Array;
+    triangleArea: Float32Array;
+    triangleAreaTotal: number;
+    triangleArea01: Float32Array;
+    sectorCount: number;
+  } | null;
+  weights?: Float32Array | null;
+  coverage?: {
+    area: Float32Array;
+    area01: Float32Array;
+    vertices: Float32Array;
+    vertices01: Float32Array;
+    triangles: Float32Array;
+    triangles01: Float32Array;
+  } | null;
+}
+
+export type HullLatticeSdfState = HullDistanceGrid;
+
+export interface HullLatticeState {
+  frame: LatticeFrame | null;
+  preset: LatticeQualityPreset;
+  profileTag: LatticeProfileTag;
+  updatedAt: number;
+  strobe?: HullLatticeStrobeState | null;
+  sdf?: HullLatticeSdfState | null;
+  volume?: HullSurfaceVoxelVolume | null;
+}
+
 export interface Hull3DSharedState {
   phase: HullPhaseBusState;
   sampling: HullSamplingWindowState;
@@ -104,6 +234,10 @@ export interface Hull3DSharedState {
   sector: HullSectorDebugState;
   palette: HullPaletteState;
   overlays: HullOverlayConfig;
+  overlayPrefs: Record<HullOverlayPrefProfile, HullOverlayPrefs>;
+  meshOverlay: CardMeshMetadata | null;
+  viewer: HullViewerState;
+  lattice: HullLatticeState;
   setPhase: (next: Partial<HullPhaseBusState>) => void;
   setSampling: (next: Partial<HullSamplingWindowState>) => void;
   setPhysics: (next: Partial<HullPhysicsScaleState>) => void;
@@ -115,12 +249,157 @@ export interface Hull3DSharedState {
       | Partial<SectorGrid3DConfig>
       | ((current: SectorGrid3DConfig) => SectorGrid3DConfig)
   ) => void;
+  setOverlayPrefs: (
+    profile: HullOverlayPrefProfile,
+    next: Partial<HullOverlayPrefs> | ((current: HullOverlayPrefs) => HullOverlayPrefs)
+  ) => void;
+  setMeshOverlay: (next: CardMeshMetadata | null) => void;
+  setViewer: (next: Partial<HullViewerState>) => void;
+  setLattice: (next: Partial<HullLatticeState> | null) => void;
   togglePhysicsLock: (locked?: boolean) => void;
   trimPhysicsDb: (deltaDb: number) => void;
 }
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+const clamp01 = (value: number) => clamp(value, 0, 1);
+
+const SPACETIME_GRID_SPACING_RANGE: [number, number] = [0.05, 5];
+const SPACETIME_GRID_WARP_RANGE: [number, number] = [0, 5];
+const SPACETIME_GRID_FALLOFF_RANGE: [number, number] = [0.05, 6];
+
+export const defaultSpacetimeGridPrefsForProfile = (
+  profile: HullOverlayPrefProfile
+): HullSpacetimeGridPrefs => {
+  const base: HullSpacetimeGridPrefs = {
+    enabled: true,
+    mode: "volume",
+    spacing_m: 0.55,
+    warpStrength: 1.0,
+    falloff_m: 0.9,
+    colorBy: "thetaSign",
+    useSdf: true,
+    warpStrengthMode: "autoThetaPk",
+  };
+  if (profile === "auto") {
+    return {
+      ...base,
+      spacing_m: 0.6,
+      warpStrength: 0.9,
+      falloff_m: 0.95,
+    };
+  }
+  if (profile === "low") {
+    return {
+      ...base,
+      spacing_m: 0.75,
+      warpStrength: 0.8,
+      falloff_m: 1.0,
+      useSdf: false,
+    };
+  }
+  if (profile === "high") {
+    return {
+      ...base,
+      spacing_m: 0.4,
+      warpStrength: 1.1,
+      falloff_m: 0.7,
+    };
+  }
+  if (profile === "card") {
+    return {
+      ...base,
+      spacing_m: 0.35,
+      warpStrength: 0.9,
+      falloff_m: 0.65,
+    };
+  }
+  return base;
+};
+
+const normalizeSpacetimeGridPrefs = (
+  profile: HullOverlayPrefProfile,
+  prefs?: Partial<HullSpacetimeGridPrefs>,
+  fallback?: HullSpacetimeGridPrefs
+): HullSpacetimeGridPrefs => {
+  const defaults = defaultSpacetimeGridPrefsForProfile(profile);
+  const base = fallback ?? defaults;
+  const candidate = prefs ?? base;
+  const mode =
+    candidate.mode === "slice" || candidate.mode === "surface" || candidate.mode === "volume"
+      ? candidate.mode
+      : base.mode;
+  const warpStrengthMode =
+    candidate.warpStrengthMode === "manual" ||
+    candidate.warpStrengthMode === "autoThetaPk" ||
+    candidate.warpStrengthMode === "autoThetaScaleExpected"
+      ? candidate.warpStrengthMode
+      : base.warpStrengthMode;
+  const colorBy =
+    candidate.colorBy === "thetaSign" ||
+    candidate.colorBy === "thetaMagnitude" ||
+    candidate.colorBy === "warpStrength"
+      ? candidate.colorBy
+      : base.colorBy;
+  const spacingCandidate = candidate.spacing_m;
+  const warpStrengthCandidate = candidate.warpStrength;
+  const falloffCandidate = candidate.falloff_m;
+  return {
+    enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : base.enabled,
+    mode,
+    spacing_m: clamp(
+      typeof spacingCandidate === "number" && Number.isFinite(spacingCandidate)
+        ? spacingCandidate
+        : base.spacing_m,
+      SPACETIME_GRID_SPACING_RANGE[0],
+      SPACETIME_GRID_SPACING_RANGE[1]
+    ),
+    warpStrength: clamp(
+      typeof warpStrengthCandidate === "number" && Number.isFinite(warpStrengthCandidate)
+        ? warpStrengthCandidate
+        : base.warpStrength,
+      SPACETIME_GRID_WARP_RANGE[0],
+      SPACETIME_GRID_WARP_RANGE[1]
+    ),
+    falloff_m: clamp(
+      typeof falloffCandidate === "number" && Number.isFinite(falloffCandidate)
+        ? falloffCandidate
+        : base.falloff_m,
+      SPACETIME_GRID_FALLOFF_RANGE[0],
+      SPACETIME_GRID_FALLOFF_RANGE[1]
+    ),
+    colorBy,
+    useSdf: typeof candidate.useSdf === "boolean" ? candidate.useSdf : base.useSdf,
+    warpStrengthMode,
+  };
+};
+
+export const defaultOverlayPrefsForProfile = (profile: HullOverlayPrefProfile): HullOverlayPrefs => {
+  const base: HullOverlayPrefs = {
+    slicesEnabled: false,
+    sliceAxis: "y",
+    sliceMin: 0.35,
+    sliceMax: 0.65,
+    coverageHeatmap: true,
+    spacetimeGrid: defaultSpacetimeGridPrefsForProfile(profile),
+  };
+  if (profile === "auto" || profile === "low") {
+    return { ...base, coverageHeatmap: false };
+  }
+  if (profile === "card") {
+    return { ...base, slicesEnabled: true };
+  }
+  return base;
+};
+
+const buildDefaultOverlayPrefs = (): Record<HullOverlayPrefProfile, HullOverlayPrefs> => {
+  const profiles: HullOverlayPrefProfile[] = ["auto", "low", "medium", "high", "card"];
+  const prefs: Record<HullOverlayPrefProfile, HullOverlayPrefs> = {} as any;
+  for (const key of profiles) {
+    prefs[key] = defaultOverlayPrefsForProfile(key);
+  }
+  return prefs;
+};
 
 const creator: StateCreator<Hull3DSharedState> = (set) => ({
   phase: {
@@ -184,6 +463,20 @@ const creator: StateCreator<Hull3DSharedState> = (set) => ({
       rOuter: 1.045,
       halfHeight: 0.055,
     },
+  },
+  overlayPrefs: buildDefaultOverlayPrefs(),
+  meshOverlay: null,
+  viewer: {
+    volumeDomain: "wallBand",
+  },
+  lattice: {
+    frame: null,
+    preset: "auto",
+    profileTag: "preview",
+    updatedAt: 0,
+    strobe: null,
+    sdf: null,
+    volume: null,
   },
   setPhase: (next) =>
     set((state) => ({
@@ -276,6 +569,92 @@ const creator: StateCreator<Hull3DSharedState> = (set) => ({
         },
       };
     }),
+  setOverlayPrefs: (profile, next) =>
+    set((state) => {
+      const current =
+        state.overlayPrefs[profile] ?? defaultOverlayPrefsForProfile(profile);
+      const target =
+        typeof next === "function"
+          ? (next as (curr: HullOverlayPrefs) => HullOverlayPrefs)(current)
+          : ({ ...current, ...next } as HullOverlayPrefs);
+      const sliceMin = clamp01(target.sliceMin);
+      const sliceMax = clamp01(target.sliceMax);
+      const min = Math.min(sliceMin, sliceMax - 0.01);
+      const max = Math.max(min + 0.01, sliceMax);
+      const currentSpacetimeGrid =
+        current.spacetimeGrid ?? defaultSpacetimeGridPrefsForProfile(profile);
+      const targetSpacetimeGrid =
+        target.spacetimeGrid ?? currentSpacetimeGrid;
+      const normalized: HullOverlayPrefs = {
+        slicesEnabled: !!target.slicesEnabled,
+        sliceAxis: target.sliceAxis === "x" || target.sliceAxis === "y" || target.sliceAxis === "z" ? target.sliceAxis : current.sliceAxis,
+        sliceMin: clamp01(min),
+        sliceMax: clamp01(max),
+        coverageHeatmap: !!target.coverageHeatmap,
+        spacetimeGrid: normalizeSpacetimeGridPrefs(
+          profile,
+          targetSpacetimeGrid,
+          currentSpacetimeGrid
+        ),
+      };
+      return {
+        overlayPrefs: {
+          ...state.overlayPrefs,
+          [profile]: normalized,
+        },
+      };
+    }),
+  setMeshOverlay: (next) =>
+    set(() => ({
+      meshOverlay: next ? { ...next, updatedAt: next.updatedAt ?? Date.now() } : null,
+    })),
+  setLattice: (next) =>
+    set((state) => {
+      if (!next) {
+        return {
+          lattice: {
+            frame: null,
+            preset: "auto",
+            profileTag: "preview",
+            updatedAt: Date.now(),
+            strobe: null,
+            sdf: null,
+            volume: null,
+          },
+        };
+      }
+      return {
+        lattice: {
+          ...state.lattice,
+          ...next,
+          updatedAt: next.updatedAt ?? Date.now(),
+        },
+      };
+    }),
+  setViewer: (next) =>
+    set((state) => ({
+      viewer: {
+        ...state.viewer,
+        ...next,
+        vizFloors: {
+          ...(state.viewer.vizFloors ?? {}),
+          ...(next.vizFloors ?? {}),
+        },
+        bounds: {
+          ...(state.viewer.bounds ?? {}),
+          ...(next.bounds ?? {}),
+        },
+        qualityOverrides: next.qualityOverrides
+          ? {
+              ...(state.viewer.qualityOverrides ?? {}),
+              ...next.qualityOverrides,
+            }
+          : state.viewer.qualityOverrides,
+        camera: next.camera
+          ? { ...(state.viewer.camera ?? {}), ...next.camera }
+          : state.viewer.camera,
+      },
+    })),
   togglePhysicsLock: (locked) =>
     set((state) => ({
       physics: {

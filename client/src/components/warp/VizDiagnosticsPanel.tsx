@@ -142,7 +142,7 @@ export default function VizDiagnosticsPanel(){
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-[11px] font-mono text-slate-200">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <span className="font-semibold">Viz Diagnostics</span>
         <div className="flex items-center gap-2">
           <button
@@ -156,10 +156,10 @@ export default function VizDiagnosticsPanel(){
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div>
           <div className="text-slate-400">Mode</div>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <select className="bg-transparent border border-white/15 rounded px-1 py-0.5"
               value={displayMode} onChange={(e) => setDisplayMode(e.target.value as any)}>
               <option value="raw">raw</option>
@@ -193,7 +193,7 @@ export default function VizDiagnosticsPanel(){
 
         <div>
           <div className="text-slate-400">Pipeline</div>
-          <div className="mt-1 grid grid-cols-2 gap-x-3">
+          <div className="mt-1 grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-2">
             <div>gammaGeo</div><div>{fmt(pipeline?.gammaGeo)}</div>
             <div>q (dA/A)</div><div>{fmt((pipeline as any)?.q ?? (pipeline as any)?.deltaAOverA ?? (pipeline as any)?.qSpoilingFactor)}</div>
             <div>gammaVdB</div><div>{fmt((pipeline as any)?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? (pipeline as any)?.gammaVanDenBroeck_mass)}</div>
@@ -203,7 +203,7 @@ export default function VizDiagnosticsPanel(){
       </div>
 
       <div className="mt-3 rounded-md border border-white/10 p-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-slate-300">Hull 3D Visual Gain</div>
           <label className="inline-flex items-center gap-1">
             <input
@@ -214,7 +214,7 @@ export default function VizDiagnosticsPanel(){
             <span className="text-slate-400">Lock</span>
           </label>
         </div>
-        <div className="mt-2 grid grid-cols-3 gap-2 items-end">
+        <div className="mt-2 grid grid-cols-1 gap-2 items-end sm:grid-cols-3">
           <label className="flex flex-col gap-1">
             <span className="text-slate-400">yGain</span>
             <input
@@ -255,7 +255,7 @@ export default function VizDiagnosticsPanel(){
             />
           </label>
         </div>
-        <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-slate-400">
+        <div className="mt-2 grid grid-cols-1 gap-2 text-[10px] text-slate-400 sm:grid-cols-3">
           <div>θ expected: <span className="text-slate-200">{fmt(physics.thetaExpected)}</span></div>
           <div>θ used: <span className="text-slate-200">{fmt(physics.thetaUsed)}</span></div>
           <div>ratio: <span className="text-slate-200">{fmt(physics.ratio)}</span></div>
@@ -264,7 +264,7 @@ export default function VizDiagnosticsPanel(){
 
       <div className="mt-3 rounded-md border border-white/10 p-2">
         <div className="text-slate-300 mb-1">Gain Ledger</div>
-        <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-[10px]">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-1 text-[10px] sm:grid-cols-3">
           <div className="text-slate-400">nβ</div><div className="col-span-2">{fmt(natario?.nBeta)}</div>
           <div className="text-slate-400">max|∇·β|</div><div className="col-span-2">{fmt(natario?.divMax)}</div>
           <div className="text-slate-400">K_rms</div><div className="col-span-2">{fmt(natario?.K_rms)}</div>
@@ -279,7 +279,7 @@ export default function VizDiagnosticsPanel(){
           <div className="text-slate-400">gainVisual</div><div className="col-span-2">{fmt(gainVisual)}</div>
           <div className="text-slate-400">gainDisplay</div><div className="col-span-2">{gainDisplayStr}</div>
         </div>
-        <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-slate-400">
+        <div className="mt-2 grid grid-cols-1 gap-2 text-[10px] text-slate-400 sm:grid-cols-3">
           <div>crestR (maj)</div><div className="col-span-2">{fmt(crest?.crestR_major)}</div>
           <div>crestR (min)</div><div className="col-span-2">{fmt(crest?.crestR_minor)}</div>
           <div>rimR</div><div className="col-span-2">{fmt(crest?.rimR)}</div>
@@ -295,7 +295,7 @@ export default function VizDiagnosticsPanel(){
       {trace && (
         <div className="mt-3">
           <div className="text-slate-400 mb-1">Trace</div>
-          <div className="grid grid-cols-3 gap-x-3 gap-y-1">
+          <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-3">
             <div>u_mode</div><div className="col-span-2">{trace.mode} ridge:{trace.ridgeMode}</div>
             <div>theta chain</div><div className="col-span-2">geo^3·q·VdB·(√dFR:{String(trace.viewAvg)})</div>
             <div>gammaGeo</div><div className="col-span-2">{fmt(trace.gammaGeo)}</div>

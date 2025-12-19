@@ -4,7 +4,9 @@ import * as React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
+import { clampHullArea, clampHullAxis, clampHullDims } from "@/lib/hull-guardrails";
 import { getModeWisdom } from "@/lib/luma-whispers-core";
+import { isFlagEnabled } from "@/lib/envFlags";
 import type {
   VacuumGapSweepRow,
   DynamicConfig,
@@ -14,6 +16,14 @@ import type {
   GateAnalytics,
   QiStats,
   PhaseScheduleTelemetry,
+  WarpGeometry,
+  WarpGeometryKind,
+  WarpGeometryFallback,
+  WarpFallbackMode,
+  CardRecipe,
+  CardMeshMetadata,
+  CardLatticeMetadata,
+  HullPreviewPayload,
 } from "@shared/schema";
 import type { ClockingSnapshot } from "@shared/clocking";
 import type {
@@ -50,6 +60,37 @@ export type QuantumInterestBook = {
   netCycle_Jm3: number;
   window_ms: number;
   rate: number;
+};
+
+export type WarpSdfPreview = {
+  key?: string | null;
+  hash?: string | null;
+  meshHash?: string | null;
+  basisSignature?: string | null;
+  dims?: [number, number, number] | null;
+  bounds?: [number, number, number] | null;
+  voxelSize?: number | null;
+  band?: number | null;
+  format?: "float" | "byte" | null;
+  clampReasons?: string[] | null;
+  stats?: {
+    sampleCount?: number;
+    voxelsTouched?: number;
+    voxelCoverage?: number;
+    trianglesTouched?: number;
+    triangleCoverage?: number;
+    maxAbsDistance?: number;
+    maxQuantizationError?: number;
+  } | null;
+  updatedAt?: number | null;
+};
+
+export type GeometryPreviewState = {
+  preview?: HullPreviewPayload | null;
+  mesh?: CardMeshMetadata | null;
+  sdf?: WarpSdfPreview | null;
+  lattice?: CardLatticeMetadata | null;
+  updatedAt?: number | null;
 };
 
 export interface MechanicalFeasibility {
@@ -105,9 +146,18 @@ export interface EnergyPipelineState {
   sag_nm?: number;
   temperature_K: number;
   modulationFreq_GHz: number;
+  warpFieldType?: DynamicConfig["warpFieldType"];
+  warpGeometry?: WarpGeometry | null;
+  warpGeometryKind?: WarpGeometryKind;
+  warpGeometryAssetId?: string;
+  cardRecipe?: CardRecipe;
+  geometryPreview?: GeometryPreviewState | null;
+  geometryFallback?: WarpGeometryFallback | null;
   
   /** Post-scale for translational bias (0..1). 1 = full translation. */
   beta_trans?: number;
+  /** Optional power fill command (0..1). 1 = nominal mode target. */
+  powerFillCmd?: number;
   /** Optional target ground speed for Taxi mode, meters/second (default 1.4). */
   taxi_target_mps?: number;
 
@@ -236,11 +286,13 @@ export interface EnergyPipelineState {
 
   // Optional: targets if you want to show them
   P_target_W?: number;
+  P_target_cmd_W?: number;
   P_cap_W?: number;
   physicsCap_W?: number;
   P_applied_W?: number;
   beta_trans_power?: number;
   beta_policy?: number;
+  shipBeta_raw?: number;
   shipBeta?: number;
   vShip_mps?: number;
   speedClosure?: "policyA" | "proxyB";
@@ -285,7 +337,17 @@ export interface EnergyPipelineState {
   zetaRaw?: number;
   qiGuardrail?: QiGuardrail;
   N_tiles: number;
+  hullAreaOverride_m2?: number;
+  hullAreaOverride_uncertainty_m2?: number;
+  __hullAreaEllipsoid_m2?: number;
+  __hullAreaSource?: "override" | "ellipsoid";
+  __hullAreaPerSectorSource?: "override" | "ellipsoid" | "uniform";
+  hullAreaPerSector_m2?: number[];
   hullArea_m2?: number;
+  tilesPerSectorVector?: number[];
+  tilesPerSectorUniform?: number[];
+  tilePowerDensityScale?: Array<number | null>;
+  tilesPerSectorStrategy?: "area-weighted" | "uniform";
   
   // System status
   fordRomanCompliance: boolean;
@@ -951,6 +1013,44 @@ export function useEnergyPipeline(options?: {
         (snapshot as any).gammaVanDenBroeck_nonAdmissible = requested > limit;
       }
 
+      // Clamp hull dims/areas to client guardrails and ensure ellipsoid axes are present for renderers.
+      const hullRaw = (snapshot as any).hull as any;
+      if (hullRaw && typeof hullRaw === "object") {
+        const clampedDims = clampHullDims(hullRaw);
+        const hasDims =
+          clampedDims.Lx_m != null ||
+          clampedDims.Ly_m != null ||
+          clampedDims.Lz_m != null;
+        const axes = {
+          a: clampHullAxis(hullRaw.a ?? (clampedDims.Lx_m != null ? clampedDims.Lx_m * 0.5 : undefined)),
+          b: clampHullAxis(hullRaw.b ?? (clampedDims.Ly_m != null ? clampedDims.Ly_m * 0.5 : undefined)),
+          c: clampHullAxis(hullRaw.c ?? (clampedDims.Lz_m != null ? clampedDims.Lz_m * 0.5 : undefined)),
+        };
+        const hullNext: any = { ...hullRaw };
+        if (hasDims) {
+          if (clampedDims.Lx_m != null) hullNext.Lx_m = clampedDims.Lx_m;
+          if (clampedDims.Ly_m != null) hullNext.Ly_m = clampedDims.Ly_m;
+          if (clampedDims.Lz_m != null) hullNext.Lz_m = clampedDims.Lz_m;
+        }
+        if (axes.a != null) hullNext.a = axes.a;
+        if (axes.b != null) hullNext.b = axes.b;
+        if (axes.c != null) hullNext.c = axes.c;
+        snapshot = { ...snapshot, hull: hullNext };
+      }
+
+      const hullArea = clampHullArea((snapshot as any).hullArea_m2);
+      const tilesArea = clampHullArea((snapshot as any)?.tiles?.hullArea_m2);
+      if (hullArea != null || tilesArea != null) {
+        snapshot = {
+          ...snapshot,
+          ...(hullArea != null ? { hullArea_m2: hullArea } : {}),
+          tiles:
+            tilesArea != null || snapshot.tiles
+              ? { ...(snapshot.tiles ?? {}), ...(tilesArea != null ? { hullArea_m2: tilesArea } : {}) }
+              : snapshot.tiles,
+        };
+      }
+
       const rows = Array.isArray(snapshot.vacuumGapSweepResults)
         ? snapshot.vacuumGapSweepResults
         : [];
@@ -1016,8 +1116,13 @@ export function useEnergyPipeline(options?: {
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
   });
 
+  const devMocksEnabled = isFlagEnabled("HELIX_DEV_MOCKS", false);
+
   React.useEffect(() => {
     if (issuedInitialMarginIntent) return;
+    if (devMocksEnabled) return;
+    if (!query.isSuccess) return;
+
     issuedInitialMarginIntent = true;
     let cancelled = false;
     (async () => {
@@ -1036,7 +1141,7 @@ export function useEnergyPipeline(options?: {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [devMocksEnabled, query.isSuccess]);
 
   const [sweepResults, setSweepResults] = React.useState<VacuumGapSweepRow[]>([]);
   const [sweepMeta, setSweepMeta] = React.useState<SweepResultsMeta>(EMPTY_SWEEP_META);
@@ -1136,9 +1241,24 @@ export function useEnergyPipeline(options?: {
 // Hook to update pipeline parameters
 export function useUpdatePipeline() {
   return useMutation({
-    mutationFn: async (params: Partial<EnergyPipelineState>) => {
+    mutationFn: async (params: Partial<EnergyPipelineState> & { fallbackMode?: WarpFallbackMode }) => {
       const response = await apiRequest('POST', '/api/helix/pipeline/update', params);
-      return response.json();
+      const payload = await response.json().catch(() => null);
+      if (response.status === 422) {
+        const err = new Error((payload as any)?.error ?? "Pipeline update blocked");
+        (err as any).payload = payload;
+        throw err;
+      }
+      if (!response.ok) {
+        const err = new Error((payload as any)?.error ?? response.statusText);
+        (err as any).payload = payload;
+        throw err;
+      }
+      const fallback = (payload as any)?.geometryFallback;
+      if (fallback?.applied || (fallback && fallback.mode === "warn")) {
+        console.warn("[HELIX] pipeline update fallback", fallback);
+      }
+      return payload;
     },
     onSuccess: () => {
       startTransition(() => {

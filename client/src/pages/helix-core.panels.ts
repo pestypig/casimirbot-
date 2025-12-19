@@ -21,8 +21,10 @@ import {
   Move3d,
   Navigation2,
   Microscope,
+  Ruler,
   RadioTower,
   Rocket,
+  Scissors,
   ScrollText,
   Sparkles,
   TerminalSquare,
@@ -51,6 +53,12 @@ export type HelixPanelRef = {
   defaultSize?: { w: number; h: number };
   defaultPosition?: { x: number; y: number };
   defaultOpen?: boolean;
+  /**
+   * True when the panel is usable with touch-first ergonomics (no hover-only controls or drag-only input).
+   * Panels default to desktop-only unless explicitly marked.
+   */
+  mobileReady?: boolean;
+  heavy?: boolean;
 };
 
 const API = {
@@ -120,7 +128,11 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "agi-task-history": ["task history", "AGI trace", "task log", "history queue", "trace timeline"],
   "essence-proposals": ["essence proposals", "proposal queue", "jobs board", "proposal actions", "proposal mgr"],
   "dresscode": ["dresscode", "pattern", "draft", "garment", "svg", "grid", "clip mask"],
-  "stellar-lsr": ["stars", "lsr", "local standard of rest", "catalog", "nav", "stellar"]
+  "stellar-lsr": ["stars", "lsr", "local standard of rest", "catalog", "nav", "stellar"],
+  "model-silhouette": ["glb", "bbox", "ellipsoid", "scale", "axes", "grid"],
+  "hull-metrics-vis": ["hull metrics", "natario", "alcubierre", "glb preview", "wireframe"],
+  "collapse-benchmark-hud": ["collapse benchmark", "tau", "L_present", "kappa", "lattice hash", "relativity"],
+  "remove-bg-edges": ["background removal", "png alpha", "canny", "grabcut", "opencv", "mask"]
 };
 
 function lazyPanel<T extends Record<string, unknown>>(
@@ -338,6 +350,7 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/NearZeroWidget")),
     defaultSize: { w: 540, h: 420 },
     defaultPosition: { x: 420, y: 200 },
+    mobileReady: true,
     endpoints: [API.pipelineGet, API.helixMode]
   },
   {
@@ -346,7 +359,8 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     icon: Navigation2,
     loader: lazyPanel(() => import("@/components/DirectionPad")),
     defaultSize: { w: 420, h: 360 },
-    defaultPosition: { x: 520, y: 260 }
+    defaultPosition: { x: 520, y: 260 },
+    mobileReady: true
   },
   {
     id: "nav-system",
@@ -409,6 +423,24 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     endpoints: [API.pipelineGet]
   },
   {
+    id: "model-silhouette",
+    title: "Silhouette Stretch",
+    icon: Ruler,
+    loader: lazyPanel(() => import("@/components/ModelSilhouettePanel")),
+    defaultSize: { w: 1080, h: 720 },
+    defaultPosition: { x: 260, y: 140 },
+    keywords: PANEL_KEYWORDS["model-silhouette"]
+  },
+  {
+    id: "hull-metrics-vis",
+    title: "Hull Metrics Vis",
+    icon: Move3d,
+    loader: lazyPanel(() => import("@/components/HullMetricsVisPanel")),
+    defaultSize: { w: 1120, h: 720 },
+    defaultPosition: { x: 220, y: 120 },
+    keywords: PANEL_KEYWORDS["hull-metrics-vis"]
+  },
+  {
     id: "shift-vector",
     title: "Shift Vector Panel",
     icon: Move3d,
@@ -444,6 +476,7 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 600, h: 320 },
     defaultPosition: { x: 160, y: 520 },
     pinned: true,
+    mobileReady: true,
     endpoints: [API.pipelineGet, API.helixMode]
   },
   {
@@ -489,6 +522,7 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/ResonanceSchedulerTile")),
     defaultSize: { w: 520, h: 420 },
     defaultPosition: { x: 260, y: 560 },
+    mobileReady: true,
     endpoints: [API.pipelineGet]
   },
   {
@@ -506,6 +540,7 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/FuelGauge"), "FuelGauge"),
     defaultSize: { w: 480, h: 360 },
     defaultPosition: { x: 520, y: 580 },
+    mobileReady: true,
     endpoints: [API.pipelineGet, API.helixMetrics]
   },
   {
@@ -515,6 +550,7 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/VacuumContractBadge")),
     defaultSize: { w: 420, h: 260 },
     defaultPosition: { x: 640, y: 560 },
+    mobileReady: true,
     endpoints: [API.pipelineGet]
   },
   {
@@ -542,6 +578,7 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/QiWidget")),
     defaultSize: { w: 480, h: 320 },
     defaultPosition: { x: 720, y: 480 },
+    mobileReady: true,
     endpoints: [API.pipelineGet]
   },
   {
@@ -559,7 +596,8 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     icon: Layers,
     loader: lazyPanel(() => import("@/components/SectorLegend"), "SectorLegend"),
     defaultSize: { w: 420, h: 320 },
-    defaultPosition: { x: 760, y: 440 }
+    defaultPosition: { x: 760, y: 440 },
+    mobileReady: true
   },
   {
     id: "sector-roles",
@@ -639,6 +677,16 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     endpoints: ["GET /api/agi/star/telemetry"]
   },
   {
+    id: "collapse-benchmark-hud",
+    title: "Collapse Benchmark HUD",
+    icon: GaugeCircle,
+    loader: lazyPanel(() => import("@/components/CollapseBenchmarkHUDPanel")),
+    defaultSize: { w: 520, h: 420 },
+    defaultPosition: { x: 300, y: 180 },
+    endpoints: ["POST /api/benchmarks/collapse"],
+    keywords: PANEL_KEYWORDS["collapse-benchmark-hud"]
+  },
+  {
     id: "agi-task-history",
     title: "Task History",
     icon: History,
@@ -646,6 +694,14 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 520, h: 600 },
     defaultPosition: { x: 1140, y: 140 },
     pinned: true
+  },
+  {
+    id: "remove-bg-edges",
+    title: "PNG Edge Cutter",
+    icon: Scissors,
+    loader: lazyPanel(() => import("@/components/RemoveBgEdgesPanel")),
+    defaultSize: { w: 960, h: 640 },
+    defaultPosition: { x: 200, y: 80 }
   },
   {
     id: "dresscode",
@@ -677,8 +733,11 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
 
 export const HELIX_PANELS: HelixPanelRef[] = RAW_HELIX_PANELS.map((panel) => {
   const fallbackKeywords = PANEL_KEYWORDS[panel.id];
+  const mobileReady = panel.mobileReady === true;
   if (!fallbackKeywords || panel.keywords?.length) {
-    return panel;
+    return { ...panel, mobileReady };
   }
-  return { ...panel, keywords: fallbackKeywords };
+  return { ...panel, keywords: fallbackKeywords, mobileReady };
 });
+
+export const MOBILE_HELIX_PANELS = HELIX_PANELS.filter((panel) => panel.mobileReady);

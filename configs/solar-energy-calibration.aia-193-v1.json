@@ -1,0 +1,22 @@
+{
+  "schema_version": "solar_energy_calibration/1",
+  "version": "aia-193-v1",
+  "instrument": "AIA",
+  "wavelength_A": 193,
+  "normalization": {
+    "input": "sunpy_map_norm_percentile_99_5",
+    "map_scale_percentile": 99.5,
+    "map_value_range": [0, 1],
+    "notes": "SunPy resample normalizes each map by the 99.5th percentile and clips to [0,1]."
+  },
+  "u_total_scale_Jm3": 0.12,
+  "u_exponent": 1.2,
+  "u_floor_Jm3": 0,
+  "u_cap_Jm3": 12,
+  "coherence_energy_scale_Jm3": 0.08,
+  "metadata": {
+    "r_sun_m": 696340000,
+    "grid_reference": "unit_disk",
+    "comment": "Maps EUV intensity 1.0 → 0.12 J/m^3 (pre-curvature proxy), tuned for quiet-Sun stability."
+  }
+}

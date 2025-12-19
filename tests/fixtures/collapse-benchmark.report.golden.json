@@ -1,0 +1,303 @@
+{
+  "schema_version": "collapse_benchmark_report/1",
+  "kind": "collapse_benchmark_report",
+  "manifest_created_at": "2025-01-01T00:00:00.000Z",
+  "generated_at_iso": "2025-01-01T00:00:00.000Z",
+  "manifest_path": "datasets/benchmarks/collapse-benchmark.fixture.json",
+  "runs": [
+    {
+      "id": "manual-baseline",
+      "data_cutoff_iso": "2025-01-01T00:00:00.000Z",
+      "result": {
+        "ok": true,
+        "schema_version": "collapse_benchmark_run/1",
+        "dt_ms": 50,
+        "tau_ms": 1000,
+        "tau_source": "manual",
+        "r_c_m": 0.5,
+        "r_c_source": "geometry",
+        "c_mps": 299792458,
+        "steps": 256,
+        "seed": "fixture-manual",
+        "lattice_generation_hash": "lattice:fixtureA",
+        "p_trigger": 0.048770575499285984,
+        "L_present_m": 0.5,
+        "kappa_present_m2": 4,
+        "trigger_count": 10,
+        "trigger_rate": 0.0390625,
+        "u": {
+          "mean": 0.5106488054479996,
+          "min": 0.002618292346596718,
+          "max": 0.9982275939546525
+        },
+        "histogram_u": {
+          "bins": 8,
+          "counts": [
+            31,
+            28,
+            37,
+            32,
+            25,
+            31,
+            33,
+            39
+          ]
+        },
+        "sample": [
+          {
+            "step_index": 0,
+            "u": 0.5272232943680137,
+            "trigger": false
+          },
+          {
+            "step_index": 1,
+            "u": 0.3801622975151986,
+            "trigger": false
+          },
+          {
+            "step_index": 2,
+            "u": 0.10124275647103786,
+            "trigger": false
+          },
+          {
+            "step_index": 3,
+            "u": 0.20896467310376465,
+            "trigger": false
+          },
+          {
+            "step_index": 4,
+            "u": 0.4932474095840007,
+            "trigger": false
+          },
+          {
+            "step_index": 5,
+            "u": 0.6672100997529924,
+            "trigger": false
+          },
+          {
+            "step_index": 6,
+            "u": 0.08024903200566769,
+            "trigger": false
+          },
+          {
+            "step_index": 7,
+            "u": 0.08338161604478955,
+            "trigger": false
+          },
+          {
+            "step_index": 8,
+            "u": 0.06624010484665632,
+            "trigger": false
+          },
+          {
+            "step_index": 9,
+            "u": 0.8581660764757544,
+            "trigger": false
+          },
+          {
+            "step_index": 10,
+            "u": 0.06694765225984156,
+            "trigger": false
+          },
+          {
+            "step_index": 11,
+            "u": 0.8228938160464168,
+            "trigger": false
+          },
+          {
+            "step_index": 12,
+            "u": 0.523413056274876,
+            "trigger": false
+          },
+          {
+            "step_index": 13,
+            "u": 0.8874748686794192,
+            "trigger": false
+          },
+          {
+            "step_index": 14,
+            "u": 0.2925406266003847,
+            "trigger": false
+          },
+          {
+            "step_index": 15,
+            "u": 0.47837497922591865,
+            "trigger": false
+          }
+        ],
+        "data_cutoff_iso": "2025-01-01T00:00:00.000Z",
+        "inputs_hash": "sha256:1ad0eafeee709c28ecaee74f5533d8db2e0d6f2b7d9b9a2ebe678a74382a8328",
+        "features_hash": "sha256:82c262543484b17043ba0f11a09336a82ceae2674aefb0e739f9206b700ba6d5",
+        "information_boundary": {
+          "schema_version": "ib/1",
+          "data_cutoff_iso": "2025-01-01T00:00:00.000Z",
+          "inputs_hash": "sha256:1ad0eafeee709c28ecaee74f5533d8db2e0d6f2b7d9b9a2ebe678a74382a8328",
+          "features_hash": "sha256:82c262543484b17043ba0f11a09336a82ceae2674aefb0e739f9206b700ba6d5",
+          "mode": "observables",
+          "labels_used_as_features": false,
+          "event_features_included": false
+        }
+      },
+      "run_hash": "sha256:6a04afe920258d8c9baf3b5b7868236fe3cbdb63ef43ad2451512de5763549ef"
+    },
+    {
+      "id": "curvature-instability",
+      "data_cutoff_iso": "2025-01-01T00:00:00.000Z",
+      "result": {
+        "ok": true,
+        "schema_version": "collapse_benchmark_run/1",
+        "dt_ms": 50,
+        "tau_ms": 1457.4739150241944,
+        "tau_source": "field_estimator",
+        "r_c_m": 0.16251839999999998,
+        "r_c_source": "field_estimator",
+        "c_mps": 299792458,
+        "steps": 256,
+        "seed": "fixture-estimator",
+        "lattice_generation_hash": "lattice:fixtureB",
+        "p_trigger": 0.03372415461119482,
+        "L_present_m": 0.16251839999999998,
+        "kappa_present_m2": 37.861247883336475,
+        "trigger_count": 15,
+        "trigger_rate": 0.05859375,
+        "u": {
+          "mean": 0.5080763533787831,
+          "min": 0.0034217394422739744,
+          "max": 0.9976998299825937
+        },
+        "histogram_u": {
+          "bins": 12,
+          "counts": [
+            27,
+            21,
+            14,
+            21,
+            23,
+            14,
+            22,
+            20,
+            21,
+            24,
+            33,
+            16
+          ]
+        },
+        "sample": [
+          {
+            "step_index": 0,
+            "u": 0.8356463587842882,
+            "trigger": false
+          },
+          {
+            "step_index": 1,
+            "u": 0.5953679180238396,
+            "trigger": false
+          },
+          {
+            "step_index": 2,
+            "u": 0.8064257600344718,
+            "trigger": false
+          },
+          {
+            "step_index": 3,
+            "u": 0.26042526168748736,
+            "trigger": false
+          },
+          {
+            "step_index": 4,
+            "u": 0.3108172893989831,
+            "trigger": false
+          },
+          {
+            "step_index": 5,
+            "u": 0.8994297459721565,
+            "trigger": false
+          },
+          {
+            "step_index": 6,
+            "u": 0.9844954134896398,
+            "trigger": false
+          },
+          {
+            "step_index": 7,
+            "u": 0.8457302262540907,
+            "trigger": false
+          },
+          {
+            "step_index": 8,
+            "u": 0.1602617953903973,
+            "trigger": false
+          },
+          {
+            "step_index": 9,
+            "u": 0.294460290344432,
+            "trigger": false
+          },
+          {
+            "step_index": 10,
+            "u": 0.8823494967073202,
+            "trigger": false
+          },
+          {
+            "step_index": 11,
+            "u": 0.15681453351862729,
+            "trigger": false
+          },
+          {
+            "step_index": 12,
+            "u": 0.3652714006602764,
+            "trigger": false
+          },
+          {
+            "step_index": 13,
+            "u": 0.8838248576503247,
+            "trigger": false
+          },
+          {
+            "step_index": 14,
+            "u": 0.08677958813495934,
+            "trigger": false
+          },
+          {
+            "step_index": 15,
+            "u": 0.15226970403455198,
+            "trigger": false
+          }
+        ],
+        "data_cutoff_iso": "2025-01-01T00:00:00.000Z",
+        "inputs_hash": "sha256:5124a127a7ee6ecbf28ccf0ab1ab7858a4297a6ec497127542167b95e3156b2d",
+        "features_hash": "sha256:a4647492dfe8a93b93698a21efb7c3c26f97e63b232d9002368574524e9c5806",
+        "information_boundary": {
+          "schema_version": "ib/1",
+          "data_cutoff_iso": "2025-01-01T00:00:00.000Z",
+          "inputs_hash": "sha256:5124a127a7ee6ecbf28ccf0ab1ab7858a4297a6ec497127542167b95e3156b2d",
+          "features_hash": "sha256:a4647492dfe8a93b93698a21efb7c3c26f97e63b232d9002368574524e9c5806",
+          "mode": "observables",
+          "labels_used_as_features": false,
+          "event_features_included": false
+        },
+        "tau_estimator": {
+          "tau_ms": 1457.4739150241944,
+          "r_c_m": 0.16251839999999998,
+          "instability": 0.610406292015899,
+          "components": {
+            "drive_vs_body": 0.2687973059224399,
+            "residual": 0.9933774834437087,
+            "dispersion": 0.72,
+            "incoherence": 0.65,
+            "roots": 0.5
+          },
+          "bounds": {
+            "tau_floor_ms": 90,
+            "tau_ceiling_ms": 3600,
+            "r_c_floor_m": 0.16000000000000003,
+            "r_c_ceiling_m": 2
+          },
+          "mode": "curvature_heuristic"
+        }
+      },
+      "run_hash": "sha256:3cc89cb33067f3d6b99de36f6a6b50eacbe5b71fa828e09fd6f8e5f70b70d12a"
+    }
+  ],
+  "report_hash": "sha256:a9ea038d622a0519c2148bdf891771de3dcbf2c323e1553cf11172edfdedaa3f"
+}

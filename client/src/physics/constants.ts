@@ -1,5 +1,7 @@
-export const G = 6.67430e-11; // m^3 kg^-1 s^-2
-export const c = 2.99792458e8; // m/s
+import { C, G as GRAVITATIONAL_CONSTANT } from "@shared/physics-const";
+
+export const G = GRAVITATIONAL_CONSTANT; // m^3 kg^-1 s^-2
+export const c = C; // m/s
 export const kB = 1.380649e-23; // J/K
 export const mH = 1.6735575e-27; // kg
 export const sigmaSB = 5.670374419e-8; // W m^-2 K^-4

@@ -44,3 +44,17 @@ body: Time-sliced sector strobing makes GR hear the average source; prove TS >> 
 refs:
   - client/src/pages/why.tsx
 :::
+
+::: whisper
+id: X-ETHOS-REALITY
+hashes:
+  - "#why"
+  - "#ethos"
+  - "#truth"
+mode: bubble
+severity: hint
+zen: Let the map yield.
+body: When evidence breaks the story, revise the story. The world does not owe us agreement; the vow is kept by truthful models and gentle hands.
+refs:
+  - client/src/pages/why.tsx
+:::

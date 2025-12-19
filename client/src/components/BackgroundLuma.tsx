@@ -1,5 +1,8 @@
 "use client";
 import * as React from "react";
+import { LumaEmotionBadge } from "./LumaEmotionBadge";
+import { LUMA_MOOD_ORDER, type LumaMood } from "@/lib/luma-moods";
+import { subscribe, unsubscribe } from "@/lib/luma-bus";
 
 // Background stars component
 function BackgroundStars() {
@@ -8,7 +11,7 @@ function BackgroundStars() {
       {Array.from({ length: 50 }).map((_, i) => (
         <div
           key={i}
-          className="absolute w-1 h-1 bg-white rounded-full opacity-60 animate-pulse"
+          className="absolute h-1 w-1 rounded-full bg-white opacity-60 animate-pulse"
           style={{
             left: `${Math.random() * 100}%`,
             top: `${Math.random() * 100}%`,
@@ -24,9 +27,12 @@ function BackgroundStars() {
 export function BackgroundLuma({
   opacity = 0.18,
   blurPx = 6,
-}: { opacity?: number; blurPx?: number }) {
-  const [paused, setPaused] = React.useState(false);
+  mood: moodProp = null,
+  listenToMoodBus = true,
+}: { opacity?: number; blurPx?: number; mood?: LumaMood | null; listenToMoodBus?: boolean }) {
+  const paused = false;
   const [visPaused, setVisPaused] = React.useState(false);
+  const [mood, setMood] = React.useState<LumaMood | null>(moodProp ?? null);
 
   React.useEffect(() => {
     const h = () => setVisPaused(document.hidden);
@@ -34,9 +40,31 @@ export function BackgroundLuma({
     return () => document.removeEventListener("visibilitychange", h);
   }, []);
 
+  React.useEffect(() => {
+    setMood(moodProp ?? null);
+  }, [moodProp]);
+
+  React.useEffect(() => {
+    if (!listenToMoodBus) return;
+    const id = subscribe("luma:mood", (payload: any) => {
+      const next = (payload?.mood ?? payload) as LumaMood | null;
+      if (typeof next === "string" && LUMA_MOOD_ORDER.includes(next as LumaMood)) {
+        setMood(next as LumaMood);
+        return;
+      }
+      setMood(null);
+    });
+    return () => {
+      if (id) unsubscribe(id);
+      return undefined as void;
+    };
+  }, [listenToMoodBus]);
+
+  const animation = paused || visPaused ? "none" : "luma-float 8s ease-in-out infinite";
+
   return (
     <div
-      className="fixed inset-0 pointer-events-none"
+      className="pointer-events-none fixed inset-0"
       style={{ zIndex: 0, filter: `blur(${blurPx}px)`, opacity }}
     >
       {/* inline radial gradient instead of 'bg-gradient-radial' */}
@@ -44,7 +72,7 @@ export function BackgroundLuma({
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(40% 35% at 50% 40%, rgba(255,200,120,0.14), rgba(255,160,80,0.08) 40%, rgba(0,0,0,0) 70%)"
+            "radial-gradient(40% 35% at 50% 40%, rgba(255,200,120,0.14), rgba(255,160,80,0.08) 40%, rgba(0,0,0,0) 70%)",
         }}
       >
         {/* stars (cheap DOM dots are fine) */}
@@ -52,36 +80,41 @@ export function BackgroundLuma({
           {Array.from({ length: 60 }).map((_, i) => (
             <div
               key={i}
-              className="absolute w-[3px] h-[3px] bg-white/70 rounded-full"
+              className="absolute h-[3px] w-[3px] rounded-full bg-white/70"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
-                opacity: 0.5 + Math.random() * 0.5
+                opacity: 0.5 + Math.random() * 0.5,
               }}
             />
           ))}
         </div>
 
         {/* Luma PNG — make it large enough to read under blur */}
-        <img
-          src="/luma/Luma_29.png"
-          alt="Luma Guardian"
+        <div
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-          style={{ 
-            width: "60vmin", 
-            maxWidth: 900, 
-            opacity: 0.85, 
-            filter: "brightness(1.08) contrast(0.9)",
-            animation: paused || visPaused ? 'none' : 'luma-float 8s ease-in-out infinite'
-          }}
-          onError={(e) => {
-            console.warn("Luma PNG not found:", "/luma/Luma_29.png");
-            (e.currentTarget as HTMLImageElement).style.display = "none";
-          }}
-          onLoad={() => {
-            console.log("✅ Luma PNG loaded successfully");
-          }}
-        />
+          style={{ width: "60vmin", maxWidth: 900, animation }}
+        >
+          <div className="relative inline-block">
+            <img
+              src="/luma/Luma_29.png"
+              alt="Luma Guardian"
+              className="block w-full"
+              style={{
+                opacity: 0.85,
+                filter: "brightness(1.08) contrast(0.9)",
+              }}
+              onError={(e) => {
+                console.warn("Luma PNG not found:", "/luma/Luma_29.png");
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+              onLoad={() => {
+                console.log("Luma PNG loaded successfully");
+              }}
+            />
+            <LumaEmotionBadge mood={mood} />
+          </div>
+        </div>
 
         <style>{`
           @keyframes luma-float {

@@ -26,26 +26,121 @@ import DesktopPage from "@/pages/desktop";
 import SignInPage from "@/pages/sign-in";
 import StarHydrostaticPanel from "@/pages/star-hydrostatic-panel";
 import { useQiStream } from "@/hooks/useQiStream";
+import { LumaWhispersProvider } from "@/lib/luma-whispers";
+import MobileStartPage from "@/pages/mobile-start";
+import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
+
+const hasDesktopOverride = () => {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("desktop") === "1";
+  } catch {
+    return false;
+  }
+};
+
+const hasMobileOverride = () => {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("mobile") === "1";
+  } catch {
+    return false;
+  }
+};
 
 function DesktopRedirect() {
   const [, setLocation] = useLocation();
+  const { isMobile, isReady } = useIsMobileViewport();
+  const desktopOverride = hasDesktopOverride();
+  const mobileOverride = hasMobileOverride();
 
   useEffect(() => {
+    if (mobileOverride) {
+      setLocation("/mobile", { replace: true });
+      return;
+    }
+
+    if (desktopOverride) {
+      setLocation("/desktop", { replace: true });
+      return;
+    }
+
+    if (!isReady) return;
+
+    if (isMobile) {
+      setLocation("/mobile", { replace: true });
+      return;
+    }
+
     setLocation("/desktop", { replace: true });
-  }, [setLocation]);
+  }, [desktopOverride, isMobile, isReady, mobileOverride, setLocation]);
 
   return null;
+}
+
+function StartRoute() {
+  const [, setLocation] = useLocation();
+  const { isMobile, isReady } = useIsMobileViewport();
+  const desktopOverride = hasDesktopOverride();
+  const mobileOverride = hasMobileOverride();
+
+  useEffect(() => {
+    if (mobileOverride) {
+      setLocation("/mobile", { replace: true });
+      return;
+    }
+
+    if (desktopOverride) return;
+
+    if (!isReady) return;
+    if (isMobile) {
+      setLocation("/mobile", { replace: true });
+    }
+  }, [desktopOverride, isMobile, isReady, mobileOverride, setLocation]);
+
+  if (mobileOverride || (!desktopOverride && (!isReady || isMobile))) {
+    return null;
+  }
+
+  return <StartPortal />;
+}
+
+function HelixCoreRoute() {
+  return (
+    <LumaWhispersProvider>
+      <HelixCore />
+    </LumaWhispersProvider>
+  );
+}
+
+function DesktopRoute() {
+  return (
+    <LumaWhispersProvider>
+      <DesktopPage />
+    </LumaWhispersProvider>
+  );
+}
+
+function MobileRoute() {
+  return (
+    <LumaWhispersProvider>
+      <MobileStartPage />
+    </LumaWhispersProvider>
+  );
 }
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={DesktopRedirect} />
-      <Route path="/start" component={StartPortal} />
+      <Route path="/start" component={StartRoute} />
+      <Route path="/mobile" component={MobileRoute} />
       <Route path="/bridge" component={Home} />
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
-      <Route path="/helix-core" component={HelixCore} />
+      <Route path="/helix-core" component={HelixCoreRoute} />
       <Route path="/helix-observables" component={HelixObservablesPage} />
       <Route path="/helix/noise-gens" component={NoiseGenAlias} />
       <Route path="/helix-noise-gens" component={NoiseGenAlias} />
@@ -55,7 +150,7 @@ function Router() {
       <Route path="/rag/ingest" component={IngestPage} />
       <Route path="/rag/admin" component={RagAdminPage} />
       <Route path="/code-admin" component={CodeAdminPage} />
-      <Route path="/desktop" component={DesktopPage} />
+      <Route path="/desktop" component={DesktopRoute} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/why" component={Why} />
       <Route path="/star-hydrostatic" component={StarHydrostaticPanel} />

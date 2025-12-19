@@ -1,7 +1,7 @@
 ﻿// client/src/pages/helix-core.tsx
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
 import { Link, useSearch } from "wouter";
-import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, AlertTriangle, Target, CheckCircle2, Video, Layers, Cpu } from "lucide-react";
+import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, AlertTriangle, Target, CheckCircle2, Video, Layers, Cpu, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { C as SPEED_OF_LIGHT } from '@/lib/physics-const';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest, getDevMockStatus, HELIX_DEV_MOCK_EVENT } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey, useGreens } from "@/hooks/use-energy-pipeline";
+import {
+  useEnergyPipeline,
+  useSwitchMode,
+  useUpdatePipeline,
+  MODE_CONFIGS,
+  fmtPowerUnitFromW,
+  ModeKey,
+  useGreens,
+  type EnergyPipelineState as PipelineState,
+} from "@/hooks/use-energy-pipeline";
+import { useHullPreviewPayload } from "@/hooks/use-hull-preview-payload";
 import useTimeLapseRecorder from "@/hooks/useTimeLapseRecorder";
 import { useVacuumContract } from "@/hooks/useVacuumContract";
 import {
@@ -50,10 +60,12 @@ import VacuumContractBadge from "@/components/VacuumContractBadge";
 import DriveGuardsPanel from "@/components/DriveGuardsPanel";
 import PhoenixNeedlePanel from "@/components/PhoenixNeedlePanel";
 import WarpProofPanel from "@/components/WarpProofPanel";
+import CardProofOverlay from "@/components/CardProofOverlay";
+import CollapseBenchmarkHUD from "@/components/CollapseBenchmarkHUD";
+import HelixHullCardsPanel from "@/components/HelixHullCardsPanel";
 import SpeedCapabilityPanel from "@/components/SpeedCapabilityPanel";
 import DirectionPad from "@/components/DirectionPad";
 import NavPageSection from "@/components/NavPageSection";
-import { LumaWhispersProvider } from "@/lib/luma-whispers";
 import { SUPPRESS_HASH_SCROLL_KEY, useScrollHashSync } from "@/lib/whispers/useScrollHashSync";
 import { FractionalCoherenceRail } from "@/components/FractionalCoherenceRail";
 import { FractionalCoherenceGrid } from "@/components/FractionalCoherenceGrid";
@@ -62,9 +74,15 @@ import openAiLogo from "@/assets/open-ai-logo.svg";
 import githubLogo from "@/assets/git hub symbol.svg";
 import { downloadCSV } from "@/utils/csv";
 import { computeTidalEij, type V3 } from "@/lib/tidal";
-import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
-import type { VacuumGapSweepRow, RidgePreset, DynamicConfig, SweepRuntime } from "@shared/schema";
+import { defaultOverlayPrefsForProfile, useHull3DSharedStore } from "@/store/useHull3DSharedStore";
+import type { CardMeshMetadata, VacuumGapSweepRow, RidgePreset, DynamicConfig, SweepRuntime, WarpFallbackMode, HullPreviewPayload } from "@shared/schema";
+import { resolveHullBasis, type HullBasisResolved } from "@shared/hull-basis";
 import type { VizIntent } from "@/lib/nav/nav-dynamics";
+import { resolveHullDimsEffective } from "@/lib/resolve-hull-dims";
+import { VIEWER_WIREFRAME_BUDGETS } from "@/lib/resolve-wireframe-overlay";
+import { buildCardSignatures, ensureCardRecipeSchemaVersion } from "@/lib/card-signatures";
+import { buildCardExportSidecar } from "@/lib/card-export-sidecar";
+import { buildLatticeTextureExports, extractCardLatticeMetadata } from "@/lib/lattice-export";
 import DeepMixingSolarView from "@/components/DeepMixingSolarView";
 import DeepMixSweetSpot from "@/components/deepmix/DeepMixSweetSpot";
 const DeepMixGlobePanel = lazy(() => import("@/components/deepmix/DeepMixGlobePanel"));
@@ -108,6 +126,8 @@ type PumpStability = {
 };
 
 const PUMP_PHASE_BIAS_KEY = "helix:pumpPhaseBiasDeg";
+const AUTO_APPLY_PREVIEW_KEY = "helix:autoApplyPreview";
+const AUTO_APPLY_FALLBACK_KEY = "helix:autoApplyPreviewFallbackMode";
 
 const DEEP_MIXING_STATE_BADGE: Record<DeepMixingAutopilotState, string> = {
   PLAN: "bg-cyan-500/20 text-cyan-200",
@@ -134,6 +154,7 @@ const PANEL_HASHES = {
   mainframeTerminal: "mainframe-terminal",
   operationsToolbar: "operations-toolbar",
   missionPlanner: "mission-planner",
+  hullCards: "hull-cards",
 } as const;
 
 const HASH_ALIASES: Record<string, string> = {
@@ -886,46 +907,6 @@ const MAINFRAME_ZONES = {
   WARP_VISUALIZER: "Natrio Warp Bubble",
 };
 
-interface EnergyPipelineState {
-  currentMode?: string;
-  dutyCycle?: number;
-  sectorStrobing?: number;
-  gammaGeo?: number;
-  qSpoilingFactor?: number;
-  qCavity?: number;
-  P_avg?: number;
-  zeta?: number;
-  TS_ratio?: number;
-  fordRomanCompliance?: boolean; // was string
-  natarioConstraint?: boolean; // was string
-  curvatureLimit?: boolean; // was string
-  U_cycle?: number;
-  U_static?: number;
-  U_geo?: number;
-  U_Q?: number;
-  P_loss_raw?: number;
-  N_tiles?: number;
-  modulationFreq_GHz?: number;
-  M_exotic?: number;
-  gammaVanDenBroeck?: number;
-  gammaVanDenBroeck_vis?: number;
-  gammaVanDenBroeck_mass?: number;
-  qMechanical?: number; // used in ShellOutlineVisualizer + HUD calc
-  sagDepth_nm?: number; // used in WarpVisualizer parameters
-  // Add live geometry fields used by SpectrumTunerPanel inputs
-  gap_nm?: number;
-  sag_nm?: number;
-  overallStatus?: string; // used in "System Status"
-  dutyEffectiveFR?: number;
-  mechanical?: {
-    minGap_nm?: number;
-    recommendedGap_nm?: number;
-    maxStroke_pm?: number;
-    unattainable?: boolean;
-    note?: string;
-  };
-}
-
 interface SystemMetrics {
   activeSectors: number; // NEW: active sectors (1, 400, etc.)
   totalSectors: number; // NEW: total sectors (400)
@@ -1092,8 +1073,15 @@ const [timeLapseOverlayCanvas, setTimeLapseOverlayCanvas] = useState<HTMLCanvasE
 const [timeLapseOverlayDom, setTimeLapseOverlayDom] = useState<HTMLDivElement | null>(null);
 const [showSweepHud, setShowSweepHud] = useState(false);
 const [includeSweepSidecar, setIncludeSweepSidecar] = useState(true);
+const [isExportingCard, setIsExportingCard] = useState(false);
 const [isThetaHullMode, setIsThetaHullMode] = useState(false);
 const [vizIntent, setVizIntent] = useState<VizIntent>({ rise: 0, planar: 0, yaw: 0 });
+const meshOverlayMeta = useHull3DSharedStore((state) => state.meshOverlay);
+const viewerState = useHull3DSharedStore((state) => state.viewer);
+const viewerPalette = useHull3DSharedStore((state) => state.palette);
+const overlayPrefs = useHull3DSharedStore((state) => state.overlayPrefs);
+const setSharedLattice = useHull3DSharedStore((state) => state.setLattice);
+const setHullViewer = useHull3DSharedStore((state) => state.setViewer);
 const handleDirectionPadIntent = useCallback(
   ({ rise, planar }: { rise: number; planar: number }) => {
     setVizIntent((prev) =>
@@ -1137,6 +1125,971 @@ useEffect(() => {
     setShowSweepHud(false);
   }
 }, [showSweepHud, timeLapseRecorder.status]);
+
+  // Pipeline + hull data (shared across overlays/exports)
+  const { data: hullMetrics } = useMetrics(20000); // 20s vs 2s default
+  const hullPreview = useHullPreviewPayload();
+  const { data: pipelineState } = useEnergyPipeline({
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+  });
+  const switchMode = useSwitchMode();
+  const updatePipeline = useUpdatePipeline();
+  const [autoApplyPreview, setAutoApplyPreview] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(AUTO_APPLY_PREVIEW_KEY);
+    if (stored === "1") return true;
+    if (stored === "0") return false;
+    return true;
+  });
+  const [autoApplyFallbackMode, setAutoApplyFallbackMode] = useState<WarpFallbackMode>(() => {
+    if (typeof window === "undefined") return "warn";
+    const raw = window.localStorage.getItem(AUTO_APPLY_FALLBACK_KEY);
+    return raw === "warn" || raw === "block" || raw === "allow" ? (raw as WarpFallbackMode) : "warn";
+  });
+  const lastAutoApplySigRef = useRef<string | null>(null);
+  const autoApplyBusyRef = useRef(false);
+  const pendingAutoPreviewRef = useRef<HullPreviewPayload | null>(null);
+  const alcubierreRef = useRef<HTMLDivElement | null>(null);
+
+  const pipeline = pipelineState as PipelineState;
+  const hullDimsEffective = useMemo(
+    () => resolveHullDimsEffective({ previewPayload: hullPreview, pipelineSnapshot: pipeline as any }),
+    [hullPreview, pipeline],
+  );
+  const geometryFallbackState = (pipeline as any)?.geometryFallback ?? null;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(AUTO_APPLY_PREVIEW_KEY, autoApplyPreview ? "1" : "0");
+  }, [autoApplyPreview]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(AUTO_APPLY_FALLBACK_KEY, autoApplyFallbackMode);
+  }, [autoApplyFallbackMode]);
+
+  // Optional: expose for quick console checks
+  useEffect(() => {
+    (window as any).__energyLive = pipeline;
+  }, [pipeline]);
+
+  const focusAlcubierrePanel = useCallback(() => {
+    const node = alcubierreRef.current;
+    if (!node) return;
+    try {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch {
+      node.scrollIntoView();
+    }
+  }, []);
+
+  const dispatchAutoViewEvent = useCallback((detail: any) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.dispatchEvent(new CustomEvent("helix:auto-view-preview" as any, { detail }));
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const buildPreviewUpdatePayload = useCallback(
+    (preview: HullPreviewPayload | null) => {
+      if (!preview) return null;
+      const meshHash = preview.mesh?.meshHash ?? preview.meshHash ?? undefined;
+      const precomputed = preview.precomputed ?? null;
+      const previewMesh =
+        preview.mesh ??
+        (meshHash
+          ? {
+              meshHash,
+              glbUrl: preview.glbUrl,
+              basis: preview.basis,
+              obb: preview.obb,
+              lods: preview.lods,
+              coarseLod: preview.lodCoarse,
+              fullLod: preview.lodFull,
+              provenance: preview.provenance,
+              clampReasons: preview.clampReasons,
+            }
+          : undefined);
+      const latticeHashes =
+        precomputed?.meta?.hashes ??
+        (precomputed?.frame as any)?.hashes ??
+        (precomputed as any)?.hashes ??
+        undefined;
+      const sdfHash =
+        latticeHashes?.sdf ??
+        (precomputed as any)?.sdf?.key ??
+        (precomputed as any)?.sdf?.hash ??
+        null;
+      const previewSdf =
+        sdfHash || precomputed?.frame
+          ? {
+              key: sdfHash ?? undefined,
+              hash: sdfHash ?? undefined,
+              clampReasons:
+                precomputed?.frame?.clampReasons ??
+                precomputed?.meta?.frame?.clampReasons ??
+                (precomputed as any)?.clampReasons,
+              stats: precomputed?.meta?.stats,
+            }
+          : undefined;
+      const previewLattice =
+        precomputed?.meta || precomputed?.frame
+          ? {
+              enabled: precomputed?.meta?.enabled ?? true,
+              frame: precomputed?.frame ?? precomputed?.meta?.frame,
+              hashes: latticeHashes,
+              band_m: precomputed?.meta?.band_m,
+              stats: precomputed?.meta?.stats,
+              driveLadder: precomputed?.meta?.driveLadder,
+              clampReasons:
+                precomputed?.frame?.clampReasons ??
+                precomputed?.meta?.frame?.clampReasons ??
+                (precomputed as any)?.clampReasons,
+            }
+          : undefined;
+      const hull =
+        hullDimsEffective && hullDimsEffective.Lx_m && hullDimsEffective.Ly_m && hullDimsEffective.Lz_m
+          ? { Lx_m: hullDimsEffective.Lx_m, Ly_m: hullDimsEffective.Ly_m, Lz_m: hullDimsEffective.Lz_m }
+          : preview.targetDims;
+      return {
+        preview,
+        previewMesh,
+        previewSdf,
+        previewLattice,
+        hull,
+        warpGeometryKind: "sdf" as const,
+        fallbackMode: autoApplyFallbackMode,
+      };
+    },
+    [autoApplyFallbackMode, hullDimsEffective],
+  );
+
+  const applyPreviewToPipeline = useCallback(
+    async (preview: HullPreviewPayload) => {
+      const payload = buildPreviewUpdatePayload(preview);
+      if (!payload) return;
+      autoApplyBusyRef.current = true;
+      try {
+        const response = await updatePipeline.mutateAsync(payload as any);
+        lastAutoApplySigRef.current = `${preview.meshHash ?? preview.mesh?.meshHash ?? "none"}|${preview.updatedAt ?? Date.now()}`;
+        const fallback = (response as any)?.geometryFallback;
+        const fallbackReasons = Array.isArray(fallback?.reasons) ? fallback.reasons.join(", ") : undefined;
+        const fallbackMode = (fallback?.mode as WarpFallbackMode | undefined) ?? autoApplyFallbackMode;
+        const fallbackApplied = Boolean(fallback?.applied);
+        const warnOnly = fallbackMode === "warn" && !fallbackApplied;
+        toast({
+          title: fallbackApplied ? "GLB preview applied with fallback" : warnOnly ? "GLB preview warning" : "GLB preview applied",
+          description: fallbackApplied
+            ? fallbackReasons ?? "Fallback to analytic geometry applied."
+            : warnOnly
+              ? fallbackReasons ?? "Fallback conditions present."
+              : "Warp geometry switched to lattice path.",
+          ...(fallbackApplied ? { variant: "destructive" } : warnOnly ? { variant: "default" } : {}),
+        });
+        const basisResolved =
+          hullDimsEffective?.basis ?? (preview.basis ? resolveHullBasis(preview.basis, preview.scale) : null);
+        const hullDimsPayload = payload.hull ?? null;
+        if (basisResolved || hullDimsPayload) {
+          setHullViewer({
+            bounds: {
+              ...(viewerState?.bounds ?? {}),
+              basis: basisResolved ?? viewerState?.bounds?.basis,
+            },
+          });
+        }
+        setSharedLattice(null);
+        focusAlcubierrePanel();
+        dispatchAutoViewEvent({
+          basis: basisResolved ?? null,
+          hullDims: hullDimsPayload ?? null,
+          fallback,
+          meshHash: payload.previewMesh?.meshHash ?? preview.meshHash ?? null,
+          volumeHash:
+            (response as any)?.geometryPreview?.lattice?.hashes?.volume ??
+            payload.previewLattice?.hashes?.volume ??
+            null,
+          sdfKey:
+            (response as any)?.geometryPreview?.lattice?.hashes?.sdf ??
+            payload.previewSdf?.key ??
+            null,
+          requireSdf: Boolean(payload.previewSdf),
+        });
+      } catch (err: any) {
+        const fallback = err?.payload?.geometryFallback;
+        const fallbackReasons = Array.isArray(fallback?.reasons) ? fallback.reasons.join(", ") : undefined;
+        toast({
+          title: "Auto-apply preview failed",
+          description: fallbackReasons ?? (err instanceof Error ? err.message : "Pipeline update failed"),
+          variant: "destructive",
+        });
+      } finally {
+        autoApplyBusyRef.current = false;
+        const queued = pendingAutoPreviewRef.current;
+        pendingAutoPreviewRef.current = null;
+        if (queued) {
+          const queuedGlb = queued.glbUrl ?? queued.mesh?.glbUrl ?? "glb:none";
+          const queuedSig = `${queuedGlb}|${queued.meshHash ?? queued.mesh?.meshHash ?? "none"}|${queued.updatedAt ?? 0}`;
+          if (queuedSig !== lastAutoApplySigRef.current) {
+            applyPreviewToPipeline(queued);
+          }
+        }
+      }
+    },
+    [buildPreviewUpdatePayload, updatePipeline, focusAlcubierrePanel, dispatchAutoViewEvent, hullDimsEffective?.basis, setHullViewer, viewerState?.bounds, setSharedLattice],
+  );
+
+  useEffect(() => {
+    if (!autoApplyPreview || !hullPreview) return;
+    const glbSig = hullPreview.glbUrl ?? hullPreview.mesh?.glbUrl ?? "glb:none";
+    const meshSig = hullPreview.meshHash ?? hullPreview.mesh?.meshHash ?? "mesh:none";
+    const sig = `${glbSig}|${meshSig}|${hullPreview.updatedAt ?? 0}`;
+    if (autoApplyBusyRef.current) {
+      pendingAutoPreviewRef.current = hullPreview;
+      return;
+    }
+    if (sig === lastAutoApplySigRef.current) return;
+    pendingAutoPreviewRef.current = null;
+    applyPreviewToPipeline(hullPreview);
+  }, [autoApplyPreview, hullPreview, applyPreviewToPipeline]);
+
+ const handleExportCard = useCallback(async () => {
+   if (isExportingCard) return;
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    toast({
+      title: "Export unavailable",
+      description: "Card export is only available in the browser.",
+      variant: "destructive",
+    });
+    return;
+  }
+  if (!timeLapseCanvas) {
+    toast({
+      title: "Hull view not ready",
+      description: "Open the Alcubierre viewer first so the renderer canvas is available.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+   const requestCardProfile = async (mode: "apply" | "restore", requestId: string) => {
+    const eventName =
+      mode === "apply" ? ("helix:card-export-profile:applied" as const) : ("helix:card-export-profile:restored" as const);
+    return await new Promise<boolean>((resolve) => {
+      let timeoutId: number | undefined;
+      const cleanup = () => {
+        window.removeEventListener(eventName as any, onDone as any);
+        if (timeoutId !== undefined) {
+          window.clearTimeout(timeoutId);
+        }
+      };
+      const onDone = (event: Event) => {
+        const detail = (event as CustomEvent<{ requestId?: string }>).detail;
+        if (detail?.requestId && detail.requestId !== requestId) return;
+        cleanup();
+        resolve(true);
+      };
+      timeoutId = window.setTimeout(() => {
+        cleanup();
+        resolve(false);
+      }, mode === "apply" ? 800 : 400);
+      window.addEventListener(eventName as any, onDone as any);
+      window.dispatchEvent(
+        new CustomEvent("helix:card-export-profile" as any, {
+          detail: { mode, requestId },
+        }),
+      );
+    });
+   };
+
+   const requestLatticeReady = async (params: {
+     volumeHash: string | null;
+     sdfKey: string | null;
+     requireSdf?: boolean;
+     timeoutMs?: number;
+   }) => {
+     const requestId = `lattice-ready-${Date.now()}`;
+     const timeoutMs = Number.isFinite(params.timeoutMs) ? Math.max(0, Number(params.timeoutMs)) : 4500;
+     const requireSdf = Boolean(params.requireSdf);
+     const eventName = "helix:await-lattice-ready:result" as const;
+     return await new Promise<{
+       ready: boolean;
+       volumeHash: string | null;
+       sdfKey: string | null;
+       volumeReady: boolean;
+       sdfReady: boolean;
+       volumeFailed: boolean;
+       sdfFailed: boolean;
+       reason?: string;
+     }>((resolve) => {
+       let timeoutId: number | undefined;
+       const cleanup = () => {
+         window.removeEventListener(eventName as any, onDone as any);
+         if (timeoutId !== undefined) {
+           window.clearTimeout(timeoutId);
+         }
+       };
+       const onDone = (event: Event) => {
+         const detail = (event as CustomEvent<any>).detail;
+         if (detail?.requestId !== requestId) return;
+         cleanup();
+         resolve({
+           ready: Boolean(detail?.ready),
+           volumeHash: (typeof detail?.volumeHash === "string" ? detail.volumeHash : null) as string | null,
+           sdfKey: (typeof detail?.sdfKey === "string" ? detail.sdfKey : null) as string | null,
+           volumeReady: Boolean(detail?.volumeReady),
+           sdfReady: Boolean(detail?.sdfReady),
+           volumeFailed: Boolean(detail?.volumeFailed),
+           sdfFailed: Boolean(detail?.sdfFailed),
+           reason: typeof detail?.reason === "string" ? detail.reason : undefined,
+         });
+       };
+       timeoutId = window.setTimeout(() => {
+         cleanup();
+         resolve({
+           ready: false,
+           volumeHash: params.volumeHash,
+           sdfKey: params.sdfKey,
+           volumeReady: false,
+           sdfReady: false,
+           volumeFailed: false,
+           sdfFailed: false,
+           reason: "timeout",
+         });
+       }, timeoutMs);
+       window.addEventListener(eventName as any, onDone as any);
+       window.dispatchEvent(
+         new CustomEvent("helix:await-lattice-ready" as any, {
+           detail: {
+             requestId,
+             volumeHash: params.volumeHash,
+             sdfKey: params.sdfKey,
+             requireSdf,
+             timeoutMs,
+           },
+         }),
+       );
+     });
+   };
+
+   const profileRequestId = `card-profile-${Date.now()}`;
+   setIsExportingCard(true);
+   try {
+    const profileApplied = await requestCardProfile("apply", profileRequestId);
+    if (profileApplied) {
+      await new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())),
+      );
+    }
+     const preSnapshot = typeof useHull3DSharedStore.getState === "function" ? useHull3DSharedStore.getState() : null;
+     const latticeReady = await requestLatticeReady({
+       volumeHash: preSnapshot?.lattice?.volume?.hash ?? null,
+       sdfKey: preSnapshot?.lattice?.sdf?.key ?? null,
+       requireSdf: Boolean(preSnapshot?.lattice?.sdf?.key),
+     });
+     if (latticeReady.ready) {
+       await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+     } else if (latticeReady.volumeHash || latticeReady.sdfKey) {
+       console.warn("[Helix] Proceeding with export before lattice upload completed", latticeReady);
+     }
+     const storeSnapshot = typeof useHull3DSharedStore.getState === "function" ? useHull3DSharedStore.getState() : null;
+     const meshOverlaySnapshot = storeSnapshot?.meshOverlay ?? meshOverlayMeta;
+     const viewerPaletteSnapshot = storeSnapshot?.palette ?? viewerPalette;
+     const viewerStateSnapshot = storeSnapshot?.viewer ?? viewerState ?? {};
+     const fileStem = `helix-card-${Date.now()}`;
+
+    let latticeTextures: Awaited<ReturnType<typeof buildLatticeTextureExports>> = null;
+    let latticeMeta = extractCardLatticeMetadata(storeSnapshot?.lattice ?? null);
+    try {
+      latticeTextures = await buildLatticeTextureExports({
+        fileStem,
+        lattice: storeSnapshot?.lattice ?? null,
+      });
+      latticeMeta = latticeTextures?.meta ?? latticeMeta;
+    } catch (err) {
+      console.warn("[Helix] Failed to serialize lattice textures for export", err);
+      latticeTextures = latticeMeta ? { meta: latticeMeta, assets: null, blobs: [] } : null;
+    }
+
+    const dpr = Number.isFinite(window.devicePixelRatio) ? window.devicePixelRatio : 1;
+    const targetWidth =
+      timeLapseCanvas.width ||
+      Math.max(
+        1,
+        Math.round((timeLapseCanvas.clientWidth || timeLapseCanvas.offsetWidth || 0) * dpr) || 1920
+      );
+    const targetHeight =
+      timeLapseCanvas.height ||
+      Math.max(
+        1,
+        Math.round((timeLapseCanvas.clientHeight || timeLapseCanvas.offsetHeight || 0) * dpr) || 1080
+      );
+
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = targetWidth;
+    exportCanvas.height = targetHeight;
+    const ctx = exportCanvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Failed to acquire 2D context for export.");
+    }
+
+    const overlayLayerEnabled = Boolean(
+      timeLapseOverlayCanvas && (showSweepHud || meshOverlaySnapshot?.wireframeEnabled)
+    );
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(timeLapseCanvas, 0, 0, targetWidth, targetHeight);
+    if (overlayLayerEnabled && timeLapseOverlayCanvas) {
+      ctx.drawImage(timeLapseOverlayCanvas, 0, 0, targetWidth, targetHeight);
+    }
+
+    const asFinite = (value: unknown): number | null => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : null;
+    };
+
+    const overlayFrame = timeLapseRecorder.currentFrame;
+    const pipelineAny = pipeline as any;
+    const pickLodMeta = (pref?: "preview" | "high" | null) => {
+      const lodPref = pref ?? "preview";
+      if (!hullPreview) return null;
+      const lods =
+        lodPref === "high"
+          ? [
+              hullPreview?.lodFull,
+              hullPreview?.mesh?.fullLod,
+              ...(hullPreview?.lods ?? []).filter((lod: any) => lod?.tag === "full"),
+              ...(hullPreview?.mesh?.lods ?? []).filter((lod: any) => lod?.tag === "full"),
+            ]
+          : [
+              hullPreview?.lodCoarse,
+              hullPreview?.mesh?.coarseLod,
+              ...(hullPreview?.lods ?? []).filter((lod: any) => lod?.tag === "coarse"),
+              ...(hullPreview?.mesh?.lods ?? []).filter((lod: any) => lod?.tag === "coarse"),
+            ];
+      return (lods.find((lod) => !!lod) as any) ?? null;
+    };
+    const meshBudgets = meshOverlaySnapshot?.budgets ?? VIEWER_WIREFRAME_BUDGETS;
+    const lodMeta = pickLodMeta(meshOverlaySnapshot?.lod ?? null);
+    const meshBasis =
+      meshOverlaySnapshot?.basis ??
+      meshOverlaySnapshot?.basisTags ??
+      hullPreview?.mesh?.basis ??
+      hullPreview?.basis ??
+      null;
+    const meshBasisResolved: HullBasisResolved | null =
+      meshOverlaySnapshot?.basisResolved ??
+      (meshBasis ? resolveHullBasis(meshBasis, hullPreview?.scale) : null);
+    const meshClampReasons = meshOverlaySnapshot?.clampReasons?.length ? meshOverlaySnapshot.clampReasons : undefined;
+    const meshGeometrySource =
+      meshOverlaySnapshot?.geometrySource ??
+      (meshClampReasons?.length
+        ? "geometric"
+        : (meshOverlaySnapshot?.provenance as CardMeshMetadata["provenance"]) ??
+          (hullPreview?.provenance as CardMeshMetadata["provenance"]) ??
+          (hullDimsEffective?.source as CardMeshMetadata["geometrySource"] | undefined));
+    const meshMeta: CardMeshMetadata | null =
+      meshOverlaySnapshot || hullPreview || meshClampReasons
+        ? {
+            meshHash:
+              meshOverlaySnapshot?.meshHash ?? hullPreview?.meshHash ?? hullPreview?.mesh?.meshHash ?? undefined,
+            provenance:
+              meshOverlaySnapshot?.provenance ?? (hullPreview?.provenance as CardMeshMetadata["provenance"]),
+            geometrySource: meshGeometrySource,
+            lod: meshOverlaySnapshot?.lod ?? (lodMeta ? meshOverlaySnapshot?.lod ?? "preview" : undefined),
+            lodTag: meshOverlaySnapshot?.lodTag ?? lodMeta?.tag,
+            triangleCount: meshOverlaySnapshot?.triangleCount ?? lodMeta?.triangleCount,
+            vertexCount: meshOverlaySnapshot?.vertexCount ?? lodMeta?.vertexCount,
+            decimation: meshOverlaySnapshot?.decimation ?? lodMeta?.decimation,
+            budgets: meshBudgets,
+            basis: meshBasis ?? undefined,
+            basisTags: meshOverlaySnapshot?.basisTags ?? (meshBasis ?? undefined),
+            basisResolved: meshBasisResolved ?? undefined,
+            clampReasons: meshClampReasons,
+            wireframeEnabled: meshOverlaySnapshot?.wireframeEnabled,
+            updatedAt: meshOverlaySnapshot?.updatedAt ?? undefined,
+          }
+        : null;
+    const hullAreaPreview = asFinite((hullPreview as any)?.hullMetrics?.area_m2 ?? (hullPreview as any)?.area_m2);
+    const hullAreaPipeline = asFinite(
+      (hullMetrics as any)?.tiles?.hullArea_m2 ??
+        pipelineAny?.tiles?.hullArea_m2 ??
+        pipelineAny?.hullArea_m2 ??
+        (hullMetrics as any)?.hull?.area_m2,
+    );
+    const hullAreaSource = hullAreaPreview != null ? "preview" : hullAreaPipeline != null ? "pipeline" : null;
+    const hullArea_m2 = hullAreaPreview ?? hullAreaPipeline ?? null;
+    const hullSummary = hullDimsEffective
+      ? {
+          Lx_m: hullDimsEffective.Lx_m,
+          Ly_m: hullDimsEffective.Ly_m,
+          Lz_m: hullDimsEffective.Lz_m,
+          a_m: hullDimsEffective.Lx_m / 2,
+          b_m: hullDimsEffective.Ly_m / 2,
+          c_m: hullDimsEffective.Lz_m / 2,
+          area_m2: hullArea_m2,
+          areaSource: hullAreaSource,
+          source: hullDimsEffective.source,
+        }
+      : hullMetrics?.hull
+        ? {
+            Lx_m: asFinite((hullMetrics as any)?.hull?.Lx_m),
+            Ly_m: asFinite((hullMetrics as any)?.hull?.Ly_m),
+            Lz_m: asFinite((hullMetrics as any)?.hull?.Lz_m),
+            a_m: asFinite(
+              (hullMetrics as any)?.hull?.a ??
+                ((hullMetrics as any)?.hull?.Lx_m ? (hullMetrics as any).hull.Lx_m / 2 : null),
+            ),
+            b_m: asFinite(
+              (hullMetrics as any)?.hull?.b ??
+                ((hullMetrics as any)?.hull?.Ly_m ? (hullMetrics as any).hull.Ly_m / 2 : null),
+            ),
+            c_m: asFinite(
+              (hullMetrics as any)?.hull?.c ??
+                ((hullMetrics as any)?.hull?.Lz_m ? (hullMetrics as any).hull.Lz_m / 2 : null),
+            ),
+            area_m2: hullArea_m2,
+            areaSource: hullAreaSource,
+            source: "pipeline",
+          }
+        : null;
+    const pipelineSummary = pipeline
+      ? {
+          mode: (pipeline as any)?.currentMode ?? (pipeline as any)?.mode ?? null,
+          dutyCycle: asFinite(pipeline.dutyCycle),
+          beta: asFinite(pipelineAny?.shipBeta ?? pipelineAny?.beta ?? pipelineAny?.vShip),
+          modulationFreq_GHz: asFinite(pipeline.modulationFreq_GHz),
+          tauLC_ms: asFinite(pipelineAny?.lightCrossing?.tauLC_ms ?? pipelineAny?.tauLC_ms),
+          burst_ms: asFinite(pipelineAny?.lightCrossing?.burst_ms ?? pipelineAny?.burst_ms),
+          dwell_ms: asFinite(pipelineAny?.lightCrossing?.dwell_ms ?? pipelineAny?.dwell_ms),
+          sectors: {
+            total: asFinite(
+              pipeline.sectorsTotal ??
+                pipeline.sectorCount ??
+                pipelineAny?.lightCrossing?.sectorCount ??
+                pipelineAny?.totalSectors
+            ),
+            concurrent: asFinite(
+              pipeline.sectorsConcurrent ??
+                pipeline.sectorStrobing ??
+                pipelineAny?.lightCrossing?.activeSectors ??
+                pipelineAny?.activeSectors
+            ),
+          },
+          mesh: meshMeta,
+        }
+      : null;
+
+    const overlaySummary = overlayFrame
+      ? {
+          segment: overlayFrame.segment,
+          overlayText: overlayFrame.overlayText,
+          TS: overlayFrame.TS,
+          tauLC_ms: overlayFrame.tauLC_ms,
+          burst_ms: overlayFrame.burst_ms,
+          dwell_ms: overlayFrame.dwell_ms,
+          rho: overlayFrame.rho,
+          QL: overlayFrame.QL,
+          d_eff: overlayFrame.d_eff,
+          gr: overlayFrame.gr,
+          sectors: overlayFrame.sectors,
+          sweep: overlayFrame.sweep,
+        }
+      : null;
+    const warpGeometryKindResolved =
+      pipeline?.warpGeometryKind ?? (pipelineAny?.warpGeometry as any)?.geometryKind ?? pipelineAny?.warpGeometryKind;
+    const renderedGeometryKind =
+      (storeSnapshot?.lattice?.volume ? "sdf" : null) ?? warpGeometryKindResolved;
+    const geometryUpdatePayload = (() => {
+      const payload: Record<string, unknown> = {};
+      if (hullDimsEffective) {
+        payload.hull = {
+          Lx_m: hullDimsEffective.Lx_m,
+          Ly_m: hullDimsEffective.Ly_m,
+          Lz_m: hullDimsEffective.Lz_m,
+        };
+      }
+      const areaOverride = asFinite(pipelineAny?.hullAreaOverride_m2);
+      const areaOverrideUncertainty = asFinite(pipelineAny?.hullAreaOverride_uncertainty_m2);
+      if (areaOverride != null) payload.hullAreaOverride_m2 = areaOverride;
+      if (areaOverrideUncertainty != null) {
+        payload.hullAreaOverride_uncertainty_m2 = Math.max(0, areaOverrideUncertainty);
+      }
+      const perSectorRaw = pipelineAny?.hullAreaPerSector_m2;
+      if (Array.isArray(perSectorRaw)) {
+        const cleaned = perSectorRaw
+          .map((value: unknown) => asFinite(value))
+          .filter((v: number | null): v is number => v != null);
+        if (cleaned.length) payload.hullAreaPerSector_m2 = cleaned;
+      }
+      if (pipeline?.warpFieldType) payload.warpFieldType = pipeline.warpFieldType;
+      if (pipeline?.warpGeometryKind || renderedGeometryKind) {
+        payload.warpGeometryKind = renderedGeometryKind ?? pipeline?.warpGeometryKind;
+      }
+      if (pipeline?.warpGeometryAssetId) payload.warpGeometryAssetId = pipeline.warpGeometryAssetId;
+      if (pipeline?.warpGeometry) payload.warpGeometry = pipeline.warpGeometry;
+      return Object.keys(payload).length ? payload : null;
+    })();
+    const viewerConfig = viewerStateSnapshot ?? {};
+    const cardCamera = viewerConfig.camera ?? (pipelineAny?.cardRecipe as any)?.camera ?? null;
+    const cardRecipeGeometryBase =
+      (pipelineAny?.cardRecipe as any)?.geometry ??
+      (pipelineAny?.cardRecipe as any)?.geometry ??
+      {};
+    const cardRecipeGeometryResolved = {
+      ...cardRecipeGeometryBase,
+      warpGeometryKind: renderedGeometryKind ?? cardRecipeGeometryBase?.warpGeometryKind,
+      warpGeometryAssetId:
+        pipeline?.warpGeometryAssetId ??
+        (pipelineAny?.warpGeometry as any)?.assetId ??
+        cardRecipeGeometryBase?.warpGeometryAssetId,
+      warpGeometry: pipeline?.warpGeometry ?? cardRecipeGeometryBase?.warpGeometry ?? (pipelineAny?.warpGeometry as any),
+    };
+    const overlayProfileKey =
+      viewerState?.profileTag === "card"
+        ? "card"
+        : (viewerState?.qualityPreset ?? "auto");
+    const overlayPrefsResolved =
+      overlayPrefs?.[overlayProfileKey] ?? defaultOverlayPrefsForProfile(overlayProfileKey);
+    const spacetimeGridPrefs = overlayPrefsResolved.spacetimeGrid;
+    const cardRecipeViz =
+      spacetimeGridPrefs || pipelineAny?.cardRecipe?.viz
+        ? {
+            ...(pipelineAny?.cardRecipe?.viz ?? {}),
+            ...(spacetimeGridPrefs ? { spacetimeGrid: spacetimeGridPrefs } : {}),
+          }
+        : undefined;
+    const cardRecipeWithMesh = pipelineAny?.cardRecipe
+      ? {
+          ...pipelineAny.cardRecipe,
+          geometry: cardRecipeGeometryResolved,
+          ...(cardRecipeViz ? { viz: cardRecipeViz } : {}),
+          ...(cardCamera ? { camera: cardCamera } : {}),
+          mesh: meshMeta ?? pipelineAny.cardRecipe?.mesh,
+          ...(latticeMeta ? { lattice: latticeMeta } : {}),
+        }
+      : meshMeta || latticeMeta || cardRecipeViz
+        ? {
+            ...(cardRecipeViz ? { viz: cardRecipeViz } : {}),
+            ...(cardCamera ? { camera: cardCamera } : {}),
+            geometry: cardRecipeGeometryResolved,
+            ...(meshMeta ? { mesh: meshMeta } : {}),
+            ...(latticeMeta ? { lattice: latticeMeta } : {}),
+          }
+        : null;
+    const replayViewer = {
+      camera: cardCamera,
+      planarVizMode: viewerConfig.planarVizMode ?? null,
+      volumeViz: viewerConfig.volumeViz ?? (pipelineAny?.cardRecipe as any)?.viz?.volumeViz ?? null,
+      volumeDomain:
+        viewerConfig.volumeDomain ?? (pipelineAny?.cardRecipe as any)?.viz?.volumeDomain ?? null,
+      vizFloors: viewerConfig.vizFloors ?? null,
+      gate: {
+        source: viewerConfig.gateSource ?? (pipelineAny?.cardRecipe as any)?.viz?.gateSource ?? null,
+        viewEnabled: viewerConfig.gateView ?? (pipelineAny?.cardRecipe as any)?.viz?.gateView ?? null,
+        forceFlat: viewerConfig.forceFlatGate ?? (pipelineAny?.cardRecipe as any)?.viz?.forceFlatGate ?? null,
+      },
+      opacityWindow:
+        viewerConfig.opacityWindow ?? (pipelineAny?.cardRecipe as any)?.viz?.opacityWindow ?? null,
+      boundsProfile: viewerConfig.boundsProfile ?? null,
+      palette: viewerConfig.palette ?? viewerPaletteSnapshot ?? null,
+      bounds:
+        viewerConfig.bounds ??
+        (hullDimsEffective
+          ? {
+              axes: [
+                hullDimsEffective.Lx_m / 2,
+                hullDimsEffective.Ly_m / 2,
+                hullDimsEffective.Lz_m / 2,
+              ],
+              basis: hullDimsEffective.basis,
+            }
+          : null),
+      overlays: spacetimeGridPrefs ? { spacetimeGrid: spacetimeGridPrefs } : undefined,
+    };
+    const meshSignatureInput =
+      meshMeta || hullPreview?.meshHash || hullPreview?.mesh?.meshHash
+        ? {
+            meshHash:
+              meshMeta?.meshHash ?? hullPreview?.meshHash ?? hullPreview?.mesh?.meshHash ?? undefined,
+            decimation: meshMeta?.decimation ?? lodMeta?.decimation,
+            fitBounds: lodMeta?.fitBounds,
+            triangleCount: meshMeta?.triangleCount ?? lodMeta?.triangleCount,
+            vertexCount: meshMeta?.vertexCount ?? lodMeta?.vertexCount,
+            lod: meshMeta?.lod ?? meshMeta?.lodTag ?? lodMeta?.tag,
+            lodTag: meshMeta?.lodTag,
+          }
+        : null;
+    const hullSignatureInput =
+      hullSummary && hullSummary.Lx_m != null && hullSummary.Ly_m != null && hullSummary.Lz_m != null
+        ? {
+            dims_m: { Lx_m: hullSummary.Lx_m, Ly_m: hullSummary.Ly_m, Lz_m: hullSummary.Lz_m },
+            area_m2: hullSummary.area_m2,
+            areaSource: hullSummary.areaSource,
+            source: hullSummary.source,
+          }
+        : null;
+    const geometrySignatureInput = {
+      warpGeometryKind: renderedGeometryKind,
+      warpGeometryAssetId: pipeline?.warpGeometryAssetId ?? (pipelineAny?.warpGeometry as any)?.assetId,
+      meshHash: meshSignatureInput?.meshHash ?? undefined,
+      geometrySource: meshGeometrySource,
+      fallback: geometryFallbackState ?? (pipelineAny as any)?.geometryFallback ?? null,
+      lattice: latticeMeta
+        ? renderedGeometryKind === "sdf"
+          ? {
+            enabled: latticeMeta.enabled,
+            preset: latticeMeta.frame?.preset,
+            profileTag: latticeMeta.frame?.profileTag,
+            volumeHash: latticeMeta.hashes?.volume,
+            sdfHash: latticeMeta.hashes?.sdf,
+            strobeHash: latticeMeta.hashes?.strobe,
+            weightsHash: latticeMeta.hashes?.weights,
+            clampReasons: latticeMeta.frame?.clampReasons,
+            updatedAt: latticeMeta.updatedAt,
+          }
+          : null
+        : null,
+    };
+    const signaturesComputed = await buildCardSignatures({
+      mesh: meshSignatureInput,
+      basis: meshBasisResolved ?? meshBasis ?? undefined,
+      basisScale: meshBasisResolved ? undefined : hullPreview?.scale,
+      hull: hullSignatureInput,
+      blanketTiles: pipelineAny?.tilesPerSectorVector,
+      viz: {
+        volumeViz: replayViewer.volumeViz,
+        volumeDomain: replayViewer.volumeDomain,
+        planarVizMode: replayViewer.planarVizMode,
+        vizFloors: replayViewer.vizFloors,
+        gate: replayViewer.gate,
+        opacityWindow: replayViewer.opacityWindow,
+        bounds: replayViewer.bounds ? { domainScale: replayViewer.bounds.domainScale } : undefined,
+        boundsProfile: replayViewer.boundsProfile,
+        palette: replayViewer.palette,
+      },
+      profile: {
+        profileTag: viewerStateSnapshot?.profileTag ?? (profileApplied ? "card" : undefined),
+        qualityPreset: viewerStateSnapshot?.qualityPreset ?? null,
+        qualityOverrides: viewerStateSnapshot?.qualityOverrides ?? null,
+        volumeDomain: replayViewer.volumeDomain,
+      },
+      geometry: geometrySignatureInput,
+    });
+    const signatures = {
+      ...(cardRecipeWithMesh as any)?.signatures,
+      ...signaturesComputed,
+    };
+    const cardRecipeEnriched = cardRecipeWithMesh
+      ? ensureCardRecipeSchemaVersion({
+          ...cardRecipeWithMesh,
+          signatures,
+        })
+      : null;
+
+    const replayPayload = {
+      pipelineUpdate: geometryUpdatePayload,
+      viewer: replayViewer,
+      signatures,
+      cardRecipe: cardRecipeEnriched ?? cardRecipeWithMesh ?? undefined,
+    };
+    const cardProfileMeta =
+      viewerStateSnapshot?.profileTag || profileApplied
+        ? {
+            tag: viewerStateSnapshot?.profileTag ?? (profileApplied ? "card" : undefined),
+            qualityPreset: viewerStateSnapshot?.qualityPreset ?? null,
+            qualityOverrides: viewerStateSnapshot?.qualityOverrides ?? null,
+            volumeDomain: replayViewer.volumeDomain ?? null,
+          }
+        : null;
+
+    const timestampIso = new Date().toISOString();
+    const cardPayload = buildCardExportSidecar({
+      timestampIso,
+      canvas: { width: targetWidth, height: targetHeight, devicePixelRatio: dpr },
+      overlayEnabled: overlayLayerEnabled,
+      pipeline: pipelineSummary,
+      hull: hullSummary,
+      overlayFrame: overlaySummary,
+      geometryUpdatePayload,
+      mesh: meshMeta,
+      lattice: latticeTextures ? { meta: latticeTextures.meta, assets: latticeTextures.assets } : undefined,
+      renderedPath: {
+        warpGeometryKind: renderedGeometryKind ?? undefined,
+        warpGeometryAssetId: pipeline?.warpGeometryAssetId ?? (pipelineAny?.warpGeometry as any)?.assetId ?? null,
+        meshHash: meshMeta?.meshHash ?? null,
+        meshSignature: signatures.meshSignature ?? null,
+        basisSignature: signatures.basisSignature ?? null,
+        latticeHashes: renderedGeometryKind === "sdf" ? latticeMeta?.hashes : undefined,
+        latticeEnabled: renderedGeometryKind === "sdf" ? latticeMeta?.enabled ?? null : false,
+        geometrySource: meshGeometrySource,
+        fallback:
+          (geometryFallbackState as any) ??
+          ((pipelineAny as any)?.geometryFallback
+            ? {
+                mode: (pipelineAny as any)?.geometryFallback?.mode ?? null,
+                resolvedKind: (pipelineAny as any)?.geometryFallback?.resolvedKind ?? null,
+                requestedKind: (pipelineAny as any)?.geometryFallback?.requestedKind ?? null,
+                applied: (pipelineAny as any)?.geometryFallback?.applied ?? null,
+                blocked: (pipelineAny as any)?.geometryFallback?.blocked ?? null,
+                reasons: (pipelineAny as any)?.geometryFallback?.reasons ?? null,
+              }
+            : null),
+      },
+      replayPayload,
+      cardRecipe: cardRecipeEnriched ?? cardRecipeWithMesh,
+      cardProfile: cardProfileMeta ?? undefined,
+      signatures,
+    });
+
+    const formatMaybe = (value: number | null | undefined, suffix = "", digits = 2) => {
+      if (value == null || !Number.isFinite(value)) return "n/a";
+      return `${value.toFixed(digits)}${suffix}`;
+    };
+    const percent = (value: number | null | undefined) =>
+      value == null || !Number.isFinite(value) ? "n/a" : `${(value * 100).toFixed(1)}%`;
+
+    const textLines = [
+      "HELIX CARD SNAPSHOT",
+      `Captured: ${timestampIso}`,
+      pipelineSummary
+        ? `Mode ${pipelineSummary.mode ?? "n/a"} | Duty ${percent(pipelineSummary.dutyCycle)}`
+        : null,
+      pipelineSummary
+        ? `Sectors ${pipelineSummary.sectors.total ?? "?"}/${pipelineSummary.sectors.concurrent ?? "?"}`
+        : null,
+      hullSummary
+        ? `Hull a/b/c ${formatMaybe(hullSummary.a_m, " m", 2)} / ${formatMaybe(
+            hullSummary.b_m,
+            " m",
+            2
+          )} / ${formatMaybe(hullSummary.c_m, " m", 2)}`
+        : null,
+      meshMeta
+        ? `Mesh ${meshMeta.meshHash ? meshMeta.meshHash.slice(0, 8) : "n/a"} | ${meshMeta.geometrySource ?? "n/a"}${
+            meshMeta.lod ? ` (${meshMeta.lod})` : ""
+          }${meshMeta.triangleCount ? ` · ${meshMeta.triangleCount} tris` : ""}${
+            meshMeta.clampReasons?.length ? ` clamp: ${meshMeta.clampReasons.join(",")}` : ""
+          }`
+        : null,
+      overlaySummary
+        ? `TS ${formatMaybe(overlaySummary.TS)} | rho ${formatMaybe(overlaySummary.rho)} | QL ${formatMaybe(
+            overlaySummary.QL,
+            "",
+            0
+          )}`
+        : null,
+    ].filter((line): line is string => Boolean(line));
+
+    if (textLines.length) {
+      const padding = 10;
+      const lineHeight = 16;
+      ctx.save();
+      ctx.font =
+        '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      ctx.textBaseline = "top";
+      const maxTextWidth = textLines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0);
+      const blockWidth = maxTextWidth + padding * 2;
+      const blockHeight = lineHeight * textLines.length + padding * 2;
+      const blockX = 12;
+      const blockY = 12;
+      ctx.fillStyle = "rgba(8, 15, 30, 0.8)";
+      ctx.strokeStyle = "rgba(34, 211, 238, 0.35)";
+      ctx.lineWidth = 1;
+      ctx.fillRect(blockX, blockY, blockWidth, blockHeight);
+      ctx.strokeRect(blockX, blockY, blockWidth, blockHeight);
+      ctx.fillStyle = "#e2e8f0";
+      textLines.forEach((line, idx) => {
+        ctx.fillText(line, blockX + padding, blockY + padding + idx * lineHeight);
+      });
+      ctx.restore();
+    }
+
+    const pngBlob = await new Promise<Blob>((resolve, reject) => {
+      exportCanvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Failed to encode PNG export."));
+        }
+      }, "image/png");
+    });
+
+    const downloadBlob = (blob: Blob, filename: string) => {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    };
+
+    downloadBlob(pngBlob, `${fileStem}.png`);
+
+    const metricsBlob = new Blob([JSON.stringify(cardPayload, null, 2)], {
+      type: "application/json",
+    });
+    downloadBlob(metricsBlob, `${fileStem}.json`);
+
+    const latticeBlobCount = latticeTextures?.blobs?.length ?? 0;
+    if (latticeBlobCount > 0) {
+      for (const item of latticeTextures?.blobs ?? []) {
+        downloadBlob(item.blob, item.filename);
+      }
+    }
+
+    toast({
+      title: "Card export ready",
+      description:
+        latticeBlobCount > 0
+          ? `Downloaded PNG + JSON + ${latticeBlobCount} lattice asset${latticeBlobCount === 1 ? "" : "s"}.`
+          : "Downloaded PNG + JSON snapshot from the current hull view.",
+    });
+  } catch (err) {
+    console.error("[Helix] Card export failed", err);
+    toast({
+      title: "Export failed",
+      description: err instanceof Error ? err.message : "Unable to export the current view.",
+      variant: "destructive",
+    });
+  } finally {
+    try {
+      await requestCardProfile("restore", profileRequestId);
+    } catch (err) {
+      console.warn("[Helix] Failed to restore card export profile", err);
+    }
+    setIsExportingCard(false);
+  }
+}, [
+  hullMetrics,
+  hullPreview,
+  hullDimsEffective,
+  isExportingCard,
+  meshOverlayMeta,
+  pipeline,
+  showSweepHud,
+  viewerPalette,
+  viewerState,
+  timeLapseCanvas,
+  timeLapseOverlayCanvas,
+  timeLapseRecorder,
+]);
+  const handleDriveCardPreset = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.dispatchEvent(new CustomEvent("helix:drive-card-preset"));
+      toast({
+        title: "Drive Card Preset",
+        description: "Applied θ_drive + gate overlays for card export.",
+      });
+    } catch (err) {
+      console.warn("[Helix] Failed to broadcast drive card preset", err);
+    }
+  }, []);
   const commandAbortRef = useRef<AbortController | null>(null);
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
@@ -1416,9 +2369,6 @@ useEffect(() => {
     img.src = "/galaxymap.png";
   }, []);
 
-  // Get metrics data for hull geometry (reduced polling for performance)
-  const { data: hullMetrics } = useMetrics(20000); // 20s vs 2s default
-
   // Update solar system positions periodically
   useEffect(() => {
     if (mapMode === "solar") {
@@ -1445,21 +2395,6 @@ useEffect(() => {
       clearTimeout(timer);
     };
   }, []);
-
-  // Use centralized energy pipeline
-  const { data: pipelineState } = useEnergyPipeline({
-    staleTime: 10_000,
-    refetchOnWindowFocus: false,
-  });
-  const switchMode = useSwitchMode();
-
-  // Type-safe access to pipeline state
-  const pipeline = pipelineState as EnergyPipelineState;
-
-  // Optional: expose for quick console checks
-  useEffect(() => {
-    (window as any).__energyLive = pipeline;
-  }, [pipeline]);
 
   // Listen for debug events from hardLockUniforms and push into debug panel
   useEffect(() => {
@@ -1550,6 +2485,40 @@ useEffect(() => {
 
   // --- Derived mode knobs for UI (always reflect the selected mode)
   const modeCfg = MODE_CONFIGS[((pipeline?.currentMode ?? effectiveMode) as ModeKey)] || MODE_CONFIGS.hover;
+  const powerFillLive = Number.isFinite((pipeline as any)?.powerFillCmd)
+    ? Math.max(0, Math.min(1, Number((pipeline as any).powerFillCmd)))
+    : 1;
+  const [manualPowerOpen, setManualPowerOpen] = useState(false);
+  const [powerFillLocal, setPowerFillLocal] = useState<number>(() => powerFillLive);
+  const powerFillDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setPowerFillLocal((prev) => (Math.abs(prev - powerFillLive) > 1e-3 ? powerFillLive : prev));
+  }, [powerFillLive]);
+
+  useEffect(() => () => {
+    if (powerFillDebounceRef.current) {
+      clearTimeout(powerFillDebounceRef.current);
+    }
+  }, []);
+
+  const handlePowerFillChange = useCallback((value: number) => {
+    const clamped = Math.max(0, Math.min(1, value));
+    setPowerFillLocal(clamped);
+    if (powerFillDebounceRef.current) {
+      clearTimeout(powerFillDebounceRef.current);
+    }
+    powerFillDebounceRef.current = setTimeout(() => {
+      updatePipeline.mutate({ powerFillCmd: clamped });
+    }, 140);
+  }, [updatePipeline]);
+  const P_target_nominal_W = Number.isFinite((pipeline as any)?.P_target_W)
+    ? Number((pipeline as any).P_target_W)
+    : modeCfg?.powerTarget_W ?? 0;
+  const P_target_cmd_display_W = Number.isFinite((pipeline as any)?.P_target_cmd_W)
+    ? Number((pipeline as any).P_target_cmd_W)
+    : P_target_nominal_W * powerFillLocal;
+  const modelModeLabel = String((pipeline as any)?.modelMode ?? "calibrated");
 
   // Prefer live pipeline values if present; otherwise fall back to the mode config
   const dutyUI = isFiniteNumber(pipeline?.dutyCycle) ? pipeline!.dutyCycle! : modeCfg.dutyCycle ?? 0.14;
@@ -1581,15 +2550,25 @@ useEffect(() => {
 
   // Calculate hull geometry before using it
   const hull =
-    hullMetrics && hullMetrics.hull
+    hullDimsEffective
       ? {
-          ...hullMetrics.hull,
-          // preserve explicit zeros from pipeline; only fallback when undefined/null
-          a: Number.isFinite(hullMetrics.hull.a) ? Number(hullMetrics.hull.a) : (Number.isFinite(hullMetrics.hull.Lx_m) ? hullMetrics.hull.Lx_m / 2 : 503.5),
-          b: Number.isFinite(hullMetrics.hull.b) ? Number(hullMetrics.hull.b) : (Number.isFinite(hullMetrics.hull.Ly_m) ? hullMetrics.hull.Ly_m / 2 : 132.0),
-          c: Number.isFinite(hullMetrics.hull.c) ? Number(hullMetrics.hull.c) : (Number.isFinite(hullMetrics.hull.Lz_m) ? hullMetrics.hull.Lz_m / 2 : 86.5),
+          ...(hullMetrics?.hull ?? {}),
+          Lx_m: hullDimsEffective.Lx_m,
+          Ly_m: hullDimsEffective.Ly_m,
+          Lz_m: hullDimsEffective.Lz_m,
+          a: hullDimsEffective.Lx_m / 2,
+          b: hullDimsEffective.Ly_m / 2,
+          c: hullDimsEffective.Lz_m / 2,
         }
-      : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
+      : hullMetrics && hullMetrics.hull
+        ? {
+            ...hullMetrics.hull,
+            // preserve explicit zeros from pipeline; only fallback when undefined/null
+            a: Number.isFinite(hullMetrics.hull.a) ? Number(hullMetrics.hull.a) : (Number.isFinite(hullMetrics.hull.Lx_m) ? hullMetrics.hull.Lx_m / 2 : 503.5),
+            b: Number.isFinite(hullMetrics.hull.b) ? Number(hullMetrics.hull.b) : (Number.isFinite(hullMetrics.hull.Ly_m) ? hullMetrics.hull.Ly_m / 2 : 132.0),
+            c: Number.isFinite(hullMetrics.hull.c) ? Number(hullMetrics.hull.c) : (Number.isFinite(hullMetrics.hull.Lz_m) ? hullMetrics.hull.Lz_m / 2 : 86.5),
+          }
+        : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
 
   // Shared light-crossing loop for synchronized strobing across all visual components
   const lc = useLightCrossingLoop({
@@ -2136,6 +3115,39 @@ useEffect(() => {
   }, [lc?.dwell_ms, (lc as any)?.burst_ms, localBurstFrac]);
   const dutyForEase = isFiniteNumber(pipeline?.dutyCycle) ? pipeline!.dutyCycle! : modeCfg.dutyCycle ?? 0.12;
   const burstForDwell = localBurstFrac;
+  const postPipelineUpdate = useCallback(
+    async (payload: Record<string, unknown>, opts?: { fallbackMode?: "allow" | "warn" | "block" }) => {
+      const res = await apiRequest("POST", "/api/helix/pipeline/update", {
+        ...payload,
+        fallbackMode: opts?.fallbackMode ?? "warn",
+      });
+      const json = await res.json().catch(() => null);
+      if (res.status === 422) {
+        const reasons = Array.isArray((json as any)?.geometryFallback?.reasons)
+          ? (json as any).geometryFallback.reasons.join(", ")
+          : "";
+        const message = (json as any)?.error ?? "Pipeline update blocked";
+        throw new Error(reasons ? `${message}: ${reasons}` : message);
+      }
+      if (!res.ok) {
+        const message = (json as any)?.error ?? res.statusText;
+        throw new Error(message);
+      }
+      const fallback = (json as any)?.geometryFallback;
+      if (fallback?.applied || (fallback && fallback.mode === "warn")) {
+        const reasons = Array.isArray(fallback.reasons) ? fallback.reasons.join(", ") : "unknown";
+        const applied = Boolean(fallback?.applied);
+        const warnOnly = !applied && fallback?.mode === "warn";
+        toast({
+          title: "Geometry fallback",
+          description: `Mode=${fallback.mode} ${reasons ? `· ${reasons}` : ""}`,
+          ...(applied ? { variant: "destructive" } : warnOnly ? { variant: "default" } : {}),
+        });
+      }
+      return json;
+    },
+    [],
+  );
   const handleNearZeroAction = useCallback(
     async (action: "ease" | "dwell" | "drop") => {
       if (effectiveMode !== "nearzero") {
@@ -2151,11 +3163,11 @@ useEffect(() => {
         }
         if (action === "ease") {
           const nextDuty = Math.max(0, dutyForEase * 0.92);
-          await apiRequest("POST", "/api/helix/pipeline/update", { dutyCycle: nextDuty });
+          await postPipelineUpdate({ dutyCycle: nextDuty }, { fallbackMode: "warn" });
           setMainframeLog((prev) => [...prev, `[NEARZERO] Duty eased to ${(nextDuty * 100).toFixed(2)}%`].slice(-200));
         } else if (action === "dwell") {
           const nextFrac = Math.max(0.0005, burstForDwell * 0.9);
-          await apiRequest("POST", "/api/helix/pipeline/update", { localBurstFrac: nextFrac });
+          await postPipelineUpdate({ localBurstFrac: nextFrac }, { fallbackMode: "warn" });
           setMainframeLog((prev) => [...prev, `[NEARZERO] Burst fraction trimmed to ${(nextFrac * 100).toFixed(2)}%`].slice(-200));
         }
         refetchMetrics();
@@ -2783,8 +3795,7 @@ useEffect(() => {
   );
 
   return (
-    <LumaWhispersProvider>
-      <TooltipProvider>
+    <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
         {devMockStatus.used && (
           <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
@@ -2920,8 +3931,35 @@ useEffect(() => {
           <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-2 lg:col-span-2 xl:col-span-2">
               {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
-              <h2 className="text-lg font-semibold">Alcubierre Metric Viewer</h2>
-              <div className="relative">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold">Alcubierre Metric Viewer</h2>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-200">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="auto-apply-preview"
+                      checked={autoApplyPreview}
+                      onCheckedChange={setAutoApplyPreview}
+                    />
+                    <Label htmlFor="auto-apply-preview" className="text-xs text-slate-200">
+                      Auto-apply GLB preview
+                    </Label>
+                  </div>
+                  <Select
+                    value={autoApplyFallbackMode}
+                    onValueChange={(value) => setAutoApplyFallbackMode(value as WarpFallbackMode)}
+                  >
+                    <SelectTrigger className="w-[150px] border-slate-700 bg-slate-900/70 text-slate-100">
+                      <SelectValue placeholder="Fallback mode" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 text-slate-100">
+                      <SelectItem value="warn">Fallback: warn</SelectItem>
+                      <SelectItem value="allow">Fallback: allow</SelectItem>
+                      <SelectItem value="block">Fallback: block</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div ref={alcubierreRef} className="relative">
                 <AlcubierrePanel
                   onCanvasReady={(canvas, overlay, overlayDom) => {
                     setTimeLapseCanvas(canvas ?? null);
@@ -2932,6 +3970,16 @@ useEffect(() => {
                   onPlanarVizModeChange={handlePlanarVizModeChange}
                   vizIntent={vizIntent}
                 />
+                <CardProofOverlay
+                  pipeline={pipeline}
+                  className="pointer-events-auto absolute left-4 top-4 z-10 max-w-sm"
+                />
+                {showSweepHud && (
+                  <CollapseBenchmarkHUD
+                    pipeline={pipeline}
+                    className="pointer-events-auto absolute left-4 top-44 z-10 max-w-sm"
+                  />
+                )}
                 {(timeLapseRecorder.isRecording || timeLapseRecorder.isProcessing) && (
                   <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-cyan-500/40 bg-slate-950/80 px-3 py-2 shadow-lg">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
@@ -2958,6 +4006,9 @@ useEffect(() => {
             </div>
             <PhoenixNeedlePanel />
             <WarpProofPanel />
+            <div id={PANEL_HASHES.hullCards}>
+              <HelixHullCardsPanel pipeline={pipeline} />
+            </div>
             <SpeedCapabilityPanel panelHash={PANEL_HASHES.speedCapability} />
           </div>
 
@@ -3205,9 +4256,23 @@ useEffect(() => {
                           ? "Finalizing video..."
                           : "Start capture"}
                     </Button>
-                    <div className="text-xs text-slate-400 basis-full">
-                      Opens the viewer, scripts the baseline sweep, and records frames plus metrics. First run may pause briefly while the browser spins up its encoder.
-                    </div>
+                    <Button
+                      variant="secondary"
+                      onClick={handleDriveCardPreset}
+                      className="flex items-center gap-2"
+                    >
+                      <Gauge className="w-4 h-4" />
+                      Drive Card Preset
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleExportCard}
+                      disabled={isExportingCard || !timeLapseCanvas || timeLapseRecorder.isProcessing}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      {isExportingCard ? "Exporting..." : "Export Card (PNG + JSON)"}
+                    </Button>
                     <Button
                       variant={showSweepHud ? "default" : "outline"}
                       onClick={() => {
@@ -3221,6 +4286,9 @@ useEffect(() => {
                       <Layers className="w-4 h-4" />
                       {showSweepHud ? "SWEEP HUD On" : "SWEEP HUD"}
                     </Button>
+                    <div className="text-xs text-slate-400 basis-full">
+                      Opens the viewer, scripts the baseline sweep, and records frames plus metrics; use Export Card to save the current canvas + overlay as a PNG with a JSON sidecar.
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
@@ -3509,6 +4577,44 @@ useEffect(() => {
                     <p className="text-xs text-slate-400">System Status</p>
                     <p className="text-lg font-mono text-green-400">{pipeline?.overallStatus || systemMetrics?.overallStatus || "NOMINAL"}</p>
                   </div>
+                </div>
+
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800/60">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-slate-400">Manual power fill (advanced)</div>
+                      <div className="text-[11px] text-slate-400">
+                        Scales the calibrated power target. Uses nominal P_target for beta_trans_power clamps.
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-slate-400">Manual</span>
+                      <Switch checked={manualPowerOpen} onCheckedChange={setManualPowerOpen} />
+                    </div>
+                  </div>
+                  {manualPowerOpen && (
+                    <div className="mt-3 space-y-2">
+                      <Slider
+                        value={[powerFillLocal]}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onValueChange={(vals) => handlePowerFillChange(vals?.[0] ?? 0)}
+                        aria-label="Power fill command"
+                      />
+                      <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-400">
+                        <span>
+                          powerFillCmd <span className="font-mono text-slate-200">{(powerFillLocal * 100).toFixed(1)}%</span>
+                        </span>
+                        <span className="font-mono text-slate-200">
+                          target={fmtPowerUnitFromW(P_target_cmd_display_W)} (nominal {fmtPowerUnitFromW(P_target_nominal_W)})
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        Use in raw/manual power only (modelMode={modelModeLabel}); calibrated modes still report fill vs nominal detent.
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Show current pipeline parameters */}
@@ -4910,15 +6016,10 @@ useEffect(() => {
                   )}
                 </CardContent>
               </Card>
+            </div>
+          </div>
         </div>
       </div>
-        </div>
-      </div>
-      </TooltipProvider>
-    </LumaWhispersProvider>
+    </TooltipProvider>
   );
 }
-
-
-
-

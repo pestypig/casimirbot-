@@ -35,9 +35,9 @@ export default function OperationalModePanel() {
   return (
     <Card className="bg-slate-900/60 border-slate-800">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-sm font-semibold">Operational Modes</CardTitle>
-          <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+          <Badge variant="outline" className="text-[10px] uppercase tracking-wide w-fit">
             <Zap className="mr-1 h-3 w-3 text-cyan-300" />
             Live
           </Badge>
@@ -48,7 +48,7 @@ export default function OperationalModePanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {QUICK_MODE_KEYS.map((mode) => {
             const cfg = MODE_CONFIGS[mode];
             if (!cfg) return null;
@@ -57,7 +57,7 @@ export default function OperationalModePanel() {
               <Button
                 key={mode}
                 variant={active ? "default" : "outline"}
-                className="w-44 h-16 flex flex-col items-start justify-between text-left"
+                className="h-16 w-full flex flex-col items-start justify-between text-left"
                 disabled={switchMode.isPending}
                 onClick={() => handleSwitch(mode)}
               >

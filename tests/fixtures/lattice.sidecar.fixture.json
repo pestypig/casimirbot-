@@ -1,0 +1,16 @@
+{
+  "lattice": {
+    "meta": {
+      "frame": {
+        "dims": [6, 8, 10],
+        "voxelSize_m": 0.2,
+        "latticeMin": [0, 0, 0],
+        "latticeSize": [1.2, 1.6, 2],
+        "worldToLattice": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+      },
+      "hashes": { "volume": "lattice:sidecar-fixture" },
+      "stats": { "coverage": 0.76 },
+      "band_m": 1.05
+    }
+  }
+}

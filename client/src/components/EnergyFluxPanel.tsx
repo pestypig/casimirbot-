@@ -363,7 +363,7 @@ export default function EnergyFluxPanel() {
   return (
     <Card className="h-full border-slate-800 bg-slate-950/70 text-slate-100">
       <CardHeader className="space-y-1">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2 text-lg font-semibold">
               <Activity className="h-5 w-5 text-cyan-300" />
@@ -384,7 +384,7 @@ export default function EnergyFluxPanel() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <section className="grid gap-3 sm:grid-cols-3">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <MetricTile
             icon={<Zap className="h-4 w-4 text-amber-400" />}
             label="|T00| (avg)"
@@ -420,7 +420,7 @@ export default function EnergyFluxPanel() {
               Normalized action cost = avg |S| / |avg T00|. When it drops, the Natario + Alcubierre blend is
               sitting on the stationary-action ridge described in the Action-Principle Telemetry notes.
             </p>
-            <dl className="grid gap-4 text-xs sm:grid-cols-2 lg:grid-cols-4">
+            <dl className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <dt className="text-slate-400">Action cost</dt>
                 <dd className="text-slate-100">{formatScientific(leastActionStrip.actionCost)}</dd>
@@ -448,7 +448,7 @@ export default function EnergyFluxPanel() {
           </section>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <FluxInvariantBadge stats={activeSample?.stats} />
           <LRLInvariantBadge telemetry={lrlTelemetry} />
         </div>
@@ -471,7 +471,7 @@ export default function EnergyFluxPanel() {
               Net flux and divergence are compared against dynamic gates derived from the canonical Natario brick.
               Anything above the limit trips the Symmetry-Boundary Conservation guard.
             </p>
-            <dl className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+            <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <dt className="text-slate-400">|∮S·dA|</dt>
                 <dd className={sbcpTrace.netExceeded ? "text-amber-200" : ""}>
@@ -501,7 +501,7 @@ export default function EnergyFluxPanel() {
                 </span>
               </div>
               {natarioTrace ? (
-                <dl className="grid gap-3 sm:grid-cols-3">
+                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div>
                     <dt className="text-slate-400">max |∇·β|</dt>
                     <dd
@@ -577,7 +577,7 @@ export default function EnergyFluxPanel() {
               )}
             </div>
             {overlaySync.mode === "compare" ? (
-              <dl className="grid gap-3 text-xs sm:grid-cols-3">
+              <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
                 <div>
                   <dt className="text-slate-400">Flux drift</dt>
                   <dd className={overlaySync.fluxDeltaPct != null && overlaySync.fluxDeltaPct > 0.05 ? "text-amber-200" : ""}>
@@ -664,7 +664,7 @@ export default function EnergyFluxPanel() {
           )}
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <SliceCanvas
             label="Equatorial |T00| slice"
             subtitle="Heat compresses automatically"
@@ -683,7 +683,7 @@ export default function EnergyFluxPanel() {
           />
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[1fr_240px]">
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_240px]">
           <div className="rounded-xl border border-white/5 bg-slate-900/60 p-4">
             <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
               <span>R histogram (div S / (epsilon + |T00|))</span>
@@ -1007,7 +1007,7 @@ function LRLInvariantBadge({ telemetry }: LRLInvariantBadgeProps) {
         </div>
         <LRLDocsTooltip />
       </div>
-      <dl className="grid grid-cols-2 gap-3 text-xs">
+      <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
         <div>
           <dt className="text-slate-400">Eccentricity</dt>
           <dd className="text-base text-slate-100">{formatEccentricity(ecc)}</dd>

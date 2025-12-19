@@ -349,7 +349,7 @@ export function EssenceProposalsPanel() {
                 </button>
               </div>
             </div>
-            <div className="grid flex-1 grid-cols-2 gap-4 p-6">
+            <div className="grid flex-1 grid-cols-1 gap-4 p-6 sm:grid-cols-2">
               <div className="flex flex-col gap-4">
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="text-sm font-semibold text-slate-200">Status</div>
@@ -357,7 +357,7 @@ export function EssenceProposalsPanel() {
                     <StatusPill status={selected.status} />
                     <SafetyPill status={selected.safetyStatus} score={selected.safetyScore} />
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-slate-300">
+                  <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-300 sm:grid-cols-2">
                     <div>
                       <div className="text-[11px] uppercase text-slate-500">Safety score</div>
                       <div className="mt-1 text-base text-white">{formatScore(selected.safetyScore)}</div>
@@ -614,7 +614,7 @@ function TargetDetails({ proposal }: { proposal: EssenceProposal }) {
         {envEntries.length ? (
           <div>
             <div className="text-[11px] uppercase text-slate-500">Env hints</div>
-            <dl className="mt-1 grid grid-cols-2 gap-2 text-xs text-slate-300">
+            <dl className="mt-1 grid grid-cols-1 gap-2 text-xs text-slate-300 sm:grid-cols-2">
               {envEntries.map(([key, value]) => (
                 <div key={key} className="rounded border border-white/10 bg-black/30 p-2">
                   <dt className="text-[10px] uppercase text-slate-500">{key}</dt>

@@ -104,7 +104,7 @@ export function CavityCrossSectionSplit(props: CavityCrossSectionSplitProps) {
       <div className="w-full lg:w-80 flex-shrink-0 space-y-5">
         <section className="rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-xs font-mono">
           <h4 className="text-slate-200 font-semibold mb-2">Geometry</h4>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>gap a: {gap_nm.toFixed(2)} nm</div>
             <div>sag t: {sag_nm_eff.toFixed(2)} nm</div>
             <div>pocket ⌀: {pocketDiameter_um.toFixed(0)} µm</div>

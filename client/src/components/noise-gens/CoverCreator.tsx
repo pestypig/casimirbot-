@@ -27,6 +27,12 @@ import type {
 import { cn } from "@/lib/utils";
 import { fulfillCoverJob, canFulfillLocally } from "@/lib/noise/cover-runner";
 import { autoMatchTexture, resolveTextureById } from "@/lib/noise/kb-autoselect";
+import {
+  COVER_FLOW_EVENT,
+  COVER_FLOW_STORAGE_KEY,
+  readCoverFlowPayload,
+  type CoverFlowPayload,
+} from "@/lib/noise/cover-flow";
 
 export const COVER_DROPPABLE_ID = "noise-cover-creator";
 
@@ -60,6 +66,7 @@ type JobTracker = {
   sourceLabel?: string;
   original?: Original | null;
   startedAt?: number;
+  forceRemote?: boolean;
 };
 
 const STATUS_ORDER: JobStatus[] = ["queued", "processing", "ready", "error"];
@@ -118,6 +125,7 @@ export function CoverCreator({
   const [renderProgress, setRenderProgress] = useState<{ pct: number; stage: string } | null>(null);
   const [fulfillingJobId, setFulfillingJobId] = useState<string | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const [coverFlowPayload, setCoverFlowPayload] = useState<CoverFlowPayload | null>(() => readCoverFlowPayload());
   const lastPlanTriggerRef = useRef<string | null>(null);
   const lastPreviewUrlRef = useRef<string | null>(null);
   const lastCompletedJobRef = useRef<string | null>(null);
@@ -173,6 +181,25 @@ export function CoverCreator({
   }, [sessionTempo]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleCoverFlow = (event: Event) => {
+      const detail = (event as CustomEvent<CoverFlowPayload | null>).detail;
+      setCoverFlowPayload(detail ?? null);
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === COVER_FLOW_STORAGE_KEY) {
+        setCoverFlowPayload(readCoverFlowPayload());
+      }
+    };
+    window.addEventListener(COVER_FLOW_EVENT, handleCoverFlow as EventListener);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener(COVER_FLOW_EVENT, handleCoverFlow as EventListener);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedOriginal || !kbTextures.length) {
       setAutoMatch(null);
       return;
@@ -220,6 +247,7 @@ export function CoverCreator({
             sourceLabel: fallbackMeta?.sourceLabel,
             original: fallbackMeta?.original ?? selectedOriginal,
             startedAt: fallbackMeta?.startedAt ?? Date.now(),
+            forceRemote: fallbackMeta?.forceRemote,
           };
         });
         if (response.detail) {
@@ -267,6 +295,7 @@ export function CoverCreator({
             sourceLabel: fallbackMeta?.sourceLabel,
             original: fallbackMeta?.original ?? selectedOriginal,
             startedAt: fallbackMeta?.startedAt ?? Date.now(),
+            forceRemote: fallbackMeta?.forceRemote ?? response.request?.forceRemote,
           };
         });
         const message =
@@ -323,6 +352,8 @@ export function CoverCreator({
     if (!job || job.mode !== "cover") return undefined;
     if (job.status !== "processing") return undefined;
     if (!job.snapshot) return undefined;
+    if (job.forceRemote || job.snapshot.request?.forceRemote) return undefined;
+    if (job.snapshot.request?.knowledgeFileIds?.length) return undefined;
     if (job.snapshot.previewUrl) return undefined;
     if (fulfillingJobId && fulfillingJobId !== job.id) return undefined;
     if (!canFulfillLocally()) return undefined;
@@ -403,6 +434,13 @@ export function CoverCreator({
     }
   }, [includeHelixPacket, helixPacket?.weirdness]);
 
+  useEffect(() => {
+    if (!coverFlowPayload?.kbTexture) return;
+    setKbTexture((current) =>
+      current === coverFlowPayload.kbTexture ? current : (coverFlowPayload.kbTexture as KBTextureOption),
+    );
+  }, [coverFlowPayload?.kbTexture]);
+
   const formattedDuration = useMemo(() => {
     if (!selectedOriginal) return null;
     const totalSeconds = Math.round(selectedOriginal.duration ?? 0);
@@ -411,6 +449,8 @@ export function CoverCreator({
     const seconds = (totalSeconds % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
   }, [selectedOriginal]);
+
+  const coverFlowAttachmentCount = coverFlowPayload?.knowledgeFileIds?.length ?? 0;
 
   const immersionEvidence = job?.snapshot?.evidence ?? null;
 
@@ -474,12 +514,15 @@ export function CoverCreator({
         ? clamp01(helixPacket.weirdness)
         : clamp01(weirdness);
     const autoTextureId = autoMatch?.kb.id ?? null;
-    const resolvedTexture = kbTexture === "auto" ? autoTextureId : kbTexture;
+    const coverFlowTextureId = coverFlowPayload?.kbTexture ?? null;
+    const resolvedTexture = kbTexture === "auto" ? autoTextureId ?? coverFlowTextureId : kbTexture;
     const tempoMeta = sessionTempo ?? selectedOriginal.tempo ?? readStoredTempo();
     const kbConfidence =
       kbTexture === "auto" && typeof autoMatch?.confidence === "number"
         ? autoMatch.confidence
         : undefined;
+    const knowledgeFileIds = coverFlowPayload?.knowledgeFileIds;
+    const forceRemote = Boolean(coverFlowPayload?.forceRemote || (knowledgeFileIds?.length ?? 0) > 0);
 
     const coverRequest: CoverJobRequest = {
       originalId: selectedOriginal.id,
@@ -495,6 +538,12 @@ export function CoverCreator({
     if (typeof kbConfidence === "number") {
       coverRequest.kbConfidence = kbConfidence;
     }
+    if (Array.isArray(knowledgeFileIds) && knowledgeFileIds.length > 0) {
+      coverRequest.knowledgeFileIds = knowledgeFileIds;
+    }
+    if (forceRemote) {
+      coverRequest.forceRemote = true;
+    }
     const startLabel = windows[0]?.startBar ?? 1;
     const endLabel = (windows[0]?.endBar ?? 2) - 1;
     return { coverRequest, startLabel, endLabel, linkHelix };
@@ -509,6 +558,7 @@ export function CoverCreator({
     sessionTempo,
     styleInfluence,
     weirdness,
+    coverFlowPayload,
   ]);
 
   type SubmitCoverJobOptions = {
@@ -550,6 +600,7 @@ export function CoverCreator({
           sourceLabel,
           original: selectedOriginal,
           startedAt,
+          forceRemote: coverRequest.forceRemote,
         });
         onRenderJobUpdate?.({
           jobId: response.id,
@@ -559,7 +610,7 @@ export function CoverCreator({
           sourceLabel,
           startedAt,
         });
-        setJobMessage("Queued for local rendering");
+        setJobMessage(coverRequest.forceRemote ? "Queued for remote rendering" : "Queued for local rendering");
         setRenderProgress({ pct: 0.05, stage: "Queued" });
         setLocalPreviewUrl(null);
         setFulfillingJobId(null);
@@ -837,6 +888,24 @@ export function CoverCreator({
               </p>
             </div>
           )}
+          {coverFlowAttachmentCount ? (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
+              <Badge variant="outline" className="border-primary/30 text-primary">
+                {coverFlowAttachmentCount} knowledge stem{coverFlowAttachmentCount === 1 ? "" : "s"}
+              </Badge>
+              {coverFlowPayload?.trackName ? (
+                <span className="text-slate-300">
+                  From {coverFlowPayload.trackName}
+                  {coverFlowPayload?.albumName ? ` · ${coverFlowPayload.albumName}` : ""}
+                </span>
+              ) : null}
+              {coverFlowPayload?.kbTexture ? (
+                <Badge variant="outline" className="border-sky-400/40 text-sky-200">
+                  Texture {coverFlowPayload.kbTexture}
+                </Badge>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex w-full flex-col gap-4 lg:max-w-sm">

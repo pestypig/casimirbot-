@@ -1,13 +1,12 @@
 // Utilities for GR-proxy curvature and light-crossing averaging (Phoenix window).
 
+import { kappa_drive } from "@shared/curvature-proxy";
+
 export type PhoenixInputs = {
   powerDensityWPerM2: number;
   dutyEffective: number; // duty / sectors, clamped [0,1]
   geometryGain: number; // storage/geometry gain factor
 };
-
-const G_CONST = 6.67430e-11;
-const C_LIGHT = 299_792_458;
 
 export function kappaDrive({
   powerDensityWPerM2,
@@ -17,8 +16,7 @@ export function kappaDrive({
   const p = Math.max(0, powerDensityWPerM2);
   const d = Math.max(0, Math.min(1, dutyEffective));
   const g = Math.max(0, geometryGain);
-  const prefactor = (8 * Math.PI * G_CONST) / Math.pow(C_LIGHT, 5);
-  return prefactor * p * d * g;
+  return kappa_drive(p, d, g);
 }
 
 // Compact Hann window; |u| <= 1 maps to [0,1], 0 otherwise.

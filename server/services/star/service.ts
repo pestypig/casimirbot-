@@ -5,6 +5,7 @@ import {
   type TTelemetrySnapshot,
   type TCollapseDecision,
 } from "../../../shared/star-telemetry";
+import { buildInformationBoundary } from "../../utils/information-boundary";
 
 type PhaseState = {
   micro: number;
@@ -569,6 +570,32 @@ export function emitSolarHekEvents(
       Date.parse(ev.start_time ?? ev.start ?? "") ||
       Date.parse(ev.end_time ?? ev.end ?? "") ||
       Date.now();
+    const dataCutoffIso = new Date(ts).toISOString();
+    const informationBoundary = buildInformationBoundary({
+      data_cutoff_iso: dataCutoffIso,
+      mode: "labels",
+      labels_used_as_features: true,
+      event_features_included: true,
+      inputs: {
+        kind: "solar_hek_event",
+        v: 1,
+        event_type: typeKey,
+        start_time: ev.start_time ?? ev.start ?? null,
+        end_time: ev.end_time ?? ev.end ?? null,
+        goes_class: ev.goes_class ?? null,
+        peak_flux: peakFlux ?? null,
+        noaa_ar: Number.isFinite(ev.noaa_ar ?? NaN) ? (ev.noaa_ar as number) : null,
+        ch_area: Number.isFinite(ev.ch_area ?? NaN) ? (ev.ch_area as number) : null,
+        u: Number.isFinite(ev.u ?? NaN) ? (ev.u as number) : null,
+        v_coord: Number.isFinite(ev.v ?? NaN) ? (ev.v as number) : null,
+        rho: Number.isFinite(ev.rho ?? NaN) ? (ev.rho as number) : null,
+        grid_i: Number.isFinite(ev.grid_i ?? NaN) ? (ev.grid_i as number) : null,
+        grid_j: Number.isFinite(ev.grid_j ?? NaN) ? (ev.grid_j as number) : null,
+        grid_n: Number.isFinite(ev.grid_n ?? NaN) ? (ev.grid_n as number) : null,
+        grid_rsun_arcsec: Number.isFinite(ev.grid_rsun_arcsec ?? NaN) ? (ev.grid_rsun_arcsec as number) : null,
+        id: ev.id ?? ev.ivorn ?? null,
+      },
+    });
 
     handleInformationEvent({
       session_id: sessionId,
@@ -581,6 +608,15 @@ export function emitSolarHekEvents(
       timestamp: ts,
       metadata: {
         kind: "solar_hek_event",
+        schema_version: informationBoundary.schema_version,
+        data_cutoff_iso: informationBoundary.data_cutoff_iso,
+        data_cutoff: informationBoundary.data_cutoff_iso,
+        inputs_hash: informationBoundary.inputs_hash,
+        features_hash: informationBoundary.features_hash,
+        mode: informationBoundary.mode,
+        labels_used_as_features: informationBoundary.labels_used_as_features,
+        event_features_included: informationBoundary.event_features_included,
+        information_boundary: informationBoundary,
         event_type: typeKey,
         goes_class: ev.goes_class,
         peak_flux: peakFlux ?? undefined,

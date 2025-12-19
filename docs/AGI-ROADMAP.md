@@ -47,6 +47,58 @@
 
 ---
 
+## Agentic Architecture Integration (phased plan)
+Purpose: pair the `all-agentic-architectures` LangGraph repo with Essence so every pattern (reflection, ReAct, tree-of-thoughts, ensemble, blackboard, meta-controller, PEV, dry-run, self-improve) is runnable, observable, and token-efficient on our stack.
+
+### Phase 1 - Ingest & Harness
+- [x] Add repo as submodule/shallow clone at `external/agentic-architectures` pinned to a commit (pinned `9612b347ffe7b63bde12c54d69b9be14d18bce8c`).
+- [x] Shell harness to run notebooks/scripts headless (no GPU assumptions) with env toggles. (`tools/agentic/run.ts`)
+- [x] Minimal config map to point their vector/cache paths at `data/essence` temp dirs. (`configs/agentic-architectures.json`)
+
+### Phase 2 - Essence Capture & Provenance
+- [x] Wrapper that collapses every LangGraph node output/judge result into Essence envelopes (modality-tagged, `provenance.pipeline.name=<architecture>`).
+- [x] Attach embeddings + seeds + params; enforce `information_boundary` on outbound artifacts.
+- [x] Route storage via `putEnvelope`/`putBlob`; surface links in console traces.
+
+### Phase 3 - Planning/PEV Alignment
+- [ ] Map each architecture into our plan/execute verbs (plan->graph run->verify->repair).
+  - Add an `agentic_arch_map` (arch -> planner strategy -> executor step template -> verifier/repair hooks) and surface it in `configs/agentic-architectures.json`; wire `agi.plan` to pick an arch via intent flag/strategy and emit a single `ExecutorStep` that wraps `tools/agentic/run.ts --arch <name> --trace <trace.jsonl>`.
+  - Standardize LangGraph event labels so plan nodes are tagged (`kind: plan.node`), graph runs (`kind: graph.run`), verifiers (`kind: judge|verify`), and repairs (`kind: repair.retry`) to align with PEV telemetry and TaskTrace steps.
+  - Publish an arch->PEV table in the console (reflection/react/tree-of-thoughts/blackboard/meta-controller) so operators can choose and see which verbs fire.
+- [ ] Plug LLM-as-a-Judge outputs into verifier steps; persist as Essence + TaskTrace entries.
+  - Treat LangGraph `judge`/`verdict` events as `verify` steps: collapse to Essence via `collapseLangGraphTrace`, attach to `TaskTrace.steps` with verdict text, score/confidence, and `ok` flag, and emit a dedicated SSE/tool-log entry.
+  - Persist verifier artifacts under `provenance.pipeline.name=agentic.<arch>` with `information_boundary` copied from the graph run; thread citations/embeddings so downstream reflection/memory can reuse verdicts.
+  - Add a small adapter so PEV `verify` can reuse either local LLM-as-a-Judge or the architecture’s built-in judge node, and fall back to a shared `verifier.llm` tool when none is emitted.
+- [ ] Dry-run harness: propose-only mode that emits plan Essence and waits for approval.
+  - Add `--dry-run` / `AGI_AGENTIC_DRY_RUN=1` to `tools/agentic/run.ts` to emit plan/graph envelopes without executing tools; persist a `collapse_trace` entry and stop before `execute`.
+  - `agi.plan`/`execute` gain `mode: "propose"` that writes a plan Essence + TaskTrace skeleton, marks approvals required, and holds execution until `POST /api/agi/execute?approve=1` (or console UI) is received.
+  - SSE/console should show “propose-only” badge with the generated Essence IDs so operators can inspect the plan before allowing real tool calls.
+
+### Phase 4 - Memory & Context Efficiency
+- [ ] Bridge their vector stores to `memory-store` (episodic vs semantic) with chunk -> packet mapping.
+- [ ] Auto-summarize long contexts to semantic Essence cards; keep branch roots for replay.
+- [ ] Token policy: cap per-step ctx; use rolling summary + retrieval to maximize usable tokens.
+
+### Phase 5 - Multi-Agent Routing & Safety
+- [ ] Meta-controller that selects our specialists based on envelope features/resonanceKind.
+- [ ] Blackboard/ensemble mode writes shared artifacts to Essence, tagged per branch.
+- [ ] Safety gates: simulator/checker pass before tool use; approvals logged as pipeline steps.
+
+### Phase 6 - Regression & Telemetry
+- [ ] CI smoke: run 2-3 reference flows (reflection, tree-of-thoughts, blackboard) and assert Essence IDs exist.
+- [ ] Metrics: counters for `agentic_runs_total{arch=...}` + latency; failures emit Essence error envelopes.
+- [ ] Console view: filter traces by architecture tag; drill into branch envelopes.
+
+### Codex Chat Gates
+- Phase 1 usable in chat after: submodule pinned (done) + harness stub lands + config map present; chats can trigger read-only previews of reference flows.
+- Phase 2 usable in chat after: Essence capture shim active; chats may request running an arch and get Essence links back.
+- Phase 3 usable in chat after: plan/execute wiring supports arch selection + verifier capture; chats can ask for PEV-backed runs.
+- Phase 4 usable in chat after: memory bridge + token policy enforced; chats use summarized contexts by default.
+- Phase 5 usable in chat after: meta-controller routing flag; chats can ask for multi-agent/ensemble with safety prechecks.
+- Phase 6 usable in chat after: CI smoke and metrics live; chats surface status + last-known pass/fail before running.
+
+---
+
 ## Workstreams & Owners
 
 1. **Essence & Memory**

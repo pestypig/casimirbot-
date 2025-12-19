@@ -34,3 +34,4 @@ Use this as a checklist + copy/paste snippet when wiring a new Helix desktop pan
 - Restart Vite dev server if a fresh import is not detected.
 - When running the client dev server, open `http://localhost:5173/desktop` (Vite’s default port) to validate the panel.
 - To reset saved window state during testing, clear `localStorage["desktop-windows-v2"]`.
+- HUD/overlay components that should be discoverable from Helix Start must be wrapped in a panel and registered in `helix-core.panels.ts`; mounting them inline inside `helix-core.tsx` alone will not surface them on `/desktop`.

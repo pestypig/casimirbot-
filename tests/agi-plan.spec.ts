@@ -2,7 +2,14 @@ import { randomUUID } from "node:crypto";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { TMemoryRecord, TTaskTrace } from "../shared/essence-persona";
 import type { ToolSpecShape } from "../shared/skills";
-import { PLAN_DSL_CHAIN, buildChatBPlan, compilePlan, executeCompiledPlan, renderChatBPlannerPrompt } from "../server/services/planner/chat-b";
+import {
+  PLAN_DSL_CHAIN,
+  buildChatBPlan,
+  compilePlan,
+  executeCompiledPlan,
+  renderChatBPlannerPrompt,
+  type ExecutorStep,
+} from "../server/services/planner/chat-b";
 import { listMemoryRecords, putMemoryRecord, resetMemoryStore } from "../server/services/essence/memory-store";
 import { llmLocalHandler, llmLocalSpec } from "../server/skills/llm.local";
 import { registerTool } from "../server/skills";

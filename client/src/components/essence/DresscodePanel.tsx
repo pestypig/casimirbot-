@@ -2374,7 +2374,7 @@ export default function DresscodePanel() {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-amber-50/80">Palette</span>
-                  <Button size="xs" variant="ghost" className="text-amber-100 hover:text-amber-200" onClick={randomizePalette}>
+                  <Button size="sm" variant="ghost" className="text-amber-100 hover:text-amber-200" onClick={randomizePalette}>
                     Shuffle
                   </Button>
                 </div>

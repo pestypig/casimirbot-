@@ -1,21 +1,60 @@
-import React, {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "react";
+﻿import React, {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "react";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import type { BufferGeometry, Mesh } from "three";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useHullPreviewPayload } from "@/hooks/use-hull-preview-payload";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
 import { useFlightDirectorStore } from "@/store/useFlightDirectorStore";
-import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
+import {
+  useHull3DSharedStore,
+  defaultOverlayPrefsForProfile,
+  type HullOverlayPrefProfile,
+  type HullOverlayPrefs,
+  type HullSpacetimeGridPrefs,
+  type HullSpacetimeGridMode,
+  type HullSpacetimeGridColorBy,
+  type HullSpacetimeGridStrengthMode,
+  type HullVoxelSliceAxis,
+} from "@/store/useHull3DSharedStore";
 import { useDesktopStore } from "@/store/useDesktopStore";
 import { shallow } from "zustand/shallow";
 import { VolumeModeToggle, type VolumeViz } from "@/components/VolumeModeToggle";
-import { subscribe, unsubscribe } from "@/lib/luma-bus";
-import { Hull3DRenderer, Hull3DRendererMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState } from "./Hull3DRenderer.ts";
+import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
+import { Hull3DRenderer, Hull3DRendererMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState, HullGeometryMode, HullGateSource, Hull3DVolumeDomain, type HullPreviewMeshPayload } from "./Hull3DRenderer.ts";
 import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
 import { smoothSectorWeights } from "@/lib/sector-weights";
 import { TheoryBadge } from "./common/TheoryBadge";
 import { normalizeCurvaturePalette, type CurvaturePalette } from "@/lib/curvature-directive";
 import StressOverlay from "@/components/HullViewer/StressOverlay";
+import { resolveHullDimsEffective } from "@/lib/resolve-hull-dims";
+import {
+  colorizeFieldProbe,
+  colorizeWireframeOverlay,
+  resolveHullSurfaceMesh,
+  resolveWireframeOverlay,
+  VIEWER_WIREFRAME_BUDGETS,
+  type WireframeContactPatch,
+  type WireframeOverlayResult,
+} from "@/lib/resolve-wireframe-overlay";
+import {
+  applySchedulerWeights,
+  buildHullSurfaceStrobe,
+  clearLatticeSurfaceCaches,
+  voxelizeHullSurfaceStrobe,
+} from "@/lib/lattice-surface";
+import { useFieldProbe } from "@/hooks/use-field-probe";
+import { applyHullBasisToPositions, resolveHullBasis, HULL_BASIS_IDENTITY, type HullBasisResolved } from "@shared/hull-basis";
+import { formatTriplet, remapXYZToFrontRightUp } from "@/lib/hull-hud";
+import { frameCardCameraToObb } from "@shared/card-camera";
+import type { CardCameraPreset } from "@shared/schema";
+import { buildLatticeFrame } from "@/lib/lattice-frame";
+import { buildHullDistanceGrid, clearLatticeSdfCache } from "@/lib/lattice-sdf";
+import { hashLatticeSdfDeterminism, hashLatticeVolumeDeterminism } from "@/lib/lattice-health";
+import { LATTICE_PROFILE_PERF, LatticeRebuildWatchdog, estimateLatticeUploadBytes } from "@/lib/lattice-perf";
 /**
  * TheoryRefs:
  *  - vanden-broeck-1999: UI exposes gamma_VdB with provenance
@@ -80,6 +119,62 @@ function FlightDirectorStatusRow() {
 
 // === helpers: math & smoothing =================================================
 const clamp = (x: number, a = -Infinity, b = Infinity) => Math.max(a, Math.min(b, x));
+
+type SpacetimeGridPreset = {
+  id: string;
+  label: string;
+  hint: string;
+  prefs: HullSpacetimeGridPrefs;
+};
+
+const SPACETIME_GRID_PRESETS: SpacetimeGridPreset[] = [
+  {
+    id: "warp-bubble",
+    label: "Warp bubble",
+    hint: "Surface shell with thicker falloff to show the warp wall.",
+    prefs: {
+      enabled: true,
+      mode: "surface",
+      spacing_m: 0.28,
+      warpStrength: 1.4,
+      falloff_m: 1.1,
+      colorBy: "thetaSign",
+      useSdf: true,
+      warpStrengthMode: "autoThetaPk",
+    },
+  },
+  {
+    id: "warp-volume",
+    label: "Warp volume",
+    hint: "3D cage around the hull to show expansion/contraction in space.",
+    prefs: {
+      enabled: true,
+      mode: "volume",
+      spacing_m: 0.85,
+      warpStrength: 1.1,
+      falloff_m: 1.2,
+      colorBy: "thetaSign",
+      useSdf: true,
+      warpStrengthMode: "autoThetaPk",
+    },
+  },
+  {
+    id: "slice-debug",
+    label: "Slice debug",
+    hint: "Planar slice for debugging field strength and polarity.",
+    prefs: {
+      enabled: true,
+      mode: "slice",
+      spacing_m: 0.18,
+      warpStrength: 1.6,
+      falloff_m: 0.7,
+      colorBy: "thetaSign",
+      useSdf: true,
+      warpStrengthMode: "autoThetaPk",
+    },
+  },
+];
+const SPACETIME_GRID_DEFAULT_PRESET_ID = "warp-volume";
 const sech2  = (x: number) => {
   const c = Math.cosh(x);
   return 1 / (c * c);
@@ -92,6 +187,60 @@ function dTopHatDr(r: number, sigma: number, R: number) {
   const den = Math.max(1e-8, 2 * Math.tanh(sigma * R));
   return sigma * (sech2(sigma * (r + R)) - sech2(sigma * (r - R))) / den;
 }
+
+// Mirrors lattice-surface.ts so panel can detect stale hashes without allocating weight buffers.
+const fnv1a32 = (str: string) => {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash >>> 0) * 0x01000193;
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+};
+
+const latticeBasisSignature = (basis?: HullBasisResolved | null) => {
+  if (!basis) return "basis:none";
+  const swap = `${basis.swap.x}${basis.swap.y}${basis.swap.z}`;
+  const flip = `${basis.flip.x ? 1 : 0}${basis.flip.y ? 1 : 0}${basis.flip.z ? 1 : 0}`;
+  const scale = basis.scale.map((v) => Math.round((v ?? 0) * 1e6) / 1e6).join(",");
+  const forward = basis.forward.map((v) => Math.round((v ?? 0) * 1e4) / 1e4).join(",");
+  const up = basis.up.map((v) => Math.round((v ?? 0) * 1e4) / 1e4).join(",");
+  const right = basis.right.map((v) => Math.round((v ?? 0) * 1e4) / 1e4).join(",");
+  return `basis:${swap}|${flip}|${scale}|${forward}|${up}|${right}`;
+};
+
+type LatticeStrobeWeightParams = {
+  totalSectors: number;
+  liveSectors: number;
+  sectorCenter01: number;
+  gaussianSigma: number;
+  sectorFloor: number;
+  splitEnabled?: boolean;
+  splitFrac?: number;
+  syncMode?: number;
+};
+
+const quantizeSectorCenter01 = (center01: number, totalSectors: number) => {
+  const total = Math.max(1, Math.floor(totalSectors));
+  const center = ((center01 % 1) + 1) % 1;
+  const idx = Math.min(total - 1, Math.max(0, Math.floor(center * total)));
+  return (idx + 0.5) / total;
+};
+
+const latticeParamsSignature = (params: LatticeStrobeWeightParams) => {
+  const center01 = quantizeSectorCenter01(params.sectorCenter01, params.totalSectors);
+  const parts = [
+    `total=${Math.floor(params.totalSectors)}`,
+    `live=${Math.floor(params.liveSectors)}`,
+    `center=${Math.round(center01 * 1e6) / 1e6}`,
+    `sigma=${Math.round(params.gaussianSigma * 1e6) / 1e6}`,
+    `floor=${Math.round(params.sectorFloor * 1e6) / 1e6}`,
+    `split=${params.splitEnabled ? 1 : 0}`,
+    `frac=${Math.round((params.splitFrac ?? 0) * 1e6) / 1e6}`,
+    `mode=${params.syncMode ?? 1}`,
+  ];
+  return parts.join("|");
+};
 
 // Robust tail peak estimator
 function tailPeakAbs(arr: Float32Array | number[], tail = 0.01) {
@@ -508,9 +657,23 @@ function MetricTooltipBadge({ label, value, description, className }: MetricTool
 function Hull3DDebugToggles({
   surfaceOn,
   setSurfaceOn,
+  gateSource,
+  setGateSource,
+  gateViewEnabled,
+  setGateViewEnabled,
+  forceFlatGate,
+  setForceFlatGate,
+  onGatePreset,
 }: {
   surfaceOn: boolean;
   setSurfaceOn: React.Dispatch<React.SetStateAction<boolean>>;
+  gateSource: HullGateSource;
+  setGateSource: React.Dispatch<React.SetStateAction<HullGateSource>>;
+  gateViewEnabled: boolean;
+  setGateViewEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+  forceFlatGate: boolean;
+  setForceFlatGate: React.Dispatch<React.SetStateAction<boolean>>;
+  onGatePreset?: () => void;
 }) {
   const [ringOn, setRingOn] = useState<boolean>(() => {
     const w: any = (typeof window !== "undefined") ? window : {};
@@ -544,6 +707,15 @@ function Hull3DDebugToggles({
     const w: any = (typeof window !== "undefined") ? window : {};
     return Number.isInteger(w.__hullRingOverlayField) ? (w.__hullRingOverlayField | 0) : -1;
   });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = () => {
+      setSurfaceOn(true);
+      setRingOn(true);
+    };
+    window.addEventListener("helix:drive-card-preset" as any, handler as any);
+    return () => window.removeEventListener("helix:drive-card-preset" as any, handler as any);
+  }, [setSurfaceOn, setRingOn]);
   useEffect(() => {
     if (typeof window !== "undefined") {
       (window as any).__hullShowRingOverlay = ringOn;
@@ -671,6 +843,53 @@ function Hull3DDebugToggles({
           )}
         </div>
       )}
+      <div className="ml-2 flex flex-wrap items-center gap-2 rounded bg-slate-800/50 px-2 py-1">
+        <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+          <span className="text-slate-400">Gate source</span>
+          <select
+            className="rounded bg-slate-900 px-1 py-0.5"
+            value={gateSource}
+            onChange={(e) => setGateSource(e.target.value as HullGateSource)}
+            title="Choose schedule-only, blanket-only, or their product"
+          >
+            <option value="schedule">Schedule</option>
+            <option value="blanket">Blanket</option>
+            <option value="combined">Schedule × Blanket</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+          <span className="text-slate-400">Gate view</span>
+          <input
+            type="checkbox"
+            checked={gateViewEnabled}
+            onChange={(e) => setGateViewEnabled(e.target.checked)}
+            className="accent-emerald-500"
+            title="Keep gate visualization active even when duty is tiny"
+          />
+        </label>
+        <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+          <span className="text-slate-400">Flat gate</span>
+          <input
+            type="checkbox"
+            checked={forceFlatGate}
+            onChange={(e) => setForceFlatGate(e.target.checked)}
+            className="accent-amber-500"
+            title="Force a uniform gate for A/B against scheduler/blanket"
+          />
+        </label>
+        <button
+          type="button"
+          className="rounded bg-slate-700 px-2 py-1 text-[0.65rem] text-slate-100 hover:bg-slate-600"
+          onClick={() => {
+            setSurfaceOn(true);
+            setRingOn(true);
+            onGatePreset?.();
+          }}
+          title="Set θ_drive viz, enable gate view, and blend schedule×blanket"
+        >
+          Drive preset
+        </button>
+      </div>
     </div>
   </CurvatureVoxProvider>
   );
@@ -723,7 +942,7 @@ export default function AlcubierrePanel({
   }, [onCanvasReady]);
   const lastDriveLogRef = useRef(0);
 
-  const [planarVizMode, setPlanarVizMode] = useState<VizMode>(3); // 0 theta_GR, 1 rho_GR, 2 theta_Drive, 3 theta_Hull3D
+const [planarVizMode, setPlanarVizMode] = useState<VizMode>(3); // 0 theta_GR, 1 rho_GR, 2 theta_Drive, 3 theta_Hull3D
   useEffect(() => {
     onPlanarVizModeChange?.(planarVizMode);
   }, [planarVizMode, onPlanarVizModeChange]);
@@ -757,15 +976,62 @@ const closeDesktopPanel = useDesktopStore((s) => s.close);
 const [hullMode, setHullMode] = useState<Hull3DRendererMode>("instant");
 const [hullBlend, setHullBlend] = useState(0);
 const [hullVolumeVizLive, setHullVolumeVizLive] = useState<Hull3DVolumeViz>("theta_drive");
-const [showHullSectorRing, setShowHullSectorRing] = useState(true);
-const [showHullSurfaceOverlay, setShowHullSurfaceOverlay] = useState<boolean>(() => {
-  if (typeof window === "undefined") return true;
-  const w: any = window;
-  if (typeof w.__hullShowSurfaceOverlay === "boolean") return !!w.__hullShowSurfaceOverlay;
+const [hullVolumeDomain, setHullVolumeDomain] = useState<Hull3DVolumeDomain>("wallBand");
+const [bubbleBoundsMode, setBubbleBoundsMode] = useState<"tight" | "wide">("tight");
+const [bubbleOpacityHi, setBubbleOpacityHi] = useState(0.35);
+const bubbleOpacityWindow = useMemo<[number, number]>(() => {
+  const hi = clamp(bubbleOpacityHi, 0.05, 1.2);
+  const lo = Math.max(0.02, Math.min(hi * 0.55, hi));
+  return [lo, hi];
+}, [bubbleOpacityHi]);
+const [hullGeometry, setHullGeometry] = useState<HullGeometryMode>("ellipsoid");
+const [autoHullGeometryReason, setAutoHullGeometryReason] = useState<string | null>(null);
+const [gateSource, setGateSource] = useState<HullGateSource>(() => {
+  const w: any = typeof window !== "undefined" ? window : {};
+  const raw = w.__hullGateSource;
+  return raw === "schedule" || raw === "blanket" || raw === "combined" ? raw : "combined";
+});
+const [gateViewEnabled, setGateViewEnabled] = useState<boolean>(() => {
+  const w: any = typeof window !== "undefined" ? window : {};
+  if (typeof w.__hullGateViewEnabled === "boolean") return !!w.__hullGateViewEnabled;
   return true;
 });
-const [showHullGhostSlice, setShowHullGhostSlice] = useState(false);
+const [forceFlatGate, setForceFlatGate] = useState<boolean>(() => {
+  const w: any = typeof window !== "undefined" ? window : {};
+  return !!w.__hullForceFlatGate;
+});
+useEffect(() => {
+  if (hullVolumeDomain === "bubbleBox" && hullVolumeVizLive !== "theta_drive") {
+    setHullVolumeVizLive("theta_drive");
+  }
+}, [hullVolumeDomain, hullVolumeVizLive]);
+const geometryUserOverrideRef = useRef(false);
+const [showHullSectorRing, setShowHullSectorRing] = useState(false);
+const [showHullSurfaceOverlay, setShowHullSurfaceOverlay] = useState<boolean>(() => {
+  if (typeof window === "undefined") return false;
+  const w: any = window;
+  if (typeof w.__hullShowSurfaceOverlay === "boolean") return !!w.__hullShowSurfaceOverlay;
+  return false;
+});
+const [showWireframeOverlay, setShowWireframeOverlay] = useState(true);
+const [wireframeLod, setWireframeLod] = useState<"preview" | "high">("preview");
+const [wireframePatches, setWireframePatches] = useState<WireframeContactPatch[]>([]);
+const [useFieldProbeOverlay, setUseFieldProbeOverlay] = useState(false);
+const [latticeModeEnabled, setLatticeModeEnabled] = useState<boolean>(() => {
+  if (typeof window === "undefined") return true;
+  const w: any = window;
+  if (typeof w.__hullLatticeModeEnabled === "boolean") return !!w.__hullLatticeModeEnabled;
+  return true;
+});
+const [latticeRequireSdf, setLatticeRequireSdf] = useState<boolean>(() => {
+  if (typeof window === "undefined") return false;
+  const w: any = window;
+  if (typeof w.__hullLatticeRequireSdf === "boolean") return !!w.__hullLatticeRequireSdf;
+  return false;
+});
+const [showLatticeDiagnostics, setShowLatticeDiagnostics] = useState(false);
 const [followHullPhase, setFollowHullPhase] = useState(true);
+const [cardCameraPreset, setCardCameraPreset] = useState<CardCameraPreset>("threeQuarterFront");
 const ONE_G_MS2 = 9.80665;
 const [betaOverlayEnabled, setBetaOverlayEnabled] = useState(false);
 const [betaTargetMs2, setBetaTargetMs2] = useState(ONE_G_MS2);
@@ -783,6 +1049,8 @@ const [showTiltOverlay, setShowTiltOverlay] = useState<boolean>(() => {
 const [showGreensOverlay, setShowGreensOverlay] = useState(false);
 const tiltFromBusRef = useRef<TiltDirective | null>(null);
 const [tiltBusVersion, bumpTiltVersion] = useReducer((x: number) => x + 1, 0);
+const wireframePatchTick = useRef(0);
+const wireframeBudgets = VIEWER_WIREFRAME_BUDGETS;
 const [curvatureOverlay, setCurvatureOverlay] = useState<{
   enabled: boolean;
   gain: number;
@@ -890,12 +1158,22 @@ const setLiveVolumeMode = useCallback((mode: VolumeViz) => {
 const handleVolumeModeChange = useCallback((mode: VolumeViz) => {
   setLiveVolumeMode(mode);
 }, [setLiveVolumeMode]);
+const handleHullGeometryChange = useCallback((mode: HullGeometryMode) => {
+  geometryUserOverrideRef.current = true;
+  setHullGeometry(mode);
+  setAutoHullGeometryReason(null);
+}, []);
 const setSharedPhase = useHull3DSharedStore((s) => s.setPhase);
 const setSharedSampling = useHull3DSharedStore((s) => s.setSampling);
 const setSharedPhysics = useHull3DSharedStore((s) => s.setPhysics);
 const setSharedCompliance = useHull3DSharedStore((s) => s.setCompliance);
 const setSharedSector = useHull3DSharedStore((s) => s.setSector);
 const setSharedPalette = useHull3DSharedStore((s) => s.setPalette);
+const setSharedMeshOverlay = useHull3DSharedStore((s) => s.setMeshOverlay);
+const setSharedLattice = useHull3DSharedStore((s) => s.setLattice);
+const setViewer = useHull3DSharedStore((s) => s.setViewer);
+const overlayPrefs = useHull3DSharedStore((s) => s.overlayPrefs, shallow);
+const setOverlayPrefs = useHull3DSharedStore((s) => s.setOverlayPrefs);
 const sharedHullState = useHull3DSharedStore(
   (s) => ({
     phase: s.phase,
@@ -904,6 +1182,7 @@ const sharedHullState = useHull3DSharedStore(
     compliance: s.compliance,
     sector: s.sector,
     palette: s.palette,
+    lattice: s.lattice,
   }),
   shallow
 );
@@ -913,6 +1192,232 @@ const sharedPhysicsState = sharedHullState.physics;
 const sharedComplianceState = sharedHullState.compliance;
 const sharedSectorState = sharedHullState.sector;
 const sharedPaletteState = sharedHullState.palette;
+const sharedLatticeState = sharedHullState.lattice;
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  const handler = (event: Event) => {
+    const detail = (event as CustomEvent<any>).detail ?? {};
+    if (!detail || typeof detail !== "object") return;
+    setLatticeModeEnabled(true);
+    if ((detail as any).requireSdf) setLatticeRequireSdf(true);
+    const basis = (detail as any).basis as HullBasisResolved | undefined;
+    const dims = (detail as any).hullDims as { Lx_m: number; Ly_m: number; Lz_m: number } | undefined;
+    setViewer({
+      bounds: {
+        ...(basis ? { basis } : {}),
+        ...(dims
+          ? {
+              axes: [dims.Lx_m / 2, dims.Ly_m / 2, dims.Lz_m / 2] as [number, number, number],
+            }
+          : {}),
+      },
+    });
+  };
+  window.addEventListener("helix:auto-view-preview" as any, handler as any);
+  return () => window.removeEventListener("helix:auto-view-preview" as any, handler as any);
+}, [setViewer]);
+const latticeSdfStats = useMemo(() => {
+  const sdf = sharedLatticeState?.sdf;
+  if (!sdf?.stats) return null;
+  const voxPct = Math.max(0, Math.min(1, sdf.stats.voxelCoverage)) * 100;
+  const triPct = Math.max(0, Math.min(1, sdf.stats.triangleCoverage)) * 100;
+  const maxD = sdf.stats.maxAbsDistance;
+  const band = sdf.band;
+  return {
+    voxPct,
+    triPct,
+    maxD,
+    band,
+    cacheHit: !!sdf.cacheHit,
+    label: `SDF ${voxPct.toFixed(1)}% vox · ${triPct.toFixed(1)}% tris · |d|max ${maxD.toFixed(3)} m${band ? ` / band ${band.toFixed(3)} m` : ""}${sdf.cacheHit ? " (cache)" : ""}`,
+  };
+}, [sharedLatticeState?.sdf]);
+const latticeVolumeStats = useMemo(() => {
+  const vol = sharedLatticeState?.volume;
+  if (!vol?.stats) return null;
+  const covPct = Math.max(0, Math.min(1, vol.stats.coverage)) * 100;
+  const maxGate = vol.stats.maxGate ?? 0;
+  const maxDrive = vol.stats.maxDrive ?? 0;
+  return {
+    covPct,
+    maxGate,
+    maxDrive,
+    budgetHit: !!vol.stats.budgetHit,
+    cacheHit: !!vol.cacheHit,
+    hashShort: typeof vol.hash === "string" ? vol.hash.slice(0, 8) : null,
+    label: `VOL ${covPct.toFixed(1)}% cov · gate ${maxGate.toFixed(3)} · drive ${maxDrive.toFixed(3)}${vol.stats.budgetHit ? " (budget)" : ""}${vol.cacheHit ? " (cache)" : ""}`,
+  };
+}, [sharedLatticeState?.volume]);
+const latticeFrameStats = useMemo(() => {
+  const frame = sharedLatticeState?.frame;
+  if (!frame) return null;
+  const voxels = Math.max(1, frame.voxelCount);
+  const budget = frame.budget?.maxVoxels ?? 0;
+  const pct = budget > 0 ? (voxels / budget) * 100 : null;
+  return {
+    dims: frame.dims,
+    voxelSize_m: frame.voxelSize_m,
+    voxelCount: voxels,
+    budgetMaxVoxels: budget,
+    budgetPct: pct,
+    clampReasons: frame.clampReasons ?? [],
+  };
+}, [sharedLatticeState?.frame]);
+
+  type LatticeGpuStatus = ReturnType<(typeof Hull3DRenderer)["prototype"]["getLatticeGpuStatus"]>;
+
+  const [latticeVolumeDeterminismHash, setLatticeVolumeDeterminismHash] = useState<string | null>(null);
+  const [latticeSdfDeterminismHash, setLatticeSdfDeterminismHash] = useState<string | null>(null);
+  const [latticeGpuStatus, setLatticeGpuStatus] = useState<LatticeGpuStatus | null>(null);
+  const latticeHealthKeyRef = useRef<string>("");
+  const latticeFallbackReasonRef = useRef<string | null>(null);
+  const overlayTelemetryKeyRef = useRef<string>("");
+  const latticeAutoTuneRef = useRef<{
+    lastFrameKey?: string | null;
+    lastSdfKey?: string | null;
+    capsApplied?: boolean;
+  }>({});
+  const latticeUploadTelemetry = (latticeGpuStatus as any)?.runtime?.telemetry ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+    const volume = sharedLatticeState?.volume ?? null;
+    const volumeHash = typeof volume?.hash === "string" ? volume.hash : null;
+    if (!latticeModeEnabled || !volume || !volumeHash) {
+      setLatticeVolumeDeterminismHash((prev) => (prev ? null : prev));
+      return;
+    }
+    hashLatticeVolumeDeterminism(volume)
+      .then((digest) => {
+        if (cancelled) return;
+        setLatticeVolumeDeterminismHash((prev) => (prev === digest ? prev : digest));
+      })
+      .catch((error) => {
+        console.warn("[Hull3D][lattice] Failed to hash volume determinism probe", error);
+        if (!cancelled) setLatticeVolumeDeterminismHash(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [latticeModeEnabled, sharedLatticeState?.volume?.hash]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const sdf = sharedLatticeState?.sdf ?? null;
+    const sdfKey = typeof sdf?.key === "string" ? sdf.key : null;
+    if (!latticeModeEnabled || !sdf || !sdfKey) {
+      setLatticeSdfDeterminismHash((prev) => (prev ? null : prev));
+      return;
+    }
+    hashLatticeSdfDeterminism(sdf)
+      .then((digest) => {
+        if (cancelled) return;
+        setLatticeSdfDeterminismHash((prev) => (prev === digest ? prev : digest));
+      })
+      .catch((error) => {
+        console.warn("[Hull3D][lattice] Failed to hash SDF determinism probe", error);
+        if (!cancelled) setLatticeSdfDeterminismHash(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [latticeModeEnabled, sharedLatticeState?.sdf?.key]);
+
+  useEffect(() => {
+    if (!latticeModeEnabled || typeof window === "undefined") {
+      setLatticeGpuStatus((prev) => (prev ? null : prev));
+      return;
+    }
+
+    const volumeHash = sharedLatticeState?.volume?.hash ?? null;
+    const sdfKey = latticeRequireSdf ? sharedLatticeState?.sdf?.key ?? null : null;
+    let timer: number | null = null;
+
+    const tick = () => {
+      const renderer = hullRendererRef.current;
+      if (!renderer) {
+        setLatticeGpuStatus((prev) => (prev ? null : prev));
+        return;
+      }
+      const status = renderer.getLatticeGpuStatus({ volumeHash, sdfKey });
+      setLatticeGpuStatus((prev) => {
+        if (!prev) return status;
+        const capsPrev = (prev as any).caps;
+        const capsNext = (status as any).caps;
+        const sameCaps =
+          !!capsPrev &&
+          !!capsNext &&
+          capsPrev.maxTextureSize === capsNext.maxTextureSize &&
+          capsPrev.max3DTextureSize === capsNext.max3DTextureSize &&
+          capsPrev.supportsColorFloat === capsNext.supportsColorFloat &&
+          capsPrev.supportsFloatLinear === capsNext.supportsFloatLinear &&
+          capsPrev.supportsHalfFloatLinear === capsNext.supportsHalfFloatLinear;
+        const runtimePrev = (prev as any).runtime;
+        const runtimeNext = (status as any).runtime;
+        const sameRuntime =
+          !!runtimePrev &&
+          !!runtimeNext &&
+          runtimePrev.hasLatticeVolume === runtimeNext.hasLatticeVolume &&
+          runtimePrev.backend === runtimeNext.backend &&
+          runtimePrev.formatLabel === runtimeNext.formatLabel &&
+          (runtimePrev as any).formatReason === (runtimeNext as any).formatReason &&
+          ((runtimePrev as any).telemetry?.downgradeReason ?? null) ===
+            ((runtimeNext as any).telemetry?.downgradeReason ?? null) &&
+          runtimePrev.packedRG === runtimeNext.packedRG &&
+          runtimePrev.useAtlas === runtimeNext.useAtlas &&
+          runtimePrev.hasLatticeSdf === runtimeNext.hasLatticeSdf;
+        if (
+          prev.expectedVolumeHash === status.expectedVolumeHash &&
+          prev.expectedSdfKey === status.expectedSdfKey &&
+          prev.volumeReady === status.volumeReady &&
+          prev.volumeFailed === status.volumeFailed &&
+          (prev as any).volumeFailedReason === (status as any).volumeFailedReason &&
+          prev.sdfReady === status.sdfReady &&
+          prev.sdfFailed === status.sdfFailed &&
+          (prev as any).sdfFailedReason === (status as any).sdfFailedReason &&
+          sameCaps &&
+          sameRuntime
+        ) {
+          return prev;
+        }
+        return status;
+      });
+    };
+
+    tick();
+    timer = window.setInterval(tick, 650);
+    return () => {
+      if (timer != null) window.clearInterval(timer);
+    };
+  }, [latticeModeEnabled, latticeRequireSdf, sharedLatticeState?.volume?.hash, sharedLatticeState?.sdf?.key]);
+
+  const latticeFallbackReasonLegacy = useMemo(() => {
+    if (!latticeModeEnabled) return "disabled";
+    const frame = sharedLatticeState?.frame ?? null;
+    if (!frame) return "frame-missing";
+    const volume = sharedLatticeState?.volume ?? null;
+    if (!volume) return "volume-missing";
+    if (volume.stats?.budgetHit || volume.clampReasons?.includes("voxel:budgetHit")) return "volume-over-budget";
+    if (latticeRequireSdf && !sharedLatticeState?.sdf) return "sdf-missing-required";
+    if (latticeGpuStatus?.volumeFailed) return "gpu-volume-upload-failed";
+    if (latticeRequireSdf && latticeGpuStatus?.sdfFailed) return "gpu-sdf-upload-failed";
+    if (latticeGpuStatus && !latticeGpuStatus.volumeReady) return "gpu-volume-upload-pending";
+    if (latticeRequireSdf && latticeGpuStatus && !latticeGpuStatus.sdfReady) return "gpu-sdf-upload-pending";
+    return null;
+  }, [
+    latticeModeEnabled,
+    latticeRequireSdf,
+    sharedLatticeState?.frame,
+    sharedLatticeState?.volume,
+    sharedLatticeState?.sdf,
+    latticeGpuStatus,
+  ]);
+
+  useEffect(() => {
+    // NOTE: Lattice telemetry/observability publishing is centralized near the
+  // component return so it can include hash-stale guardrails + WebGL caps/runtime.
+  }, []);
 const [busPhasePayload, setBusPhasePayload] = useState<{
   phase01: number;
   phaseCont?: number;
@@ -944,9 +1449,34 @@ useEffect(() => {
 }, [showHullSurfaceOverlay]);
 useEffect(() => {
   if (typeof window !== "undefined") {
+    (window as any).__hullGateSource = gateSource;
+  }
+}, [gateSource]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    (window as any).__hullGateViewEnabled = gateViewEnabled;
+  }
+}, [gateViewEnabled]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    (window as any).__hullForceFlatGate = forceFlatGate;
+  }
+}, [forceFlatGate]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
     (window as any).__hullShowTiltOverlay = showTiltOverlay;
   }
 }, [showTiltOverlay]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    (window as any).__hullLatticeModeEnabled = latticeModeEnabled;
+  }
+}, [latticeModeEnabled]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    (window as any).__hullLatticeRequireSdf = latticeRequireSdf;
+  }
+}, [latticeRequireSdf]);
 useEffect(() => {
   const handlerId = subscribe("warp:viz", (payload: any) => {
     const v = Number(payload?.volumeViz);
@@ -957,12 +1487,517 @@ useEffect(() => {
   return () => {
     if (handlerId) unsubscribe(handlerId);
   };
-}, [setLiveVolumeMode]);
-  const [hullQuality, setHullQuality] = useState<Hull3DQualityPreset>("auto");
-  const [hullVoxelDensity, setHullVoxelDensity] = useState<"low" | "medium" | "high">("high");
+  }, [setLiveVolumeMode]);
+  const [hullQuality, setHullQuality] = useState<Hull3DQualityPreset>("low");
+  const [hullVoxelDensity, setHullVoxelDensity] = useState<"low" | "medium" | "high">("medium");
   const [hullRayStepsMax, setHullRayStepsMax] = useState<number | null>(null);
   const [hullStepBias, setHullStepBias] = useState<number | null>(null);
   const [hullQualityAdvanced, setHullQualityAdvanced] = useState(false);
+  const [viewerProfileTag, setViewerProfileTag] = useState<string | undefined>(undefined);
+  const overlayProfileKey = useMemo<HullOverlayPrefProfile>(
+    () => (viewerProfileTag === "card" ? "card" : hullQuality),
+    [viewerProfileTag, hullQuality],
+  );
+  const latticeQualityLocked = useMemo(
+    () =>
+      viewerProfileTag === "card" ||
+      hullQuality !== "auto" ||
+      hullVoxelDensity !== "medium" ||
+      hullRayStepsMax !== null ||
+      hullStepBias !== null,
+    [viewerProfileTag, hullQuality, hullVoxelDensity, hullRayStepsMax, hullStepBias],
+  );
+  const [voxelSlicesEnabled, setVoxelSlicesEnabled] = useState<boolean>(
+    () => defaultOverlayPrefsForProfile("auto").slicesEnabled
+  );
+  const [voxelSliceAxis, setVoxelSliceAxis] = useState<HullVoxelSliceAxis>(
+    () => defaultOverlayPrefsForProfile("auto").sliceAxis
+  );
+  const [voxelSliceMin, setVoxelSliceMin] = useState<number>(
+    () => defaultOverlayPrefsForProfile("auto").sliceMin
+  );
+  const [voxelSliceMax, setVoxelSliceMax] = useState<number>(
+    () => defaultOverlayPrefsForProfile("auto").sliceMax
+  );
+  const [coverageHeatmapEnabled, setCoverageHeatmapEnabled] = useState<boolean>(
+    () => defaultOverlayPrefsForProfile("auto").coverageHeatmap
+  );
+  const [spacetimeGridEnabled, setSpacetimeGridEnabled] = useState<boolean>(
+    () => defaultOverlayPrefsForProfile("auto").spacetimeGrid.enabled
+  );
+  const [spacetimeGridMode, setSpacetimeGridMode] = useState<HullSpacetimeGridMode>(
+    () => defaultOverlayPrefsForProfile("auto").spacetimeGrid.mode
+  );
+  const [spacetimeGridSpacing, setSpacetimeGridSpacing] = useState<number>(
+    () => defaultOverlayPrefsForProfile("auto").spacetimeGrid.spacing_m
+  );
+  const [spacetimeGridWarpStrength, setSpacetimeGridWarpStrength] = useState<number>(
+    () => defaultOverlayPrefsForProfile("auto").spacetimeGrid.warpStrength
+  );
+  const [spacetimeGridFalloff, setSpacetimeGridFalloff] = useState<number>(
+    () => defaultOverlayPrefsForProfile("auto").spacetimeGrid.falloff_m
+  );
+  const [spacetimeGridColorBy, setSpacetimeGridColorBy] = useState<HullSpacetimeGridColorBy>(
+    () => defaultOverlayPrefsForProfile("auto").spacetimeGrid.colorBy
+  );
+  const [spacetimeGridUseSdf, setSpacetimeGridUseSdf] = useState<boolean>(
+    () => defaultOverlayPrefsForProfile("auto").spacetimeGrid.useSdf
+  );
+  const [spacetimeGridStrengthMode, setSpacetimeGridStrengthMode] =
+    useState<HullSpacetimeGridStrengthMode>(
+      () => defaultOverlayPrefsForProfile("auto").spacetimeGrid.warpStrengthMode
+    );
+  const [spacetimeGridDbg, setSpacetimeGridDbg] = useState<any | null>(null);
+  const cardProfileStateRef = useRef<{
+    active: boolean;
+    requestId?: string;
+    snapshot: {
+      volumeDomain: Hull3DVolumeDomain;
+      quality: Hull3DQualityPreset;
+      voxelDensity: "low" | "medium" | "high";
+      rayStepsMax: number | null;
+      stepBias: number | null;
+      boundsProfile: "tight" | "wide";
+    } | null;
+  }>({ active: false, snapshot: null, requestId: undefined });
+  const cardProfileLatestRef = useRef({
+    volumeDomain: hullVolumeDomain,
+    quality: hullQuality,
+    voxelDensity: hullVoxelDensity,
+    rayStepsMax: hullRayStepsMax,
+    stepBias: hullStepBias,
+    boundsProfile: bubbleBoundsMode,
+  });
+  const CARD_PROFILE_OVERRIDES = useMemo<Hull3DQualityOverrides>(
+    () => ({
+      voxelDensity: "high",
+      raySteps: 128,
+      stepBias: 0.42,
+    }),
+    [],
+  );
+  useEffect(() => {
+    cardProfileLatestRef.current = {
+      volumeDomain: hullVolumeDomain,
+      quality: hullQuality,
+      voxelDensity: hullVoxelDensity,
+      rayStepsMax: hullRayStepsMax,
+      stepBias: hullStepBias,
+      boundsProfile: bubbleBoundsMode,
+    };
+  }, [hullVolumeDomain, hullQuality, hullVoxelDensity, hullRayStepsMax, hullStepBias, bubbleBoundsMode]);
+  useEffect(() => {
+    if (!overlayPrefs[overlayProfileKey]) {
+      setOverlayPrefs(overlayProfileKey, defaultOverlayPrefsForProfile(overlayProfileKey));
+    }
+    if (overlayPrefs[overlayProfileKey] && !overlayPrefs[overlayProfileKey]?.spacetimeGrid) {
+      setOverlayPrefs(overlayProfileKey, (current) => ({
+        ...current,
+        spacetimeGrid:
+          current.spacetimeGrid ?? defaultOverlayPrefsForProfile(overlayProfileKey).spacetimeGrid,
+      }));
+    }
+    const prefs = overlayPrefs[overlayProfileKey] ?? defaultOverlayPrefsForProfile(overlayProfileKey);
+    const spacetimeGrid = prefs.spacetimeGrid ?? defaultOverlayPrefsForProfile(overlayProfileKey).spacetimeGrid;
+    setVoxelSlicesEnabled(prefs.slicesEnabled);
+    setVoxelSliceAxis(prefs.sliceAxis);
+    setVoxelSliceMin(prefs.sliceMin);
+    setVoxelSliceMax(prefs.sliceMax);
+    setCoverageHeatmapEnabled(prefs.coverageHeatmap);
+    setSpacetimeGridEnabled(spacetimeGrid.enabled);
+    setSpacetimeGridMode(spacetimeGrid.mode);
+    setSpacetimeGridSpacing(spacetimeGrid.spacing_m);
+    setSpacetimeGridWarpStrength(spacetimeGrid.warpStrength);
+    setSpacetimeGridFalloff(spacetimeGrid.falloff_m);
+    setSpacetimeGridColorBy(spacetimeGrid.colorBy);
+    setSpacetimeGridUseSdf(spacetimeGrid.useSdf);
+    setSpacetimeGridStrengthMode(spacetimeGrid.warpStrengthMode);
+  }, [overlayPrefs, overlayProfileKey, setOverlayPrefs]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let timer: number | null = null;
+    let lastKey = "";
+    const tick = () => {
+      const dbg = (window as any).__spacetimeGridDbg;
+      if (dbg && typeof dbg === "object") {
+        const reasons = Array.isArray(dbg.degraded?.reasons) ? dbg.degraded.reasons : [];
+        const key = [
+          dbg.enabled ? 1 : 0,
+          dbg.postEnabled ? 1 : 0,
+          dbg.postMode ?? "none",
+          dbg.mode ?? "none",
+          Math.round((dbg.degraded?.spacingUsed_m ?? 0) * 1000),
+          Math.round((dbg.bounds?.expandedBy_m ?? 0) * 1000),
+          reasons.join(","),
+        ].join("|");
+        if (key !== lastKey) {
+          lastKey = key;
+          setSpacetimeGridDbg(dbg);
+        }
+      }
+      timer = window.setTimeout(tick, 750);
+    };
+    tick();
+    return () => {
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, []);
+  const syncOverlayPrefs = useCallback(
+    (next: Partial<HullOverlayPrefs> | ((current: HullOverlayPrefs) => HullOverlayPrefs)) => {
+      setOverlayPrefs(overlayProfileKey, next);
+    },
+    [overlayProfileKey, setOverlayPrefs],
+  );
+  const updateSpacetimeGridPrefs = useCallback(
+    (partial: Partial<HullOverlayPrefs["spacetimeGrid"]>) => {
+      setOverlayPrefs(overlayProfileKey, (current) => {
+        const base =
+          current.spacetimeGrid ?? defaultOverlayPrefsForProfile(overlayProfileKey).spacetimeGrid;
+        return {
+          ...current,
+          spacetimeGrid: { ...base, ...partial },
+        };
+      });
+    },
+    [overlayProfileKey, setOverlayPrefs],
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const shouldForce = !spacetimeGridEnabled;
+    if (!shouldForce) return;
+    try {
+      const key = "hullSpacetimeGridAutoEnabled:v3";
+      if (window.localStorage.getItem(key) === "1") return;
+      const preset =
+        SPACETIME_GRID_PRESETS.find((entry) => entry.id === SPACETIME_GRID_DEFAULT_PRESET_ID) ??
+        SPACETIME_GRID_PRESETS[0];
+      if (preset) {
+        updateSpacetimeGridPrefs(preset.prefs);
+      } else {
+        updateSpacetimeGridPrefs({ enabled: true });
+      }
+      window.localStorage.setItem(key, "1");
+    } catch {
+      const fallback =
+        SPACETIME_GRID_PRESETS.find((entry) => entry.id === SPACETIME_GRID_DEFAULT_PRESET_ID) ??
+        SPACETIME_GRID_PRESETS[0];
+      if (fallback) {
+        updateSpacetimeGridPrefs(fallback.prefs);
+      } else {
+        updateSpacetimeGridPrefs({ enabled: true });
+      }
+    }
+  }, [spacetimeGridEnabled, updateSpacetimeGridPrefs]);
+  const applySliceBounds = useCallback(
+    (min: number, max: number) => {
+      const lo = Math.max(0, Math.min(1, min));
+      const hiRaw = Math.max(0, Math.min(1, max));
+      const loFixed = Math.max(0, Math.min(lo, hiRaw - 0.01));
+      const hi = Math.min(1, Math.max(loFixed + 0.01, hiRaw));
+      setVoxelSliceMin(loFixed);
+      setVoxelSliceMax(hi);
+      syncOverlayPrefs({ sliceMin: loFixed, sliceMax: hi });
+    },
+    [syncOverlayPrefs],
+  );
+  const handleSliceToggle = useCallback(
+    (enabled: boolean) => {
+      setVoxelSlicesEnabled(enabled);
+      syncOverlayPrefs({ slicesEnabled: enabled });
+    },
+    [syncOverlayPrefs],
+  );
+  const handleSliceAxisChange = useCallback(
+    (axis: HullVoxelSliceAxis) => {
+      setVoxelSliceAxis(axis);
+      syncOverlayPrefs({ sliceAxis: axis });
+    },
+    [syncOverlayPrefs],
+  );
+  const handleHeatmapToggle = useCallback(
+    (enabled: boolean) => {
+      setCoverageHeatmapEnabled(enabled);
+      syncOverlayPrefs({ coverageHeatmap: enabled });
+    },
+    [syncOverlayPrefs],
+  );
+  const handleSpacetimeGridToggle = useCallback(
+    (enabled: boolean) => {
+      setSpacetimeGridEnabled(enabled);
+      updateSpacetimeGridPrefs({ enabled });
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const handleSpacetimeGridModeChange = useCallback(
+    (mode: HullSpacetimeGridMode) => {
+      setSpacetimeGridMode(mode);
+      updateSpacetimeGridPrefs({ mode });
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const handleSpacetimeGridSpacingChange = useCallback(
+    (value: number) => {
+      const clampedVal = clamp(value, 0.05, 5);
+      setSpacetimeGridSpacing(clampedVal);
+      updateSpacetimeGridPrefs({ spacing_m: clampedVal });
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const handleSpacetimeGridWarpStrengthChange = useCallback(
+    (value: number) => {
+      const clampedVal = clamp(value, 0, 5);
+      setSpacetimeGridWarpStrength(clampedVal);
+      updateSpacetimeGridPrefs({ warpStrength: clampedVal });
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const handleSpacetimeGridFalloffChange = useCallback(
+    (value: number) => {
+      const clampedVal = clamp(value, 0.05, 6);
+      setSpacetimeGridFalloff(clampedVal);
+      updateSpacetimeGridPrefs({ falloff_m: clampedVal });
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const handleSpacetimeGridColorByChange = useCallback(
+    (colorBy: HullSpacetimeGridColorBy) => {
+      setSpacetimeGridColorBy(colorBy);
+      updateSpacetimeGridPrefs({ colorBy });
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const handleSpacetimeGridUseSdfChange = useCallback(
+    (useSdf: boolean) => {
+      setSpacetimeGridUseSdf(useSdf);
+      updateSpacetimeGridPrefs({ useSdf });
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const handleSpacetimeGridStrengthModeChange = useCallback(
+    (mode: HullSpacetimeGridStrengthMode) => {
+      setSpacetimeGridStrengthMode(mode);
+      updateSpacetimeGridPrefs({ warpStrengthMode: mode });
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const applySpacetimeGridPreset = useCallback(
+    (preset: SpacetimeGridPreset) => {
+      const next = preset.prefs;
+      setSpacetimeGridEnabled(next.enabled);
+      setSpacetimeGridMode(next.mode);
+      setSpacetimeGridSpacing(next.spacing_m);
+      setSpacetimeGridWarpStrength(next.warpStrength);
+      setSpacetimeGridFalloff(next.falloff_m);
+      setSpacetimeGridColorBy(next.colorBy);
+      setSpacetimeGridUseSdf(next.useSdf);
+      setSpacetimeGridStrengthMode(next.warpStrengthMode);
+      updateSpacetimeGridPrefs(next);
+    },
+    [updateSpacetimeGridPrefs],
+  );
+  const applyCardExportProfile = useCallback(
+    (requestId?: string) => {
+      if (!cardProfileStateRef.current.active) {
+        cardProfileStateRef.current = {
+          active: true,
+          requestId,
+          snapshot: {
+            ...cardProfileLatestRef.current,
+          },
+        };
+      } else {
+        cardProfileStateRef.current.requestId = requestId ?? cardProfileStateRef.current.requestId;
+      }
+      setViewerProfileTag("card");
+      if (hullVolumeDomain !== "bubbleBox") {
+        setHullVolumeDomain("bubbleBox");
+      }
+      setHullQuality("high");
+      setHullVoxelDensity(CARD_PROFILE_OVERRIDES.voxelDensity ?? "high");
+      setHullRayStepsMax(CARD_PROFILE_OVERRIDES.raySteps ?? null);
+      setHullStepBias(CARD_PROFILE_OVERRIDES.stepBias ?? null);
+      window.dispatchEvent(
+        new CustomEvent("helix:card-export-profile:applied" as any, {
+          detail: { requestId, profile: "card" },
+        }),
+      );
+    },
+    [
+      CARD_PROFILE_OVERRIDES,
+      hullVolumeDomain,
+      setHullQuality,
+      setHullRayStepsMax,
+      setHullStepBias,
+      setHullVoxelDensity,
+      setHullVolumeDomain,
+      setViewerProfileTag,
+    ],
+  );
+  const restoreCardExportProfile = useCallback(
+    (requestId?: string) => {
+      const snapshot = cardProfileStateRef.current.snapshot;
+      if (snapshot) {
+        setHullVolumeDomain(snapshot.volumeDomain);
+        setHullQuality(snapshot.quality);
+        setHullVoxelDensity(snapshot.voxelDensity);
+        setHullRayStepsMax(snapshot.rayStepsMax);
+        setHullStepBias(snapshot.stepBias);
+        setBubbleBoundsMode(snapshot.boundsProfile);
+      }
+      cardProfileStateRef.current = { active: false, snapshot: null, requestId: undefined };
+      setViewerProfileTag(undefined);
+      window.dispatchEvent(
+        new CustomEvent("helix:card-export-profile:restored" as any, {
+          detail: { requestId },
+        }),
+      );
+    },
+    [
+      setBubbleBoundsMode,
+      setHullQuality,
+      setHullRayStepsMax,
+      setHullStepBias,
+      setHullVoxelDensity,
+      setHullVolumeDomain,
+      setViewerProfileTag,
+    ],
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ mode?: "apply" | "restore"; requestId?: string }>).detail;
+      if (!detail?.mode) return;
+      if (detail.mode === "apply") {
+        applyCardExportProfile(detail.requestId);
+      } else if (detail.mode === "restore") {
+        restoreCardExportProfile(detail.requestId);
+      }
+    };
+    window.addEventListener("helix:card-export-profile" as any, handler as any);
+    return () => window.removeEventListener("helix:card-export-profile" as any, handler as any);
+  }, [applyCardExportProfile, restoreCardExportProfile]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        requestId?: string;
+        volumeHash?: string | null;
+        sdfKey?: string | null;
+        requireSdf?: boolean;
+        timeoutMs?: number;
+      }>).detail;
+      const requestId = detail?.requestId;
+      if (!requestId) return;
+      const volumeHash = typeof detail.volumeHash === "string" ? detail.volumeHash : null;
+      const sdfKey = typeof detail.sdfKey === "string" ? detail.sdfKey : null;
+      const requireSdf = Boolean(detail.requireSdf);
+      const timeoutMs = Number.isFinite(detail.timeoutMs) ? Math.max(0, Number(detail.timeoutMs)) : 4500;
+
+      const start = typeof performance !== "undefined" ? performance.now() : Date.now();
+      let rafId: number | null = null;
+
+      const respond = (payload: Record<string, unknown>) => {
+        if (rafId != null) {
+          try {
+            cancelAnimationFrame(rafId);
+          } catch {}
+          rafId = null;
+        }
+        window.dispatchEvent(
+          new CustomEvent("helix:await-lattice-ready:result" as any, {
+            detail: { requestId, ...payload },
+          }),
+        );
+      };
+
+      const tick = () => {
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const elapsed = now - start;
+        const renderer = hullRendererRef.current;
+        if (!renderer) {
+          if (!volumeHash && !sdfKey) {
+            respond({
+              ready: true,
+              volumeHash,
+              sdfKey,
+              volumeReady: true,
+              sdfReady: true,
+              volumeFailed: false,
+              sdfFailed: false,
+              reason: "no-lattice",
+            });
+            return;
+          }
+          if (elapsed >= timeoutMs) {
+            respond({
+              ready: false,
+              volumeHash,
+              sdfKey,
+              volumeReady: false,
+              sdfReady: false,
+              volumeFailed: false,
+              sdfFailed: false,
+              reason: "renderer-missing",
+            });
+            return;
+          }
+          rafId = requestAnimationFrame(tick);
+          return;
+        }
+
+        const status = renderer.getLatticeGpuStatus({
+          volumeHash,
+          sdfKey: requireSdf ? sdfKey : null,
+        });
+        const ready = status.volumeReady && status.sdfReady && !status.volumeFailed && !status.sdfFailed;
+        if (ready) {
+          respond({
+            ready: true,
+            volumeHash: status.expectedVolumeHash,
+            sdfKey: status.expectedSdfKey,
+            volumeReady: status.volumeReady,
+            sdfReady: status.sdfReady,
+            volumeFailed: status.volumeFailed,
+            sdfFailed: status.sdfFailed,
+            reason: "ready",
+          });
+          return;
+        }
+        if (status.volumeFailed || status.sdfFailed) {
+          respond({
+            ready: false,
+            volumeHash: status.expectedVolumeHash,
+            sdfKey: status.expectedSdfKey,
+            volumeReady: status.volumeReady,
+            sdfReady: status.sdfReady,
+            volumeFailed: status.volumeFailed,
+            sdfFailed: status.sdfFailed,
+            reason: status.volumeFailed ? "volume-upload-failed" : "sdf-upload-failed",
+          });
+          return;
+        }
+        if (elapsed >= timeoutMs) {
+          respond({
+            ready: false,
+            volumeHash: status.expectedVolumeHash,
+            sdfKey: status.expectedSdfKey,
+            volumeReady: status.volumeReady,
+            sdfReady: status.sdfReady,
+            volumeFailed: status.volumeFailed,
+            sdfFailed: status.sdfFailed,
+            reason: "timeout",
+          });
+          return;
+        }
+        rafId = requestAnimationFrame(tick);
+      };
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    window.addEventListener("helix:await-lattice-ready" as any, handler as any);
+    return () => window.removeEventListener("helix:await-lattice-ready" as any, handler as any);
+  }, []);
   // Exposure (log slider mapped to 0.01x .. 100x; 0.5 -> 1x)
   const [hullExposure01, setHullExposure01] = useState(0.5);
   // Parity diagnostics: CPU peak vs shader sector center
@@ -977,6 +2012,15 @@ const res = 256;
     staleTime: 5000,
     refetchOnWindowFocus: false,
   });
+  const hullPreview = useHullPreviewPayload();
+  const [rawPreviewMesh, setRawPreviewMesh] = useState<{
+    key: string;
+    positions: Float32Array;
+    indices: Uint32Array | Uint16Array | null;
+    uvs?: Float32Array | null;
+    texture?: TexImageSource | null;
+    color?: [number, number, number, number];
+  } | null>(null);
 
   const view = useMemo(() => ((live as any)?.view ?? {}), [live]);
 
@@ -987,6 +2031,199 @@ const res = 256;
     }
     return undefined;
   }, [live]);
+  const hullDimsResolved = useMemo(
+    () => resolveHullDimsEffective({ previewPayload: hullPreview, pipelineSnapshot: live as any }),
+    [hullPreview, live],
+  );
+  const previewTargetDims = useMemo(
+    () =>
+      hullDimsResolved
+        ? { Lx_m: hullDimsResolved.Lx_m, Ly_m: hullDimsResolved.Ly_m, Lz_m: hullDimsResolved.Lz_m }
+        : hullPreview?.targetDims,
+    [hullDimsResolved, hullPreview?.targetDims],
+  );
+  const lastHullDimsSourceRef = useRef<"preview" | "pipeline" | null>(null);
+  useEffect(() => {
+    const nextSource = hullDimsResolved?.source ?? null;
+    const prevSource = lastHullDimsSourceRef.current;
+    if (prevSource && nextSource && prevSource !== nextSource) {
+      clearLatticeSurfaceCaches();
+      clearLatticeSdfCache();
+      setSharedLattice(null);
+    }
+    lastHullDimsSourceRef.current = nextSource;
+  }, [hullDimsResolved?.source, setSharedLattice]);
+  const wireframeOverlay = useMemo<WireframeOverlayResult>(() => {
+    const targetDims = hullDimsResolved
+      ? { Lx_m: hullDimsResolved.Lx_m, Ly_m: hullDimsResolved.Ly_m, Lz_m: hullDimsResolved.Lz_m }
+      : null;
+    return resolveWireframeOverlay(hullPreview, {
+      lod: wireframeLod,
+      targetDims,
+      ...wireframeBudgets,
+    });
+  }, [hullPreview, wireframeLod, hullDimsResolved, wireframeBudgets]);
+  const activeWireframeLod = useMemo(() => {
+    if (!hullPreview) return null;
+    const lods =
+      wireframeLod === "high"
+        ? [
+            hullPreview.lodFull,
+            hullPreview.mesh?.fullLod,
+            ...(hullPreview.lods ?? []).filter((lod) => lod?.tag === "full"),
+            ...(hullPreview.mesh?.lods ?? []).filter((lod) => lod?.tag === "full"),
+          ]
+        : [
+            hullPreview.lodCoarse,
+            hullPreview.mesh?.coarseLod,
+            ...(hullPreview.lods ?? []).filter((lod) => lod?.tag === "coarse"),
+            ...(hullPreview.mesh?.lods ?? []).filter((lod) => lod?.tag === "coarse"),
+          ];
+    return (lods.find((lod) => !!lod) as typeof hullPreview.lodFull | typeof hullPreview.lodCoarse | null) ?? null;
+  }, [hullPreview, wireframeLod]);
+  useEffect(() => {
+    const url = hullPreview?.glbUrl;
+    if (!url) {
+      setRawPreviewMesh(null);
+      return;
+    }
+    let cancelled = false;
+    const loader = new GLTFLoader();
+    loader.load(
+      url,
+      (gltf) => {
+        if (cancelled) return;
+        let mesh: Mesh | null = null;
+        gltf.scene.traverse((child) => {
+          if (!mesh && (child as any).isMesh) {
+            mesh = child as Mesh;
+          }
+        });
+        if (!mesh) {
+          setRawPreviewMesh(null);
+          return;
+        }
+        const meshObj = mesh as Mesh;
+        meshObj.updateMatrixWorld(true);
+        const geom = (meshObj.geometry as BufferGeometry).clone();
+        geom.applyMatrix4(meshObj.matrixWorld);
+        const posAttr = geom.getAttribute("position");
+        if (!posAttr || !posAttr.array || posAttr.count === 0) {
+          setRawPreviewMesh(null);
+          geom.dispose();
+          return;
+        }
+        const positions = new Float32Array(posAttr.array as ArrayLike<number>);
+        const indexAttr = geom.getIndex();
+        const indices = indexAttr
+          ? new (indexAttr.array instanceof Uint32Array ? Uint32Array : Uint16Array)(indexAttr.array as any)
+          : null;
+        const uvAttr = geom.getAttribute("uv");
+        const uvs = uvAttr ? new Float32Array(uvAttr.array as ArrayLike<number>) : null;
+        const material = Array.isArray(meshObj.material) ? meshObj.material[0] : meshObj.material;
+        const mapImage = (material as any)?.map?.image as TexImageSource | undefined;
+        const color: [number, number, number, number] | undefined = (material as any)?.color
+          ? [
+              (material as any).color.r,
+              (material as any).color.g,
+              (material as any).color.b,
+              (material as any).opacity ?? 1,
+            ]
+          : undefined;
+        setRawPreviewMesh({
+          key: `glb:${url}`,
+          positions,
+          indices,
+          uvs,
+          texture: mapImage ?? null,
+          color,
+        });
+        geom.dispose();
+      },
+      undefined,
+      (err) => {
+        if (cancelled) return;
+        console.warn("[AlcubierrePanel] GLB preview load failed", err);
+        setRawPreviewMesh(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [hullPreview?.glbUrl]);
+  const wireframeClampLabel = useMemo(() => {
+    if (!wireframeOverlay.clampReasons.length) return null;
+    const labels = wireframeOverlay.clampReasons.map((reason) => {
+      if (reason === "overlay:missingMesh") return "Preview mesh missing";
+      if (reason === "overlay:missingLod") return "LOD unavailable";
+      if (reason === "overlay:missingGeometry") return "Indexed geometry missing";
+      if (reason === "overlay:overBudget") return "LOD over budget";
+      if (reason === "overlay:decimationOverBudget") return "Decimation over budget";
+      if (reason === "overlay:payloadTooLarge") return "Upload size clamped";
+      if (reason === "overlay:lineWidthClamped") return "Line width capped";
+      if (reason === "overlay:indicesMissing") return "No indices (fallback to rings)";
+      return reason;
+    });
+    return labels.join(", ");
+  }, [wireframeOverlay.clampReasons]);
+  const { result: fieldProbe, loading: fieldProbeLoading } = useFieldProbe({
+    overlay: wireframeOverlay.overlay,
+    preview: hullPreview,
+    pipeline: live,
+    enabled: showWireframeOverlay && useFieldProbeOverlay && !!wireframeOverlay.overlay,
+  });
+  useEffect(() => {
+    const basisRaw = hullPreview?.mesh?.basis ?? hullPreview?.basis;
+    const basisResolved =
+      wireframeOverlay.overlay?.basis ?? resolveHullBasis(basisRaw, hullPreview?.scale);
+    const meshHash = wireframeOverlay.overlay?.meshHash ?? hullPreview?.meshHash ?? hullPreview?.mesh?.meshHash;
+    const triangleCount = wireframeOverlay.overlay?.triangleCount ?? activeWireframeLod?.triangleCount;
+    const vertexCount = wireframeOverlay.overlay?.vertexCount ?? activeWireframeLod?.vertexCount;
+    const clampReasons = wireframeOverlay.clampReasons.length ? wireframeOverlay.clampReasons : undefined;
+    const geometrySource = (
+      wireframeOverlay.source === "fallback"
+        ? "geometric"
+        : (hullPreview?.provenance as "preview" | "pipeline" | undefined) ?? "preview"
+    );
+
+    setSharedMeshOverlay({
+      meshHash,
+      provenance: hullPreview?.provenance as "preview" | "pipeline" | undefined,
+      geometrySource,
+      lod: wireframeLod,
+      lodTag: activeWireframeLod?.tag,
+      triangleCount,
+      vertexCount,
+      decimation: activeWireframeLod?.decimation,
+      budgets: wireframeBudgets,
+      basis: basisRaw ?? undefined,
+      basisResolved,
+      basisTags: basisRaw,
+      clampReasons,
+      wireframeEnabled: showWireframeOverlay,
+      updatedAt: Date.now(),
+    });
+  }, [
+    activeWireframeLod?.decimation,
+    activeWireframeLod?.tag,
+    activeWireframeLod?.triangleCount,
+    activeWireframeLod?.vertexCount,
+    hullPreview?.basis,
+    hullPreview?.mesh?.basis,
+    hullPreview?.scale,
+    hullPreview?.mesh?.meshHash,
+    hullPreview?.meshHash,
+    hullPreview?.provenance,
+    setSharedMeshOverlay,
+    showWireframeOverlay,
+    wireframeBudgets,
+    wireframeLod,
+    wireframeOverlay.clampReasons,
+    wireframeOverlay.overlay,
+    wireframeOverlay.source,
+  ]);
+  // Lattice frame/volume/SDF building now happens after `syncMode` so the panel can
+  // debounce rebuilds and surface guardrails without TDZ dependency hazards.
 
   // Auto-fill Ïƒ_sector per operational mode, with server override, when following mode
   useEffect(() => {
@@ -1067,7 +2304,23 @@ const res = 256;
   // Live parameters (safe defaults)
   const beta  = useMemo(() => resolveBeta(live), [live]);
   const sigma = useMemo(() => Math.max(1e-6, fnum(live?.sigma ?? 6.0, 6.0)), [live]);
-  const R     = useMemo(() => 1.0, []);
+  const R     = useMemo(() => {
+    if (hullDimsResolved) {
+      const maxDim = Math.max(hullDimsResolved.Lx_m, hullDimsResolved.Ly_m, hullDimsResolved.Lz_m);
+      return Math.max(1e-3, maxDim * 0.5);
+    }
+    const a = Math.max(1e-3, fnum(live?.hull?.a, 1));
+    const b = Math.max(1e-3, fnum(live?.hull?.b, 1));
+    const c = Math.max(1e-3, fnum(live?.hull?.c, 1));
+    return Math.max(a, b, c);
+  }, [hullDimsResolved, live]);
+  const hullDomainScale = useMemo(() => {
+    const base = hullVolumeDomain === "bubbleBox"
+      ? (bubbleBoundsMode === "tight" ? 1.08 : 1.65)
+      : 1.3;
+    const scaled = base * R;
+    return clamp(scaled, 0.85 * R, 2.2 * R);
+  }, [bubbleBoundsMode, hullVolumeDomain, R]);
 
   // Engineering â€œamplitude chainâ€ used only in Drive mode
   const ampChain = useMemo(() => {
@@ -1127,6 +2380,34 @@ const res = 256;
       thetaDrive: Number.isFinite(prev.thetaDrive) && prev.thetaDrive > 0 ? prev.thetaDrive : vizFloorDefaults.thetaDrive,
     }));
   }, [vizFloorDefaults]);
+  const applyDriveCardPreset = useCallback(() => {
+    setHullVolumeVizLive("theta_drive");
+    setPlanarVizMode(3);
+    setGateViewEnabled(true);
+    setGateSource("combined");
+    setForceFlatGate(false);
+    setSharedPalette({ id: "diverging", encodeBetaSign: true, legend: true });
+    setVizFloors({
+      thetaGR: 1e-9,
+      rhoGR: 1e-18,
+      thetaDrive: 1e-6,
+    });
+  }, [
+    setForceFlatGate,
+    setGateSource,
+    setGateViewEnabled,
+    setHullVolumeVizLive,
+    setPlanarVizMode,
+    setSharedPalette,
+    setShowHullSectorRing,
+    setShowHullSurfaceOverlay,
+  ]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = () => applyDriveCardPreset();
+    window.addEventListener("helix:drive-card-preset" as any, handler as any);
+    return () => window.removeEventListener("helix:drive-card-preset" as any, handler as any);
+  }, [applyDriveCardPreset]);
 
   const gateRaw = useMemo(() => {
     if (FORCE_SHOW) return 1;
@@ -1139,6 +2420,12 @@ const res = 256;
     const g = Math.sqrt(Math.max(dutyFRRaw, dFRViewMin));
     return Number.isFinite(g) ? g : 0;
   }, [dutyFRRaw, dFRViewMin]);
+
+  const gateView = useMemo(() => {
+    if (FORCE_SHOW) return 1;
+    if (!gateViewEnabled) return 0;
+    return gate;
+  }, [gateViewEnabled, gate]);
 
   const dutyFR = useMemo(() => {
     const d = Math.max(0, Math.min(1, dutyFRRaw));
@@ -1160,18 +2447,373 @@ const res = 256;
     (live as any)?.liveSectors, 1
   )), [live]);
   const fActive = useMemo(() => {
+    const activeFracRaw = fnum(
+      (live as any)?.activeFraction ??
+      (live as any)?.tiles?.activeFraction ??
+      (live as any)?.tiles?.fActive,
+      Number.NaN
+    );
+    if (Number.isFinite(activeFracRaw) && activeFracRaw > 0) {
+      return Math.max(1e-6, Math.min(1, activeFracRaw));
+    }
+    const activeTiles = fnum(
+      (live as any)?.activeTiles ??
+      (live as any)?.tiles?.active ??
+      (live as any)?.tiles?.activeTiles,
+      Number.NaN
+    );
+    const totalTiles = fnum(
+      (live as any)?.tiles?.total ??
+      (live as any)?.N_tiles ??
+      (live as any)?.tiles?.tiles ??
+      (live as any)?.tiles?.totalTiles,
+      Number.NaN
+    );
+    if (Number.isFinite(activeTiles) && Number.isFinite(totalTiles) && totalTiles > 0) {
+      return Math.max(1e-6, Math.min(1, activeTiles / Math.max(1, totalTiles)));
+    }
+    const activeSectorsRaw = fnum(
+      (live as any)?.activeSectors ??
+      (live as any)?.sectorsConcurrent ??
+      (live as any)?.concurrentSectors,
+      Number.NaN
+    );
+    if (Number.isFinite(activeSectorsRaw) && totalSectors > 0) {
+      const frac = Math.max(1 / totalSectors, activeSectorsRaw / totalSectors);
+      return Math.max(frac, Math.max(0, Math.min(1, dutyFR)));
+    }
     const base = Math.max(1 / totalSectors, liveSectors / totalSectors);
     return Math.max(base, dutyFR);
-  }, [totalSectors, liveSectors, dutyFR]);
+  }, [live, dutyFR, liveSectors, totalSectors]);
+  const hullSurfaceMesh = useMemo(
+    () =>
+      resolveHullSurfaceMesh(hullPreview, {
+        lod: wireframeLod,
+        targetDims: previewTargetDims ?? null,
+        totalSectors,
+      }),
+    [hullPreview, wireframeLod, previewTargetDims, totalSectors],
+  );
+  const previewMeshFallback = useMemo<HullPreviewMeshPayload | null>(() => {
+    if (!hullSurfaceMesh.surface) return null;
+    return {
+      key: `surface:${hullSurfaceMesh.surface.key}`,
+      positions: hullSurfaceMesh.surface.positions,
+      indices: hullSurfaceMesh.surface.indices ?? null,
+      uvs: null,
+      texture: null,
+      color: [0.67, 0.81, 0.95, 0.6],
+    };
+  }, [hullSurfaceMesh.surface]);
+  const previewMeshFromGlb = useMemo<HullPreviewMeshPayload | null>(() => {
+    if (!rawPreviewMesh) return null;
+    const targetDims = previewTargetDims ?? undefined;
+    const transformed = applyHullBasisToPositions(rawPreviewMesh.positions, {
+      basis: hullPreview?.mesh?.basis ?? hullPreview?.basis,
+      extraScale: hullPreview?.scale,
+      targetDims: targetDims ?? undefined,
+    });
+    const dimsSig = targetDims
+      ? `${targetDims.Lx_m.toFixed(4)}|${targetDims.Ly_m.toFixed(4)}|${targetDims.Lz_m.toFixed(4)}`
+      : "dims:none";
+    const basisSig = latticeBasisSignature(transformed.basis);
+    return {
+      key: [rawPreviewMesh.key, basisSig, dimsSig].join("|"),
+      positions: transformed.positions,
+      indices: rawPreviewMesh.indices ?? null,
+      uvs: rawPreviewMesh.uvs ?? null,
+      texture: rawPreviewMesh.texture ?? null,
+      color: rawPreviewMesh.color ?? [0.88, 0.92, 0.96, 0.95],
+    };
+  }, [rawPreviewMesh, hullPreview?.mesh?.basis, hullPreview?.basis, hullPreview?.scale, previewTargetDims]);
+  const previewMeshForRenderer = useMemo<HullPreviewMeshPayload | null>(
+    () => previewMeshFromGlb ?? previewMeshFallback,
+    [previewMeshFromGlb, previewMeshFallback],
+  );
 
   // sector "boost" term (visibility of a single active arc): âˆš(w/f)
+  const tilesPerSectorVector = useMemo(() => {
+    const raw =
+      (live as any)?.tilesPerSectorVector ??
+      (live as any)?.tilesPerSector ??
+      (live as any)?.tiles?.perSector;
+    let vec: number[] | undefined;
+    if (Array.isArray(raw)) {
+      vec = raw as number[];
+    } else if (raw && ArrayBuffer.isView(raw as ArrayBufferView)) {
+      vec = Array.from(raw as ArrayLike<number>);
+    }
+    if (!vec || vec.length === 0) return undefined;
+    const filtered = vec
+      .map((v) => Number(v))
+      .filter((v) => Number.isFinite(v) && v >= 0);
+    return filtered.length ? filtered : undefined;
+  }, [live]);
+
   const boostWF = useMemo(() => Math.sqrt(Math.max(1e-12, 1 / fActive)), [fActive]);
 
+  // --- track canvas aspect so camera fits accurately
+  const [aspect, setAspect] = useState(16 / 9);
+
   // Viewer axes (hull aspect)
-  const axes = useMemo(
-    () => [fnum(live?.hull?.a, 1), fnum(live?.hull?.b, 1), fnum(live?.hull?.c, 1)] as [number,number,number],
-    [live]
+  const axes = useMemo<[number, number, number]>(() => {
+    if (hullDimsResolved) {
+      return [
+        Math.max(1e-3, hullDimsResolved.Lx_m * 0.5),
+        Math.max(1e-3, hullDimsResolved.Ly_m * 0.5),
+        Math.max(1e-3, hullDimsResolved.Lz_m * 0.5),
+      ];
+    }
+    return [fnum(live?.hull?.a, 1), fnum(live?.hull?.b, 1), fnum(live?.hull?.c, 1)] as [number, number, number];
+  }, [hullDimsResolved, live]);
+  const hullObb = useMemo(() => {
+    const previewObb = hullPreview?.mesh?.obb ?? hullPreview?.obb;
+    if (previewObb) return previewObb;
+    const basis = hullDimsResolved?.basis;
+    return {
+      center: [0, 0, 0] as [number, number, number],
+      halfSize: axes,
+      axes: basis
+        ? ([basis.right, basis.up, basis.forward] as [
+            [number, number, number],
+            [number, number, number],
+            [number, number, number],
+          ])
+        : undefined,
+    };
+  }, [axes, hullDimsResolved, hullPreview]);
+  const cardCameraFrame = useMemo(
+    () =>
+      frameCardCameraToObb({
+        preset: cardCameraPreset,
+        obb: hullObb,
+        halfSize: axes,
+        domainScale: hullDomainScale,
+        basis: hullDimsResolved?.basis ?? null,
+        fov_deg: 45,
+        minRadius: Math.max(R * 4.2, 12),
+        yawOffset_rad: followHullPhase ? (ds.phase01 ?? 0) * Math.PI * 2 : 0,
+      }),
+    [R, axes, cardCameraPreset, ds.phase01, followHullPhase, hullDimsResolved?.basis, hullDomainScale, hullObb],
   );
+
+  useEffect(() => {
+    setViewer({
+      planarVizMode,
+      volumeViz: hullVolumeVizLive,
+      volumeDomain: hullVolumeDomain,
+      opacityWindow: bubbleOpacityWindow,
+      boundsProfile: bubbleBoundsMode,
+      vizFloors,
+      gateSource,
+      gateView: gateViewEnabled,
+      forceFlatGate,
+      qualityPreset: hullQuality,
+      qualityOverrides: hullQualityOverridesRef.current,
+      profileTag: viewerProfileTag,
+      bounds: { axes, aspect, domainScale: hullDomainScale, basis: hullDimsResolved?.basis },
+      palette: sharedPaletteState,
+      camera: cardCameraFrame,
+    });
+  }, [
+    cardCameraFrame,
+    setViewer,
+    planarVizMode,
+    hullVolumeVizLive,
+    vizFloors,
+    gateSource,
+    gateViewEnabled,
+    forceFlatGate,
+    hullQuality,
+    hullRayStepsMax,
+    hullStepBias,
+    hullVoxelDensity,
+    viewerProfileTag,
+    axes,
+    aspect,
+    sharedPaletteState,
+    R,
+    hullDomainScale,
+    hullVolumeDomain,
+    bubbleOpacityWindow,
+    bubbleBoundsMode,
+  ]);
+
+  const hullRadiusLUT = useMemo(() => {
+    const radial = (live as any)?.hull?.radialLUT ?? (live as any)?.hull?.radialLut;
+    if (!radial) return null;
+    const sizeRaw = (radial as any).size ?? (radial as any).dims ?? (radial as any).dim;
+    const width = Number((radial as any).width ?? (radial as any).w ?? sizeRaw?.[0]);
+    const height = Number((radial as any).height ?? (radial as any).h ?? sizeRaw?.[1]);
+    const dataRaw = (radial as any).data ?? (radial as any).values ?? null;
+    if (!(width > 0 && height > 0 && dataRaw)) return null;
+    const len = width * height;
+    let data: Float32Array | null = null;
+    if (dataRaw instanceof Float32Array && dataRaw.length >= len) {
+      data = dataRaw;
+    } else if (Array.isArray(dataRaw) && dataRaw.length >= len) {
+      data = new Float32Array((dataRaw as number[]).slice(0, len));
+    }
+    if (!data) return null;
+    const maxRRaw = (radial as any).maxR ?? (radial as any).hullMaxR;
+    const maxR = Number.isFinite(maxRRaw) ? (maxRRaw as number) : undefined;
+    return { data, size: [width, height] as [number, number], maxR };
+  }, [live]);
+
+  const hullSdf = useMemo(() => {
+    const parseSdf = (sdf: any) => {
+      if (!sdf) return null;
+      const sizeRaw = (sdf as any).size ?? (sdf as any).dims ?? (sdf as any).dim ?? (sdf as any).shape;
+      const nx = Number((sdf as any).nx ?? sizeRaw?.[0]);
+      const ny = Number((sdf as any).ny ?? sizeRaw?.[1]);
+      const nz = Number((sdf as any).nz ?? sizeRaw?.[2]);
+      if (!(nx > 0 && ny > 0 && nz > 0)) return null;
+      const len = nx * ny * nz;
+      const dataRaw = (sdf as any).data ?? (sdf as any).values ?? (sdf as any).grid;
+      let data: Float32Array | Uint8Array | null = null;
+      let format: "float" | "byte" = "float";
+      if (dataRaw instanceof Float32Array && dataRaw.length >= len) {
+        data = dataRaw;
+        format = "float";
+      } else if (dataRaw instanceof Uint8Array && dataRaw.length >= len) {
+        data = dataRaw;
+        format = "byte";
+      } else if (Array.isArray(dataRaw) && dataRaw.length >= len) {
+        data = new Float32Array((dataRaw as number[]).slice(0, len));
+        format = "float";
+      }
+      if (!data) return null;
+      const boundsRaw = (sdf as any).bounds ?? (sdf as any).extents ?? (sdf as any).radius ?? null;
+      const bounds: [number, number, number] | undefined =
+        Array.isArray(boundsRaw) && boundsRaw.length >= 3
+          ? [Math.abs(boundsRaw[0] ?? 0), Math.abs(boundsRaw[1] ?? 0), Math.abs(boundsRaw[2] ?? 0)] as [number, number, number]
+          : undefined;
+      const bandRaw =
+        (sdf as any).band ?? (sdf as any).shellWidth ?? (sdf as any).wallWidth ??
+        (sdf as any).band_m ?? (sdf as any).bandMeters;
+      const band = Number.isFinite(bandRaw as number) ? (bandRaw as number) : undefined;
+      return { data, dims: [nx, ny, nz] as [number, number, number], bounds, band, format };
+    };
+
+    const liveSdf = parseSdf((live as any)?.hull?.sdf ?? (live as any)?.hull?.SDF);
+    if (liveSdf) return liveSdf;
+
+    const latticeSdf = sharedLatticeState?.sdf ?? null;
+    if (latticeSdf && latticeSdf.dims?.length === 3) {
+      const [nx, ny, nz] = latticeSdf.dims;
+      if (nx > 0 && ny > 0 && nz > 0 && latticeSdf.distances?.length) {
+        return {
+          data: latticeSdf.distances,
+          dims: [nx, ny, nz] as [number, number, number],
+          bounds: latticeSdf.bounds,
+          band: latticeSdf.band,
+          format: "float" as const,
+        };
+      }
+    }
+
+    return null;
+  }, [live, sharedLatticeState?.sdf]);
+
+  const hullRadiusMax = useMemo(() => {
+    const sdfBound = hullSdf?.bounds
+      ? Math.max(Math.abs(hullSdf.bounds[0] ?? 0), Math.abs(hullSdf.bounds[1] ?? 0), Math.abs(hullSdf.bounds[2] ?? 0))
+      : null;
+    const dimsRadius = hullDimsResolved
+      ? Math.max(hullDimsResolved.Lx_m, hullDimsResolved.Ly_m, hullDimsResolved.Lz_m) * 0.5
+      : null;
+    const liveRadius = (() => {
+      const a = Math.max(1e-3, fnum(live?.hull?.a, 1));
+      const b = Math.max(1e-3, fnum(live?.hull?.b, 1));
+      const c = Math.max(1e-3, fnum(live?.hull?.c, 1));
+      return Math.max(a, b, c);
+    })();
+    const candidates = [sdfBound, dimsRadius, liveRadius, R].filter((v) => Number.isFinite(v as number) && (v as number) > 0) as number[];
+    return candidates.length ? Math.max(...candidates) : 1.0;
+  }, [hullSdf?.bounds, hullDimsResolved, live, R]);
+
+  const fieldProbeColors = useMemo(() => {
+    if (!useFieldProbeOverlay || !fieldProbe?.values?.length) return null;
+    const { colors } = colorizeFieldProbe(fieldProbe.values, { absMax: fieldProbe.stats?.absMax });
+    return colors;
+  }, [fieldProbe?.stats?.absMax, fieldProbe?.values, useFieldProbeOverlay]);
+
+  useEffect(() => {
+    if (geometryUserOverrideRef.current) return;
+    let next: HullGeometryMode | null = null;
+    let reason: string | null = null;
+    if (hullSdf) {
+      next = "sdf";
+      const dims = hullSdf.dims ? `${hullSdf.dims[0]}x${hullSdf.dims[1]}x${hullSdf.dims[2]}` : null;
+      reason = `Auto: hull SDF${dims ? ` (${dims})` : ""}`;
+    } else if (hullRadiusLUT) {
+      next = "radial";
+      const size = hullRadiusLUT.size ? `${hullRadiusLUT.size[0]}x${hullRadiusLUT.size[1]}` : null;
+      reason = `Auto: radial LUT${size ? ` (${size})` : ""}`;
+    } else {
+      next = "ellipsoid";
+    }
+    if (next && next !== hullGeometry) {
+      setHullGeometry(next);
+      setAutoHullGeometryReason(reason);
+    } else if (next === hullGeometry) {
+      setAutoHullGeometryReason(reason);
+    }
+  }, [hullSdf, hullRadiusLUT, hullGeometry, live]);
+
+  const hullDimsEffective = useMemo<[number, number, number]>(() => {
+    const base: [number, number, number] = hullDimsResolved
+      ? [
+          Math.max(Math.abs(hullDimsResolved.Lx_m), 1e-3),
+          Math.max(Math.abs(hullDimsResolved.Ly_m), 1e-3),
+          Math.max(Math.abs(hullDimsResolved.Lz_m), 1e-3),
+        ]
+      : [
+          Math.max(Math.abs(axes[0]) * R * 2, 1e-3),
+          Math.max(Math.abs(axes[1]) * R * 2, 1e-3),
+          Math.max(Math.abs(axes[2]) * R * 2, 1e-3),
+        ];
+    if (hullGeometry !== "ellipsoid") {
+      const candidates = [...base];
+      const maxR = hullRadiusLUT?.maxR;
+      const maxSdfBound = hullSdf?.bounds
+        ? Math.max(Math.abs(hullSdf.bounds[0]), Math.max(Math.abs(hullSdf.bounds[1]), Math.abs(hullSdf.bounds[2])))
+        : undefined;
+      if (Number.isFinite(maxSdfBound)) candidates.push((maxSdfBound as number) * 2);
+      if (Number.isFinite(maxR)) candidates.push((maxR as number) * 2);
+      const diameter = candidates.length ? Math.max(...candidates) : Math.max(...base);
+      return [diameter, diameter, diameter];
+    }
+    return base;
+  }, [axes, R, hullGeometry, hullRadiusLUT, hullSdf, hullDimsResolved]);
+
+  const wireframeOverlayForRenderer = useMemo(() => {
+    if (!showWireframeOverlay) return null;
+    if (!wireframeOverlay.overlay) return null;
+    if (useFieldProbeOverlay && fieldProbeColors) {
+      return {
+        ...wireframeOverlay.overlay,
+        colors: fieldProbeColors,
+        colorMode: "field" as const,
+        colorSignature: fieldProbe?.meta?.cache?.key ?? `${wireframeOverlay.overlay.key}|field`,
+        patches: fieldProbe?.patches ?? wireframeOverlay.overlay.patches,
+        fieldThreshold: fieldProbe?.fieldThreshold ?? wireframeOverlay.overlay.fieldThreshold,
+        gradientThreshold: fieldProbe?.gradientThreshold ?? wireframeOverlay.overlay.gradientThreshold,
+        fieldStats: fieldProbe?.stats,
+      };
+    }
+    return wireframeOverlay.overlay;
+  }, [
+    fieldProbe?.fieldThreshold,
+    fieldProbe?.gradientThreshold,
+    fieldProbe?.meta?.cache?.key,
+    fieldProbe?.patches,
+    fieldProbe?.stats,
+    fieldProbeColors,
+    showWireframeOverlay,
+    useFieldProbeOverlay,
+    wireframeOverlay.overlay,
+  ]);
 
   const sectorPeriodMs = useMemo(() => {
     const cand = (live as any) ?? {};
@@ -1691,6 +3333,16 @@ const res = 256;
     const thetaFloor = Math.max(1e-9, vizFloors.thetaGR ?? 1e-9);
     const rhoFloor = Math.max(1e-18, vizFloors.rhoGR ?? 1e-18);
     const isoStep = isGRMode ? (planarVizMode === 1 ? rhoFloor * 1.6 : thetaFloor * 1.4) : thetaFloor;
+    const spacetimeGridPrefs = {
+      enabled: spacetimeGridEnabled,
+      mode: spacetimeGridMode,
+      spacing_m: spacetimeGridSpacing,
+      warpStrength: spacetimeGridWarpStrength,
+      falloff_m: spacetimeGridFalloff,
+      colorBy: spacetimeGridColorBy,
+      useSdf: spacetimeGridUseSdf,
+      warpStrengthMode: spacetimeGridStrengthMode,
+    };
 
     const overlays: Hull3DOverlayState = {
       phase,
@@ -1728,6 +3380,7 @@ const res = 256;
         palette: curvatureOverlay.palette,
         showQIMargin: curvatureOverlay.showQIMargin,
       },
+      spacetimeGrid: spacetimeGridPrefs,
     };
 
     const epsilonTilt = firstFinite(
@@ -1785,9 +3438,1033 @@ const res = 256;
     live,
     curvatureOverlay,
     busTiltDirective,
+    spacetimeGridEnabled,
+    spacetimeGridMode,
+    spacetimeGridSpacing,
+    spacetimeGridWarpStrength,
+    spacetimeGridFalloff,
+    spacetimeGridColorBy,
+    spacetimeGridUseSdf,
+    spacetimeGridStrengthMode,
   ]);
 
   const syncMode = useMemo(() => (syncScheduler && schedulerCenter !== null ? 1 : 0), [syncScheduler, schedulerCenter]);
+  const latticeProfileTag = viewerProfileTag === "card" ? "card" : "preview";
+  const latticeAvailable = hullDimsResolved?.source === "preview" && !!hullPreview;
+  const latticeEnabled = latticeModeEnabled && latticeAvailable;
+
+  const latticeFrame = useMemo(() => {
+    if (!latticeEnabled || !hullDimsResolved) return null;
+    return buildLatticeFrame({
+      hullDims: {
+        Lx_m: hullDimsResolved.Lx_m,
+        Ly_m: hullDimsResolved.Ly_m,
+        Lz_m: hullDimsResolved.Lz_m,
+      },
+      basis: hullDimsResolved.basis ?? HULL_BASIS_IDENTITY,
+      boundsProfile: bubbleBoundsMode ?? "tight",
+      preset: hullQuality,
+      profileTag: latticeProfileTag,
+    });
+  }, [
+    latticeEnabled,
+    hullDimsResolved,
+    bubbleBoundsMode,
+    hullQuality,
+    latticeProfileTag,
+  ]);
+
+  const latticeSdfFrame = useMemo(() => {
+    if (latticeFrame) return latticeFrame;
+    if (!hullPreview || !hullDimsResolved) return null;
+    return buildLatticeFrame({
+      hullDims: {
+        Lx_m: hullDimsResolved.Lx_m,
+        Ly_m: hullDimsResolved.Ly_m,
+        Lz_m: hullDimsResolved.Lz_m,
+      },
+      basis: hullDimsResolved.basis ?? HULL_BASIS_IDENTITY,
+      boundsProfile: bubbleBoundsMode ?? "tight",
+      preset: hullQuality,
+      profileTag: latticeProfileTag,
+    });
+  }, [latticeFrame, hullPreview, hullDimsResolved, bubbleBoundsMode, hullQuality, latticeProfileTag]);
+
+  const latticeStrobeBuild = useMemo(() => {
+    if (!latticeEnabled || !hullDimsResolved || !hullPreview) return null;
+    const strobe = buildHullSurfaceStrobe(hullPreview, {
+      surface: {
+        lod: wireframeLod,
+        targetDims: {
+          Lx_m: hullDimsResolved.Lx_m,
+          Ly_m: hullDimsResolved.Ly_m,
+          Lz_m: hullDimsResolved.Lz_m,
+        },
+        totalSectors,
+        ...wireframeBudgets,
+      },
+    });
+    const basisSig = strobe.surface?.basis ? latticeBasisSignature(strobe.surface.basis) : undefined;
+    return { strobe, basisSig };
+  }, [latticeEnabled, hullDimsResolved, hullPreview, wireframeLod, totalSectors, wireframeBudgets]);
+
+  const latticeDesiredWeightHash = useMemo(() => {
+    const strobe = latticeStrobeBuild?.strobe;
+    const hist = strobe?.histogram;
+    if (!latticeEnabled || !strobe || !hist) return null;
+    const params: LatticeStrobeWeightParams = {
+      totalSectors: strobe.surface?.sectorCount ?? totalSectors,
+      liveSectors,
+      sectorCenter01,
+      gaussianSigma,
+      sectorFloor: ds.sectorFloor,
+      splitEnabled: ds.splitEnabled,
+      splitFrac: ds.splitFrac,
+      syncMode,
+    };
+    const basisSig = latticeStrobeBuild?.basisSig ?? "basis:none";
+    const cacheKeyRaw = [
+      strobe.hash ?? "surface:none",
+      basisSig,
+      latticeParamsSignature(params),
+      hist.sectorCount,
+      hist.triangleAreaTotal ?? 0,
+    ].join("|");
+    return fnv1a32(cacheKeyRaw);
+  }, [
+    latticeEnabled,
+    latticeStrobeBuild,
+    totalSectors,
+    liveSectors,
+    sectorCenter01,
+    gaussianSigma,
+    ds.sectorFloor,
+    ds.splitEnabled,
+    ds.splitFrac,
+    syncMode,
+  ]);
+
+  const latticeDesiredDfdrSignature = useMemo(
+    () => `${sigma.toFixed(6)}|${beta.toFixed(6)}|${R.toFixed(3)}`,
+    [sigma, beta, R],
+  );
+  const latticeDesiredDriveLadderSignature = useMemo(() => {
+    return [
+      latticeDesiredDfdrSignature,
+      `g${Math.round(gate * 1e6)}`,
+      `d${Math.round(ampChain * 1e6)}`,
+    ].join("|");
+  }, [latticeDesiredDfdrSignature, gate, ampChain]);
+  // Apply sector weights in-shader for continuous phase; keep voxel volume weights uniform.
+  const latticeUseDynamicWeights = true;
+
+  const latticeGuardrails = useMemo(() => {
+    const messages: Array<{ level: "warn" | "error"; label: string }> = [];
+    if (!latticeModeEnabled) {
+      return {
+        messages,
+        staleHash: false,
+        desiredWeightHash: null as string | null,
+        builtWeightHash: null as string | null,
+      };
+    }
+    const vol = sharedLatticeState?.volume;
+    const hasVolume = !!vol;
+    if (hasVolume && (vol?.stats?.budgetHit || vol?.clampReasons?.includes("voxel:budgetHit"))) {
+      messages.push({ level: "error", label: "Over budget" });
+    }
+    if (latticeRequireSdf && hasVolume && !sharedLatticeState?.sdf) {
+      messages.push({ level: "warn", label: "Missing SDF (required)" });
+    } else if (!latticeRequireSdf && hasVolume && !sharedLatticeState?.sdf) {
+      messages.push({ level: "warn", label: "Missing SDF" });
+    }
+
+    const desired = latticeUseDynamicWeights ? null : latticeDesiredWeightHash;
+    const built = latticeUseDynamicWeights ? null : (sharedLatticeState?.strobe?.weightHash ?? null);
+    const staleHash = !latticeUseDynamicWeights && !!(desired && built && desired !== built);
+    if (!latticeUseDynamicWeights) {
+      if (desired && !built) {
+        messages.push({ level: "warn", label: "Weights pending" });
+      } else if (staleHash) {
+        messages.push({ level: "warn", label: "Stale hash" });
+      }
+    }
+
+    return { messages, staleHash, desiredWeightHash: desired, builtWeightHash: built };
+  }, [
+    latticeModeEnabled,
+    latticeRequireSdf,
+    sharedLatticeState?.volume,
+    sharedLatticeState?.sdf,
+    sharedLatticeState?.strobe?.weightHash,
+    latticeDesiredWeightHash,
+    latticeUseDynamicWeights,
+  ]);
+
+  const latticeVolumeForRenderer = useMemo(() => {
+    if (!latticeModeEnabled) return null;
+    const vol = sharedLatticeState?.volume ?? null;
+    if (!vol) return null;
+    if (vol.stats?.budgetHit || vol.clampReasons?.includes("voxel:budgetHit")) return null;
+    if (latticeRequireSdf && !sharedLatticeState?.sdf) return null;
+    const desiredWeightHash = latticeDesiredWeightHash;
+    const builtWeightHash = sharedLatticeState?.strobe?.weightHash ?? null;
+    if (!latticeUseDynamicWeights && desiredWeightHash && builtWeightHash !== desiredWeightHash) return null;
+    const desiredDriveSig = latticeDesiredDriveLadderSignature;
+    const builtDriveSig = vol.metadata?.driveLadder?.signature ?? null;
+    if (desiredDriveSig && builtDriveSig && builtDriveSig !== desiredDriveSig) return null;
+    return vol;
+  }, [
+    latticeModeEnabled,
+    latticeRequireSdf,
+    sharedLatticeState?.volume,
+    sharedLatticeState?.sdf,
+    sharedLatticeState?.strobe?.weightHash,
+    latticeDesiredWeightHash,
+    latticeDesiredDriveLadderSignature,
+    latticeUseDynamicWeights,
+  ]);
+  const latticeSdfForRenderer = useMemo(() => {
+    if (!latticeVolumeForRenderer) return null;
+    return sharedLatticeState?.sdf ?? null;
+  }, [latticeVolumeForRenderer, sharedLatticeState?.sdf]);
+
+  type LatticeFallbackStatusLevel = "info" | "warn" | "error";
+  type LatticeFallbackStatus = {
+    reason: string;
+    level: LatticeFallbackStatusLevel;
+    label: string;
+    hint?: string;
+    detail?: string;
+  };
+
+  const latticeFallbackStatus = useMemo<LatticeFallbackStatus | null>(() => {
+    const volumeFailedReason =
+      typeof (latticeGpuStatus as any)?.volumeFailedReason === "string"
+        ? String((latticeGpuStatus as any).volumeFailedReason)
+        : null;
+    const formatReason =
+      typeof (latticeGpuStatus as any)?.runtime?.formatReason === "string"
+        ? String((latticeGpuStatus as any).runtime.formatReason)
+        : typeof (latticeGpuStatus as any)?.runtime?.telemetry?.downgradeReason === "string"
+          ? String((latticeGpuStatus as any).runtime.telemetry.downgradeReason)
+          : null;
+    const caps = (latticeGpuStatus as any)?.caps ?? null;
+
+    if (!latticeModeEnabled) {
+      return { reason: "disabled", level: "info", label: "Disabled", hint: "Lattice sampling disabled." };
+    }
+    if (!latticeAvailable) {
+      return {
+        reason: "preview-missing",
+        level: "warn",
+        label: "Preview missing",
+        hint: "Load a preview hull (GLB) via Model Silhouette before enabling lattice sampling; using analytic ellipsoid instead.",
+      };
+    }
+
+    const frame = sharedLatticeState?.frame ?? null;
+    const frameClampReasons = frame?.clampReasons ?? [];
+    if (!frame) {
+      return {
+        reason: "frame-missing",
+        level: "warn",
+        label: "Frame missing",
+        hint: "Waiting for lattice frame build.",
+      };
+    }
+    // Keep running with a clamped frame; diagnostics panel surfaces clamp reasons.
+
+    const volume = sharedLatticeState?.volume ?? null;
+    const volumeClampReasons = volume?.clampReasons ?? [];
+    if (!volume) {
+      return {
+        reason: "volume-missing",
+        level: "warn",
+        label: "Volume missing",
+        hint: "Waiting for lattice voxelization.",
+      };
+    }
+
+    const volumeBudgetHit =
+      volume.stats?.budgetHit || volumeClampReasons.some((reason) => reason.includes("budget"));
+    if (volumeBudgetHit) {
+      return {
+        reason: "volume-over-budget",
+        level: "error",
+        label: "Volume over budget",
+        hint: "Lower lattice preset / quality or increase voxel size; lattice auto-falls back to analytic.",
+        detail: volumeClampReasons.length ? volumeClampReasons.join(", ") : "voxel:budgetHit",
+      };
+    }
+
+    const desiredWeightHash = latticeDesiredWeightHash;
+    const builtWeightHash = sharedLatticeState?.strobe?.weightHash ?? null;
+    if (!latticeUseDynamicWeights && desiredWeightHash && builtWeightHash !== desiredWeightHash) {
+      return {
+        reason: "hash-stale",
+        level: "warn",
+        label: "Rebuilding weights",
+        hint: `Scheduler params changed; using analytic until lattice rebuild completes (want ${desiredWeightHash} vs built ${builtWeightHash ?? "n/a"}).`,
+        detail: `want=${desiredWeightHash} built=${builtWeightHash ?? "n/a"}`,
+      };
+    }
+
+    const desiredDriveSig = latticeDesiredDriveLadderSignature;
+    const builtDriveSig = volume.metadata?.driveLadder?.signature ?? null;
+    if (desiredDriveSig && builtDriveSig && builtDriveSig !== desiredDriveSig) {
+      return {
+        reason: "drive-ladder-mismatch",
+        level: "warn",
+        label: "Drive ladder changed",
+        hint: "Drive ladder scalars changed; using analytic until volume rebuild completes.",
+      };
+    }
+
+    if (latticeRequireSdf && !sharedLatticeState?.sdf) {
+      return {
+        reason: "sdf-missing-required",
+        level: "warn",
+        label: "Missing SDF (required)",
+        hint: "Wait for SDF build or disable Require SDF to re-enable lattice sampling.",
+      };
+    }
+
+    if (caps) {
+      if (!caps.max3DTextureSize || caps.max3DTextureSize <= 0) {
+        return {
+          reason: "caps:texture3d-unsupported",
+          level: "warn",
+          label: "3D textures unavailable",
+          hint: "Browser lacks 3D textures; reverting to analytic ellipsoid.",
+          detail: "caps:texture3d-unsupported",
+        };
+      }
+      if (!caps.supportsFloatLinear && !caps.supportsHalfFloatLinear) {
+        return {
+          reason: "caps:no-linear-filter",
+          level: "warn",
+          label: "No linear filtering",
+          hint: "GPU lacks float/half-float linear filtering; using analytic ellipsoid.",
+          detail: "caps:float-linear",
+        };
+      }
+      if (!caps.supportsColorFloat) {
+        return {
+          reason: "caps:no-float-texture",
+          level: "warn",
+          label: "Float targets unavailable",
+          hint: "GPU float targets unavailable for lattice volume; reverting to analytic ellipsoid.",
+          detail: "caps:color-buffer-float",
+        };
+      }
+    }
+
+    if (latticeGpuStatus?.volumeFailed) {
+      const capsHint =
+        volumeFailedReason === "caps:max3dTextureSize"
+          ? "MAX_3D_TEXTURE_SIZE too small for lattice dims; lower lattice preset."
+          : volumeFailedReason === "caps:maxTextureSize"
+            ? "MAX_TEXTURE_SIZE too small for atlas fallback; lower lattice preset."
+            : null;
+      const budgetFail = volumeFailedReason?.startsWith("budget:");
+      const capsFail = volumeFailedReason?.startsWith("caps:");
+      return {
+        reason: budgetFail ? "gpu-volume-budget" : capsFail ? "gpu-volume-caps" : "gpu-volume-upload-failed",
+        level: budgetFail ? "warn" : "error",
+        label: budgetFail ? "GPU budget hit" : capsHint ? "GPU caps insufficient" : "GPU upload failed",
+        hint:
+          budgetFail && volumeFailedReason === "budget:bytes"
+            ? "Volume upload exceeded GPU byte budget; lower preset or voxel density."
+            : budgetFail
+              ? "Volume upload exceeded GPU voxel budget; lower preset or voxel density."
+              : capsHint ?? "Volume upload failed; try lowering lattice preset or reload the viewer.",
+        ...(volumeFailedReason ? { detail: volumeFailedReason } : {}),
+      };
+    }
+
+    if (latticeRequireSdf && latticeGpuStatus?.sdfFailed) {
+      const detail =
+        typeof (latticeGpuStatus as any)?.sdfFailedReason === "string"
+          ? String((latticeGpuStatus as any).sdfFailedReason)
+          : null;
+      return {
+        reason: "gpu-sdf-upload-failed",
+        level: "warn",
+        label: "SDF upload failed",
+        hint: "Hull SDF band upload failed; analytic blending will be used instead.",
+        ...(detail ? { detail } : {}),
+      };
+    }
+
+    if (latticeGpuStatus && !latticeGpuStatus.volumeReady) {
+      return {
+        reason: "gpu-volume-upload-pending",
+        level: "info",
+        label: "Uploading volume",
+        hint: "Uploading lattice volume to GPU.",
+      };
+    }
+
+    if (latticeRequireSdf && latticeGpuStatus && !latticeGpuStatus.sdfReady) {
+      return {
+        reason: "gpu-sdf-upload-pending",
+        level: "info",
+        label: "Uploading SDF",
+        hint: "Uploading hull SDF band to GPU.",
+      };
+    }
+
+    if (formatReason && formatReason.startsWith("caps:")) {
+      return {
+        reason: formatReason,
+        level: "warn",
+        label: "GPU downgraded lattice",
+        hint: "Viewer downgraded lattice format due to GPU caps; using analytic ellipsoid instead.",
+        detail: formatReason,
+      };
+    }
+
+    const runtime = (latticeGpuStatus as any)?.runtime;
+    if (runtime && !runtime.hasLatticeVolume && !latticeVolumeForRenderer) {
+      return {
+        reason: "analytic-fallback",
+        level: "warn",
+        label: "Analytic fallback",
+        hint: "Lattice not active; using analytic volume.",
+        detail: runtime.formatReason ?? formatReason ?? undefined,
+      };
+    }
+
+    return null;
+  }, [
+    latticeModeEnabled,
+    latticeAvailable,
+    latticeRequireSdf,
+    latticeDesiredWeightHash,
+    latticeDesiredDriveLadderSignature,
+    latticeVolumeForRenderer,
+    sharedLatticeState?.frame,
+    sharedLatticeState?.volume,
+    sharedLatticeState?.sdf,
+    sharedLatticeState?.strobe?.weightHash,
+    latticeGpuStatus,
+    latticeUseDynamicWeights,
+  ]);
+
+  const latticeRuntime = useMemo(() => (latticeGpuStatus as any)?.runtime ?? null, [latticeGpuStatus]);
+  const frameClampSignature = useMemo(
+    () => (sharedLatticeState?.frame?.clampReasons ?? []).join("|"),
+    [sharedLatticeState?.frame?.clampReasons]
+  );
+  const sdfClampSignature = useMemo(() => {
+    const sdf: any = sharedLatticeState?.sdf ?? null;
+    const parts: string[] = [];
+    if (Array.isArray(sdf?.clampReasons)) {
+      parts.push(...sdf.clampReasons.filter(Boolean));
+    }
+    const stats = sdf?.stats ?? null;
+    if (stats) {
+      if (Array.isArray(stats.clampReasons)) {
+        parts.push(...stats.clampReasons.filter(Boolean));
+      }
+      if (stats.fallbackReason) parts.push(String(stats.fallbackReason));
+      if (stats.budgetHit) parts.push("budget:hit");
+    }
+    const sdfFailedReason =
+      typeof (latticeGpuStatus as any)?.sdfFailedReason === "string"
+        ? String((latticeGpuStatus as any).sdfFailedReason)
+        : null;
+    if (sdfFailedReason) parts.push(sdfFailedReason);
+    return parts.join("|");
+  }, [sharedLatticeState?.sdf, latticeGpuStatus]);
+  const latticePathActive = latticeRuntime?.hasLatticeVolume && !latticeFallbackStatus;
+  const latticeOverlayVolumeReady = latticePathActive && !!latticeVolumeForRenderer;
+  const latticeRebuildPending =
+    latticePathActive && !latticeOverlayVolumeReady && !!sharedLatticeState?.volume;
+  const overlayLockedReason = useMemo(() => {
+    if (!latticeModeEnabled) return "Lattice disabled";
+    if (!latticeAvailable) return "Preview mesh required";
+    if (latticeFallbackStatus) return latticeFallbackStatus.hint ?? latticeFallbackStatus.label;
+    if (latticeGuardrails.staleHash) return "Rebuilding lattice weights";
+    if (latticeRebuildPending) return "Rebuilding lattice";
+    if (!latticeOverlayVolumeReady) return "Lattice not ready";
+    return null;
+  }, [
+    latticeAvailable,
+    latticeFallbackStatus,
+    latticeGuardrails.staleHash,
+    latticeModeEnabled,
+    latticeOverlayVolumeReady,
+    latticeRebuildPending,
+  ]);
+  const voxelSlicesSuppressed = latticeOverlayVolumeReady; // hide 2D slice overlays when 3D volume is live
+  const voxelOverlayActive =
+    latticeOverlayVolumeReady &&
+    !overlayLockedReason &&
+    (coverageHeatmapEnabled || (voxelSlicesEnabled && !voxelSlicesSuppressed));
+  const voxelSliceActive = voxelOverlayActive && voxelSlicesEnabled && !voxelSlicesSuppressed;
+  const surfaceOverlaySuppressed = latticeOverlayVolumeReady; // hide surface debug when 3D volume is live
+  const overlayCanvasVisible = overlayHudEnabled || voxelOverlayActive;
+  const overlayControlsDisabled = !!overlayLockedReason || !latticeOverlayVolumeReady;
+  const sliceControlsDisabled = overlayControlsDisabled || !voxelSlicesEnabled;
+  const spacetimeGridBadges = useMemo(() => {
+    if (!spacetimeGridEnabled) return [] as Array<{ label: string; title?: string; level: "info" | "warn" }>;
+    const degraded = spacetimeGridDbg?.degraded ?? null;
+    const reasons = Array.isArray(degraded?.reasons) ? degraded.reasons : [];
+    const spacingUsedRaw = Number(degraded?.spacingUsed_m ?? spacetimeGridSpacing);
+    const spacingReqRaw = Number(degraded?.spacingRequested_m ?? spacetimeGridSpacing);
+    const spacingUsed = Number.isFinite(spacingUsedRaw) ? spacingUsedRaw : spacetimeGridSpacing;
+    const spacingReq = Number.isFinite(spacingReqRaw) ? spacingReqRaw : spacetimeGridSpacing;
+    const postEnabled = spacetimeGridDbg?.postEnabled ?? spacetimeGridDbg?.enabled;
+    const postMode = spacetimeGridDbg?.postMode ?? null;
+    const volumeActive = Boolean(spacetimeGridDbg?.volumeEnabled ?? spacetimeGridMode === "volume");
+    const boundsExpanded = Number(spacetimeGridDbg?.bounds?.expandedBy_m ?? 0);
+    const gpuReason = typeof spacetimeGridDbg?.gpu?.formatReason === "string"
+      ? spacetimeGridDbg.gpu.formatReason
+      : null;
+    const badges: Array<{ label: string; title?: string; level: "info" | "warn" }> = [];
+    if (postEnabled === false) {
+      badges.push({
+        label: "Post shader off",
+        level: "warn",
+        title: "Surface/slice overlay disabled; try toggling Spacetime grid or reloading the viewer.",
+      });
+    }
+    if (volumeActive && postEnabled) {
+      badges.push({
+        label: "Surface + Volume",
+        level: "info",
+        title: `Rendering shell overlay with volume cage (${postMode ?? "surface"}).`,
+      });
+    }
+    if (gpuReason) {
+      badges.push({
+        label: "GPU fallback",
+        level: "warn",
+        title: `GPU format fallback: ${gpuReason}`,
+      });
+    }
+    const sdfMissing = Boolean(degraded?.sdfMissing || reasons.includes("sdf-missing"));
+    const analyticOnly = Boolean(degraded?.analyticOnly || reasons.includes("analytic-only"));
+    if (sdfMissing) {
+      badges.push({
+        label: "SDF missing",
+        level: "warn",
+        title: "Lattice SDF unavailable; using analytic distance fallback.",
+      });
+    } else if (analyticOnly) {
+      badges.push({
+        label: "Analytic only",
+        level: "info",
+        title: "SDF sampling disabled; using analytic distance fallback.",
+      });
+    }
+    if (reasons.includes("coarse-spacing")) {
+      const detail = spacingReq !== spacingUsed
+        ? `Requested ${spacingReq.toFixed(2)} m, using ${spacingUsed.toFixed(2)} m`
+        : `Spacing ${spacingUsed.toFixed(2)} m`;
+      badges.push({
+        label: "Coarse spacing",
+        level: "warn",
+        title: reasons.includes("line-cap") ? `${detail} (line cap)` : detail,
+      });
+    }
+    if (reasons.includes("line-cap")) {
+      badges.push({
+        label: "Line cap",
+        level: "warn",
+        title: "Line budget hit; spacing increased to keep GPU budget in bounds.",
+      });
+    }
+    if (Number.isFinite(boundsExpanded) && boundsExpanded > 1e-3) {
+      badges.push({
+        label: "Expanded bounds",
+        level: "info",
+        title: `Grid bounds expanded by ${boundsExpanded.toFixed(2)} m to show the waveform.`,
+      });
+    }
+    return badges;
+  }, [spacetimeGridDbg, spacetimeGridEnabled, spacetimeGridMode, spacetimeGridSpacing]);
+  const latticeDowngradeLabel = latticeRuntime?.useAtlas
+    ? "2D atlas"
+    : latticeRuntime?.formatLabel?.replace(/^3D\s+/i, "") ?? (latticePathActive ? "R32F" : "analytic");
+  const latticeDowngradeReason =
+    (latticeRuntime as any)?.formatReason ??
+    ((latticeRuntime as any)?.telemetry?.downgradeReason ?? null);
+
+  const latticeBaseKeyRef = useRef<string>("");
+  useEffect(() => {
+    const key = latticeEnabled && latticeFrame && latticeStrobeBuild?.strobe
+      ? [
+          latticeFrame.profileTag,
+          latticeFrame.preset,
+          latticeFrame.dims.join("x"),
+          latticeFrame.voxelSize_m.toFixed(6),
+          latticeFrame.boundsProfile,
+          latticeStrobeBuild.strobe.hash,
+          latticeStrobeBuild.strobe.lod,
+          latticeStrobeBuild.strobe.source,
+          latticeStrobeBuild.strobe.surface?.meshHash ?? "mesh:none",
+        ].join("|")
+      : `off|${latticeProfileTag}|${latticeModeEnabled ? 1 : 0}|${latticeAvailable ? 1 : 0}`;
+
+    if (key === latticeBaseKeyRef.current) return;
+    latticeBaseKeyRef.current = key;
+
+    if (!latticeEnabled || !latticeFrame || !latticeStrobeBuild?.strobe) {
+      setSharedLattice({
+        frame: null,
+        preset: "auto",
+        profileTag: latticeProfileTag,
+        strobe: null,
+        sdf: null,
+        volume: null,
+      });
+      return;
+    }
+
+    const strobe = latticeStrobeBuild.strobe;
+    setSharedLattice({
+      frame: latticeFrame,
+      preset: latticeFrame.preset,
+      profileTag: latticeFrame.profileTag,
+      strobe: {
+        hash: strobe.hash,
+        source: strobe.source,
+        lod: strobe.lod,
+        meshHash: strobe.surface?.meshHash,
+        basisSignature: latticeStrobeBuild.basisSig,
+        handedness: strobe.surface?.handedness,
+        sectorCount: strobe.surface?.sectorCount,
+        triangleCount: strobe.surface?.triangleCount,
+        vertexCount: strobe.surface?.vertexCount,
+        clampReasons: strobe.clampReasons,
+        weightHash: undefined,
+        weightCacheHit: false,
+        hist: strobe.histogram,
+        weights: null,
+        coverage: null,
+      },
+      sdf: null,
+      volume: null,
+    });
+  }, [latticeEnabled, latticeFrame, latticeStrobeBuild, latticeModeEnabled, latticeAvailable, latticeProfileTag, setSharedLattice]);
+
+  const latticeVolumeTimerRef = useRef<number | null>(null);
+  const latticeVolumePendingSinceRef = useRef<number | null>(null);
+  const latticeVolumeWantedKeyRef = useRef<string | null>(null);
+  const latticeVolumeBuildingRef = useRef(false);
+  const latticeRebuildWatchdogs = useRef({
+    preview: new LatticeRebuildWatchdog(LATTICE_PROFILE_PERF.preview.rebuildMinMs),
+    card: new LatticeRebuildWatchdog(LATTICE_PROFILE_PERF.card.rebuildMinMs),
+  });
+  const [latticeWatchdogStats, setLatticeWatchdogStats] = useState({ blocked: 0, lastBlockedAt: 0 });
+
+  useEffect(() => {
+    if (!latticeEnabled) {
+      if (latticeVolumeTimerRef.current != null) {
+        window.clearTimeout(latticeVolumeTimerRef.current);
+        latticeVolumeTimerRef.current = null;
+      }
+      latticeVolumePendingSinceRef.current = null;
+      latticeVolumeWantedKeyRef.current = null;
+      latticeVolumeBuildingRef.current = false;
+      setLatticeWatchdogStats({ blocked: 0, lastBlockedAt: 0 });
+      return;
+    }
+
+    const strobe = latticeStrobeBuild?.strobe;
+    const frame = latticeFrame;
+    if (!frame || !strobe?.surface || !strobe.histogram) {
+      setSharedLattice({ volume: null });
+      return;
+    }
+
+    const rails = LATTICE_PROFILE_PERF[latticeProfileTag] ?? LATTICE_PROFILE_PERF.preview;
+    const frameVoxels = Math.max(1, frame.voxelCount ?? frame.dims[0] * frame.dims[1] * frame.dims[2]);
+    const estBytes = estimateLatticeUploadBytes(frame.dims, { packedRG: true, bytesPerComponent: 4 });
+    const perfClampReasons: string[] = [];
+    if (frameVoxels > rails.maxVoxels) perfClampReasons.push("budget:maxVoxels");
+    if (estBytes > rails.maxBytes) perfClampReasons.push("budget:maxBytes");
+    if (perfClampReasons.length) {
+      const clampedFrame = {
+        ...frame,
+        clampReasons: Array.from(new Set([...(frame.clampReasons ?? []), ...perfClampReasons])),
+      };
+      setSharedLattice({
+        frame: clampedFrame,
+        volume: null,
+        updatedAt: Date.now(),
+      });
+      publish("hull3d:lattice:fallback", {
+        ts: Date.now(),
+        enabled: latticeModeEnabled,
+        reason: perfClampReasons[0],
+        label: "Perf clamp",
+        detail: perfClampReasons.join(", "),
+        path: "analytic",
+        caps: null,
+        runtime: null,
+        frameClampReasons: clampedFrame.clampReasons,
+        volumeClampReasons: perfClampReasons,
+      });
+      return;
+    }
+
+    const desiredWeightHash = latticeDesiredWeightHash;
+    if (!desiredWeightHash && !latticeUseDynamicWeights) return;
+
+    const currentWeightHash = sharedLatticeState?.strobe?.weightHash ?? null;
+    const currentDriveSig = sharedLatticeState?.volume?.metadata?.driveLadder?.signature ?? null;
+    const desiredDriveSig = latticeDesiredDriveLadderSignature;
+    const surfaceHash = strobe.hash;
+    const currentSurfaceHash = sharedLatticeState?.strobe?.hash ?? null;
+
+    const needsRebuild =
+      !sharedLatticeState?.volume ||
+      currentSurfaceHash !== surfaceHash ||
+      (!latticeUseDynamicWeights && currentWeightHash !== desiredWeightHash) ||
+      currentDriveSig !== desiredDriveSig;
+
+    if (!needsRebuild) {
+      if (latticeVolumeTimerRef.current != null) {
+        window.clearTimeout(latticeVolumeTimerRef.current);
+        latticeVolumeTimerRef.current = null;
+      }
+      latticeVolumePendingSinceRef.current = null;
+      latticeVolumeWantedKeyRef.current = null;
+      return;
+    }
+
+    const frameKey = `${frame.dims.join("x")}@${frame.voxelSize_m.toFixed(6)}|${frame.profileTag}`;
+    const weightKey = latticeUseDynamicWeights ? "weights:dynamic" : desiredWeightHash ?? "weights:none";
+    const wantedKey = `${frameKey}|${surfaceHash}|${weightKey}|${desiredDriveSig}`;
+
+    latticeVolumeWantedKeyRef.current = wantedKey;
+    if (latticeVolumeBuildingRef.current) {
+      return;
+    }
+
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const major =
+      !sharedLatticeState?.volume ||
+      currentSurfaceHash !== surfaceHash ||
+      currentDriveSig !== desiredDriveSig ||
+      (!latticeUseDynamicWeights && currentWeightHash !== desiredWeightHash) ||
+      latticeProfileTag === "card";
+
+    if (major) {
+      latticeVolumePendingSinceRef.current = now;
+    } else if (latticeVolumePendingSinceRef.current == null) {
+      latticeVolumePendingSinceRef.current = now;
+    }
+
+    const pendingSince = latticeVolumePendingSinceRef.current ?? now;
+    const elapsed = now - pendingSince;
+    const debounceMs = latticeProfileTag === "card" ? 0 : 160;
+    const maxWaitMs = latticeProfileTag === "card" ? 0 : 650;
+    const delay = major || elapsed >= maxWaitMs ? 0 : debounceMs;
+
+    if (latticeVolumeTimerRef.current != null) {
+      window.clearTimeout(latticeVolumeTimerRef.current);
+      latticeVolumeTimerRef.current = null;
+    }
+
+    const watchdog = latticeRebuildWatchdogs.current[latticeProfileTag] ?? latticeRebuildWatchdogs.current.preview;
+    latticeVolumeTimerRef.current = window.setTimeout(() => {
+      const latestKey = latticeVolumeWantedKeyRef.current;
+      if (!latestKey || latestKey !== wantedKey) return;
+      if (!latticeModeEnabled) return;
+      const guardNow = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const guard = watchdog.shouldThrottle(guardNow);
+      if (guard.blocked) {
+        setLatticeWatchdogStats((prev) => ({
+          blocked: prev.blocked + 1,
+          lastBlockedAt: guardNow,
+        }));
+        return;
+      }
+      latticeVolumeBuildingRef.current = true;
+      try {
+        const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const surface = strobe.surface;
+        const histogram = strobe.histogram;
+        if (!surface || !histogram) return;
+
+        const strobeWeights = applySchedulerWeights(
+          histogram,
+          {
+            totalSectors: surface.sectorCount ?? totalSectors,
+            liveSectors,
+            sectorCenter01,
+            gaussianSigma,
+            sectorFloor: ds.sectorFloor,
+            splitEnabled: ds.splitEnabled,
+            splitFrac: ds.splitFrac,
+            syncMode,
+          },
+          { surfaceHash: strobe.hash, basis: surface.basis },
+        );
+        const tWeights = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const sectorWeights = latticeUseDynamicWeights ? null : strobeWeights?.weights ?? null;
+        const weightsHash = latticeUseDynamicWeights ? "dynamic" : strobeWeights?.hash;
+
+        const perVertexDfdr =
+          surface.positions.length >= (surface.vertexCount ?? 0) * 3
+            ? (() => {
+                const count = surface.vertexCount ?? Math.floor(surface.positions.length / 3);
+                const arr = new Float32Array(count);
+                const ax = Math.max(1e-6, axes[0]);
+                const ay = Math.max(1e-6, axes[1]);
+                const az = Math.max(1e-6, axes[2]);
+                for (let i = 0; i < count; i++) {
+                  const base = i * 3;
+                  const x = surface.positions[base] ?? 0;
+                  const y = surface.positions[base + 1] ?? 0;
+                  const z = surface.positions[base + 2] ?? 0;
+                  const mx = x / ax;
+                  const my = y / ay;
+                  const mz = z / az;
+                  const r = Math.sqrt(mx * mx + my * my + mz * mz);
+                  const cosX = r > 1e-6 ? mx / r : 0;
+                  const df = dTopHatDr(r, sigma, R) * cosX * beta;
+                  arr[i] = Number.isFinite(df) ? df : 0;
+                }
+                return arr;
+              })()
+            : null;
+        const tDfdr = typeof performance !== "undefined" ? performance.now() : Date.now();
+
+        const volume = voxelizeHullSurfaceStrobe({
+          frame,
+          surface,
+          sectorWeights,
+          perVertexDfdr,
+          gateScale: gate,
+          driveScale: ampChain,
+          driveLadder: { R, sigma, beta, gate, ampChain },
+          shellThickness: frame.voxelSize_m * 1.25,
+          sampleBudget: Math.floor(frame.voxelCount * 6),
+          surfaceHash: strobe.hash,
+          weightsHash,
+          dfdrSignature: latticeDesiredDfdrSignature,
+        });
+        const tVoxel = typeof performance !== "undefined" ? performance.now() : Date.now();
+
+        setSharedLattice({
+          frame,
+          preset: frame.preset,
+          profileTag: frame.profileTag,
+          strobe: {
+            hash: strobe.hash,
+            source: strobe.source,
+            lod: strobe.lod,
+            meshHash: surface.meshHash,
+            basisSignature: latticeStrobeBuild?.basisSig,
+            handedness: surface.handedness,
+            sectorCount: surface.sectorCount,
+            triangleCount: surface.triangleCount,
+            vertexCount: surface.vertexCount,
+            clampReasons: strobe.clampReasons,
+            weightHash: strobeWeights?.hash,
+            weightCacheHit: strobeWeights?.cacheHit ?? false,
+            hist: histogram,
+            weights: strobeWeights?.weights ?? null,
+            coverage: strobeWeights
+              ? {
+                  area: strobeWeights.areaWeighted,
+                  area01: strobeWeights.areaWeighted01,
+                  vertices: strobeWeights.vertexWeighted,
+                  vertices01: strobeWeights.vertexWeighted01,
+                  triangles: strobeWeights.triangleWeighted,
+                  triangles01: strobeWeights.triangleWeighted01,
+                }
+              : null,
+          },
+          volume: volume.volume ?? null,
+        });
+
+        if (volume.volume) {
+          const msTotal = tVoxel - t0;
+          const msWeights = tWeights - t0;
+          const msDfdr = tDfdr - tWeights;
+          const msVoxel = tVoxel - tDfdr;
+          console.info("[Hull3D][lattice] volume build", {
+            volumeHash: volume.volume.hash.slice(0, 16),
+            cacheHit: volume.volume.cacheHit,
+            dims: volume.volume.dims,
+            voxelSize_m: volume.volume.voxelSize,
+            voxelCount: volume.volume.dims[0] * volume.volume.dims[1] * volume.volume.dims[2],
+            coveragePct: Math.round((volume.volume.stats.coverage ?? 0) * 1000) / 10,
+            maxGate: volume.volume.stats.maxGate,
+            weightsHash: strobeWeights?.hash ?? null,
+            driveSig: volume.volume.metadata.driveLadder.signature,
+            ms: {
+              total: Math.round(msTotal * 10) / 10,
+              weights: Math.round(msWeights * 10) / 10,
+              dfdr: Math.round(msDfdr * 10) / 10,
+              voxelize: Math.round(msVoxel * 10) / 10,
+            },
+          });
+        }
+
+        if (frame.clampReasons.length) {
+          console.debug("[Hull3D][lattice] frame clamped", {
+            preset: frame.preset,
+            profileTag: frame.profileTag,
+            clampReasons: frame.clampReasons,
+            dims: frame.dims,
+            voxelSize_m: frame.voxelSize_m,
+            voxelCount: frame.voxelCount,
+          });
+        }
+        if (strobe.clampReasons.length) {
+          console.debug("[Hull3D][lattice] surface strobe clamp", {
+            clampReasons: strobe.clampReasons,
+            meshHash: strobe.surface?.meshHash,
+            lod: strobe.lod,
+          });
+        }
+        if (volume.clampReasons.length) {
+          console.debug("[Hull3D][lattice] lattice volume clamp", {
+            clampReasons: volume.clampReasons,
+            volumeHash: volume.volume?.hash,
+          });
+        }
+      } finally {
+        latticeVolumeBuildingRef.current = false;
+        latticeVolumePendingSinceRef.current = null;
+        latticeVolumeTimerRef.current = null;
+      }
+    }, delay);
+
+    return () => {
+      if (latticeVolumeTimerRef.current != null) {
+        window.clearTimeout(latticeVolumeTimerRef.current);
+        latticeVolumeTimerRef.current = null;
+      }
+    };
+  }, [
+    latticeEnabled,
+    latticeFrame,
+    latticeStrobeBuild,
+    latticeDesiredWeightHash,
+    latticeDesiredDriveLadderSignature,
+    latticeDesiredDfdrSignature,
+    latticeUseDynamicWeights,
+    latticeProfileTag,
+    latticeModeEnabled,
+    gate,
+    ampChain,
+    sigma,
+    beta,
+    R,
+    axes,
+    totalSectors,
+    liveSectors,
+    sectorCenter01,
+    gaussianSigma,
+    ds.sectorFloor,
+    ds.splitEnabled,
+    ds.splitFrac,
+    syncMode,
+    sharedLatticeState?.strobe?.hash,
+    sharedLatticeState?.strobe?.weightHash,
+    sharedLatticeState?.volume,
+    setSharedLattice,
+  ]);
+
+  const latticeSdfTimerRef = useRef<number | null>(null);
+  const latticeSdfSeqRef = useRef(0);
+  useEffect(() => {
+    const frame = latticeSdfFrame;
+    if (!frame || !hullPreview || !hullDimsResolved) {
+      if (latticeSdfTimerRef.current != null) {
+        window.clearTimeout(latticeSdfTimerRef.current);
+        latticeSdfTimerRef.current = null;
+      }
+      latticeSdfSeqRef.current += 1;
+      setSharedLattice({ sdf: null });
+      return;
+    }
+
+    const delay = latticeRequireSdf || latticeProfileTag === "card" ? 0 : 350;
+    if (latticeSdfTimerRef.current != null) {
+      window.clearTimeout(latticeSdfTimerRef.current);
+      latticeSdfTimerRef.current = null;
+    }
+
+    const seq = ++latticeSdfSeqRef.current;
+    latticeSdfTimerRef.current = window.setTimeout(() => {
+      const run = async () => {
+        const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const result = await buildHullDistanceGrid({
+          payload: hullPreview,
+          frame,
+          band: frame.voxelSize_m * 2.5,
+          surface: {
+            lod: wireframeLod,
+            targetDims: {
+              Lx_m: hullDimsResolved.Lx_m,
+              Ly_m: hullDimsResolved.Ly_m,
+              Lz_m: hullDimsResolved.Lz_m,
+            },
+            totalSectors,
+            ...wireframeBudgets,
+          },
+          maxSamples: Math.floor(frame.voxelCount * 0.5),
+        });
+        const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+        if (seq !== latticeSdfSeqRef.current) return;
+        setSharedLattice({ sdf: result.grid ?? null });
+        if (result.grid) {
+          console.info("[Hull3D][lattice] hull SDF build", {
+            sdfKey: result.grid.key.slice(0, 16),
+            cacheHit: result.grid.cacheHit,
+            dims: result.grid.dims,
+            voxelSize_m: result.grid.voxelSize,
+            band_m: result.grid.band,
+            voxelCoveragePct: Math.round((result.grid.stats?.voxelCoverage ?? 0) * 1000) / 10,
+            triangleCoveragePct: Math.round((result.grid.stats?.triangleCoverage ?? 0) * 1000) / 10,
+            maxAbsDistance_m: result.grid.stats?.maxAbsDistance,
+            ms: Math.round((t1 - t0) * 10) / 10,
+          });
+        }
+        if (result.clampReasons.length) {
+          console.debug("[Hull3D][lattice] hull SDF clamp", {
+            reasons: result.clampReasons,
+            meshHash: result.grid?.meshHash ?? hullPreview.meshHash ?? hullPreview.mesh?.meshHash,
+            cacheKey: result.key,
+          });
+        }
+      };
+
+      run().catch((error) => {
+        console.error("[Hull3D][lattice] hull SDF build failed", error);
+        if (seq === latticeSdfSeqRef.current) {
+          setSharedLattice({ sdf: null });
+        }
+      });
+    }, delay);
+
+    return () => {
+      if (latticeSdfTimerRef.current != null) {
+        window.clearTimeout(latticeSdfTimerRef.current);
+        latticeSdfTimerRef.current = null;
+      }
+    };
+  }, [
+    latticeSdfFrame,
+    hullPreview,
+    hullDimsResolved,
+    wireframeLod,
+    totalSectors,
+    wireframeBudgets,
+    latticeRequireSdf,
+    latticeProfileTag,
+    setSharedLattice,
+  ]);
 
   const driveWeightAt = useCallback((angle01: number) => {
     // Apply global phase offset before any scheduler math (wrap to [0,1))
@@ -1879,10 +4556,6 @@ const res = 256;
     showSectorGridOverlay,
   ]);
 
-
-  // --- track canvas aspect so camera fits accurately
-  const [aspect, setAspect] = useState(16/9);
-
   // --- Parity check: sample CPU gating peak vs shader sector center (sync mode only)
   useEffect(() => {
     if (planarVizMode !== 2) return; // drive-only
@@ -1928,7 +4601,7 @@ const res = 256;
     if (planarVizMode !== 0) return null;
     const nx = res, ny = res;
     const field = new Float32Array(nx * ny);
-    const domainScale = R * 1.3;
+    const domainScale = hullDomainScale;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
         const gx = -1 + 2 * (i / (nx - 1));
@@ -1946,13 +4619,13 @@ const res = 256;
       }
     }
     return field;
-  }, [planarVizMode, beta, sigma, R, axes, res]);
+  }, [planarVizMode, beta, sigma, R, axes, res, hullDomainScale]);
 
   const rhoField_GR = useMemo(() => {
     if (planarVizMode !== 1) return null;
     const nx = res, ny = res;
     const field = new Float32Array(nx * ny);
-    const domainScale = R * 1.3;
+    const domainScale = hullDomainScale;
     const INV16PI = 0.019894367886486918;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
@@ -1979,7 +4652,7 @@ const res = 256;
       }
     }
     return field;
-  }, [planarVizMode, beta, sigma, R, axes, res]);
+  }, [planarVizMode, beta, sigma, R, axes, res, hullDomainScale]);
 
   // Optional contrast boost for sector visibility; >1 exaggerates lumps a bit
   const lumpBoostExp = useMemo(() => {
@@ -1987,12 +4660,62 @@ const res = 256;
     return Number.isFinite(v) && v > 0 ? v : 1.25;
   }, [live]);
 
+  useEffect(() => {
+    if (!wireframeOverlay.overlay || !showWireframeOverlay) {
+      setWireframePatches([]);
+      return;
+    }
+    if (useFieldProbeOverlay && fieldProbe?.patches) {
+      setWireframePatches(fieldProbe.patches.slice(0, 6));
+      return;
+    }
+    const now = performance.now();
+    if (now - wireframePatchTick.current < 90) return;
+    wireframePatchTick.current = now;
+    const { patches } = colorizeWireframeOverlay(wireframeOverlay.overlay, {
+      phase01: ds.phase01 ?? 0,
+      sectorCenter01,
+      gaussianSigma,
+      totalSectors,
+      liveSectors,
+      sectorFloor: ds.sectorFloor,
+      lumpExp: lumpBoostExp,
+      duty: dutyFR,
+      gateView,
+      splitEnabled: ds.splitEnabled,
+      splitFrac: ds.splitFrac,
+      syncMode,
+      tilesPerSectorVector,
+      fieldThreshold: 0.4,
+      gradientThreshold: 0.2,
+    });
+    setWireframePatches((patches ?? []).slice(0, 6));
+  }, [
+    fieldProbe?.patches,
+    useFieldProbeOverlay,
+    wireframeOverlay.overlay,
+    showWireframeOverlay,
+    ds.phase01,
+    sectorCenter01,
+    gaussianSigma,
+    totalSectors,
+    liveSectors,
+    ds.sectorFloor,
+    lumpBoostExp,
+    dutyFR,
+    gateView,
+    ds.splitEnabled,
+    ds.splitFrac,
+    syncMode,
+    tilesPerSectorVector,
+  ]);
+
   const thetaField_Drive = useMemo(() => {
     if (planarVizMode !== 2) return null;
     const nx = res, ny = res;
     const field = new Float32Array(nx * ny);
     const twoPi = 2 * Math.PI;
-    const domainScale = R * 1.3;
+    const domainScale = hullDomainScale;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
         const gx = -1 + 2 * (i / (nx - 1));
@@ -2021,7 +4744,7 @@ const res = 256;
       }
     }
     return field;
-  }, [planarVizMode, beta, sigma, R, ampChain, gate, fActive, axes, res, lumpBoostExp, driveWeightAt, ds.phase01]);
+  }, [planarVizMode, beta, sigma, R, ampChain, gate, fActive, axes, res, lumpBoostExp, driveWeightAt, ds.phase01, hullDomainScale]);
 
   const [thetaPkAbs, thetaPkPos, thetaMin, thetaMax] = useMemo(() => {
     const field = planarVizMode === 0 ? thetaField_GR : planarVizMode === 1 ? rhoField_GR : thetaField_Drive;
@@ -2240,9 +4963,9 @@ const res = 256;
     const tanY = Math.tan(fovy * 0.5);
     const tanX = tanY * Math.max(0.2, aspect);
 
-  // Horizontal half-extent with axes scaling (geometry scaled by R*1.3*axes)
-  const halfX = R * 1.3 * (axes[0] || 1);
-  const halfZ = R * 1.3 * (axes[2] || 1);
+  // Horizontal half-extent with axes scaling (geometry scaled by domain*axes)
+  const halfX = hullDomainScale * (axes[0] || 1);
+  const halfZ = hullDomainScale * (axes[2] || 1);
   const halfW = Math.max(halfX, halfZ);
 
     // Vertical half-extent (world space). Let the camera auto-expand to cover the
@@ -2287,13 +5010,14 @@ const res = 256;
       }
     }
     return M;
-  }, [aspect, R, targetHalf, heightFitBias, eyeYScale, eyeYBase, axes, yGain, thetaMax, thetaMin, centerPlane]);
+  }, [aspect, R, targetHalf, heightFitBias, eyeYScale, eyeYBase, axes, yGain, thetaMax, thetaMin, centerPlane, hullDomainScale]);
 
   // === Dynamic param refs (decouple GL init from frequent pipeline changes) ===
   const dynRef = useRef({
     axes: [1,1,1] as [number,number,number],
     sigma: 6,
-  R: 1,
+    R: 1,
+    domainScale: 1,
     beta: 0,
     planarVizMode: 0 as VizMode,
     volumeViz: "theta_drive" as Hull3DVolumeViz,
@@ -2324,18 +5048,22 @@ const res = 256;
     hullDims: [1, 1, 1] as [number, number, number],
     betaTexture: null,
     betaSampler: null,
+    previewMesh: null as HullPreviewMeshPayload | null,
   });
 
   // Immediate priming (so first frame doesn't see zeroed MVP/uniforms)
   dynRef.current.axes = axes;
   dynRef.current.sigma = sigma;
   dynRef.current.R = R;
+  dynRef.current.domainScale = hullDomainScale;
   dynRef.current.beta = beta;
   dynRef.current.planarVizMode = planarVizMode;
   dynRef.current.volumeViz = hullVolumeVizLive;
+  (dynRef.current as any).volumeDomain = hullVolumeDomain;
+  (dynRef.current as any).opacityWindow = bubbleOpacityWindow;
   dynRef.current.ampChain = ampChain;
   dynRef.current.gate = gateRaw;
-  dynRef.current.gateView = gate;
+  dynRef.current.gateView = gateView;
   dynRef.current.duty = dutyFR;
   dynRef.current.yGain = yGainFinal;
   dynRef.current.yBias = yBias;
@@ -2368,6 +5096,7 @@ const res = 256;
   dynRef.current.betaUniform_ms2 = betaTargetMs2;
   dynRef.current.betaTexture = null;
   dynRef.current.betaSampler = null;
+  dynRef.current.previewMesh = previewMeshForRenderer;
 
   useEffect(()=>{
     dynRef.current.axes = axes;
@@ -2378,7 +5107,7 @@ const res = 256;
     dynRef.current.volumeViz = hullVolumeVizLive;
     dynRef.current.ampChain = ampChain;
     dynRef.current.gate = gateRaw;
-    dynRef.current.gateView = gate;
+    dynRef.current.gateView = gateView;
     dynRef.current.duty = dutyFR;
   dynRef.current.yGain = yGainFinal;
     dynRef.current.yBias = yBias;
@@ -2396,40 +5125,45 @@ const res = 256;
   dynRef.current.syncMode = syncMode;
   dynRef.current.phase01 = ds.phase01;
   dynRef.current.showSurfaceOverlay = showHullSurfaceOverlay;
-  const hullDimsEffect: [number, number, number] = [
-    Math.max(Math.abs(axes[0]) * R * 2, 1e-3),
-    Math.max(Math.abs(axes[1]) * R * 2, 1e-3),
-    Math.max(Math.abs(axes[2]) * R * 2, 1e-3),
-  ];
-  dynRef.current.hullDims = hullDimsEffect;
+  dynRef.current.hullDims = hullDimsEffective;
   dynRef.current.betaOverlayEnabled = betaOverlayEnabled;
   dynRef.current.betaTarget_ms2 = betaTargetMs2;
   dynRef.current.comfort_ms2 = betaComfortMs2;
   dynRef.current.betaUniform_ms2 = betaTargetMs2;
   dynRef.current.betaTexture = null;
   dynRef.current.betaSampler = null;
+  dynRef.current.previewMesh = previewMeshForRenderer;
   (dynRef.current as any).splitEnabled = ds.splitEnabled ? 1 : 0;
   (dynRef.current as any).splitFrac = ds.splitFrac;
-  }, [axes, sigma, R, beta, planarVizMode, hullVolumeVizLive, ampChain, gate, dutyFR, yGainFinal, yBias, kColor, mvp, totalSectors, liveSectors, lumpBoostExp, sectorCenter01, gaussianSigma, ds.sectorFloor, syncMode, ds.phase01, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, ds.splitEnabled, ds.splitFrac]);
+  }, [axes, sigma, R, beta, planarVizMode, hullVolumeVizLive, ampChain, gateRaw, gateView, dutyFR, yGainFinal, yBias, kColor, mvp, totalSectors, liveSectors, lumpBoostExp, sectorCenter01, gaussianSigma, ds.sectorFloor, syncMode, ds.phase01, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, ds.splitEnabled, ds.splitFrac, hullGeometry, hullRadiusLUT, hullSdf, hullDimsEffective, previewMeshForRenderer]);
 
   useEffect(() => {
-    const hullDimsBase: [number, number, number] = [
-      Math.max(Math.abs(axes[0]) * R * 2, 1e-3),
-      Math.max(Math.abs(axes[1]) * R * 2, 1e-3),
-      Math.max(Math.abs(axes[2]) * R * 2, 1e-3),
-    ];
+    const fActiveRenderer = gateSource === "blanket" ? 1 : fActive;
     const base: Hull3DRendererState = {
       axes,
+      domainScale: hullDomainScale,
+      boundsProfile: bubbleBoundsMode,
+      geometry: hullGeometry,
+      hullRadiusLUT: hullRadiusLUT?.data,
+      hullRadiusLUTSize: hullRadiusLUT?.size,
+      hullRadiusMax: hullRadiusLUT?.maxR ?? hullRadiusMax,
+      hullSDF: hullSdf?.data,
+      hullSDFDims: hullSdf?.dims,
+      hullSDFBounds: hullSdf?.bounds,
+      hullSDFBand: hullSdf?.band,
+      hullSDFFormat: hullSdf?.format,
       R,
       sigma,
       beta,
       ampChain,
       gate: gateRaw,
-      gateView: gate,
+      gateView,
+      gateSource,
+      tilesPerSectorVector,
       vizFloorThetaGR: vizFloors.thetaGR,
       vizFloorRhoGR: vizFloors.rhoGR,
       vizFloorThetaDrive: vizFloors.thetaDrive,
-      fActive,
+      fActive: fActiveRenderer,
       duty: dutyFR,
       exposure: (() => {
         // Map [0,1] -> [1e-2, 1e+2] with center 0.5 = 1x using 10^(4*(x-0.5))
@@ -2448,26 +5182,42 @@ const res = 256;
       syncMode,
       phase01: ds.phase01,
       showSectorRing: showHullSectorRing,
-      showGhostSlice: showHullGhostSlice,
-      showSurfaceOverlay: showHullSurfaceOverlay,
+      showGhostSlice: voxelSliceActive,
+      showSurfaceOverlay: showHullSurfaceOverlay && !surfaceOverlaySuppressed,
       betaOverlayEnabled,
       betaTarget_ms2: betaTargetMs2,
       comfort_ms2: betaComfortMs2,
       betaUniform_ms2: betaTargetMs2,
-      hullDims: hullDimsBase,
+      hullDims: hullDimsEffective,
       betaTexture: null,
       betaSampler: null,
       followPhase: followHullPhase,
       volumeViz: hullVolumeVizLive,
+      volumeDomain: hullVolumeDomain,
+      opacityWindow: bubbleOpacityWindow,
+      camera: cardCameraFrame,
       blendFactor: hullBlend,
       freeze: bubbleStatus === "CRITICAL",
       timeSec: 0,
       bubbleStatus,
       aspect,
+      previewMesh: previewMeshForRenderer,
+      wireframeOverlay: wireframeOverlayForRenderer,
       overlays: overlayConfig,
+      latticeFrame: latticeModeEnabled ? sharedLatticeState?.frame ?? null : null,
+      latticePreset: latticeModeEnabled ? sharedLatticeState?.preset ?? "auto" : "auto",
+      latticeProfileTag: latticeModeEnabled ? sharedLatticeState?.profileTag ?? "preview" : "preview",
+      latticeClampReasons: latticeModeEnabled ? sharedLatticeState?.frame?.clampReasons ?? [] : [],
+      latticeStrobe: latticeModeEnabled ? sharedLatticeState?.strobe ?? null : null,
+      latticeSdf: latticeModeEnabled ? latticeSdfForRenderer : null,
+      latticeVolume: latticeModeEnabled ? latticeVolumeForRenderer : null,
+      latticeWeightMode: latticeUseDynamicWeights ? "dynamic" : "baked",
+      latticeWorldToLattice: latticeModeEnabled ? sharedLatticeState?.frame?.worldToLattice ?? null : null,
+      latticeMin: latticeModeEnabled ? sharedLatticeState?.frame?.bounds.minLattice ?? null : null,
+      latticeSize: latticeModeEnabled ? sharedLatticeState?.frame?.bounds.size ?? null : null,
     };
     hullStateRef.current = base;
-  }, [axes, R, sigma, beta, ampChain, gate, gateRaw, dutyFR, gaussianSigma, sectorCenter01, totalSectors, liveSectors, ds.sectorFloor, lumpBoostExp, ds.splitEnabled, ds.splitFrac, syncMode, ds.phase01, showHullSectorRing, showHullGhostSlice, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, followHullPhase, hullVolumeVizLive, hullBlend, bubbleStatus, aspect, vizFloors.thetaGR, vizFloors.rhoGR, vizFloors.thetaDrive, overlayConfig, sharedPhase, sharedSampling, sharedPhysicsState, sharedComplianceState, sharedSectorState, sharedPaletteState]);
+  }, [axes, hullDomainScale, bubbleBoundsMode, hullGeometry, hullRadiusMax, hullRadiusLUT, hullSdf, R, sigma, beta, ampChain, gateView, gateRaw, gateSource, tilesPerSectorVector, fActive, dutyFR, gaussianSigma, sectorCenter01, totalSectors, liveSectors, ds.sectorFloor, lumpBoostExp, ds.splitEnabled, ds.splitFrac, syncMode, ds.phase01, showHullSectorRing, voxelSliceActive, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, followHullPhase, hullVolumeVizLive, hullVolumeDomain, bubbleOpacityWindow, cardCameraFrame, hullBlend, bubbleStatus, aspect, vizFloors.thetaGR, vizFloors.rhoGR, vizFloors.thetaDrive, overlayConfig, sharedPhase, sharedSampling, sharedPhysicsState, sharedComplianceState, sharedSectorState, sharedPaletteState, wireframeOverlayForRenderer, latticeModeEnabled, latticeSdfForRenderer, latticeVolumeForRenderer, sharedLatticeState?.frame, sharedLatticeState?.preset, sharedLatticeState?.profileTag, sharedLatticeState?.strobe, previewMeshForRenderer, latticeUseDynamicWeights]);
 
   // When an operational mode that implies drive activity is set, default to theta(Drive)
   // once, unless the user has already picked a planarVizMode explicitly. Only override planar GR modes.
@@ -2902,14 +5652,56 @@ const res = 256;
     glRef.current = gl;
     setGlError(null);
 
-    const renderer = new Hull3DRenderer(gl, cv, {
-      quality: hullQuality,
-      qualityOverrides: hullQualityOverridesRef.current,
-      emaAlpha: 0.12,
-    });
-    renderer.setMode(hullConfigRef.current.mode, hullConfigRef.current.blend);
-    renderer.setQuality(hullQuality, hullQualityOverridesRef.current);
-    hullRendererRef.current = renderer;
+    const onLost = (event: Event) => {
+      try {
+        (event as any).preventDefault?.();
+      } catch {}
+      console.warn("[Alcubierre][Hull3D] WebGL context lost", event);
+      setGlError("WebGL context lost – attempting restore.");
+      try {
+        hullRendererRef.current?.dispose();
+      } catch {}
+      hullRendererRef.current = null;
+    };
+
+    const recreateRenderer = () => {
+      try {
+        hullRendererRef.current?.dispose();
+      } catch {}
+      const next = new Hull3DRenderer(gl, cv, {
+        quality: hullQuality,
+        qualityOverrides: hullQualityOverridesRef.current,
+        emaAlpha: 0.12,
+      });
+      const config = hullConfigRef.current;
+      next.setMode(config.mode, config.blend);
+      next.setQuality(hullQuality, hullQualityOverridesRef.current);
+      hullRendererRef.current = next;
+    };
+
+    const onRestored = () => {
+      console.warn("[Alcubierre][Hull3D] WebGL context restored – recreating renderer");
+      try {
+        setGlError(null);
+        recreateRenderer();
+      } catch (err) {
+        console.error("[Alcubierre][Hull3D] Failed to recreate renderer after context restore", err);
+        setGlError("WebGL context restored but Hull3D renderer failed to reinitialize.");
+      }
+    };
+
+    cv.addEventListener("webglcontextlost", onLost as any, { passive: false } as any);
+    cv.addEventListener("webglcontextrestored", onRestored as any);
+
+    recreateRenderer();
+
+    if (!hullRendererRef.current) {
+      setGlError("Failed to initialize Hull3D renderer.");
+      return () => {
+        cv.removeEventListener("webglcontextlost", onLost as any);
+        cv.removeEventListener("webglcontextrestored", onRestored as any);
+      };
+    }
 
     const resize = () => {
       const rect = cv.getBoundingClientRect();
@@ -2917,6 +5709,11 @@ const res = 256;
       const h = Math.max(360, Math.floor(rect.height * devicePixelRatio));
       cv.width = w;
       cv.height = h;
+      const overlayCanvas = overlayCanvasRef.current;
+      if (overlayCanvas) {
+        overlayCanvas.width = w;
+        overlayCanvas.height = h;
+      }
       gl.viewport(0, 0, w, h);
       setAspect(w / Math.max(1, h));
     };
@@ -2949,15 +5746,16 @@ const res = 256;
     const loop = () => {
       if (disposed || planarVizMode !== 3) return;
       const base = hullStateRef.current;
-      if (base) {
+      const active = hullRendererRef.current;
+      if (base && active) {
         const config = hullConfigRef.current;
-        renderer.setMode(config.mode, config.blend);
-        renderer.update({
+        active.setMode(config.mode, config.blend);
+        active.update({
           ...base,
           blendFactor: config.blend,
           timeSec: performance.now() / 1000,
         });
-        renderer.draw();
+        active.draw();
         // Begin polling diagnostics once renderer has drawn at least one frame
         startDiagPoll();
       }
@@ -2974,7 +5772,11 @@ const res = 256;
       }
       ro.disconnect();
       stopDiagPoll();
-      renderer.dispose();
+      cv.removeEventListener("webglcontextlost", onLost as any);
+      cv.removeEventListener("webglcontextrestored", onRestored as any);
+      try {
+        hullRendererRef.current?.dispose();
+      } catch {}
       hullRendererRef.current = null;
     };
   }, [planarVizMode]);
@@ -3047,7 +5849,7 @@ const res = 256;
     return {
       ampChain,
       gate: gateRaw,
-      gateView: gate,
+      gateView,
       thetaPkPos,
       span,
       sectorFloor: ds.sectorFloor,
@@ -3055,7 +5857,7 @@ const res = 256;
       syncScheduler,
       centerDeltaDeg,
     };
-  }, [planarVizMode, ampChain, gateRaw, gate, thetaPkPos, thetaMax, thetaMin, ds.sectorFloor, ds.sigmaSectors, syncScheduler, centerDeltaDeg, ds]);
+  }, [planarVizMode, ampChain, gateRaw, gateView, thetaPkPos, thetaMax, thetaMin, ds.sectorFloor, ds.sigmaSectors, syncScheduler, centerDeltaDeg, ds]);
 
   useEffect(() => {
     const expected =
@@ -3360,55 +6162,79 @@ const res = 256;
 
   const hullSummary = useMemo(() => {
 
-    const dimsValid =
-
+    const axesValid =
       Array.isArray(axes) &&
-
       axes.length >= 3 &&
-
       axes.slice(0, 3).every((value: number) => Number.isFinite(Number(value)));
+    const basisResolved = hullDimsResolved?.basis ?? HULL_BASIS_IDENTITY;
 
     const wallNum = Number(wallWidth_m);
-
     const wallValid = Number.isFinite(wallNum);
 
-    if (!dimsValid && !wallValid) {
-
+    if (!axesValid && !wallValid) {
       return {
-
         text: "Hull --",
-
         className: undefined,
-
         title: "Hull dimensions unavailable",
-
       };
-
     }
 
-    const dimsText = dimsValid
+    const axesHalfXYZ = axesValid
+      ? ([Number(axes[0]), Number(axes[1]), Number(axes[2])] as [number, number, number])
+      : null;
+    const dimsXYZ = axesHalfXYZ
+      ? ([axesHalfXYZ[0] * 2, axesHalfXYZ[1] * 2, axesHalfXYZ[2] * 2] as [number, number, number])
+      : null;
 
-      ? `${Number(axes[0]).toFixed(1)}x${Number(axes[1]).toFixed(1)}x${Number(axes[2]).toFixed(1)} m`
-
-      : "--";
+    const dimsFRU = dimsXYZ ? remapXYZToFrontRightUp(dimsXYZ, basisResolved) : null;
+    const axesFRU = axesHalfXYZ ? remapXYZToFrontRightUp(axesHalfXYZ, basisResolved) : null;
 
     const wallText = wallValid ? `${wallNum.toFixed(3)} m` : "--";
+    const basisLabel = dimsFRU ? `basis F/R/U=${dimsFRU.labels.front}/${dimsFRU.labels.right}/${dimsFRU.labels.up}` : "basis --";
 
     return {
-
-      text: `Hull ${dimsText} | t_w ${wallText}`,
-
+      text: `Hull F/R/U ${dimsFRU ? `${formatTriplet(dimsFRU.values, 1)} m` : "--"} | t_w ${wallText}`,
       className: undefined,
-
-      title: `axes=${
-
-        dimsValid ? `${Number(axes[0])}, ${Number(axes[1])}, ${Number(axes[2])}` : "--"
-
-      }, wallWidth=${wallValid ? wallNum : "--"}`,
-
+      title: `${basisLabel}${
+        axesHalfXYZ
+          ? ` | axes (x,y,z half)=${axesHalfXYZ.map((v) => v.toFixed(3)).join(",")} | axes (F/R/U half)=${axesFRU ? formatTriplet(axesFRU.values, 3) : "--"}`
+          : ""
+      }${
+        dimsXYZ
+          ? ` | dims (x,y,z)=${dimsXYZ.map((v) => v.toFixed(3)).join(",")} | dims (F/R/U)=${dimsFRU ? formatTriplet(dimsFRU.values, 3) : "--"}`
+          : ""
+      } | wallWidth=${wallValid ? wallNum : "--"}`,
     };
+  }, [axes, hullDimsResolved?.basis, wallWidth_m]);
 
-  }, [axes, wallWidth_m]);
+  const bubbleBoxSummary = useMemo(() => {
+    if (hullVolumeDomain !== "bubbleBox") return null;
+    const axesValid =
+      Array.isArray(axes) &&
+      axes.length >= 3 &&
+      axes.slice(0, 3).every((value: number) => Number.isFinite(Number(value)));
+    if (!axesValid) {
+      return {
+        text: `bubbleBox ${bubbleBoundsMode} --`,
+        title: "bubbleBox bounds unavailable (missing hull axes)",
+      };
+    }
+    const basisResolved = hullDimsResolved?.basis ?? HULL_BASIS_IDENTITY;
+    const dimsXYZ: [number, number, number] = [Number(axes[0]) * 2, Number(axes[1]) * 2, Number(axes[2]) * 2];
+    const scale = Number.isFinite(hullDomainScale) ? hullDomainScale : 1;
+    const boundsXYZ: [number, number, number] = [dimsXYZ[0] * scale, dimsXYZ[1] * scale, dimsXYZ[2] * scale];
+    const boundsFRU = remapXYZToFrontRightUp(boundsXYZ, basisResolved);
+    const titleParts = [
+      `bubbleBox bounds (x,y,z)=${boundsXYZ.map((v) => v.toFixed(3)).join(",")}`,
+      `bubbleBox bounds (F/R/U)=${formatTriplet(boundsFRU.values, 3)}`,
+      `domainScale=${scale}`,
+      `basis F/R/U=${boundsFRU.labels.front}/${boundsFRU.labels.right}/${boundsFRU.labels.up}`,
+    ];
+    return {
+      text: `bubbleBox ${bubbleBoundsMode} F/R/U ${formatTriplet(boundsFRU.values, 1)} m`,
+      title: titleParts.join(" | "),
+    };
+  }, [axes, bubbleBoundsMode, hullDomainScale, hullDimsResolved?.basis, hullVolumeDomain]);
 
   const thetaScaleBadge = useMemo(() => {
     const expected = Number.isFinite(Number(thetaScaleExpected)) ? Number(thetaScaleExpected) : null;
@@ -3433,6 +6259,640 @@ const res = 256;
       title: `expected=${expected}, est=${estimate}, diffPct=${delta ?? "--"}, deviation=${audit.deviation ?? "--"}`,
     };
   }, [thetaScaleExpected, thetaAudit]);
+  const latticeCoverageBadge = useMemo(() => {
+    if (!latticeModeEnabled) {
+      return {
+        text: "Coverage --",
+        className: "bg-slate-900/70 text-slate-300",
+        title: "Enable lattice to view volume coverage.",
+      };
+    }
+    if (!latticeOverlayVolumeReady || !latticeVolumeStats) {
+      return {
+        text: "Coverage pending",
+        className: "bg-amber-900/60 text-amber-100",
+        title: overlayLockedReason ?? "Lattice path not active; using analytic volume.",
+      };
+    }
+    const covText = `${latticeVolumeStats.covPct.toFixed(1)}%`;
+    const gateText = latticeVolumeStats.maxGate.toFixed(3);
+    const clampBits: string[] = [];
+    if (sharedLatticeState?.volume?.clampReasons?.length) {
+      clampBits.push(`volume clamp: ${sharedLatticeState.volume.clampReasons.join(", ")}`);
+    }
+    if (latticeFrameStats?.clampReasons?.length) {
+      clampBits.push(`frame clamp: ${latticeFrameStats.clampReasons.join(", ")}`);
+    }
+    const titleParts = [
+      `Coverage ${covText} | max gate ${gateText}${latticeVolumeStats.cacheHit ? " (cache)" : ""}`,
+      clampBits.length ? clampBits.join(" | ") : null,
+    ].filter(Boolean);
+    return {
+      text: `Coverage ${covText} | gate ${gateText}`,
+      className: "bg-sky-900/60 text-sky-100",
+      title: titleParts.join(" | "),
+    };
+  }, [
+    latticeModeEnabled,
+    latticeOverlayVolumeReady,
+    latticeVolumeStats,
+    overlayLockedReason,
+    sharedLatticeState?.volume?.clampReasons,
+    latticeFrameStats?.clampReasons,
+  ]);
+  const perfProfileBadge = useMemo(
+    () => ({
+      text: `Profile ${overlayProfileKey}${latticeProfileTag === "card" ? "/card" : ""}`,
+      className: "bg-slate-900/70 text-slate-200",
+      title: `Quality preset ${hullQuality} | lattice profile ${latticeProfileTag}`,
+    }),
+    [hullQuality, latticeProfileTag, overlayProfileKey],
+  );
+  const latticePathBadge = useMemo(() => {
+    const pathText = latticePathActive ? "Lattice" : "Analytic";
+    const className = latticePathActive
+      ? "bg-emerald-900/70 text-emerald-100"
+      : "bg-amber-900/70 text-amber-100";
+    const titleParts = [
+      `Path=${pathText}`,
+      latticeDowngradeLabel ? `Format=${latticeDowngradeLabel}` : null,
+      latticeDowngradeReason ? `Reason=${latticeDowngradeReason}` : null,
+      latticeFallbackStatus?.hint ?? latticeFallbackStatus?.label ?? overlayLockedReason,
+    ].filter(Boolean);
+    return {
+      text: `${pathText} | ${latticeDowngradeLabel}`,
+      className,
+      title: titleParts.join(" | "),
+    };
+  }, [
+    latticeDowngradeLabel,
+    latticeDowngradeReason,
+    latticeFallbackStatus?.hint,
+    latticeFallbackStatus?.label,
+    latticePathActive,
+    overlayLockedReason,
+  ]);
+
+  const latticeDowngradeBadge = useMemo(() => {
+    const reason =
+      latticeDowngradeReason ??
+      ((latticeRuntime as any)?.telemetry?.downgradeReason as string | undefined) ??
+      ((latticeRuntime as any)?.formatReason as string | undefined) ??
+      null;
+    const frameClamp = latticeFrameStats?.clampReasons?.length ? latticeFrameStats.clampReasons.join(", ") : null;
+    const volumeClamp = sharedLatticeState?.volume?.clampReasons?.length
+      ? sharedLatticeState.volume.clampReasons.join(", ")
+      : null;
+    if (!reason && !frameClamp && !volumeClamp) return null;
+    const titleParts = [
+      reason ? `downgrade: ${reason}` : null,
+      latticeRuntime?.formatLabel ? `format: ${latticeRuntime.formatLabel}` : null,
+      frameClamp ? `frame clamp: ${frameClamp}` : null,
+      volumeClamp ? `volume clamp: ${volumeClamp}` : null,
+    ].filter(Boolean);
+    return {
+      text: reason ? `Downgrade ${reason}` : "Clamp active",
+      className: "bg-amber-900/70 text-amber-100",
+      title: titleParts.join(" | "),
+    };
+  }, [
+    latticeDowngradeReason,
+    latticeRuntime,
+    latticeFrameStats?.clampReasons,
+    sharedLatticeState?.volume?.clampReasons,
+  ]);
+  const latticeRetryable =
+    latticeModeEnabled &&
+    latticeAvailable &&
+    Boolean(latticeFallbackStatus || latticeGpuStatus?.volumeFailed || latticeGpuStatus?.sdfFailed);
+
+  const handleRetryLattice = useCallback(() => {
+    latticeVolumeWantedKeyRef.current = null;
+    latticeVolumePendingSinceRef.current = null;
+    latticeVolumeBuildingRef.current = false;
+    setLatticeGpuStatus(null);
+    setSharedLattice({
+      volume: null,
+      sdf: latticeRequireSdf ? null : undefined,
+      updatedAt: Date.now(),
+    });
+    publish("hull3d:lattice:retry", {
+      ts: Date.now(),
+      reason: latticeFallbackStatus?.reason ?? null,
+      modeEnabled: latticeModeEnabled,
+    });
+  }, [latticeFallbackStatus?.reason, latticeModeEnabled, latticeRequireSdf, setSharedLattice]);
+
+  useEffect(() => {
+    if (!latticeModeEnabled || !frameClampSignature) return;
+    if (latticeQualityLocked) return;
+    if (latticeAutoTuneRef.current.lastFrameKey === frameClampSignature) return;
+    const frameClampReasons = sharedLatticeState?.frame?.clampReasons ?? [];
+    const hitPaddingOrDims = frameClampReasons.some(
+      (reason) => reason.startsWith("padding:") || reason.startsWith("dims:")
+    );
+    if (!hitPaddingOrDims) return;
+
+    let changed = false;
+    const actions: string[] = [];
+    if (hullVolumeDomain !== "wallBand") {
+      setHullVolumeDomain("wallBand");
+      actions.push("volumeDomain=wallBand");
+      changed = true;
+    }
+    if (bubbleBoundsMode !== "tight") {
+      setBubbleBoundsMode("tight");
+      actions.push("padding=tight");
+      changed = true;
+    }
+    if (hullVoxelDensity === "high") {
+      setHullVoxelDensity("medium");
+      actions.push("voxelDensity=medium");
+      changed = true;
+    } else if (hullVoxelDensity === "medium") {
+      setHullVoxelDensity("low");
+      actions.push("voxelDensity=low");
+      changed = true;
+    }
+    if (hullQuality !== "low") {
+      setHullQuality("low");
+      actions.push("quality=low");
+      changed = true;
+    }
+
+    latticeAutoTuneRef.current.lastFrameKey = frameClampSignature;
+    if (changed) {
+      console.info("[Hull3D] Auto-tuned lattice after frame clamp", { actions, frameClampReasons });
+      handleRetryLattice();
+    }
+  }, [
+    bubbleBoundsMode,
+    frameClampSignature,
+    handleRetryLattice,
+    hullQuality,
+    hullVoxelDensity,
+    hullVolumeDomain,
+    latticeModeEnabled,
+    latticeQualityLocked,
+    sharedLatticeState?.frame?.clampReasons,
+  ]);
+
+  useEffect(() => {
+    if (!latticeModeEnabled || !latticeRequireSdf) return;
+    if (!sdfClampSignature) return;
+    if (latticeAutoTuneRef.current.lastSdfKey === sdfClampSignature) return;
+
+    const signature = sdfClampSignature.toLowerCase();
+    const hasDegenerate = signature.includes("degenerate");
+    const budgetHit = signature.includes("budget");
+    const sampleHit = signature.includes("sample");
+    if (hasDegenerate || budgetHit || sampleHit) {
+      latticeAutoTuneRef.current.lastSdfKey = sdfClampSignature;
+      setLatticeRequireSdf(false);
+      console.warn("[Hull3D] Auto-disabled Require SDF after SDF clamp", { reasons: sdfClampSignature });
+    }
+  }, [latticeModeEnabled, latticeRequireSdf, sdfClampSignature]);
+
+  useEffect(() => {
+    const caps = (latticeGpuStatus as any)?.caps ?? null;
+    if (!latticeModeEnabled || !caps) return;
+    if (latticeAutoTuneRef.current.capsApplied) return;
+
+    const actions: string[] = [];
+    if (!caps.supportsHalfFloatLinear && !caps.supportsFloatLinear && hullVoxelDensity !== "low") {
+      setHullVoxelDensity("low");
+      actions.push("voxelDensity=low");
+    }
+    if (caps.max3DTextureSize && caps.max3DTextureSize < 1024) {
+      if (hullVolumeDomain !== "wallBand") {
+        setHullVolumeDomain("wallBand");
+        actions.push("volumeDomain=wallBand");
+      }
+      if (bubbleBoundsMode !== "tight") {
+        setBubbleBoundsMode("tight");
+        actions.push("padding=tight");
+      }
+    }
+
+    latticeAutoTuneRef.current.capsApplied = true;
+    if (actions.length) {
+      console.info("[Hull3D] Auto-tuned lattice for GPU caps", { actions, caps });
+    }
+  }, [bubbleBoundsMode, hullVoxelDensity, hullVolumeDomain, latticeGpuStatus, latticeModeEnabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const frame = sharedLatticeState?.frame ?? null;
+    const volume = sharedLatticeState?.volume ?? null;
+    const sdf = sharedLatticeState?.sdf ?? null;
+    const strobe = sharedLatticeState?.strobe ?? null;
+
+    const voxels = frame?.voxelCount ?? 0;
+    const budgetMax = frame?.budget?.maxVoxels ?? null;
+    const budgetPct = budgetMax && budgetMax > 0 ? (voxels / budgetMax) * 100 : null;
+
+    const caps = (latticeGpuStatus as any)?.caps ?? null;
+    const runtime = (latticeGpuStatus as any)?.runtime ?? null;
+    const volumeFailedReason =
+      typeof (latticeGpuStatus as any)?.volumeFailedReason === "string"
+        ? String((latticeGpuStatus as any).volumeFailedReason)
+        : null;
+    const sdfFailedReason =
+      typeof (latticeGpuStatus as any)?.sdfFailedReason === "string"
+        ? String((latticeGpuStatus as any).sdfFailedReason)
+        : null;
+    const watchdogStats = latticeWatchdogStats;
+    const uploadTelemetry = (runtime as any)?.telemetry ?? null;
+    const formatReason =
+      ((runtime as any)?.formatReason as string | undefined) ??
+      (uploadTelemetry?.downgradeReason as string | undefined) ??
+      null;
+    const frameClampReasons = frame?.clampReasons?.length ? frame.clampReasons : null;
+    const volumeClampReasons = volume?.clampReasons?.length ? volume.clampReasons : null;
+
+    const health = {
+      ts: Date.now(),
+      enabled: latticeModeEnabled,
+      path: runtime?.hasLatticeVolume ? "lattice" : "analytic",
+      fallbackReason: latticeFallbackStatus?.reason ?? null,
+      fallbackLabel: latticeFallbackStatus?.label ?? null,
+      fallbackLevel: latticeFallbackStatus?.level ?? null,
+      hashes: {
+        strobe: strobe?.hash ?? null,
+        weights: strobe?.weightHash ?? null,
+        volume: volume?.hash ?? null,
+        volumeDeterminism: latticeVolumeDeterminismHash,
+        sdf: sdf?.key ?? null,
+        sdfDeterminism: latticeSdfDeterminismHash,
+      },
+      metrics: {
+        voxelCount: voxels,
+        voxelBudgetMax: budgetMax,
+        voxelBudgetPct: budgetPct,
+        coveragePct: volume?.stats?.coverage != null ? volume.stats.coverage * 100 : null,
+        maxGate: volume?.stats?.maxGate ?? null,
+        formatLabel: runtime?.formatLabel ?? null,
+        formatReason: formatReason,
+        uploadBytes: uploadTelemetry?.bytes ?? null,
+        uploadBudgetBytes: uploadTelemetry?.budgetBytes ?? null,
+        uploadBudgetVoxels: uploadTelemetry?.budgetVoxels ?? null,
+        uploadSkippedReason: uploadTelemetry?.skippedReason ?? null,
+        uploadDowngradeReason: uploadTelemetry?.downgradeReason ?? null,
+        frameClampReasons,
+        volumeClampReasons,
+        watchdogBlocked: watchdogStats?.blocked ?? 0,
+        watchdogLastBlockedAt: watchdogStats?.lastBlockedAt ?? null,
+      },
+      gpu: latticeGpuStatus
+        ? {
+            volumeReady: latticeGpuStatus.volumeReady,
+            volumeFailed: latticeGpuStatus.volumeFailed,
+            volumeFailedReason,
+            sdfReady: latticeGpuStatus.sdfReady,
+            sdfFailed: latticeGpuStatus.sdfFailed,
+            sdfFailedReason,
+            caps,
+            runtime,
+          }
+        : null,
+    };
+
+    const healthKey = [
+      latticeModeEnabled ? 1 : 0,
+      runtime?.hasLatticeVolume ? "lattice" : "analytic",
+      latticeFallbackStatus?.reason ?? "ok",
+      volumeFailedReason ?? "volFail:none",
+      sdfFailedReason ?? "sdfFail:none",
+      runtime?.backend ?? "backend:none",
+      runtime?.formatLabel ?? "fmt:none",
+      runtime?.formatReason ?? "fmtReason:none",
+      caps?.max3DTextureSize ?? 0,
+      caps?.maxTextureSize ?? 0,
+      caps?.supportsFloatLinear ? 1 : 0,
+      caps?.supportsHalfFloatLinear ? 1 : 0,
+      strobe?.hash ?? "strobe:none",
+      strobe?.weightHash ?? "weights:none",
+      volume?.hash ?? "volume:none",
+      latticeVolumeDeterminismHash ?? "volumeDet:none",
+      sdf?.key ?? "sdf:none",
+      latticeSdfDeterminismHash ?? "sdfDet:none",
+      voxels,
+      budgetMax ?? 0,
+      Math.round((budgetPct ?? 0) * 10) / 10,
+      latticeGpuStatus?.volumeReady ? 1 : 0,
+      latticeGpuStatus?.volumeFailed ? 1 : 0,
+      latticeGpuStatus?.sdfReady ? 1 : 0,
+      latticeGpuStatus?.sdfFailed ? 1 : 0,
+      Math.round(((volume?.stats?.coverage ?? 0) * 1000)) / 10,
+      Math.round(((volume?.stats?.maxGate ?? 0) * 1e6)) / 1e6,
+      uploadTelemetry?.bytes ?? "upload:none",
+      uploadTelemetry?.skippedReason ?? "upload:ok",
+      uploadTelemetry?.downgradeReason ?? "upload:downgrade:none",
+      watchdogStats?.blocked ?? 0,
+    ].join("|");
+
+    if (healthKey !== latticeHealthKeyRef.current) {
+      latticeHealthKeyRef.current = healthKey;
+      (window as any).__hullLatticeHealth = health;
+      (window as any).__hullWebGLCaps = caps;
+      publish("hull3d:lattice:health", health);
+    }
+
+    const prevFallback = latticeFallbackReasonRef.current;
+    const nextFallback = latticeFallbackStatus?.reason ?? null;
+    if (nextFallback !== prevFallback) {
+      latticeFallbackReasonRef.current = nextFallback;
+      publish("hull3d:lattice:fallback", {
+        ts: health.ts,
+        enabled: latticeModeEnabled,
+        reason: nextFallback,
+        label: latticeFallbackStatus?.label ?? null,
+        level: latticeFallbackStatus?.level ?? null,
+        hint: latticeFallbackStatus?.hint ?? null,
+        detail: latticeFallbackStatus?.detail ?? null,
+        volumeHash: volume?.hash ?? null,
+        sdfKey: sdf?.key ?? null,
+        path: health.path,
+        runtime,
+        caps,
+        formatReason,
+        frameClampReasons,
+        volumeClampReasons,
+      });
+
+      if (nextFallback) {
+        const debug =
+          typeof window !== "undefined" && Boolean((window as any).__latticeFallbackDebug);
+        if (nextFallback !== "preview-missing" || debug) {
+          const log = latticeFallbackStatus?.level === "info" ? console.info : console.warn;
+          log("[Hull3D][lattice] fallback", {
+            reason: nextFallback,
+            label: latticeFallbackStatus?.label,
+            hint: latticeFallbackStatus?.hint,
+            detail: latticeFallbackStatus?.detail,
+            path: health.path,
+            volumeHash: volume?.hash?.slice(0, 16) ?? null,
+            sdfKey: sdf?.key?.slice(0, 16) ?? null,
+            caps,
+            runtime,
+          });
+        }
+      }
+    }
+  }, [
+    latticeModeEnabled,
+    latticeFallbackStatus,
+    latticeGpuStatus,
+    sharedLatticeState?.frame,
+    sharedLatticeState?.strobe,
+    sharedLatticeState?.volume,
+    sharedLatticeState?.sdf,
+    latticeVolumeDeterminismHash,
+    latticeSdfDeterminismHash,
+    latticeProfileTag,
+    latticeWatchdogStats,
+  ]);
+
+  useEffect(() => {
+    const canvas = overlayCanvasRef.current;
+    const volume = latticeOverlayVolumeReady ? latticeVolumeForRenderer : null;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    const rect = canvas.getBoundingClientRect();
+    const cssW = Math.max(1, rect.width);
+    const cssH = Math.max(1, rect.height);
+    const w = Math.max(1, Math.round(cssW * dpr));
+    const h = Math.max(1, Math.round(cssH * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!voxelOverlayActive || !volume) {
+      ctx.restore();
+      return;
+    }
+
+    ctx.scale(dpr, dpr);
+    ctx.font = "11px Inter, system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "rgba(15,23,42,0.55)";
+    ctx.strokeStyle = "rgba(148,163,184,0.65)";
+
+    const dims = volume.dims;
+    const gate = volume.gate3D;
+    const axisIndex = voxelSliceAxis === "x" ? 0 : voxelSliceAxis === "y" ? 1 : 2;
+    const sliceCount = Math.max(1, dims[axisIndex] || 1);
+    const sliceMinIdx = Math.max(0, Math.min(sliceCount - 1, Math.round(voxelSliceMin * (sliceCount - 1))));
+    const sliceMaxIdx = Math.max(sliceMinIdx, Math.min(sliceCount - 1, Math.round(voxelSliceMax * (sliceCount - 1))));
+    const maxGate = Math.max(1e-6, latticeVolumeStats?.maxGate ?? volume.stats?.maxGate ?? 1);
+
+    const dimsA = axisIndex === 0 ? dims[1] : axisIndex === 1 ? dims[0] : dims[1];
+    const dimsB = axisIndex === 0 ? dims[2] : axisIndex === 1 ? dims[2] : dims[0];
+    const indexFor = (a: number, b: number, slice: number) => {
+      if (axisIndex === 0) {
+        const x = slice;
+        const y = a;
+        const z = b;
+        return x + dims[0] * (y + dims[1] * z);
+      }
+      if (axisIndex === 1) {
+        const x = a;
+        const y = slice;
+        const z = b;
+        return x + dims[0] * (y + dims[1] * z);
+      }
+      const x = b;
+      const y = a;
+      const z = slice;
+      return x + dims[0] * (y + dims[1] * z);
+    };
+
+    const sampleValue = (a: number, b: number, slice: number) => {
+      const idx = indexFor(a, b, slice);
+      return gate[idx] ?? 0;
+    };
+
+    const size = Math.floor(Math.max(64, Math.min(180, Math.min(cssW, cssH) * 0.26)));
+    const pad = 12;
+    const boxW = size;
+    const boxH = size;
+    const sliceYTop = pad;
+    const sliceYBottom = sliceYTop + boxH + 14;
+    const sliceX = cssW - boxW - pad;
+
+    const renderSlice = (label: string, sliceIndex: number, ox: number, oy: number) => {
+      ctx.fillStyle = "rgba(15,23,42,0.55)";
+      ctx.fillRect(ox - 4, oy - 4, boxW + 8, boxH + 20);
+      const img = ctx.createImageData(boxW, boxH);
+      const data = img.data;
+      for (let y = 0; y < boxH; y++) {
+        const aIdx = Math.min(dimsA - 1, Math.round((y / Math.max(1, boxH - 1)) * (dimsA - 1)));
+        for (let x = 0; x < boxW; x++) {
+          const bIdx = Math.min(dimsB - 1, Math.round((x / Math.max(1, boxW - 1)) * (dimsB - 1)));
+          const val = sampleValue(aIdx, bIdx, sliceIndex);
+          const norm = Math.max(0, Math.min(1, val / maxGate));
+          const tone = Math.pow(norm, 0.4);
+          const r = Math.round(40 + 170 * tone);
+          const g = Math.round(110 + 130 * tone);
+          const b = Math.round(160 + 70 * tone);
+          const a = Math.round(220 * tone);
+          const base = (y * boxW + x) * 4;
+          data[base] = r;
+          data[base + 1] = g;
+          data[base + 2] = b;
+          data[base + 3] = a;
+        }
+      }
+      ctx.putImageData(img, ox, oy);
+      ctx.strokeStyle = "rgba(148,163,184,0.7)";
+      ctx.strokeRect(ox - 1, oy - 1, boxW + 2, boxH + 2);
+      ctx.fillStyle = "rgba(226,232,240,0.85)";
+      ctx.fillText(`${label} ${voxelSliceAxis.toUpperCase()} slice #${sliceIndex + 1}/${sliceCount}`, ox, oy + boxH + 12);
+    };
+
+    if (voxelSlicesEnabled) {
+      renderSlice("Min", sliceMinIdx, sliceX, sliceYTop);
+      renderSlice("Max", sliceMaxIdx, sliceX, sliceYBottom);
+    }
+
+    if (coverageHeatmapEnabled) {
+      const strideA = Math.max(1, Math.floor(dimsA / 64));
+      const strideB = Math.max(1, Math.floor(dimsB / 64));
+      const profile = new Float32Array(sliceCount);
+      let profileMax = 0;
+      for (let s = 0; s < sliceCount; s++) {
+        let peak = 0;
+        for (let a = 0; a < dimsA; a += strideA) {
+          for (let bIdx = 0; bIdx < dimsB; bIdx += strideB) {
+            const v = sampleValue(a, bIdx, s);
+            if (v > peak) peak = v;
+          }
+        }
+        profile[s] = peak;
+        if (peak > profileMax) profileMax = peak;
+      }
+      const chartW = Math.max(180, cssW * 0.42);
+      const chartH = 48;
+      const chartX = pad;
+      const chartY = cssH - chartH - pad;
+      ctx.fillStyle = "rgba(15,23,42,0.6)";
+      ctx.fillRect(chartX - 4, chartY - 4, chartW + 8, chartH + 8);
+      ctx.fillStyle = "rgba(148,163,184,0.35)";
+      ctx.fillRect(chartX, chartY, chartW, chartH);
+      if (profileMax > 0) {
+        const bucketCount = Math.min(220, sliceCount);
+        const bucketW = chartW / Math.max(1, bucketCount);
+        for (let i = 0; i < bucketCount; i++) {
+          const start = Math.floor((i / bucketCount) * sliceCount);
+          const end = Math.min(sliceCount, Math.floor(((i + 1) / bucketCount) * sliceCount));
+          let bucketPeak = 0;
+          for (let s = start; s < end; s++) {
+            if (profile[s] > bucketPeak) bucketPeak = profile[s];
+          }
+          const norm = Math.max(0, Math.min(1, bucketPeak / profileMax));
+          const barH = norm * (chartH - 10);
+          ctx.fillStyle = `rgba(16,185,129,${0.25 + 0.55 * norm})`;
+          ctx.fillRect(chartX + i * bucketW, chartY + chartH - barH - 4, Math.max(1, bucketW - 0.5), barH);
+        }
+        const minLine = chartX + (sliceMinIdx / Math.max(1, sliceCount - 1)) * chartW;
+        const maxLine = chartX + (sliceMaxIdx / Math.max(1, sliceCount - 1)) * chartW;
+        ctx.strokeStyle = "rgba(94,234,212,0.9)";
+        ctx.beginPath();
+        ctx.moveTo(minLine, chartY - 2);
+        ctx.lineTo(minLine, chartY + chartH + 2);
+        ctx.moveTo(maxLine, chartY - 2);
+        ctx.lineTo(maxLine, chartY + chartH + 2);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(226,232,240,0.85)";
+        ctx.fillText(`Coverage by slice (axis ${voxelSliceAxis.toUpperCase()})`, chartX, chartY - 6);
+      }
+    }
+
+    ctx.restore();
+  }, [
+    coverageHeatmapEnabled,
+    latticeOverlayVolumeReady,
+    latticeVolumeForRenderer,
+    latticeVolumeStats?.maxGate,
+    voxelOverlayActive,
+    voxelSliceAxis,
+    voxelSliceMax,
+    voxelSliceMin,
+    voxelSlicesEnabled,
+  ]);
+
+  useEffect(() => {
+    const payload = {
+      ts: Date.now(),
+      profile: overlayProfileKey,
+      latticeProfile: latticeProfileTag,
+      overlays: {
+        slices: {
+          enabled: voxelSlicesEnabled,
+          axis: voxelSliceAxis,
+          min: voxelSliceMin,
+          max: voxelSliceMax,
+        },
+        coverageHeatmap: coverageHeatmapEnabled,
+      },
+      path: latticePathActive ? "lattice" : "analytic",
+      fallback: latticeFallbackStatus?.reason ?? null,
+      coveragePct: latticeVolumeStats?.covPct ?? null,
+      maxGate: latticeVolumeStats?.maxGate ?? null,
+      downgrade: latticeDowngradeLabel,
+      downgradeReason: latticeDowngradeReason,
+      backend: (latticeRuntime as any)?.backend ?? null,
+    };
+    const key = JSON.stringify({
+      profile: payload.profile,
+      latticeProfile: payload.latticeProfile,
+      overlays: payload.overlays,
+      path: payload.path,
+      fallback: payload.fallback,
+      coveragePct: payload.coveragePct,
+      maxGate: payload.maxGate,
+      downgrade: payload.downgrade,
+      downgradeReason: payload.downgradeReason,
+      backend: payload.backend,
+    });
+    if (overlayTelemetryKeyRef.current !== key) {
+      overlayTelemetryKeyRef.current = key;
+      (window as any).__hullVoxelOverlay = payload;
+      (window as any).__hullLatticePath = {
+        path: payload.path,
+        fallback: payload.fallback,
+        coveragePct: payload.coveragePct,
+        maxGate: payload.maxGate,
+        downgrade: payload.downgrade,
+        downgradeReason: payload.downgradeReason,
+        profile: payload.profile,
+        latticeProfile: payload.latticeProfile,
+        backend: payload.backend,
+      };
+      publish("hull3d:voxel-overlays", payload);
+    }
+  }, [
+    coverageHeatmapEnabled,
+    latticeDowngradeLabel,
+    latticeDowngradeReason,
+    latticeFallbackStatus?.reason,
+    latticePathActive,
+    latticeProfileTag,
+    latticeVolumeStats?.covPct,
+    latticeVolumeStats?.maxGate,
+    overlayProfileKey,
+    voxelSliceAxis,
+    voxelSliceMax,
+    voxelSliceMin,
+    voxelSlicesEnabled,
+    (latticeRuntime as any)?.backend,
+  ]);
 
   return (
     <CurvatureVoxProvider quality="medium" refetchMs={80}>
@@ -3680,12 +7140,46 @@ const res = 256;
             >
               {hullSummary.text}
             </span>
+            {bubbleBoxSummary ? (
+              <span
+                className="rounded px-2 py-1 bg-slate-900/70 text-slate-200"
+                title={bubbleBoxSummary.title}
+              >
+                {bubbleBoxSummary.text}
+              </span>
+            ) : null}
             <span
               className={cn("rounded px-2 py-1", thetaScaleBadge.className)}
               title={thetaScaleBadge.title}
             >
               {thetaScaleBadge.text}
             </span>
+            <span
+              className={cn("rounded px-2 py-1", latticeCoverageBadge.className)}
+              title={latticeCoverageBadge.title}
+            >
+              {latticeCoverageBadge.text}
+            </span>
+            <span
+              className={cn("rounded px-2 py-1", perfProfileBadge.className)}
+              title={perfProfileBadge.title}
+            >
+              {perfProfileBadge.text}
+            </span>
+            <span
+              className={cn("rounded px-2 py-1", latticePathBadge.className)}
+              title={latticePathBadge.title}
+            >
+              {latticePathBadge.text}
+            </span>
+            {latticeDowngradeBadge ? (
+              <span
+                className={cn("rounded px-2 py-1", latticeDowngradeBadge.className)}
+                title={latticeDowngradeBadge.title}
+              >
+                {latticeDowngradeBadge.text}
+              </span>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 rounded bg-slate-800/60 px-2 py-1">
@@ -3832,7 +7326,7 @@ const res = 256;
             </button>
           </div>
           {(planarVizMode === 0 || planarVizMode === 1) && (
-            <div className="mt-3 grid grid-cols-2 gap-2 rounded bg-slate-800/40 px-3 py-2 text-[0.65rem] text-slate-200">
+            <div className="mt-3 grid grid-cols-1 gap-2 rounded bg-slate-800/40 px-3 py-2 text-[0.65rem] text-slate-200 sm:grid-cols-2">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -3896,6 +7390,13 @@ const res = 256;
               <Hull3DDebugToggles
                 surfaceOn={showHullSurfaceOverlay}
                 setSurfaceOn={setShowHullSurfaceOverlay}
+                gateSource={gateSource}
+                setGateSource={setGateSource}
+                gateViewEnabled={gateViewEnabled}
+                setGateViewEnabled={setGateViewEnabled}
+                forceFlatGate={forceFlatGate}
+                setForceFlatGate={setForceFlatGate}
+                onGatePreset={applyDriveCardPreset}
               />
               <div className="flex flex-col gap-2 rounded bg-slate-900/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-3">
@@ -3910,7 +7411,7 @@ const res = 256;
                     />
                   </label>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-[0.65rem] text-slate-300">
+                <div className="grid grid-cols-1 gap-3 text-[0.65rem] text-slate-300 sm:grid-cols-2">
                   <label className="flex flex-col gap-1">
                     <span className="text-slate-400 uppercase tracking-wide">ß target (m/s²)</span>
                     <input
@@ -3966,9 +7467,657 @@ const res = 256;
                   Uses /api/helix/qi/diagnostics to blend grad_phi, Var[rho_C], and pi_FR with live zeta/FR duty. Toggle on to display the CSI heat overlay on the hull view.
                 </p>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Wireframe</span>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={showWireframeOverlay}
+                    onChange={(event) => setShowWireframeOverlay(event.target.checked)}
+                  />
+                  <span>Enable</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setWireframeLod("preview")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    wireframeLod === "preview" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Coarse LOD; caps line width for speed"
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWireframeLod("high")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    wireframeLod === "high" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Higher detail wireframe (clamped thickness)"
+                >
+                  High
+                </button>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={useFieldProbeOverlay}
+                    disabled={!wireframeOverlay.overlay}
+                    onChange={(event) => setUseFieldProbeOverlay(event.target.checked)}
+                  />
+                  <span>Field probe</span>
+                </label>
+                {useFieldProbeOverlay && fieldProbeLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-300" />
+                ) : null}
+                {wireframeOverlay.overlay?.meshHash ? (
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[0.65rem] text-emerald-100">
+                    Mesh {wireframeOverlay.overlay.meshHash.slice(0, 8)}
+                  </span>
+                ) : null}
+                {wireframeClampLabel ? (
+                  <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[0.65rem] text-amber-100">
+                    {wireframeClampLabel}
+                  </span>
+                ) : null}
+                {useFieldProbeOverlay && fieldProbe?.stats ? (
+                  <span className="rounded-full bg-sky-500/10 px-2 py-1 text-[0.65rem] text-sky-100">
+                    |theta| max {fieldProbe.stats.absMax.toFixed(2)}
+                  </span>
+                ) : null}
+                {!wireframeOverlay.overlay && showWireframeOverlay ? (
+                  <span className="rounded-full bg-slate-800 px-2 py-1 text-[0.65rem] text-slate-200">
+                    Fallback: geometric rings
+                  </span>
+                ) : null}
+                {wireframePatches.length ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {wireframePatches.map((patch) => (
+                      <span
+                        key={patch.sector}
+                        className="rounded-full bg-emerald-500/10 px-2 py-1 text-[0.6rem] text-emerald-100"
+                      >
+                        S{patch.sector}: {patch.gateAvg.toFixed(2)} ({patch.gateMin.toFixed(2)}–{patch.gateMax.toFixed(2)})
+                        {patch.blanketAvg !== undefined
+                          ? ` • blanket ${patch.blanketAvg.toFixed(2)}`
+                          : ""}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Lattice</span>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={latticeModeEnabled}
+                    disabled={!latticeModeEnabled && (!hullPreview || hullDimsResolved?.source !== "preview")}
+                    onChange={(event) => setLatticeModeEnabled(event.target.checked)}
+                  />
+                  <span>Enable</span>
+                </label>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={latticeRequireSdf}
+                    disabled={!latticeRequireSdf && (!latticeModeEnabled || !hullPreview || hullDimsResolved?.source !== "preview")}
+                    onChange={(event) => setLatticeRequireSdf(event.target.checked)}
+                  />
+                  <span>Require SDF</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowLatticeDiagnostics((prev) => !prev)}
+                  className="rounded border border-slate-600 px-2 py-1 text-[0.65rem] text-slate-200 hover:border-emerald-400 hover:text-emerald-200"
+                >
+                  {showLatticeDiagnostics ? "Hide diag" : "Diag"}
+                </button>
+                {!hullPreview || hullDimsResolved?.source !== "preview" ? (
+                  <span className="rounded-full bg-slate-800 px-2 py-1 text-[0.65rem] text-slate-200">
+                    Preview mesh required
+                  </span>
+                ) : null}
+                {latticeModeEnabled && latticeVolumeStats?.hashShort ? (
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[0.65rem] text-emerald-100">
+                    Vol {latticeVolumeStats.hashShort}
+                  </span>
+                ) : null}
+                {latticeModeEnabled && sharedLatticeState?.sdf?.key ? (
+                  <span className="rounded-full bg-sky-500/10 px-2 py-1 text-[0.65rem] text-sky-100">
+                    SDF {sharedLatticeState.sdf.key.slice(0, 8)}
+                  </span>
+                ) : null}
+                {latticeModeEnabled && latticeGuardrails.messages.length
+                  ? latticeGuardrails.messages.map((msg) => (
+                      <span
+                        key={msg.label}
+                        title={(() => {
+                          if (msg.label === "Stale hash" || msg.label === "Weights pending") {
+                            const desired = latticeGuardrails.desiredWeightHash ?? "n/a";
+                            const built = latticeGuardrails.builtWeightHash ?? "n/a";
+                            return `want ${desired} vs built ${built}`;
+                          }
+                          if (msg.label.startsWith("Missing SDF")) {
+                            return latticeRequireSdf
+                              ? "Hull SDF required before enabling lattice sampling."
+                              : "Hull SDF not ready; analytic shell blend disabled.";
+                          }
+                          if (msg.label === "Over budget") {
+                            const reasons = sharedLatticeState?.volume?.clampReasons?.join(", ");
+                            return reasons ? `volume clamp: ${reasons}` : "Voxel sample budget exceeded.";
+                          }
+                          return msg.label;
+                        })()}
+                        className={cn(
+                          "rounded-full px-2 py-1 text-[0.65rem]",
+                          msg.level === "error"
+                            ? "bg-red-500/10 text-red-100"
+                            : "bg-amber-500/10 text-amber-100",
+                        )}
+                      >
+                        {msg.label}
+                      </span>
+                    ))
+                  : null}
+                {latticeModeEnabled &&
+                latticeFallbackStatus &&
+                latticeFallbackStatus.reason !== "disabled" &&
+                latticeFallbackStatus.reason !== "preview-required" &&
+                latticeFallbackStatus.reason !== "preview-missing" ? (
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-1 text-[0.65rem]",
+                      latticeFallbackStatus.level === "error"
+                        ? "bg-red-500/10 text-red-100"
+                        : latticeFallbackStatus.level === "warn"
+                          ? "bg-amber-500/10 text-amber-100"
+                          : "bg-slate-800 px-2 py-1 text-slate-200",
+                    )}
+                    title={[
+                      latticeFallbackStatus.reason,
+                      latticeFallbackStatus.hint,
+                      latticeFallbackStatus.detail ? `detail: ${latticeFallbackStatus.detail}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" | ")}
+                  >
+                    {latticeFallbackStatus.label}
+                  </span>
+                ) : null}
+                {latticeModeEnabled && !latticeFallbackStatus && latticeGpuStatus?.runtime?.hasLatticeVolume ? (
+                  <span
+                    className="rounded-full bg-sky-500/10 px-2 py-1 text-[0.65rem] text-sky-100"
+                    title={`GPU path: ${latticeGpuStatus.runtime.formatLabel ?? latticeGpuStatus.runtime.backend ?? "lattice"}${
+                      latticeGpuStatus.runtime.useAtlas ? " (atlas)" : ""
+                    }${
+                      latticeGpuStatus.runtime.formatReason
+                        ? ` | ${latticeGpuStatus.runtime.formatReason}`
+                        : (latticeGpuStatus.runtime as any)?.telemetry?.downgradeReason
+                          ? ` | ${(latticeGpuStatus.runtime as any).telemetry.downgradeReason}`
+                          : ""
+                    }`}
+                  >
+                      GPU {latticeGpuStatus.runtime.formatLabel ?? "lattice"}
+                  </span>
+                ) : null}
+                {latticeModeEnabled && latticeRetryable ? (
+                  <button
+                    type="button"
+                    onClick={handleRetryLattice}
+                    disabled={latticeRebuildPending}
+                    className={cn(
+                      "rounded border px-2 py-1 text-[0.65rem]",
+                      latticeRebuildPending
+                        ? "cursor-not-allowed border-slate-700 text-slate-400"
+                        : "border-emerald-500/60 text-emerald-100 hover:border-emerald-300 hover:text-emerald-50",
+                    )}
+                    title="Retry lattice rebuild/upload with current profile"
+                  >
+                    Retry lattice
+                  </button>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Voxel overlays</span>
+                <label
+                  className="flex items-center gap-1 text-[0.65rem] text-slate-200"
+                  title={overlayControlsDisabled ? overlayLockedReason ?? undefined : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={voxelSlicesEnabled}
+                    disabled={overlayControlsDisabled}
+                    onChange={(event) => handleSliceToggle(event.target.checked)}
+                  />
+                  <span>Slices</span>
+                </label>
+                <select
+                  value={voxelSliceAxis}
+                  onChange={(event) => handleSliceAxisChange(event.target.value as HullVoxelSliceAxis)}
+                  disabled={sliceControlsDisabled}
+                  className="rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100 disabled:opacity-50"
+                >
+                  <option value="x">Axis X</option>
+                  <option value="y">Axis Y</option>
+                  <option value="z">Axis Z</option>
+                </select>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <span>Min</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={voxelSliceMin.toFixed(2)}
+                    disabled={sliceControlsDisabled}
+                    onChange={(event) => {
+                      const next = parseFloat(event.target.value);
+                      applySliceBounds(Number.isFinite(next) ? next : voxelSliceMin, voxelSliceMax);
+                    }}
+                    className="w-16 rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100 disabled:opacity-50"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <span>Max</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={voxelSliceMax.toFixed(2)}
+                    disabled={sliceControlsDisabled}
+                    onChange={(event) => {
+                      const next = parseFloat(event.target.value);
+                      applySliceBounds(voxelSliceMin, Number.isFinite(next) ? next : voxelSliceMax);
+                    }}
+                    className="w-16 rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100 disabled:opacity-50"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={coverageHeatmapEnabled}
+                    disabled={overlayControlsDisabled}
+                    onChange={(event) => handleHeatmapToggle(event.target.checked)}
+                  />
+                  <span>Coverage heatmap</span>
+                </label>
+                {overlayLockedReason ? (
+                  <span className="rounded-full bg-slate-800 px-2 py-1 text-[0.65rem] text-slate-200">
+                    {overlayLockedReason}
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Spacetime grid</span>
+                <span className="text-[0.6rem] uppercase tracking-wide text-slate-500">Presets</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {SPACETIME_GRID_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => applySpacetimeGridPreset(preset)}
+                      title={preset.hint}
+                      className="rounded-full border border-slate-700/70 bg-slate-900/70 px-2 py-1 text-[0.6rem] text-slate-200 hover:border-slate-500/70 hover:bg-slate-800"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={spacetimeGridEnabled}
+                    onChange={(event) => handleSpacetimeGridToggle(event.target.checked)}
+                  />
+                  <span>Enabled</span>
+                </label>
+                <select
+                  value={spacetimeGridMode}
+                  onChange={(event) =>
+                    handleSpacetimeGridModeChange(event.target.value as HullSpacetimeGridMode)
+                  }
+                  className="rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100"
+                >
+                  <option value="slice">Slice</option>
+                  <option value="surface">Surface</option>
+                  <option value="volume">Volume</option>
+                </select>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <span>Spacing (m)</span>
+                  <input
+                    type="number"
+                    min={0.05}
+                    max={5}
+                    step={0.05}
+                    value={spacetimeGridSpacing.toFixed(2)}
+                    onChange={(event) => {
+                      const next = parseFloat(event.target.value);
+                      handleSpacetimeGridSpacingChange(Number.isFinite(next) ? next : spacetimeGridSpacing);
+                    }}
+                    className="w-20 rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <span>Warp</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={5}
+                    step={0.05}
+                    value={spacetimeGridWarpStrength.toFixed(2)}
+                    onChange={(event) => {
+                      const next = parseFloat(event.target.value);
+                      handleSpacetimeGridWarpStrengthChange(
+                        Number.isFinite(next) ? next : spacetimeGridWarpStrength
+                      );
+                    }}
+                    className="w-20 rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <span>Falloff (m)</span>
+                  <input
+                    type="number"
+                    min={0.05}
+                    max={6}
+                    step={0.05}
+                    value={spacetimeGridFalloff.toFixed(2)}
+                    onChange={(event) => {
+                      const next = parseFloat(event.target.value);
+                      handleSpacetimeGridFalloffChange(Number.isFinite(next) ? next : spacetimeGridFalloff);
+                    }}
+                    className="w-20 rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100"
+                  />
+                </label>
+                <select
+                  value={spacetimeGridColorBy}
+                  onChange={(event) =>
+                    handleSpacetimeGridColorByChange(event.target.value as HullSpacetimeGridColorBy)
+                  }
+                  className="rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100"
+                >
+                  <option value="thetaSign">Color by theta sign</option>
+                  <option value="thetaMagnitude">Color by |theta|</option>
+                  <option value="warpStrength">Color by warp strength</option>
+                </select>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={spacetimeGridUseSdf}
+                    onChange={(event) => handleSpacetimeGridUseSdfChange(event.target.checked)}
+                    title="Prefer lattice SDF for offsets; falls back to analytic distance when missing."
+                  />
+                  <span>Use SDF</span>
+                </label>
+                <select
+                  value={spacetimeGridStrengthMode}
+                  onChange={(event) =>
+                    handleSpacetimeGridStrengthModeChange(
+                      event.target.value as HullSpacetimeGridStrengthMode
+                    )
+                  }
+                  className="rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100"
+                  title="Manual uses entered warp; auto scales to theta peaks or expected scale."
+                >
+                  <option value="manual">Manual</option>
+                  <option value="autoThetaPk">Auto theta peak</option>
+                  <option value="autoThetaScaleExpected">Auto theta expected</option>
+                </select>
+                {spacetimeGridBadges.length
+                  ? spacetimeGridBadges.map((badge) => (
+                      <span
+                        key={badge.label}
+                        title={badge.title}
+                        className={cn(
+                          "rounded-full px-2 py-1 text-[0.65rem]",
+                          badge.level === "warn"
+                            ? "bg-amber-500/10 text-amber-100"
+                            : "bg-slate-800 text-slate-200",
+                        )}
+                      >
+                        {badge.label}
+                      </span>
+                    ))
+                  : null}
+              </div>
+              {showLatticeDiagnostics && (
+                <div className="w-full rounded bg-slate-900/60 px-3 py-2 text-[0.65rem] text-slate-200">
+                  <div className="grid grid-cols-1 gap-x-4 gap-y-1 font-mono sm:grid-cols-2">
+                    <span>mode</span>
+                    <span>{latticeModeEnabled ? "enabled" : "off"}</span>
+                    <span>profile</span>
+                    <span>{sharedLatticeState?.profileTag ?? "preview"}</span>
+                    <span>preset</span>
+                    <span>{sharedLatticeState?.preset ?? "auto"}</span>
+                    <span>frame</span>
+                    <span>
+                      {latticeFrameStats
+                        ? `${latticeFrameStats.dims.join("x")} @ ${latticeFrameStats.voxelSize_m.toFixed(3)} m`
+                        : "—"}
+                    </span>
+                    <span>voxels</span>
+                    <span>
+                      {latticeFrameStats
+                        ? `${latticeFrameStats.voxelCount.toLocaleString()}${
+                            latticeFrameStats.budgetMaxVoxels
+                              ? ` / ${latticeFrameStats.budgetMaxVoxels.toLocaleString()}`
+                              : ""
+                          }${latticeFrameStats.budgetPct != null ? ` (${latticeFrameStats.budgetPct.toFixed(1)}%)` : ""}`
+                        : "—"}
+                    </span>
+                    <span>frame clamp</span>
+                    <span>
+                      {latticeFrameStats?.clampReasons?.length ? latticeFrameStats.clampReasons.join(", ") : "—"}
+                    </span>
+                    <span>volume</span>
+                    <span>{latticeVolumeStats ? latticeVolumeStats.label : "—"}</span>
+                    <span>volume clamp</span>
+                    <span>
+                      {sharedLatticeState?.volume?.clampReasons?.length
+                        ? sharedLatticeState.volume.clampReasons.join(", ")
+                        : "—"}
+                    </span>
+                    <span>upload bytes</span>
+                    <span>
+                      {latticeUploadTelemetry
+                        ? `${(latticeUploadTelemetry.bytes / (1024 * 1024)).toFixed(1)} MB / ${(
+                            latticeUploadTelemetry.budgetBytes / (1024 * 1024)
+                          ).toFixed(0)} MB`
+                        : "—"}
+                    </span>
+                    <span>watchdog</span>
+                    <span>{`${latticeWatchdogStats.blocked} block${latticeWatchdogStats.blocked === 1 ? "" : "s"}`}</span>
+                    <span>sdf</span>
+                    <span>{latticeSdfStats ? latticeSdfStats.label : "—"}</span>
+                    <span>sdf clamp</span>
+                    <span>
+                      {sharedLatticeState?.sdf?.clampReasons?.length ? sharedLatticeState.sdf.clampReasons.join(", ") : "—"}
+                    </span>
+                    <span>strobe</span>
+                    <span>
+                      {sharedLatticeState?.strobe?.hash ? sharedLatticeState.strobe.hash.slice(0, 16) : "—"}
+                    </span>
+                    <span>weights hash</span>
+                    <span>
+                      {sharedLatticeState?.strobe?.weightHash ? sharedLatticeState.strobe.weightHash : "—"}
+                    </span>
+                    <span>volume hash</span>
+                    <span>{sharedLatticeState?.volume?.hash ? sharedLatticeState.volume.hash.slice(0, 16) : "—"}</span>
+                    <span>volume det</span>
+                    <span>{latticeVolumeDeterminismHash ?? "—"}</span>
+                    <span>sdf det</span>
+                    <span>{latticeSdfDeterminismHash ?? "—"}</span>
+                    <span>fallback</span>
+                    <span>{latticeFallbackStatus?.reason ?? "ok"}</span>
+                    <span>path</span>
+                    <span>
+                      {latticeGpuStatus?.runtime
+                        ? latticeGpuStatus.runtime.hasLatticeVolume
+                          ? `lattice ${latticeGpuStatus.runtime.formatLabel ?? latticeGpuStatus.runtime.backend ?? ""}${
+                              latticeGpuStatus.runtime.useAtlas ? " (atlas)" : ""
+                            }`
+                          : "analytic"
+                        : "—"}
+                    </span>
+                    <span>gl caps</span>
+                    <span>
+                      {latticeGpuStatus?.caps
+                        ? `3D ${latticeGpuStatus.caps.max3DTextureSize} | 2D ${latticeGpuStatus.caps.maxTextureSize} | f32lin ${
+                            latticeGpuStatus.caps.supportsFloatLinear ? "y" : "n"
+                          } | f16lin ${latticeGpuStatus.caps.supportsHalfFloatLinear ? "y" : "n"}`
+                        : "—"}
+                    </span>
+                    <span>gpu reason</span>
+                    <span>
+                      {latticeGpuStatus?.volumeFailedReason || latticeGpuStatus?.sdfFailedReason
+                        ? `${latticeGpuStatus.volumeFailedReason ?? ""}${
+                            latticeGpuStatus.sdfFailedReason ? ` / ${latticeGpuStatus.sdfFailedReason}` : ""
+                          }`
+                        : latticeGpuStatus?.runtime?.formatReason ||
+                            ((latticeGpuStatus as any)?.runtime?.telemetry?.downgradeReason ?? "—")}
+                    </span>
+                    <span>gpu</span>
+                    <span>
+                      {latticeGpuStatus
+                        ? `${latticeGpuStatus.volumeFailed ? "VOL fail" : latticeGpuStatus.volumeReady ? "VOL ok" : "VOL pending"}${
+                            latticeRequireSdf
+                              ? ` / ${latticeGpuStatus.sdfFailed ? "SDF fail" : latticeGpuStatus.sdfReady ? "SDF ok" : "SDF pending"}`
+                              : ""
+                          }`
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Volume field</span>
                 <VolumeModeToggle value={liveVolumeMode} onChange={handleVolumeModeChange} />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Domain</span>
+                <button
+                  type="button"
+                  onClick={() => setHullVolumeDomain("wallBand")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    hullVolumeDomain === "wallBand" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Current wall band transfer function with adaptive step near the shell"
+                >
+                  Wall band
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHullVolumeDomain("bubbleBox")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    hullVolumeDomain === "bubbleBox" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Full bubble box using analytic theta_drive with OBB padding"
+                >
+                  Bubble box
+                </button>
+                {hullVolumeDomain === "bubbleBox" && (
+                  <>
+                    <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                      <span>Bounds</span>
+                      <select
+                        value={bubbleBoundsMode}
+                        onChange={(event) => setBubbleBoundsMode(event.target.value as "tight" | "wide")}
+                        className="rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100"
+                      >
+                        <option value="tight">Tight OBB</option>
+                        <option value="wide">Wide OBB</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                      <span>Opacity</span>
+                      <input
+                        type="range"
+                        min={0.08}
+                        max={1.0}
+                        step={0.01}
+                        value={bubbleOpacityHi}
+                        onChange={(event) => setBubbleOpacityHi(Number(event.target.value))}
+                        className="w-28 accent-amber-500"
+                      />
+                      <span className="font-mono text-[0.65rem] text-slate-300">
+                        [{bubbleOpacityWindow[0].toFixed(2)}…{bubbleOpacityWindow[1].toFixed(2)}]
+                      </span>
+                    </label>
+                    <span className="text-[0.6rem] text-slate-400">
+                      Slices stay available as a bailout if volume perf dips.
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Card camera</span>
+                <button
+                  type="button"
+                  onClick={() => setCardCameraPreset("threeQuarterFront")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    cardCameraPreset === "threeQuarterFront" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Three-quarter front orbit anchored to the hull OBB (card default)"
+                >
+                  3/4 front
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCardCameraPreset("broadside")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    cardCameraPreset === "broadside" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Profile view aligned to the hull right axis"
+                >
+                  Broadside
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCardCameraPreset("topDown")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    cardCameraPreset === "topDown" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Top-down orbit over the hull OBB"
+                >
+                  Top-down
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Geometry</span>
+                <select
+                  className="rounded bg-slate-900 px-2 py-1 text-[0.7rem] text-slate-100"
+                  value={hullGeometry}
+                  onChange={(e) => handleHullGeometryChange(e.target.value as HullGeometryMode)}
+                  title="Switch between analytic ellipsoid, radial LUT, or uploaded SDF."
+                >
+                  <option value="ellipsoid">Ellipsoid</option>
+                  <option value="radial">Hull (radial)</option>
+                  <option value="sdf">Hull (SDF)</option>
+                </select>
+                {autoHullGeometryReason ? (
+                  <span className="rounded-full border border-emerald-300/40 bg-emerald-400/10 px-2 py-1 text-[0.65rem] text-emerald-100">
+                    {autoHullGeometryReason}
+                  </span>
+                ) : null}
+                {!hullRadiusLUT && hullGeometry === "radial" && (
+                  <span className="text-[0.6rem] text-amber-300">No hull LUT found — falling back to ellipsoid</span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Mode</span>
@@ -4038,15 +8187,6 @@ const res = 256;
                 <input
                   type="checkbox"
                   className="accent-amber-500"
-                  checked={showHullGhostSlice}
-                  onChange={(event) => setShowHullGhostSlice(event.target.checked)}
-                />
-                Ghost slice
-              </label>
-              <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
-                <input
-                  type="checkbox"
-                  className="accent-amber-500"
                   checked={followHullPhase}
                   onChange={(event) => setFollowHullPhase(event.target.checked)}
                 />
@@ -4093,6 +8233,21 @@ const res = 256;
                     hullHealth.fail > 0 ? "bg-amber-800/70 text-amber-100" : "bg-emerald-800/70 text-emerald-100"
                   )}>
                     {hullHealth.pass} pass · {hullHealth.fail} fail
+                  </span>
+                )}
+                {latticeModeEnabled && latticeFrameStats && (
+                  <span className="rounded bg-slate-800/70 px-2 py-1 text-[0.65rem] text-slate-200">
+                    Lattice {latticeFrameStats.dims.join("x")} Aú {latticeFrameStats.voxelSize_m.toFixed(3)} m
+                  </span>
+                )}
+                {latticeModeEnabled && latticeVolumeStats && (
+                  <span className="rounded bg-slate-800/70 px-2 py-1 text-[0.65rem] text-slate-200">
+                    {latticeVolumeStats.label}
+                  </span>
+                )}
+                {latticeModeEnabled && latticeSdfStats && (
+                  <span className="rounded bg-slate-800/70 px-2 py-1 text-[0.65rem] text-slate-200">
+                    {latticeSdfStats.label}
                   </span>
                 )}
                 {hullDiagMsg && (
@@ -4188,7 +8343,7 @@ const res = 256;
             ref={overlayCanvasRef}
             className="absolute inset-0"
             style={{
-              opacity: overlayHudEnabled ? 1 : 0,
+              opacity: overlayCanvasVisible ? 1 : 0,
               pointerEvents: overlayHudEnabled ? "auto" : "none",
             }}
           />
@@ -4201,6 +8356,51 @@ const res = 256;
             }}
             aria-hidden="true"
           />
+          {latticeModeEnabled ? (
+            <div className="pointer-events-none absolute right-2 top-2 flex flex-col items-end gap-1 text-[0.65rem]">
+              <div className="flex flex-wrap items-center gap-1">
+                <span
+                  className={cn("rounded px-2 py-1 shadow-md shadow-black/40", latticePathBadge.className)}
+                  title={latticePathBadge.title}
+                >
+                  {latticePathBadge.text}
+                </span>
+                {latticeDowngradeBadge ? (
+                  <span
+                    className={cn("rounded px-2 py-1 shadow-md shadow-black/40", latticeDowngradeBadge.className)}
+                    title={latticeDowngradeBadge.title}
+                  >
+                    {latticeDowngradeBadge.text}
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                <span
+                  className={cn("rounded px-2 py-1 shadow-md shadow-black/40", latticeCoverageBadge.className)}
+                  title={latticeCoverageBadge.title}
+                >
+                  {latticeCoverageBadge.text}
+                </span>
+                {latticeFallbackStatus && latticeFallbackStatus.reason !== "disabled" ? (
+                  <span
+                    className={cn(
+                      "rounded px-2 py-1 shadow-md shadow-black/40",
+                      latticeFallbackStatus.level === "error"
+                        ? "bg-red-500/80 text-red-50"
+                        : latticeFallbackStatus.level === "warn"
+                          ? "bg-amber-500/80 text-amber-50"
+                          : "bg-slate-800/80 text-slate-100",
+                    )}
+                    title={[latticeFallbackStatus.reason, latticeFallbackStatus.hint, latticeFallbackStatus.detail]
+                      .filter(Boolean)
+                      .join(" | ")}
+                  >
+                    {latticeFallbackStatus.label}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         {planarVizMode === 2 && (
           <div className="pointer-events-none absolute top-2 left-2 w-14 h-14 rounded-full border border-emerald-700/60 bg-slate-900/30">
             <div
@@ -4236,12 +8436,4 @@ const res = 256;
   </CurvatureVoxProvider>
   );
 }
-
-
-
-
-
-
-
-
 

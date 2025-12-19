@@ -7,12 +7,14 @@
       "slug": "mission-ethos",
       "title": "Mission Ethos",
       "excerpt": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.",
-      "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.",
+      "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.\n\nWhen measurements disagree with our story, we revise the story. The vow survives by truth, not by force.",
       "tags": ["stewardship", "compassion"],
-      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course"],
+      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "integrity-protocols"],
       "links": [
         { "rel": "see-also", "to": "bodhisattva-craft" },
-        { "rel": "see-also", "to": "beginners-mind" }
+        { "rel": "see-also", "to": "beginners-mind" },
+        { "rel": "see-also", "to": "worldview-integrity" },
+        { "rel": "see-also", "to": "integrity-protocols" }
       ],
       "references": [
         { "kind": "doc", "title": "Mission Ethos Seeds", "path": "docs/ethos/why.md" }
@@ -48,9 +50,10 @@
       "excerpt": "Duty stays green; TS stays high; compare kappa_drive vs kappa_body to prove average safety.",
       "bodyMD": "Hold zeta \u2264 1 to keep curvature from cracking the hull or the vow.\n\nLight-crossing cadence (TS \u2265 1) is how relativity hears the average promise rather than the spikes.",
       "tags": ["metrics", "discipline"],
-      "children": [],
+      "children": ["reciprocity-contract"],
       "links": [
-        { "rel": "parent", "to": "bodhisattva-craft" }
+        { "rel": "parent", "to": "bodhisattva-craft" },
+        { "rel": "child", "to": "reciprocity-contract" }
       ],
       "references": [
         { "kind": "panel", "title": "Vacuum Gap Heatmap", "panelId": "vacuum-gap-heatmap" }
@@ -67,10 +70,11 @@
       "excerpt": "Shoshin resists stagnation; we tune geometry so the vacuum keeps breathing cleanly.",
       "bodyMD": "Gamma_geo \u2265 20 with a_eff near 0.984 nm: not just math, but a breathing space for attention.\n\nPort polishing, Q preservation, and healthy duty cycles are the same as protecting wonder.",
       "tags": ["shoshin", "geometry"],
-      "children": ["inner-spark"],
+      "children": ["inner-spark", "phoenix-averaging"],
       "links": [
         { "rel": "parent", "to": "mission-ethos" },
-        { "rel": "child", "to": "inner-spark" }
+        { "rel": "child", "to": "inner-spark" },
+        { "rel": "child", "to": "phoenix-averaging" }
       ],
       "references": [
         { "kind": "panel", "title": "Spectrum Tuner", "panelId": "spectrum-tuner" }
@@ -106,9 +110,10 @@
       "excerpt": "Sweat, tears, and humor are artifacts; they prove we earn each coordinate.",
       "bodyMD": "Every challenge logged in the ledger is a calibration point for compassion.\n\nWhen dreams are questioned, understanding bridges the distance better than thrust does.",
       "tags": ["resilience"],
-      "children": [],
+      "children": ["promise-trials"],
       "links": [
-        { "rel": "parent", "to": "mission-ethos" }
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "child", "to": "promise-trials" }
       ],
       "references": [
         { "kind": "panel", "title": "AGI Task History", "panelId": "agi-task-history" }
@@ -135,6 +140,197 @@
       "actions": [
         { "label": "Open Solar Navigation", "action": { "kind": "openPanel", "panelId": "nav-system" } },
         { "label": "Return Home", "action": { "kind": "gotoNode", "to": "mission-ethos" } }
+      ]
+    },
+    {
+      "id": "worldview-integrity",
+      "slug": "worldview-integrity",
+      "title": "Worldview Integrity",
+      "excerpt": "When evidence breaks the story, let the story break — not the people.",
+      "bodyMD": "Self-deception is a private apocalypse: the world remains, but the map is gone.\n\nWe refuse to protect a worldview by sacrificing compassion or by manipulating others. If a model requires coercion to survive, it is already failing.\n\nOur method is simple: make claims that can be tested, keep the ledger, and revise without shame.\n\nSee [[node:stewardship-ledger]] for the operational guardrails and [[node:beginners-mind]] for the discipline of clean attention.",
+      "tags": ["truth", "revision", "falsifiability", "compassion"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "stewardship-ledger" },
+        { "rel": "see-also", "to": "beginners-mind" }
+      ],
+      "references": [
+        { "kind": "doc", "title": "Mission Ethos Seeds", "path": "docs/ethos/why.md" },
+        { "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }
+      ],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Open Stewardship Ledger", "action": { "kind": "gotoNode", "to": "stewardship-ledger" } }
+      ]
+    },
+    {
+      "id": "integrity-protocols",
+      "slug": "integrity-protocols",
+      "title": "Integrity Protocols",
+      "excerpt": "Break false loops with provenance, liveness, cross-checks, ledger, compassion, and revision so innovation stays constructive.",
+      "bodyMD": "In high-stakes systems, the easiest mistake is self-serving certainty. This protocol exists to prevent that: separate what is decidable (claims that can be measured, cross-checked, costed, and revised) from what is chosen (values we refuse to trade away).\n\nSix codes:\n- **Provenance:** every claim names source, time, method, and scope.\n- **Liveness:** track age; label stale explicitly.\n- **Cross-checks:** no single-channel certainty; require an independent read and a falsification hook.\n- **Ledger:** costs are accounted, not hidden; name who bears them (risk, burden, exclusion, downstream harm).\n- **Compassion:** the chosen constraint; protect the vulnerable and reduce coercion, even when it costs status or convenience.\n- **Revision:** update without shame; when measures disagree or channels feel compromised, downgrade confidence, rollback, and re-verify.\n\nInnovation is not novelty; it is a promise that survives contact with reality.\n\nFeedback loops inherit stories. Some are true, many are stale, and some are weaponized. Our job is to keep only what can be carried forward without distortion.\n\nSee [[node:stewardship-ledger]] for guardrails and [[node:beginners-mind]] for signal discipline.",
+      "tags": ["provenance", "liveness", "cross-checks", "ledger", "compassion", "revision", "verification", "resilience"],
+      "children": [
+        "provenance-protocol",
+        "liveness-or-it-didnt-happen",
+        "voice-integrity",
+        "feedback-loop-hygiene",
+        "verification-checklist",
+        "compromised-channel-response"
+      ],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "child", "to": "provenance-protocol" },
+        { "rel": "child", "to": "liveness-or-it-didnt-happen" },
+        { "rel": "child", "to": "voice-integrity" },
+        { "rel": "child", "to": "feedback-loop-hygiene" },
+        { "rel": "child", "to": "verification-checklist" },
+        { "rel": "child", "to": "compromised-channel-response" }
+      ],
+      "references": [
+        { "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }
+      ],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Start with Provenance", "action": { "kind": "gotoNode", "to": "provenance-protocol" } }
+      ]
+    },
+    {
+      "id": "provenance-protocol",
+      "slug": "provenance-protocol",
+      "title": "Provenance Protocol",
+      "excerpt": "Trust is voice + provenance: every claim carries its source.",
+      "bodyMD": "We do not accept anonymous certainty.\n\nWhen you state a metric, prediction, or value, attach:\n- **Source** (where it came from)\n- **Time** (when it was observed)\n- **Method** (how it was produced)\n- **Scope** (what it does *not* cover)\n\nIf any of those are missing, label the claim **unknown** until verified.\n\nNext: [[node:liveness-or-it-didnt-happen]].",
+      "tags": ["provenance", "trust"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "integrity-protocols" }],
+      "references": [{ "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Go to Liveness", "action": { "kind": "gotoNode", "to": "liveness-or-it-didnt-happen" } }
+      ]
+    },
+    {
+      "id": "liveness-or-it-didnt-happen",
+      "slug": "liveness-or-it-didnt-happen",
+      "title": "Liveness or It Didn’t Happen",
+      "excerpt": "No cached myths: prove liveness or mark stale.",
+      "bodyMD": "A value that cannot be shown to update is not evidence.\n\nStability is good (noise dies out). Staleness is dangerous (myths look stable). So we always track **age** and label **stale** explicitly.\n\nThis is how we break generational feedback loops: we do not pass forward unlabeled snapshots.\n\nNext: [[node:voice-integrity]].",
+      "tags": ["liveness", "staleness", "feedback"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "integrity-protocols" }],
+      "references": [{ "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Go to Voice Integrity", "action": { "kind": "gotoNode", "to": "voice-integrity" } }
+      ]
+    },
+    {
+      "id": "voice-integrity",
+      "slug": "voice-integrity",
+      "title": "Voice Integrity",
+      "excerpt": "Assume the channel can be hijacked: cross-check before you believe.",
+      "bodyMD": "Companionship is not proof. Agreement is not proof. A single channel is not proof.\n\nWhen outcomes matter, we require at least two independent reads and a delta check. If the reads diverge, we downgrade confidence and switch to a safer posture.\n\nSee [[node:compromised-channel-response]].",
+      "tags": ["integrity", "cross-checks", "resilience"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "integrity-protocols" }],
+      "references": [{ "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Compromised Channel Response", "action": { "kind": "gotoNode", "to": "compromised-channel-response" } }
+      ]
+    },
+    {
+      "id": "feedback-loop-hygiene",
+      "slug": "feedback-loop-hygiene",
+      "title": "Feedback Loop Hygiene",
+      "excerpt": "Close loops only with verified signals.",
+      "bodyMD": "Feedback loops amplify what they measure. If the measurement is corrupted, the loop becomes a lie generator.\n\nWe keep loops constructive by:\n- Choosing the right window (instant vs averaged).\n- Using guardrails (duty, zeta, TS) to bound harm.\n- Keeping a rollback path when signals go weird.\n\nInnovation lives here: new ideas become safe when they enter a loop with proof and guardrails.\n\nSee [[node:reciprocity-contract]].",
+      "tags": ["feedback", "innovation", "guardrails"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "integrity-protocols" }],
+      "references": [
+        { "kind": "panel", "title": "Helix Core", "panelId": "helix-core" },
+        { "kind": "panel", "title": "Vacuum Gap Heatmap", "panelId": "vacuum-gap-heatmap" }
+      ],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Open Vacuum Gap Heatmap", "action": { "kind": "openPanel", "panelId": "vacuum-gap-heatmap" } }
+      ]
+    },
+    {
+      "id": "verification-checklist",
+      "slug": "verification-checklist",
+      "title": "Verification Checklist",
+      "excerpt": "Narratives must ship with verification hooks.",
+      "bodyMD": "A manifesto is only useful if it can be tested.\n\nEvery claim we publish should include:\n- What to measure\n- Where to read it\n- What would falsify it\n- What to do next if falsified\n\nThis makes the story portable without becoming propaganda.",
+      "tags": ["verification", "falsifiability"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "integrity-protocols" }],
+      "references": [
+        { "kind": "doc", "title": "Casimir Tile Mechanism", "path": "docs/casimir-tile-mechanism.md" },
+        { "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }
+      ],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } }
+      ]
+    },
+    {
+      "id": "compromised-channel-response",
+      "slug": "compromised-channel-response",
+      "title": "Compromised Channel Response",
+      "excerpt": "If the truth-anchor sounds wrong, re-verify and downgrade.",
+      "bodyMD": "If a signal feels urgent but cannot be verified, treat urgency as a threat model.\n\nResponse pattern:\n1. **Slow down** (reduce duty / choose SAFE posture).\n2. **Cross-check** (independent channel, derived vs computed).\n3. **Label stale** (do not let a bad feed become a story).\n4. **Rebuild trust** (run diagnostics, re-establish provenance).\n\nWe keep the promise by refusing to steer on corrupted data.",
+      "tags": ["safety", "resilience", "integrity"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "integrity-protocols" }],
+      "references": [{ "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }],
+      "actions": [{ "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } }]
+    },
+    {
+      "id": "reciprocity-contract",
+      "slug": "reciprocity-contract",
+      "title": "Reciprocity Contract",
+      "excerpt": "Timing honesty: if burst < \u03c4LC, the average claim is not earned.",
+      "bodyMD": "Reciprocity is timing honesty.\n\n- If **burst \u2265 \u03c4LC**, we can treat the cycle-average as meaningful.\n- If **burst < \u03c4LC**, we are sampling faster than the light-crossing time and the average claim is not earned.\n\nThis is not moralizing about speed. It is a guardrail against self-deception.\n\nSee [[node:stewardship-ledger]] and [[node:liveness-or-it-didnt-happen]].",
+      "tags": ["reciprocity", "timing", "guardrails"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "stewardship-ledger" }],
+      "references": [{ "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Return to Stewardship Ledger", "action": { "kind": "gotoNode", "to": "stewardship-ledger" } }
+      ]
+    },
+    {
+      "id": "phoenix-averaging",
+      "slug": "phoenix-averaging",
+      "title": "Phoenix Averaging",
+      "excerpt": "Step back: choose the right window to see the real signal.",
+      "bodyMD": "Solitude in a system is a windowed average.\n\nInstant readings are useful, but easy to manipulate and easy to misread. The cure is to step back to the correct window: instant, \u03c4LC, burst, or one-sector.\n\nInnovation stays constructive when the window matches the claim.\n\nSee [[node:beginners-mind]] and [[node:stewardship-ledger]].",
+      "tags": ["averaging", "signal", "discipline"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "beginners-mind" }],
+      "references": [{ "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Return to Beginner's Mind", "action": { "kind": "gotoNode", "to": "beginners-mind" } }
+      ]
+    },
+    {
+      "id": "promise-trials",
+      "slug": "promise-trials",
+      "title": "Promise Trials",
+      "excerpt": "Promises are proven under separation and pressure.",
+      "bodyMD": "When a mission splits roles, the vow is tested.\n\nOne side continues the work. Another side becomes exposed to stress, persuasion, or noise. We measure integrity by what happens next:\n- Do we return with proof, or with a story?\n- Do we protect the vulnerable, or use them as evidence?\n\nInnovation depends on this. Without trustworthy promises, teams cannot take coherent risks.",
+      "tags": ["trust", "promises", "resilience"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "struggle-testament" }],
+      "references": [{ "kind": "panel", "title": "AGI Task History", "panelId": "agi-task-history" }],
+      "actions": [
+        { "label": "Trace Trials in Task History", "action": { "kind": "openPanel", "panelId": "agi-task-history" } },
+        { "label": "Return to Struggle as Testament", "action": { "kind": "gotoNode", "to": "struggle-testament" } }
       ]
     }
   ]

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { HelpCircle } from "lucide-react";
@@ -33,8 +33,9 @@ export default function CurvatureSlicePanel() {
   const [size, setSize] = useState({ w: 640, h: 320 });
   useEffect(() => {
     const ro = new ResizeObserver(([e]) => {
-      const w = Math.max(360, Math.min(820, Math.floor(e.contentRect.width)));
-      setSize({ w, h: Math.round(w / 2) });
+      const w = Math.max(320, Math.min(820, Math.floor(e.contentRect.width)));
+      const h = Math.round(w / 1.8);
+      setSize({ w, h });
     });
     if (hostRef.current) ro.observe(hostRef.current);
     return () => ro.disconnect();
@@ -105,7 +106,7 @@ export default function CurvatureSlicePanel() {
   return (
     <Card className="bg-slate-900/50 border-slate-800">
       <CardHeader>
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+        <CardTitle className="flex flex-col gap-1 text-sm font-semibold sm:flex-row sm:items-center sm:gap-2">
           Equatorial Curvature Slice (REAL, to-scale)
           <Tooltip>
             <TooltipTrigger asChild>
@@ -148,7 +149,6 @@ export default function CurvatureSlicePanel() {
           gammaVdB={gammaVdB}
           dutyCycle={dutyUI}
           sectors={totalSectors}
-
           // visual controls: conservative, readable parity defaults
           sigmaRange={6}
           exposure={5.0}
@@ -157,10 +157,13 @@ export default function CurvatureSlicePanel() {
           curvatureGain={0}
           curvatureBoostMax={1}
         />
-        <div className="mt-2 text-[10px] text-slate-400 font-mono">
-          mode={mode} • FR-duty={Number.isFinite(dutyFR) ? dutyFR.toExponential(2) : '—'} • γ³={Number.isFinite(gammaGeo) ? Math.pow(gammaGeo,3).toExponential(2) : '—'} • ΔA/A≈{Number.isFinite(qSpoil) ? qSpoil.toFixed(3) : '—'} • γ<sub>VdB</sub>≈{Number.isFinite(gammaVdB) ? gammaVdB.toExponential(1) : '—'}
+        <div className="mt-2 break-words text-[10px] font-mono leading-4 text-slate-400">
+          mode={mode} | FR-duty={Number.isFinite(dutyFR) ? dutyFR.toExponential(2) : "-"} | I3A3={Number.isFinite(gammaGeo) ? Math.pow(gammaGeo, 3).toExponential(2) : "-"} | qSpoil={Number.isFinite(qSpoil) ? qSpoil.toFixed(3) : "-"} | I3_VdB={Number.isFinite(gammaVdB) ? gammaVdB.toExponential(1) : "-"}
         </div>
       </CardContent>
     </Card>
   );
 }
+
+
+

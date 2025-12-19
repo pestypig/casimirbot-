@@ -129,7 +129,7 @@ const auditCache = new Map<
   string,
   {
     blocks: PhysicsAuditBlock[];
-    meta: { enabled: boolean; reason?: string; mode?: "fallback" | "llm" };
+    meta: { enabled: boolean; reason?: string; mode?: "fallback" | "llm" | "disabled" };
   }
 >();
 

@@ -2,7 +2,12 @@ import { createWithEqualityFn } from "zustand/traditional";
 import { persist } from "zustand/middleware";
 import { navigate } from "wouter/use-browser-location";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
+import { getPanelDef } from "@/lib/desktop/panelRegistry";
+import * as lumaWhispers from "@/lib/luma-whispers-core";
 import { recordPanelActivity } from "@/lib/essence/activityReporter";
+
+const whisperPanelOpen: (panelId: string, title?: string) => void =
+  lumaWhispers.whisperPanelOpen ?? (() => {});
 
 export type Bounds = { x: number; y: number; w: number; h: number };
 
@@ -162,6 +167,8 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
         }),
 
       open: (id) => {
+        const def = getPanelDef(id);
+        whisperPanelOpen(id, def?.title);
         set((state) => {
           const current = state.windows[id];
           if (!current) return state;
@@ -435,6 +442,8 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
       openInHelix: (panelId) => {
         const target = panelId?.trim();
         if (!target) return;
+        const def = getPanelDef(target);
+        whisperPanelOpen(target, def?.title);
         navigate(`/helix-core?panel=${encodeURIComponent(target)}`);
         recordPanelActivity(target, "openInHelix");
       }

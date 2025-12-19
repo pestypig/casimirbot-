@@ -9,6 +9,19 @@ import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
 
+const stripViteHmrClient = (html: string): string => {
+  let next = html;
+  next = next.replace(
+    /<script\s+type="module"\s+src="\/@vite\/client"><\/script>/g,
+    "",
+  );
+  next = next.replace(
+    /<script\s+type="module">[\s\S]*?@react-refresh[\s\S]*?<\/script>/g,
+    "",
+  );
+  return next;
+};
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -21,9 +34,29 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  const baseServerConfig = viteConfig.server ?? {};
+  const hmrDisabled =
+    process.env.DISABLE_VITE_HMR === "1" || process.env.VITE_HMR === "0";
+  const resolvedHmrPortRaw = process.env.HMR_PORT ?? process.env.PORT ?? "";
+  const resolvedHmrPort = Number.parseInt(resolvedHmrPortRaw, 10);
+  const hmrPort = Number.isFinite(resolvedHmrPort) ? resolvedHmrPort : null;
+  const hmrHost = process.env.HMR_HOST || null;
+  const hmrProtocol = process.env.HMR_PROTOCOL || null;
+
+  const hmrConfig = {
+    ...(baseServerConfig.hmr ?? {}),
+    server,
+    ...(hmrHost ? { host: hmrHost } : {}),
+    ...(hmrPort ? { port: hmrPort, clientPort: hmrPort } : {}),
+    ...(hmrProtocol ? { protocol: hmrProtocol } : {}),
+  };
+
   const serverOptions = {
+    ...baseServerConfig,
+    ...(hmrPort ? { port: hmrPort } : {}),
+    ...(hmrHost ? { host: hmrHost } : {}),
     middlewareMode: true,
-    hmr: { server },
+    hmr: hmrDisabled ? false : hmrConfig,
     allowedHosts: true as const,
   };
 
@@ -64,7 +97,8 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      const finalPage = hmrDisabled ? stripViteHmrClient(page) : page;
+      res.status(200).set({ "Content-Type": "text/html" }).end(finalPage);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);

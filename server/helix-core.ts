@@ -11,6 +11,8 @@ import {
   getGlobalPipelineState,
   setGlobalPipelineState,
   sampleDisplacementField,
+  sampleDisplacementFieldGeometry,
+  fieldSamplesToCsv,
   MODE_CONFIGS,
   PAPER_DUTY,
   orchestrateVacuumGapSweep,
@@ -21,7 +23,7 @@ import {
   DEFAULT_PULSED_CURRENT_LIMITS_A,
 } from "./energy-pipeline";
 // Import the type on a separate line to avoid esbuild/tsx parse grief
-import type { EnergyPipelineState, ScheduleSweepRequest } from "./energy-pipeline";
+import type { EnergyPipelineState, FieldSampleBuffer, ScheduleSweepRequest, WarpGeometrySpec } from "./energy-pipeline";
 import { QI_AUTOTHROTTLE_HYST, QI_AUTOTHROTTLE_TARGET } from "./config/env.js";
 import {
   computeSweepPointExtended,
@@ -55,6 +57,16 @@ import {
   hardwareSectorStateSchema,
   hardwareQiSampleSchema,
   hardwareSpectrumFrameSchema,
+  hullSchema,
+  hullAreaOverrideSchema,
+  hullAreaPerSectorSchema,
+  warpGeometrySchema,
+  warpGeometryKindSchema,
+  warpRadialSampleSchema,
+  warpFallbackModeSchema,
+  hullPreviewPayloadSchema,
+  cardMeshMetadataSchema,
+  cardLatticeMetadataSchema,
 } from "../shared/schema.js";
 import type {
   SweepSpec,
@@ -65,7 +77,18 @@ import type {
   HardwareSectorState,
   HardwareQiSample,
   HardwareSpectrumFrame,
+  BasisTransform,
+  HullPreviewPayload,
+  AxisLabel,
+  WarpGeometryFallback,
 } from "../shared/schema.js";
+import {
+  applyHullBasisToDims,
+  HULL_BASIS_IDENTITY,
+  isIdentityHullBasis,
+  resolveHullBasis,
+  type HullBasisResolved,
+} from "../shared/hull-basis.js";
 import { getSpectrumSnapshots, postSpectrum } from "./metrics/spectrum.js";
 import type { SpectrumSnapshot } from "./metrics/spectrum.js";
 import { slewPump } from "./instruments/pump.js";
@@ -765,6 +788,10 @@ export async function* orchestrateParametricSweep(
 }
 
 // Schema for pipeline parameter updates
+const HULL_DIM_MIN_M = 1e-3;
+const HULL_DIM_MAX_M = 20_000; // Guardrail: cap hull length-scale at 20 km
+const HULL_AREA_MAX_M2 = 1e8; // Guardrail: cap surface area at 100 km^2
+const PREVIEW_TRI_CAP = 2_000_000; // Guardrail: reject preview meshes that exceed 2M triangles
 const vacuumGapSweepUpdateSchema = vacuumGapSweepConfigSchema
   .partial()
   .extend({
@@ -777,12 +804,59 @@ const dynamicConfigUpdateSchema = dynamicConfigSchema
     sweep: vacuumGapSweepUpdateSchema.optional(),
   });
 
+const warpSdfPreviewSchema = z
+  .object({
+    key: z.string().min(1).optional(),
+    hash: z.string().optional(),
+    meshHash: z.string().optional(),
+    basisSignature: z.string().optional(),
+    dims: z
+      .tuple([z.number().int().positive(), z.number().int().positive(), z.number().int().positive()])
+      .optional(),
+    bounds: z.tuple([z.number(), z.number(), z.number()]).optional(),
+    voxelSize: z.number().positive().optional(),
+    band: z.number().positive().optional(),
+    format: z.enum(["float", "byte"]).optional(),
+    clampReasons: z.array(z.string()).optional(),
+    stats: z
+      .object({
+        sampleCount: z.number().int().nonnegative().optional(),
+        voxelsTouched: z.number().int().nonnegative().optional(),
+        voxelCoverage: z.number().nonnegative().optional(),
+        trianglesTouched: z.number().int().nonnegative().optional(),
+        triangleCoverage: z.number().nonnegative().optional(),
+        maxAbsDistance: z.number().nonnegative().optional(),
+        maxQuantizationError: z.number().nonnegative().optional(),
+      })
+      .optional(),
+    updatedAt: z.number().nonnegative().optional(),
+  })
+  .partial();
+
 const UpdateSchema = z.object({
   tileArea_cm2: z.number().min(0.01).max(10_000).optional(),
   gap_nm: z.number().min(0.1).max(1000).optional(),
   sag_nm: z.number().min(0).max(1000).optional(),
   temperature_K: z.number().min(0).max(400).optional(),
   modulationFreq_GHz: z.number().min(0.001).max(1000).optional(),
+  hull: hullSchema.partial().optional(),
+  hullAreaOverride_m2: hullAreaOverrideSchema.shape.hullAreaOverride_m2,
+  hullAreaOverride_uncertainty_m2: hullAreaOverrideSchema.shape.hullAreaOverride_uncertainty_m2,
+  hullAreaPerSector_m2: hullAreaPerSectorSchema,
+  warpFieldType: z.enum(["natario", "natario_sdf", "alcubierre"]).optional(),
+  warpGeometry: warpGeometrySchema.partial().optional(),
+  warpGeometryKind: warpGeometryKindSchema.optional(),
+  warpGeometryAssetId: z.string().optional(),
+  fallbackMode: warpFallbackModeSchema.optional(),
+  preview: hullPreviewPayloadSchema.nullable().optional(),
+  previewMesh: cardMeshMetadataSchema.nullable().optional(),
+  mesh: cardMeshMetadataSchema.nullable().optional(),
+  previewSdf: warpSdfPreviewSchema.nullable().optional(),
+  sdf: warpSdfPreviewSchema.nullable().optional(),
+  previewLattice: cardLatticeMetadataSchema.nullable().optional(),
+  lattice: cardLatticeMetadataSchema.nullable().optional(),
+  beta_trans: z.number().min(0).max(1).optional(),
+  powerFillCmd: z.number().min(0).max(1).optional(),
   dynamicConfig: dynamicConfigUpdateSchema.optional(),
   negativeFraction: z.number().min(0).max(1).optional(),
   dutyCycle: z.number().min(0).max(1).optional(),
@@ -794,6 +868,81 @@ const UpdateSchema = z.object({
   iPeakMaxSector_A: z.number().min(0).max(1e9).optional(),
   iPeakMaxLauncher_A: z.number().min(0).max(1e9).optional(),
   rhoTarget: z.number().min(0).max(1).optional(),
+}).superRefine((value, ctx) => {
+  const hull = value.hull;
+  if (hull) {
+    const checkDim = (key: "Lx_m" | "Ly_m" | "Lz_m") => {
+      const raw = hull[key];
+      if (raw == null) return;
+      if (!Number.isFinite(raw)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "hull dimension must be finite", path: ["hull", key] });
+        return;
+      }
+      if (raw <= HULL_DIM_MIN_M || raw > HULL_DIM_MAX_M) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `hull.${key} must be within (${HULL_DIM_MIN_M}, ${HULL_DIM_MAX_M}] m`,
+          path: ["hull", key],
+        });
+      }
+    };
+    checkDim("Lx_m");
+    checkDim("Ly_m");
+    checkDim("Lz_m");
+    if (hull.wallThickness_m != null) {
+      if (!Number.isFinite(hull.wallThickness_m)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "hull.wallThickness_m must be finite", path: ["hull", "wallThickness_m"] });
+      } else if (hull.wallThickness_m <= 0 || hull.wallThickness_m > HULL_DIM_MAX_M) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `hull.wallThickness_m must be within (0, ${HULL_DIM_MAX_M}] m`,
+          path: ["hull", "wallThickness_m"],
+        });
+      }
+    }
+  }
+  const checkArea = (raw: unknown, key: "hullAreaOverride_m2" | "hullAreaOverride_uncertainty_m2", allowZero: boolean) => {
+    if (raw == null) return;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${key} must be finite`, path: [key] });
+    } else if ((allowZero ? n < 0 : n <= 0) || n > HULL_AREA_MAX_M2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${key} must be within ${allowZero ? "[0," : "(0,"} ${HULL_AREA_MAX_M2}] m^2`,
+        path: [key],
+      });
+    }
+  };
+  checkArea(value.hullAreaOverride_m2, "hullAreaOverride_m2", false);
+  checkArea(value.hullAreaOverride_uncertainty_m2, "hullAreaOverride_uncertainty_m2", true);
+  if (value.hullAreaPerSector_m2 != null) {
+    if (!Array.isArray(value.hullAreaPerSector_m2) || value.hullAreaPerSector_m2.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "hullAreaPerSector_m2 must be a non-empty array",
+        path: ["hullAreaPerSector_m2"],
+      });
+    } else if (value.hullAreaPerSector_m2.length > 10_000) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "hullAreaPerSector_m2 length exceeds limit (10k)",
+        path: ["hullAreaPerSector_m2"],
+      });
+    } else {
+      const badIdx = value.hullAreaPerSector_m2.findIndex(
+        (v) => !Number.isFinite(v) || v < 0 || v > HULL_AREA_MAX_M2,
+      );
+      if (badIdx >= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `hullAreaPerSector_m2[${badIdx}] must be within [0, ${HULL_AREA_MAX_M2}] m^2`,
+          path: ["hullAreaPerSector_m2", badIdx],
+        });
+      }
+    }
+  }
+});
 /* BEGIN STRAY_DUPLICATED_BLOCK - commented out to fix top-level parse errors
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
@@ -1037,7 +1186,6 @@ const UpdateSchema = z.object({
   };
 */
 
-});
 // Run diagnostics scan on all sectors
 async function runDiagnosticsScan() {
   const s = getGlobalPipelineState();
@@ -1512,8 +1660,16 @@ export function getSystemMetrics(req: Request, res: Response) {
   const now = Date.now() / 1000;
   const sweepIdx = Math.floor(now * strobeHz) % totalSectors;
 
-  const tilesPerSector = Math.floor(s.N_tiles / totalSectors);
-  const activeTiles = tilesPerSector * concurrent;
+  const tilesVecRaw = Array.isArray((s as any).tilesPerSectorVector)
+    ? ((s as any).tilesPerSectorVector as number[])
+    : null;
+  const tilesPerSectorAvg = tilesVecRaw && tilesVecRaw.length
+    ? tilesVecRaw.reduce((a, b) => a + b, 0) / Math.max(1, totalSectors)
+    : s.N_tiles / totalSectors;
+  const tilesPerSector = Math.max(0, Math.round(tilesPerSectorAvg));
+  const activeTiles = tilesVecRaw && tilesVecRaw.length
+    ? Math.max(0, Math.round(tilesVecRaw.reduce((a, b) => a + b, 0) * activeFraction))
+    : tilesPerSector * concurrent;
 
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
 
@@ -1704,7 +1860,19 @@ export function getSystemMetrics(req: Request, res: Response) {
     massPerTile_kg,
     overallStatus: s.overallStatus ?? (s.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
-    tiles: { tileArea_cm2: s.tileArea_cm2, hullArea_m2: s.hullArea_m2 ?? null, N_tiles: s.N_tiles },
+    tiles: {
+      tileArea_cm2: s.tileArea_cm2,
+      hullArea_m2: s.hullArea_m2 ?? null,
+      N_tiles: s.N_tiles,
+      tilesPerSector: s.tilesPerSector,
+      tilesPerSectorVector: (s as any).tilesPerSectorVector,
+      tilesPerSectorUniform: (s as any).tilesPerSectorUniform,
+      tilePowerDensityScale: (s as any).tilePowerDensityScale,
+      areaPerSector_m2: (s as any).hullAreaPerSector_m2,
+      areaPerSectorSource: (s as any).__hullAreaPerSectorSource,
+      hullAreaSource: (s as any).__hullAreaSource,
+      hullAreaEllipsoid_m2: (s as any).__hullAreaEllipsoid_m2,
+    },
 
     // Add tile data with positions and T00 values for Green's Potential computation
     tileData: generateSampleTiles(Math.min(100, activeTiles)), // Generate sample tiles for φ computation
@@ -1857,26 +2025,288 @@ export async function updatePipelineParams(req: Request, res: Response) {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid parameters", issues: parsed.error.issues });
     }
-    const params = { ...parsed.data };
+    type WarpGeometryInput =
+      | (Partial<Omit<WarpGeometrySpec, "sdf">> & {
+          kind?: EnergyPipelineState["warpGeometryKind"];
+          geometryKind?: EnergyPipelineState["warpGeometryKind"];
+          radial?: Partial<WarpGeometrySpec["radial"]>;
+          sdf?:
+            | (Partial<WarpGeometrySpec["sdf"]> & {
+                dims?: [number, number, number];
+                bounds_m?: [number, number, number];
+                band_m?: number;
+                format?: "float" | "byte";
+              })
+            | null;
+        })
+      | null;
+  type PipelineParamInput = Partial<Omit<EnergyPipelineState, "hull" | "warpGeometry">> & {
+    hull?: Partial<EnergyPipelineState["hull"]>;
+    warpGeometry?: WarpGeometryInput;
+  } & Record<string, any>;
+  const params: PipelineParamInput = { ...parsed.data };
+  const previewPayload = params.preview ?? null;
+  const previewMesh = params.previewMesh ?? params.mesh ?? null;
+  const previewSdf = params.previewSdf ?? params.sdf ?? null;
+  const previewLattice = params.previewLattice ?? params.lattice ?? null;
+  const fallbackModeRaw = params.fallbackMode;
+  const validatePreview = (): string[] => {
+    const reasons: string[] = [];
+    const triCandidates = [
+      (previewMesh as any)?.triangleCount,
+      (previewPayload as any)?.lodFull?.triangleCount,
+      (previewPayload as any)?.lodCoarse?.triangleCount,
+    ]
+      .map((v) => (Number.isFinite(v) ? Number(v) : null))
+      .filter((v): v is number => v != null);
+    if (triCandidates.length && Math.max(...triCandidates) > PREVIEW_TRI_CAP) {
+      reasons.push(`triangles>${PREVIEW_TRI_CAP}`);
+    }
+    const dimsCandidates: Array<[number, number, number]> = [];
+    const targetDims = (previewPayload as any)?.targetDims;
+    if (targetDims && Number.isFinite(targetDims.Lx_m) && Number.isFinite(targetDims.Ly_m) && Number.isFinite(targetDims.Lz_m)) {
+      dimsCandidates.push([targetDims.Lx_m, targetDims.Ly_m, targetDims.Lz_m]);
+    }
+    const metricDims = (previewPayload as any)?.hullMetrics?.dims_m;
+    if (metricDims && Number.isFinite(metricDims.Lx_m) && Number.isFinite(metricDims.Ly_m) && Number.isFinite(metricDims.Lz_m)) {
+      dimsCandidates.push([metricDims.Lx_m, metricDims.Ly_m, metricDims.Lz_m]);
+    }
+    const obb = (previewMesh as any)?.obb ?? (previewPayload as any)?.obb;
+    if (obb?.halfSize && Array.isArray(obb.halfSize) && obb.halfSize.length >= 3) {
+      const [hx, hy, hz] = obb.halfSize;
+      if ([hx, hy, hz].every((v: any) => Number.isFinite(v))) {
+        dimsCandidates.push([hx * 2, hy * 2, hz * 2]);
+      } else {
+        reasons.push("obb:nonfinite");
+      }
+    }
+    for (const dims of dimsCandidates) {
+      if (dims.some((v) => !Number.isFinite(v) || v <= 0)) {
+        reasons.push("dims:nonfinite");
+        break;
+      }
+      const maxDim = Math.max(...dims);
+      if (maxDim > HULL_DIM_MAX_M) {
+        reasons.push(`extent>${HULL_DIM_MAX_M}`);
+        break;
+      }
+    }
+    return Array.from(new Set(reasons));
+  };
+
+    const previewProvided = Object.prototype.hasOwnProperty.call(parsed.data, "preview");
+  const previewMeshProvided =
+    Object.prototype.hasOwnProperty.call(parsed.data, "previewMesh") ||
+    Object.prototype.hasOwnProperty.call(parsed.data, "mesh");
+  const previewSdfProvided =
+    Object.prototype.hasOwnProperty.call(parsed.data, "previewSdf") ||
+    Object.prototype.hasOwnProperty.call(parsed.data, "sdf");
+  const previewLatticeProvided =
+    Object.prototype.hasOwnProperty.call(parsed.data, "previewLattice") ||
+    Object.prototype.hasOwnProperty.call(parsed.data, "lattice");
+  const previewSdfPresent = previewSdfProvided && previewSdf != null;
+  const previewLatticePresent = previewLatticeProvided && previewLattice != null;
+  const fallbackMode: "allow" | "warn" | "block" =
+    fallbackModeRaw === "warn" || fallbackModeRaw === "block" ? fallbackModeRaw : "allow";
+  if (previewProvided || previewMeshProvided || previewSdfProvided || previewLatticeProvided) {
+    const validationReasons = validatePreview();
+    if (validationReasons.length) {
+      return res.status(422).json({ error: "preview-validation-failed", validation: validationReasons });
+    }
+  }
+
+    const pickHash = (value: unknown) =>
+      typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+    let resolvedGeometryKind: EnergyPipelineState["warpGeometryKind"] | undefined;
+
+    delete params.preview;
+    delete params.previewMesh;
+    delete params.mesh;
+    delete params.previewSdf;
+    delete params.sdf;
+    delete params.previewLattice;
+    delete params.lattice;
+    delete (params as any).fallbackMode;
+
     if (typeof params.negativeFraction === "number") {
       params.negativeFraction = Math.max(0, Math.min(1, params.negativeFraction));
     }
-    const { nextState: newState, scheduledJob } = await pipeMutex.lock<{
+    const { nextState: newState, scheduledJob, fallback: geometryFallback, blocked } = await pipeMutex.lock<{
       nextState: EnergyPipelineState;
       scheduledJob: SweepJob | null;
+      fallback: {
+        mode: "allow" | "warn" | "block";
+        applied: boolean;
+        reasons: string[];
+        requestedKind: EnergyPipelineState["warpGeometryKind"] | null;
+        resolvedKind: EnergyPipelineState["warpGeometryKind"] | undefined;
+        blocked?: boolean;
+      };
+      blocked: boolean;
     }>(async () => {
       let pendingJob: SweepJob | null = null;
       const curr = getGlobalPipelineState();
-      const next = await updateParameters(curr, params, {
+      const previewState = (curr as any).geometryPreview ?? null;
+
+      const meshHashIncoming = pickHash(
+        (previewMesh as any)?.meshHash ?? (previewPayload as any)?.meshHash ?? (previewPayload as any)?.mesh?.meshHash,
+      );
+      const meshHashExisting = pickHash(
+        (previewState as any)?.mesh?.meshHash ??
+          (previewState as any)?.preview?.meshHash ??
+          (previewState as any)?.preview?.mesh?.meshHash,
+      );
+      const meshesAlign = !meshHashIncoming || !meshHashExisting || meshHashIncoming === meshHashExisting;
+      const meshHash = meshHashIncoming ?? meshHashExisting;
+
+      const sdfHashIncoming = pickHash(
+        (previewSdf as any)?.key ?? (previewSdf as any)?.hash ?? (previewLattice as any)?.hashes?.sdf,
+      );
+      const sdfHashExisting = meshesAlign
+        ? pickHash((previewState as any)?.sdf?.key ?? (previewState as any)?.sdf?.hash ?? (previewState as any)?.lattice?.hashes?.sdf)
+        : null;
+      const sdfHash = sdfHashIncoming ?? sdfHashExisting;
+
+      const volumeHashIncoming = pickHash((previewLattice as any)?.hashes?.volume);
+      const volumeHashExisting = meshesAlign ? pickHash((previewState as any)?.lattice?.hashes?.volume) : null;
+      const volumeHash = volumeHashIncoming ?? volumeHashExisting;
+
+      const latticeEnabledIncoming = (previewLattice as any)?.enabled;
+      const latticeEnabledExisting = meshesAlign ? (previewState as any)?.lattice?.enabled : undefined;
+      const latticeEnabled = latticeEnabledIncoming ?? latticeEnabledExisting;
+
+      const clampReasons: string[] = [];
+      const sdfClampIncoming = (previewSdf as any)?.clampReasons;
+      if (Array.isArray(sdfClampIncoming)) clampReasons.push(...sdfClampIncoming);
+      const latticeClampIncoming = (previewLattice as any)?.frame?.clampReasons;
+      if (Array.isArray(latticeClampIncoming)) clampReasons.push(...latticeClampIncoming);
+      if (meshesAlign) {
+        const sdfClampExisting = (previewState as any)?.sdf?.clampReasons;
+        if (Array.isArray(sdfClampExisting)) clampReasons.push(...sdfClampExisting);
+        const latticeClampExisting = (previewState as any)?.lattice?.frame?.clampReasons;
+        if (Array.isArray(latticeClampExisting)) clampReasons.push(...latticeClampExisting);
+      }
+
+      const hasPreviewSdf =
+        previewSdfPresent || (!previewSdfProvided && meshesAlign && !!(previewState as any)?.sdf);
+      const hasPreviewLattice =
+        previewLatticePresent || (!previewLatticeProvided && meshesAlign && !!(previewState as any)?.lattice);
+
+      const fallbackReasons: string[] = [];
+      const validSdfHashes = !!(meshHash && (sdfHash || volumeHash));
+      const canUseSdf = validSdfHashes && clampReasons.length === 0 && latticeEnabled !== false;
+      const wantsSdf = canUseSdf || params.warpGeometryKind === "sdf" || hasPreviewSdf || hasPreviewLattice;
+
+      const resolvedKind = canUseSdf
+        ? "sdf"
+        : wantsSdf
+          ? "ellipsoid"
+          : params.warpGeometryKind ?? curr.warpGeometryKind;
+      resolvedGeometryKind = resolvedKind;
+      if (!meshHash) fallbackReasons.push("preview:missing-mesh");
+      if (!(sdfHash || volumeHash)) fallbackReasons.push("preview:missing-sdf");
+      if (!hasPreviewSdf && !hasPreviewLattice) fallbackReasons.push("preview:missing");
+      if (latticeEnabled === false) fallbackReasons.push("lattice:disabled");
+      if (clampReasons.length) {
+        for (const reason of clampReasons) fallbackReasons.push(`clamp:${reason}`);
+      }
+      const fallbackReasonsUnique = Array.from(new Set(fallbackReasons));
+      const fallbackRequested = wantsSdf && !canUseSdf;
+      const fallbackApplied = fallbackRequested && resolvedKind === "ellipsoid";
+      const fallbackMeta: WarpGeometryFallback = {
+        mode: fallbackMode,
+        applied: fallbackApplied,
+        reasons:
+          fallbackApplied || fallbackMode === "warn"
+            ? fallbackReasonsUnique
+            : [],
+        requestedKind: params.warpGeometryKind ?? curr.warpGeometryKind ?? null,
+        resolvedKind,
+      };
+
+      const { hull: hullPartial, warpGeometry: warpGeometryPartial, ...paramsRest } = params;
+      const paramsTyped: Partial<EnergyPipelineState> = { ...paramsRest };
+      if (warpGeometryPartial !== undefined) {
+        paramsTyped.warpGeometry =
+          warpGeometryPartial === null ? null : (warpGeometryPartial as unknown as WarpGeometrySpec);
+      }
+      if (hullPartial) {
+        paramsTyped.hull = {
+          ...(curr.hull ?? {
+            Lx_m: curr.shipRadius_m * 2,
+            Ly_m: curr.shipRadius_m * 2,
+            Lz_m: curr.shipRadius_m * 2,
+          }),
+          ...hullPartial,
+        } as EnergyPipelineState["hull"];
+      }
+      const geometryPreviewTouched =
+        previewProvided || previewMeshProvided || previewSdfProvided || previewLatticeProvided;
+      let mergedPreview: any = null;
+      if (geometryPreviewTouched) {
+        mergedPreview = { ...(curr as any).geometryPreview ?? {} };
+        if (previewProvided) mergedPreview.preview = previewPayload;
+        if (previewMeshProvided) mergedPreview.mesh = previewMesh;
+        if (previewSdfProvided) mergedPreview.sdf = previewSdf;
+        if (previewLatticeProvided) mergedPreview.lattice = previewLattice;
+        mergedPreview.updatedAt = Date.now();
+        paramsTyped.geometryPreview = mergedPreview;
+      }
+      if (resolvedKind) {
+        if (fallbackApplied) {
+          console.warn("[helix-core] warp geometry fallback to ellipsoid", {
+            requestedKind: params.warpGeometryKind ?? curr.warpGeometryKind ?? null,
+            meshHash,
+            sdfHash: sdfHash ?? volumeHash ?? null,
+            clampReasons,
+            latticeEnabled: latticeEnabled ?? true,
+            previewHashesAligned: meshesAlign,
+            fallbackReasons: fallbackReasonsUnique,
+          });
+        }
+        paramsTyped.warpGeometryKind = resolvedKind;
+        if (paramsTyped.warpGeometry) {
+          paramsTyped.warpGeometry = {
+            ...(paramsTyped.warpGeometry as any),
+            geometryKind: resolvedKind,
+          } as any;
+        }
+      }
+      if (fallbackApplied && fallbackMode === "block") {
+        const nextStateBlocked = geometryPreviewTouched
+          ? {
+              ...curr,
+              geometryPreview: mergedPreview ?? (curr as any).geometryPreview ?? null,
+              geometryFallback: { ...fallbackMeta, blocked: true },
+            }
+          : { ...curr, geometryFallback: { ...fallbackMeta, blocked: true } };
+        setGlobalPipelineState(nextStateBlocked);
+        return { nextState: nextStateBlocked, scheduledJob: pendingJob, fallback: { ...fallbackMeta, blocked: true }, blocked: true };
+      }
+      const next = await updateParameters(curr, paramsTyped, {
         sweepMode: "async",
         sweepReason: "pipeline-update",
         scheduleSweep: (request) => {
           pendingJob = enqueueSweepJob(curr, { ...request, reason: request.reason ?? "pipeline-update" });
         },
       });
+      if (fallbackApplied || fallbackMode === "warn") {
+        (next as any).geometryFallback = fallbackMeta;
+      }
       setGlobalPipelineState(next);
-      return { nextState: next, scheduledJob: pendingJob };
+      return { nextState: next, scheduledJob: pendingJob, fallback: fallbackMeta, blocked: false };
     });
+
+    if (blocked && geometryFallback) {
+      return res
+        .status(422)
+        .json({ error: "warp-geometry-fallback-blocked", geometryFallback: { ...geometryFallback, blocked: true } });
+    }
+
+    const shouldAttachFallback = geometryFallback && (geometryFallback.applied || geometryFallback.mode === "warn");
+    const attachGeometryFallback = (payload: any) =>
+      shouldAttachFallback ? { ...payload, geometryFallback } : payload;
 
     // Write calibration for phase diagram integration
     await writePhaseCalibration({
@@ -1887,11 +2317,18 @@ export async function updatePipelineParams(req: Request, res: Response) {
       zeta_target: 0.5
     }, 'pipeline_update');
 
-    publish("warp:reload", { reason: "pipeline-update", keys: Object.keys(params), ts: Date.now() });
+    const publishKeys = Object.keys(params);
+    if (resolvedGeometryKind && !publishKeys.includes("warpGeometryKind")) {
+      publishKeys.push("warpGeometryKind");
+    }
+    if (previewProvided || previewMeshProvided || previewSdfProvided || previewLatticeProvided) {
+      publishKeys.push("geometryPreview");
+    }
+    publish("warp:reload", { reason: "pipeline-update", keys: publishKeys, ts: Date.now() });
 
     if (scheduledJob) {
       const isCurrentJob = newState.sweep?.jobId === scheduledJob.id;
-      const responsePayload = {
+      const responsePayload = attachGeometryFallback({
         ...newState,
         sweepJob: {
           id: scheduledJob.id,
@@ -1901,10 +2338,10 @@ export async function updatePipelineParams(req: Request, res: Response) {
           enqueuedAt: scheduledJob.enqueuedAt,
           queuedBehindActive: !isCurrentJob && newState.sweep?.status === "running",
         },
-      };
+      });
       res.status(202).json(responsePayload);
     } else {
-      res.json(newState);
+      res.json(attachGeometryFallback(newState));
     }
   } catch (error) {
     res.status(400).json({ error: "Failed to update parameters", details: error instanceof Error ? error.message : "Unknown error" });
@@ -1978,6 +2415,563 @@ export function getHelixMetrics(req: Request, res: Response) {
   return getSystemMetrics(req, res);
 }
 
+// --- Field geometry helpers --------------------------------------------------
+
+const PREVIEW_STALE_MS = 24 * 60 * 60 * 1000; // 24h
+const FIELD_GEOMETRY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const FIELD_GEOMETRY_CACHE_MAX = 12;
+
+type BasisResolved = HullBasisResolved;
+
+type GeometryResolution = {
+  hull: { Lx_m: number; Ly_m: number; Lz_m: number };
+  sampleHull: { Lx_m: number; Ly_m: number; Lz_m: number };
+  basis: BasisResolved;
+  source: "preview" | "pipeline";
+  meshHash?: string;
+  clampReasons: string[];
+  previewUpdatedAt?: number;
+  stale: boolean;
+};
+
+type FieldGeometryCacheEntry = {
+  createdAt: number;
+  key: string;
+  buffer: FieldSampleBuffer;
+  meta: {
+    geometrySource: GeometryResolution["source"];
+    basisApplied: BasisResolved;
+    hullDims: GeometryResolution["hull"];
+    sampleHull: GeometryResolution["sampleHull"];
+    meshHash?: string;
+    clampReasons: string[];
+    previewUpdatedAt?: number;
+  };
+};
+
+const fieldGeometryCache = new Map<string, FieldGeometryCacheEntry>();
+
+const clampHullDim = (value: unknown) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  const v = Math.abs(n);
+  return Math.max(HULL_DIM_MIN_M, Math.min(HULL_DIM_MAX_M, v));
+};
+
+const clampHullDimsFrom = (raw: any): GeometryResolution["hull"] | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const dims = {
+    Lx_m: clampHullDim((raw as any).Lx_m ?? (raw as any).x ?? ((raw as any).a ? (raw as any).a * 2 : undefined)),
+    Ly_m: clampHullDim((raw as any).Ly_m ?? (raw as any).y ?? ((raw as any).b ? (raw as any).b * 2 : undefined)),
+    Lz_m: clampHullDim((raw as any).Lz_m ?? (raw as any).z ?? ((raw as any).c ? (raw as any).c * 2 : undefined)),
+  };
+  if (dims.Lx_m && dims.Ly_m && dims.Lz_m) return dims as GeometryResolution["hull"];
+  return null;
+};
+
+const hullDimsFromObb = (obb: any): GeometryResolution["hull"] | null => {
+  const half = obb?.halfSize;
+  if (!Array.isArray(half) || half.length < 3) return null;
+  return clampHullDimsFrom({
+    Lx_m: (half[0] ?? 0) * 2,
+    Ly_m: (half[1] ?? 0) * 2,
+    Lz_m: (half[2] ?? 0) * 2,
+  });
+};
+
+const divideHullByScale = (
+  hull: GeometryResolution["hull"],
+  scale: BasisResolved["scale"],
+): GeometryResolution["hull"] => {
+  const safeScale = (value: number | undefined) => {
+    const n = Number(value);
+    return Number.isFinite(n) && Math.abs(n) > 1e-9 ? Math.abs(n) : 1;
+  };
+  return {
+    Lx_m: clampHullDim(hull.Lx_m / safeScale(scale[0])) ?? hull.Lx_m,
+    Ly_m: clampHullDim(hull.Ly_m / safeScale(scale[1])) ?? hull.Ly_m,
+    Lz_m: clampHullDim(hull.Lz_m / safeScale(scale[2])) ?? hull.Lz_m,
+  };
+};
+
+const coercePreviewPayload = (raw: any): HullPreviewPayload | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const parsed = hullPreviewPayloadSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  return parsed.data as HullPreviewPayload;
+};
+
+const resolveGeometryForSampling = (
+  previewRaw: any,
+  pipelineHull: any,
+): GeometryResolution => {
+  const preview = coercePreviewPayload(previewRaw);
+  const previewUpdatedAt =
+    preview && Number.isFinite(preview.updatedAt) ? Number(preview.updatedAt) : undefined;
+  const previewStale = previewUpdatedAt != null
+    ? Date.now() - previewUpdatedAt > PREVIEW_STALE_MS
+    : false;
+
+  const basis = resolveHullBasis(preview?.mesh?.basis ?? (preview?.basis as BasisTransform | null), preview?.scale);
+
+  const clampReasons: string[] = [];
+  if (Array.isArray(preview?.clampReasons)) clampReasons.push(...preview.clampReasons);
+  if (Array.isArray(preview?.mesh?.clampReasons)) clampReasons.push(...preview.mesh.clampReasons);
+
+  const previewDimsRaw =
+    clampHullDimsFrom(preview?.targetDims) ??
+    hullDimsFromObb(preview?.mesh?.obb) ??
+    hullDimsFromObb(preview?.obb) ??
+    clampHullDimsFrom(preview?.hullMetrics?.dims_m);
+  const previewDims = previewDimsRaw ? applyHullBasisToDims(previewDimsRaw, basis) : null;
+
+  const previewIssues: string[] = [];
+  if (!preview) previewIssues.push("preview-missing");
+  if (preview && !previewDims) previewIssues.push("preview-missing-dims");
+  if (previewStale && previewDims) previewIssues.push("preview-stale");
+  if (preview && clampReasons.length) previewIssues.push("preview-clamped");
+
+  const usePreview = !!previewDims && previewIssues.length === 0;
+  const pipelineDims = clampHullDimsFrom(pipelineHull);
+  const hull = usePreview
+    ? (previewDims as GeometryResolution["hull"])
+    : (pipelineDims ?? (previewDims ?? { Lx_m: 100, Ly_m: 100, Lz_m: 100 }));
+
+  const basisApplied = usePreview ? basis : HULL_BASIS_IDENTITY;
+  const sampleHull = divideHullByScale(hull, basisApplied.scale);
+
+  return {
+    hull,
+    sampleHull,
+    basis: basisApplied,
+    source: usePreview ? "preview" : "pipeline",
+    meshHash: preview?.meshHash ?? preview?.mesh?.meshHash,
+    clampReasons: usePreview ? clampReasons : [...clampReasons, ...previewIssues],
+    previewUpdatedAt,
+    stale: previewStale,
+  };
+};
+
+const detachFieldBuffer = (buffer: FieldSampleBuffer): FieldSampleBuffer => ({
+  length: buffer.length,
+  x: Float32Array.from(buffer.x),
+  y: Float32Array.from(buffer.y),
+  z: Float32Array.from(buffer.z),
+  nx: Float32Array.from(buffer.nx),
+  ny: Float32Array.from(buffer.ny),
+  nz: Float32Array.from(buffer.nz),
+  rho: Float32Array.from(buffer.rho),
+  bell: Float32Array.from(buffer.bell),
+  sgn: Float32Array.from(buffer.sgn),
+  disp: Float32Array.from(buffer.disp),
+  dA: Float32Array.from(buffer.dA),
+});
+
+const transformBufferWithBasis = (
+  buffer: FieldSampleBuffer,
+  basis: BasisResolved,
+): FieldSampleBuffer => {
+  if (isIdentityHullBasis(basis)) return buffer;
+  const { swap, flip, scale } = basis;
+  const len = buffer.length;
+  const x = new Float32Array(len);
+  const y = new Float32Array(len);
+  const z = new Float32Array(len);
+  const nx = new Float32Array(len);
+  const ny = new Float32Array(len);
+  const nz = new Float32Array(len);
+
+  const pick = (axis: AxisLabel, v: { x: number; y: number; z: number }) =>
+    axis === "x" ? v.x : axis === "y" ? v.y : v.z;
+
+  for (let i = 0; i < len; i++) {
+    const srcPos = { x: buffer.x[i], y: buffer.y[i], z: buffer.z[i] };
+    const srcN = { x: buffer.nx[i], y: buffer.ny[i], z: buffer.nz[i] };
+
+    const px = pick(swap.x, srcPos) * (flip.x ? -1 : 1) * scale[0];
+    const py = pick(swap.y, srcPos) * (flip.y ? -1 : 1) * scale[1];
+    const pz = pick(swap.z, srcPos) * (flip.z ? -1 : 1) * scale[2];
+
+    const nxRaw = pick(swap.x, srcN) * (flip.x ? -1 : 1);
+    const nyRaw = pick(swap.y, srcN) * (flip.y ? -1 : 1);
+    const nzRaw = pick(swap.z, srcN) * (flip.z ? -1 : 1);
+    const nMag = Math.hypot(nxRaw, nyRaw, nzRaw);
+    const invN = nMag > 1e-9 ? 1 / nMag : 1;
+
+    x[i] = px;
+    y[i] = py;
+    z[i] = pz;
+    nx[i] = nxRaw * invN;
+    ny[i] = nyRaw * invN;
+    nz[i] = nzRaw * invN;
+  }
+
+  return { ...buffer, x, y, z, nx, ny, nz };
+};
+
+const readGeometryCache = (key: string): FieldGeometryCacheEntry | null => {
+  const cached = fieldGeometryCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.createdAt > FIELD_GEOMETRY_CACHE_TTL_MS) {
+    fieldGeometryCache.delete(key);
+    return null;
+  }
+  return cached;
+};
+
+const writeGeometryCache = (entry: FieldGeometryCacheEntry) => {
+  if (fieldGeometryCache.size >= FIELD_GEOMETRY_CACHE_MAX) {
+    const oldest = fieldGeometryCache.keys().next().value;
+    if (oldest) fieldGeometryCache.delete(oldest);
+  }
+  fieldGeometryCache.set(entry.key, entry);
+};
+
+const makeGeometryCacheKey = (input: {
+  resolved: GeometryResolution;
+  geometryKind: string;
+  params: Record<string, any>;
+}) => {
+  const keyPayload = {
+    source: input.resolved.source,
+    meshHash: input.resolved.meshHash ?? null,
+    hull: input.resolved.hull,
+    sampleHull: input.resolved.sampleHull,
+    basis: input.resolved.basis,
+    geometryKind: input.geometryKind,
+    params: input.params,
+    previewUpdatedAt: input.resolved.previewUpdatedAt ?? null,
+  };
+  return JSON.stringify(keyPayload);
+};
+
+// --- Field probe (mesh-aware) -------------------------------------------------
+
+type FieldProbePatch = {
+  sector: number;
+  gateAvg: number;
+  gateMin: number;
+  gateMax: number;
+  count: number;
+};
+
+type FieldProbeCacheEntry = {
+  createdAt: number;
+  key: string;
+  values: Float32Array;
+  patches: FieldProbePatch[];
+  stats: { min: number; max: number; mean: number; absMax: number; absMean: number };
+  meta: {
+    geometrySource: GeometryResolution["source"];
+    basisApplied: BasisResolved;
+    hullDims: GeometryResolution["hull"];
+    sampleHull: GeometryResolution["sampleHull"];
+    meshHash?: string;
+    clampReasons: string[];
+    previewUpdatedAt?: number;
+    stateSig: string;
+    cacheKey: string;
+  };
+  thresholds: { field: number; gradient: number };
+};
+
+const FIELD_PROBE_CACHE_TTL_MS = 1500;
+const FIELD_PROBE_CACHE_MAX = 8;
+const FIELD_PROBE_VERTEX_CAP = 120_000;
+
+const fieldProbeCache = new Map<string, FieldProbeCacheEntry>();
+
+const fieldProbeStateSignature = (state: EnergyPipelineState) => {
+  const hull = state.hull ?? { Lx_m: 0, Ly_m: 0, Lz_m: 0 };
+  const parts: Array<number | string | null> = [
+    state.gammaGeo ?? null,
+    state.qSpoilingFactor ?? null,
+    state.sag_nm ?? null,
+    state.sectorCount ?? null,
+    state.concurrentSectors ?? null,
+    hull.Lx_m,
+    hull.Ly_m,
+    hull.Lz_m,
+    state.warpFieldType ?? "natario",
+  ];
+  return parts.map((p) => (Number.isFinite(p as number) ? Math.round((p as number) * 1e6) / 1e6 : String(p ?? "n"))).join("|");
+};
+
+const fieldProbePositionsSignature = (positions: Float32Array) => {
+  const verts = Math.floor(positions.length / 3);
+  if (verts === 0) return "0";
+  const step = Math.max(1, Math.floor(verts / 24));
+  let acc = 0;
+  for (let i = 0; i < positions.length; i += step * 3) {
+    const x = Math.round((positions[i] ?? 0) * 1000);
+    const y = Math.round((positions[i + 1] ?? 0) * 1000);
+    const z = Math.round((positions[i + 2] ?? 0) * 1000);
+    acc = (acc * 31 + x * 17 + y * 13 + z * 7) | 0;
+  }
+  return `${verts}:${acc >>> 0}`;
+};
+
+const readFieldProbeCache = (key: string): FieldProbeCacheEntry | null => {
+  const cached = fieldProbeCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.createdAt > FIELD_PROBE_CACHE_TTL_MS) {
+    fieldProbeCache.delete(key);
+    return null;
+  }
+  return cached;
+};
+
+const writeFieldProbeCache = (entry: FieldProbeCacheEntry) => {
+  if (fieldProbeCache.size >= FIELD_PROBE_CACHE_MAX) {
+    const oldest = fieldProbeCache.keys().next().value;
+    if (oldest) fieldProbeCache.delete(oldest);
+  }
+  fieldProbeCache.set(entry.key, entry);
+};
+
+const aggregateProbePatches = (
+  values: Float32Array,
+  positions: Float32Array,
+  sectors: number,
+  fieldThreshold: number,
+  gradientThreshold: number,
+): FieldProbePatch[] => {
+  const total = Math.max(1, Math.floor(sectors));
+  const buckets = Array.from({ length: total }, () => ({
+    min: Number.POSITIVE_INFINITY,
+    max: Number.NEGATIVE_INFINITY,
+    sum: 0,
+    count: 0,
+  }));
+
+  for (let i = 0; i < values.length; i++) {
+    const base = i * 3;
+    const x = positions[base] ?? 0;
+    const z = positions[base + 2] ?? 0;
+    const theta = Math.atan2(z, x);
+    const idx = Math.min(total - 1, Math.max(0, Math.floor(((theta / (2 * Math.PI)) + 1) % 1 * total)));
+    const v = values[i] ?? 0;
+    const b = buckets[idx];
+    if (v < b.min) b.min = v;
+    if (v > b.max) b.max = v;
+    b.sum += v;
+    b.count += 1;
+  }
+
+  const patches: FieldProbePatch[] = [];
+  for (let s = 0; s < buckets.length; s++) {
+    const b = buckets[s];
+    if (!b.count) continue;
+    const avg = b.sum / b.count;
+    const span = b.max - b.min;
+    const peak = Math.max(Math.abs(b.min), Math.abs(b.max));
+    if (peak < fieldThreshold && span < gradientThreshold) continue;
+    patches.push({
+      sector: s,
+      gateAvg: avg,
+      gateMin: b.min,
+      gateMax: b.max,
+      count: b.count,
+    });
+  }
+
+  patches.sort((a, b) => Math.abs(b.gateMax) - Math.abs(a.gateMax));
+  return patches;
+};
+
+export function probeFieldOnHull(req: Request, res: Response) {
+  if (req.method === "OPTIONS") {
+    setCors(res);
+    return res.status(200).end();
+  }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const state = getGlobalPipelineState();
+    const body = req.body ?? {};
+    const schema = z.object({
+      preview: hullPreviewPayloadSchema.optional(),
+      overlay: z.object({
+        positions: z.array(z.number()).min(3),
+        normals: z.array(z.number()).optional(),
+        meshHash: z.string().optional(),
+        lod: z.enum(["preview", "high"]).optional(),
+        aligned: z.boolean().optional(),
+      }),
+      params: z
+        .object({
+          totalSectors: z.number().int().positive().optional(),
+          liveSectors: z.number().int().positive().optional(),
+          fieldThreshold: z.number().positive().optional(),
+          gradientThreshold: z.number().positive().optional(),
+        })
+        .optional(),
+    });
+
+    const parsed = schema.parse(body);
+    const previewRaw = parsed.preview ?? (body as any)?.previewPayload ?? (body as any)?.hullPreview ?? null;
+    const resolved = resolveGeometryForSampling(previewRaw, state.hull);
+
+    const positionsInput = parsed.overlay.positions;
+    const normalsInput = parsed.overlay.normals;
+    const positionsArr = new Float32Array(positionsInput);
+    const normalsArr = normalsInput ? new Float32Array(normalsInput) : null;
+
+    const vertCount = Math.floor(positionsArr.length / 3);
+    if (vertCount <= 0) {
+      return res.status(400).json({ error: "probe-empty" });
+    }
+    if (vertCount > FIELD_PROBE_VERTEX_CAP) {
+      return res.status(413).json({ error: "probe-over-budget", clampReasons: ["probe:overBudget"] });
+    }
+
+    const sectorsResolved = Math.max(1, Math.floor(parsed.params?.totalSectors ?? state.sectorCount ?? 16));
+    const splitResolved = Math.floor(sectorsResolved / 2);
+    const fieldThreshold = parsed.params?.fieldThreshold ?? 0.4;
+    const gradientThreshold = parsed.params?.gradientThreshold ?? 0.22;
+
+    const stateSig = fieldProbeStateSignature(state);
+    const posSig = fieldProbePositionsSignature(positionsArr);
+    const cacheKey = [
+      "probe",
+      posSig,
+      resolved.source,
+      resolved.meshHash ?? parsed.overlay.meshHash ?? "none",
+      resolved.previewUpdatedAt ?? "none",
+      sectorsResolved,
+      fieldThreshold,
+      gradientThreshold,
+      stateSig,
+    ].join("|");
+
+    const cached = readFieldProbeCache(cacheKey);
+    if (cached) {
+      res.setHeader("X-Geometry-Source", cached.meta.geometrySource);
+      res.setHeader("X-Geometry-Basis", JSON.stringify(cached.meta.basisApplied));
+      if (cached.meta.meshHash) res.setHeader("X-Mesh-Hash", cached.meta.meshHash);
+      if (cached.meta.previewUpdatedAt) res.setHeader("X-Preview-Updated-At", String(cached.meta.previewUpdatedAt));
+      return res.json({
+        count: cached.values.length,
+        geometrySource: cached.meta.geometrySource,
+        basisApplied: cached.meta.basisApplied,
+        meshHash: cached.meta.meshHash,
+        hullDims: cached.meta.hullDims,
+        sampleHull: cached.meta.sampleHull,
+        clampReasons: cached.meta.clampReasons,
+        previewUpdatedAt: cached.meta.previewUpdatedAt ?? null,
+        cache: { hit: true, key: cached.meta.cacheKey, ageMs: Date.now() - cached.createdAt },
+        stats: cached.stats,
+        patches: cached.patches,
+        fieldThreshold: cached.thresholds.field,
+        gradientThreshold: cached.thresholds.gradient,
+        values: Array.from(cached.values),
+      });
+    }
+
+    // Build samples directly from provided vertices; assume positions are already basis-aligned.
+    const samples: { p: [number, number, number]; n: [number, number, number] }[] = new Array(vertCount);
+    for (let i = 0; i < vertCount; i++) {
+      const base = i * 3;
+      const p: [number, number, number] = [
+        positionsArr[base] ?? 0,
+        positionsArr[base + 1] ?? 0,
+        positionsArr[base + 2] ?? 0,
+      ];
+      let n: [number, number, number];
+      if (normalsArr && normalsArr.length >= positionsArr.length) {
+        n = [
+          normalsArr[base] ?? 0,
+          normalsArr[base + 1] ?? 0,
+          normalsArr[base + 2] ?? 0,
+        ];
+      } else {
+        const mag = Math.hypot(p[0], p[1], p[2]);
+        const inv = mag > 1e-9 ? 1 / mag : 1;
+        n = [p[0] * inv, p[1] * inv, p[2] * inv];
+      }
+      samples[i] = { p, n };
+    }
+
+    const bufferDetached = detachFieldBuffer(
+      sampleDisplacementFieldGeometry(
+        { ...state, hull: resolved.sampleHull ?? resolved.hull },
+        {
+          geometryKind: "sdf",
+          sdf: { samples },
+          sectors: sectorsResolved,
+          split: splitResolved,
+        },
+      ),
+    );
+
+    const values = bufferDetached.disp;
+    const count = bufferDetached.length;
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    let sum = 0;
+    let absMean = 0;
+    for (let i = 0; i < count; i++) {
+      const v = values[i] ?? 0;
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+      absMean += Math.abs(v);
+    }
+    const mean = count > 0 ? sum / count : 0;
+    absMean = count > 0 ? absMean / count : 0;
+    const absMax = Math.max(Math.abs(min), Math.abs(max));
+
+    const patches = aggregateProbePatches(values, positionsArr, sectorsResolved, fieldThreshold, gradientThreshold);
+
+    const response = {
+      count,
+      geometrySource: resolved.source,
+      basisApplied: resolved.basis,
+      meshHash: parsed.overlay.meshHash ?? resolved.meshHash,
+      hullDims: resolved.hull,
+      sampleHull: resolved.sampleHull,
+      clampReasons: resolved.clampReasons,
+      previewUpdatedAt: resolved.previewUpdatedAt ?? null,
+      cache: { hit: false, key: cacheKey, ageMs: 0 },
+      stats: { min, max, mean, absMax, absMean },
+      patches,
+      fieldThreshold,
+      gradientThreshold,
+      values: Array.from(values),
+    };
+
+    writeFieldProbeCache({
+      createdAt: Date.now(),
+      key: cacheKey,
+      values: Float32Array.from(values),
+      patches,
+      stats: { min, max, mean, absMax, absMean },
+      meta: {
+        geometrySource: resolved.source,
+        basisApplied: resolved.basis,
+        hullDims: resolved.hull,
+        sampleHull: resolved.sampleHull,
+        meshHash: parsed.overlay.meshHash ?? resolved.meshHash,
+        clampReasons: resolved.clampReasons,
+        previewUpdatedAt: resolved.previewUpdatedAt,
+        stateSig,
+        cacheKey,
+      },
+      thresholds: { field: fieldThreshold, gradient: gradientThreshold },
+    });
+
+    res.setHeader("X-Geometry-Source", resolved.source);
+    if (resolved.meshHash) res.setHeader("X-Mesh-Hash", String(resolved.meshHash));
+    if (resolved.previewUpdatedAt) res.setHeader("X-Preview-Updated-At", String(resolved.previewUpdatedAt));
+    res.setHeader("X-Geometry-Basis", JSON.stringify(resolved.basis));
+    res.json(response);
+  } catch (e) {
+    console.error("field probe endpoint error:", e);
+    res.status(400).json({ error: "field-probe-failed" });
+  }
+}
+
 // Get displacement field samples for physics validation
 export function getDisplacementField(req: Request, res: Response) {
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
@@ -2027,6 +3021,169 @@ export function getDisplacementField(req: Request, res: Response) {
   } catch (e) {
     console.error("field endpoint error:", e);
     res.status(500).json({ error: "field sampling failed" });
+  }
+}
+
+// Geometry-aware sampler (ellipsoid | radial | sdf) with optional CSV output
+export function getDisplacementFieldGeometry(req: Request, res: Response) {
+  if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const body = req.body ?? {};
+    const previewRaw = (body as any)?.preview ?? (body as any)?.previewPayload ?? (body as any)?.hullPreview ?? null;
+
+    // Allow `format=csv` via query or body
+    const fmtQuery = typeof req.query?.format === "string" ? (req.query.format as string) : undefined;
+
+    const geometrySchema = warpGeometrySchema.partial().extend({
+      format: z.enum(["json", "csv"]).optional(),
+      nTheta: z.number().int().positive().optional(),
+      nPhi: z.number().int().positive().optional(),
+      wallWidth_m: z.number().positive().optional(),
+      shellOffset: z.number().optional(),
+      sectors: z.number().int().positive().optional(),
+      split: z.number().int().nonnegative().optional(),
+    });
+    const parsed = geometrySchema.parse(body);
+    const geometryKind = (parsed as any)?.geometryKind ?? parsed.kind ?? "ellipsoid";
+
+    const radial = parsed.radial ?? {};
+    const sdf = parsed.sdf ?? {};
+
+    const radialSamples = Array.isArray(radial.samples)
+      ? radial.samples.map((sample) => warpRadialSampleSchema.parse(sample))
+      : undefined;
+    const sdfSamples = Array.isArray(sdf.samples)
+      ? sdf.samples.map((sample) => ({
+          p: sample.p as [number, number, number],
+          n: sample.n as [number, number, number] | undefined,
+          dA: sample.dA,
+          signedDistance_m: sample.signedDistance_m,
+        }))
+      : undefined;
+
+    const sectorsResolved = Math.max(1, Math.floor(parsed.sectors ?? state.sectorCount ?? 1));
+    const splitResolved = Number.isFinite(parsed.split as number)
+      ? Math.max(0, Math.floor(parsed.split as number))
+      : Math.floor(sectorsResolved / 2);
+
+    const resolved = resolveGeometryForSampling(previewRaw, state.hull);
+    const hullForSampling = resolved.sampleHull ?? resolved.hull;
+    const samplerState: EnergyPipelineState = { ...state, hull: hullForSampling };
+
+    const cacheParams = {
+      nTheta: parsed.nTheta ?? radial.nTheta,
+      nPhi: parsed.nPhi ?? radial.nPhi,
+      sectors: sectorsResolved,
+      split: splitResolved,
+      wallWidth_m: parsed.wallWidth_m,
+      shellOffset: parsed.shellOffset,
+      radialSamples,
+      sdfSamples,
+    };
+    const cacheKey = makeGeometryCacheKey({ resolved, geometryKind, params: cacheParams });
+    const cached = readGeometryCache(cacheKey);
+
+    const fieldDetached = cached
+      ? cached.buffer
+      : transformBufferWithBasis(
+          detachFieldBuffer(
+            sampleDisplacementFieldGeometry(samplerState, {
+              geometryKind,
+              nTheta: parsed.nTheta,
+              nPhi: parsed.nPhi,
+              sectors: sectorsResolved,
+              split: splitResolved,
+              wallWidth_m: parsed.wallWidth_m,
+              shellOffset: parsed.shellOffset,
+              radial: {
+                nTheta: parsed.nTheta,
+                nPhi: parsed.nPhi,
+                samples: radialSamples,
+              },
+              sdf: sdfSamples ? { samples: sdfSamples } : undefined,
+            }),
+          ),
+          resolved.basis,
+        );
+
+    const responseMeta = cached?.meta ?? {
+      geometrySource: resolved.source,
+      basisApplied: resolved.basis,
+      hullDims: resolved.hull,
+      sampleHull: resolved.sampleHull,
+      meshHash: resolved.meshHash,
+      clampReasons: resolved.clampReasons,
+      previewUpdatedAt: resolved.previewUpdatedAt,
+    };
+
+    if (!cached) {
+      writeGeometryCache({
+        createdAt: Date.now(),
+        key: cacheKey,
+        buffer: fieldDetached,
+        meta: responseMeta,
+      });
+    }
+
+    res.setHeader("X-Geometry-Source", responseMeta.geometrySource);
+    if (responseMeta.meshHash) res.setHeader("X-Mesh-Hash", String(responseMeta.meshHash));
+    if (responseMeta.previewUpdatedAt) {
+      res.setHeader("X-Preview-Updated-At", String(responseMeta.previewUpdatedAt));
+    }
+    res.setHeader("X-Geometry-Basis", JSON.stringify(responseMeta.basisApplied));
+
+    const format = (parsed.format ?? fmtQuery ?? "json").toLowerCase();
+    if (format === "csv") {
+      res.setHeader("Content-Type", "text/csv");
+      res.send(fieldSamplesToCsv(fieldDetached));
+      return;
+    }
+
+    res.json({
+      count: fieldDetached.length,
+      geometryKind,
+      geometrySource: responseMeta.geometrySource,
+      basisApplied: responseMeta.basisApplied,
+      meshHash: responseMeta.meshHash,
+      hullDims: responseMeta.hullDims,
+      sampleHull: responseMeta.sampleHull,
+      clampReasons: responseMeta.clampReasons,
+      cache: {
+        hit: !!cached,
+        key: cacheKey,
+        ageMs: cached ? Date.now() - cached.createdAt : 0,
+      },
+      previewUpdatedAt: responseMeta.previewUpdatedAt ?? null,
+      w_m: (state.sag_nm ?? 16) * 1e-9,
+      rhoMetric: "harmonic",
+      physics: {
+        gammaGeo: state.gammaGeo,
+        qSpoiling: state.qSpoilingFactor,
+        sectorStrobing: sectorsResolved,
+        sectorCount: state.sectorCount,
+        concurrentSectors: state.concurrentSectors,
+      },
+      data: {
+        length: fieldDetached.length,
+        x: fieldDetached.x,
+        y: fieldDetached.y,
+        z: fieldDetached.z,
+        nx: fieldDetached.nx,
+        ny: fieldDetached.ny,
+        nz: fieldDetached.nz,
+        rho: fieldDetached.rho,
+        bell: fieldDetached.bell,
+        sgn: fieldDetached.sgn,
+        disp: fieldDetached.disp,
+        dA: fieldDetached.dA,
+      },
+    });
+  } catch (e) {
+    console.error("field geometry endpoint error:", e);
+    res.status(400).json({ error: "field geometry sampling failed" });
   }
 }
 

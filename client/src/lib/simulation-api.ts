@@ -27,6 +27,6 @@ export async function downloadAllFiles(simulationId: string): Promise<Blob> {
 
 export function createWebSocketConnection(simulationId: string): WebSocket {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}?simulationId=${simulationId}`;
+  const wsUrl = `${protocol}//${window.location.host}/ws?simulationId=${encodeURIComponent(simulationId)}`;
   return new WebSocket(wsUrl);
 }

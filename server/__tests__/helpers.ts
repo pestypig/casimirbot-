@@ -1,6 +1,7 @@
 import express from "express";
 import request from "supertest";
 import type { ConsoleTelemetryBundle } from "@shared/desktop";
+import type { TResonanceSelectionSnapshot } from "@shared/essence-persona";
 import { planRouter } from "../routes/agi.plan";
 import { getLatticeVersion as readLatticeVersion } from "../services/code-lattice/loader";
 
@@ -18,12 +19,12 @@ type PlanRequestBody = {
 
 type PlanResponse = {
   traceId: string;
-  resonance_selection?: unknown;
+  resonance_selection?: TResonanceSelectionSnapshot | null;
   lattice_version?: number | string | null;
 };
 
 type ExecuteResponse = {
-  resonance_selection?: unknown;
+  resonance_selection?: TResonanceSelectionSnapshot | null;
   lattice_version?: number | string | null;
 };
 

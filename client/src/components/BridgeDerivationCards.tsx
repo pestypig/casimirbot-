@@ -290,7 +290,7 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
       )}
 
       {/* Live parameters row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+      <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 md:grid-cols-4">
         <div>
           <div className="text-muted-foreground">Sectors</div>
           <div><Eq>{S_live !== undefined && S_total !== undefined ? `${fint(S_live)}/${fint(S_total)}` : "—"}</Eq></div>
@@ -960,7 +960,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_live: {T.sectorsConcurrent.from}</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 text-xs mt-1">
+      <div className="grid grid-cols-1 gap-3 text-xs mt-1 sm:grid-cols-2">
         <div className="text-muted-foreground">Kernel</div>
         <div className="font-mono">
           {kindLabel}
@@ -1329,7 +1329,7 @@ export default function BridgeDerivationCards() {
               {mockBannerUsed ? "DEV MOCK" : "LIVE"}
             </Badge>
           </div>
-          <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {mockAssertions.map((row) => (
               <div
                 key={row.key}
@@ -1353,7 +1353,7 @@ export default function BridgeDerivationCards() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <UniformsExplainCard data={uexp} m={m} />
           <ThetaScaleCard m={m} />
           <EnergyAndMassCard m={m} />

@@ -560,6 +560,31 @@ function clipKnowledgePreview(value?: string): string | undefined {
   return `${normalized.slice(0, MAX_KNOWLEDGE_PREVIEW_CHARS)}...`;
 }
 
+function prioritizeKnowledgeContext(
+  context: KnowledgeProjectExport[] | undefined,
+  preferredIds: string[],
+): KnowledgeProjectExport[] | undefined {
+  if (!context || context.length === 0 || !preferredIds || preferredIds.length === 0) {
+    return context;
+  }
+  const map = new Map(context.map((bundle) => [bundle.project.id, bundle]));
+  const ordered: KnowledgeProjectExport[] = [];
+  for (const id of preferredIds) {
+    const hit = map.get(id);
+    if (hit) {
+      ordered.push(hit);
+      map.delete(id);
+    }
+  }
+  for (const bundle of context) {
+    if (map.has(bundle.project.id)) {
+      ordered.push(bundle);
+      map.delete(bundle.project.id);
+    }
+  }
+  return ordered;
+}
+
 function selectToolForGoal(goal: string, manifest: ToolManifestEntry[]): string {
   const available = new Set(manifest.map((entry) => entry.name));
   const prefersLocalSpawn =
@@ -1591,6 +1616,7 @@ planRouter.post("/plan", async (req, res) => {
       });
     }
   }
+  knowledgeContext = prioritizeKnowledgeContext(knowledgeContext, requestedProjects);
   if (debugSources) {
     const groundingHolder: { groundingReport?: GroundingReport } = { groundingReport };
     recordResonancePatchSources(groundingHolder, {

@@ -103,6 +103,8 @@ export type CoverJobRequest = {
   helix?: HelixPacket;
   kbTexture?: KBTextureId | null;
   kbConfidence?: number;
+  knowledgeFileIds?: string[];
+  forceRemote?: boolean;
   sampleInfluence?: number;
   styleInfluence?: number;
   weirdness?: number;

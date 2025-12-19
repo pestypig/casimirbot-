@@ -141,7 +141,7 @@ export async function syncKnowledgeProjects(projects: KnowledgeProjectSyncPayloa
 
       if (project.files.length > 0) {
         await client.query(
-          `DELETE FROM knowledge_file WHERE project_id = $1 AND file_id <> ALL($2::text[])`,
+          `DELETE FROM knowledge_file WHERE project_id = $1 AND NOT (file_id = ANY($2::text[]))`,
           [project.id, keepIds],
         );
       } else {
@@ -163,6 +163,8 @@ export async function listKnowledgeFilesByProjects(projectIds: string[]): Promis
   }
   await ensureDatabase();
   const pool = getPool();
+  const placeholders = projectIds.map((_, idx) => `$${idx + 1}`).join(", ");
+  const params = projectIds;
   const { rows } = await pool.query<KnowledgeFileRow>(
     `
       SELECT
@@ -187,10 +189,10 @@ export async function listKnowledgeFilesByProjects(projectIds: string[]): Promis
         f.updated_at
       FROM knowledge_file f
       JOIN knowledge_project p ON p.id = f.project_id
-      WHERE f.project_id = ANY($1::text[])
+      WHERE f.project_id IN (${placeholders})
       ORDER BY f.updated_at DESC;
     `,
-    [projectIds],
+    params,
   );
   return rows;
 }

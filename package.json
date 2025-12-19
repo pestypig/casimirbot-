@@ -4,9 +4,9 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development SKIP_VITE_MIDDLEWARE=0 tsx server/index.ts",
-    "dev:agi": "cross-env ENABLE_ESSENCE=1 ENABLE_AGI=1 SKIP_VITE_MIDDLEWARE=0 vite-node server/index.ts",
-    "dev:agi:5173": "cross-env PORT=5173 API_PROXY_TARGET=http://localhost:5173 ENABLE_ESSENCE=1 ENABLE_AGI=1 SKIP_VITE_MIDDLEWARE=0 vite-node server/index.ts",
+    "dev": "cross-env NODE_ENV=development SKIP_VITE_MIDDLEWARE=0 DISABLE_VITE_HMR=1 tsx server/index.ts",
+    "dev:agi": "cross-env ENABLE_ESSENCE=1 ENABLE_AGI=1 SKIP_VITE_MIDDLEWARE=0 DISABLE_VITE_HMR=1 vite-node server/index.ts",
+    "dev:agi:5173": "cross-env PORT=5173 API_PROXY_TARGET=http://localhost:5173 ENABLE_ESSENCE=1 ENABLE_AGI=1 SKIP_VITE_MIDDLEWARE=0 DISABLE_VITE_HMR=1 vite-node server/index.ts",
     "dev:static": "cross-env NODE_ENV=development SKIP_VITE_MIDDLEWARE=1 tsx server/index.ts",
     "bench": "tsx scripts/bench.ts",
     "eval:smoke": "tsx scripts/eval-smoke.ts",
@@ -31,7 +31,9 @@
     "test:repo": "vitest --root . --run",
     "physics:ask": "tsx cli/physics-ask.ts",
     "physics:validate": "tsx cli/physics-validate.ts",
-    "ops:relief": "tsx cli/qi-relief.ts"
+    "ops:relief": "tsx cli/qi-relief.ts",
+    "collapse:bench": "tsx cli/collapse-bench.ts",
+    "precompute:lattice": "tsx scripts/precompute-lattice.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
@@ -101,7 +103,7 @@
     "nanoid": "^5.1.5",
     "next-themes": "^0.4.6",
     "node-fetch": "^3.3.2",
-    "openai": "^6.9.1",
+    "openai": "^6.10.0",
     "openseadragon": "^5.0.1",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",

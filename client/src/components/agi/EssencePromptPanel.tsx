@@ -154,7 +154,7 @@ export function EssencePromptPanel() {
             ))}
           </div>
         ) : null}
-        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-white/80">
+        <div className="mt-3 grid grid-cols-1 gap-3 text-xs text-white/80 sm:grid-cols-2">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-400">Strengths</div>
             <ul className="mt-1 space-y-1">

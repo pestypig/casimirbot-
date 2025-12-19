@@ -1,7 +1,11 @@
-﻿import React, { useMemo, useRef, useEffect, useState } from "react";
+﻿import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { PhoenixBadge } from "./PhoenixBadge";
 import { kappaDrive, lightCrossingAverage, normalizeSeries } from "@/lib/phoenixAveraging";
-import { useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, useUpdatePipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { useHullPreviewPayload } from "@/hooks/use-hull-preview-payload";
+import { loadHullMetricsFromGLB, type HullMetrics } from "@/lib/hull-metrics";
+import { clampHullArea, clampHullDims, clampHullThickness, HULL_DIM_MAX_M, HULL_DIM_MIN_M } from "@/lib/hull-guardrails";
+import { nanoid } from "nanoid";
 
 type Heatmap = {
   image: Uint8ClampedArray;
@@ -78,10 +82,134 @@ type CavitySpectrum = {
 
 type ShellField = { values: Float64Array; width: number; height: number; hullRadiusPx?: number };
 
+type HullLibraryEntry = {
+  id: string;
+  name: string;
+  hull: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number };
+  hullAreaOverride_m2?: number;
+  hullAreaOverride_uncertainty_m2?: number;
+  hullAreaPerSector_m2?: number[];
+  sectorCount?: number;
+  glbUrl?: string;
+  note?: string;
+  source?: "preset" | "silhouette" | "glb";
+};
+
+const NEEDLE_PRESET: HullLibraryEntry = {
+  id: "preset-needle-mk1",
+  name: "Needle Hull (Mk1)",
+  hull: { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
+  source: "preset",
+};
+
+const normalizeHullDims = (dims: { Lx_m?: number; Ly_m?: number; Lz_m?: number }) => {
+  const clamped = clampHullDims(dims);
+  return {
+    Lx_m: clamped.Lx_m ?? HULL_DIM_MIN_M,
+    Ly_m: clamped.Ly_m ?? HULL_DIM_MIN_M,
+    Lz_m: clamped.Lz_m ?? HULL_DIM_MIN_M,
+  };
+};
+
+const buildHullPayload = (
+  dims: { Lx_m?: number; Ly_m?: number; Lz_m?: number },
+  wallThickness?: number | null,
+  area?: number | null,
+  areaUnc?: number | null,
+  areaPerSector?: number[] | null,
+) => {
+  const clampedDims = clampHullDims(dims);
+  const safeDims = {
+    Lx_m: clampedDims.Lx_m ?? HULL_DIM_MIN_M,
+    Ly_m: clampedDims.Ly_m ?? HULL_DIM_MIN_M,
+    Lz_m: clampedDims.Lz_m ?? HULL_DIM_MIN_M,
+  };
+  const clampMessages: string[] = [];
+  const noteClamp = (label: string, raw: unknown, clamped?: number, unit = " m", precision = 4) => {
+    const rawNum = Number(raw);
+    const clampedNum = Number(clamped);
+    if (!Number.isFinite(rawNum) || !Number.isFinite(clampedNum)) return;
+    if (Math.abs(rawNum - clampedNum) < 1e-12) return;
+    clampMessages.push(`${label}->${clampedNum.toFixed(precision)}${unit}`);
+  };
+
+  const payload: any = {
+    hull: {
+      ...safeDims,
+      a: safeDims.Lx_m * 0.5,
+      b: safeDims.Ly_m * 0.5,
+      c: safeDims.Lz_m * 0.5,
+    },
+  };
+
+  noteClamp("Lx", dims.Lx_m, clampedDims.Lx_m);
+  noteClamp("Ly", dims.Ly_m, clampedDims.Ly_m);
+  noteClamp("Lz", dims.Lz_m, clampedDims.Lz_m);
+
+  const wallClamped = clampHullThickness(wallThickness);
+  if (wallClamped != null) {
+    payload.hull.wallThickness_m = wallClamped;
+    noteClamp("wallThickness", wallThickness, wallClamped);
+  }
+
+  const areaClamped = clampHullArea(area);
+  if (areaClamped != null) {
+    payload.hullAreaOverride_m2 = areaClamped;
+    noteClamp("area", area, areaClamped, " m^2", 2);
+  }
+  const areaUncClamped = clampHullArea(areaUnc, true);
+  if (areaUncClamped != null) {
+    payload.hullAreaOverride_uncertainty_m2 = areaUncClamped;
+    noteClamp("area_unc", areaUnc, areaUncClamped, " m^2", 2);
+  }
+  if (Array.isArray(areaPerSector)) {
+    const cleaned = areaPerSector
+      .map((v) => clampHullArea(v, true))
+      .map((v) => (v != null && Number.isFinite(v) && (v as number) >= 0 ? (v as number) : 0));
+    const sum = cleaned.reduce((acc, v) => acc + (Number.isFinite(v) ? (v as number) : 0), 0);
+    if (sum > 0) {
+      payload.hullAreaPerSector_m2 = cleaned;
+    }
+  }
+  return { payload, clampMessages };
+};
+
 function PhoenixNeedlePanelInner() {
   const [logScale, setLogScale] = useState(true);
   const [overlayBand, setOverlayBand] = useState(true);
+  const [hullGlbUrlInput, setHullGlbUrlInput] = useState<string>("/luma/Butler.glb");
+  const [hullGlbUrl, setHullGlbUrl] = useState<string>("/luma/Butler.glb");
+  const [hullTransform, setHullTransform] = useState<{
+    scale: [number, number, number];
+    rotQuat: [number, number, number, number];
+    offset: [number, number, number];
+    unitScale: number;
+    areaUncertaintyRatio?: number;
+    axisSwap?: { x?: "x" | "y" | "z"; y?: "x" | "y" | "z"; z?: "x" | "y" | "z" };
+    axisFlip?: { x?: boolean; y?: boolean; z?: boolean };
+  }>({
+    scale: [1, 1, 1],
+    rotQuat: [0, 0, 0, 1],
+    offset: [0, 0, 0],
+    unitScale: 1,
+    areaUncertaintyRatio: 0.1,
+    axisSwap: { x: "x", y: "y", z: "z" },
+    axisFlip: { x: false, y: false, z: false },
+  });
+  const [hullMetrics, setHullMetrics] = useState<HullMetrics | null>(null);
+  const [hullMetricsLoading, setHullMetricsLoading] = useState(false);
+  const [hullMetricsError, setHullMetricsError] = useState<string | null>(null);
+  const [targetDims, setTargetDims] = useState<{ Lx_m: number; Ly_m: number; Lz_m: number } | null>(null);
   const { data: pipeline } = useEnergyPipeline({ refetchInterval: 1000 });
+  const updatePipeline = useUpdatePipeline();
+  const [applyStatus, setApplyStatus] = useState<string | null>(null);
+  const [clampNotice, setClampNotice] = useState<string | null>(null);
+  const [hullLibrary, setHullLibrary] = useState<HullLibraryEntry[]>([]);
+  const externalPreviewTsRef = useRef<number>(0);
+  const clampNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hullPreview = useHullPreviewPayload();
+  const previewArea_m2 = useMemo(() => clampHullArea(hullPreview?.area_m2), [hullPreview?.area_m2]);
+  const previewAreaUnc_m2 = useMemo(() => clampHullArea(hullPreview?.areaUnc_m2, true), [hullPreview?.areaUnc_m2]);
 
   const phoenixInputs = useMemo(() => computePhoenixInputs(pipeline), [pipeline]);
   const spectrum = useMemo(() => buildCavityFilter(pipeline), [pipeline]);
@@ -90,6 +218,247 @@ function PhoenixNeedlePanelInner() {
     () => buildHeatmaps({ logScale, overlayBand }, phoenixInputs.inputs),
     [logScale, overlayBand, phoenixInputs.inputs],
   );
+
+  const hullTransformKey = useMemo(() => JSON.stringify(hullTransform), [hullTransform]);
+
+  const pipelineHullArea_m2 = useMemo(
+    () => clampHullArea(finiteNumber((pipeline as any)?.hullArea_m2 ?? (pipeline as any)?.tiles?.hullArea_m2)) ?? undefined,
+    [pipeline],
+  );
+  const pipelineHullAreaSource = useMemo(() => {
+    const tag = typeof (pipeline as any)?.__hullAreaSource === "string" ? (pipeline as any).__hullAreaSource : undefined;
+    if (pipelineHullArea_m2 != null) return tag ?? "pipeline.hullArea_m2";
+    return tag ?? undefined;
+  }, [pipeline, pipelineHullArea_m2]);
+
+  const showClampNotice = useCallback((messages: string[]) => {
+    if (clampNoticeTimerRef.current) {
+      clearTimeout(clampNoticeTimerRef.current);
+      clampNoticeTimerRef.current = null;
+    }
+    if (!messages.length) {
+      setClampNotice(null);
+      return;
+    }
+    setClampNotice(`Clamped: ${messages.join(", ")}`);
+    clampNoticeTimerRef.current = setTimeout(() => setClampNotice(null), 4200);
+  }, []);
+
+  const hullApplyClampWarnings = useMemo(() => {
+    if (!hullMetrics) return [];
+    const wallThickness = finiteNumber((pipeline as any)?.hull?.wallThickness_m);
+    const { clampMessages } = buildHullPayload(
+      hullMetrics.dims_m,
+      wallThickness,
+      hullMetrics.area_m2,
+      hullMetrics.areaUnc_m2,
+      hullMetrics.areaPerSector_m2,
+    );
+    return clampMessages;
+  }, [hullMetrics, pipeline?.hull?.wallThickness_m]);
+  const hullAreaReady = hullMetrics != null && Number.isFinite(hullMetrics.area_m2);
+
+  useEffect(() => {
+    if (!hullPreview) return;
+    const updatedAt = Number(hullPreview.updatedAt ?? 0);
+    if (!Number.isFinite(updatedAt) || updatedAt <= externalPreviewTsRef.current) return;
+    externalPreviewTsRef.current = updatedAt;
+    const previewDims = hullPreview.targetDims ? normalizeHullDims(hullPreview.targetDims) : undefined;
+    if (hullPreview.glbUrl) {
+      setHullGlbUrlInput(hullPreview.glbUrl);
+      setHullGlbUrl(hullPreview.glbUrl);
+    }
+    if (hullPreview.scale) {
+      const nextScale: [number, number, number] = [
+        Number(hullPreview.scale[0]) || 1,
+        Number(hullPreview.scale[1]) || 1,
+        Number(hullPreview.scale[2]) || 1,
+      ];
+      setHullTransform((prev) => ({ ...prev, scale: nextScale }));
+    }
+    if (previewDims) {
+      setTargetDims(previewDims);
+    }
+    if (hullPreview.hullMetrics) {
+      const dims = normalizeHullDims(hullPreview.hullMetrics.dims_m);
+      if (dims) {
+        const nextMetrics: HullMetrics = {
+          dims_m: dims,
+          area_m2: hullPreview.hullMetrics.area_m2,
+          areaUnc_m2: hullPreview.hullMetrics.areaUnc_m2 ?? undefined,
+          method: "OBB_PCA",
+          triangleCount: hullPreview.hullMetrics.triangleCount ?? 0,
+          vertexCount: hullPreview.hullMetrics.vertexCount ?? 0,
+        };
+        setHullMetrics(nextMetrics);
+        setHullMetricsError(null);
+        setHullMetricsLoading(false);
+      }
+    } else if (previewDims && previewArea_m2 != null) {
+      const fallbackMetrics: HullMetrics = {
+        dims_m: previewDims,
+        area_m2: previewArea_m2,
+        areaUnc_m2: previewAreaUnc_m2 ?? undefined,
+        method: "OBB_PCA",
+        triangleCount: 0,
+        vertexCount: 0,
+      };
+      setHullMetrics(fallbackMetrics);
+      setHullMetricsError(null);
+      setHullMetricsLoading(false);
+    }
+  }, [hullPreview, previewArea_m2, previewAreaUnc_m2]);
+
+  useEffect(() => {
+    return () => {
+      if (clampNoticeTimerRef.current) {
+        clearTimeout(clampNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const addHullLibraryEntry = (entry: Omit<HullLibraryEntry, "id"> & { id?: string }) => {
+    setHullLibrary((prev) => {
+      const id = entry.id ?? nanoid(10);
+      const areaOverride = clampHullArea(entry.hullAreaOverride_m2);
+      const areaUnc = clampHullArea(entry.hullAreaOverride_uncertainty_m2, true);
+      const sectorAreas = Array.isArray(entry.hullAreaPerSector_m2)
+        ? entry.hullAreaPerSector_m2.map((v) => (Number.isFinite(v) && (v as number) >= 0 ? (v as number) : 0))
+        : undefined;
+      const sectorCount = entry.sectorCount ?? (sectorAreas ? sectorAreas.length : undefined);
+      const glbUrl = entry.glbUrl ?? hullPreview?.glbUrl ?? entry.glbUrl;
+      const cleaned: HullLibraryEntry = {
+        ...entry,
+        id,
+        hull: normalizeHullDims(entry.hull),
+        hullAreaOverride_m2: areaOverride ?? undefined,
+        hullAreaOverride_uncertainty_m2: areaUnc ?? undefined,
+        hullAreaPerSector_m2: sectorAreas,
+        sectorCount,
+        glbUrl,
+      };
+      return [cleaned, ...prev.filter((e) => e.id !== id)];
+    });
+  };
+
+  const saveFromSilhouette = () => {
+    if (!targetDims) return;
+    addHullLibraryEntry({
+      id: nanoid(10),
+      name: `Silhouette hull ${new Date().toISOString()}`,
+      hull: normalizeHullDims(targetDims),
+      hullAreaOverride_m2: undefined,
+      hullAreaOverride_uncertainty_m2: undefined,
+      source: "silhouette",
+    });
+  };
+
+  const saveFromGLB = () => {
+    if (!hullMetrics) return;
+    addHullLibraryEntry({
+      id: nanoid(10),
+      name: `GLB hull ${new Date().toISOString()}`,
+      hull: normalizeHullDims(hullMetrics.dims_m),
+      hullAreaOverride_m2: clampHullArea(hullMetrics.area_m2) ?? undefined,
+      hullAreaOverride_uncertainty_m2: clampHullArea(hullMetrics.areaUnc_m2, true) ?? undefined,
+      hullAreaPerSector_m2: hullMetrics.areaPerSector_m2,
+      sectorCount: hullMetrics.sectorCount,
+      glbUrl: hullGlbUrl,
+      source: "glb",
+    });
+  };
+
+  useEffect(() => {
+    if (targetDims) return;
+    if (hullPreview?.targetDims) {
+      const clamped = normalizeHullDims(hullPreview.targetDims);
+      if (clamped) {
+        setTargetDims(clamped);
+        return;
+      }
+    }
+    if (pipeline?.hull) {
+      const { Lx_m, Ly_m, Lz_m } = pipeline.hull;
+      const clamped = clampHullDims({ Lx_m, Ly_m, Lz_m });
+      if (clamped.Lx_m && clamped.Ly_m && clamped.Lz_m) {
+        setTargetDims(normalizeHullDims(clamped));
+      }
+    }
+  }, [pipeline?.hull, targetDims, hullPreview?.targetDims]);
+
+  useEffect(() => {
+    const url = (hullGlbUrl ?? "").trim();
+    if (!url) return;
+    const controller = new AbortController();
+    let cancelled = false;
+    setHullMetricsLoading(true);
+    setHullMetricsError(null);
+    loadHullMetricsFromGLB(url, {
+      previewScale: hullTransform.scale,
+      previewRotationQuat: hullTransform.rotQuat,
+      previewOffset: hullTransform.offset,
+      unitScale: hullTransform.unitScale,
+      axisSwap: hullTransform.axisSwap,
+      axisFlip: hullTransform.axisFlip,
+      areaUncertaintyRatio: hullTransform.areaUncertaintyRatio,
+      sectorCount: typeof (pipeline as any)?.sectorCount === "number" ? Math.max(1, Math.floor((pipeline as any).sectorCount)) : 400,
+      signal: controller.signal,
+    })
+      .then((metrics) => {
+        if (cancelled) return;
+        setHullMetrics(metrics);
+        setHullMetricsLoading(false);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || cancelled) return;
+        setHullMetrics(null);
+        const message =
+          err instanceof Error
+            ? err.message
+            : typeof err === "string"
+            ? err
+            : "Failed to measure hull";
+        setHullMetricsError(message);
+        setHullMetricsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [hullGlbUrl, hullTransformKey, (pipeline as any)?.sectorCount]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("hullLibrary");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setHullLibrary((prev) => {
+            const next = (parsed as HullLibraryEntry[]).map((entry) => ({
+              ...entry,
+              hull: normalizeHullDims(entry.hull),
+              hullAreaOverride_m2: clampHullArea(entry.hullAreaOverride_m2) ?? undefined,
+              hullAreaOverride_uncertainty_m2: clampHullArea(entry.hullAreaOverride_uncertainty_m2, true) ?? undefined,
+            }));
+            const hasNeedle = next.some((e) => e.id === NEEDLE_PRESET.id || e.name === NEEDLE_PRESET.name);
+            return hasNeedle ? next : [NEEDLE_PRESET, ...next];
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("[HullLibrary] failed to load from localStorage", err);
+    }
+    setHullLibrary([NEEDLE_PRESET]);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hullLibrary", JSON.stringify(hullLibrary));
+    } catch (err) {
+      console.warn("[HullLibrary] failed to persist to localStorage", err);
+    }
+  }, [hullLibrary]);
 
   return (
     <div className="relative flex h-full w-full flex-col bg-[#050915] text-slate-100">
@@ -202,6 +571,420 @@ function PhoenixNeedlePanelInner() {
         >
           <PhoenixInputsCard rows={phoenixInputs.rows} />
         </PanelCard>
+        <PanelCard
+          title="Hull asset metrics (preview-only)"
+          subtitle="GLB-derived dims and surface area; stays local until applied."
+        >
+          <div className="space-y-3 px-3 pb-3 pt-2 text-sm text-slate-100">
+            <div className="flex flex-col gap-2">
+              <label className="text-[12px] uppercase tracking-wide text-slate-400">GLB URL</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  className="w-full rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400"
+                  value={hullGlbUrlInput}
+                  onChange={(e) => setHullGlbUrlInput(e.target.value)}
+                  placeholder="/path/to/hull.glb"
+                />
+                <button
+                  className="rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-500 disabled:opacity-60"
+                  onClick={() => setHullGlbUrl(hullGlbUrlInput.trim())}
+                  disabled={hullMetricsLoading || !hullGlbUrlInput.trim()}
+                >
+                  {hullMetricsLoading ? "Measuring..." : "Measure"}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 rounded border border-white/10 bg-white/5 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-[12px] uppercase tracking-wide text-slate-400">Preview scale</div>
+                  <div className="mt-1 grid grid-cols-3 gap-2 text-xs">
+                    {(["x", "y", "z"] as const).map((axis, idx) => (
+                      <label key={axis} className="flex items-center gap-1">
+                        <span className="w-4 text-right text-slate-300">{axis.toUpperCase()}:</span>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={hullTransform.scale[idx]}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setHullTransform((prev) => {
+                              const next = [...prev.scale] as [number, number, number];
+                              next[idx] = Number.isFinite(val) && val > 0 ? val : prev.scale[idx];
+                              return { ...prev, scale: next };
+                            });
+                          }}
+                          className="w-20 rounded border border-white/10 bg-black/30 px-2 py-1 text-white focus:border-emerald-400"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid gap-2 text-xs sm:grid-cols-2">
+                  <label className="flex items-center justify-between gap-2 rounded border border-white/10 bg-black/30 px-3 py-2">
+                    <span className="text-slate-300">Unit scale</span>
+                    <input
+                      type="number"
+                      min="1e-6"
+                      step="0.1"
+                      value={hullTransform.unitScale}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setHullTransform((prev) => ({
+                          ...prev,
+                          unitScale: Number.isFinite(val) && val > 0 ? val : prev.unitScale,
+                        }));
+                      }}
+                      className="w-20 rounded border border-white/10 bg-black/30 px-2 py-1 text-right text-white focus:border-emerald-400"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-2 rounded border border-white/10 bg-black/30 px-3 py-2">
+                    <span className="text-slate-300">Area sigma (ratio)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={hullTransform.areaUncertaintyRatio ?? 0}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setHullTransform((prev) => ({
+                          ...prev,
+                          areaUncertaintyRatio: Number.isFinite(val) && val >= 0 ? val : prev.areaUncertaintyRatio,
+                        }));
+                      }}
+                      className="w-20 rounded border border-white/10 bg-black/30 px-2 py-1 text-right text-white focus:border-emerald-400"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-xs text-slate-200">
+                {(["x", "y", "z"] as const).map((axis) => (
+                  <label key={`swap-${axis}`} className="flex items-center justify-between gap-2 rounded border border-white/10 bg-black/20 px-2 py-1">
+                    <span className="text-slate-300">
+                      Axis {axis.toUpperCase()} {"->"}
+                    </span>
+                    <select
+                      className="rounded border border-white/10 bg-black/40 px-2 py-1 text-white focus:border-emerald-400"
+                      value={hullTransform.axisSwap?.[axis] ?? axis}
+                      onChange={(e) =>
+                        setHullTransform((prev) => ({
+                          ...prev,
+                          axisSwap: { ...(prev.axisSwap ?? {}), [axis]: e.target.value as "x" | "y" | "z" },
+                        }))
+                      }
+                    >
+                      <option value="x">X</option>
+                      <option value="y">Y</option>
+                      <option value="z">Z</option>
+                    </select>
+                  </label>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-xs text-slate-200">
+                {(["x", "y", "z"] as const).map((axis) => (
+                  <label key={axis} className="flex items-center justify-between gap-2 rounded border border-white/10 bg-black/20 px-2 py-1">
+                    <span className="text-slate-300">Flip {axis.toUpperCase()}</span>
+                    <input
+                      type="checkbox"
+                      className="accent-emerald-500"
+                      checked={Boolean(hullTransform.axisFlip?.[axis])}
+                      onChange={(e) =>
+                        setHullTransform((prev) => ({
+                          ...prev,
+                          axisFlip: { ...(prev.axisFlip ?? {}), [axis]: e.target.checked },
+                        }))
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded border border-white/10 bg-black/40 p-3 text-sm text-slate-200">
+              {hullMetricsLoading ? (
+                <div className="text-emerald-200">Measuring hull...</div>
+              ) : hullMetricsError ? (
+                <div className="text-amber-300">Measurement failed: {hullMetricsError}</div>
+              ) : hullMetrics ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                    <span>Method: {hullMetrics.method}</span>
+                    <span>Triangles: {hullMetrics.triangleCount}</span>
+                    <span>Vertices: {hullMetrics.vertexCount}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <MetricBox label="Lx" value={hullMetrics.dims_m.Lx_m} unit="m" />
+                    <MetricBox label="Ly" value={hullMetrics.dims_m.Ly_m} unit="m" />
+                    <MetricBox label="Lz" value={hullMetrics.dims_m.Lz_m} unit="m" />
+                  </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <MetricBox label="Area" value={hullMetrics.area_m2} unit="m^2" />
+                <MetricBox label="Area sigma" value={hullMetrics.areaUnc_m2} unit="m^2" />
+                <MetricBox label="Area / ellipsoid" value={hullMetrics.areaRatio} unit="x" precision={3} />
+              </div>
+                  <div className="text-xs text-slate-400">
+                    Surface complexity penalty is the area ratio vs. ellipsoid surrogate (same bbox-derived axes).
+                  </div>
+                </div>
+              ) : (
+                <div className="text-slate-400">Load a GLB to see measured hull metrics.</div>
+              )}
+            </div>
+
+            <div className="rounded border border-white/10 bg-white/5 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[12px] uppercase tracking-wide text-slate-400">Fit to silhouette</div>
+                <button
+                  className="rounded bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-sky-500 disabled:opacity-60"
+                  onClick={() => {
+                    if (!hullMetrics || !targetDims) return;
+                    const { Lx_m: cx, Ly_m: cy, Lz_m: cz } = hullMetrics.dims_m;
+                    const { Lx_m: tx, Ly_m: ty, Lz_m: tz } = targetDims;
+                    if (!(cx > 0 && cy > 0 && cz > 0)) return;
+                    const sx = tx > 0 ? tx / cx : 1;
+                    const sy = ty > 0 ? ty / cy : 1;
+                    const sz = tz > 0 ? tz / cz : 1;
+                    setHullTransform((prev) => ({
+                      ...prev,
+                      scale: [
+                        prev.scale[0] * sx,
+                        prev.scale[1] * sy,
+                        prev.scale[2] * sz,
+                      ],
+                    }));
+                  }}
+                  disabled={hullMetricsLoading || !hullMetrics || !targetDims}
+                >
+                  Fit to silhouette
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                {(["Lx_m", "Ly_m", "Lz_m"] as const).map((key) => (
+                  <label key={key} className="flex items-center justify-between gap-2 rounded border border-white/10 bg-black/20 px-2 py-1 text-xs text-slate-200">
+                    <span className="text-slate-300">{key.replace("_m", "").toUpperCase()}</span>
+                    <input
+                      type="number"
+                      min={HULL_DIM_MIN_M}
+                      max={HULL_DIM_MAX_M}
+                      step="0.01"
+                      value={targetDims?.[key] ?? ""}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setTargetDims((prev) => {
+                          const base = prev ?? { Lx_m: HULL_DIM_MIN_M, Ly_m: HULL_DIM_MIN_M, Lz_m: HULL_DIM_MIN_M };
+                          const clamped = clampHullDims({ [key]: val } as any)[key];
+                          const nextVal = clamped ?? base[key];
+                          return normalizeHullDims({ ...base, [key]: nextVal });
+                        });
+                      }}
+                      className="w-24 rounded border border-white/10 bg-black/30 px-2 py-1 text-right text-white focus:border-sky-400"
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="mt-2 text-[11px] text-slate-400">
+                Target dims should come from Silhouette Stretch (canonical hull box). Fit only adjusts preview scale; no pipeline push.
+              </div>
+            </div>
+
+              <div className="rounded border border-white/10 bg-white/5 p-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[12px] uppercase tracking-wide text-slate-400">Apply to pipeline (ellipsoid surrogate)</div>
+                  <button
+                    className="rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-500 disabled:opacity-60"
+                  disabled={hullMetricsLoading || !hullMetrics || !hullAreaReady || updatePipeline.isPending}
+                  onClick={async () => {
+                    if (!hullMetrics) return;
+                    const wallThickness = finiteNumber((pipeline as any)?.hull?.wallThickness_m);
+                    const { payload, clampMessages } = buildHullPayload(
+                      hullMetrics.dims_m,
+                      wallThickness,
+                      hullMetrics.area_m2,
+                      hullMetrics.areaUnc_m2,
+                      hullMetrics.areaPerSector_m2,
+                    );
+                    showClampNotice(clampMessages);
+                    setApplyStatus(
+                      clampMessages.length
+                        ? `Applying hull + area override (clamped: ${clampMessages.join(", ")})...`
+                        : "Applying hull + area override...",
+                    );
+                    try {
+                      const res: any = await updatePipeline.mutateAsync(payload);
+                      const source = typeof res?.__hullAreaSource === "string" ? res.__hullAreaSource : pipelineHullAreaSource;
+                      const areaApplied =
+                        clampHullArea(finiteNumber(res?.hullArea_m2)) ??
+                        clampHullArea(pipelineHullArea_m2) ??
+                        clampHullArea(hullMetrics.area_m2) ??
+                        undefined;
+                      setApplyStatus(
+                        `Applied. hullArea=${areaApplied != null ? areaApplied.toFixed(2) : "n/a"} m^2` +
+                          (source ? ` (${source})` : "") +
+                          (clampMessages.length ? ` | clamped: ${clampMessages.join(", ")}` : ""),
+                      );
+                    } catch (err: any) {
+                      const msg = err?.message ?? "Failed to apply hull";
+                      setApplyStatus(`Apply failed: ${msg}`);
+                    }
+                  }}
+                >
+                  {updatePipeline.isPending ? "Applying..." : "Apply to pipeline"}
+                </button>
+              </div>
+              {clampNotice ? (
+                <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-[11px] text-amber-100">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+                  <span>{clampNotice}</span>
+                </div>
+              ) : null}
+              {hullApplyClampWarnings.length ? (
+                <div className="rounded border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                  <div className="font-semibold text-amber-200">Inputs will be clamped</div>
+                  <div className="mt-1 space-y-0.5">
+                    {hullApplyClampWarnings.map((msg) => (
+                      <div key={msg}>{msg}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <MetricBox label="Pipeline hull area" value={pipelineHullArea_m2} unit="m^2" />
+                <div className="rounded border border-white/10 bg-black/30 px-3 py-2">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-400">Area source</div>
+                  <div className="text-sm font-semibold text-white">{pipelineHullAreaSource ?? "n/a"}</div>
+                </div>
+              </div>
+              {applyStatus ? (
+                <div className="rounded border border-white/10 bg-black/30 px-3 py-2 text-xs text-slate-200">{applyStatus}</div>
+              ) : null}
+              <div className="text-[11px] text-slate-400">
+                Posts bbox dims + surface area override to /api/helix/pipeline/update. Solver/render stays ellipsoid (dims/2).
+              </div>
+            </div>
+
+            <div className="rounded border border-white/10 bg-white/5 p-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[12px] uppercase tracking-wide text-slate-400">Hull library</div>
+                <div className="flex gap-2">
+                  <button
+                    className="rounded bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-500 disabled:opacity-60"
+                    onClick={saveFromSilhouette}
+                    disabled={!targetDims}
+                  >
+                    Save from silhouette
+                  </button>
+                  <button
+                    className="rounded bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-purple-500 disabled:opacity-60"
+                    onClick={saveFromGLB}
+                    disabled={!hullMetrics}
+                  >
+                    Save from GLB
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {hullLibrary.length === 0 ? (
+                  <div className="text-sm text-slate-400">No hull entries saved yet.</div>
+                ) : (
+                  hullLibrary.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="rounded border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-semibold text-white">{entry.name}</div>
+                        <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                          {entry.source ?? "custom"}
+                        </span>
+                      </div>
+                      <div className="mt-1 grid grid-cols-3 gap-2 text-xs text-slate-300">
+                        <span>Lx {entry.hull.Lx_m.toFixed(2)} m</span>
+                        <span>Ly {entry.hull.Ly_m.toFixed(2)} m</span>
+                        <span>Lz {entry.hull.Lz_m.toFixed(2)} m</span>
+                      </div>
+                      <div className="mt-1 grid grid-cols-3 gap-2 text-[11px] text-slate-400">
+                        <span>Area {entry.hullAreaOverride_m2 ? entry.hullAreaOverride_m2.toFixed(2) : "n/a"} m^2</span>
+                        <span>
+                          Sigma{" "}
+                          {entry.hullAreaOverride_uncertainty_m2
+                            ? entry.hullAreaOverride_uncertainty_m2.toFixed(2)
+                            : "n/a"}{" "}
+                          m^2
+                        </span>
+                        <span>{entry.glbUrl ? "GLB linked" : "No GLB"}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <button
+                          className="rounded border border-white/20 bg-white/5 px-2 py-1 text-white hover:border-emerald-400"
+                          onClick={() => {
+                            setTargetDims(normalizeHullDims(entry.hull));
+                            setHullTransform((prev) => ({
+                              ...prev,
+                              scale: [1, 1, 1],
+                            }));
+                          }}
+                        >
+                          Set as target
+                        </button>
+                        {entry.glbUrl ? (
+                          <button
+                            className="rounded border border-white/20 bg-white/5 px-2 py-1 text-white hover:border-sky-400"
+                            onClick={() => {
+                              setHullGlbUrlInput(entry.glbUrl ?? "");
+                              setHullGlbUrl(entry.glbUrl ?? "");
+                            }}
+                          >
+                            Load GLB
+                          </button>
+                        ) : null}
+                        <button
+                          className="rounded border border-white/20 bg-white/5 px-2 py-1 text-white hover:border-amber-400"
+                          onClick={async () => {
+                            const { payload, clampMessages } = buildHullPayload(
+                              entry.hull,
+                              finiteNumber((pipeline as any)?.hull?.wallThickness_m),
+                              entry.hullAreaOverride_m2,
+                              entry.hullAreaOverride_uncertainty_m2,
+                              entry.hullAreaPerSector_m2,
+                            );
+                            showClampNotice(clampMessages);
+                            setApplyStatus(
+                              clampMessages.length
+                                ? `Applying hull from library (clamped: ${clampMessages.join(", ")})...`
+                                : "Applying hull from library...",
+                            );
+                            try {
+                              const res: any = await updatePipeline.mutateAsync(payload);
+                              const source = typeof res?.__hullAreaSource === "string" ? res.__hullAreaSource : pipelineHullAreaSource;
+                              const areaApplied =
+                                clampHullArea(finiteNumber(res?.hullArea_m2)) ??
+                                clampHullArea(entry.hullAreaOverride_m2) ??
+                                clampHullArea(hullMetrics?.area_m2) ??
+                                undefined;
+                              setApplyStatus(
+                                `Applied from library. hullArea=${areaApplied != null ? areaApplied.toFixed(2) : "n/a"} m^2` +
+                                  (source ? ` (${source})` : "") +
+                                  (clampMessages.length ? ` | clamped: ${clampMessages.join(", ")}` : ""),
+                              );
+                            } catch (err: any) {
+                              setApplyStatus(`Apply failed: ${err?.message ?? "unknown error"}`);
+                            }
+                          }}
+                        >
+                          Apply to pipeline
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </PanelCard>
       </div>
 
       <div className="grid gap-3 px-4 pb-4 md:grid-cols-2">
@@ -252,6 +1035,19 @@ export function PhoenixNeedlePanel() {
 }
 
 export default PhoenixNeedlePanelInner;
+
+function MetricBox({ label, value, unit, precision = 2 }: { label: string; value: number | undefined; unit?: string; precision?: number }) {
+  const display = Number.isFinite(value) ? (value as number).toFixed(precision) : "n/a";
+  return (
+    <div className="rounded border border-white/10 bg-black/30 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="text-sm font-semibold text-white">
+        {display}
+        {unit ? <span className="ml-1 text-xs text-slate-300">{unit}</span> : null}
+      </div>
+    </div>
+  );
+}
 
 function PanelCard({
   title,
@@ -695,16 +1491,31 @@ function computePhoenixInputs(pipeline?: EnergyPipelineState | null): PhoenixInp
   const activeTiles = finiteNumber((p as any).tiles?.active);
   const totalTiles = finiteNumber((p as any).tiles?.total);
   const tileAreaTotal = tileArea_m2 && activeTiles ? tileArea_m2 * activeTiles : undefined;
-  const hullArea =
-    finiteNumber((p as any).tiles?.hullArea_m2) ??
-    ((p as any).hull?.wallWidth_m && (p as any).hull?.Lx_m ? (p as any).hull.wallWidth_m * (p as any).hull.Lx_m : undefined);
-  const area = tileAreaTotal ?? hullArea;
+  const hullAreaPipeline = finiteNumber((p as any).hullArea_m2);
+  const hullAreaEllipsoid = finiteNumber((p as any).__hullAreaEllipsoid_m2);
+  const hullAreaTiles = finiteNumber((p as any).tiles?.hullArea_m2);
+  const hullWallWidth = finiteNumber((p as any).hull?.wallWidth_m);
+  const hullAreaWall = hullWallWidth != null && hullLengthRaw != null ? hullWallWidth * hullLengthRaw : undefined;
+  const area =
+    hullAreaPipeline ??
+    hullAreaEllipsoid ??
+    hullAreaTiles ??
+    tileAreaTotal ??
+    hullAreaWall;
+  const hullArea = area;
+  const hullAreaSourceTag = typeof (p as any).__hullAreaSource === "string" ? (p as any).__hullAreaSource : undefined;
   const areaSource =
-    tileAreaTotal != null
-      ? "tileArea_cm2 x activeTiles"
-      : hullArea != null
-        ? "hull.wallWidth_m x hullLength"
-        : undefined;
+    hullAreaPipeline != null
+      ? `pipeline.hullArea_m2${hullAreaSourceTag ? ` (${hullAreaSourceTag})` : ""}`
+      : hullAreaEllipsoid != null
+        ? "pipeline.__hullAreaEllipsoid_m2"
+        : hullAreaTiles != null
+          ? "tiles.hullArea_m2"
+          : tileAreaTotal != null
+            ? "tileArea_cm2 x activeTiles"
+            : hullAreaWall != null
+              ? "hull.wallWidth_m x hullLength"
+              : undefined;
 
   let powerDensityBase = 5e7;
   let powerDensitySource = "fallback 5e7 W/m2";
@@ -935,7 +1746,7 @@ function SpectrumCanvas({ spectrum }: { spectrum: CavitySpectrum }) {
       ctx.lineTo(W - 40, midY);
       ctx.stroke();
       ctx.fillStyle = "#bcd6ff";
-      const label = `∫ spectral → P = ${(pressure_Pa as number).toExponential(2)} Pa`;
+      const label = `∫ spectral -> P = ${(pressure_Pa as number).toExponential(2)} Pa`;
       ctx.font = "12px ui-sans-serif, system-ui";
       ctx.fillText(label, 44, midY - 6);
     }

@@ -852,7 +852,7 @@ export default function NeedleIpeakWorksheetPanel() {
             hint="Comma/space separated"
             status={inductances}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Pulse window tau (us)" value={tauInput} onChange={setTauInput} />
             <Field label="P_avg (MW)" value={pAvgInput} onChange={setPAvgInput} />
           </div>
@@ -865,7 +865,7 @@ export default function NeedleIpeakWorksheetPanel() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             variant="secondary"
             size="sm"
@@ -979,7 +979,7 @@ export default function NeedleIpeakWorksheetPanel() {
                 </div>
 
                 <div className="space-y-3 rounded-lg border border-white/10 bg-slate-900/60 p-3">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <SummaryCard
                       label="I_peak solved"
                       value={`${fillMeta.filledRows}/${fillMeta.parsedRows || 0}`}
@@ -1307,7 +1307,7 @@ type HeaderStripProps = {
 
 function HeaderStrip({ tau, pAvg, energies, inductances }: HeaderStripProps) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-slate-900/60">
+    <div className="grid grid-cols-1 gap-3 p-4 bg-slate-900/60 sm:grid-cols-2 lg:grid-cols-4">
       <SummaryCard label="Pulse window tau" value={`${tau} us`} icon={<Zap className="h-4 w-4 text-cyan-200" />} />
       <SummaryCard label="P_avg" value={`${pAvg} MW`} icon={<Bolt className="h-4 w-4 text-emerald-200" />} />
       <SummaryCard label="E choices" value={`${energies.length} values`} icon={<Calculator className="h-4 w-4 text-indigo-200" />} />

@@ -1,14 +1,18 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HelpCircle } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { C as SPEED_OF_LIGHT } from "@/lib/physics-const";
-import { useEnergyPipeline, MODE_CONFIGS, fmtPowerUnitFromW, type ModeKey } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, useUpdatePipeline, MODE_CONFIGS, fmtPowerUnitFromW, type ModeKey } from "@/hooks/use-energy-pipeline";
 import { cn } from "@/lib/utils";
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const clamp01 = (v: number) => clamp(v, 0, 1);
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 
 // Mode power fallback (mirrors MODE_POLICY on the server)
@@ -37,11 +41,23 @@ function fmtBeta(b?: number) {
 
 function fmtSpeed(v_mps?: number) {
   if (!isNum(v_mps)) return "--";
-  const kmps = v_mps / 1000;
-  const abs = Math.abs(kmps);
-  if (abs >= 1000) return `${kmps.toLocaleString(undefined, { maximumFractionDigits: 0 })} km/s`;
-  if (abs >= 10) return `${kmps.toFixed(1)} km/s`;
-  return `${kmps.toFixed(2)} km/s`;
+  const abs = Math.abs(v_mps);
+  const units = [
+    { label: "m/s", factor: 1 },
+    { label: "km/s", factor: 1e3 },
+    { label: "Mm/s", factor: 1e6 },
+    { label: "Gm/s", factor: 1e9 },
+  ];
+  for (const u of units) {
+    const scaled = abs / u.factor;
+    if (scaled < 1000) {
+      const val = v_mps / u.factor;
+      return `${val.toFixed(2)} ${u.label}`;
+    }
+  }
+  // If we’re beyond gigameters/sec, show as a fraction of c.
+  const fracC = v_mps / SPEED_OF_LIGHT;
+  return `${fracC.toFixed(2)} c`;
 }
 
 function modePowerTargetW(mode: ModeKey): number {
@@ -63,6 +79,49 @@ function gammaFromBeta(beta?: number) {
   if (!isNum(beta)) return undefined;
   const b = clamp(beta, 0, 0.999999);
   return 1 / Math.sqrt(1 - b * b);
+}
+
+function vCmdFromThrottle(u01: number, vFine: number, vCap: number, uFine = 0.75, gamma = 3.2) {
+  const u = clamp01(u01);
+  const cap = Math.max(0, vCap);
+  if (cap <= 0) return 0;
+
+  const fine = Math.max(1e-6, Math.min(vFine, cap));
+  const uf = Math.max(1e-3, Math.min(0.95, uFine));
+
+  if (u <= uf) {
+    const x = u / uf;
+    return fine * Math.pow(x, gamma);
+  }
+
+  const t = (u - uf) / (1 - uf);
+  return fine * Math.pow(cap / fine, t);
+}
+
+function betaTransFromThrottle(u01: number, betaCap: number, vFine: number, uFine = 0.75, gamma = 3.2) {
+  const bCap = clamp(betaCap ?? 0, 0, 0.99);
+  const vCap = bCap * SPEED_OF_LIGHT;
+  const vCmd = vCmdFromThrottle(u01, vFine, vCap, uFine, gamma);
+  return vCap > 0 ? clamp01(vCmd / vCap) : 0;
+}
+
+function throttleFromBetaTrans(betaTrans: number, betaCap: number, vFine: number, uFine = 0.75, gamma = 3.2) {
+  const bCap = clamp(betaCap ?? 0, 0, 0.99);
+  const vCap = bCap * SPEED_OF_LIGHT;
+  if (vCap <= 0) return 0;
+  const fine = Math.max(1e-6, Math.min(vFine, vCap));
+  const uf = Math.max(1e-3, Math.min(0.95, uFine));
+
+  const vTarget = clamp(betaTrans ?? 0, 0, 1) * vCap;
+  if (vTarget <= fine) {
+    const x = vTarget / fine;
+    return uf * Math.pow(Math.max(0, x), 1 / Math.max(1e-3, gamma));
+  }
+
+  const span = Math.max(1e-6, vCap / fine);
+  if (span <= 1 + 1e-6) return 1;
+  const t = Math.log(Math.max(vTarget, fine) / fine) / Math.log(span);
+  return clamp01(uf + t * (1 - uf));
 }
 
 type EquationRowProps = {
@@ -131,7 +190,10 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
     const beta_policy = beta_policy_server ?? clamp(beta_base * beta_trans_power, 0, 0.99);
 
     const shipBetaServer = isNum((live as any)?.shipBeta) ? clamp(Number((live as any).shipBeta), 0, 0.99) : undefined;
-    const shipBetaFallback = clamp(beta_policy * beta_trans, 0, 0.99);
+    const shipBetaRaw = isNum((live as any)?.shipBeta_raw)
+      ? clamp(Number((live as any).shipBeta_raw), 0, 0.99)
+      : (shipBetaServer ?? beta_policy);
+    const shipBetaFallback = clamp(shipBetaRaw * beta_trans, 0, 0.99);
     const shipBeta = shipBetaServer ?? shipBetaFallback;
 
     const vShip_mps =
@@ -144,9 +206,12 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
       : shipBetaServer
         ? "policyA"
         : "client:fallback";
+    const taxi_target_mps = isNum((live as any)?.taxi_target_mps)
+      ? Number((live as any).taxi_target_mps)
+      : undefined;
 
     const beta_policy_source = beta_policy_server ? "server:beta_policy" : "client:beta_base*power_fill";
-    const shipBetaSource = shipBetaServer ? "server:shipBeta" : "client:beta_policy*beta_trans";
+    const shipBetaSource = shipBetaServer ? "server:shipBeta" : "client:shipBeta_raw*beta_trans";
 
     return {
       mode,
@@ -155,6 +220,7 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
       beta_trans_power,
       beta_policy,
       beta_policy_source,
+      shipBetaRaw,
       shipBeta,
       shipBetaSource,
       vShip_mps,
@@ -164,10 +230,110 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
       P_applied_W,
       P_cap_W,
       fill_ratio,
+      taxi_target_mps,
     };
   }, [live]);
 
+  const throttleProfile = useMemo(() => {
+    const modeCfg = MODE_CONFIGS[derived.mode] ?? MODE_CONFIGS.hover;
+    const betaCap = clamp(derived.shipBetaRaw ?? 0, 0, 0.99);
+    const vCap = betaCap * SPEED_OF_LIGHT;
+
+    const taxiTarget = isNum(derived.taxi_target_mps) ? Math.max(derived.taxi_target_mps, 0.1) : 1.4;
+    const nearZeroFine = Math.max(0.1, Number((modeCfg as any)?.envCaps?.v_pad ?? 30));
+    const defaultFine =
+      derived.mode === "taxi"
+        ? taxiTarget
+        : derived.mode === "nearzero"
+          ? nearZeroFine
+          : Math.max(0.1, Number((modeCfg as any)?.envCaps?.v_strat ?? 100));
+
+    const vFine = vCap > 0 ? clamp(defaultFine, 0.1, vCap) : defaultFine;
+
+    return {
+      betaCap,
+      vCap,
+      vFine,
+      uFine: 0.75,
+      gamma: 3.2,
+    };
+  }, [derived.mode, derived.shipBetaRaw, derived.taxi_target_mps]);
+
+  const updatePipeline = useUpdatePipeline();
+  const [throttle, setThrottle] = useState<number>(() =>
+    throttleFromBetaTrans(derived.beta_trans, throttleProfile.betaCap, throttleProfile.vFine, throttleProfile.uFine, throttleProfile.gamma)
+  );
+  const [betaTransCmd, setBetaTransCmd] = useState<number>(() => derived.beta_trans);
+  const [targetSpeedInput, setTargetSpeedInput] = useState("");
+  const betaUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const betaFromThrottle = useCallback(
+    (u: number) => betaTransFromThrottle(u, throttleProfile.betaCap, throttleProfile.vFine, throttleProfile.uFine, throttleProfile.gamma),
+    [throttleProfile]
+  );
+
+  const throttleFromBeta = useCallback(
+    (beta: number) => throttleFromBetaTrans(beta, throttleProfile.betaCap, throttleProfile.vFine, throttleProfile.uFine, throttleProfile.gamma),
+    [throttleProfile]
+  );
+
+  useEffect(() => {
+    const liveBeta = derived.beta_trans;
+    if (!Number.isFinite(liveBeta)) return;
+    setBetaTransCmd((prev) => (Math.abs(prev - liveBeta) > 1e-3 ? liveBeta : prev));
+    const targetThrottle = throttleFromBeta(liveBeta);
+    setThrottle((prev) => (Math.abs(prev - targetThrottle) > 1e-3 ? targetThrottle : prev));
+  }, [derived.beta_trans, throttleFromBeta]);
+
+  useEffect(() => {
+    return () => {
+      if (betaUpdateTimer.current) {
+        clearTimeout(betaUpdateTimer.current);
+      }
+    };
+  }, []);
+
+  const pushBetaTrans = useCallback((value: number) => {
+    const clamped = clamp(value ?? 0, 0, 1);
+    setBetaTransCmd(clamped);
+    if (betaUpdateTimer.current) {
+      clearTimeout(betaUpdateTimer.current);
+    }
+    betaUpdateTimer.current = setTimeout(() => {
+      updatePipeline.mutate({ beta_trans: clamped });
+    }, 120);
+  }, [updatePipeline]);
+
+  const applyThrottle = useCallback((u: number) => {
+    const clamped = clamp01(u ?? 0);
+    setThrottle(clamped);
+    const betaCmd = betaFromThrottle(clamped);
+    pushBetaTrans(betaCmd);
+  }, [betaFromThrottle, pushBetaTrans]);
+
+  const handleBetaSliderChange = useCallback((values: number[]) => {
+    applyThrottle(values?.[0] ?? 0);
+  }, [applyThrottle]);
+
+  const handleTargetSpeedApply = useCallback(() => {
+    const v_kmps = parseFloat(targetSpeedInput);
+    if (!Number.isFinite(v_kmps)) return;
+    const vTarget_mps = v_kmps * 1000;
+    const vCap = throttleProfile.vCap;
+    const betaCmd = vCap > 0 ? clamp01(vTarget_mps / vCap) : 0;
+    const nextThrottle = throttleFromBeta(betaCmd);
+    setThrottle(nextThrottle);
+    pushBetaTrans(betaCmd);
+  }, [pushBetaTrans, targetSpeedInput, throttleFromBeta, throttleProfile.vCap]);
+
   const modes: ModeKey[] = ["standby", "taxi", "nearzero", "hover", "cruise", "emergency"];
+  const policyBetaCap = throttleProfile.betaCap;
+  const policySpeedCap_mps = throttleProfile.vCap;
+  const predictedPolicySpeed_mps = throttleProfile.betaCap * betaTransCmd * SPEED_OF_LIGHT;
+  const vPlaceholder = isNum(derived.vShip_mps) ? (derived.vShip_mps / 1000).toFixed(2) : "";
+  const fineZonePct = Math.round(throttleProfile.uFine * 100);
+  const fineSpeedEffective = Math.max(1e-6, Math.min(throttleProfile.vFine, throttleProfile.vCap));
+  const fineZoneSpeedLabel = fmtSpeed(fineSpeedEffective);
 
   const capSummary = useMemo(() => {
     const maxBeta = Math.max(...modes.map((m) => BETA_POLICY[m] ?? 0));
@@ -198,7 +364,7 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
                   stays comoving; the displayed v is the outside/rest-frame coordinate translation derived from beta.
                 </p>
                 <div className="mt-2 text-xs text-slate-300/90">
-                  Chain: beta_ship = beta_policy(mode) * beta_trans * beta_trans_power, then v = beta_ship * c.
+                  Chain: shipBeta_raw = proxy? beta_proxy : beta_policy(mode) * beta_trans_power; shipBeta = shipBeta_raw * beta_trans; v = shipBeta * c.
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -226,7 +392,7 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
 
           <div className="rounded-xl bg-slate-950/70 p-3 border border-slate-800">
             <div className="text-xs uppercase tracking-wide text-slate-400">Power</div>
-            <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <div className="mt-1 grid grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-2">
               <div className="text-slate-400">P_target</div>
               <div className="font-mono">{fmtPowerUnitFromW(derived.P_target_W)}</div>
 
@@ -245,7 +411,7 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
 
           <div className="rounded-xl bg-slate-950/70 p-3 border border-slate-800">
             <div className="text-xs uppercase tracking-wide text-slate-400">beta -&gt; v (outside frame)</div>
-            <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <div className="mt-1 grid grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-2">
               <div className="text-slate-400">beta_base(mode)</div>
               <div className="font-mono">{fmtBeta(derived.beta_base)}</div>
 
@@ -254,6 +420,9 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
 
               <div className="text-slate-400">beta_policy</div>
               <div className="font-mono">{fmtBeta(derived.beta_policy)}</div>
+
+              <div className="text-slate-400">beta_ship_raw</div>
+              <div className="font-mono">{fmtBeta(derived.shipBetaRaw)}</div>
 
               <div className="text-slate-400">beta_trans</div>
               <div className="font-mono">{fmtBeta(derived.beta_trans)}</div>
@@ -269,6 +438,81 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
             </div>
             <div className="mt-2 text-[11px] text-slate-400">
               Ship frame: v_local ~ 0 (comoving). beta_policy already carries the mode cap x power fill; beta_trans is the UI knob if the server has not sent shipBeta.
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-slate-950/70 p-3 border border-slate-800">
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-slate-400">Segmented translation throttle (β_trans)</div>
+              <div className="text-[11px] text-slate-400">
+                Slider works in speed space: precision ramp then geometric climb to the live envelope, mapped back to β_trans.
+              </div>
+            </div>
+            <Badge className="bg-sky-500/20 text-sky-100">CONTROL</Badge>
+          </div>
+          <Slider
+            value={[throttle]}
+            min={0}
+            max={1}
+            step={0.001}
+            onValueChange={handleBetaSliderChange}
+            aria-label="Speed-first translation throttle"
+          />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-400">
+            <span>
+              throttle u <span className="font-mono text-slate-200">{throttle.toFixed(2)}</span>
+            </span>
+            <span>
+              β_trans cmd <span className="font-mono text-slate-200">{betaTransCmd.toFixed(2)}</span>
+            </span>
+            <span>
+              precision {fineZonePct}% → <span className="font-mono text-slate-200">{fineZoneSpeedLabel}</span>
+            </span>
+            <span>
+              cap <span className="font-mono text-slate-200">β_raw={fmtBeta(policyBetaCap)}</span>{" "}
+              (<span className="font-mono text-slate-200">{fmtSpeed(policySpeedCap_mps)}</span>)
+            </span>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-[1.1fr_minmax(0,1fr)]">
+            <div>
+              <div className="text-[11px] font-semibold uppercase text-slate-400">Target speed (km/s)</div>
+              <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  inputMode="decimal"
+                  value={targetSpeedInput}
+                  placeholder={vPlaceholder || "e.g. 0.10"}
+                  onChange={(e) => setTargetSpeedInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleTargetSpeedApply();
+                  }}
+                  className="bg-slate-950"
+                />
+                <Button size="sm" onClick={handleTargetSpeedApply}>
+                  Set β_trans
+                </Button>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400">
+                Uses live β_raw cap -&gt; segmented throttle (fine + log ramp) -&gt; β_trans command.
+              </div>
+            </div>
+            <div className="rounded border border-slate-800/70 bg-slate-900/50 p-2 text-[11px] text-slate-300">
+              <div className="flex items-center justify-between">
+                <span>Live ship β</span>
+                <span className="font-mono text-cyan-200">{fmtBeta(derived.shipBeta)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span>Policy-path v (β_raw * β_trans)</span>
+                <span className="font-mono text-slate-200">{fmtSpeed(predictedPolicySpeed_mps)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span>Closure</span>
+                <span className="font-mono text-slate-200">{derived.speedClosure}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -313,8 +557,8 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
             />
             <EquationRow
               label="Ship beta closure"
-              formula="shipBeta = proxy? clampBeta(beta_proxy) : beta_policy * beta_trans"
-              value={`shipBeta=${fmtBeta(derived.shipBeta)} (closure=${derived.speedClosure})`}
+              formula="shipBeta = clampBeta(shipBeta_raw * beta_trans); shipBeta_raw = proxy? beta_proxy : beta_policy"
+              value={`raw=${fmtBeta(derived.shipBetaRaw)} shipBeta=${fmtBeta(derived.shipBeta)} (closure=${derived.speedClosure})`}
               source="server/energy-pipeline.ts: speedClosure"
               note={`source=${derived.shipBetaSource}`}
               accent
@@ -421,7 +665,7 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
           </div>
 
           <div className="mt-3 text-[11px] text-slate-400">
-            Interpretation: beta_policy is the mode ceiling, beta_trans is your translation knob, and beta_trans_power is the
+            Interpretation: beta_policy is the mode ceiling (with power fill), beta_trans is the post-closure translation knob, and beta_trans_power is the
             power-fill clamp (about P_applied / P_target when not provided by the server).
           </div>
         </div>

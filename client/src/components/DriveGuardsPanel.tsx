@@ -3777,7 +3777,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
             </label>
           </div>
           <div className="font-mono text-[11px] text-slate-400">{yorkDocString}</div>
-          <div className="grid grid-cols-2 gap-3 font-mono">
+          <div className="grid grid-cols-1 gap-3 font-mono sm:grid-cols-2">
             <div>
               <div className="text-slate-500">max|∇·β|</div>
               <div className="text-cyan-200">{divMaxDisplay}</div>
@@ -3866,7 +3866,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-2 text-xs">
+        <div className="mt-3 grid gap-3 text-xs md:grid-cols-2">
           <div className="rounded-lg border border-slate-800/80 bg-slate-950/50 p-3 space-y-2">
             <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-100">
               <span>Ledger green-band probes</span>
@@ -3946,7 +3946,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
 
 
 
@@ -4215,7 +4215,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
             {proofBridgeCards.map((card) => (
               <div
                 key={card.key}
@@ -4519,7 +4519,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
 
 
 
@@ -5103,7 +5103,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-          <div className="mt-4 grid gap-4 md:grid-cols-[180px,1fr]">
+          <div className="mt-4 grid gap-4 sm:grid-cols-[180px,1fr]">
 
 
 
@@ -5239,7 +5239,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-            <div className="grid gap-3 text-xs text-slate-300 md:grid-cols-2">
+            <div className="grid gap-3 text-xs text-slate-300 sm:grid-cols-2">
 
 
 
@@ -5825,7 +5825,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-          <div className="mt-3 grid gap-3 text-xs text-slate-300 md:grid-cols-2">
+          <div className="mt-3 grid gap-3 text-xs text-slate-300 sm:grid-cols-2">
 
 
 
@@ -6217,7 +6217,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-          <div className="mt-3 grid gap-3 text-xs text-slate-300 md:grid-cols-3">
+          <div className="mt-3 grid gap-3 text-xs text-slate-300 sm:grid-cols-2 md:grid-cols-3">
 
 
 
@@ -6533,7 +6533,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
             <CurvatureLedgerPanel />
           </div>
 
-          <div className="mt-4 grid gap-3 text-xs text-slate-300 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-3 text-xs text-slate-300 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3">
 
 
 

@@ -40,7 +40,7 @@ memoryTraceRouter.get("/by-trace/:traceId", async (req, res) => {
     const { k } = parsed.data;
     const matchKeys = new Set([`session:${traceId}`, `task:${traceId}`]);
     const memories = records
-      .filter((record) => hasMatchingKey(record, matchKeys))
+      .filter((record) => hasMatchingKey(record, matchKeys) && record.kind !== "procedural")
       .sort(sortByCreatedDesc)
       .slice(0, k)
       .map(toSummary);

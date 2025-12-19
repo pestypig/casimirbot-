@@ -2,7 +2,7 @@
   "tokenizerId": "mock-helix-local",
   "prompt": "Helix core token budget check. Stay within guardrails.",
   "prompt_hash": "sha256:d46724221b564fc4901ae4ed304a88c8b83e60dac2647c8a3c4a2ea4656506e4",
-  "tokenizer_hash": "sha256:4e339ff37c0617f65ddffc188abb983ed5c2bba2d4d64e3fe4818a253841ff35",
+  "tokenizer_hash": "sha256:d5d00b8c960c83ce4dcb715a33fc1bf8570d6980b11f47ae7050f9d61bef84cb",
   "merges_hash": "sha256:5007fd9d5816ffefec0fa1f6c29991ec33f47b15c297560cc0d75ae2203c4b74",
   "tokens": [
     4,

@@ -43,7 +43,7 @@ export default function ResonanceSchedulerTile({
 
   return (
     <Card className="bg-slate-900/50 border-slate-800">
-      <CardHeader>
+      <CardHeader className="space-y-1">
         <CardTitle className="flex items-center gap-2">
           Resonance Scheduler
         </CardTitle>
@@ -52,7 +52,7 @@ export default function ResonanceSchedulerTile({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-3 grid grid-cols-3 gap-2 text-xs">
+        <div className="mb-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
           <div className="p-2 bg-slate-950 rounded">
             <div className="text-slate-400">Mode</div>
             <div className="font-mono">{mode}</div>

@@ -1,0 +1,28 @@
+{
+  "schema_version": "dataset_manifest/1",
+  "kind": "dataset_manifest",
+  "created_at": "2025-01-01T00:00:00.000Z",
+  "name": "solar-energy-proxy-fixture",
+  "description": "Deterministic SunPy energy proxy sample (2x2 map, AIA 193).",
+  "entries": [
+    {
+      "id": "solar-energy:aia193:v1:map4",
+      "pipeline": "solar_energy_proxy",
+      "input": {
+        "instrument": "AIA",
+        "wavelength_A": 193,
+        "grid_size": 2,
+        "map_b64": "AAAAAAAAAD8AAIA/AACAPg==",
+        "start": "2025-01-01T00:00:00.000Z",
+        "end": "2025-01-01T00:05:00.000Z",
+        "calibration_version": "aia-193-v1"
+      },
+      "expected": {
+        "hashes": {
+          "inputs_hash": "sha256:72ff77669dc27fa4b41bf98eaa779874afc08065f675d20d98967d0e8305a515",
+          "features_hash": "sha256:2e0316c5c861aa813b4dda567cefa9ed2ef9231104a539e023c706f5ed474160"
+        }
+      }
+    }
+  ]
+}

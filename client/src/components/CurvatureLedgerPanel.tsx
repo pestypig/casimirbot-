@@ -101,7 +101,7 @@ export function CurvatureLedgerPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-baseline justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
           <div className="text-xs uppercase tracking-tight text-slate-400">
             Ledger drift
           </div>
@@ -145,7 +145,7 @@ export function CurvatureLedgerPanel() {
             strokeWidth={1}
           />
         </svg>
-        <dl className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+        <dl className="grid grid-cols-1 gap-2 text-xs text-slate-400 sm:grid-cols-2">
           <div>
             <dt className="text-[10px] uppercase tracking-wide">Bus</dt>
             <dd className="font-mono text-slate-200">

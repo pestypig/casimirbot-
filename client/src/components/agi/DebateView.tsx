@@ -893,7 +893,7 @@ export function LegacyDebateView({ debateId, open, onClose }: LegacyDebateViewPr
 
         </header>
 
-        <div className="flex-1 grid grid-cols-2 gap-4 p-6 overflow-hidden">
+        <div className="flex-1 grid grid-cols-1 gap-4 p-6 overflow-hidden sm:grid-cols-2">
 
           <TurnColumn label="Proponent" accent="text-emerald-300" turns={proponentTurns} />
 

@@ -24,11 +24,15 @@ export {
   whisperNav,
   whisperSystem,
   whisperCustom,
+  whisperPanelOpen,
   publishWhisper,
   sendDriveNudge,
   getModeWisdom,
   speakTypewriter,
 } from "./luma-whispers-core";
+
+// mood / spectrum helpers
+export { publishMoodForWhisper, classifyMoodFromWhisper, LUMA_MOOD_BINS } from "./luma-mood-spectrum";
 
 type WhisperCtx = {
   active: TLumaWhisper[];

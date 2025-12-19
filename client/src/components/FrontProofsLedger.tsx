@@ -52,9 +52,9 @@ function buildLedgerRows(snap?: EnergyPipelineSnapshot | null): LedgerRow[] {
 
   // Hull / geometry
   const hullRaw = snap.hull ?? {};
-  const Lx = Number.isFinite(hullRaw.Lx_m) ? hullRaw.Lx_m : FALLBACK_HULL.Lx_m;
-  const Ly = Number.isFinite(hullRaw.Ly_m) ? hullRaw.Ly_m : FALLBACK_HULL.Ly_m;
-  const Lz = Number.isFinite(hullRaw.Lz_m) ? hullRaw.Lz_m : FALLBACK_HULL.Lz_m;
+  const Lx = Number.isFinite(hullRaw.Lx_m) ? Number(hullRaw.Lx_m) : FALLBACK_HULL.Lx_m;
+  const Ly = Number.isFinite(hullRaw.Ly_m) ? Number(hullRaw.Ly_m) : FALLBACK_HULL.Ly_m;
+  const Lz = Number.isFinite(hullRaw.Lz_m) ? Number(hullRaw.Lz_m) : FALLBACK_HULL.Lz_m;
   const a = Lx;
   const b = Ly;
   const c = Lz;

@@ -70,7 +70,7 @@ const SnapshotView = ({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Metric label="Global coherence" value={formatPercent(snapshot.global_coherence)} />
         <Metric label="Collapse pressure" value={formatPercent(snapshot.collapse_pressure)} />
         <Metric label="Phase dispersion" value={formatPercent(snapshot.phase_dispersion)} />
@@ -80,7 +80,7 @@ const SnapshotView = ({
       <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
         <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="text-[11px] uppercase tracking-[0.25em] text-slate-400">Level lattice</div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <LevelBar label="Micro" value={levels.micro} />
             <LevelBar label="Meso" value={levels.meso} />
             <LevelBar label="Macro" value={levels.macro} />
@@ -116,7 +116,7 @@ const SnapshotView = ({
             </div>
           )}
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+        <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
           <Metric
             label="Collapse confidence"
             value={formatPercent(governorConfidence ?? snapshot.collapse_pressure)}

@@ -155,7 +155,7 @@ export const CavityFrameView: React.FC<CavityFrameViewProps> = (props) => {
       </div>
       {/* External chrome area */}
       {showChrome && (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
+      <div className="grid grid-cols-1 gap-4 text-xs font-mono sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
           <h4 className="text-slate-200 font-semibold mb-1">Legend</h4>
           <ul className="space-y-1">
@@ -173,7 +173,7 @@ export const CavityFrameView: React.FC<CavityFrameViewProps> = (props) => {
         </div>
         <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3 col-span-2 lg:col-span-1">
           <h4 className="text-slate-200 font-semibold mb-1">Geometry</h4>
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
             <div>a (gap)</div><div>{gap_nm.toFixed(2)} nm</div>
             <div>sag t</div><div>{sag_nm_eff.toFixed(1)} nm</div>
             <div>pocket ⌀</div><div>{pocketDiameter_um.toFixed(0)} µm</div>

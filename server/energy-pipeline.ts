@@ -1,4 +1,4 @@
-// HELIX-CORE: Independent Dynamic Casimir Energy Pipeline
+﻿// HELIX-CORE: Independent Dynamic Casimir Energy Pipeline
 // This module provides centralized energy calculations that all panels can access
 
 // Model mode switch: raw physics or paper-calibrated targets
@@ -6,7 +6,7 @@
 const MODEL_MODE: 'calibrated' | 'raw' =
   (process.env.HELIX_MODEL_MODE === 'raw') ? 'raw' : 'calibrated';
 
-// GöÇGöÇ Physics Constants (centralized) GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// G├╢├çG├╢├ç Physics Constants (centralized) G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
 import { HBAR } from "./physics-const.js";
 import { C } from "./utils/physics-const-safe";
 import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
@@ -19,7 +19,7 @@ const STROBE_DUTY_STALE_MS = 20_000;
 
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
-const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles GåÆ skip dynamic per-tile-ish helpers (use aggregate)
+const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles G├Ñ├å skip dynamic per-tile-ish helpers (use aggregate)
 
 // Production-quiet logging toggle
 const DEBUG_PIPE = process.env.NODE_ENV !== 'production' && (process.env.HELIX_DEBUG?.includes('pipeline') ?? false);
@@ -43,6 +43,13 @@ import {
 } from '../modules/dynamic/stress-energy-equations.js';
 import warpBubbleModule from '../modules/warp/warp-module.js';
 import { DEFAULT_GEOMETRY_SWEEP, DEFAULT_PHASE_MICRO_SWEEP } from "../shared/schema.js";
+import type {
+  CardRecipe,
+  CardMeshMetadata,
+  CardLatticeMetadata,
+  HullPreviewPayload,
+} from "../shared/schema.js";
+import { CARD_RECIPE_SCHEMA_VERSION } from "../shared/schema.js";
 import {
   applyQiAutothrottleStep,
   applyScaleToGatePulses,
@@ -146,7 +153,7 @@ export const DEFAULT_PULSED_CURRENT_LIMITS_A = {
   launcher: parseEnvNumber(process.env.IPEAK_MAX_LAUNCHER_A, 14_142), // 10 kJ @ 100 uH @ 20 us -> ~14.1 kA
 } as const;
 
-export const TAU_LC_UNIT_DRIFT_LIMIT = 50; // reject >50x unit drift (ms vs µs)
+export const TAU_LC_UNIT_DRIFT_LIMIT = 50; // reject >50x unit drift (ms vs ┬╡s)
 
 export function computeTauLcMsFromHull(hull?: {
   Lx_m?: number;
@@ -286,7 +293,7 @@ function rhoEllipsoid(p: [number, number, number], ax: HullAxes) {
 }
 
 function nEllipsoid(p: [number, number, number], ax: HullAxes): [number, number, number] {
-  // Gêç(x^2/a^2 + y^2/b^2 + z^2/c^2) normalized
+  // G├¬├º(x^2/a^2 + y^2/b^2 + z^2/c^2) normalized
   const nx = p[0] / (ax.a * ax.a);
   const ny = p[1] / (ax.b * ax.b);
   const nz = p[2] / (ax.c * ax.c);
@@ -300,6 +307,20 @@ function nEllipsoid(p: [number, number, number], ax: HullAxes): [number, number,
   return [n0 / m, n1 / m, n2 / m];
 }
 
+const vecLen = (v: [number, number, number]) => Math.hypot(v[0], v[1], v[2]);
+export const normalizeVec = (v: [number, number, number]): [number, number, number] => {
+  const m = vecLen(v) || 1;
+  return [v[0] / m, v[1] / m, v[2] / m];
+};
+
+export const sectorSign = (theta: number, sectors: number, split: number) => {
+  const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
+  const sectorIdx = Math.floor(u * sectors);
+  const distToSplit = (sectorIdx - split + 0.5);
+  const strobeWidth = 0.75; // matches renderer
+  const softSign = (x: number) => Math.tanh(x);
+  return softSign(-distToSplit / strobeWidth);
+};
 // ---------- Physics-side displacement sampling for debug/validation ----------
 export interface FieldSample {
   p: [number, number, number];   // sample coordinate (meters)
@@ -308,7 +329,7 @@ export interface FieldSample {
   n: [number, number, number];   // outward normal
   sgn: number;                   // sector sign (+/-)
   disp: number;                  // scalar displacement magnitude used
-  dA?: number;                   // proper area element at sample (m^2) GÇö from metric
+  dA?: number;                   // proper area element at sample (m^2) G├ç├╢ from metric
 }
 
 export interface FieldSampleBuffer {
@@ -367,12 +388,84 @@ export interface FieldRequest {
   nPhi?: number;     // default 32
   shellOffset?: number; // meters; 0 = on shell, >0 outside, <0 inside (default 0)
   // physics
-  wallWidth_m?: number; // bell width w-ü in meters (default from sag_nm)
+  wallWidth_m?: number; // bell width w-├╝ in meters (default from sag_nm)
   sectors?: number;     // sector count (default state.sectorCount)
-  split?: number;       // (+)/(GêÆ) split index (default floor(sectors/2))
-  clamp?: Partial<SampleClamp>; // G¼àn+Å new, optional
+  split?: number;       // (+)/(G├¬├å) split index (default floor(sectors/2))
+  clamp?: Partial<SampleClamp>; // G┬╝├án+├à new, optional
 }
 
+export type GeometryKind = "ellipsoid" | "radial" | "sdf";
+
+export type SurfaceSampleInput = {
+  p: [number, number, number];
+  n?: [number, number, number];
+  dA?: number;
+  signedDistance_m?: number; // optional signed distance to iso-surface (meters)
+};
+
+export type RadialSampleInput = {
+  theta?: number;
+  phi?: number;
+  r: number;
+  n?: [number, number, number];
+  dA?: number;
+};
+
+export interface FieldGeometryRequest extends FieldRequest {
+  geometryKind?: GeometryKind;
+  radial?: {
+    samples?: RadialSampleInput[];
+    radiusAt?: (dir: [number, number, number]) => number | { r: number; n?: [number, number, number]; dA?: number };
+    nTheta?: number;
+    nPhi?: number;
+  };
+  sdf?: {
+    samples: SurfaceSampleInput[];
+  };
+}
+
+export type WarpFieldType = "natario" | "natario_sdf" | "alcubierre";
+
+export type WarpSdfPreview = {
+  key?: string | null;
+  hash?: string | null;
+  meshHash?: string | null;
+  basisSignature?: string | null;
+  dims?: [number, number, number] | null;
+  bounds?: [number, number, number] | null;
+  voxelSize?: number | null;
+  band?: number | null;
+  format?: "float" | "byte" | null;
+  clampReasons?: string[] | null;
+  stats?: {
+    sampleCount?: number;
+    voxelsTouched?: number;
+    voxelCoverage?: number;
+    trianglesTouched?: number;
+    triangleCoverage?: number;
+    maxAbsDistance?: number;
+    maxQuantizationError?: number;
+  } | null;
+  updatedAt?: number | null;
+};
+
+export type GeometryPreviewSnapshot = {
+  preview?: HullPreviewPayload | null;
+  mesh?: CardMeshMetadata | null;
+  sdf?: WarpSdfPreview | null;
+  lattice?: CardLatticeMetadata | null;
+  updatedAt?: number | null;
+};
+
+export interface WarpGeometrySpec extends FieldGeometryRequest {
+  assetId?: string;
+  resolution?: number;
+  band_m?: number;
+  bounds_m?: [number, number, number];
+  format?: "float" | "byte";
+  wallThickness_m?: number;
+  driveDirection?: [number, number, number];
+}
 export interface TileParams {
   gap_nm: number;           // Casimir cavity gap in nanometers
   radius_mm: number;        // Radius of curvature in millimeters
@@ -451,6 +544,8 @@ export type SurfaceAreaEstimate = {
   value: number; // preferred estimate (metric quadrature)
   uncertainty: number; // +- absolute m^2
   band: { min: number; max: number };
+  sectorAreas?: number[]; // optional per-sector estimate aligned with sectorCount
+  sectors?: number;
   components: {
     metric: number;
     monteCarlo?: { value: number; stderr: number; samples: number };
@@ -475,6 +570,22 @@ export interface EnergyPipelineState {
 
   // Hull geometry
   hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number }; // Paper-authentic stack ~1 m; default auto-tunes to modulation dwell
+  warpFieldType?: WarpFieldType;
+  warpGeometry?: WarpGeometrySpec | null;
+  warpGeometryKind?: GeometryKind;
+  warpGeometryAssetId?: string;
+  geometryPreview?: GeometryPreviewSnapshot | null;
+  bubble?: {
+    R?: number;
+    sigma?: number;
+    beta?: number;
+    dutyGate?: number;
+  };
+  // Legacy top-level bubble mirrors
+  beta?: number;
+  sigma?: number;
+  R?: number;
+  cardRecipe?: CardRecipe;
 
   // Mode parameters
   currentMode: 'hover' | 'taxi' | 'nearzero' | 'cruise' | 'emergency' | 'standby';
@@ -527,8 +638,8 @@ export interface EnergyPipelineState {
   P_applied_W?: number;     // Applied ship-average power after caps/guards (W)
   // Speed/beta closure (derived)
   beta_trans_power?: number; // Power throttle fraction (0..1)
-  beta_policy?: number;      // β from policy throttle
-  shipBeta?: number;         // Effective β (v/c proxy)
+  beta_policy?: number;      // ╬▓ from policy throttle
+  shipBeta?: number;         // Effective ╬▓ (v/c proxy)
   vShip_mps?: number;        // Outside-frame coordinate speed
   speedClosure?: 'policyA' | 'proxyB';
   M_exotic: number;         // Exotic mass generated
@@ -569,9 +680,19 @@ export interface EnergyPipelineState {
   N_tiles: number;          // Total number of tiles
   N_tiles_band?: { min: number; max: number }; // Census range propagated from geometry uncertainty
   hullArea_m2?: number;     // Hull surface area (for Bridge display)
+  hullAreaOverride_m2?: number;
+  hullAreaOverride_uncertainty_m2?: number;
+  hullAreaPerSector_m2?: number[]; // Optional per-sector surface area map (m^2)
+  __hullAreaSource?: "override" | "ellipsoid";
+  __hullAreaEllipsoid_m2?: number;
+  __hullAreaPerSectorSource?: "override" | "ellipsoid" | "uniform";
 
   // Sector management
   tilesPerSector: number;   // Tiles per sector
+  tilesPerSectorVector?: number[]; // Geometry-aware allocation (sums to N_tiles)
+  tilesPerSectorUniform?: number[]; // Uniform allocation (legacy baseline)
+  tilePowerDensityScale?: Array<number | null>; // Desired/actual tile ratio if uniform allocation is forced
+  tilesPerSectorStrategy?: "area-weighted" | "uniform";
   activeSectors: number;    // Currently active sectors
   activeTiles: number;      // Currently active tiles
   activeFraction: number;   // Active sectors / total sectors
@@ -638,21 +759,162 @@ export interface EnergyPipelineState {
   qiAutoscale?: QiAutoscaleState | null;
 }
 
+export function buildCardRecipeFromPipeline(state: EnergyPipelineState): CardRecipe {
+  const clamp01 = (value: unknown) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return undefined;
+    return Math.max(0, Math.min(1, n));
+  };
+  const toVec3 = (value: unknown): [number, number, number] | undefined => {
+    if (!Array.isArray(value) || value.length < 3) return undefined;
+    const [x, y, z] = value;
+    const nx = Number(x);
+    const ny = Number(y);
+    const nz = Number(z);
+    if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(nz)) return undefined;
+    return [nx, ny, nz];
+  };
+
+  const shipRadius = Number.isFinite(state.shipRadius_m) && (state.shipRadius_m as number) > 0
+    ? (state.shipRadius_m as number)
+    : 1;
+  const hullRaw = state.hull ?? {
+    Lx_m: shipRadius * 2,
+    Ly_m: shipRadius * 2,
+    Lz_m: shipRadius * 2,
+  };
+  const hull: CardRecipe["hull"] = {
+    Lx_m: Number.isFinite(hullRaw.Lx_m) && (hullRaw.Lx_m as number) > 0 ? (hullRaw.Lx_m as number) : shipRadius * 2,
+    Ly_m: Number.isFinite(hullRaw.Ly_m) && (hullRaw.Ly_m as number) > 0 ? (hullRaw.Ly_m as number) : shipRadius * 2,
+    Lz_m: Number.isFinite(hullRaw.Lz_m) && (hullRaw.Lz_m as number) > 0 ? (hullRaw.Lz_m as number) : shipRadius * 2,
+    ...(Number.isFinite((hullRaw as any).wallThickness_m) && (hullRaw as any).wallThickness_m > 0
+      ? { wallThickness_m: (hullRaw as any).wallThickness_m as number }
+      : {}),
+  };
+
+  const overrideArea = Number.isFinite(state.hullAreaOverride_m2) && (state.hullAreaOverride_m2 as number) > 0
+    ? (state.hullAreaOverride_m2 as number)
+    : undefined;
+  const overrideUnc = Number.isFinite(state.hullAreaOverride_uncertainty_m2)
+    ? Math.max(0, Number(state.hullAreaOverride_uncertainty_m2))
+    : undefined;
+  const area: CardRecipe["area"] = {
+    hullAreaOverride_m2: overrideArea,
+    hullAreaOverride_uncertainty_m2: overrideUnc,
+    hullArea_m2: Number.isFinite(state.hullArea_m2) ? Number(state.hullArea_m2) : undefined,
+    __hullAreaSource: typeof state.__hullAreaSource === "string"
+      ? (state.__hullAreaSource as CardRecipe["area"]["__hullAreaSource"])
+      : undefined,
+  };
+
+  const tilesPerSectorVector = Array.isArray(state.tilesPerSectorVector)
+    ? state.tilesPerSectorVector.map((value) => {
+        const n = Number(value);
+        return Number.isFinite(n) && n >= 0 ? n : 0;
+      })
+    : undefined;
+  const blanket: CardRecipe["blanket"] = {
+    tilesPerSectorVector: tilesPerSectorVector && tilesPerSectorVector.length ? tilesPerSectorVector : undefined,
+    activeFraction: clamp01(state.activeFraction),
+  };
+
+  const gateSourceRaw = typeof (state as any).gateSource === "string" ? (state as any).gateSource : undefined;
+  const gateSource =
+    gateSourceRaw === "blanket" || gateSourceRaw === "combined" ? gateSourceRaw : "schedule";
+  const gateViewRaw = (state as any).gateView;
+  const volumeDomainRaw = (state as any).volumeDomain;
+  const volumeDomain: CardRecipe["viz"]["volumeDomain"] =
+    volumeDomainRaw === "bubbleBox" ? "bubbleBox" : "wallBand";
+  const viz: CardRecipe["viz"] = {
+    volumeViz: "theta_drive",
+    volumeDomain,
+    gateSource,
+    gateView: typeof gateViewRaw === "boolean" ? gateViewRaw : true,
+    ...(typeof (state as any).forceFlatGate === "boolean"
+      ? { forceFlatGate: (state as any).forceFlatGate as boolean }
+      : {}),
+  };
+
+  const warpGeometryRaw = state.warpGeometry ?? undefined;
+  const warpGeometry =
+    warpGeometryRaw && typeof warpGeometryRaw === "object"
+      ? (({ geometryKind: _gk, ...rest }) => rest)(warpGeometryRaw as Record<string, unknown>)
+      : undefined;
+  const geometry: CardRecipe["geometry"] = {
+    warpFieldType: state.warpFieldType,
+    warpGeometryKind: state.warpGeometryKind ?? (warpGeometryRaw as any)?.geometryKind,
+    warpGeometryAssetId: state.warpGeometryAssetId ?? (warpGeometryRaw as any)?.assetId,
+    warpGeometry: warpGeometry as any,
+  };
+
+  const cameraSource = (state as any).camera ?? (state as any).hullCamera ?? null;
+  let camera: CardRecipe["camera"] = undefined;
+  if (cameraSource && typeof cameraSource === "object") {
+    const eye = toVec3((cameraSource as any).eye);
+    const target = toVec3((cameraSource as any).target ?? (cameraSource as any).center);
+    const up = toVec3((cameraSource as any).up);
+    const radius_m = Number.isFinite((cameraSource as any).radius)
+      ? Math.max(0, Number((cameraSource as any).radius))
+      : undefined;
+    const yaw_deg = Number.isFinite((cameraSource as any).yaw_deg ?? (cameraSource as any).yaw)
+      ? Number((cameraSource as any).yaw_deg ?? (cameraSource as any).yaw)
+      : undefined;
+    const pitch_deg = Number.isFinite((cameraSource as any).pitch_deg ?? (cameraSource as any).pitch)
+      ? Number((cameraSource as any).pitch_deg ?? (cameraSource as any).pitch)
+      : undefined;
+    const fov_deg = Number.isFinite((cameraSource as any).fov_deg ?? (cameraSource as any).fov)
+      ? Number((cameraSource as any).fov_deg ?? (cameraSource as any).fov)
+      : undefined;
+    const presetRaw = (cameraSource as any).preset;
+    const preset =
+      presetRaw === "threeQuarterFront" || presetRaw === "broadside" || presetRaw === "topDown"
+        ? presetRaw
+        : undefined;
+
+    if (
+      eye ||
+      target ||
+      up ||
+      radius_m !== undefined ||
+      yaw_deg !== undefined ||
+      pitch_deg !== undefined ||
+      fov_deg !== undefined ||
+      preset
+    ) {
+      camera = { eye, target, up, radius_m, yaw_deg, pitch_deg, fov_deg, preset };
+    }
+  }
+
+  return {
+    schemaVersion: CARD_RECIPE_SCHEMA_VERSION,
+    hull,
+    area,
+    blanket,
+    viz,
+    geometry,
+    camera,
+    ...(state.geometryPreview?.mesh ? { mesh: state.geometryPreview.mesh as CardMeshMetadata } : {}),
+    ...(state.geometryPreview?.lattice
+      ? { lattice: state.geometryPreview.lattice as CardLatticeMetadata }
+      : {}),
+  };
+}
+
 // Physical constants
-const HBAR_C = HBAR * C;             // GäÅc Gëê 3.16152677e-26 [J-+m] for Casimir calculations
+const HBAR_C = HBAR * C;             // G├ñ├àc G├½├¬ 3.16152677e-26 [J-+m] for Casimir calculations
 const NM_TO_M = 1e-9;
 const CM2_TO_M2 = 1e-4;
 
-// GöÇGöÇ Paper-backed constants (consolidated physics)
+// G├╢├çG├╢├ç Paper-backed constants (consolidated physics)
 /**
  * TheoryRefs:
  *  - ford-roman-qi-1995: derives dutyEffectiveFR ceiling (tau/K)
  */
 const TOTAL_SECTORS    = 400;
-const BURST_DUTY_LOCAL = 0.01;   // 10 -¦s / 1 ms
+const BURST_DUTY_LOCAL = 0.01;   // 10 -┬ªs / 1 ms
 const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
 const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
-const RADIAL_LAYERS    = 10;     // surface +ù radial lattice
+const RADIAL_LAYERS    = 10;     // surface +├╣ radial lattice
 
 // Public clamp constants for display-only symmetry (do not affect ++/mass)
 export const SAMPLE_CLAMP = { maxPush: 0.10, softness: 0.60 } as const;
@@ -678,7 +940,7 @@ const MECH_ELASTIC_MODULUS_PA = parseEnvNumber(process.env.MECH_YOUNG_MODULUS_PA
 const MECH_POISSON = parseEnvNumber(process.env.MECH_POISSON_RATIO, 0.27);
 const MECH_DEFLECTION_COEFF = 0.0138; // clamped square plate under uniform load (Roark)
 const MECH_ROUGHNESS_RMS_NM = parseEnvNumber(process.env.MECH_ROUGHNESS_RMS_NM, 0.2);
-const MECH_ROUGHNESS_SIGMA = parseEnvNumber(process.env.MECH_ROUGHNESS_SIGMA, 5); // 5σ separation guard
+const MECH_ROUGHNESS_SIGMA = parseEnvNumber(process.env.MECH_ROUGHNESS_SIGMA, 5); // 5╧â separation guard
 const MECH_PATCH_V_RMS = parseEnvNumber(process.env.MECH_PATCH_V_RMS, 0.05); // volts (50 mV patch noise)
 const MECH_GAP_SWEEP = { min_nm: 0.5, max_nm: 200, step_nm: 0.5 } as const;
 const MECH_SPAN_SCALE_RAW = parseEnvNumber(process.env.MECH_SPAN_SCALE_RAW, 0.2); // compress effective span to represent ribbed sub-tiles (raw)
@@ -806,7 +1068,7 @@ function guardGammaVdB(params: {
   const pocketThickness_m = wall / Math.max(1, gammaClamped);
   const planckMargin = pocketRadius_m / PLANCK_LENGTH_M;
   const admissible = params.gammaRequested <= limit;
-  const reason = `γ_VdB bounded by pocket floor ${pocketFloor.toExponential(
+  const reason = `╬│_VdB bounded by pocket floor ${pocketFloor.toExponential(
     2,
   )} m (wall=${wall.toExponential(2)} m, minRadius=${minRadius.toExponential(2)} m)`;
   return {
@@ -1634,10 +1896,10 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
   return allRows;
 }
 
-// GöÇGöÇ Metric imports (induced surface metric on hull)
+// G├╢├çG├╢├ç Metric imports (induced surface metric on hull)
 import { firstFundamentalForm } from "../src/metric.js";
 
-// --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +¦_VdB for mass) ---
+// --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +┬ª_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
   hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405 },
@@ -1801,10 +2063,15 @@ function surfaceAreaEllipsoidMetric(
   Lz_m: number,
   nTheta = 256,
   nPhi = 128,
+  sectorCount?: number,
 ): SurfaceAreaEstimate {
   const axes: HullAxes = { a: Lx_m / 2, b: Ly_m / 2, c: Lz_m / 2 };
   const dTheta = (2 * Math.PI) / nTheta;
   const dPhi = Math.PI / Math.max(1, nPhi - 1); // phi in [-pi/2, pi/2]
+  const sectors = Number.isFinite(sectorCount) && (sectorCount as number) > 0
+    ? Math.max(1, Math.floor(sectorCount as number))
+    : 0;
+  const sectorAreas = sectors > 0 ? new Array(sectors).fill(0) : null;
   let areaMetric = 0;
   for (let i = 0; i < nTheta; i++) {
     const theta = i * dTheta;
@@ -1812,6 +2079,11 @@ function surfaceAreaEllipsoidMetric(
       const phi = -Math.PI / 2 + j * dPhi;
       const { dA } = firstFundamentalForm(axes.a, axes.b, axes.c, theta, phi);
       areaMetric += dA * dTheta * dPhi;
+      if (sectorAreas) {
+        const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
+        const idx = Math.min(sectors - 1, Math.floor(u * sectors));
+        sectorAreas[idx] += dA * dTheta * dPhi;
+      }
     }
   }
 
@@ -1835,6 +2107,8 @@ function surfaceAreaEllipsoidMetric(
     value: areaMetric,
     uncertainty,
     band,
+    sectorAreas: sectorAreas ?? undefined,
+    sectors: sectorAreas ? sectors : undefined,
     components: {
       metric: areaMetric,
       monteCarlo: { value: mc.value, stderr: mc.stderr, samples: mc.samples },
@@ -1848,7 +2122,7 @@ function surfaceAreaEllipsoidMetric(
 export function initializePipelineState(): EnergyPipelineState {
   return {
     // Needle Hull full scale defaults for HELIX-CORE (paper-authentic)
-    tileArea_cm2: 25,  // 5+ù5 cm tiles (was 5 cm-¦, now 25 cm-¦)
+    tileArea_cm2: 25,  // 5+├╣5 cm tiles (was 5 cm-┬ª, now 25 cm-┬ª)
     tilePitch_m: Math.sqrt((25 * CM2_TO_M2) / PAPER_GEO.PACKING),
     shipRadius_m: 86.5,
     gap_nm: 1.0,
@@ -1867,8 +2141,12 @@ export function initializePipelineState(): EnergyPipelineState {
       Lz_m: 173,   // height
       wallThickness_m: DEFAULT_WALL_THICKNESS_M  // Matches 15 GHz dwell (~0.02 m); override for paper 1 m stack
     },
+    warpFieldType: 'natario',
+    warpGeometry: null,
+    warpGeometryKind: 'ellipsoid',
+    warpGeometryAssetId: undefined,
 
-    // Natário / warp-bubble defaults (ensures nonzero snapshot solves)
+    // Nat├írio / warp-bubble defaults (ensures nonzero snapshot solves)
     bubble: {
       beta: 0.15,   // translation fraction (0..1)
       sigma: 35,    // wall width (m)
@@ -1899,7 +2177,7 @@ export function initializePipelineState(): EnergyPipelineState {
     gammaGeo: 26,
     qMechanical: 1,               // Set to 1 (was 5e4) - power knob only
     qCavity: PAPER_Q.Q_BURST,             // Use paper-backed Q_BURST 
-    gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB, // Use paper-backed +¦_VdB seed
+    gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB, // Use paper-backed +┬ª_VdB seed
     exoticMassTarget_kg: 1405,    // Reference target (not a lock)
     casimirModel: 'ideal_retarded',
     ampFactors: {
@@ -2026,8 +2304,30 @@ export async function calculateEnergyPipeline(
       ? state.modelMode
       : MODEL_MODE;
 
+  // Thread warp geometry controls from dynamic config into top-level fields for downstream consumers
+  const dynWarpGeom = (state.dynamicConfig as any)?.warpGeometry;
+  if ((state.dynamicConfig as any)?.warpFieldType) {
+    state.warpFieldType = (state.dynamicConfig as any).warpFieldType as WarpFieldType;
+  }
+  if (dynWarpGeom) {
+    state.warpGeometry = {
+      ...(state.warpGeometry ?? {}),
+      ...(dynWarpGeom as WarpGeometrySpec),
+      geometryKind: (dynWarpGeom as WarpGeometrySpec)?.geometryKind ?? (dynWarpGeom as any)?.kind ?? (state.warpGeometry ?? {}).geometryKind,
+    };
+    state.warpGeometryKind =
+      (dynWarpGeom as WarpGeometrySpec)?.geometryKind ?? (dynWarpGeom as any)?.kind ?? state.warpGeometryKind ?? 'ellipsoid';
+    state.warpGeometryAssetId = (dynWarpGeom as WarpGeometrySpec)?.assetId ?? state.warpGeometryAssetId;
+  } else {
+    state.warpGeometryKind = state.warpGeometryKind ?? state.warpGeometry?.geometryKind ?? 'ellipsoid';
+  }
+  if (!state.warpFieldType) {
+    state.warpFieldType = 'natario';
+  }
+
   // --- Surface area & tile count from actual hull dims ---
   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
+  const sectorCountHint = Math.max(1, Math.floor(state.sectorCount || TOTAL_SECTORS));
 
   // If a full rectangular needle + rounded caps is added later, we can refine this.
   // For now, the ellipsoid (a=Lx/2, b=Ly/2, c=Lz/2) is an excellent approximation.
@@ -2037,18 +2337,44 @@ export async function calculateEnergyPipeline(
     Lz_m: state.shipRadius_m * 2,
   };
   // Proper surface area from induced metric (ellipsoid shell)
-  const hullArea = surfaceAreaEllipsoidMetric(hullDims.Lx_m, hullDims.Ly_m, hullDims.Lz_m);
-  const hullArea_m2 = hullArea.value;
-  const hullAreaBand = hullArea.band ?? {
-    min: Math.max(0, hullArea_m2 - Math.abs(hullArea.uncertainty ?? 0)),
-    max: hullArea_m2 + Math.abs(hullArea.uncertainty ?? 0),
-  };
+  const hullArea = surfaceAreaEllipsoidMetric(
+    hullDims.Lx_m,
+    hullDims.Ly_m,
+    hullDims.Lz_m,
+    256,
+    128,
+    sectorCountHint,
+  );
+  const hullAreaEllipsoid_m2 = hullArea.value;
+  const ellipsoidSectorAreas = Array.isArray(hullArea.sectorAreas) ? hullArea.sectorAreas.slice() : null;
+  const overrideArea = Number(state.hullAreaOverride_m2);
+  const hasOverride = Number.isFinite(overrideArea) && overrideArea > 0;
+  const overrideUnc = hasOverride
+    ? Math.max(0, Number(state.hullAreaOverride_uncertainty_m2) || 0)
+    : Math.abs(hullArea.uncertainty ?? 0);
+  const hullArea_m2 = hasOverride ? (overrideArea as number) : hullAreaEllipsoid_m2;
+  const hullAreaBand = hasOverride
+    ? {
+        min: Math.max(0, hullArea_m2 - overrideUnc),
+        max: hullArea_m2 + overrideUnc,
+      }
+    : hullArea.band ?? {
+        min: Math.max(0, hullArea_m2 - Math.abs(hullArea.uncertainty ?? 0)),
+        max: hullArea_m2 + Math.abs(hullArea.uncertainty ?? 0),
+      };
 
-  // Store hull area for Bridge display
+  // Store hull area for Bridge display + provenance
   state.hullArea_m2 = hullArea_m2;
-  state.hullArea = hullArea;
+  state.hullArea = {
+    ...hullArea,
+    value: hullArea_m2,
+    uncertainty: overrideUnc,
+    band: hullAreaBand,
+  };
+  state.__hullAreaEllipsoid_m2 = hullAreaEllipsoid_m2;
+  state.__hullAreaSource = hasOverride ? "override" : "ellipsoid";
 
-  // 1) N_tiles GÇö paper-authentic tile census
+  // 1) N_tiles G├ç├╢ paper-authentic tile census
   const surfaceTiles = Math.floor(hullArea_m2 / tileArea_m2);
   const surfaceTilesMin = Math.floor(hullAreaBand.min / tileArea_m2);
   const surfaceTilesMax = Math.ceil(hullAreaBand.max / tileArea_m2);
@@ -2138,7 +2464,7 @@ export async function calculateEnergyPipeline(
     const casimir = calculateCasimirEnergy({
       geometry: 'parallel_plate',
       gap: state.gap_nm,
-      radius: tileRadius_m * 1e6, // µm
+      radius: tileRadius_m * 1e6, // ┬╡m
       sagDepth: state.sag_nm,
       temperature: state.temperature_K,
       materialModel: state.casimirModel ?? 'ideal_retarded',
@@ -2270,15 +2596,94 @@ export async function calculateEnergyPipeline(
   state.activeSectors     = S_live_int;
   state.activeFraction    = Math.max(0, Math.min(1, S_total > 0 ? S_live / S_total : 0));
 
+  // Normalize per-sector surface areas (override -> ellipsoid -> uniform)
+  const normalizeSectorAreas = (areas: number[] | null | undefined, sectors: number): number[] | null => {
+    if (!Array.isArray(areas) || sectors <= 0) return null;
+    const out = new Array(sectors).fill(0);
+    for (let i = 0; i < sectors; i++) {
+      const v = Number((areas as any)[i]);
+      out[i] = Number.isFinite(v) && v >= 0 ? v : 0;
+    }
+    const sum = out.reduce((a, b) => a + b, 0);
+    return sum > 0 ? out : null;
+  };
+
+  const sectorAreasOverride = normalizeSectorAreas(state.hullAreaPerSector_m2, S_total);
+  const sectorAreasEllipsoid = normalizeSectorAreas(ellipsoidSectorAreas, S_total);
+  let sectorAreas = sectorAreasOverride ?? sectorAreasEllipsoid;
+  let sectorAreaSource: "override" | "ellipsoid" | "uniform" =
+    sectorAreasOverride ? "override" : sectorAreasEllipsoid ? "ellipsoid" : "uniform";
+
+  if (!sectorAreas) {
+    sectorAreas = new Array(S_total).fill(hullArea_m2 / Math.max(1, S_total));
+  }
+  const sectorAreaSum = sectorAreas.reduce((a, b) => a + b, 0);
+  const sectorAreaScale = sectorAreaSum > 0 ? hullArea_m2 / sectorAreaSum : 1;
+  sectorAreas = sectorAreas.map((a) => Math.max(0, a * sectorAreaScale));
+  const sectorAreaSumScaled = sectorAreas.reduce((a, b) => a + b, 0);
+
+  // Budget-preserving tile allocation by surface area
+  const allocateTilesByArea = (areas: number[], totalTiles: number): number[] => {
+    const n = Math.max(1, areas.length);
+    const sum = areas.reduce((a, b) => a + b, 0);
+    const total = Math.max(0, Math.round(totalTiles));
+    const ideal = areas.map((a) => (sum > 0 ? (a / sum) * total : total / n));
+    const base = ideal.map((v) => Math.floor(Math.max(0, v)));
+    let remainder = total - base.reduce((a, b) => a + b, 0);
+    const fracOrder = ideal
+      .map((v, idx) => ({ idx, frac: v - base[idx] }))
+      .sort((a, b) => b.frac - a.frac);
+    const result = base.slice();
+    if (remainder > 0) {
+      for (let k = 0; k < remainder; k++) {
+        const target = fracOrder[k % fracOrder.length]?.idx ?? 0;
+        result[target] += 1;
+      }
+    } else if (remainder < 0) {
+      let need = -remainder;
+      const order = base
+        .map((v, idx) => ({ idx, value: v }))
+        .sort((a, b) => b.value - a.value);
+      for (let i = 0; i < order.length && need > 0; i++) {
+        const idx = order[i].idx;
+        if (result[idx] > 0) {
+          result[idx] -= 1;
+          need -= 1;
+          i -= 1; // allow multiple decrements on same sector if needed
+        }
+      }
+    }
+    return result;
+  };
+
+  const tilesPerSectorVector = allocateTilesByArea(sectorAreas, state.N_tiles);
+  const tilesUniformVector = allocateTilesByArea(new Array(S_total).fill(1), state.N_tiles);
+  const tilesPerSectorMean = tilesPerSectorVector.reduce((a, b) => a + b, 0) / Math.max(1, S_total);
+  const powerDensityScale = tilesPerSectorVector.map((desired, idx) => {
+    const uniform = tilesUniformVector[idx] ?? 0;
+    if (!(uniform > 0)) return desired > 0 ? null : 0;
+    return desired / uniform;
+  });
+
+  state.hullAreaPerSector_m2 = sectorAreas;
+  state.__hullAreaPerSectorSource = sectorAreaSource;
+  state.tilesPerSectorVector = tilesPerSectorVector;
+  state.tilesPerSectorUniform = tilesUniformVector;
+  state.tilePowerDensityScale = powerDensityScale;
+  state.tilesPerSectorStrategy = sectorAreaSource === "uniform" ? "uniform" : "area-weighted";
+  if (state.hullArea) {
+    state.hullArea = { ...state.hullArea, sectorAreas, sectors: S_total };
+  }
+
   // HINT for clients: fraction of the bubble "visible" from a single concurrent pane.
   // The REAL pane can multiply this with its band/slice coverage to scale extrema and mass proxy.
   (state as any).viewMassFractionHint = state.activeFraction;
-  state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
+  state.tilesPerSector  = Math.max(0, Math.round(tilesPerSectorMean));
   const activeTilesBand = {
-    min: Math.max(0, Math.floor((tilesBand.min ?? state.N_tiles) / Math.max(1, S_total)) * S_live_int),
-    max: Math.max(0, Math.ceil((tilesBand.max ?? state.N_tiles) / Math.max(1, S_total)) * S_live_int),
+    min: Math.max(0, Math.floor((tilesBand.min ?? state.N_tiles) * (S_live_int / Math.max(1, S_total)))),
+    max: Math.max(0, Math.ceil((tilesBand.max ?? state.N_tiles) * (S_live_int / Math.max(1, S_total)))),
   };
-  state.activeTiles     = state.tilesPerSector * S_live_int;
+  state.activeTiles     = Math.max(0, Math.round(tilesPerSectorMean * S_live_int));
   (state as any).tiles = {
     total: state.N_tiles,
     active: state.activeTiles,
@@ -2287,14 +2692,20 @@ export async function calculateEnergyPipeline(
     tileArea_cm2: state.tileArea_cm2,
     hullArea_m2: state.hullArea_m2,
     hullAreaBand_m2: hullAreaBand,
+    areaPerSector_m2: sectorAreas,
+    areaPerSectorSource: sectorAreaSource,
+    areaPerSectorSum_m2: sectorAreaSumScaled,
+    tilesPerSectorVector,
+    tilesPerSectorUniform: tilesUniformVector,
+    tilePowerDensityScale: powerDensityScale,
   };
 
-  // Safety alias for consumers that assume GëÑ1 sectors for math
+  // Safety alias for consumers that assume G├½├æ1 sectors for math
   (state as any).concurrentSectorsSafe = Math.max(1, state.concurrentSectors);
 
-  // =öº expose both duties explicitly and consistently
+  // =┬â├╢┬║ expose both duties explicitly and consistently
   state.dutyBurst        = dutyLocal;  // keep as *local* ON-window; prefer measured/local override
-  state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for +¦ & audits)
+  state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for +┬ª & audits)
   (state as any).dutyEffectiveFR = d_eff; // legacy/camel alias
   (state as any).dutyMeasuredFR = measuredDutyEffective;
   (state as any).dutyEffectiveFRMeasured = measuredDutyEffective;
@@ -2305,7 +2716,7 @@ export async function calculateEnergyPipeline(
   state.dutyMeasuredFR = measuredDutyEffective ?? undefined;
   // (dutyCycle already set from MODE_CONFIGS above)
 
-  // G£à First-class fields for UI display
+  // G┬ú├á First-class fields for UI display
   state.dutyShip = d_eff;          // Ship-wide effective duty (promoted from any)
   (state as any).dutyEff = d_eff;  // Legacy alias
 
@@ -2430,7 +2841,7 @@ export async function calculateEnergyPipeline(
   (state as any).P_elec_MW = state.P_avg;  // Electrical power (same as P_avg, but clearly labeled)
   // --- Cryo power AFTER calibration and AFTER mode qSpoilingFactor is applied ---
   const Q_on  = Q;
-  // qSpoilingFactor is idle Q multiplier: >1 GçÆ less idle loss (higher Q_off)
+  // qSpoilingFactor is idle Q multiplier: >1 G├º├å less idle loss (higher Q_off)
   const Q_off = Math.max(1, Q_on * state.qSpoilingFactor); // use mode-specific qSpoilingFactor
   const P_tile_on   = Math.abs(state.U_Q) * omega / Q_on;
   const P_tile_idle = Math.abs(state.U_Q) * omega / Q_off;
@@ -2524,8 +2935,8 @@ export async function calculateEnergyPipeline(
   };
   (state as any).gammaVanDenBroeck_guard = state.gammaVanDenBroeckGuard;
   // Split gamma_VdB into visual vs mass knobs to keep calibrator away from renderer
-  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // GåÉ calibrated value used to hit M_target
-  (state as any).gammaVanDenBroeck_vis  = PAPER_VDB.GAMMA_VDB;                 // GåÉ fixed "physics/visual" seed for renderer
+  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // G├Ñ├ë calibrated value used to hit M_target
+  (state as any).gammaVanDenBroeck_vis  = PAPER_VDB.GAMMA_VDB;                 // G├Ñ├ë fixed "physics/visual" seed for renderer
 
   // Make visual factor mode-invariant (except standby)
   if (state.currentMode !== 'standby') {
@@ -2536,8 +2947,8 @@ export async function calculateEnergyPipeline(
 
   // Precomputed physics-only ++ gain for client verification
   // Canonical ship-wide ++ (authoritative):
-  //   ++ = +¦_geo^3 -+ q -+ +¦_VdB -+ duty_FR
-  // Use the calibrated/mass +¦_VdB when available; fall back to visual seed if not.
+  //   ++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ duty_FR
+  // Use the calibrated/mass +┬ª_VdB when available; fall back to visual seed if not.
   const _gammaVdB_forTheta = Number.isFinite(state.gammaVanDenBroeck)
     ? state.gammaVanDenBroeck
     : ((state as any).gammaVanDenBroeck_vis ?? PAPER_VDB.GAMMA_VDB);
@@ -2580,7 +2991,7 @@ export async function calculateEnergyPipeline(
   (state as any).uniformsExplain ??= {};
   (state as any).uniformsExplain.thetaAudit = {
     mode: modelMode,
-    eq: "++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff",
+    eq: "++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff",
     inputs: {
       gammaGeo: state.gammaGeo,
       q: state.qSpoilingFactor,
@@ -2591,9 +3002,9 @@ export async function calculateEnergyPipeline(
     results: { thetaRaw, thetaCal }
   };
 
-  console.log('=öì ++-Scale Field Strength Audit (Raw vs Calibrated):', {
+  console.log('=┬â├╢├¼ ++-Scale Field Strength Audit (Raw vs Calibrated):', {
     mode: modelMode,
-    formula: '++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff',
+    formula: '++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff',
     components: thetaComponents,
     results: {
       thetaRaw: thetaRaw,
@@ -2610,9 +3021,9 @@ export async function calculateEnergyPipeline(
   // Overall clamping status for UI warnings
   (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
 
-  /* GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+  /* G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
      "Explain-it" counters for HUD/debug
-  GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ */
+  G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç */
   (state as any).E_tile_static_J = Math.abs(state.U_static);  // Static Casimir energy per tile
   (state as any).E_tile_geo_J = Math.abs(state.U_geo);        // Geometric amplified energy per tile  
   (state as any).E_tile_on_J = Math.abs(state.U_Q);           // Stored energy per tile in on-window
@@ -2631,9 +3042,9 @@ export async function calculateEnergyPipeline(
     massCal: state.massCalibration
   });
 
-  /* GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+  /* G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
      Additional metrics (derived)
-  GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ */
+  G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç */
 
   // --- Time-scale separation (TS) using actual hull size ---
   const { Lx_m, Ly_m, Lz_m } = state.hull!;
@@ -2706,7 +3117,7 @@ export async function calculateEnergyPipeline(
 
   // Overall status (mode-aware power thresholds)
   // Mode configuration already applied early in function - no need to duplicate
-  state.sectorStrobing  = state.concurrentSectors;         // G£à Legacy alias for UI compatibility
+  state.sectorStrobing  = state.concurrentSectors;         // G┬ú├á Legacy alias for UI compatibility
   // Phase scheduler (PR-3): compute per-sector phase offsets and assign roles.
   const totalSectors = Math.max(
     1,
@@ -3238,7 +3649,7 @@ export async function calculateEnergyPipeline(
       }
     } as any, state.U_static * state.N_tiles);
 
-  // Store Nat+írio metrics in state for API access
+  // Store Nat+├¡rio metrics in state for API access
   (state as any).natario = natario;
 
   // Calculate dynamic Casimir with pipeline integration + performance guardrails
@@ -3365,7 +3776,7 @@ export async function calculateEnergyPipeline(
     if (DEBUG_PIPE) console.warn('Stress-energy calculation failed:', e);
   }
 
-  // Calculate Nat+írio warp bubble results (now pipeline-true)
+  // Calculate Nat+├¡rio warp bubble results (now pipeline-true)
   try {
     const hullGeomWarp = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
     const a_warp = hullGeomWarp.Lx_m / 2;
@@ -3382,6 +3793,14 @@ export async function calculateEnergyPipeline(
     };
     state.ampFactors = ampFactors;
     (state as any).amps = ampFactors; // back-compat alias
+    const warpFieldType = (state.dynamicConfig as any)?.warpFieldType ?? state.warpFieldType ?? 'natario';
+    const warpGeometry = (state.dynamicConfig as any)?.warpGeometry ?? state.warpGeometry ?? null;
+    const warpGeometryKind =
+      (warpGeometry as WarpGeometrySpec)?.geometryKind ??
+      (warpGeometry as any)?.kind ??
+      (state.dynamicConfig as any)?.warpGeometryKind ??
+      state.warpGeometryKind ??
+      'ellipsoid';
 
     const warpParams = {
       geometry: 'bowl' as const,
@@ -3406,8 +3825,13 @@ export async function calculateEnergyPipeline(
         lightCrossingTimeNs: tauLC_s * 1e9,
         shiftAmplitude: 50e-12,
         expansionTolerance: 1e-12,
-        warpFieldType: 'natario' as const
+        warpFieldType,
+        warpGeometry: warpGeometry ?? undefined,
+        warpGeometryKind
       },
+      warpGeometry: warpGeometry ?? undefined,
+      warpGeometryKind,
+      warpGeometryAssetId: (warpGeometry as WarpGeometrySpec)?.assetId ?? state.warpGeometryAssetId,
       // Amplification factors: prefer ampFactors, keep legacy amps alias
       ampFactors,
       amps: ampFactors
@@ -3476,6 +3900,12 @@ export async function calculateEnergyPipeline(
     };
   } catch {
     // non-fatal
+  }
+
+  try {
+    state.cardRecipe = buildCardRecipeFromPipeline(state);
+  } catch (err) {
+    if (DEBUG_PIPE) console.warn("[pipeline] card recipe build failed:", err);
   }
 
   return state;
@@ -4652,6 +5082,10 @@ export async function computeEnergySnapshot(sim: any) {
     dutyCycle: sim.dynamicConfig?.dutyCycle ?? 0.14,
     sectorCount: sim.dynamicConfig?.sectorCount ?? 400,
     exoticMassTarget_kg: sim.exoticMassTarget_kg ?? 1405,
+    warpFieldType: sim.dynamicConfig?.warpFieldType ?? (sim as any)?.warpFieldType ?? 'natario',
+    warpGeometry: (sim as any)?.warpGeometry ?? sim.dynamicConfig?.warpGeometry ?? null,
+    warpGeometryKind: (sim as any)?.warpGeometryKind ?? (sim as any)?.warpGeometry?.kind,
+    warpGeometryAssetId: (sim as any)?.warpGeometryAssetId ?? (sim as any)?.warpGeometry?.assetId,
     dynamicConfig: sim.dynamicConfig ?? null,
     iPeakMaxMidi_A: resolvePulseCap(sim.iPeakMaxMidi_A, DEFAULT_PULSED_CURRENT_LIMITS_A.midi),
     iPeakMaxSector_A: resolvePulseCap(sim.iPeakMaxSector_A, DEFAULT_PULSED_CURRENT_LIMITS_A.sector),
@@ -4671,7 +5105,7 @@ export async function computeEnergySnapshot(sim: any) {
   // Run the unified pipeline calculation
   const result = await calculateEnergyPipeline(state);
 
-  // ---- Normalize LightGÇôCrossing payload for the client API -------------------
+  // ---- Normalize LightG├ç├┤Crossing payload for the client API -------------------
   const lcSrc = (result.lc ?? result.lightCrossing ?? {}) as any;
   const lc = {
     tauLC_ms:   finite(lcSrc.tauLC_ms ?? lcSrc.tau_ms ?? (lcSrc.tau_us!=null ? lcSrc.tau_us/1000 : undefined)),
@@ -4694,7 +5128,7 @@ export async function computeEnergySnapshot(sim: any) {
     dutyFR_ship:     finite(result.dutyFR_ship),
   };
 
-  // ---- Nat+írio tensors (kept under natario.*; adapter also accepts top-level)
+  // ---- Nat+├¡rio tensors (kept under natario.*; adapter also accepts top-level)
   const natario = {
     metricMode:  !!(result.natario?.metricMode),
     lapseN:      finite(result.natario?.lapseN),
@@ -4703,11 +5137,11 @@ export async function computeEnergySnapshot(sim: any) {
     gSpatialSym: arrN(result.natario?.gSpatialSym, 6),
     viewForward: arrN(result.natario?.viewForward, 3),
     g0i:         arrN(result.natario?.g0i, 3),
-  // pass-through diagnostics from Nat+írio (unit-annotated upstream)
+  // pass-through diagnostics from Nat+├¡rio (unit-annotated upstream)
   dutyFactor:      finite(result.natario?.dutyFactor),       // unitless (++s/++s)
-  // NOTE: natario.thetaScaleCore_sqrtDuty is the explicit Nat+írio sqrt-duty
-  // diagnostic (GêÜduty semantics). Prefer `_sqrtDuty` when inspecting Nat+írio
-  // outputs; it intentionally excludes +¦_VdB and is NOT the canonical ship-wide
+  // NOTE: natario.thetaScaleCore_sqrtDuty is the explicit Nat+├¡rio sqrt-duty
+  // diagnostic (G├¬├£duty semantics). Prefer `_sqrtDuty` when inspecting Nat+├¡rio
+  // outputs; it intentionally excludes +┬ª_VdB and is NOT the canonical ship-wide
   // theta used by engines (engines should use `thetaScale` / `thetaScaleExpected`).
   // Keep the legacy `thetaScaleCore` key for back-compat but mark it deprecated
   // here by mapping it from the `_sqrtDuty` alias when present.
@@ -4743,7 +5177,7 @@ export async function computeEnergySnapshot(sim: any) {
   };
 
   const warpUniforms = {
-    // physics (visual) GÇö mass stays split and separate
+    // physics (visual) G├ç├╢ mass stays split and separate
     gammaGeo: result.gammaGeo,
     qSpoilingFactor: result.qSpoilingFactor,
     gammaVanDenBroeck: (result as any).gammaVanDenBroeck_vis,   // visual gamma
@@ -4751,7 +5185,7 @@ export async function computeEnergySnapshot(sim: any) {
     gammaVanDenBroeck_mass: (result as any).gammaVanDenBroeck_mass,
       chi_coupling: result.couplingChi,
 
-    // FordGÇôRoman duty (ship-wide, sector-averaged)
+    // FordG├ç├┤Roman duty (ship-wide, sector-averaged)
     dutyEffectiveFR,
 
     // UI label fields (harmless to include)
@@ -4760,7 +5194,7 @@ export async function computeEnergySnapshot(sim: any) {
     sectors: result.concurrentSectors,   // concurrent/live
     currentMode: result.currentMode,
 
-    // viewer defaults GÇö visual policy only; parity/ridge set client-side
+    // viewer defaults G├ç├╢ visual policy only; parity/ridge set client-side
     viewAvg: true,
     colorMode: 'theta',
 
@@ -4775,14 +5209,14 @@ export async function computeEnergySnapshot(sim: any) {
 
   // PATCH START: uniformsExplain debug metadata for /bridge
   const uniformsExplain = {
-    // Human-readable GÇ£where did this come from?GÇ¥ pointers
+    // Human-readable G├ç┬úwhere did this come from?G├ç┬Ñ pointers
     sources: {
       gammaGeo:               "server.result.gammaGeo (pipeline state)",
       qSpoilingFactor:        "server.result.qSpoilingFactor (mode policy / pipeline)",
       qCavity:                "server.result.qCavity (dynamic cavity Q)",
-      gammaVanDenBroeck_vis:  "server.(gammaVanDenBroeck_vis) GÇö fixed visual seed unless standby",
-      gammaVanDenBroeck_mass: "server.(gammaVanDenBroeck_mass) GÇö calibrated to hit M_target",
-      dutyEffectiveFR:        "server.derived (burstLocal +ù S_live / S_total; FordGÇôRoman window)",
+      gammaVanDenBroeck_vis:  "server.(gammaVanDenBroeck_vis) G├ç├╢ fixed visual seed unless standby",
+      gammaVanDenBroeck_mass: "server.(gammaVanDenBroeck_mass) G├ç├╢ calibrated to hit M_target",
+      dutyEffectiveFR:        "server.derived (burstLocal +├╣ S_live / S_total; FordG├ç├┤Roman window)",
       dutyCycle:              "server.result.dutyCycle (UI duty from MODE_CONFIGS)",
       sectorCount:            "server.result.sectorCount (TOTAL sectors; usually 400)",
       sectors:                "server.result.concurrentSectors (live concurrent sectors)",
@@ -4792,7 +5226,7 @@ export async function computeEnergySnapshot(sim: any) {
       viewAvg:                "policy: true (clients render FR-averaged ++ by default)",
     },
 
-    // FordGÇôRoman duty derivation (numbers)
+    // FordG├ç├┤Roman duty derivation (numbers)
     fordRomanDuty: {
       formula: "d_eff = measuredDuty || (dutyBurst * S_live / S_total)",
       burstLocal: result.dutyBurst ?? PAPER_DUTY.BURST_DUTY_LOCAL,
@@ -4806,8 +5240,8 @@ export async function computeEnergySnapshot(sim: any) {
 
     // ++ audit + the inputs used to compute it (for transparency)
     thetaAudit: {
-      note: "++ audit GÇö raw vs calibrated VdB",
-      equation: "++ = +¦_geo^3 -+ q -+ +¦_VdB -+ d_eff", 
+      note: "++ audit G├ç├╢ raw vs calibrated VdB",
+      equation: "++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff", 
       mode: (result as any).modelMode ?? MODEL_MODE, // "raw" | "calibrated"
       inputs: {
         gammaGeo: result.gammaGeo,
@@ -4855,12 +5289,12 @@ export async function computeEnergySnapshot(sim: any) {
     // Base equations (render these + a line below with the live values)
     equations: {
       d_eff: "d_eff = burstLocal -+ S_live / S_total",
-      theta_expected: "++_expected = +¦_geo^3 -+ q -+ +¦_VdB(vis) -+ GêÜd_eff",
+      theta_expected: "++_expected = +┬ª_geo^3 -+ q -+ +┬ª_VdB(vis) -+ G├¬├£d_eff",
       U_static: "U_static = chi_coupling * [-pi^2 * hbar * c/(720 * a^3)] * A_tile",
-      U_geo: "U_geo = +¦_geo^3 -+ U_static",
+      U_geo: "U_geo = +┬ª_geo^3 -+ U_static",
       U_Q: "U_Q = q_mech -+ U_geo",
-      P_avg: "P_avg = |U_Q| -+ -ë / Q -+ N_tiles -+ d_eff",
-      M_exotic: "M = [U_static -+ +¦_geo^3 -+ Q_burst -+ +¦_VdB -+ d_eff] -+ N_tiles / c-¦",
+      P_avg: "P_avg = |U_Q| -+ -├½ / Q -+ N_tiles -+ d_eff",
+      M_exotic: "M = [U_static -+ +┬ª_geo^3 -+ Q_burst -+ +┬ª_VdB -+ d_eff] -+ N_tiles / c-┬ª",
       TS_long: "TS_long = (L_long / c) / (1/f_m)",
     },
   };
@@ -4893,7 +5327,7 @@ export async function computeEnergySnapshot(sim: any) {
   dutyCycle: result.dutyCycle,
   sectorStrobing: result.sectorStrobing,
 
-    // Nat+írio / stress-energy surface (time-averaged)
+    // Nat+├¡rio / stress-energy surface (time-averaged)
     T00_avg: (result as any).warp?.stressEnergyTensor?.T00 ?? (result as any).stressEnergy?.T00,
     T11_avg: (result as any).warp?.stressEnergyTensor?.T11 ?? (result as any).stressEnergy?.T11,
     T22_avg: (result as any).warp?.stressEnergyTensor?.T22 ?? (result as any).stressEnergy?.T22,
@@ -4933,11 +5367,11 @@ export async function computeEnergySnapshot(sim: any) {
 }
 
 /**
- * Sample the Nat+írio bell displacement on an ellipsoidal shell using the same math as the renderer.
+ * Sample the Nat+├¡rio bell displacement on an ellipsoidal shell using the same math as the renderer.
  * Returns ~ nTheta*nPhi points, suitable for JSON compare or CSV export.
  */
 /**
- * Sample the Nat+írio bell displacement on an ellipsoidal shell using the same math as the renderer.
+ * Sample the Nat+├¡rio bell displacement on an ellipsoidal shell using the same math as the renderer.
  * Returns typed buffers suitable for JSON compare or CSV export without allocating per-sample objects.
  */
 export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSampleBuffer {
@@ -4949,20 +5383,20 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const axes: HullAxes = { a, b, c };
 
   const nTheta = Math.max(1, req.nTheta ?? 64);
-  const nPhi   = Math.max(2, req.nPhi ?? 32); // need GëÑ2 to avoid (nPhi-1)=0
+  const nPhi   = Math.max(2, req.nPhi ?? 32); // need G├½├æ2 to avoid (nPhi-1)=0
   const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
   const split   = Number.isFinite(req.split as number) ? Math.max(0, Math.floor(req.split!)) : Math.floor(sectors / 2);
 
   const totalSamples = nTheta * nPhi;
   ensureFieldSampleCapacity(totalSamples);
 
-  // Canonical bell width in *ellipsoidal* radius units: w-ü = w_m / a_eff.
-  // Use harmonic-mean effective radius to match viewer/renderer -ü-units.
-  const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);  // G£à harmonic mean (matches viewer)
+  // Canonical bell width in *ellipsoidal* radius units: w-├╝ = w_m / a_eff.
+  // Use harmonic-mean effective radius to match viewer/renderer -├╝-units.
+  const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);  // G┬ú├á harmonic mean (matches viewer)
   const w_m = req.wallWidth_m ?? Math.max(1e-6, (state.sag_nm ?? 16) * 1e-9); // meters
   const w_rho = Math.max(1e-6, w_m / aEff);
 
-  // Match renderer's gain chain (display-focused): disp ~ +¦_geo^3 * q_spoil * bell * sgn
+  // Match renderer's gain chain (display-focused): disp ~ +┬ª_geo^3 * q_spoil * bell * sgn
   const gammaGeo   = state.gammaGeo ?? 26;
   const qSpoil     = state.qSpoilingFactor ?? 1;
   const geoAmp     = Math.pow(gammaGeo, 3);               // *** cubic, same as pipeline ***
@@ -4971,17 +5405,17 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   let idx = 0;
 
   for (let i = 0; i < nTheta; i++) {
-    const theta = (i / nTheta) * 2 * Math.PI;      // [--Ç, -Ç] ring index
+    const theta = (i / nTheta) * 2 * Math.PI;      // [--├ç, -├ç] ring index
     // --- Smooth sector strobing (matches renderer exactly) ---
     const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
     const sectorIdx = Math.floor(u * sectors);
     const distToSplit = (sectorIdx - split + 0.5);
     const strobeWidth = 0.75;                 // same as renderer
-    const softSign = (x: number) => Math.tanh(x); // smooth -¦1 transition
+    const softSign = (x: number) => Math.tanh(x); // smooth -┬ª1 transition
     const sgn = softSign(-distToSplit / strobeWidth); // smooth sector sign
 
     for (let j = 0; j < nPhi; j++) {
-      const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [--Ç/2, -Ç/2]
+      const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [--├ç/2, -├ç/2]
       const onShell: [number, number, number] = [
         axes.a * Math.cos(phi) * Math.cos(theta),
         axes.b * Math.sin(phi),
@@ -5006,7 +5440,7 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
       else if (asd >= b_band) wallWin = 0.0;
       else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - a_band) / (b_band - a_band))); // smooth to 0
 
-      const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Nat+írio canonical bell
+      const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Nat+├¡rio canonical bell
 
       // --- Soft front/back polarity (if needed) ---
       const front = 1.0; // placeholder - can add soft polarity later if needed
@@ -5049,4 +5483,165 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
     disp: sampleDisp.subarray(0, idx),
     dA: sampleDA.subarray(0, idx),
   };
+}
+
+// Truth sampler that can operate on ellipsoid (legacy), radial profile, or explicit surface samples (SDF/meshes)
+export function sampleDisplacementFieldGeometry(state: EnergyPipelineState, req: FieldGeometryRequest = {}): FieldSampleBuffer {
+  const geometryKind = req.geometryKind ?? "ellipsoid";
+  if (geometryKind === "ellipsoid" || (geometryKind !== "radial" && geometryKind !== "sdf")) {
+    return sampleDisplacementField(state, req);
+  }
+
+  const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
+  const a = hullGeom.Lx_m / 2;
+  const b = hullGeom.Ly_m / 2;
+  const c = hullGeom.Lz_m / 2;
+  const axes: HullAxes = { a, b, c };
+
+  const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
+  const split = Number.isFinite(req.split as number) ? Math.max(0, Math.floor(req.split!)) : Math.floor(sectors / 2);
+
+  const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);
+  const w_m = req.wallWidth_m ?? Math.max(1e-6, (state.sag_nm ?? 16) * 1e-9);
+  const w_rho = Math.max(1e-6, w_m / aEff);
+  const gammaGeo   = state.gammaGeo ?? 26;
+  const qSpoil     = state.qSpoilingFactor ?? 1;
+  const geoAmp     = Math.pow(gammaGeo, 3);
+  const vizGain    = 1.0;
+  const shellOffset = req.shellOffset ?? 0;
+
+  const radialReq = req.radial ?? {};
+  const nTheta = Math.max(1, radialReq.nTheta ?? req.nTheta ?? 64);
+  const nPhi   = Math.max(2, radialReq.nPhi ?? req.nPhi ?? 32);
+
+  const sdfSamples = Array.isArray(req.sdf?.samples) ? req.sdf!.samples : [];
+  const radialSamples = Array.isArray(radialReq.samples) ? radialReq.samples : null;
+  const totalSamples = geometryKind === "sdf"
+    ? sdfSamples.length
+    : (radialSamples?.length ?? (nTheta * nPhi));
+
+  ensureFieldSampleCapacity(Math.max(totalSamples, 0));
+  let idx = 0;
+
+  const emitSample = (pOn: [number, number, number], nInput: [number, number, number], dAInput?: number, signedDistance_m?: number) => {
+    const n = normalizeVec(nInput);
+    const p: [number, number, number] = [
+      pOn[0] + shellOffset * n[0],
+      pOn[1] + shellOffset * n[1],
+      pOn[2] + shellOffset * n[2],
+    ];
+    const radius = vecLen(p);
+    const rho = radius / Math.max(aEff, 1e-9);
+    const sd_rho = (rho - 1) + ((signedDistance_m ?? 0) / Math.max(aEff, 1e-9));
+
+    const asd = Math.abs(sd_rho);
+    const a_band = 2.5 * w_rho, b_band = 3.5 * w_rho;
+    let wallWin: number;
+    if (asd <= a_band) wallWin = 1.0;
+    else if (asd >= b_band) wallWin = 0.0;
+    else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - a_band) / (b_band - a_band)));
+
+    const bell = Math.exp(- (sd_rho / w_rho) * (sd_rho / w_rho));
+
+    const theta = Math.atan2(p[2], p[0]);
+    const sgn = sectorSign(theta, sectors, split);
+    let disp = vizGain * geoAmp * qSpoil * wallWin * bell * sgn;
+
+    const maxPush = 0.10;
+    const softness = 0.6;
+    disp = maxPush * Math.tanh(disp / (softness * maxPush));
+
+    const phi = Math.atan2(p[1], Math.hypot(p[0], p[2]));
+    const dThetaApprox = (2 * Math.PI) / Math.max(1, sectors);
+    const dPhiApprox = Math.PI / Math.max(1, nPhi - 1);
+    const dA = Number.isFinite(dAInput as number) && (dAInput as number) > 0
+      ? (dAInput as number)
+      : Math.max(1e-12, radius * radius * Math.max(1e-3, Math.cos(phi)) * dThetaApprox * dPhiApprox);
+
+    sampleX[idx] = p[0];
+    sampleY[idx] = p[1];
+    sampleZ[idx] = p[2];
+    sampleNX[idx] = n[0];
+    sampleNY[idx] = n[1];
+    sampleNZ[idx] = n[2];
+    sampleRho[idx] = rho;
+    sampleBell[idx] = bell;
+    sampleSgn[idx] = sgn;
+    sampleDisp[idx] = disp;
+    sampleDA[idx] = dA;
+    idx += 1;
+  };
+
+  if (geometryKind === "sdf" && sdfSamples.length) {
+    for (const s of sdfSamples) {
+      const n = s.n ? normalizeVec(s.n) : normalizeVec(s.p);
+      emitSample(s.p, n, s.dA, s.signedDistance_m);
+    }
+  } else if (geometryKind === "radial") {
+    if (radialSamples && radialSamples.length) {
+      for (const s of radialSamples) {
+        const theta = Number.isFinite(s.theta) ? (s.theta as number) : 0;
+        const phi = Number.isFinite(s.phi) ? (s.phi as number) : 0;
+        const dir: [number, number, number] = [
+          Math.cos(phi) * Math.cos(theta),
+          Math.sin(phi),
+          Math.cos(phi) * Math.sin(theta),
+        ];
+        const r = Number.isFinite(s.r) ? Math.max(1e-9, s.r) : Math.max(1e-9, aEff);
+        const pOn: [number, number, number] = [dir[0] * r, dir[1] * r, dir[2] * r];
+        emitSample(pOn, s.n ?? dir, s.dA);
+      }
+    } else {
+      const dTheta = (2 * Math.PI) / Math.max(1, nTheta);
+      const dPhi = Math.PI / Math.max(1, nPhi - 1);
+      for (let i = 0; i < nTheta; i++) {
+        const theta = (i / nTheta) * 2 * Math.PI;
+        for (let j = 0; j < nPhi; j++) {
+          const phi = -Math.PI / 2 + (j / Math.max(1, nPhi - 1)) * Math.PI;
+          const dir: [number, number, number] = [
+            Math.cos(phi) * Math.cos(theta),
+            Math.sin(phi),
+            Math.cos(phi) * Math.sin(theta),
+          ];
+          const evalRadius = radialReq.radiusAt ? radialReq.radiusAt(dir) : undefined;
+          let r = typeof evalRadius === "number" ? evalRadius : (evalRadius as any)?.r;
+          const nFromEval = (evalRadius as any)?.n;
+          const dAOverride = (evalRadius as any)?.dA;
+          if (!Number.isFinite(r)) r = aEff;
+          const pOn: [number, number, number] = [dir[0] * r, dir[1] * r, dir[2] * r];
+          const areaApprox = Math.max(1e-12, r * r * Math.max(1e-3, Math.cos(phi)) * dTheta * dPhi);
+          emitSample(pOn, nFromEval ?? dir, Number.isFinite(dAOverride as number) ? (dAOverride as number) : areaApprox);
+        }
+      }
+    }
+  }
+
+  return {
+    length: idx,
+    x: sampleX.subarray(0, idx),
+    y: sampleY.subarray(0, idx),
+    z: sampleZ.subarray(0, idx),
+    nx: sampleNX.subarray(0, idx),
+    ny: sampleNY.subarray(0, idx),
+    nz: sampleNZ.subarray(0, idx),
+    rho: sampleRho.subarray(0, idx),
+    bell: sampleBell.subarray(0, idx),
+    sgn: sampleSgn.subarray(0, idx),
+    disp: sampleDisp.subarray(0, idx),
+    dA: sampleDA.subarray(0, idx),
+  };
+}
+
+export function fieldSamplesToCsv(buffer: FieldSampleBuffer): string {
+  const header = ["x","y","z","nx","ny","nz","rho","bell","sgn","disp","dA"].join(",");
+  const rows: string[] = new Array(buffer.length);
+  for (let i = 0; i < buffer.length; i++) {
+    rows[i] = [
+      buffer.x[i], buffer.y[i], buffer.z[i],
+      buffer.nx[i], buffer.ny[i], buffer.nz[i],
+      buffer.rho[i], buffer.bell[i], buffer.sgn[i],
+      buffer.disp[i], buffer.dA[i],
+    ].join(",");
+  }
+  return [header, ...rows].join("\n");
 }

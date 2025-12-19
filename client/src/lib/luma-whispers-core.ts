@@ -1,4 +1,5 @@
 import { publish } from "./luma-bus";
+import { resolvePanelIdeologyWhisper } from "./luma-ideology-whispers";
 
 const SPEAK_COOLDOWN_MS = 2_500;
 
@@ -67,6 +68,23 @@ export function whisperSystem(context: keyof typeof SYSTEM_WHISPERS) {
 
 export function whisperCustom(text: string) {
   publish("luma:whisper", { text });
+}
+
+export function whisperPanelOpen(panelId: string, title?: string) {
+  const label = (title ?? panelId ?? "").toString().trim() || "Panel";
+  const resolved = resolvePanelIdeologyWhisper(panelId, title);
+  if (resolved) {
+    publish("luma:whisper", {
+      text: resolved.text,
+      tags: resolved.tags,
+      mood: resolved.mood ?? undefined,
+    });
+    return;
+  }
+  publish("luma:whisper", {
+    text: `Opening ${label}.`,
+    tags: ["panel", panelId].filter(Boolean) as string[],
+  });
 }
 
 export function publishWhisper(topic: string, payload: unknown) {

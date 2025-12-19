@@ -21,8 +21,12 @@ import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
 import { helixQiRouter } from "./routes/helix/qi";
 import { warpViabilityRouter } from "./routes/warp-viability";
+import { curvatureRouter } from "./routes/physics.curvature";
+import { collapseBenchmarksRouter } from "./routes/benchmarks.collapse";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { vectorizerRouter } from "./routes/vectorizer";
+import { removeBgEdgesRouter } from "./routes/remove-bg-edges";
+import { hullPreviewRouter } from "./routes/hull-preview";
 import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
 import { qiControllerRouter, startQiController } from "./modules/qi/qi-controller.js";
 import { codeLatticeRouter } from "./routes/code-lattice";
@@ -52,8 +56,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(trainStatusRouter);
   app.use("/api/stellar", stellarRouter);
   app.use("/api/ethos", ethosRouter);
+  app.use("/api/benchmarks/collapse", collapseBenchmarksRouter);
   app.use("/api/physics/warp", warpViabilityRouter);
+  app.use("/api/physics/curvature", curvatureRouter);
   app.use("/api/vectorizer", vectorizerRouter);
+  app.use("/api/tools/remove-bg-edges", removeBgEdgesRouter);
 
 
   app.use("/api/orchestrator", orchestratorRouter);
@@ -906,6 +913,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     getSystemMetrics,
     getPipelineState,
     getDisplacementField,
+    getDisplacementFieldGeometry,
+    probeFieldOnHull,
     updatePipelineParams,
     ingestHardwareSweepPoint,
     ingestHardwareSectorState,
@@ -947,6 +956,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Backwards-compatible alias: some clients (HelixCasimirAmplifier) request /api/helix/state
   app.get("/api/helix/state", getPipelineState);
   app.get("/api/helix/field", getDisplacementField);
+  app.options("/api/helix/field-geometry", getDisplacementFieldGeometry);
+  app.post("/api/helix/field-geometry", getDisplacementFieldGeometry);
+  app.options("/api/helix/field-probe", probeFieldOnHull);
+  app.post("/api/helix/field-probe", probeFieldOnHull);
   app.options("/api/helix/hardware/sweep-point", ingestHardwareSweepPoint);
   app.post("/api/helix/hardware/sweep-point", ingestHardwareSweepPoint);
   app.options("/api/helix/hardware/sector-state", ingestHardwareSectorState);
@@ -954,6 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.options("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
   app.post("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
   app.use("/api/helix/qi", helixQiRouter);
+  app.use("/api/helix/hull-preview", hullPreviewRouter);
 
   app.get("/api/qisnap/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
