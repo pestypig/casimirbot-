@@ -246,7 +246,7 @@ const handleHealthCheck = (req: HealthCheckRequest, res: ServerResponse): boolea
     return true;
   }
 
-  if (path === "/" && isHealthCheckRequest(req)) {
+  if (path === "/" && (!appReady || isHealthCheckRequest(req))) {
     if (method === "HEAD") {
       res.statusCode = 200;
       res.end();
@@ -379,6 +379,7 @@ app.use((req, res, next) => {
   const isWin = process.platform === "win32";
   const listenOpts: any = { port, host: "0.0.0.0" };
   if (!isWin) listenOpts.reusePort = true;
+  log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"}`);
 
   const server = createServer((req, res) => {
     if (handleHealthCheck(req, res)) {
@@ -400,7 +401,14 @@ app.use((req, res, next) => {
 
   // Start listening early so health checks succeed while routes finish initializing.
   server.listen(listenOpts, () => {
-    log(`serving on port ${port}`);
+    const address = server.address();
+    const addressLabel =
+      typeof address === "string"
+        ? address
+        : address
+          ? `${address.address}:${address.port}`
+          : `0.0.0.0:${port}`;
+    log(`serving on ${addressLabel}`);
   });
 
   const bootstrap = async () => {
