@@ -26,6 +26,7 @@ let appReady = false;
 let serverInstance: Server | null = null;
 let latticeWatcher: LatticeWatcherHandle | null = null;
 let shuttingDown = false;
+const fastBoot = process.env.FAST_BOOT === "1";
 const log = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -412,21 +413,25 @@ app.use((req, res, next) => {
   });
 
   const bootstrap = async () => {
-    const { initializeModules } = await import("./modules/module-loader.js");
-    await initializeModules();
+    if (fastBoot) {
+      log("FAST_BOOT=1: skipping module init, API routes, and background services");
+    } else {
+      const { initializeModules } = await import("./modules/module-loader.js");
+      await initializeModules();
 
-    const { registerRoutes } = await import("./routes");
-    await registerRoutes(app, server);
+      const { registerRoutes } = await import("./routes");
+      await registerRoutes(app, server);
 
-    if (process.env.ENABLE_LATTICE_WATCHER === "1") {
-      const debounceMs = Number(process.env.LATTICE_WATCHER_DEBOUNCE_MS);
-      const watcherOptions = Number.isFinite(debounceMs) ? { debounceMs } : undefined;
-      try {
-        const { startLatticeWatcher } = await import("./services/code-lattice/watcher");
-        latticeWatcher = await startLatticeWatcher(watcherOptions);
-        log(`[code-lattice] watcher ready (version=${latticeWatcher.getVersion()})`);
-      } catch (error) {
-        console.error("[code-lattice] watcher failed to start:", error);
+      if (process.env.ENABLE_LATTICE_WATCHER === "1") {
+        const debounceMs = Number(process.env.LATTICE_WATCHER_DEBOUNCE_MS);
+        const watcherOptions = Number.isFinite(debounceMs) ? { debounceMs } : undefined;
+        try {
+          const { startLatticeWatcher } = await import("./services/code-lattice/watcher");
+          latticeWatcher = await startLatticeWatcher(watcherOptions);
+          log(`[code-lattice] watcher ready (version=${latticeWatcher.getVersion()})`);
+        } catch (error) {
+          console.error("[code-lattice] watcher failed to start:", error);
+        }
       }
     }
 
