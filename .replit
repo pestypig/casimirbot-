@@ -9,7 +9,7 @@ packages = ["gmsh", "emscripten", "jq"]
 [deployment]
 deploymentTarget = "vm"
 build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+run = ["env", "PORT=5173", "npm", "run", "start"]
 
 [[ports]]
 localPort = 5173
