@@ -26,7 +26,10 @@ let appReady = false;
 let serverInstance: Server | null = null;
 let latticeWatcher: LatticeWatcherHandle | null = null;
 let shuttingDown = false;
-const fastBoot = process.env.FAST_BOOT === "1";
+const runtimeEnv = process.env.NODE_ENV ?? "development";
+const fastBoot =
+  process.env.FAST_BOOT === "1" ||
+  (process.env.FAST_BOOT !== "0" && runtimeEnv === "production");
 const log = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -380,7 +383,7 @@ app.use((req, res, next) => {
   const isWin = process.platform === "win32";
   const listenOpts: any = { port, host: "0.0.0.0" };
   if (!isWin) listenOpts.reusePort = true;
-  log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"}`);
+  log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} FAST_BOOT=${fastBoot ? "1" : "0"}`);
 
   const server = createServer((req, res) => {
     if (handleHealthCheck(req, res)) {
