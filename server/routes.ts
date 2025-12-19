@@ -43,38 +43,43 @@ const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean 
   return defaultValue;
 };
 
+const fastBoot = process.env.FAST_BOOT === "1";
+
 export async function registerRoutes(app: Express, existingServer?: Server): Promise<Server> {
   const httpServer = existingServer ?? createServer(app);
+  if (fastBoot) {
+    console.warn("[routes] FAST_BOOT=1: skipping optional routes and background jobs for faster startup.");
+  }
   app.use("/api/luma/ops", lumaHceRouter);
   app.use("/api/luma", lumaRouter);
   registerLumaWhisperRoute(app);
-  const { knowledgeRouter } = await import("./routes/knowledge");
 
+  if (!fastBoot) {
+    const { knowledgeRouter } = await import("./routes/knowledge");
+    app.use("/api/knowledge", knowledgeRouter);
+    app.use("/api/code-lattice", codeLatticeRouter);
+    app.use(trainStatusRouter);
+    app.use("/api/stellar", stellarRouter);
+    app.use("/api/ethos", ethosRouter);
+    app.use("/api/benchmarks/collapse", collapseBenchmarksRouter);
+    app.use("/api/physics/warp", warpViabilityRouter);
+    app.use("/api/physics/curvature", curvatureRouter);
+    app.use("/api/vectorizer", vectorizerRouter);
+    app.use("/api/tools/remove-bg-edges", removeBgEdgesRouter);
 
-  app.use("/api/knowledge", knowledgeRouter);
-  app.use("/api/code-lattice", codeLatticeRouter);
-  app.use(trainStatusRouter);
-  app.use("/api/stellar", stellarRouter);
-  app.use("/api/ethos", ethosRouter);
-  app.use("/api/benchmarks/collapse", collapseBenchmarksRouter);
-  app.use("/api/physics/warp", warpViabilityRouter);
-  app.use("/api/physics/curvature", curvatureRouter);
-  app.use("/api/vectorizer", vectorizerRouter);
-  app.use("/api/tools/remove-bg-edges", removeBgEdgesRouter);
-
-
-  app.use("/api/orchestrator", orchestratorRouter);
-  app.use(noiseGensRouter);
-  app.use("/api/hull/status", hullStatusRouter);
-  if (flagEnabled(process.env.ENABLE_STAR_SERVICE ?? process.env.ENABLE_STAR, true)) {
-    app.use("/api/star", starRouter);
+    app.use("/api/orchestrator", orchestratorRouter);
+    app.use(noiseGensRouter);
+    app.use("/api/hull/status", hullStatusRouter);
+    if (flagEnabled(process.env.ENABLE_STAR_SERVICE ?? process.env.ENABLE_STAR, true)) {
+      app.use("/api/star", starRouter);
+    }
+    if (process.env.HULL_MODE === "1" && process.env.ENABLE_CAPSULE_IMPORT === "1") {
+      const { hullCapsules } = await import("./routes/hull.capsules");
+      app.use("/api/hull/capsules", hullCapsules);
+    }
   }
-  if (process.env.HULL_MODE === "1" && process.env.ENABLE_CAPSULE_IMPORT === "1") {
-    const { hullCapsules } = await import("./routes/hull.capsules");
-    app.use("/api/hull/capsules", hullCapsules);
-  }
 
-  const enableEssence = flagEnabled(process.env.ENABLE_ESSENCE, true);
+  const enableEssence = !fastBoot && flagEnabled(process.env.ENABLE_ESSENCE, true);
   if (enableEssence) {
     if (process.env.ENABLE_ESSENCE === undefined) {
       console.warn("[routes] ENABLE_ESSENCE not set; defaulting to enabled (set ENABLE_ESSENCE=0 to disable).");
@@ -88,10 +93,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   }
 
   // Star Watcher: solar video → coherence
-  const { starWatcherRouter } = await import("./routes/star-watcher");
-  app.use("/api/star-watcher", starWatcherRouter);
+  if (!fastBoot) {
+    const { starWatcherRouter } = await import("./routes/star-watcher");
+    app.use("/api/star-watcher", starWatcherRouter);
+  }
 
-  const enableAgi = flagEnabled(process.env.ENABLE_AGI, true);
+  const enableAgi = !fastBoot && flagEnabled(process.env.ENABLE_AGI, true);
   if (enableAgi) {
     if (process.env.ENABLE_AGI === undefined) {
       console.warn("[routes] ENABLE_AGI not set; defaulting to enabled (set ENABLE_AGI=0 to disable).");
@@ -123,23 +130,23 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi/eval", evalRouter);
   }
 
-  if (process.env.SMALL_LLM_URL) {
+  if (!fastBoot && process.env.SMALL_LLM_URL) {
     const { smallLlmRouter } = await import("./routes/small-llm");
     app.use("/api/small-llm", smallLlmRouter);
   }
 
-  if (process.env.ENABLE_PROFILE_SUMMARIZER === "1") {
+  if (!fastBoot && process.env.ENABLE_PROFILE_SUMMARIZER === "1") {
     const { startProfileSummarizerJob } = await import("./services/profile-summarizer-job");
     startProfileSummarizerJob();
   }
 
   // Jobs + Tokens router (env-gated optional)
-  if (flagEnabled(process.env.ENABLE_ESSENCE_JOBS, true)) {
+  if (!fastBoot && flagEnabled(process.env.ENABLE_ESSENCE_JOBS, true)) {
     const { jobsRouter } = await import("./routes/jobs");
     app.use("/api/jobs", jobsRouter);
   }
 
-  if (flagEnabled(process.env.ENABLE_ESSENCE_PROPOSALS, true)) {
+  if (!fastBoot && flagEnabled(process.env.ENABLE_ESSENCE_PROPOSALS, true)) {
     const { proposalsRouter } = await import("./routes/proposals");
     const { profilePanelRouter } = await import("./routes/proposals.profile-panel");
     app.use("/api/proposals", proposalsRouter);
@@ -148,13 +155,15 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     startProposalJobRunner();
   }
 
-  if (process.env.ENABLE_SPECIALISTS === "1") {
+  if (!fastBoot && process.env.ENABLE_SPECIALISTS === "1") {
     const { specialistsRouter } = await import("./routes/agi.specialists");
     app.use("/api/agi/specialists", specialistsRouter);
   }
 
-  startQiController();
-  app.use("/api/qi", qiControllerRouter);
+  if (!fastBoot) {
+    startQiController();
+    app.use("/api/qi", qiControllerRouter);
+  }
 
   // --- Realtime plumbing ----------------------------------------------------
   // Support multiple WS subscribers per simulation + SSE fallback

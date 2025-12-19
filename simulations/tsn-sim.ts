@@ -275,7 +275,9 @@ const isDirectRun = (() => {
   }
 })();
 
-if (isDirectRun) {
+const enableDemoRun = process.env.TSN_SIM_DEMO === "1";
+
+if (isDirectRun && enableDemoRun) {
   const result = simulate({
     schedule: DEFAULT_QBV_SCHEDULE,
     flows: DEMO_FLOWS,
