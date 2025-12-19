@@ -425,6 +425,8 @@ app.use((req, res, next) => {
   const bootstrap = async () => {
     if (fastBoot) {
       log("FAST_BOOT=1: skipping module init, API routes, and background services");
+      appReady = true;
+      log("app ready (fast boot)");
     } else {
       const { initializeModules } = await import("./modules/module-loader.js");
       await initializeModules();
