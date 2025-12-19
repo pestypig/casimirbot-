@@ -709,7 +709,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // Resolve warp-web root robustly across different runtime CWDs (dev/prod/replit)
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const overrideRoot = process.env.WARP_WEB_ROOT;
-  const preferFastWarpResolve = process.env.NODE_ENV === "production";
+  // Always use fast resolution to avoid blocking startup with deep filesystem scans
+  const preferFastWarpResolve = true;
   function hasWarpWeb(dir: string) {
     try {
       return fs.existsSync(dir)

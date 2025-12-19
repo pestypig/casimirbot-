@@ -163,6 +163,18 @@ const desktopRedirectHtml = `<!doctype html>
 </html>`;
 
 const rootHandler = (req: Request, res: Response) => {
+  // Health check: respond immediately with 200 for fastest possible response
+  // This ensures deployment health checks pass quickly
+  const isHealthCheck = req.headers['user-agent']?.includes('health') || 
+                        req.headers['x-health-check'] || 
+                        !req.headers.accept ||
+                        req.headers.accept === '*/*';
+  
+  if (isHealthCheck) {
+    res.status(200).send("ok");
+    return;
+  }
+  
   if (!appReady) {
     res.status(200).send("starting");
     return;
@@ -175,6 +187,7 @@ const rootHandler = (req: Request, res: Response) => {
   res.status(200).json({ status: "ok", redirect: "/desktop" });
 };
 
+// Register root health check handler FIRST for immediate response
 app.get("/", rootHandler);
 app.head("/", (_req, res) => {
   res.status(200).end();
