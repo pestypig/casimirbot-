@@ -287,13 +287,7 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5173 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const isReplit = Boolean(process.env.REPL_ID);
-  const fallbackPort =
-    app.get("env") === "production"
-      ? isReplit
-        ? "5000"
-        : "8080"
-      : "5173";
+  const fallbackPort = app.get("env") === "production" ? "5000" : "5173";
   const port = parseInt(process.env.PORT || fallbackPort, 10);
   const isWin = process.platform === "win32";
   const listenOpts: any = { port, host: "0.0.0.0" };

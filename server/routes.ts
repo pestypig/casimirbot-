@@ -708,11 +708,49 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // so mounting the whole folder at /warp makes those resolve to /warp/css, /warp/js.
   // Resolve warp-web root robustly across different runtime CWDs (dev/prod/replit)
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const overrideRoot = process.env.WARP_WEB_ROOT;
+  const preferFastWarpResolve = process.env.NODE_ENV === "production";
   function hasWarpWeb(dir: string) {
     try {
       return fs.existsSync(dir)
         && (fs.existsSync(path.join(dir, 'creator.html')) || fs.existsSync(path.join(dir, 'spore-pedia.html')));
     } catch { return false; }
+  }
+  function resolveFastWarpRoot(): { root: string; attempts: string[] } {
+    const attempts: string[] = [];
+    const seen = new Set<string>();
+    const push = (p: string) => {
+      if (!p) return;
+      const r = path.resolve(p);
+      if (!seen.has(r)) {
+        attempts.push(r);
+        seen.add(r);
+      }
+    };
+
+    if (overrideRoot) {
+      push(overrideRoot);
+      if (hasWarpWeb(overrideRoot)) {
+        return { root: path.resolve(overrideRoot), attempts };
+      }
+    }
+
+    const candidates = [
+      path.resolve(process.cwd(), "warp-web"),
+      path.resolve(process.cwd(), "client", "src", "warp-web"),
+      path.resolve(process.cwd(), "dist", "warp-web"),
+      path.resolve(__dirname, "..", "warp-web"),
+      path.resolve(__dirname, "..", "..", "warp-web"),
+    ];
+
+    for (const candidate of candidates) {
+      push(candidate);
+      if (hasWarpWeb(candidate)) {
+        return { root: candidate, attempts };
+      }
+    }
+
+    return { root: attempts[0] || path.join(process.cwd(), "warp-web"), attempts };
   }
   function findWarpRoot(): { root: string; attempts: string[] } {
     const attempts: string[] = [];
@@ -772,7 +810,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     // Fall back to first attempt
     return { root: attempts[0] || path.join(process.cwd(), 'warp-web'), attempts };
   }
-  const found = findWarpRoot();
+  const found = preferFastWarpResolve ? resolveFastWarpRoot() : findWarpRoot();
   const warpRoot = found.root;
   const warpAttempts = found.attempts;
   if (!hasWarpWeb(warpRoot)) {
@@ -785,8 +823,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
   // Replit compatibility: allow overriding warp-web root explicitly via env
   // e.g., WARP_WEB_ROOT=/home/runner/workspace/warp-web
-  const overrideRoot = process.env.WARP_WEB_ROOT;
-  if (overrideRoot && fs.existsSync(overrideRoot)) {
+  if (overrideRoot && fs.existsSync(overrideRoot) && path.resolve(overrideRoot) !== path.resolve(warpRoot)) {
     console.log(`[warp] Replit override detected: WARP_WEB_ROOT=${overrideRoot}`);
     app.use('/warp', express.static(overrideRoot));
   }
