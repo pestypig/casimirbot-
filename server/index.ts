@@ -47,7 +47,15 @@ app.head("/healthz", (_req, res) => {
   res.status(200).end();
 });
 
-app.use(jwtMiddleware);
+const isPublicHealthRoute = (req: Request): boolean =>
+  req.path === "/" || req.path === "/healthz";
+
+app.use((req, res, next) => {
+  if (isPublicHealthRoute(req)) {
+    return next();
+  }
+  return jwtMiddleware(req, res, next);
+});
 const requestShutdown = (signal: NodeJS.Signals) => {
   try {
     console.error(`[process] signal received: ${signal}`);
@@ -279,7 +287,13 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5173 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const fallbackPort = app.get("env") === "production" ? "8080" : "5173";
+  const isReplit = Boolean(process.env.REPL_ID);
+  const fallbackPort =
+    app.get("env") === "production"
+      ? isReplit
+        ? "5000"
+        : "8080"
+      : "5173";
   const port = parseInt(process.env.PORT || fallbackPort, 10);
   const isWin = process.platform === "win32";
   const listenOpts: any = { port, host: "0.0.0.0" };
