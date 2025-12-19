@@ -2,25 +2,52 @@ import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer, type Server } from "http";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
-import { startLatticeWatcher, type LatticeWatcherHandle } from "./services/code-lattice/watcher";
+
+type LatticeWatcherHandle = {
+  close(): Promise<void>;
+  getVersion(): number;
+};
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 registerMetricsEndpoint(app);
-app.use(jwtMiddleware);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const docsDir = path.resolve(__dirname, "..", "docs");
 
+let appReady = false;
 let serverInstance: Server | null = null;
 let latticeWatcher: LatticeWatcherHandle | null = null;
 let shuttingDown = false;
+const log = (message: string, source = "express") => {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`${formattedTime} [${source}] ${message}`);
+};
+
+const healthPayload = () => ({
+  status: appReady ? "ok" : "starting",
+  ready: appReady,
+  timestamp: new Date().toISOString(),
+});
+
+app.get("/healthz", (_req, res) => {
+  res.status(200).json(healthPayload());
+});
+app.head("/healthz", (_req, res) => {
+  res.status(200).end();
+});
+
+app.use(jwtMiddleware);
 const requestShutdown = (signal: NodeJS.Signals) => {
   try {
     console.error(`[process] signal received: ${signal}`);
@@ -116,6 +143,10 @@ app.use('/warp-engine*.js', (req, res, next) => {
 });
 
 const redirectToDesktop = (_req: Request, res: Response) => {
+  if (!appReady) {
+    res.status(200).send("starting");
+    return;
+  }
   res.redirect(302, "/desktop");
 };
 
@@ -229,7 +260,8 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5173 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5173", 10);
+  const fallbackPort = app.get("env") === "production" ? "8080" : "5173";
+  const port = parseInt(process.env.PORT || fallbackPort, 10);
   const isWin = process.platform === "win32";
   const listenOpts: any = { port, host: "0.0.0.0" };
   if (!isWin) listenOpts.reusePort = true;
@@ -252,52 +284,66 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
   });
 
-  // Initialize physics modules
-  const { initializeModules } = await import("./modules/module-loader.js");
-  await initializeModules();
+  const bootstrap = async () => {
+    const { initializeModules } = await import("./modules/module-loader.js");
+    await initializeModules();
 
-  await registerRoutes(app, server);
+    const { registerRoutes } = await import("./routes");
+    await registerRoutes(app, server);
 
-  if (process.env.ENABLE_LATTICE_WATCHER === "1") {
-    const debounceMs = Number(process.env.LATTICE_WATCHER_DEBOUNCE_MS);
-    const watcherOptions = Number.isFinite(debounceMs) ? { debounceMs } : undefined;
-    try {
-      latticeWatcher = await startLatticeWatcher(watcherOptions);
-      log(`[code-lattice] watcher ready (version=${latticeWatcher.getVersion()})`);
-    } catch (error) {
-      console.error("[code-lattice] watcher failed to start:", error);
-    }
-  }
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    // Log the error but do not crash the server; this keeps dev server alive
-    // and avoids connection refusals after a first route error.
-    try {
-      console.error("[express] error handler:", status, message);
-      if (process.env.NODE_ENV !== "production") {
-        console.error(err?.stack || err);
+    if (process.env.ENABLE_LATTICE_WATCHER === "1") {
+      const debounceMs = Number(process.env.LATTICE_WATCHER_DEBOUNCE_MS);
+      const watcherOptions = Number.isFinite(debounceMs) ? { debounceMs } : undefined;
+      try {
+        const { startLatticeWatcher } = await import("./services/code-lattice/watcher");
+        latticeWatcher = await startLatticeWatcher(watcherOptions);
+        log(`[code-lattice] watcher ready (version=${latticeWatcher.getVersion()})`);
+      } catch (error) {
+        console.error("[code-lattice] watcher failed to start:", error);
       }
-    } catch {}
-    if (!res.headersSent) {
-      res.status(status).json({ message });
     }
-  });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  const skipVite = process.env.SKIP_VITE_MIDDLEWARE === "1";
-  if (app.get("env") === "development" && !skipVite) {
-    log("dev: Vite middleware enabled (hot reload via Express)");
-    await setupVite(app, server);
-  } else {
-    if (skipVite) {
-      log("dev: skipping Vite middlewares (SKIP_VITE_MIDDLEWARE=1); serving prebuilt client instead");
-    } else if (app.get("env") !== "development") {
-      log(`dev: NODE_ENV=${process.env.NODE_ENV ?? "undefined"}; serving prebuilt client instead of Vite HMR`);
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      // Log the error but do not crash the server; this keeps dev server alive
+      // and avoids connection refusals after a first route error.
+      try {
+        console.error("[express] error handler:", status, message);
+        if (process.env.NODE_ENV !== "production") {
+          console.error(err?.stack || err);
+        }
+      } catch {}
+      if (!res.headersSent) {
+        res.status(status).json({ message });
+      }
+    });
+
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    const skipVite = process.env.SKIP_VITE_MIDDLEWARE === "1";
+    if (app.get("env") === "development" && !skipVite) {
+      log("dev: Vite middleware enabled (hot reload via Express)");
+      const { setupVite } = await import("./vite");
+      await setupVite(app, server);
+    } else {
+      if (skipVite) {
+        log("dev: skipping Vite middlewares (SKIP_VITE_MIDDLEWARE=1); serving prebuilt client instead");
+      } else if (app.get("env") !== "development") {
+        log(`dev: NODE_ENV=${process.env.NODE_ENV ?? "undefined"}; serving prebuilt client instead of Vite HMR`);
+      }
+      const { serveStatic } = await import("./vite");
+      serveStatic(app);
     }
-    serveStatic(app);
-  }
+
+    appReady = true;
+    log("app ready");
+  };
+
+  setTimeout(() => {
+    void bootstrap().catch((error) => {
+      console.error("[server] bootstrap failed:", error);
+    });
+  }, 0);
 })();

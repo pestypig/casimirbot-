@@ -414,10 +414,11 @@ export function NeedleCavityBubblePanel() {
             <div className="text-xs font-semibold uppercase tracking-wide text-sky-200">
               Warp bubble (needle hull cloak)
             </div>
-            <div className="mt-0.5 text-[11px] text-sky-100/80">
-              Ellipsoidal needle hull with a high-coverage Casimir cloak and Natario/Alcubierre
-              wall profile.
-            </div>
+          <div className="mt-0.5 text-[11px] text-sky-100/80">
+            Ellipsoidal needle hull with a high-coverage Casimir cloak and Natario/Alcubierre
+            wall profile. The bubble behaves more like a boat, displacing a volume of
+            spacetime, rather than generating lift like a plane.
+          </div>
           </div>
           <div className="flex-1 space-y-2 px-3 py-3 text-[11px]">
             <LedgerRow
