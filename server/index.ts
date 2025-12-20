@@ -28,9 +28,7 @@ let serverInstance: Server | null = null;
 let latticeWatcher: LatticeWatcherHandle | null = null;
 let shuttingDown = false;
 const runtimeEnv = process.env.NODE_ENV ?? "development";
-const fastBoot =
-  process.env.FAST_BOOT === "1" ||
-  (process.env.FAST_BOOT !== "0" && runtimeEnv === "production");
+const fastBoot = process.env.FAST_BOOT === "1";
 const log = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
