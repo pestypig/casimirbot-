@@ -79,6 +79,32 @@ const normalizeHealthPath = (value?: string): string => {
   return base;
 };
 
+const getPathname = (value?: string): string => {
+  try {
+    return new URL(value ?? "/", "http://localhost").pathname || "/";
+  } catch {
+    return (value ?? "/").split("?")[0] || "/";
+  }
+};
+
+const isLivenessProbe = (req: HealthCheckRequest): boolean => {
+  const method = (req.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return false;
+  const path = getPathname(req.url);
+  return path === "/" || path === "";
+};
+
+const replyPlain = (req: HealthCheckRequest, res: ServerResponse, statusCode: number, body: string): void => {
+  res.statusCode = statusCode;
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  if ((req.method ?? "GET").toUpperCase() === "HEAD") {
+    res.end();
+    return;
+  }
+  res.end(body);
+};
+
 const isPublicHealthRoute = (req: Request): boolean => {
   const normalized = normalizeHealthPath(req.path || req.originalUrl);
   return normalized === "/" || normalized === "/healthz";
@@ -196,6 +222,18 @@ for (const sig of ['SIGINT','SIGTERM'] as const) {
   process.on(sig, () => requestShutdown(sig));
 }
 
+let lastLagTick = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  const lag = now - lastLagTick - 1000;
+  if (lag > 250) {
+    try {
+      console.warn(`[lag] event loop lag ${lag}ms`);
+    } catch {}
+  }
+  lastLagTick = now;
+}, 1000).unref?.();
+
 // Serve PDF files from attached_assets folder
 app.use('/attached_assets', express.static('attached_assets'));
 
@@ -248,30 +286,20 @@ const handleHealthCheck = (req: HealthCheckRequest, res: ServerResponse): boolea
     return false;
   }
 
-  const path = normalizeHealthPath(req.url);
+  const path = getPathname(req.url);
   if (path === "/healthz") {
     const payload = healthPayload();
     const statusCode = payload.ready ? 200 : 503;
     if (method === "HEAD") {
       res.statusCode = statusCode;
+      res.setHeader("Cache-Control", "no-store");
       res.end();
       return true;
     }
     res.statusCode = statusCode;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
     res.end(JSON.stringify(payload));
-    return true;
-  }
-
-  if (path === "/" && (!appReady || isHealthCheckRequest(req))) {
-    if (method === "HEAD") {
-      res.statusCode = 200;
-      res.end();
-      return true;
-    }
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.end("ok");
     return true;
   }
 
@@ -416,14 +444,23 @@ app.use((req, res, next) => {
   log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} FAST_BOOT=${fastBoot ? "1" : "0"}`);
 
   const server = createServer((req, res) => {
+    if (isLivenessProbe(req)) {
+      const start = Date.now();
+      const ua = headerValue(req.headers["user-agent"]);
+      try {
+        console.log(`[probe] ${req.method ?? "GET"} ${req.url ?? "/"} ua="${ua}"`);
+      } catch {}
+      replyPlain(req, res, 200, "ok");
+      try {
+        console.log(`[probe] responded 200 in ${Date.now() - start}ms`);
+      } catch {}
+      return;
+    }
     if (handleHealthCheck(req, res)) {
-      if (deferRouteBoot && !bootstrapPromise) {
-        scheduleBootstrap("post-healthcheck");
-      }
       return;
     }
     if (deferRouteBoot && !bootstrapPromise) {
-      scheduleBootstrap("first-request");
+      scheduleBootstrap("first-real-request");
     }
     app(req, res);
   });
