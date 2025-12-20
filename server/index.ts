@@ -57,10 +57,12 @@ const healthPayload = () => {
 };
 
 app.get("/healthz", (_req, res) => {
-  res.status(200).json(healthPayload());
+  const payload = healthPayload();
+  res.status(payload.ready ? 200 : 503).json(payload);
 });
 app.head("/healthz", (_req, res) => {
-  res.status(200).end();
+  const ready = appReady || healthReady;
+  res.status(ready ? 200 : 503).end();
 });
 
 const headerValue = (value: string | string[] | undefined): string => {
@@ -248,14 +250,16 @@ const handleHealthCheck = (req: HealthCheckRequest, res: ServerResponse): boolea
 
   const path = normalizeHealthPath(req.url);
   if (path === "/healthz") {
+    const payload = healthPayload();
+    const statusCode = payload.ready ? 200 : 503;
     if (method === "HEAD") {
-      res.statusCode = 200;
+      res.statusCode = statusCode;
       res.end();
       return true;
     }
-    res.statusCode = 200;
+    res.statusCode = statusCode;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify(healthPayload()));
+    res.end(JSON.stringify(payload));
     return true;
   }
 
@@ -413,9 +417,12 @@ app.use((req, res, next) => {
 
   const server = createServer((req, res) => {
     if (handleHealthCheck(req, res)) {
+      if (deferRouteBoot && !bootstrapPromise) {
+        scheduleBootstrap("post-healthcheck");
+      }
       return;
     }
-    if (deferRouteBoot && !bootstrapPromise && !isHealthCheckRequest(req)) {
+    if (deferRouteBoot && !bootstrapPromise) {
       scheduleBootstrap("first-request");
     }
     app(req, res);
@@ -516,7 +523,7 @@ app.use((req, res, next) => {
   });
 
   if (deferRouteBoot) {
-    log("bootstrap deferred until first non-health request");
+    log("bootstrap deferred until first health check or request");
   } else {
     scheduleBootstrap("startup");
   }
