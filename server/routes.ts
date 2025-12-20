@@ -1209,7 +1209,16 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post("/api/helix/spectrum", postSpectrumLog);
 
   // TSN/Qbv simulator exposure for Helix panels (logic-only)
-  app.post("/api/sim/tsn", (req, res) => {
+  app.post("/api/sim/tsn", async (req, res) => {
+    let tsnSim: typeof import("../simulations/tsn-sim");
+    try {
+      tsnSim = await import("../simulations/tsn-sim");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: "tsn_sim_unavailable", message });
+      return;
+    }
+    const { simulate: simulateTsn, DEFAULT_QBV_SCHEDULE, DEMO_FLOWS } = tsnSim;
     const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
     const parseNumber = (value: unknown): number | undefined => {
       const n = Number(value);
