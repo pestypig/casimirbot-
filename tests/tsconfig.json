@@ -6,6 +6,7 @@
     "./lattice-parity-probes.spec.ts",
     "./warpfield-lattice.integration.spec.ts",
     "./warpfield-alignment*.spec.ts",
+    "./warpfield-cross-validation.spec.ts",
     "./physics-contract.gate0.spec.ts",
     "../types/**/*.d.ts",
     "../client/src/types/**/*.d.ts"

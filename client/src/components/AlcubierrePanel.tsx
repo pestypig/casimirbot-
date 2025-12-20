@@ -26,7 +26,7 @@ import { shallow } from "zustand/shallow";
 import { VolumeModeToggle, type VolumeViz } from "@/components/VolumeModeToggle";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { Hull3DRenderer, Hull3DRendererMode, Hull3DSkyboxMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState, HullGeometryMode, HullGateSource, Hull3DVolumeDomain, type HullPreviewMeshPayload } from "./Hull3DRenderer.ts";
-import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
+import { CurvatureVoxProvider, DEFAULT_FLUX_CHANNEL, DEFAULT_T00_CHANNEL } from "./CurvatureVoxProvider";
 import { smoothSectorWeights } from "@/lib/sector-weights";
 import { TheoryBadge } from "./common/TheoryBadge";
 import { normalizeCurvaturePalette, type CurvaturePalette } from "@/lib/curvature-directive";
@@ -56,6 +56,8 @@ import { buildLatticeFrame } from "@/lib/lattice-frame";
 import { buildHullDistanceGrid, clearLatticeSdfCache } from "@/lib/lattice-sdf";
 import { hashLatticeSdfDeterminism, hashLatticeVolumeDeterminism } from "@/lib/lattice-health";
 import { LATTICE_PROFILE_PERF, LatticeRebuildWatchdog, estimateLatticeUploadBytes } from "@/lib/lattice-perf";
+import { loadWfbrickFile } from "@/lib/wfbrick";
+import { GEO_VIS_THETA_PRESET } from "@/lib/warpfield-presets";
 /**
  * TheoryRefs:
  *  - vanden-broeck-1999: UI exposes gamma_VdB with provenance
@@ -219,6 +221,13 @@ type LatticeStrobeWeightParams = {
   splitEnabled?: boolean;
   splitFrac?: number;
   syncMode?: number;
+};
+
+type WfBrickStatus = {
+  name: string;
+  dims: [number, number, number];
+  hasFlux: boolean;
+  loadedAt: number;
 };
 
 const quantizeSectorCenter01 = (center01: number, totalSectors: number) => {
@@ -1099,6 +1108,10 @@ const [showFluxStreamlines, setShowFluxStreamlines] = useState(false);
 const [fluxSeedCount, setFluxSeedCount] = useState(56);
 const [fluxSeedRadius, setFluxSeedRadius] = useState(1.0);
 const [fluxSeedSpread, setFluxSeedSpread] = useState(0.08);
+const wfbrickInputRef = useRef<HTMLInputElement | null>(null);
+const wfbrickStampRef = useRef(0);
+const [wfbrickStatus, setWfbrickStatus] = useState<WfBrickStatus | null>(null);
+const [wfbrickError, setWfbrickError] = useState<string | null>(null);
 const tiltFromBusRef = useRef<TiltDirective | null>(null);
 const [tiltBusVersion, bumpTiltVersion] = useReducer((x: number) => x + 1, 0);
 const wireframePatchTick = useRef(0);
@@ -1137,6 +1150,57 @@ useEffect(() => {
   return () => {
     unsubscribe(id);
   };
+}, []);
+
+const handleWfbrickLoad = useCallback(
+  async (file: File) => {
+    setWfbrickError(null);
+    try {
+      const dataset = await loadWfbrickFile(file);
+      wfbrickStampRef.current += 1;
+      const updatedAt = Date.now();
+      const payloadBase = {
+        dims: dataset.dims,
+        stats: dataset.stats,
+        version: wfbrickStampRef.current,
+        updatedAt,
+      };
+      publish(DEFAULT_T00_CHANNEL, {
+        ...payloadBase,
+        data: dataset.t00.data,
+        min: dataset.t00.min,
+        max: dataset.t00.max,
+        t00: dataset.t00,
+      });
+      publish(DEFAULT_FLUX_CHANNEL, { ...payloadBase, flux: dataset.flux });
+      setWfbrickStatus({
+        name: file.name,
+        dims: dataset.dims,
+        hasFlux: dataset.hasFlux,
+        loadedAt: updatedAt,
+      });
+      setVolumeSource("brick");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "wfbrick: load failed";
+      setWfbrickError(message);
+      setWfbrickStatus(null);
+    }
+  },
+  [setVolumeSource]
+);
+
+const handleWfbrickInputChange = useCallback(
+  (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    void handleWfbrickLoad(file);
+    event.target.value = "";
+  },
+  [handleWfbrickLoad]
+);
+
+const openWfbrickPicker = useCallback(() => {
+  wfbrickInputRef.current?.click();
 }, []);
 
 useEffect(() => {
@@ -2471,12 +2535,20 @@ const res = 256;
     setShowHullSurfaceOverlay,
   ]);
   const applyGeoVisThetaPreset = useCallback(() => {
-    setHullVolumeVizLive("theta_gr");
-    setPlanarVizMode(3);
+    setHullVolumeVizLive(GEO_VIS_THETA_PRESET.hullVolumeViz);
+    setPlanarVizMode(GEO_VIS_THETA_PRESET.planarVizMode);
     setUserVizLocked(true);
-    setSharedPalette({ id: "diverging", encodeBetaSign: true, legend: true });
-    setShowThetaIsoOverlay(true);
-  }, [setHullVolumeVizLive, setPlanarVizMode, setSharedPalette, setShowThetaIsoOverlay, setUserVizLocked]);
+    setThetaSign(GEO_VIS_THETA_PRESET.thetaSign);
+    setSharedPalette(GEO_VIS_THETA_PRESET.palette);
+    setShowThetaIsoOverlay(GEO_VIS_THETA_PRESET.showThetaIsoOverlay);
+  }, [
+    setHullVolumeVizLive,
+    setPlanarVizMode,
+    setSharedPalette,
+    setShowThetaIsoOverlay,
+    setThetaSign,
+    setUserVizLocked,
+  ]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = () => applyDriveCardPreset();
@@ -3393,9 +3465,16 @@ const res = 256;
   }, [ds, totalSectors, liveSectors]);
 
   const overlayConfig = useMemo<Hull3DOverlayState>(() => {
-    const isGRVolume = hullVolumeVizLive === "theta_gr" || hullVolumeVizLive === "rho_gr";
+    const isGRVolume =
+      hullVolumeVizLive === "theta_gr" ||
+      hullVolumeVizLive === "rho_gr" ||
+      hullVolumeVizLive === "shear_gr" ||
+      hullVolumeVizLive === "vorticity_gr";
     const isGRMode = planarVizMode === 0 || planarVizMode === 1 || (planarVizMode === 3 && isGRVolume);
-    const isRhoMode = planarVizMode === 1 || (planarVizMode === 3 && hullVolumeVizLive === "rho_gr");
+    const isRhoMode =
+      planarVizMode === 1 ||
+      (planarVizMode === 3 &&
+        (hullVolumeVizLive === "rho_gr" || hullVolumeVizLive === "shear_gr"));
     const phase = Number.isFinite(loopPhase) ? loopPhase : ds.phase01 ?? 0;
     const tauLCms = firstFinite(
       lightLoop.tauLC_ms,
@@ -8194,7 +8273,7 @@ const res = 256;
                   type="button"
                   onClick={applyGeoVisThetaPreset}
                   className="rounded bg-slate-700 px-2 py-1 text-[0.65rem] text-slate-100 hover:bg-slate-600"
-                  title="GeoViS theta: theta_GR volume, diverging palette, theta-iso overlay"
+                  title="GeoViS theta: theta_GR volume, diverging palette, theta-iso overlay, theta sign -1"
                 >
                   GeoViS ${GREEK_THETA}
                 </button>
@@ -8226,6 +8305,13 @@ const res = 256;
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Volume source</span>
+                <input
+                  ref={wfbrickInputRef}
+                  type="file"
+                  accept=".wfbrick,application/json"
+                  className="hidden"
+                  onChange={handleWfbrickInputChange}
+                />
                 <button
                   type="button"
                   onClick={() => setVolumeSource("analytic")}
@@ -8259,7 +8345,28 @@ const res = 256;
                 >
                   Brick
                 </button>
+                <button
+                  type="button"
+                  onClick={openWfbrickPicker}
+                  className="rounded bg-slate-700 px-2 py-1 text-[0.65rem] text-slate-100 hover:bg-slate-600"
+                  title="Load a WarpFactory wfbrick dataset"
+                >
+                  Load dataset
+                </button>
               </div>
+              {(wfbrickStatus || wfbrickError) && (
+                <div className="flex flex-wrap items-center gap-2 text-[0.6rem] text-slate-400">
+                  {wfbrickStatus && (
+                    <span>
+                      Dataset: {wfbrickStatus.name} ({wfbrickStatus.dims.join("x")})
+                    </span>
+                  )}
+                  {wfbrickStatus && !wfbrickStatus.hasFlux && (
+                    <span className="text-amber-300">Flux missing, streamlines disabled</span>
+                  )}
+                  {wfbrickError && <span className="text-amber-300">{wfbrickError}</span>}
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Volume field</span>
                 <VolumeModeToggle value={liveVolumeMode} onChange={handleVolumeModeChange} />
@@ -8323,7 +8430,12 @@ const res = 256;
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Card camera</span>
+                <span
+                  className="text-[0.65rem] uppercase tracking-wide text-slate-400"
+                  title="Applies to the live viewer and card exports"
+                >
+                  Camera
+                </span>
                 <button
                   type="button"
                   onClick={() => setCardCameraPreset("threeQuarterFront")}
