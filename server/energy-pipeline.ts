@@ -424,7 +424,7 @@ export interface FieldGeometryRequest extends FieldRequest {
   };
 }
 
-export type WarpFieldType = "natario" | "natario_sdf" | "alcubierre";
+export type WarpFieldType = "natario" | "natario_sdf" | "alcubierre" | "irrotational";
 
 export type WarpSdfPreview = {
   key?: string | null;
@@ -825,9 +825,15 @@ export function buildCardRecipeFromPipeline(state: EnergyPipelineState): CardRec
   const volumeDomainRaw = (state as any).volumeDomain;
   const volumeDomain: CardRecipe["viz"]["volumeDomain"] =
     volumeDomainRaw === "bubbleBox" ? "bubbleBox" : "wallBand";
+  const volumeSourceRaw = (state as any).volumeSource;
+  const volumeSource: CardRecipe["viz"]["volumeSource"] =
+    volumeSourceRaw === "analytic" || volumeSourceRaw === "brick" || volumeSourceRaw === "lattice"
+      ? volumeSourceRaw
+      : "lattice";
   const viz: CardRecipe["viz"] = {
     volumeViz: "theta_drive",
     volumeDomain,
+    volumeSource,
     gateSource,
     gateView: typeof gateViewRaw === "boolean" ? gateViewRaw : true,
     ...(typeof (state as any).forceFlatGate === "boolean"

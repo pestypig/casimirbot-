@@ -31,8 +31,8 @@ import { qiControllerRouter, startQiController } from "./modules/qi/qi-controlle
 import { codeLatticeRouter } from "./routes/code-lattice";
 import { stellarRouter } from "./routes/stellar";
 import { starRouter } from "./routes/star";
-import { simulate as simulateTsn, DEFAULT_QBV_SCHEDULE, DEMO_FLOWS } from "../simulations/tsn-sim";
-import type { SimConfig, SimResult, Schedule, Flow, Faults, ClockModel } from "@shared/tsn-sim";
+import type { SimResult, Schedule, Flow, Faults, ClockModel } from "@shared/tsn-sim";
+import { DEFAULT_QBV_SCHEDULE, DEMO_FLOWS, simulate as simulateTsn } from "../simulations/tsn-sim";
 import { getGitFirstAppearances } from "./lib/git-first-appearance";
 import { trainStatusRouter } from "./routes/train-status";
 

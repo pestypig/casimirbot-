@@ -65,8 +65,7 @@ const mobileStoreCreator: StateCreator<MobileAppState> = (set, get) => ({
     set((state) => {
       const existing = state.stack.find((entry) => entry.panelId === panelId);
       if (existing) {
-        const hydrated = existing.loader ? existing : hydrateEntry(panelId, existing.openedAt);
-        if (!hydrated) return state;
+        const hydrated = existing;
         whisperPanelOpen(panelId, hydrated.title);
         return {
           ...state,

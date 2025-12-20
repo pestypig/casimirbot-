@@ -42,9 +42,13 @@ export async function setupVite(app: Express, server: Server) {
   const hmrPort = Number.isFinite(resolvedHmrPort) ? resolvedHmrPort : null;
   const hmrHost = process.env.HMR_HOST || null;
   const hmrProtocol = process.env.HMR_PROTOCOL || null;
+  const baseHmrConfig =
+    baseServerConfig.hmr && typeof baseServerConfig.hmr === "object"
+      ? baseServerConfig.hmr
+      : {};
 
   const hmrConfig = {
-    ...(baseServerConfig.hmr ?? {}),
+    ...baseHmrConfig,
     server,
     ...(hmrHost ? { host: hmrHost } : {}),
     ...(hmrPort ? { port: hmrPort, clientPort: hmrPort } : {}),

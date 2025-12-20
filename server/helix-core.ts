@@ -843,7 +843,7 @@ const UpdateSchema = z.object({
   hullAreaOverride_m2: hullAreaOverrideSchema.shape.hullAreaOverride_m2,
   hullAreaOverride_uncertainty_m2: hullAreaOverrideSchema.shape.hullAreaOverride_uncertainty_m2,
   hullAreaPerSector_m2: hullAreaPerSectorSchema,
-  warpFieldType: z.enum(["natario", "natario_sdf", "alcubierre"]).optional(),
+  warpFieldType: z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]).optional(),
   warpGeometry: warpGeometrySchema.partial().optional(),
   warpGeometryKind: warpGeometryKindSchema.optional(),
   warpGeometryAssetId: z.string().optional(),
@@ -2147,14 +2147,7 @@ export async function updatePipelineParams(req: Request, res: Response) {
     const { nextState: newState, scheduledJob, fallback: geometryFallback, blocked } = await pipeMutex.lock<{
       nextState: EnergyPipelineState;
       scheduledJob: SweepJob | null;
-      fallback: {
-        mode: "allow" | "warn" | "block";
-        applied: boolean;
-        reasons: string[];
-        requestedKind: EnergyPipelineState["warpGeometryKind"] | null;
-        resolvedKind: EnergyPipelineState["warpGeometryKind"] | undefined;
-        blocked?: boolean;
-      };
+      fallback: WarpGeometryFallback;
       blocked: boolean;
     }>(async () => {
       let pendingJob: SweepJob | null = null;
