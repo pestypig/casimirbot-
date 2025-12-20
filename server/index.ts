@@ -29,6 +29,7 @@ let latticeWatcher: LatticeWatcherHandle | null = null;
 let shuttingDown = false;
 const runtimeEnv = process.env.NODE_ENV ?? "development";
 const fastBoot = process.env.FAST_BOOT === "1";
+const skipModuleInit = process.env.SKIP_MODULE_INIT === "1";
 const log = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -426,8 +427,12 @@ app.use((req, res, next) => {
       appReady = true;
       log("app ready (fast boot)");
     } else {
-      const { initializeModules } = await import("./modules/module-loader.js");
-      await initializeModules();
+      if (skipModuleInit) {
+        log("SKIP_MODULE_INIT=1: skipping physics module initialization");
+      } else {
+        const { initializeModules } = await import("./modules/module-loader.js");
+        await initializeModules();
+      }
 
       const { registerRoutes } = await import("./routes");
       await registerRoutes(app, server);

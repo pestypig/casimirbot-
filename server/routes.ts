@@ -5,7 +5,6 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createServer, type Server } from "http";
 import { storage } from "./sim-storage";
-import { scuffemService } from "./services/scuffem";
 import { fileManager } from "./services/fileManager";
 import { simulationParametersSchema, sweepSpecSchema } from "@shared/schema";
 import { WebSocket, WebSocketServer } from "ws";
@@ -44,6 +43,13 @@ const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean 
 };
 
 const fastBoot = process.env.FAST_BOOT === "1";
+let scuffemServicePromise: Promise<typeof import("./services/scuffem").scuffemService> | null = null;
+const getScuffemService = async () => {
+  if (!scuffemServicePromise) {
+    scuffemServicePromise = import("./services/scuffem").then((mod) => mod.scuffemService);
+  }
+  return scuffemServicePromise;
+};
 
 export async function registerRoutes(app: Express, existingServer?: Server): Promise<Server> {
   const httpServer = existingServer ?? createServer(app);
@@ -386,6 +392,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // Start simulation
   app.post("/api/simulations/:id/start", async (req, res) => {
     try {
+      const scuffemService = await getScuffemService();
       const simulation = await storage.getSimulation(req.params.id);
       if (!simulation) {
         return res.status(404).json({ message: "Simulation not found" });
@@ -462,6 +469,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // Generate .scuffgeo file only
   app.post("/api/simulations/:id/generate", async (req, res) => {
     try {
+      const scuffemService = await getScuffemService();
       const simulation = await storage.getSimulation(req.params.id);
       if (!simulation) {
         return res.status(404).json({ message: "Simulation not found" });
