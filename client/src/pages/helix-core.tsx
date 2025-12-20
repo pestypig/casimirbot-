@@ -1753,10 +1753,13 @@ useEffect(() => {
     const overlayPrefsResolved =
       overlayPrefs?.[overlayProfileKey] ?? defaultOverlayPrefsForProfile(overlayProfileKey);
     const spacetimeGridPrefs = overlayPrefsResolved.spacetimeGrid;
+    const volumeSource =
+      viewerConfig.volumeSource ?? (pipelineAny?.cardRecipe as any)?.viz?.volumeSource ?? null;
     const cardRecipeViz =
-      spacetimeGridPrefs || pipelineAny?.cardRecipe?.viz
+      spacetimeGridPrefs || pipelineAny?.cardRecipe?.viz || volumeSource != null
         ? {
             ...(pipelineAny?.cardRecipe?.viz ?? {}),
+            ...(volumeSource != null ? { volumeSource } : {}),
             ...(spacetimeGridPrefs ? { spacetimeGrid: spacetimeGridPrefs } : {}),
           }
         : undefined;
@@ -1784,6 +1787,7 @@ useEffect(() => {
       volumeViz: viewerConfig.volumeViz ?? (pipelineAny?.cardRecipe as any)?.viz?.volumeViz ?? null,
       volumeDomain:
         viewerConfig.volumeDomain ?? (pipelineAny?.cardRecipe as any)?.viz?.volumeDomain ?? null,
+      volumeSource,
       vizFloors: viewerConfig.vizFloors ?? null,
       gate: {
         source: viewerConfig.gateSource ?? (pipelineAny?.cardRecipe as any)?.viz?.gateSource ?? null,
@@ -1861,6 +1865,7 @@ useEffect(() => {
       viz: {
         volumeViz: replayViewer.volumeViz,
         volumeDomain: replayViewer.volumeDomain,
+        volumeSource: replayViewer.volumeSource,
         planarVizMode: replayViewer.planarVizMode,
         vizFloors: replayViewer.vizFloors,
         gate: replayViewer.gate,

@@ -255,13 +255,22 @@ export const warpGeometrySchema = z.object({
 });
 export type WarpGeometry = z.infer<typeof warpGeometrySchema>;
 
-export const warpFieldTypeSchema = z.enum(["natario", "natario_sdf", "alcubierre"]);
+export const warpFieldTypeSchema = z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]);
 export type WarpFieldType = z.infer<typeof warpFieldTypeSchema>;
 
 const cardGateSourceSchema = z.enum(["schedule", "blanket", "combined"]);
-const cardVolumeVizSchema = z.enum(["theta_drive", "theta_gr", "rho_gr"]);
+const cardVolumeVizSchema = z.enum(["theta_drive", "theta_gr", "rho_gr", "shear_gr", "vorticity_gr"]);
 const cardVolumeDomainSchema = z.enum(["wallBand", "bubbleBox"]);
-export const cardCameraPresetSchema = z.enum(["threeQuarterFront", "broadside", "topDown"]);
+const cardVolumeSourceSchema = z.enum(["analytic", "lattice", "brick"]);
+export type CardVolumeSource = z.infer<typeof cardVolumeSourceSchema>;
+export const cardCameraPresetSchema = z.enum([
+  "threeQuarterFront",
+  "broadside",
+  "topDown",
+  "inside",
+  "outside",
+  "wallGrazing",
+]);
 export type CardCameraPreset = z.infer<typeof cardCameraPresetSchema>;
 const cardCameraSchema = z
   .object({
@@ -451,6 +460,7 @@ export const cardRecipeSchema = z.object({
   viz: z.object({
     volumeViz: cardVolumeVizSchema.default("theta_drive"),
     volumeDomain: cardVolumeDomainSchema.default("wallBand"),
+    volumeSource: cardVolumeSourceSchema.default("lattice"),
     gateSource: cardGateSourceSchema.default("schedule"),
     gateView: z.boolean().default(true),
     forceFlatGate: z.boolean().optional(),

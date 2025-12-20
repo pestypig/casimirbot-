@@ -7,8 +7,9 @@ import { type StateCreator } from "zustand";
 import { createWithEqualityFn } from "zustand/traditional";
 
 export type HullGateSource = "schedule" | "blanket" | "combined";
-export type HullVolumeViz = "theta_gr" | "rho_gr" | "theta_drive";
+export type HullVolumeViz = "theta_gr" | "rho_gr" | "theta_drive" | "shear_gr" | "vorticity_gr";
 export type HullVolumeDomain = "wallBand" | "bubbleBox";
+export type HullVolumeSource = "analytic" | "lattice" | "brick";
 export type HullQualityPreset = "auto" | "low" | "medium" | "high";
 export interface HullQualityOverrides {
   voxelDensity?: "low" | "medium" | "high";
@@ -168,6 +169,7 @@ export interface HullViewerState {
   planarVizMode?: number;
   volumeViz?: HullVolumeViz;
   volumeDomain?: HullVolumeDomain;
+  volumeSource?: HullVolumeSource;
   vizFloors?: HullVizFloors;
   qualityPreset?: HullQualityPreset;
   qualityOverrides?: HullQualityOverrides;
@@ -468,6 +470,7 @@ const creator: StateCreator<Hull3DSharedState> = (set) => ({
   meshOverlay: null,
   viewer: {
     volumeDomain: "wallBand",
+    volumeSource: "lattice",
   },
   lattice: {
     frame: null,

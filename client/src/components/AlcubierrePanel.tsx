@@ -19,12 +19,13 @@ import {
   type HullSpacetimeGridColorBy,
   type HullSpacetimeGridStrengthMode,
   type HullVoxelSliceAxis,
+  type HullVolumeSource,
 } from "@/store/useHull3DSharedStore";
 import { useDesktopStore } from "@/store/useDesktopStore";
 import { shallow } from "zustand/shallow";
 import { VolumeModeToggle, type VolumeViz } from "@/components/VolumeModeToggle";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
-import { Hull3DRenderer, Hull3DRendererMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState, HullGeometryMode, HullGateSource, Hull3DVolumeDomain, type HullPreviewMeshPayload } from "./Hull3DRenderer.ts";
+import { Hull3DRenderer, Hull3DRendererMode, Hull3DSkyboxMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState, HullGeometryMode, HullGateSource, Hull3DVolumeDomain, type HullPreviewMeshPayload } from "./Hull3DRenderer.ts";
 import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
 import { smoothSectorWeights } from "@/lib/sector-weights";
 import { TheoryBadge } from "./common/TheoryBadge";
@@ -292,6 +293,10 @@ const volumeModeFromHull = (mode: Hull3DVolumeViz): VolumeViz => {
       return 0;
     case "rho_gr":
       return 1;
+    case "shear_gr":
+      return 3;
+    case "vorticity_gr":
+      return 4;
     default:
       return 2;
   }
@@ -303,6 +308,10 @@ const hullVizFromVolumeMode = (mode: VolumeViz): Hull3DVolumeViz => {
       return "theta_gr";
     case 1:
       return "rho_gr";
+    case 3:
+      return "shear_gr";
+    case 4:
+      return "vorticity_gr";
     default:
       return "theta_drive";
   }
@@ -401,7 +410,8 @@ uniform vec3  u_axes;                   // hull axes scale (a,b,c) -> x,y,z
 uniform float u_sigma;                  // wall thickness sigma
 uniform float u_R;                      // bubble radius R
 uniform float u_beta;                   // ship beta along +x
-uniform int   u_viz;                    // 0 theta_GR, 1 rho_GR, 2 theta_Drive
+uniform float u_thetaSign;
+uniform int   u_viz;                    // 0 theta_GR, 1 rho_GR, 2 theta_Drive, 3 shear_GR, 4 vorticity_GR
 uniform float u_ampChain;               // gamma_geo^3 * q * gamma_VdB
 uniform float u_gate;                   // sqrt(d_FR) * (sector visibility)
 uniform float u_gate_view;
@@ -483,7 +493,7 @@ void main(){
   float dfy = dfdr * dir.y;
   float dfz = dfdr * dir.z;
 
-  float theta_gr = u_beta * dfx;
+  float theta_gr = u_beta * dfx * u_thetaSign;
 
   float Kxx = -u_beta * dfx;
   float Kxy = -0.5 * u_beta * dfy;
@@ -492,6 +502,9 @@ void main(){
   float KijKij = Kxx*Kxx + 2.0*Kxy*Kxy + 2.0*Kxz*Kxz;
   const float INV16PI = 0.019894367886486918;
   float rho_gr = (K2 - KijKij) * INV16PI;
+
+  float sigma2 = max(KijKij - (K2 / 3.0), 0.0);
+  float vorticity = u_beta * sqrt(dfy*dfy + dfz*dfz);
 
   float gateWF = 1.0;
   if (u_viz == 2) {
@@ -539,8 +552,26 @@ void main(){
   }
   float theta_drive = theta_gr * u_ampChain * u_gate_view * gateWF;
 
-  float s_raw = (u_viz == 0) ? theta_gr : ((u_viz == 1) ? rho_gr : theta_drive);
-  float floorV = (u_viz == 0) ? u_vizFloorThetaGR : ((u_viz == 1) ? u_vizFloorRhoGR : u_vizFloorThetaDrive);
+  float s_raw = theta_gr;
+  if (u_viz == 1) {
+    s_raw = rho_gr;
+  } else if (u_viz == 2) {
+    s_raw = theta_drive;
+  } else if (u_viz == 3) {
+    s_raw = sigma2;
+  } else if (u_viz == 4) {
+    s_raw = vorticity;
+  }
+  float floorV = u_vizFloorThetaGR;
+  if (u_viz == 1) {
+    floorV = u_vizFloorRhoGR;
+  } else if (u_viz == 2) {
+    floorV = u_vizFloorThetaDrive;
+  } else if (u_viz == 3) {
+    floorV = u_vizFloorRhoGR;
+  } else if (u_viz == 4) {
+    floorV = u_vizFloorThetaGR;
+  }
   float s = s_raw;
   if (floorV > 0.0) {
     float mag = abs(s_raw);
@@ -975,8 +1006,20 @@ const closeDesktopPanel = useDesktopStore((s) => s.close);
 
 const [hullMode, setHullMode] = useState<Hull3DRendererMode>("instant");
 const [hullBlend, setHullBlend] = useState(0);
+const [skyboxMode, setSkyboxMode] = useState<Hull3DSkyboxMode>(() => {
+  if (typeof window === "undefined") return "off";
+  const w: any = window;
+  const raw = w.__hullSkyboxMode;
+  return raw === "flat" || raw === "geodesic" ? raw : "off";
+});
 const [hullVolumeVizLive, setHullVolumeVizLive] = useState<Hull3DVolumeViz>("theta_drive");
 const [hullVolumeDomain, setHullVolumeDomain] = useState<Hull3DVolumeDomain>("wallBand");
+const [volumeSource, setVolumeSource] = useState<HullVolumeSource>(() => {
+  if (typeof window === "undefined") return "lattice";
+  const w: any = window;
+  const raw = w.__hullVolumeSource;
+  return raw === "analytic" || raw === "lattice" || raw === "brick" ? raw : "lattice";
+});
 const [bubbleBoundsMode, setBubbleBoundsMode] = useState<"tight" | "wide">("tight");
 const [bubbleOpacityHi, setBubbleOpacityHi] = useState(0.35);
 const bubbleOpacityWindow = useMemo<[number, number]>(() => {
@@ -1038,6 +1081,11 @@ const [betaTargetMs2, setBetaTargetMs2] = useState(ONE_G_MS2);
 const [betaComfortMs2, setBetaComfortMs2] = useState(0.4 * ONE_G_MS2);
 const [showKHeatOverlay, setShowKHeatOverlay] = useState(true);
 const [showThetaIsoOverlay, setShowThetaIsoOverlay] = useState(true);
+const [thetaSign, setThetaSign] = useState<1 | -1>(() => {
+  if (typeof window === "undefined") return 1;
+  const w: any = window;
+  return w.__hullThetaSign === -1 ? -1 : 1;
+});
 const [showFordRomanBar, setShowFordRomanBar] = useState(true);
 const [showSectorArcOverlay, setShowSectorArcOverlay] = useState(true);
 const [showTiltOverlay, setShowTiltOverlay] = useState<boolean>(() => {
@@ -1047,6 +1095,10 @@ const [showTiltOverlay, setShowTiltOverlay] = useState<boolean>(() => {
   return true;
 });
 const [showGreensOverlay, setShowGreensOverlay] = useState(false);
+const [showFluxStreamlines, setShowFluxStreamlines] = useState(false);
+const [fluxSeedCount, setFluxSeedCount] = useState(56);
+const [fluxSeedRadius, setFluxSeedRadius] = useState(1.0);
+const [fluxSeedSpread, setFluxSeedSpread] = useState(0.08);
 const tiltFromBusRef = useRef<TiltDirective | null>(null);
 const [tiltBusVersion, bumpTiltVersion] = useReducer((x: number) => x + 1, 0);
 const wireframePatchTick = useRef(0);
@@ -1469,6 +1521,21 @@ useEffect(() => {
 }, [showTiltOverlay]);
 useEffect(() => {
   if (typeof window !== "undefined") {
+    (window as any).__hullThetaSign = thetaSign;
+  }
+}, [thetaSign]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    (window as any).__hullVolumeSource = volumeSource;
+  }
+}, [volumeSource]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    (window as any).__hullSkyboxMode = skyboxMode;
+  }
+}, [skyboxMode]);
+useEffect(() => {
+  if (typeof window !== "undefined") {
     (window as any).__hullLatticeModeEnabled = latticeModeEnabled;
   }
 }, [latticeModeEnabled]);
@@ -1480,7 +1547,7 @@ useEffect(() => {
 useEffect(() => {
   const handlerId = subscribe("warp:viz", (payload: any) => {
     const v = Number(payload?.volumeViz);
-    if (v === 0 || v === 1 || v === 2) {
+    if (v === 0 || v === 1 || v === 2 || v === 3 || v === 4) {
       setLiveVolumeMode(v as VolumeViz);
     }
   });
@@ -2012,6 +2079,7 @@ const res = 256;
     staleTime: 5000,
     refetchOnWindowFocus: false,
   });
+  const warpFieldType = live?.warpFieldType ?? live?.dynamicConfig?.warpFieldType ?? "natario";
   const hullPreview = useHullPreviewPayload();
   const [rawPreviewMesh, setRawPreviewMesh] = useState<{
     key: string;
@@ -2402,6 +2470,13 @@ const res = 256;
     setShowHullSectorRing,
     setShowHullSurfaceOverlay,
   ]);
+  const applyGeoVisThetaPreset = useCallback(() => {
+    setHullVolumeVizLive("theta_gr");
+    setPlanarVizMode(3);
+    setUserVizLocked(true);
+    setSharedPalette({ id: "diverging", encodeBetaSign: true, legend: true });
+    setShowThetaIsoOverlay(true);
+  }, [setHullVolumeVizLive, setPlanarVizMode, setSharedPalette, setShowThetaIsoOverlay, setUserVizLocked]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = () => applyDriveCardPreset();
@@ -2582,6 +2657,12 @@ const res = 256;
         : undefined,
     };
   }, [axes, hullDimsResolved, hullPreview]);
+  const cardCameraMinRadius = useMemo(() => {
+    if (cardCameraPreset === "inside") return 0;
+    if (cardCameraPreset === "wallGrazing") return Math.max(R * 1.1, 3);
+    if (cardCameraPreset === "outside") return Math.max(R * 6.0, 18);
+    return Math.max(R * 4.2, 12);
+  }, [cardCameraPreset, R]);
   const cardCameraFrame = useMemo(
     () =>
       frameCardCameraToObb({
@@ -2591,10 +2672,10 @@ const res = 256;
         domainScale: hullDomainScale,
         basis: hullDimsResolved?.basis ?? null,
         fov_deg: 45,
-        minRadius: Math.max(R * 4.2, 12),
+        minRadius: cardCameraMinRadius,
         yawOffset_rad: followHullPhase ? (ds.phase01 ?? 0) * Math.PI * 2 : 0,
       }),
-    [R, axes, cardCameraPreset, ds.phase01, followHullPhase, hullDimsResolved?.basis, hullDomainScale, hullObb],
+    [R, axes, cardCameraMinRadius, cardCameraPreset, ds.phase01, followHullPhase, hullDimsResolved?.basis, hullDomainScale, hullObb],
   );
 
   useEffect(() => {
@@ -2602,6 +2683,7 @@ const res = 256;
       planarVizMode,
       volumeViz: hullVolumeVizLive,
       volumeDomain: hullVolumeDomain,
+      volumeSource,
       opacityWindow: bubbleOpacityWindow,
       boundsProfile: bubbleBoundsMode,
       vizFloors,
@@ -2620,6 +2702,7 @@ const res = 256;
     setViewer,
     planarVizMode,
     hullVolumeVizLive,
+    hullVolumeVizLive,
     vizFloors,
     gateSource,
     gateViewEnabled,
@@ -2635,6 +2718,7 @@ const res = 256;
     R,
     hullDomainScale,
     hullVolumeDomain,
+    volumeSource,
     bubbleOpacityWindow,
     bubbleBoundsMode,
   ]);
@@ -3309,7 +3393,9 @@ const res = 256;
   }, [ds, totalSectors, liveSectors]);
 
   const overlayConfig = useMemo<Hull3DOverlayState>(() => {
-    const isGRMode = planarVizMode === 0 || planarVizMode === 1;
+    const isGRVolume = hullVolumeVizLive === "theta_gr" || hullVolumeVizLive === "rho_gr";
+    const isGRMode = planarVizMode === 0 || planarVizMode === 1 || (planarVizMode === 3 && isGRVolume);
+    const isRhoMode = planarVizMode === 1 || (planarVizMode === 3 && hullVolumeVizLive === "rho_gr");
     const phase = Number.isFinite(loopPhase) ? loopPhase : ds.phase01 ?? 0;
     const tauLCms = firstFinite(
       lightLoop.tauLC_ms,
@@ -3332,7 +3418,7 @@ const res = 256;
     );
     const thetaFloor = Math.max(1e-9, vizFloors.thetaGR ?? 1e-9);
     const rhoFloor = Math.max(1e-18, vizFloors.rhoGR ?? 1e-18);
-    const isoStep = isGRMode ? (planarVizMode === 1 ? rhoFloor * 1.6 : thetaFloor * 1.4) : thetaFloor;
+    const isoStep = isGRMode ? (isRhoMode ? rhoFloor * 1.6 : thetaFloor * 1.4) : thetaFloor;
     const spacetimeGridPrefs = {
       enabled: spacetimeGridEnabled,
       mode: spacetimeGridMode,
@@ -3348,8 +3434,8 @@ const res = 256;
       phase,
       kInvariants: {
         enabled: isGRMode && showKHeatOverlay,
-        mode: planarVizMode === 1 ? 2 : 0,
-        gain: planarVizMode === 1 ? 4.0 : 6.0,
+        mode: isRhoMode ? 2 : 0,
+        gain: isRhoMode ? 4.0 : 6.0,
         alpha: showKHeatOverlay ? 0.65 : 0,
       },
       thetaIso: {
@@ -3880,6 +3966,13 @@ const res = 256;
   }, [sharedLatticeState?.sdf, latticeGpuStatus]);
   const latticePathActive = latticeRuntime?.hasLatticeVolume && !latticeFallbackStatus;
   const latticeOverlayVolumeReady = latticePathActive && !!latticeVolumeForRenderer;
+  const volumePath =
+    volumeSource === "lattice"
+      ? latticeOverlayVolumeReady
+        ? "lattice"
+        : "analytic"
+      : volumeSource;
+  const volumePathActive = volumePath === "lattice";
   const latticeRebuildPending =
     latticePathActive && !latticeOverlayVolumeReady && !!sharedLatticeState?.volume;
   const overlayLockedReason = useMemo(() => {
@@ -3898,13 +3991,13 @@ const res = 256;
     latticeOverlayVolumeReady,
     latticeRebuildPending,
   ]);
-  const voxelSlicesSuppressed = latticeOverlayVolumeReady; // hide 2D slice overlays when 3D volume is live
+  const voxelSlicesSuppressed = volumePathActive && latticeOverlayVolumeReady; // hide 2D slice overlays when 3D volume is live
   const voxelOverlayActive =
     latticeOverlayVolumeReady &&
     !overlayLockedReason &&
     (coverageHeatmapEnabled || (voxelSlicesEnabled && !voxelSlicesSuppressed));
   const voxelSliceActive = voxelOverlayActive && voxelSlicesEnabled && !voxelSlicesSuppressed;
-  const surfaceOverlaySuppressed = latticeOverlayVolumeReady; // hide surface debug when 3D volume is live
+  const surfaceOverlaySuppressed = volumePathActive && latticeOverlayVolumeReady; // hide surface debug when 3D volume is live
   const overlayCanvasVisible = overlayHudEnabled || voxelOverlayActive;
   const overlayControlsDisabled = !!overlayLockedReason || !latticeOverlayVolumeReady;
   const sliceControlsDisabled = overlayControlsDisabled || !voxelSlicesEnabled;
@@ -4615,11 +4708,11 @@ const res = 256;
         const r = Math.sqrt(mx * mx + mz * mz);
         const cos = mx / Math.max(r, 1e-6);
         const dfdr = dTopHatDr(r, sigma, R);
-        field[j * nx + i] = beta * cos * dfdr;
+        field[j * nx + i] = thetaSign * beta * cos * dfdr;
       }
     }
     return field;
-  }, [planarVizMode, beta, sigma, R, axes, res, hullDomainScale]);
+  }, [planarVizMode, beta, thetaSign, sigma, R, axes, res, hullDomainScale]);
 
   const rhoField_GR = useMemo(() => {
     if (planarVizMode !== 1) return null;
@@ -4740,11 +4833,11 @@ const res = 256;
           lumpBoostExp
         );
 
-        field[j * nx + i] = ampChain * beta * cos * dfdr * gate * gateWF;
+        field[j * nx + i] = thetaSign * ampChain * beta * cos * dfdr * gate * gateWF;
       }
     }
     return field;
-  }, [planarVizMode, beta, sigma, R, ampChain, gate, fActive, axes, res, lumpBoostExp, driveWeightAt, ds.phase01, hullDomainScale]);
+  }, [planarVizMode, beta, thetaSign, sigma, R, ampChain, gate, fActive, axes, res, lumpBoostExp, driveWeightAt, ds.phase01, hullDomainScale]);
 
   const [thetaPkAbs, thetaPkPos, thetaMin, thetaMax] = useMemo(() => {
     const field = planarVizMode === 0 ? thetaField_GR : planarVizMode === 1 ? rhoField_GR : thetaField_Drive;
@@ -5019,8 +5112,10 @@ const res = 256;
     R: 1,
     domainScale: 1,
     beta: 0,
+    thetaSign: 1,
     planarVizMode: 0 as VizMode,
     volumeViz: "theta_drive" as Hull3DVolumeViz,
+    volumeSource: "lattice" as HullVolumeSource,
     ampChain: 1,
     gate: 0,
     gateView: 0,
@@ -5057,8 +5152,10 @@ const res = 256;
   dynRef.current.R = R;
   dynRef.current.domainScale = hullDomainScale;
   dynRef.current.beta = beta;
+  dynRef.current.thetaSign = thetaSign;
   dynRef.current.planarVizMode = planarVizMode;
   dynRef.current.volumeViz = hullVolumeVizLive;
+  dynRef.current.volumeSource = volumeSource;
   (dynRef.current as any).volumeDomain = hullVolumeDomain;
   (dynRef.current as any).opacityWindow = bubbleOpacityWindow;
   dynRef.current.ampChain = ampChain;
@@ -5103,8 +5200,10 @@ const res = 256;
     dynRef.current.sigma = sigma;
     dynRef.current.R = R;
     dynRef.current.beta = beta;
+    dynRef.current.thetaSign = thetaSign;
     dynRef.current.planarVizMode = planarVizMode;
     dynRef.current.volumeViz = hullVolumeVizLive;
+    dynRef.current.volumeSource = volumeSource;
     dynRef.current.ampChain = ampChain;
     dynRef.current.gate = gateRaw;
     dynRef.current.gateView = gateView;
@@ -5135,7 +5234,7 @@ const res = 256;
   dynRef.current.previewMesh = previewMeshForRenderer;
   (dynRef.current as any).splitEnabled = ds.splitEnabled ? 1 : 0;
   (dynRef.current as any).splitFrac = ds.splitFrac;
-  }, [axes, sigma, R, beta, planarVizMode, hullVolumeVizLive, ampChain, gateRaw, gateView, dutyFR, yGainFinal, yBias, kColor, mvp, totalSectors, liveSectors, lumpBoostExp, sectorCenter01, gaussianSigma, ds.sectorFloor, syncMode, ds.phase01, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, ds.splitEnabled, ds.splitFrac, hullGeometry, hullRadiusLUT, hullSdf, hullDimsEffective, previewMeshForRenderer]);
+  }, [axes, sigma, R, beta, thetaSign, planarVizMode, hullVolumeVizLive, volumeSource, ampChain, gateRaw, gateView, dutyFR, yGainFinal, yBias, kColor, mvp, totalSectors, liveSectors, lumpBoostExp, sectorCenter01, gaussianSigma, ds.sectorFloor, syncMode, ds.phase01, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, ds.splitEnabled, ds.splitFrac, hullGeometry, hullRadiusLUT, hullSdf, hullDimsEffective, previewMeshForRenderer]);
 
   useEffect(() => {
     const fActiveRenderer = gateSource === "blanket" ? 1 : fActive;
@@ -5181,6 +5280,7 @@ const res = 256;
       splitFrac: ds.splitFrac,
       syncMode,
       phase01: ds.phase01,
+      thetaSign,
       showSectorRing: showHullSectorRing,
       showGhostSlice: voxelSliceActive,
       showSurfaceOverlay: showHullSurfaceOverlay && !surfaceOverlaySuppressed,
@@ -5194,6 +5294,8 @@ const res = 256;
       followPhase: followHullPhase,
       volumeViz: hullVolumeVizLive,
       volumeDomain: hullVolumeDomain,
+      volumeSource,
+      warpFieldType,
       opacityWindow: bubbleOpacityWindow,
       camera: cardCameraFrame,
       blendFactor: hullBlend,
@@ -5204,6 +5306,15 @@ const res = 256;
       previewMesh: previewMeshForRenderer,
       wireframeOverlay: wireframeOverlayForRenderer,
       overlays: overlayConfig,
+      skybox: {
+        mode: skyboxMode,
+      },
+      fluxStreamlines: {
+        enabled: showFluxStreamlines,
+        seedCount: fluxSeedCount,
+        seedRadius: fluxSeedRadius,
+        seedSpread: fluxSeedSpread,
+      },
       latticeFrame: latticeModeEnabled ? sharedLatticeState?.frame ?? null : null,
       latticePreset: latticeModeEnabled ? sharedLatticeState?.preset ?? "auto" : "auto",
       latticeProfileTag: latticeModeEnabled ? sharedLatticeState?.profileTag ?? "preview" : "preview",
@@ -5217,7 +5328,7 @@ const res = 256;
       latticeSize: latticeModeEnabled ? sharedLatticeState?.frame?.bounds.size ?? null : null,
     };
     hullStateRef.current = base;
-  }, [axes, hullDomainScale, bubbleBoundsMode, hullGeometry, hullRadiusMax, hullRadiusLUT, hullSdf, R, sigma, beta, ampChain, gateView, gateRaw, gateSource, tilesPerSectorVector, fActive, dutyFR, gaussianSigma, sectorCenter01, totalSectors, liveSectors, ds.sectorFloor, lumpBoostExp, ds.splitEnabled, ds.splitFrac, syncMode, ds.phase01, showHullSectorRing, voxelSliceActive, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, followHullPhase, hullVolumeVizLive, hullVolumeDomain, bubbleOpacityWindow, cardCameraFrame, hullBlend, bubbleStatus, aspect, vizFloors.thetaGR, vizFloors.rhoGR, vizFloors.thetaDrive, overlayConfig, sharedPhase, sharedSampling, sharedPhysicsState, sharedComplianceState, sharedSectorState, sharedPaletteState, wireframeOverlayForRenderer, latticeModeEnabled, latticeSdfForRenderer, latticeVolumeForRenderer, sharedLatticeState?.frame, sharedLatticeState?.preset, sharedLatticeState?.profileTag, sharedLatticeState?.strobe, previewMeshForRenderer, latticeUseDynamicWeights]);
+  }, [axes, hullDomainScale, bubbleBoundsMode, hullGeometry, hullRadiusMax, hullRadiusLUT, hullSdf, R, sigma, beta, ampChain, gateView, gateRaw, gateSource, tilesPerSectorVector, fActive, dutyFR, gaussianSigma, sectorCenter01, totalSectors, liveSectors, ds.sectorFloor, lumpBoostExp, ds.splitEnabled, ds.splitFrac, syncMode, ds.phase01, thetaSign, showHullSectorRing, voxelSliceActive, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, followHullPhase, hullVolumeVizLive, hullVolumeDomain, volumeSource, warpFieldType, bubbleOpacityWindow, cardCameraFrame, hullBlend, bubbleStatus, aspect, vizFloors.thetaGR, vizFloors.rhoGR, vizFloors.thetaDrive, overlayConfig, skyboxMode, showFluxStreamlines, fluxSeedCount, fluxSeedRadius, fluxSeedSpread, sharedPhase, sharedSampling, sharedPhysicsState, sharedComplianceState, sharedSectorState, sharedPaletteState, wireframeOverlayForRenderer, latticeModeEnabled, latticeSdfForRenderer, latticeVolumeForRenderer, sharedLatticeState?.frame, sharedLatticeState?.preset, sharedLatticeState?.profileTag, sharedLatticeState?.strobe, previewMeshForRenderer, latticeUseDynamicWeights]);
 
   // When an operational mode that implies drive activity is set, default to theta(Drive)
   // once, unless the user has already picked a planarVizMode explicitly. Only override planar GR modes.
@@ -5451,6 +5562,7 @@ const res = 256;
       u_sigma: gl.getUniformLocation(prog, "u_sigma"),
       u_R: gl.getUniformLocation(prog, "u_R"),
       u_beta: gl.getUniformLocation(prog, "u_beta"),
+      u_thetaSign: gl.getUniformLocation(prog, "u_thetaSign"),
       u_viz: gl.getUniformLocation(prog, "u_viz"),
       u_ampChain: gl.getUniformLocation(prog, "u_ampChain"),
       u_gate: gl.getUniformLocation(prog, "u_gate"),
@@ -5505,6 +5617,7 @@ const res = 256;
   if (loc.u_sigma) gl.uniform1f(loc.u_sigma, s(d.sigma, 6));
   if (loc.u_R) gl.uniform1f(loc.u_R, Math.max(0.1, s(d.R, 1)));
   if (loc.u_beta) gl.uniform1f(loc.u_beta, s(d.beta, 0));
+  if (loc.u_thetaSign) gl.uniform1f(loc.u_thetaSign, s((d as any).thetaSign ?? 1, 1));
   if (loc.u_viz) gl.uniform1i(loc.u_viz, d.planarVizMode);
   if (loc.u_ampChain) gl.uniform1f(loc.u_ampChain, s(d.ampChain, 1));
   if (loc.u_gate) gl.uniform1f(loc.u_gate, Math.max(0, s(d.gate, 0)));
@@ -6268,10 +6381,14 @@ const res = 256;
       };
     }
     if (!latticeOverlayVolumeReady || !latticeVolumeStats) {
+      const fallbackTitle =
+        volumePath === "brick"
+          ? "Volume source is brick; lattice coverage pending."
+          : "Lattice path not active; using analytic volume.";
       return {
         text: "Coverage pending",
         className: "bg-amber-900/60 text-amber-100",
-        title: overlayLockedReason ?? "Lattice path not active; using analytic volume.",
+        title: overlayLockedReason ?? fallbackTitle,
       };
     }
     const covText = `${latticeVolumeStats.covPct.toFixed(1)}%`;
@@ -6299,6 +6416,7 @@ const res = 256;
     overlayLockedReason,
     sharedLatticeState?.volume?.clampReasons,
     latticeFrameStats?.clampReasons,
+    volumePath,
   ]);
   const perfProfileBadge = useMemo(
     () => ({
@@ -6309,18 +6427,23 @@ const res = 256;
     [hullQuality, latticeProfileTag, overlayProfileKey],
   );
   const latticePathBadge = useMemo(() => {
-    const pathText = latticePathActive ? "Lattice" : "Analytic";
-    const className = latticePathActive
-      ? "bg-emerald-900/70 text-emerald-100"
-      : "bg-amber-900/70 text-amber-100";
+    const pathText = volumePath === "lattice" ? "Lattice" : volumePath === "brick" ? "Brick" : "Analytic";
+    const className =
+      volumePath === "lattice"
+        ? "bg-emerald-900/70 text-emerald-100"
+        : volumePath === "brick"
+          ? "bg-slate-800/70 text-slate-100"
+          : "bg-amber-900/70 text-amber-100";
     const titleParts = [
       `Path=${pathText}`,
-      latticeDowngradeLabel ? `Format=${latticeDowngradeLabel}` : null,
-      latticeDowngradeReason ? `Reason=${latticeDowngradeReason}` : null,
+      `Source=${volumeSource}`,
+      volumePath === "lattice" && latticeDowngradeLabel ? `Format=${latticeDowngradeLabel}` : null,
+      volumePath === "lattice" && latticeDowngradeReason ? `Reason=${latticeDowngradeReason}` : null,
       latticeFallbackStatus?.hint ?? latticeFallbackStatus?.label ?? overlayLockedReason,
     ].filter(Boolean);
+    const formatLabel = volumePath === "lattice" && latticeDowngradeLabel ? ` | ${latticeDowngradeLabel}` : "";
     return {
-      text: `${pathText} | ${latticeDowngradeLabel}`,
+      text: `${pathText}${formatLabel}`,
       className,
       title: titleParts.join(" | "),
     };
@@ -6329,8 +6452,9 @@ const res = 256;
     latticeDowngradeReason,
     latticeFallbackStatus?.hint,
     latticeFallbackStatus?.label,
-    latticePathActive,
     overlayLockedReason,
+    volumePath,
+    volumeSource,
   ]);
 
   const latticeDowngradeBadge = useMemo(() => {
@@ -6841,7 +6965,7 @@ const res = 256;
         },
         coverageHeatmap: coverageHeatmapEnabled,
       },
-      path: latticePathActive ? "lattice" : "analytic",
+      path: volumePath,
       fallback: latticeFallbackStatus?.reason ?? null,
       coveragePct: latticeVolumeStats?.covPct ?? null,
       maxGate: latticeVolumeStats?.maxGate ?? null,
@@ -6882,7 +7006,7 @@ const res = 256;
     latticeDowngradeLabel,
     latticeDowngradeReason,
     latticeFallbackStatus?.reason,
-    latticePathActive,
+    volumePath,
     latticeProfileTag,
     latticeVolumeStats?.covPct,
     latticeVolumeStats?.maxGate,
@@ -7757,6 +7881,70 @@ const res = 256;
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Momentum flow</span>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-500"
+                    checked={showFluxStreamlines}
+                    onChange={(event) => setShowFluxStreamlines(event.target.checked)}
+                  />
+                  <span>Streamlines</span>
+                </label>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <span>Seeds</span>
+                  <input
+                    type="number"
+                    min={8}
+                    max={256}
+                    step={4}
+                    value={fluxSeedCount}
+                    disabled={!showFluxStreamlines}
+                    onChange={(event) => {
+                      const next = parseInt(event.target.value, 10);
+                      setFluxSeedCount(Number.isFinite(next) ? Math.max(8, Math.min(256, next)) : fluxSeedCount);
+                    }}
+                    className="w-16 rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100 disabled:opacity-50"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <span>Shell r</span>
+                  <input
+                    type="number"
+                    min={0.2}
+                    max={1.5}
+                    step={0.05}
+                    value={fluxSeedRadius.toFixed(2)}
+                    disabled={!showFluxStreamlines}
+                    onChange={(event) => {
+                      const next = parseFloat(event.target.value);
+                      const clamped = Number.isFinite(next) ? Math.max(0.2, Math.min(1.5, next)) : fluxSeedRadius;
+                      setFluxSeedRadius(clamped);
+                    }}
+                    className="w-16 rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100 disabled:opacity-50"
+                    title="Seed radius in r/R units (1.0 hugs the wall)."
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                  <span>Spread</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={0.4}
+                    step={0.02}
+                    value={fluxSeedSpread.toFixed(2)}
+                    disabled={!showFluxStreamlines}
+                    onChange={(event) => {
+                      const next = parseFloat(event.target.value);
+                      const clamped = Number.isFinite(next) ? Math.max(0, Math.min(0.4, next)) : fluxSeedSpread;
+                      setFluxSeedSpread(clamped);
+                    }}
+                    className="w-16 rounded bg-slate-900 px-2 py-1 text-[0.65rem] text-slate-100 disabled:opacity-50"
+                    title="Shell thickness for random seed jitter."
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Spacetime grid</span>
                 <span className="text-[0.6rem] uppercase tracking-wide text-slate-500">Presets</span>
                 <div className="flex flex-wrap items-center gap-1">
@@ -8000,6 +8188,78 @@ const res = 256;
                   </div>
                 </div>
               )}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Presets</span>
+                <button
+                  type="button"
+                  onClick={applyGeoVisThetaPreset}
+                  className="rounded bg-slate-700 px-2 py-1 text-[0.65rem] text-slate-100 hover:bg-slate-600"
+                  title="GeoViS theta: theta_GR volume, diverging palette, theta-iso overlay"
+                >
+                  GeoViS ${GREEK_THETA}
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">${GREEK_THETA} sign</span>
+                <button
+                  type="button"
+                  onClick={() => setThetaSign(1)}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    thetaSign === 1 ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Positive theta sign (default convention)"
+                >
+                  +1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThetaSign(-1)}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    thetaSign === -1 ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Flip theta sign (GeoViS parity)"
+                >
+                  -1
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Volume source</span>
+                <button
+                  type="button"
+                  onClick={() => setVolumeSource("analytic")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    volumeSource === "analytic" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Analytic volume (ellipsoid)"
+                >
+                  Analytic
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVolumeSource("lattice")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    volumeSource === "lattice" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Lattice voxel volume (gate + drive)"
+                >
+                  Lattice
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVolumeSource("brick")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    volumeSource === "brick" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Stress-energy brick (T00)"
+                >
+                  Brick
+                </button>
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Volume field</span>
                 <VolumeModeToggle value={liveVolumeMode} onChange={handleVolumeModeChange} />
@@ -8097,6 +8357,39 @@ const res = 256;
                 >
                   Top-down
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setCardCameraPreset("inside")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    cardCameraPreset === "inside" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Interior orbit from inside the bubble"
+                >
+                  Inside
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCardCameraPreset("outside")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    cardCameraPreset === "outside" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Pull back to show the full exterior hull"
+                >
+                  Outside
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCardCameraPreset("wallGrazing")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    cardCameraPreset === "wallGrazing" ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-200"
+                  )}
+                  title="Near-wall orbit to graze the shell"
+                >
+                  Wall graze
+                </button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Geometry</span>
@@ -8154,6 +8447,42 @@ const res = 256;
                   />
                   <span className="font-mono text-[0.65rem] text-slate-300">{Math.round(hullBlend * 100)}%</span>
                 </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Background</span>
+                <button
+                  type="button"
+                  onClick={() => setSkyboxMode("off")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    skyboxMode === "off" ? "bg-slate-700 text-slate-100" : "bg-slate-800 text-slate-300"
+                  )}
+                  title="Disable the geodesic skybox background"
+                >
+                  Off
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSkyboxMode("flat")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    skyboxMode === "flat" ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300"
+                  )}
+                  title="Show the environment map without lensing (Minkowski baseline)"
+                >
+                  Flat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSkyboxMode("geodesic")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    skyboxMode === "geodesic" ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300"
+                  )}
+                  title="Integrate null geodesics against the current metric"
+                >
+                  Geodesic
+                </button>
               </div>
               <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
                 <span>Exposure</span>

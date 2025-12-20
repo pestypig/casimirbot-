@@ -391,6 +391,32 @@ Use this as a working outline for Codex to ship a card-ready view that shows the
     - Auto-scaling: warpStrengthMode picks manual vs thetaPkAbs vs thetaScaleExpected for consistent visuals across duty/gamma.
     - Perf/fallbacks: cap line counts, downsample spacing on low tier, HUD badge for degraded (analytic-only/coarse spacing/SDF missing).
     - Export/replay: pack spacetimeGrid prefs into `cardRecipe`/sidecar.
+
+
+- **Phase 12 - Warp bubble visualizer integration (sources)** [ ]
+
+  - Implementation details: see `PATCH_PLAN.md` section 4.
+
+  - [ ] Kinematic scalar modes: add `shear_gr` and `vorticity_gr` volume viz alongside `theta_gr`/`rho_gr`/`theta_drive` in `shared/schema.ts`, `Hull3DRenderer`, `AlcubierrePanel`, and `VolumeModeToggle`.
+
+  - [ ] GeoViS parity: add a theta sign toggle and camera presets (inside/outside/wall-grazing), plus a "GeoViS theta" preset (diverging palette + theta iso overlay).
+
+  - [ ] Brick lane: add a volume source selector (analytic | lattice | brick) and allow `t00` bricks to render as a selectable volume source (still keep t00 overlay).
+
+  - [ ] Momentum flowlines: integrate `hull3d:flux` Sx/Sy/Sz into a streamline overlay with UI toggle and seeding controls.
+
+  - [ ] Geodesic skybox mode: add a background pass in `Hull3DRenderer` for null geodesic tracing + env map sampling.
+
+  - [ ] Metric plugin interface: introduce a shared metric evaluator and new `warpFieldType` for an irrotational shift-flow metric.
+
+  - [ ] WarpFactory dataset import: add a loader for external scalar/vector volumes (e.g., `.wfbrick`) and bind to the same volume source selector.
+
+  - [ ] Cross-validation: theta parity (2D vs 3D), Natario invariants (theta/vorticity ~ 0), brick vs analytic sign/shape, GeoViS parity.
+
+  - Local references (cloned):
+    - `external/WarpFactory`
+    - `external/black-hole-skymap`
+    - `external/geodesic_raytracing`
 ## Concrete tasks to reach needle-hull GLB lattice as default
 
 - Pipeline ingest & replay

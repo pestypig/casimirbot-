@@ -47,6 +47,7 @@ export function normalizeTilesForSignature(tiles?: ArrayLike<number> | null): nu
 type VizSignatureInput = {
   volumeViz?: unknown;
   volumeDomain?: unknown;
+  volumeSource?: unknown;
   planarVizMode?: unknown;
   vizFloors?: unknown;
   gate?: unknown;
@@ -164,6 +165,7 @@ export async function buildCardSignatures(input: CardSignatureInputs): Promise<C
     signatures.vizSignature = await hashSignature({
       volumeViz: input.viz.volumeViz,
       volumeDomain: input.viz.volumeDomain,
+      volumeSource: input.viz.volumeSource,
       planarVizMode: input.viz.planarVizMode,
       vizFloors: input.viz.vizFloors,
       gate: input.viz.gate,

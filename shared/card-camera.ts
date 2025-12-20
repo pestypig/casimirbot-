@@ -96,6 +96,9 @@ export function frameCardCameraToObb(opts: FrameCameraOpts): CardCameraOrbit {
     threeQuarterFront: { forward: 1.0, right: 0.7, up: 0.4, distanceScale: 1.0 },
     broadside: { forward: 0.05, right: 1.0, up: 0.25, distanceScale: 1.05 },
     topDown: { forward: 0.08, right: 0.08, up: 1.0, distanceScale: 0.95 },
+    inside: { forward: 0.9, right: 0.35, up: 0.2, distanceScale: 0.45 },
+    outside: { forward: 1.0, right: 0.65, up: 0.35, distanceScale: 1.6 },
+    wallGrazing: { forward: 0.12, right: 1.0, up: 0.12, distanceScale: 0.85 },
   };
 
   const w = weights[preset] ?? weights.threeQuarterFront;

@@ -1,0 +1,10 @@
+{
+  "texture": "/skybox/warp-skybox.png",
+  "exposure": 1.1,
+  "rotation_deg": 0,
+  "steps": 48,
+  "step_scale": 0.06,
+  "bend": 0.7,
+  "shift_scale": 0.85,
+  "max_dist": 6.0
+}

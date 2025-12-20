@@ -1,5 +1,5 @@
 modules = ["nodejs-20", "web", "postgresql-16", "python-3.11", "python3"]
-run = "FAST_BOOT=1 PORT=5173 npm run dev"
+run = "FAST_BOOT=1 PORT=5000 npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -9,19 +9,11 @@ packages = ["gmsh", "emscripten", "jq"]
 [deployment]
 deploymentTarget = "vm"
 build = ["npm", "run", "build"]
-run = ["env", "FAST_BOOT=0", "SKIP_MODULE_INIT=1", "npm", "run", "start"]
+run = ["env", "PORT=5000", "FAST_BOOT=0", "SKIP_MODULE_INIT=1", "DEFER_ROUTE_BOOT=1", "npm", "run", "start"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 5173
-externalPort = 5173
-
-[[ports]]
-localPort = 24678
-externalPort = 3001
 
 [env]
 REPLIT_KEEP_PACKAGE_DEV_DEPENDENCIES = "1"
@@ -44,5 +36,5 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "FAST_BOOT=1 PORT=5173 npm run dev"
-waitForPort = 5173
+args = "FAST_BOOT=1 PORT=5000 npm run dev"
+waitForPort = 5000

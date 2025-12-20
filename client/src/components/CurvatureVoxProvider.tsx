@@ -47,13 +47,20 @@ export function CurvatureVoxProvider({
     if (!stress) return;
     stressStampRef.current += 1;
     const updatedAt = stressQuery.dataUpdatedAt ?? Date.now();
+    const t00 = stress.t00;
     const packet = {
       dims: stress.dims,
       stats: stress.stats,
       version: stressStampRef.current,
       updatedAt,
     };
-    publish(t00Channel, { ...packet, t00: stress.t00 });
+    publish(t00Channel, {
+      ...packet,
+      data: t00?.data,
+      min: t00?.min,
+      max: t00?.max,
+      t00,
+    });
     publish(fluxChannel, { ...packet, flux: stress.flux });
   }, [stressQuery.data, stressQuery.dataUpdatedAt, t00Channel, fluxChannel]);
 

@@ -443,7 +443,7 @@ export const warpBubbleModule: CasimirModule = {
 
       // Perform Natário warp bubble calculations
       let warpResult: NatarioWarpResult;
-      if (warpFieldType === 'natario' || warpFieldType === 'natario_sdf') {
+      if (warpFieldType === 'natario' || warpFieldType === 'natario_sdf' || warpFieldType === 'irrotational') {
         warpResult = calculateNatarioWarpBubble(warpParams);
       } else {
         debugWarn(`[WarpModule] Unsupported warpFieldType "${warpFieldType}", falling back to Natário solver`);

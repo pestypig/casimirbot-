@@ -6,6 +6,7 @@ import {
   type HullCameraState,
   type HullSpacetimeGridPrefs,
   type HullVolumeDomain,
+  type HullVolumeSource,
 } from "@/store/useHull3DSharedStore";
 import {
   curvaturePaletteIndex,
@@ -18,6 +19,9 @@ import { encodeHullDistanceBandWeightsR8, type HullDistanceGrid } from "@/lib/la
 import type { HullSurfaceVoxelVolume } from "@/lib/lattice-surface";
 import type { LatticeFrame, LatticeProfileTag, LatticeQualityPreset } from "@/lib/lattice-frame";
 import { LATTICE_PROFILE_PERF, estimateLatticeUploadBytes } from "@/lib/lattice-perf";
+import { buildFluxStreamlines, type FluxStreamlineSettings, type FluxVectorField } from "@/lib/flux-streamlines";
+import { metricModeFromWarpFieldType, type MetricModeId } from "@shared/metric-eval";
+import type { WarpFieldType } from "@shared/schema";
 
 
 
@@ -105,12 +109,89 @@ const LATTICE_PREFER_HALF_FLOAT_UPLOAD_BYTES = 64 * 1024 * 1024;
 
 const LATTICE_UPLOAD_MAX_DT_SEC = 0.25;
 
+const SKYBOX_CONFIG_URL = "/skybox/warp-skybox.lut.json";
+const SKYBOX_MAX_STEPS = 96;
+
+type SkyboxConfig = {
+  texture: string;
+  exposure: number;
+  rotation_deg: number;
+  steps: number;
+  step_scale: number;
+  bend: number;
+  shift_scale: number;
+  max_dist: number;
+};
+
+const DEFAULT_SKYBOX_CONFIG: SkyboxConfig = {
+  texture: "/skybox/warp-skybox.png",
+  exposure: 1.1,
+  rotation_deg: 0,
+  steps: 48,
+  step_scale: 0.06,
+  bend: 0.7,
+  shift_scale: 0.85,
+  max_dist: 6.0,
+};
+
+const normalizeSkyboxConfig = (raw?: Partial<SkyboxConfig> | null): SkyboxConfig => {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const numberFrom = (value: unknown, fallback: number, min?: number, max?: number) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    if (min !== undefined && n < min) return min;
+    if (max !== undefined && n > max) return max;
+    return n;
+  };
+  const stringFrom = (value: unknown, fallback: string) =>
+    typeof value === "string" && value.length ? value : fallback;
+  const steps = Math.round(
+    numberFrom((src as SkyboxConfig).steps, DEFAULT_SKYBOX_CONFIG.steps, 1, SKYBOX_MAX_STEPS)
+  );
+  return {
+    texture: stringFrom((src as SkyboxConfig).texture, DEFAULT_SKYBOX_CONFIG.texture),
+    exposure: numberFrom((src as SkyboxConfig).exposure, DEFAULT_SKYBOX_CONFIG.exposure, 0.1, 8),
+    rotation_deg: numberFrom(
+      (src as SkyboxConfig).rotation_deg,
+      DEFAULT_SKYBOX_CONFIG.rotation_deg,
+      -180,
+      180
+    ),
+    steps,
+    step_scale: numberFrom(
+      (src as SkyboxConfig).step_scale,
+      DEFAULT_SKYBOX_CONFIG.step_scale,
+      0.005,
+      0.4
+    ),
+    bend: numberFrom((src as SkyboxConfig).bend, DEFAULT_SKYBOX_CONFIG.bend, 0, 4),
+    shift_scale: numberFrom(
+      (src as SkyboxConfig).shift_scale,
+      DEFAULT_SKYBOX_CONFIG.shift_scale,
+      0,
+      4
+    ),
+    max_dist: numberFrom(
+      (src as SkyboxConfig).max_dist,
+      DEFAULT_SKYBOX_CONFIG.max_dist,
+      1,
+      20
+    ),
+  };
+};
+
 const latticeRailsForProfile = (tag?: LatticeProfileTag) =>
   LATTICE_PROFILE_PERF[tag ?? "preview"] ?? LATTICE_PROFILE_PERF.preview;
 
 const wrapPhase01 = (value: number) => {
   const wrapped = value % 1;
   return wrapped < 0 ? wrapped + 1 : wrapped;
+};
+
+const VOLUME_SOURCE_TO_INDEX: Record<Hull3DVolumeSource, 0 | 1 | 2> = {
+  analytic: 0,
+  lattice: 1,
+  brick: 2,
 };
 
 const shortestPhaseDelta = (nextValue: number, prevValue: number) => {
@@ -282,13 +363,20 @@ function readOverlayFlags(): OverlayToggleFlags {
 
 export type Hull3DRendererMode = "instant" | "average" | "blend";
 
+export type Hull3DSkyboxMode = "off" | "flat" | "geodesic";
+
 
 
 export type Hull3DQualityPreset = "auto" | "low" | "medium" | "high";
 
 
 
-export type Hull3DVolumeViz = "theta_gr" | "rho_gr" | "theta_drive";
+export type Hull3DVolumeViz =
+  | "theta_gr"
+  | "rho_gr"
+  | "theta_drive"
+  | "shear_gr"
+  | "vorticity_gr";
 
 
 
@@ -297,10 +385,11 @@ export type Hull3DVolumeViz = "theta_gr" | "rho_gr" | "theta_drive";
 
 
 export type Hull3DVolumeDomain = HullVolumeDomain;
+export type Hull3DVolumeSource = HullVolumeSource;
 
 
 
-const VOLUME_VIZ_TO_INDEX: Record<Hull3DVolumeViz, 0 | 1 | 2> = {
+const VOLUME_VIZ_TO_INDEX: Record<Hull3DVolumeViz, 0 | 1 | 2 | 3 | 4> = {
 
 
 
@@ -313,6 +402,14 @@ const VOLUME_VIZ_TO_INDEX: Record<Hull3DVolumeViz, 0 | 1 | 2> = {
 
 
   theta_drive: 2,
+
+
+
+  shear_gr: 3,
+
+
+
+  vorticity_gr: 4,
 
 
 
@@ -562,6 +659,23 @@ export interface Hull3DOverlayState {
 
 }
 
+export interface Hull3DSkyboxState {
+  mode?: Hull3DSkyboxMode;
+  exposure?: number;
+}
+
+export type FluxStreamlineConfig = {
+  enabled?: boolean;
+  seedCount?: number;
+  seedRadius?: number;
+  seedSpread?: number;
+  stepCount?: number;
+  stepScale?: number;
+  minSpeedFraction?: number;
+  bidirectional?: boolean;
+  seed?: number;
+};
+
 
 
 
@@ -794,6 +908,8 @@ export interface Hull3DRendererState {
 
   phaseSign?: number;
 
+  thetaSign?: number;
+
 
 
   // UI toggles
@@ -817,6 +933,8 @@ export interface Hull3DRendererState {
 
 
   volumeDomain?: Hull3DVolumeDomain;
+  volumeSource?: Hull3DVolumeSource;
+  warpFieldType?: WarpFieldType;
 
 
 
@@ -914,6 +1032,8 @@ export interface Hull3DRendererState {
 
 
   overlays?: Hull3DOverlayState;
+  skybox?: Hull3DSkyboxState;
+  fluxStreamlines?: FluxStreamlineConfig;
 
   latticeFrame?: LatticeFrame | null;
 
@@ -2211,7 +2331,8 @@ uniform float u_domainScale;
 
 
 
-uniform float u_beta;
+ uniform float u_beta;
+ uniform int u_metricMode;
 
 
 
@@ -2317,6 +2438,8 @@ uniform float u_phase01;
 
 
 uniform float u_phaseSign;
+
+uniform float u_thetaSign;
 
 
 
@@ -2460,7 +2583,8 @@ uniform int u_grayMode;       // 1 to force grayscale volume
 
 
 
-uniform int u_volumeViz;      // 0 theta_GR, 1 rho_GR, 2 theta_Drive
+uniform int u_volumeSource;   // 0 analytic, 1 lattice, 2 brick
+uniform int u_volumeViz;      // 0 theta_GR, 1 rho_GR, 2 theta_Drive, 3 shear_GR, 4 vorticity_GR
 
 
 
@@ -2516,9 +2640,6 @@ uniform mat4 u_invViewProj;
 
 
 const float INV_TAU = 0.15915494309189535;
-
-
-
 const float INV16PI = 0.019894367886486918;
 
 
@@ -3056,10 +3177,6 @@ bool intersectEllipsoid(vec3 ro, vec3 rd, vec3 axes, out float t0, out float t1)
 
 
 
-
-
-
-
 void main() {
 
 
@@ -3361,6 +3478,14 @@ void main() {
 
 
     vec3 gridCentered = pos / bounds;
+    bool brickVolume = (u_volumeSource == 2);
+    float t00Value = 0.0;
+    if (brickVolume) {
+      vec3 t00UVW = clamp(gridCentered * 0.5 + 0.5, 0.0, 1.0);
+      float t00Raw = texture(u_t00Tex, t00UVW).r;
+      float t00Span = max(1e-12, max(abs(u_t00Range.x), abs(u_t00Range.y)));
+      t00Value = t00Raw / t00Span;
+    }
     vec3 latticeUVW = clamp(gridCentered * 0.5 + 0.5, 0.0, 1.0);
     if (u_hasLatticeVolume) {
       vec4 lp = u_worldToLattice * vec4(pos, 1.0);
@@ -3575,6 +3700,17 @@ void main() {
 
 
 
+          float sigma2 = max(KijKij - (K2 / 3.0), 0.0);
+
+
+
+          float vorticity = u_beta * sqrt(dfy * dfy + dfz * dfz);
+          if (u_metricMode == 2) {
+            vorticity = 0.0;
+          }
+
+
+
           float sdfBlend = clamp(sdfBand, 0.0, 1.0);
           sdfBlend *= sdfBlend;
           float driveAnalytic = thetaGR * u_ampChain * gateWeight;
@@ -3589,17 +3725,36 @@ void main() {
             thetaDrive = driveSharpened * max(u_gate_view, 0.0);
           }
 
+          thetaGR *= u_thetaSign;
+          thetaDrive *= u_thetaSign;
+
 
 
           int fieldSel = (u_ringOverlayField < 0) ? u_volumeViz : u_ringOverlayField;
 
 
 
-          float fieldValue = (fieldSel == 1) ? rhoGR : ((fieldSel == 2) ? thetaDrive : thetaGR);
+          float fieldValue = thetaGR;
+          if (brickVolume) {
+            fieldValue = t00Value;
+          } else if (fieldSel == 1) {
+            fieldValue = rhoGR;
+          } else if (fieldSel == 2) {
+            fieldValue = thetaDrive;
+          } else if (fieldSel == 3) {
+            fieldValue = sigma2;
+          } else if (fieldSel == 4) {
+            fieldValue = vorticity;
+          }
 
 
 
-          float boost = (fieldSel == 1) ? max(u_grRhoGain, 1e-12) : max(u_grThetaGain, 1e-12);
+          float boost = max(u_grThetaGain, 1e-12);
+          if (brickVolume) {
+            boost = 1.0;
+          } else if (fieldSel == 1 || fieldSel == 3) {
+            boost = max(u_grRhoGain, 1e-12);
+          }
 
 
 
@@ -3671,6 +3826,14 @@ void main() {
 
 
 
+    float dfy = df * dir.y;
+
+
+
+    float dfz = df * dir.z;
+
+
+
     float wSafe = 1.0;
     if (u_forceFlatGate == 0 && (!u_hasLatticeVolume || u_latticeDynamicWeights != 0)) {
       float a01Base = a01_metric(pMetric);
@@ -3714,6 +3877,9 @@ void main() {
       thetaDrive = driveSharpened * max(u_gate_view, 0.0);
     }
 
+    thetaGR *= u_thetaSign;
+    thetaDrive *= u_thetaSign;
+
 
 
     float K2 = k.K2;
@@ -3725,6 +3891,17 @@ void main() {
 
 
     float rhoGR = k.rhoGR;
+
+
+
+    float sigma2 = max(KijKij - (K2 / 3.0), 0.0);
+
+
+
+    float vorticity = u_beta * sqrt(dfy * dfy + dfz * dfz);
+    if (u_metricMode == 2) {
+      vorticity = 0.0;
+    }
 
 
 
@@ -3780,11 +3957,33 @@ void main() {
 
 
 
-    float fieldValue = (u_volumeViz == 0) ? thetaGR : ((u_volumeViz == 1) ? rhoGR : thetaDrive);
+    float fieldValue = thetaGR;
+    if (brickVolume) {
+      fieldValue = t00Value;
+    } else if (u_volumeViz == 1) {
+      fieldValue = rhoGR;
+    } else if (u_volumeViz == 2) {
+      fieldValue = thetaDrive;
+    } else if (u_volumeViz == 3) {
+      fieldValue = sigma2;
+    } else if (u_volumeViz == 4) {
+      fieldValue = vorticity;
+    }
 
 
 
-    float floorV = (u_volumeViz == 0) ? u_vizFloorThetaGR : ((u_volumeViz == 1) ? u_vizFloorRhoGR : u_vizFloorThetaDrive);
+    float floorV = u_vizFloorThetaGR;
+    if (brickVolume) {
+      floorV = 0.0;
+    } else if (u_volumeViz == 1) {
+      floorV = u_vizFloorRhoGR;
+    } else if (u_volumeViz == 2) {
+      floorV = u_vizFloorThetaDrive;
+    } else if (u_volumeViz == 3) {
+      floorV = u_vizFloorRhoGR;
+    } else if (u_volumeViz == 4) {
+      floorV = u_vizFloorThetaGR;
+    }
 
 
 
@@ -3816,7 +4015,7 @@ void main() {
 
 
 
-    if (u_volumeDomain == 1) {
+    if (u_volumeDomain == 1 && !brickVolume) {
 
 
 
@@ -3876,30 +4075,20 @@ void main() {
 
 
 
-    if (u_volumeDomain != 1 && u_volumeViz == 0) {
-
-
-
-      float thetaBoost = max(u_grThetaGain, 1e-12);
-
-
-
-      displayValue = thetaGR * thetaBoost;
-
-
-
-    } else if (u_volumeDomain != 1 && u_volumeViz == 1) {
-
-
-
-      float rhoBoost = max(u_grRhoGain, 1e-12);
-
-
-
-      displayValue = rhoGR * rhoBoost;
-
-
-
+    if (!brickVolume) {
+      if (u_volumeDomain != 1 && u_volumeViz == 0) {
+        float thetaBoost = max(u_grThetaGain, 1e-12);
+        displayValue = thetaGR * thetaBoost;
+      } else if (u_volumeDomain != 1 && u_volumeViz == 1) {
+        float rhoBoost = max(u_grRhoGain, 1e-12);
+        displayValue = rhoGR * rhoBoost;
+      } else if (u_volumeDomain != 1 && u_volumeViz == 3) {
+        float rhoBoost = max(u_grRhoGain, 1e-12);
+        displayValue = sigma2 * rhoBoost;
+      } else if (u_volumeDomain != 1 && u_volumeViz == 4) {
+        float thetaBoost = max(u_grThetaGain, 1e-12);
+        displayValue = vorticity * thetaBoost;
+      }
     }
 
 
@@ -4487,6 +4676,24 @@ uniform sampler2D u_ringAverageTex;
 
 uniform sampler2D u_greensTex;
 
+uniform sampler2D u_envMap;
+uniform int u_skyboxEnabled;
+uniform int u_skyboxMode; // 0 off, 1 flat, 2 geodesic
+uniform float u_skyboxExposure;
+uniform int u_geoSteps;
+uniform float u_geoStep;
+uniform float u_geoBend;
+uniform float u_geoShift;
+uniform float u_geoMaxDist;
+uniform float u_envRotation;
+uniform mat4 u_invViewProj;
+uniform vec3 u_cameraPos;
+uniform vec3 u_axes;
+uniform float u_R;
+uniform float u_sigma;
+uniform float u_beta;
+uniform int u_metricMode;
+
 #if ENABLE_SPACETIME_GRID
 uniform sampler3D u_spaceGridSdf;
 
@@ -4796,6 +5003,130 @@ const float INV_TAU = 0.15915494309189535;
 
 
 
+const float PI = 3.141592653589793;
+const float TWO_PI_F = 6.283185307179586;
+
+float tanhF(float x) {
+
+  float ex = exp(x);
+
+  float exInv = exp(-x);
+
+  float denom = max(ex + exInv, 1e-6);
+
+  return (ex - exInv) / denom;
+
+}
+
+float sech2F(float x) {
+
+  float c = cosh(x);
+
+  return 1.0 / max(c * c, 1e-6);
+
+}
+
+float shapeF(float r, float sigma, float R) {
+
+  float den = max(1e-6, 2.0 * tanhF(sigma * R));
+
+  float tPlus = tanhF(sigma * (r + R));
+
+  float tMinus = tanhF(sigma * (r - R));
+
+  return (tPlus - tMinus) / den;
+
+}
+
+float dTopHatDr(float r, float sigma, float R) {
+
+  float den = max(1e-6, 2.0 * tanhF(sigma * R));
+
+  return sigma * (sech2F(sigma * (r + R)) - sech2F(sigma * (r - R))) / den;
+
+}
+
+vec2 envMapUV(vec3 dir) {
+
+  float phi = atan(dir.z, dir.x) + u_envRotation;
+
+  float u = fract(0.5 + phi / TWO_PI_F);
+
+  float v = 0.5 - asin(clamp(dir.y, -1.0, 1.0)) / PI;
+
+  return vec2(u, clamp(v, 0.0, 1.0));
+
+}
+
+vec3 sampleSkybox(vec3 dir) {
+
+  vec2 uv = envMapUV(normalize(dir));
+
+  return texture(u_envMap, uv).rgb * u_skyboxExposure;
+
+}
+
+vec3 viewRayDir(vec2 ndc) {
+
+  vec4 farH = u_invViewProj * vec4(ndc, 1.0, 1.0);
+
+  farH /= max(farH.w, 1e-6);
+
+  return normalize(farH.xyz - u_cameraPos);
+
+}
+
+vec3 integrateGeodesic(vec3 origin, vec3 dir, float betaAmp) {
+
+  vec3 pos = origin;
+
+  vec3 v = dir;
+
+  vec3 axesSafe = max(abs(u_axes), vec3(1e-4));
+
+  vec3 invAxesSq = 1.0 / (axesSafe * axesSafe);
+
+  float R = max(u_R, 1e-4);
+
+  float stopR = R * max(u_geoMaxDist, 1.0);
+
+  float step = max(u_geoStep, 1e-5);
+
+  for (int i = 0; i < ${SKYBOX_MAX_STEPS}; i++) {
+
+    if (i >= u_geoSteps) break;
+
+    float rs = length(pos / axesSafe);
+
+    float f = shapeF(rs, u_sigma, R);
+
+    vec3 beta = vec3(-betaAmp * f, 0.0, 0.0);
+    if (u_metricMode == 2) {
+      vec3 dirRadial = (rs > 1e-6) ? normalize(pos / axesSafe) : vec3(1.0, 0.0, 0.0);
+      beta = betaAmp * f * dirRadial;
+    }
+
+    float dfdr = dTopHatDr(rs, u_sigma, R);
+
+    vec3 grad = pos * invAxesSq;
+
+    grad *= dfdr / max(rs, 1e-6);
+
+    vec3 bend = -grad * betaAmp * u_geoBend;
+
+    v = normalize(v + bend * step + beta * u_geoShift);
+
+    pos += v * step + beta * u_geoShift * step;
+
+    if (rs > stopR && u_geoMaxDist > 0.0) break;
+
+  }
+
+  return v;
+
+}
+
+
 
 
 float saturate(float v) {
@@ -5103,6 +5434,16 @@ void main() {
 
 
   vec3 color = base.rgb;
+
+  if (u_skyboxEnabled != 0) {
+    vec3 rayDir = viewRayDir(v_ndc);
+    vec3 skyDir = rayDir;
+    if (u_skyboxMode == 2 && u_geoSteps > 0 && u_geoStep > 0.0) {
+      skyDir = integrateGeodesic(u_cameraPos, rayDir, u_beta);
+    }
+    vec3 sky = sampleSkybox(skyDir);
+    color = mix(sky, color, base.a);
+  }
 
 
 
@@ -5573,6 +5914,9 @@ void main() {
 
 
   float finalAlpha = max(base.a, saturate(alphaOverlay));
+  if (u_skyboxEnabled != 0) {
+    finalAlpha = max(finalAlpha, 1.0);
+  }
 
 
 
@@ -5932,11 +6276,15 @@ uniform float u_domainScale;            // bounds scale relative to hull axes (v
 
 
 
-uniform float u_beta;                   // ship beta along +x
+ uniform float u_beta;                   // ship beta along +x
+
+uniform int u_metricMode;
+
+ uniform float u_thetaSign;
 
 
 
-uniform int   u_viz;                    // 0 theta_GR, 1 rho_GR, 2 theta_Drive
+uniform int   u_viz;                    // 0 theta_GR, 1 rho_GR, 2 theta_Drive, 3 shear_GR, 4 vorticity_GR
 
 
 
@@ -6372,7 +6720,7 @@ void main(){
 
 
 
-  float theta_gr = u_beta * dfx;
+  float theta_gr = u_beta * dfx * u_thetaSign;
 
 
 
@@ -6405,6 +6753,17 @@ void main(){
 
 
   float rho_gr = (K2 - KijKij) * INV16PI;
+
+
+
+  float sigma2 = max(KijKij - (K2 / 3.0), 0.0);
+
+
+
+  float vorticity = u_beta * sqrt(dfy * dfy + dfz * dfz);
+  if (u_metricMode == 2) {
+    vorticity = 0.0;
+  }
 
 
 
@@ -6572,11 +6931,29 @@ void main(){
 
 
 
-  float s_raw = (u_viz == 0) ? theta_gr : ((u_viz == 1) ? rho_gr : theta_drive);
+  float s_raw = theta_gr;
+  if (u_viz == 1) {
+    s_raw = rho_gr;
+  } else if (u_viz == 2) {
+    s_raw = theta_drive;
+  } else if (u_viz == 3) {
+    s_raw = sigma2;
+  } else if (u_viz == 4) {
+    s_raw = vorticity;
+  }
 
 
 
-  float floorV = (u_viz == 0) ? u_vizFloorThetaGR : ((u_viz == 1) ? u_vizFloorRhoGR : u_vizFloorThetaDrive);
+  float floorV = u_vizFloorThetaGR;
+  if (u_viz == 1) {
+    floorV = u_vizFloorRhoGR;
+  } else if (u_viz == 2) {
+    floorV = u_vizFloorThetaDrive;
+  } else if (u_viz == 3) {
+    floorV = u_vizFloorRhoGR;
+  } else if (u_viz == 4) {
+    floorV = u_vizFloorThetaGR;
+  }
 
 
 
@@ -7187,7 +7564,11 @@ type RayUniformParams = {
 
 
 
-  volumeVizIndex: 0 | 1 | 2;
+  volumeVizIndex: 0 | 1 | 2 | 3 | 4;
+
+
+
+  volumeSourceIndex: 0 | 1 | 2;
 
 
 
@@ -7283,6 +7664,8 @@ export class Hull3DRenderer {
 
 
 
+  private disposed = false;
+
   private mode: Hull3DRendererMode = "instant";
 
 
@@ -7312,6 +7695,7 @@ export class Hull3DRenderer {
 
 
   private volumeViz: Hull3DVolumeViz = "theta_drive";
+  private volumeSource: Hull3DVolumeSource = "lattice";
 
 
 
@@ -7337,6 +7721,7 @@ export class Hull3DRenderer {
 
   private curvatureBusId: string | null = null;
   private t00BusId: string | null = null;
+  private fluxBusId: string | null = null;
 
 
 
@@ -7614,8 +7999,16 @@ export class Hull3DRenderer {
     range: [1e-12, 1e-12] as [number, number],
   };
   private t00StampWarned = false;
+  private fluxField: (FluxVectorField & { version: number; updatedAt: number; avgMag?: number }) | null = null;
 
   private fallbackTex2D: WebGLTexture | null = null;
+
+  private skyboxTexture: WebGLTexture | null = null;
+  private skyboxTexturePath: string | null = null;
+  private skyboxTexturePending = false;
+  private skyboxConfig: SkyboxConfig = DEFAULT_SKYBOX_CONFIG;
+  private skyboxConfigRequested = false;
+  private skyboxConfigFailed = false;
 
 
 
@@ -7811,6 +8204,8 @@ export class Hull3DRenderer {
 
 
     u_beta: WebGLUniformLocation | null;
+
+    u_thetaSign: WebGLUniformLocation | null;
 
 
 
@@ -8027,6 +8422,11 @@ export class Hull3DRenderer {
     spaceGridColorVbo: null as WebGLBuffer | null,
 
     spaceGridCount: 0,
+    fluxStreamVao: null as WebGLVertexArrayObject | null,
+    fluxStreamVbo: null as WebGLBuffer | null,
+    fluxStreamCount: 0,
+    fluxStreamAlpha: 0,
+    fluxStreamColor: [0.36, 0.9, 0.95] as [number, number, number],
 
 
 
@@ -8109,6 +8509,7 @@ export class Hull3DRenderer {
 
 
     spaceGridKey: "",
+    fluxStreamKey: "",
 
 
 
@@ -8450,11 +8851,20 @@ export class Hull3DRenderer {
 
 
 
-      if (v === 0 || v === 1 || v === 2) {
+      if (v === 0 || v === 1 || v === 2 || v === 3 || v === 4) {
 
 
 
-        const next: Hull3DVolumeViz = v === 0 ? "theta_gr" : v === 1 ? "rho_gr" : "theta_drive";
+        const next: Hull3DVolumeViz =
+          v === 0
+            ? "theta_gr"
+            : v === 1
+              ? "rho_gr"
+              : v === 2
+                ? "theta_drive"
+                : v === 3
+                  ? "shear_gr"
+                  : "vorticity_gr";
 
 
 
@@ -8492,6 +8902,9 @@ export class Hull3DRenderer {
 
     this.t00BusId = subscribe("hull3d:t00-volume", (payload: any) => {
       this.handleT00Brick(payload);
+    });
+    this.fluxBusId = subscribe("hull3d:flux", (payload: any) => {
+      this.handleFluxBrick(payload);
     });
 
 
@@ -9171,6 +9584,8 @@ export class Hull3DRenderer {
 
           u_beta: gl.getUniformLocation(prog, "u_beta"),
 
+          u_thetaSign: gl.getUniformLocation(prog, "u_thetaSign"),
+
 
 
           u_viz: gl.getUniformLocation(prog, "u_viz"),
@@ -9626,8 +10041,7 @@ export class Hull3DRenderer {
 
 
     this.volumeViz = this.resolveVolumeViz(nextState);
-
-
+    this.volumeSource = this.resolveVolumeSource(nextState);
 
     this.volumeDomain = this.resolveVolumeDomain(nextState);
 
@@ -9707,6 +10121,7 @@ export class Hull3DRenderer {
 
 
     this.ensureOverlayGeometry(nextState);
+    this.ensureFluxStreamlines(nextState);
 
 
 
@@ -11910,6 +12325,111 @@ export class Hull3DRenderer {
 
 
 
+  private ensureFluxStreamlines(state: Hull3DRendererState) {
+    const cfg = state.fluxStreamlines;
+    const enabled = Boolean(cfg?.enabled);
+    if (!enabled || !this.fluxField) {
+      this.overlay.fluxStreamCount = 0;
+      this.overlay.fluxStreamAlpha = 0;
+      if (!enabled) this.overlayCache.fluxStreamKey = "";
+      return;
+    }
+
+    const clampInt = (value: number, min: number, max: number) =>
+      Math.min(max, Math.max(min, Math.round(value)));
+    const seedCountRaw = Number(cfg?.seedCount ?? 56);
+    const seedCount = clampInt(Number.isFinite(seedCountRaw) ? seedCountRaw : 56, 8, 256);
+    const seedRadiusRaw = Number(cfg?.seedRadius ?? 1.0);
+    const seedRadius = clamp(Number.isFinite(seedRadiusRaw) ? seedRadiusRaw : 1.0, 0.2, 1.5);
+    const seedSpreadRaw = Number(cfg?.seedSpread ?? 0.08);
+    const seedSpread = clamp(Number.isFinite(seedSpreadRaw) ? seedSpreadRaw : 0.08, 0, 0.4);
+    const stepCountRaw = Number(cfg?.stepCount ?? 42);
+    const stepCount = clampInt(Number.isFinite(stepCountRaw) ? stepCountRaw : 42, 6, 200);
+    const stepScaleRaw = Number(cfg?.stepScale ?? 0.045);
+    const stepScale = clamp(Number.isFinite(stepScaleRaw) ? stepScaleRaw : 0.045, 0.005, 0.25);
+    const minSpeedRaw = Number(cfg?.minSpeedFraction ?? 0.02);
+    const minSpeedFraction = clamp(Number.isFinite(minSpeedRaw) ? minSpeedRaw : 0.02, 0.001, 0.2);
+    const bidirectional = cfg?.bidirectional !== false;
+    const seed = Number.isFinite(Number(cfg?.seed))
+      ? Math.floor(Number(cfg?.seed))
+      : this.fluxField.version;
+
+    const axes = state.axes;
+    const domainScale = this.domainScale;
+    const bounds: [number, number, number] = [
+      Math.max(1e-4, Math.abs(axes[0]) * domainScale),
+      Math.max(1e-4, Math.abs(axes[1]) * domainScale),
+      Math.max(1e-4, Math.abs(axes[2]) * domainScale),
+    ];
+    const shellScale = Math.max(1e-4, Math.abs(state.R ?? 1));
+    const shellAxes: [number, number, number] = [
+      Math.max(1e-4, Math.abs(axes[0]) * shellScale),
+      Math.max(1e-4, Math.abs(axes[1]) * shellScale),
+      Math.max(1e-4, Math.abs(axes[2]) * shellScale),
+    ];
+
+    const keyParts = [
+      this.fluxField.version,
+      seedCount,
+      seedRadius.toFixed(3),
+      seedSpread.toFixed(3),
+      stepCount,
+      stepScale.toFixed(3),
+      minSpeedFraction.toFixed(3),
+      bidirectional ? 1 : 0,
+      bounds.map((v) => v.toFixed(3)).join(","),
+      shellAxes.map((v) => v.toFixed(3)).join(","),
+    ];
+    const key = keyParts.join("|");
+    if (this.overlayCache.fluxStreamKey === key) {
+      return;
+    }
+    this.overlayCache.fluxStreamKey = key;
+
+    const settings: FluxStreamlineSettings = {
+      bounds,
+      shellAxes,
+      seedCount,
+      seedRadius,
+      seedSpread,
+      stepCount,
+      stepScale,
+      minSpeedFraction,
+      bidirectional,
+      seed,
+    };
+    const result = buildFluxStreamlines(this.fluxField, settings);
+
+    const avgMag = (this.fluxField as any).avgMag ?? 0;
+    const maxMag = this.fluxField.maxMag ?? 0;
+    const strength = maxMag > 0 ? clamp(avgMag / maxMag, 0, 1) : 0;
+    this.overlay.fluxStreamAlpha = clamp(0.12 + strength * 0.8, 0.06, 0.85);
+
+    this.disposed = true;
+
+    const { gl } = this;
+    if (!this.overlay.fluxStreamVao || !this.overlay.fluxStreamVbo) {
+      const vao = gl.createVertexArray();
+      const vbo = gl.createBuffer();
+      if (vao && vbo) {
+        gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+        gl.bufferData(gl.ARRAY_BUFFER, result.positions, gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        gl.bindVertexArray(null);
+        this.overlay.fluxStreamVao = vao;
+        this.overlay.fluxStreamVbo = vbo;
+      }
+    } else {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.overlay.fluxStreamVbo);
+      gl.bufferData(gl.ARRAY_BUFFER, result.positions, gl.DYNAMIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    this.overlay.fluxStreamCount = result.vertexCount;
+  }
+
   private updateMeshWireColors(state: Hull3DRendererState, meshWire: WireframeOverlayBuffers) {
     const { gl } = this;
     if (!this.overlay.meshWireColorVbo) return;
@@ -12663,6 +13183,8 @@ export class Hull3DRenderer {
     if (this.overlay.spaceGridVao) gl.deleteVertexArray(this.overlay.spaceGridVao);
     if (this.overlay.spaceGridVbo) gl.deleteBuffer(this.overlay.spaceGridVbo);
     if (this.overlay.spaceGridColorVbo) gl.deleteBuffer(this.overlay.spaceGridColorVbo);
+    if (this.overlay.fluxStreamVao) gl.deleteVertexArray(this.overlay.fluxStreamVao);
+    if (this.overlay.fluxStreamVbo) gl.deleteBuffer(this.overlay.fluxStreamVbo);
     this.overlay.spaceGridVao = null;
     this.overlay.spaceGridVbo = null;
     this.overlay.spaceGridColorVbo = null;
@@ -12991,6 +13513,8 @@ export class Hull3DRenderer {
     const tiltEnabled = Boolean(tiltCfg?.enabled && tiltCfg?.dir);
     const tiltDir = (tiltCfg?.dir ?? [0, 0]) as [number, number];
     const dbgWindow = typeof window !== "undefined" ? (window as any) : undefined;
+    const thetaSign = (Math.sign(state.thetaSign ?? 1) || 1) * (dbgWindow?.__hullThetaSign === -1 ? -1 : 1);
+    const metricMode: MetricModeId = metricModeFromWarpFieldType(state.warpFieldType);
     const tiltMag = Math.max(0, Math.min(1, tiltCfg?.magnitude ?? 0));
     const tiltAlphaBase = tiltCfg?.alpha ?? 0.85;
     const tiltAlpha = Math.max(0, Math.min(1, tiltAlphaBase));
@@ -13060,6 +13584,8 @@ export class Hull3DRenderer {
 
 
     if (loc.u_beta) gl.uniform1f(loc.u_beta, state.beta);
+    if (loc.u_metricMode) gl.uniform1i(loc.u_metricMode, metricMode);
+    if (loc.u_thetaSign) gl.uniform1f(loc.u_thetaSign, thetaSign);
 
 
 
@@ -13088,6 +13614,7 @@ export class Hull3DRenderer {
 
 
     if (loc.u_volumeDomain) gl.uniform1i(loc.u_volumeDomain, params.volumeDomainIndex);
+    if (loc.u_volumeSource) gl.uniform1i(loc.u_volumeSource, params.volumeSourceIndex);
 
 
 
@@ -13858,6 +14385,7 @@ export class Hull3DRenderer {
 
 
         u_beta: gl.getUniformLocation(this.resources.rayProgram, "u_beta"),
+        u_metricMode: gl.getUniformLocation(this.resources.rayProgram, "u_metricMode"),
 
 
 
@@ -13902,6 +14430,8 @@ export class Hull3DRenderer {
 
 
         u_phaseSign: gl.getUniformLocation(this.resources.rayProgram, "u_phaseSign"),
+
+        u_thetaSign: gl.getUniformLocation(this.resources.rayProgram, "u_thetaSign"),
 
 
 
@@ -13974,6 +14504,7 @@ export class Hull3DRenderer {
 
 
         u_volumeViz: gl.getUniformLocation(this.resources.rayProgram, "u_volumeViz"),
+        u_volumeSource: gl.getUniformLocation(this.resources.rayProgram, "u_volumeSource"),
 
 
 
@@ -14109,8 +14640,10 @@ export class Hull3DRenderer {
 
 
 
+      const volumeSource = this.resolveVolumeSource(state);
+      const useLattice = volumeSource === "lattice";
       const activeLattice =
-        state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
+        useLattice && state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
           ? this.latticeUpload
           : null;
       const hasLattice = !!activeLattice;
@@ -14144,6 +14677,7 @@ export class Hull3DRenderer {
       }
 
       const hasLatticeSdf = !!(
+        useLattice &&
         hasLattice &&
         state.latticeSdf &&
         this.latticeSdfReadyKey &&
@@ -14391,6 +14925,10 @@ export class Hull3DRenderer {
 
 
 
+      const volumeSourceIndex = VOLUME_SOURCE_TO_INDEX[volumeSource];
+
+
+
       const volumeDomainIndex = this.resolveVolumeDomainIndex(state);
 
 
@@ -14535,6 +15073,10 @@ export class Hull3DRenderer {
 
 
 
+        volumeSourceIndex,
+
+
+
         volumeDomainIndex,
 
 
@@ -14662,7 +15204,7 @@ export class Hull3DRenderer {
 
 
 
-        this.drawPostComposite(state);
+        this.drawPostComposite(state, invViewProj, camera.eye);
 
 
 
@@ -14858,6 +15400,8 @@ export class Hull3DRenderer {
 
     const program = this.surfaceProgram;
 
+    const metricMode = metricModeFromWarpFieldType(state.warpFieldType);
+
 
 
     gl.useProgram(program);
@@ -14883,6 +15427,9 @@ export class Hull3DRenderer {
 
 
       u_beta: gl.getUniformLocation(program, "u_beta"),
+      u_metricMode: gl.getUniformLocation(program, "u_metricMode"),
+
+      u_thetaSign: gl.getUniformLocation(program, "u_thetaSign"),
 
 
 
@@ -15033,6 +15580,7 @@ export class Hull3DRenderer {
 
 
     const dbgWindow = typeof window !== "undefined" ? (window as any) : undefined; // [tilt-gain]
+    const thetaSign = (Math.sign(state.thetaSign ?? 1) || 1) * (dbgWindow?.__hullThetaSign === -1 ? -1 : 1);
 
 
 
@@ -15222,7 +15770,8 @@ export class Hull3DRenderer {
 
 
     if (loc.u_beta) gl.uniform1f(loc.u_beta, state.beta);
-
+    if (loc.u_metricMode) gl.uniform1i(loc.u_metricMode, metricMode);
+    if (loc.u_thetaSign) gl.uniform1f(loc.u_thetaSign, thetaSign);
 
 
     if (loc.u_viz) {
@@ -15467,11 +16016,15 @@ export class Hull3DRenderer {
 
 
 
-  private drawPostComposite(state: Hull3DRendererState) {
+  private drawPostComposite(state: Hull3DRendererState, invViewProj: Float32Array, cameraPos: Vec3) {
 
 
 
     const { gl } = this;
+
+
+
+    const metricMode = metricModeFromWarpFieldType(state.warpFieldType);
 
 
 
@@ -15508,6 +16061,23 @@ export class Hull3DRenderer {
 
 
       u_greensTex: gl.getUniformLocation(this.resources.postProgram, "u_greensTex"),
+      u_envMap: gl.getUniformLocation(this.resources.postProgram, "u_envMap"),
+      u_skyboxEnabled: gl.getUniformLocation(this.resources.postProgram, "u_skyboxEnabled"),
+      u_skyboxMode: gl.getUniformLocation(this.resources.postProgram, "u_skyboxMode"),
+      u_skyboxExposure: gl.getUniformLocation(this.resources.postProgram, "u_skyboxExposure"),
+      u_geoSteps: gl.getUniformLocation(this.resources.postProgram, "u_geoSteps"),
+      u_geoStep: gl.getUniformLocation(this.resources.postProgram, "u_geoStep"),
+      u_geoBend: gl.getUniformLocation(this.resources.postProgram, "u_geoBend"),
+      u_geoShift: gl.getUniformLocation(this.resources.postProgram, "u_geoShift"),
+      u_geoMaxDist: gl.getUniformLocation(this.resources.postProgram, "u_geoMaxDist"),
+      u_envRotation: gl.getUniformLocation(this.resources.postProgram, "u_envRotation"),
+      u_invViewProj: gl.getUniformLocation(this.resources.postProgram, "u_invViewProj"),
+      u_cameraPos: gl.getUniformLocation(this.resources.postProgram, "u_cameraPos"),
+      u_axes: gl.getUniformLocation(this.resources.postProgram, "u_axes"),
+      u_R: gl.getUniformLocation(this.resources.postProgram, "u_R"),
+      u_sigma: gl.getUniformLocation(this.resources.postProgram, "u_sigma"),
+      u_beta: gl.getUniformLocation(this.resources.postProgram, "u_beta"),
+      u_metricMode: gl.getUniformLocation(this.resources.postProgram, "u_metricMode"),
 
 
 
@@ -15834,6 +16404,38 @@ export class Hull3DRenderer {
 
     const greensAlpha = greensCfg?.alpha ?? 0.0;
 
+    const skyboxState = state.skybox;
+    const skyboxMode =
+      skyboxState?.mode === "flat" || skyboxState?.mode === "geodesic"
+        ? skyboxState.mode
+        : "off";
+    const skyboxModeIndex = skyboxMode === "flat" ? 1 : skyboxMode === "geodesic" ? 2 : 0;
+    if (skyboxModeIndex > 0) {
+      this.ensureSkyboxConfig();
+      this.ensureSkyboxTexture();
+    }
+    const skyboxCfg = this.skyboxConfig;
+    const skyboxReady = skyboxModeIndex > 0 && !!this.skyboxTexture;
+    const skyboxExposureRaw = skyboxState?.exposure;
+    const skyboxExposure = clamp(
+      Number.isFinite(skyboxExposureRaw as number)
+        ? (skyboxExposureRaw as number)
+        : skyboxCfg.exposure,
+      0.1,
+      8
+    );
+    const baseR = Number.isFinite(state.R) ? state.R : 1;
+    const geoSteps = skyboxModeIndex === 2
+      ? Math.min(SKYBOX_MAX_STEPS, Math.max(1, Math.round(skyboxCfg.steps)))
+      : 0;
+    const geoStep = skyboxModeIndex === 2
+      ? Math.max(1e-4, baseR * skyboxCfg.step_scale)
+      : 0;
+    const geoBend = skyboxModeIndex === 2 ? clamp(skyboxCfg.bend, 0, 4) : 0;
+    const geoShift = skyboxModeIndex === 2 ? clamp(skyboxCfg.shift_scale, 0, 4) : 0;
+    const geoMaxDist = skyboxModeIndex === 2 ? clamp(skyboxCfg.max_dist, 1, 20) : 0;
+    const envRotation = (skyboxCfg.rotation_deg ?? 0) * (Math.PI / 180);
+
 
 
     const curvActive2D = isCurvatureDirectiveEnabled(curvCfg);
@@ -16084,6 +16686,24 @@ export class Hull3DRenderer {
 
     if (loc.u_greensAlpha) gl.uniform1f(loc.u_greensAlpha, greensAlpha);
 
+    if (loc.u_skyboxEnabled) gl.uniform1i(loc.u_skyboxEnabled, skyboxReady ? 1 : 0);
+    if (loc.u_skyboxMode) gl.uniform1i(loc.u_skyboxMode, skyboxModeIndex);
+    if (loc.u_skyboxExposure) gl.uniform1f(loc.u_skyboxExposure, skyboxExposure);
+    if (loc.u_geoSteps) gl.uniform1i(loc.u_geoSteps, geoSteps);
+    if (loc.u_geoStep) gl.uniform1f(loc.u_geoStep, geoStep);
+    if (loc.u_geoBend) gl.uniform1f(loc.u_geoBend, geoBend);
+    if (loc.u_geoShift) gl.uniform1f(loc.u_geoShift, geoShift);
+    if (loc.u_geoMaxDist) gl.uniform1f(loc.u_geoMaxDist, geoMaxDist);
+    if (loc.u_envRotation) gl.uniform1f(loc.u_envRotation, envRotation);
+    if (loc.u_invViewProj) gl.uniformMatrix4fv(loc.u_invViewProj, false, invViewProj);
+    if (loc.u_cameraPos) gl.uniform3f(loc.u_cameraPos, cameraPos[0], cameraPos[1], cameraPos[2]);
+    if (loc.u_axes) gl.uniform3f(loc.u_axes, state.axes[0], state.axes[1], state.axes[2]);
+    if (loc.u_R) gl.uniform1f(loc.u_R, Math.max(1e-4, state.R));
+    if (loc.u_sigma) gl.uniform1f(loc.u_sigma, Math.max(1e-6, state.sigma));
+    if (loc.u_beta) gl.uniform1f(loc.u_beta, state.beta);
+
+    if (loc.u_metricMode) gl.uniform1i(loc.u_metricMode, metricMode);
+
     if (loc.u_spaceGridEnabled) gl.uniform1i(loc.u_spaceGridEnabled, spaceEnabled);
     if (loc.u_spaceGridMode) gl.uniform1i(loc.u_spaceGridMode, spaceMode);
     if (loc.u_spaceGridHasSdf) gl.uniform1i(loc.u_spaceGridHasSdf, spaceHasSdf);
@@ -16208,6 +16828,11 @@ export class Hull3DRenderer {
 
 
 
+    const envTex = skyboxReady && this.skyboxTexture ? this.skyboxTexture : this.ensureFallback2D();
+    gl.activeTexture(gl.TEXTURE7);
+    gl.bindTexture(gl.TEXTURE_2D, envTex);
+    if (loc.u_envMap) gl.uniform1i(loc.u_envMap, 7);
+
     gl.bindVertexArray(this.resources.quadVao);
 
 
@@ -16219,6 +16844,10 @@ export class Hull3DRenderer {
     gl.bindVertexArray(null);
 
 
+
+    gl.activeTexture(gl.TEXTURE7);
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
 
     gl.activeTexture(gl.TEXTURE6);
 
@@ -16338,6 +16967,7 @@ export class Hull3DRenderer {
     const tiltEnabled = Boolean(tiltCfg?.enabled && tiltCfg?.dir);
     const tiltDir = (tiltCfg?.dir ?? [0, 0]) as [number, number];
     const dbgWindow = typeof window !== "undefined" ? (window as any) : undefined;
+    const thetaSign = (Math.sign(state.thetaSign ?? 1) || 1) * (dbgWindow?.__hullThetaSign === -1 ? -1 : 1);
     const tiltMag = Math.max(0, Math.min(1, tiltCfg?.magnitude ?? 0));
     const tiltAlphaBase = tiltCfg?.alpha ?? 0.85;
     const tiltAlpha = Math.max(0, Math.min(1, tiltAlphaBase));
@@ -16387,6 +17017,8 @@ export class Hull3DRenderer {
 
 
     if (u.u_beta) gl.uniform1f(u.u_beta, state.beta);
+
+    if (u.u_thetaSign) gl.uniform1f(u.u_thetaSign, thetaSign);
 
 
 
@@ -17104,7 +17736,8 @@ export class Hull3DRenderer {
       Math.max(1, Number(dimsRaw[2]) | 0),
     ];
 
-    const dataSource = (payload as any).data;
+    const t00Payload = (payload as any).t00;
+    const dataSource = (payload as any).data ?? (t00Payload as any)?.data;
     let data: Float32Array | null = null;
     if (dataSource instanceof Float32Array) {
       data = dataSource;
@@ -17248,7 +17881,8 @@ export class Hull3DRenderer {
       Math.max(1, Number(dimsRaw[2]) | 0),
     ];
 
-    const dataSource = (payload as any).data;
+    const t00Payload = (payload as any).t00;
+    const dataSource = (payload as any).data ?? (t00Payload as any)?.data;
     let data: Float32Array | null = null;
     if (dataSource instanceof Float32Array) {
       data = dataSource;
@@ -17271,8 +17905,8 @@ export class Hull3DRenderer {
     const upload = data.length === expected ? data : data.subarray(0, expected);
 
     // Track absolute span for quick normalization
-    const minRaw = Number((payload as any).min);
-    const maxRaw = Number((payload as any).max);
+    const minRaw = Number((payload as any).min ?? (t00Payload as any)?.min);
+    const maxRaw = Number((payload as any).max ?? (t00Payload as any)?.max);
     let absSpan = 1e-12;
     if (Number.isFinite(minRaw) || Number.isFinite(maxRaw)) {
       const a = Math.abs(Number.isFinite(minRaw) ? (minRaw as number) : 0);
@@ -17296,6 +17930,93 @@ export class Hull3DRenderer {
     this.t00.version = versionRaw;
     this.t00.updatedAt = Number((payload as any).updatedAt ?? Date.now());
     this.t00.hasData = true;
+  }
+
+  private handleFluxBrick(payload: any) {
+    if (!payload || typeof payload !== "object") return;
+
+    const versionRaw = Number((payload as any).version ?? 0);
+    if (!Number.isFinite(versionRaw)) return;
+    if (this.fluxField && versionRaw <= this.fluxField.version) return;
+
+    const dimsRaw = (payload as any).dims;
+    if (!Array.isArray(dimsRaw) || dimsRaw.length !== 3) return;
+
+    const dims: [number, number, number] = [
+      Math.max(1, Number(dimsRaw[0]) | 0),
+      Math.max(1, Number(dimsRaw[1]) | 0),
+      Math.max(1, Number(dimsRaw[2]) | 0),
+    ];
+
+    const flux = (payload as any).flux ?? payload;
+    const coerceFloat32 = (dataSource: any): Float32Array | null => {
+      if (dataSource instanceof Float32Array) return dataSource;
+      if (dataSource instanceof ArrayBuffer) return new Float32Array(dataSource);
+      if (Array.isArray(dataSource)) return new Float32Array(dataSource);
+      if (dataSource && ArrayBuffer.isView(dataSource) && dataSource.buffer instanceof ArrayBuffer) {
+        try {
+          return new Float32Array(dataSource.buffer);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
+    const resolveChannel = (channel: any) => {
+      const raw = channel?.data ?? channel;
+      return {
+        data: coerceFloat32(raw),
+        min: Number(channel?.min),
+        max: Number(channel?.max),
+      };
+    };
+
+    const sxChan = resolveChannel((flux as any)?.Sx);
+    const syChan = resolveChannel((flux as any)?.Sy);
+    const szChan = resolveChannel((flux as any)?.Sz);
+    if (!sxChan.data || !syChan.data || !szChan.data) return;
+
+    const expected = dims[0] * dims[1] * dims[2];
+    if (sxChan.data.length < expected || syChan.data.length < expected || szChan.data.length < expected) {
+      return;
+    }
+
+    const absFromMinMax = (channel: { min: number; max: number }) => {
+      const minRaw = channel.min;
+      const maxRaw = channel.max;
+      const abs = Math.max(Math.abs(minRaw), Math.abs(maxRaw));
+      return Number.isFinite(abs) ? abs : 0;
+    };
+
+    let maxAbs = Math.max(absFromMinMax(sxChan), absFromMinMax(syChan), absFromMinMax(szChan));
+    if (!Number.isFinite(maxAbs) || maxAbs <= 0) {
+      maxAbs = 0;
+      for (let i = 0; i < expected; i += 1) {
+        const ax = Math.abs(sxChan.data[i] ?? 0);
+        const ay = Math.abs(syChan.data[i] ?? 0);
+        const az = Math.abs(szChan.data[i] ?? 0);
+        if (ax > maxAbs) maxAbs = ax;
+        if (ay > maxAbs) maxAbs = ay;
+        if (az > maxAbs) maxAbs = az;
+      }
+    }
+
+    const maxMag = Math.sqrt(3) * Math.max(0, maxAbs);
+    const avgMagRaw = Number((payload as any).stats?.avgFluxMagnitude ?? (flux as any)?.stats?.avgFluxMagnitude);
+    const avgMag = Number.isFinite(avgMagRaw) ? avgMagRaw : undefined;
+
+    this.fluxField = {
+      dims,
+      Sx: sxChan.data.length === expected ? sxChan.data : sxChan.data.subarray(0, expected),
+      Sy: syChan.data.length === expected ? syChan.data : syChan.data.subarray(0, expected),
+      Sz: szChan.data.length === expected ? szChan.data : szChan.data.subarray(0, expected),
+      maxMag,
+      version: versionRaw,
+      updatedAt: Number((payload as any).updatedAt ?? Date.now()),
+      ...(avgMag !== undefined ? { avgMag } : {}),
+    };
+    this.overlayCache.fluxStreamKey = "";
   }
 
   private ensureFallback2D(): WebGLTexture {
@@ -17373,6 +18094,75 @@ export class Hull3DRenderer {
 
 
 
+
+  private ensureSkyboxConfig() {
+    if (this.skyboxConfigRequested || this.skyboxConfigFailed) return;
+    this.skyboxConfigRequested = true;
+    fetch(SKYBOX_CONFIG_URL)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Skybox config HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((raw) => {
+        if (this.disposed) return;
+        this.skyboxConfig = normalizeSkyboxConfig(raw);
+        this.skyboxTexturePath = null;
+      })
+      .catch((err) => {
+        if (this.disposed) return;
+        this.skyboxConfigFailed = true;
+        console.warn("[Hull3DRenderer] Skybox config load failed", err);
+      });
+  }
+
+  private ensureSkyboxTexture() {
+    if (this.skyboxTexturePending) return;
+    const cfg = this.skyboxConfig;
+    if (!cfg.texture) return;
+    if (this.skyboxTexture && this.skyboxTexturePath === cfg.texture) return;
+
+    const { gl } = this;
+    const src = cfg.texture;
+    const img = new Image();
+    this.skyboxTexturePending = true;
+    img.onload = () => {
+      if (this.disposed) return;
+      const tex = gl.createTexture();
+      if (!tex) {
+        this.skyboxTexturePending = false;
+        return;
+      }
+      const isPow2 = (value: number) => (value & (value - 1)) === 0;
+      const useMips = isPow2(img.width) && isPow2(img.height);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      if (useMips) {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.generateMipmap(gl.TEXTURE_2D);
+      } else {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      }
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      if (this.skyboxTexture) {
+        gl.deleteTexture(this.skyboxTexture);
+      }
+      this.skyboxTexture = tex;
+      this.skyboxTexturePath = src;
+      this.skyboxTexturePending = false;
+    };
+    img.onerror = (err) => {
+      this.skyboxTexturePending = false;
+      console.warn("[Hull3DRenderer] Skybox texture load failed", err);
+    };
+    img.src = src;
+  }
 
   private ensureHarnessWhiteProgram() {
 
@@ -17531,6 +18321,10 @@ export class Hull3DRenderer {
 
 
 
+        u_metricMode: gl.getUniformLocation(this.resources.rayProgram, "u_metricMode"),
+
+
+
         u_ampChain: gl.getUniformLocation(this.resources.rayProgram, "u_ampChain"),
 
 
@@ -17571,6 +18365,8 @@ export class Hull3DRenderer {
 
 
         u_phaseSign: gl.getUniformLocation(this.resources.rayProgram, "u_phaseSign"),
+
+        u_thetaSign: gl.getUniformLocation(this.resources.rayProgram, "u_thetaSign"),
 
 
 
@@ -17643,16 +18439,11 @@ export class Hull3DRenderer {
 
 
         u_volumeViz: gl.getUniformLocation(this.resources.rayProgram, "u_volumeViz"),
-
-
+        u_volumeSource: gl.getUniformLocation(this.resources.rayProgram, "u_volumeSource"),
 
         u_volumeDomain: gl.getUniformLocation(this.resources.rayProgram, "u_volumeDomain"),
 
-
-
         u_opacityWindow: gl.getUniformLocation(this.resources.rayProgram, "u_opacityWindow"),
-
-
 
         u_grThetaGain: gl.getUniformLocation(this.resources.rayProgram, "u_grThetaGain"),
 
@@ -17710,8 +18501,10 @@ export class Hull3DRenderer {
       gl.activeTexture(gl.TEXTURE6);
       gl.bindTexture(gl.TEXTURE_3D, gateTex);
       if (loc.u_gateVolume) gl.uniform1i(loc.u_gateVolume, 6);
+      const volumeSource = this.resolveVolumeSource(state);
+      const useLattice = volumeSource === "lattice";
       const activeLattice =
-        state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
+        useLattice && state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
           ? this.latticeUpload
           : null;
       const hasLattice = !!activeLattice;
@@ -17745,6 +18538,7 @@ export class Hull3DRenderer {
       }
 
       const hasLatticeSdf = !!(
+        useLattice &&
         hasLattice &&
         state.latticeSdf &&
         this.latticeSdfReadyKey &&
@@ -17877,6 +18671,10 @@ export class Hull3DRenderer {
 
 
 
+      const volumeSourceIndex = VOLUME_SOURCE_TO_INDEX[this.resolveVolumeSource(state)];
+
+
+
       const volumeDomainIndex = this.resolveVolumeDomainIndex(state);
 
 
@@ -17958,6 +18756,10 @@ export class Hull3DRenderer {
 
 
         volumeVizIndex,
+
+
+
+        volumeSourceIndex,
 
 
 
@@ -19013,6 +19815,10 @@ export class Hull3DRenderer {
 
 
 
+      const volumeSourceIndex = VOLUME_SOURCE_TO_INDEX[this.resolveVolumeSource(testState)];
+
+
+
       const volumeDomainIndex = this.resolveVolumeDomainIndex(testState);
 
 
@@ -19074,6 +19880,10 @@ export class Hull3DRenderer {
 
 
 
+        u_metricMode: gl.getUniformLocation(this.resources.rayProgram, "u_metricMode"),
+
+
+
         u_ampChain: gl.getUniformLocation(this.resources.rayProgram, "u_ampChain"),
 
 
@@ -19111,6 +19921,8 @@ export class Hull3DRenderer {
 
 
         u_phaseSign: gl.getUniformLocation(this.resources.rayProgram, "u_phaseSign"),
+
+        u_thetaSign: gl.getUniformLocation(this.resources.rayProgram, "u_thetaSign"),
 
 
 
@@ -19183,16 +19995,11 @@ export class Hull3DRenderer {
 
 
         u_volumeViz: gl.getUniformLocation(this.resources.rayProgram, "u_volumeViz"),
-
-
+        u_volumeSource: gl.getUniformLocation(this.resources.rayProgram, "u_volumeSource"),
 
         u_volumeDomain: gl.getUniformLocation(this.resources.rayProgram, "u_volumeDomain"),
 
-
-
         u_opacityWindow: gl.getUniformLocation(this.resources.rayProgram, "u_opacityWindow"),
-
-
 
         u_grThetaGain: gl.getUniformLocation(this.resources.rayProgram, "u_grThetaGain"),
 
@@ -19254,8 +20061,10 @@ export class Hull3DRenderer {
       gl.activeTexture(gl.TEXTURE6);
       gl.bindTexture(gl.TEXTURE_3D, gateTex);
       if (loc.u_gateVolume) gl.uniform1i(loc.u_gateVolume, 6);
+      const volumeSource = this.resolveVolumeSource(state);
+      const useLattice = volumeSource === "lattice";
       const activeLattice =
-        state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
+        useLattice && state.latticeVolume && this.latticeUpload && this.latticeUpload.hash === state.latticeVolume.hash
           ? this.latticeUpload
           : null;
       const hasLattice = !!activeLattice;
@@ -19289,6 +20098,7 @@ export class Hull3DRenderer {
       }
 
       const hasLatticeSdf = !!(
+        useLattice &&
         hasLattice &&
         state.latticeSdf &&
         this.latticeSdfReadyKey &&
@@ -19462,6 +20272,10 @@ export class Hull3DRenderer {
 
 
         volumeVizIndex,
+
+
+
+        volumeSourceIndex,
 
 
 
@@ -20955,6 +21769,25 @@ export class Hull3DRenderer {
 
 
 
+    const streamlinesReady =
+      !!state.fluxStreamlines?.enabled &&
+      !!this.overlay.fluxStreamVao &&
+      this.overlay.fluxStreamCount > 1 &&
+      this.overlay.fluxStreamAlpha > 1e-4;
+
+    if (streamlinesReady) {
+      const [r, g, b] = this.overlay.fluxStreamColor;
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      if (loc.u_useColor) gl.uniform1i(loc.u_useColor, 0);
+      if (loc.u_color) gl.uniform3f(loc.u_color, r, g, b);
+      if (loc.u_alpha) gl.uniform1f(loc.u_alpha, this.overlay.fluxStreamAlpha);
+      gl.bindVertexArray(this.overlay.fluxStreamVao);
+      gl.drawArrays(gl.LINES, 0, this.overlay.fluxStreamCount);
+      gl.bindVertexArray(null);
+      gl.disable(gl.BLEND);
+    }
+
     if ((this._diag.state === 'holding' || !this._diag.lastOk) && this._diag.message) {
 
 
@@ -21107,7 +21940,13 @@ export class Hull3DRenderer {
 
 
 
-    if (mode === "theta_gr" || mode === "rho_gr" || mode === "theta_drive") {
+    if (
+      mode === "theta_gr" ||
+      mode === "rho_gr" ||
+      mode === "theta_drive" ||
+      mode === "shear_gr" ||
+      mode === "vorticity_gr"
+    ) {
 
 
 
@@ -21132,6 +21971,14 @@ export class Hull3DRenderer {
 
 
 
+
+  private resolveVolumeSource(state: Hull3DRendererState): Hull3DVolumeSource {
+    const mode = state.volumeSource ?? this.volumeSource;
+    if (mode === "analytic" || mode === "lattice" || mode === "brick") {
+      return mode;
+    }
+    return "lattice";
+  }
 
   private normalizeOpacityWindow(window?: [number, number]): [number, number] {
 
@@ -21232,7 +22079,7 @@ export class Hull3DRenderer {
 
 
 
-  private resolveVolumeVizIndex(state: Hull3DRendererState): 0 | 1 | 2 {
+  private resolveVolumeVizIndex(state: Hull3DRendererState): 0 | 1 | 2 | 3 | 4 {
 
 
 
@@ -21596,7 +22443,7 @@ export class Hull3DRenderer {
 
 
 
-    if (viz === "theta_gr") {
+    if (viz === "theta_gr" || viz === "vorticity_gr") {
 
 
 
@@ -21608,7 +22455,7 @@ export class Hull3DRenderer {
 
 
 
-    if (viz === "rho_gr") {
+    if (viz === "rho_gr" || viz === "shear_gr") {
 
 
 
@@ -21652,7 +22499,7 @@ export class Hull3DRenderer {
 
 
 
-    if (viz === "theta_gr") {
+    if (viz === "theta_gr" || viz === "vorticity_gr") {
 
 
 
@@ -21669,6 +22516,9 @@ export class Hull3DRenderer {
 
 
       rawMag = Math.abs(betaSq) * dfMax * dfMax * INV16PI;
+    } else if (viz === "shear_gr") {
+      const betaSq = beta * beta;
+      rawMag = Math.abs(betaSq) * dfMax * dfMax;
 
 
 
@@ -22030,6 +22880,7 @@ export class Hull3DRenderer {
       gl.deleteTexture(this.t00.fallback);
       this.t00.fallback = null;
     }
+    this.fluxField = null;
 
 
 
@@ -22116,6 +22967,13 @@ export class Hull3DRenderer {
     }
 
 
+
+    if (this.skyboxTexture) {
+      gl.deleteTexture(this.skyboxTexture);
+      this.skyboxTexture = null;
+    }
+    this.skyboxTexturePath = null;
+    this.skyboxTexturePending = false;
 
     if (this.overlay.ringVao) gl.deleteVertexArray(this.overlay.ringVao);
 
@@ -22295,6 +23153,10 @@ export class Hull3DRenderer {
     if (this.t00BusId) {
       unsubscribe(this.t00BusId);
       this.t00BusId = null;
+    }
+    if (this.fluxBusId) {
+      unsubscribe(this.fluxBusId);
+      this.fluxBusId = null;
     }
 
 

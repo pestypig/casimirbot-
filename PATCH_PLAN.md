@@ -371,3 +371,121 @@
 - Instant↔EMA toggle alters smoothing once; no double smoothing and phase sign remains stable through source switches.
 - HUD shows phase source + EMA parameters during transitions.
 - No WebGL validation errors; frame time stays within ±10 % of baseline.
+
+
+## 4) Warp Bubble Visualizer Integration (source-aligned)
+
+Roadmap: `docs/warpfield-visualization-roadmap.md` Phase 12.
+
+### Scope
+- Unify three visualization lanes: analytic shader, lattice volume, and server bricks.
+- Add kinematic scalars (shear, vorticity) to match WarpFactory outputs.
+- Add GeoViS parity controls (theta sign toggle + camera presets).
+- Promote stress-energy bricks (t00 + flux) to a selectable volume source.
+- Add momentum-flow streamlines overlay.
+- Optional geodesic skybox rendering mode.
+- Metric plugin interface to support an irrotational shift-flow metric.
+- Optional WarpFactory dataset import path for external grids.
+
+### 4.1 Kinematic scalar modes (shear, vorticity)
+
+Patch points
+- `shared/schema.ts`: extend `cardVolumeVizSchema` with `"shear_gr"` and `"vorticity_gr"` (keep defaults intact).
+- `client/src/store/useHull3DSharedStore.ts`: extend `HullVolumeViz` union.
+- `client/src/components/Hull3DRenderer.ts`:
+  - Extend `Hull3DVolumeViz` and `VOLUME_VIZ_TO_INDEX` to include the new modes (append indices 3, 4).
+  - Compute shear magnitude: `sigma2 = KijKij - (K2 / 3)` (use `K2`, `KijKij` from `kfast`).
+  - Compute vorticity magnitude: `beta * sqrt(dfy*dfy + dfz*dfz)` (proxy from Alcubierre shift curl).
+  - Extend `u_volumeViz` selection, floors, and boost logic to cover new modes.
+- `client/src/components/AlcubierrePanel.tsx`:
+  - Update `volumeModeFromHull` and `hullVizFromVolumeMode` mappings.
+  - Update planar proof shader `u_viz` mapping so new modes render in the 2D panel as well.
+- `client/src/components/VolumeModeToggle.tsx`:
+  - Extend `VolumeViz` numeric enum and label map (0..4).
+
+Acceptance
+- Alcubierre: shear/vorticity peak on the bubble wall; near-zero in interior.
+- Natario: shear/vorticity collapses toward 0 when `isZeroExpansion` and `isCurlFree`.
+
+### 4.2 GeoViS parity preset + theta sign toggle
+
+Patch points
+- `client/src/components/AlcubierrePanel.tsx`:
+  - Add a "GeoViS theta" preset (theta_gr + diverging palette + theta-iso overlay).
+  - Add camera presets (inside, outside, wall-grazing) using existing framing helpers.
+  - Add a theta sign toggle (+1 / -1) for convention flips.
+- `client/src/components/Hull3DRenderer.ts`:
+  - Add a uniform (e.g., `u_thetaSign`) that multiplies theta-based fields.
+  - Thread sign into overlay and planar proof usage.
+
+Acceptance
+- Front/back sign structure matches GeoViS (contraction ahead, expansion behind).
+
+### 4.3 Brick lane (stress-energy bricks as a volume source)
+
+Patch points
+- `client/src/components/CurvatureVoxProvider.tsx`: keep publishing `hull3d:t00-volume` and `hull3d:flux`; add bounds metadata if needed by renderer.
+- `client/src/components/AlcubierrePanel.tsx`:
+  - Add a volume source selector: `analytic | lattice | brick`.
+  - Persist selection in shared store and card recipe export.
+- `client/src/components/Hull3DRenderer.ts`:
+  - Add a `volumeSource` state and route `u_volume` to analytic/lattice or t00 texture based on source.
+  - Optional: add a `t00` volume viz mode instead of overloading `u_volume`.
+
+Acceptance
+- Brick mode renders stable, sliceable fields; analytic and brick agree on sign/shape.
+
+### 4.4 Momentum-flow streamlines overlay
+
+Patch points
+- New helper (suggested): `client/src/lib/flux-streamlines.ts` for CPU streamline integration.
+- `client/src/components/Hull3DRenderer.ts`:
+  - Subscribe to `hull3d:flux` and build a vector field from `Sx/Sy/Sz`.
+  - Render streamlines as polylines in the overlay pass.
+- `client/src/components/AlcubierrePanel.tsx`: add toggle + seeding controls.
+
+Acceptance
+- Streamlines hug the wall for Alcubierre and calm down for curl-free Natario.
+
+### 4.5 Geodesic skybox rendering mode
+
+Patch points
+- `client/src/components/Hull3DRenderer.ts`: add a background pass that integrates null geodesics per pixel and samples an environment map.
+- `client/src/components/AlcubierrePanel.tsx`: add renderer mode toggle.
+- `public/`: add an environment map asset with a small LUT config file.
+
+Acceptance
+- Minkowski baseline matches the skybox; Alcubierre shows expected lensing.
+
+### 4.6 Metric plugin interface + irrotational shift-flow type
+
+Patch points
+- `shared/schema.ts`: add a new `warpFieldType` enum value (e.g., `"irrotational"`).
+- `modules/warp/warp-module.ts`: allow the new type (no fallback).
+- `client/src/components/Hull3DRenderer.ts`: route analytic scalar evaluation and geodesic pass to the selected metric.
+- New helper (suggested): `shared/metric-eval.ts` with `(alpha, beta^i, gamma_ij, dBeta)` interface.
+
+Acceptance
+- Irrotational metric reports near-zero vorticity in the new vorticity mode.
+
+### 4.7 WarpFactory dataset import (optional)
+
+Patch points
+- New loader: `client/src/lib/wfbrick.ts` (bounds + dims + named channels).
+- `client/src/components/AlcubierrePanel.tsx`: "Load dataset" button + source switch.
+- `client/src/components/Hull3DRenderer.ts`: accept external volume textures as a source.
+
+Acceptance
+- WarpFactory volumes can be loaded and compared side-by-side with analytic mode.
+
+### Cross-validation checklist
+- Theta parity (2D vs 3D): planar proof vs hull volume matches sign/magnitude.
+- Natario invariants: `isZeroExpansion` + `isCurlFree` keep theta/vorticity near zero.
+- Brick vs analytic: t00 and rho_gr agree in sign/topology within expected scaling.
+- GeoViS match: theta mode + presets reproduce the expansion/contraction pattern.
+
+### Open decisions
+- Keep external source repos as links, or pin local copies under `external/`?
+- Surface shear/vorticity in the primary toggle or an "Advanced" submenu?
+- Persist GeoViS presets in card recipes or keep view-only?
+- Treat t00 as a volume viz mode or as a separate "source" selector?

@@ -21,10 +21,12 @@ import {
   normalizeCurvaturePalette,
 } from "@/lib/curvature-directive";
 
-export type VolumeViz = 0 | 1 | 2; // 0=θ_GR, 1=ρ_GR, 2=θ_Drive
+export type VolumeViz = 0 | 1 | 2 | 3 | 4; // 0=theta_GR, 1=rho_GR, 2=theta_Drive, 3=shear_GR, 4=vorticity_GR
 
 const THETA = "\u03B8";
 const RHO = "\u03C1";
+const SIGMA = "\u03C3";
+const OMEGA = "\u03C9";
 
 const OVERLAY_STATE_QUERY_KEY = ["hull3d:overlay:controls"] as const;
 
@@ -55,6 +57,14 @@ const labels: Record<VolumeViz, { short: string; title: string }> = {
   1: {
     short: `${RHO} (GR)`,
     title: `${RHO} (GR) — Hamiltonian constraint energy density (≤ 0 in shell)`,
+  },
+  3: {
+    short: `${SIGMA}^2 (GR)`,
+    title: `${SIGMA}^2 (GR) shear magnitude from K_ij K_ij - K^2/3`,
+  },
+  4: {
+    short: `${OMEGA} (GR)`,
+    title: `${OMEGA} (GR) vorticity proxy beta * sqrt(dfy^2 + dfz^2)`,
   },
 };
 
@@ -440,6 +450,8 @@ export function VolumeModeToggle({ value, onChange, className }: VolumeModeToggl
         {renderButton(2)}
         {renderButton(0)}
         {renderButton(1)}
+        {renderButton(3)}
+        {renderButton(4)}
       </div>
       <OverlaysBlock className="mt-3" />
       <Overlay3DControls className="mt-3" />

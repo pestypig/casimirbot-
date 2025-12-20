@@ -70,7 +70,7 @@ export interface NatarioWarpParams {
   betaTiltVec?: [number, number, number];   // optional pipeline tilt mapping
   exoticMassTarget_kg?: number;
   tileArea_m2_override?: number;
-  warpFieldType?: 'natario' | 'natario_sdf' | 'alcubierre';
+  warpFieldType?: 'natario' | 'natario_sdf' | 'alcubierre' | 'irrotational';
   warpGeometry?: WarpGeometry | null;
   warpGeometryKind?: WarpGeometryKind;
   warpGeometryAssetId?: string;

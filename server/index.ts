@@ -30,6 +30,12 @@ let shuttingDown = false;
 const runtimeEnv = process.env.NODE_ENV ?? "development";
 const fastBoot = process.env.FAST_BOOT === "1";
 const skipModuleInit = process.env.SKIP_MODULE_INIT === "1";
+const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1" || skipModuleInit;
+const bootstrapDelayMsRaw = process.env.BOOTSTRAP_DELAY_MS;
+const bootstrapDelayMs = Number.isFinite(Number(bootstrapDelayMsRaw))
+  ? Math.max(0, Number(bootstrapDelayMsRaw))
+  : 0;
+let bootstrapPromise: Promise<void> | null = null;
 const log = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -377,6 +383,23 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const startBootstrap = (reason: string) => {
+    if (bootstrapPromise) return;
+    log(`bootstrap start (${reason})`);
+    bootstrapPromise = bootstrap().catch((error) => {
+      console.error("[server] bootstrap failed:", error);
+    });
+  };
+  const scheduleBootstrap = (reason: string) => {
+    if (bootstrapPromise) return;
+    if (bootstrapDelayMs > 0) {
+      const timer = setTimeout(() => startBootstrap(reason), bootstrapDelayMs);
+      timer.unref?.();
+      return;
+    }
+    setImmediate(() => startBootstrap(reason));
+  };
+
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5173 if not specified.
   // this serves both the API and the client.
@@ -392,6 +415,9 @@ app.use((req, res, next) => {
     if (handleHealthCheck(req, res)) {
       return;
     }
+    if (deferRouteBoot && !bootstrapPromise && !isHealthCheckRequest(req)) {
+      scheduleBootstrap("first-request");
+    }
     app(req, res);
   });
   serverInstance = server;
@@ -404,21 +430,6 @@ app.use((req, res, next) => {
       return;
     }
     console.error("[server] unexpected listen error:", err);
-  });
-
-  // Start listening early so health checks succeed while routes finish initializing.
-  server.listen(listenOpts, () => {
-    const address = server.address();
-    const addressLabel =
-      typeof address === "string"
-        ? address
-        : address
-          ? `${address.address}:${address.port}`
-          : `0.0.0.0:${port}`;
-    log(`serving on ${addressLabel}`);
-    if (fastBoot) {
-      healthReady = true;
-    }
   });
 
   const bootstrap = async () => {
@@ -489,9 +500,24 @@ app.use((req, res, next) => {
     log("app ready");
   };
 
-  setTimeout(() => {
-    void bootstrap().catch((error) => {
-      console.error("[server] bootstrap failed:", error);
-    });
-  }, 0);
+  // Start listening early so health checks succeed while routes finish initializing.
+  server.listen(listenOpts, () => {
+    const address = server.address();
+    const addressLabel =
+      typeof address === "string"
+        ? address
+        : address
+          ? `${address.address}:${address.port}`
+          : `0.0.0.0:${port}`;
+    log(`serving on ${addressLabel}`);
+    if (fastBoot) {
+      healthReady = true;
+    }
+  });
+
+  if (deferRouteBoot) {
+    log("bootstrap deferred until first non-health request");
+  } else {
+    scheduleBootstrap("startup");
+  }
 })();
