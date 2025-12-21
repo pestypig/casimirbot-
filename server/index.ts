@@ -31,7 +31,7 @@ let shuttingDown = false;
 const runtimeEnv = process.env.NODE_ENV ?? "development";
 const fastBoot = process.env.FAST_BOOT === "1";
 const skipModuleInit = process.env.SKIP_MODULE_INIT === "1";
-const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1" || skipModuleInit;
+const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1";
 const netDiag = process.env.NET_DIAG === "1";
 const netDiagMaxConnections = 25;
 let netDiagConnectionsLogged = 0;
@@ -521,11 +521,13 @@ app.use((req, res, next) => {
   const server = createServer((req, res) => {
     const method = (req.method ?? "GET").toUpperCase();
     const pathname = getPathname(req.url);
+    const isRootPath = pathname === "/" || pathname === "";
+    const isHealthCheck = isHealthCheckRequest(req);
     const isProbePath =
-      pathname === "/" ||
-      pathname === "" ||
       pathname === "/healthz" ||
-      pathname === "/__selfcheck";
+      pathname === "/__selfcheck" ||
+      (isRootPath && isHealthCheck);
+    const shouldStartBootstrap = deferRouteBoot && !bootstrapPromise;
     if (netDiag) {
       if (isProbePath && netProbeLogCount < netProbeLogLimit) {
         netProbeLogCount += 1;
@@ -568,7 +570,10 @@ app.use((req, res, next) => {
         log(`[req] probe log limit reached (${netProbeLogLimit})`, "net");
       }
     }
-    if (isLivenessProbe(req)) {
+    if (isLivenessProbe(req) && isHealthCheck) {
+      if (shouldStartBootstrap) {
+        scheduleBootstrap("liveness-probe");
+      }
       const start = Date.now();
       const ua = headerValue(req.headers["user-agent"]);
       try {
@@ -585,6 +590,9 @@ app.use((req, res, next) => {
       return;
     }
     if (handleHealthCheck(req, res)) {
+      if (shouldStartBootstrap) {
+        scheduleBootstrap("healthz-probe");
+      }
       return;
     }
     if (deferRouteBoot && !bootstrapPromise && !isProbePath) {
