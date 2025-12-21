@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { FrontProofsLedger } from "./FrontProofsLedger";
 import { NeedleCavityBubblePanel } from "./NeedleCavityBubblePanel";
 import { MODE_CONFIGS, useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { PLANCK_LUMINOSITY_W } from "@/lib/physics-const";
 import { openDocPanel } from "@/lib/docs/openDocPanel";
 import { Button } from "@/components/ui/button";
 import {
@@ -534,6 +535,10 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
           const P_avg_MW = pos((p as any)?.P_avg);
           const P_avg_W =
             pos((p as any)?.P_avg_W) ?? (P_avg_MW != null ? P_avg_MW * 1e6 : null);
+          const planckRatio =
+            P_avg_W != null && Number.isFinite(P_avg_W)
+              ? P_avg_W / PLANCK_LUMINOSITY_W
+              : null;
           const mode = (p as any)?.currentMode ?? (p as any)?.mode;
           const mechGuard = (p as any)?.mechGuard ?? {};
           const P_cap_W =
@@ -577,6 +582,9 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
                     Capped
                   </span>
                 ) : null}
+              </div>
+              <div className="font-mono text-emerald-100">
+                P/(c^5/G)={fmtMaybe(planckRatio, 3)}
               </div>
               <div className="font-mono text-emerald-100">
                 P_target={fmtMw(P_target_W)} · P_cap={fmtMw(P_cap_W)} · mechGuard_status={mechGuard?.status ?? "n/a"}

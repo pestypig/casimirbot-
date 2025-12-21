@@ -521,8 +521,12 @@ app.use((req, res, next) => {
   const server = createServer((req, res) => {
     const method = (req.method ?? "GET").toUpperCase();
     const pathname = getPathname(req.url);
+    const isProbePath =
+      pathname === "/" ||
+      pathname === "" ||
+      pathname === "/healthz" ||
+      pathname === "/__selfcheck";
     if (netDiag) {
-      const isProbePath = pathname === "/" || pathname === "/healthz" || pathname === "/__selfcheck";
       if (isProbePath && netProbeLogCount < netProbeLogLimit) {
         netProbeLogCount += 1;
         const id = ++netReqSeq;
@@ -583,7 +587,7 @@ app.use((req, res, next) => {
     if (handleHealthCheck(req, res)) {
       return;
     }
-    if (deferRouteBoot && !bootstrapPromise) {
+    if (deferRouteBoot && !bootstrapPromise && !isProbePath) {
       scheduleBootstrap("first-real-request");
     }
     app(req, res);
