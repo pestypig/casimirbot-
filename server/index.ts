@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer, get as httpGet, type Server, type ServerResponse } from "http";
+import os from "os";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
 
@@ -390,15 +391,39 @@ const resolveRouteLabel = (req: Request): string => {
   return url || "/";
 };
 
+const resolveContainerIPv4 = (): string | null => {
+  const nets = os.networkInterfaces();
+  for (const entries of Object.values(nets)) {
+    if (!entries) continue;
+    for (const net of entries) {
+      const family = typeof net.family === "string" ? net.family : String(net.family);
+      if ((family === "IPv4" || family === "4") && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return null;
+};
+
 const selfCheck = (port: number) => {
   if (!netDiag) return;
-  const started = Date.now();
-  httpGet(`http://127.0.0.1:${port}/?selfcheck=1`, (res) => {
-    log(`[selfcheck] IPv4 / -> ${res.statusCode} in ${Date.now() - started}ms`, "net");
-    res.resume();
-  }).on("error", (error) => {
-    log(`[selfcheck] IPv4 failed: ${error.message}`, "net");
-  });
+  const runCheck = (label: string, url: string) => {
+    const started = Date.now();
+    httpGet(url, (res) => {
+      log(`[selfcheck] ${label} / -> ${res.statusCode} in ${Date.now() - started}ms`, "net");
+      res.resume();
+    }).on("error", (error) => {
+      log(`[selfcheck] ${label} failed: ${error.message}`, "net");
+    });
+  };
+
+  runCheck("IPv4", `http://127.0.0.1:${port}/?selfcheck=1`);
+  const containerIp = resolveContainerIPv4();
+  if (containerIp) {
+    runCheck(`container ${containerIp}`, `http://${containerIp}:${port}/?selfcheck=1`);
+  } else {
+    log("[selfcheck] container IPv4 not found", "net");
+  }
 };
 
 app.use((req, res, next) => {
@@ -508,9 +533,21 @@ app.use((req, res, next) => {
       socket.destroy();
     });
 
+    const formatAddr = (addr?: string, port?: number) => {
+      if (!addr) return "unknown";
+      const portLabel = port ?? "unknown";
+      if (addr.includes(":")) {
+        return `[${addr}]:${portLabel}`;
+      }
+      return `${addr}:${portLabel}`;
+    };
+
     server.on("request", (req) => {
       if (isProbePath(req.url)) {
-        log(`[probe-start] ${req.method ?? "GET"} ${req.url ?? "/"}`, "net");
+        const remote = formatAddr(req.socket?.remoteAddress, req.socket?.remotePort);
+        const local = formatAddr(req.socket?.localAddress, req.socket?.localPort);
+        const family = req.socket?.remoteFamily ?? "unknown";
+        log(`[probe-start] ${req.method ?? "GET"} ${req.url ?? "/"} remote=${remote} local=${local} fam=${family}`, "net");
       }
     });
   }
