@@ -484,11 +484,33 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const fallbackPort = app.get("env") === "production" ? "5000" : "5173";
-  const port = parseInt(process.env.PORT || fallbackPort, 10);
+  const isDeploy =
+    process.env.REPLIT_DEPLOYMENT === "1" ||
+    process.env.REPLIT_DEPLOYMENT === "true" ||
+    process.env.DEPLOYMENT === "1" ||
+    process.env.DEPLOYMENT === "true";
+
+  let port = parseInt(process.env.PORT || fallbackPort, 10);
+  if (!Number.isFinite(port) || Number.isNaN(port) || port <= 0) {
+    port = parseInt(fallbackPort, 10);
+  }
+
   const hostEnv = process.env.HOST;
-  const host = hostEnv?.trim() ? hostEnv.trim() : "0.0.0.0";
+  let host = hostEnv?.trim() ? hostEnv.trim() : "0.0.0.0";
+
+  if (isDeploy) {
+    const forcedPort = 5000;
+    const forcedHost = "0.0.0.0";
+    if (port !== forcedPort || host !== forcedHost) {
+      log(
+        `[deploy] forcing listen ${forcedHost}:${forcedPort} (was ${host}:${port}; env PORT=${process.env.PORT ?? "unset"} HOST=${process.env.HOST ?? "unset"})`
+      );
+    }
+    port = forcedPort;
+    host = forcedHost;
+  }
+
   const isWin = process.platform === "win32";
-  const isDeploy = process.env.REPLIT_DEPLOYMENT === "1" || process.env.DEPLOYMENT === "1";
   const listenOpts: any = { port, host };
   if (typeof host === "string" && host.includes(":")) {
     listenOpts.ipv6Only = false;
@@ -676,8 +698,10 @@ app.use((req, res, next) => {
           ? `${address.address}:${address.port}`
           : `0.0.0.0:${port}`;
     log(`serving on ${addressLabel} (HOST=${host})`);
-    if (netDiag) {
+    if (app.get("env") === "production") {
       log(`[boot] server.address()=${JSON.stringify(server.address())}`, "net");
+    }
+    if (netDiag) {
       const timer = setTimeout(() => selfCheck(port), 250);
       timer.unref?.();
     }
