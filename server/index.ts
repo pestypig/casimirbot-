@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer, type Server, type ServerResponse } from "http";
+import { createServer, get as httpGet, type Server, type ServerResponse } from "http";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
 
@@ -31,6 +31,9 @@ const runtimeEnv = process.env.NODE_ENV ?? "development";
 const fastBoot = process.env.FAST_BOOT === "1";
 const skipModuleInit = process.env.SKIP_MODULE_INIT === "1";
 const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1" || skipModuleInit;
+const netDiag = process.env.NET_DIAG === "1";
+const netDiagMaxConnections = 25;
+let netDiagConnectionsLogged = 0;
 const bootstrapDelayMsRaw = process.env.BOOTSTRAP_DELAY_MS;
 const bootstrapDelayMs = Number.isFinite(Number(bootstrapDelayMsRaw))
   ? Math.max(0, Number(bootstrapDelayMsRaw))
@@ -92,6 +95,11 @@ const isLivenessProbe = (req: HealthCheckRequest): boolean => {
   if (method !== "GET" && method !== "HEAD") return false;
   const path = getPathname(req.url);
   return path === "/" || path === "";
+};
+
+const isProbePath = (value?: string): boolean => {
+  const path = getPathname(value);
+  return path === "/" || path === "/healthz";
 };
 
 const replyPlain = (req: HealthCheckRequest, res: ServerResponse, statusCode: number, body: string): void => {
@@ -382,6 +390,17 @@ const resolveRouteLabel = (req: Request): string => {
   return url || "/";
 };
 
+const selfCheck = (port: number) => {
+  if (!netDiag) return;
+  const started = Date.now();
+  httpGet(`http://127.0.0.1:${port}/?selfcheck=1`, (res) => {
+    log(`[selfcheck] IPv4 / -> ${res.statusCode} in ${Date.now() - started}ms`, "net");
+    res.resume();
+  }).on("error", (error) => {
+    log(`[selfcheck] IPv4 failed: ${error.message}`, "net");
+  });
+};
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -441,11 +460,12 @@ app.use((req, res, next) => {
   const hostEnv = process.env.HOST;
   const host = hostEnv?.trim() ? hostEnv.trim() : "0.0.0.0";
   const isWin = process.platform === "win32";
+  const isDeploy = process.env.REPLIT_DEPLOYMENT === "1" || process.env.DEPLOYMENT === "1";
   const listenOpts: any = { port, host };
   if (typeof host === "string" && host.includes(":")) {
     listenOpts.ipv6Only = false;
   }
-  if (!isWin) listenOpts.reusePort = true;
+  if (!isWin && !isDeploy) listenOpts.reusePort = true;
   log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} HOST=${host} FAST_BOOT=${fastBoot ? "1" : "0"}`);
 
   const server = createServer((req, res) => {
@@ -470,6 +490,30 @@ app.use((req, res, next) => {
     app(req, res);
   });
   serverInstance = server;
+
+  if (netDiag) {
+    server.on("connection", (socket) => {
+      if (netDiagConnectionsLogged >= netDiagMaxConnections) {
+        return;
+      }
+      netDiagConnectionsLogged += 1;
+      log(`[conn] from ${socket.remoteAddress ?? "unknown"} (${socket.remoteFamily ?? "unknown"})`, "net");
+      if (netDiagConnectionsLogged === netDiagMaxConnections) {
+        log(`[conn] log limit reached (${netDiagMaxConnections})`, "net");
+      }
+    });
+
+    server.on("clientError", (err, socket) => {
+      log(`[clientError] ${err.message}`, "net");
+      socket.destroy();
+    });
+
+    server.on("request", (req) => {
+      if (isProbePath(req.url)) {
+        log(`[probe-start] ${req.method ?? "GET"} ${req.url ?? "/"}`, "net");
+      }
+    });
+  }
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err?.code === "EADDRINUSE") {
@@ -559,6 +603,11 @@ app.use((req, res, next) => {
           ? `${address.address}:${address.port}`
           : `0.0.0.0:${port}`;
     log(`serving on ${addressLabel} (HOST=${host})`);
+    if (netDiag) {
+      log(`[boot] server.address()=${JSON.stringify(server.address())}`, "net");
+      const timer = setTimeout(() => selfCheck(port), 250);
+      timer.unref?.();
+    }
     if (fastBoot) {
       healthReady = true;
     }
