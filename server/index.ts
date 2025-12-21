@@ -32,6 +32,9 @@ const runtimeEnv = process.env.NODE_ENV ?? "development";
 const fastBoot = process.env.FAST_BOOT === "1";
 const skipModuleInit = process.env.SKIP_MODULE_INIT === "1";
 const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1";
+const healthReadyOnListen =
+  process.env.HEALTH_READY_ON_LISTEN === "1" ||
+  (process.env.HEALTH_READY_ON_LISTEN !== "0" && deferRouteBoot);
 const probeDiag = process.env.PROBE_DIAG === "1";
 const netDiag = process.env.NET_DIAG === "1";
 const netDiagMaxConnections = 25;
@@ -116,11 +119,14 @@ const replyPlain = (req: HealthCheckRequest, res: ServerResponse, statusCode: nu
 
 const addProbeHeaders = (res: ServerResponse, handler: string): void => {
   if (!probeDiag) return;
-  const bootstrapped = appReady || healthReady;
+  const bootstrapped = appReady;
   const bootState = bootstrapped ? "done" : bootstrapPromise ? "booting" : "idle";
   res.setHeader("X-Probe-Handler", handler);
   res.setHeader("X-Probe-Bootstrapped", bootstrapped ? "1" : "0");
-  res.setHeader("X-Probe-Handler-Detail", `boot=${bootState};defer=${deferRouteBoot ? "1" : "0"}`);
+  res.setHeader(
+    "X-Probe-Handler-Detail",
+    `boot=${bootState};health=${healthReady ? "1" : "0"};defer=${deferRouteBoot ? "1" : "0"}`
+  );
 };
 
 const isPublicHealthRoute = (req: Request): boolean => {
@@ -540,6 +546,7 @@ app.use((req, res, next) => {
     log(
       `[probe-diag] pid=${process.pid} NODE_ENV=${runtimeEnv} SKIP_MODULE_INIT=${process.env.SKIP_MODULE_INIT ?? "unset"} ` +
         `DEFER_ROUTE_BOOT=${process.env.DEFER_ROUTE_BOOT ?? "unset"} deferRouteBoot=${deferRouteBoot ? "1" : "0"} ` +
+        `HEALTH_READY_ON_LISTEN=${process.env.HEALTH_READY_ON_LISTEN ?? "unset"} healthReadyOnListen=${healthReadyOnListen ? "1" : "0"} ` +
         `build=${buildId}`,
       "probe"
     );
@@ -759,14 +766,23 @@ app.use((req, res, next) => {
       const timer = setTimeout(() => selfCheck(port), 250);
       timer.unref?.();
     }
+    if (healthReadyOnListen && !healthReady) {
+      healthReady = true;
+      if (probeDiag) {
+        log("health ready (pre-bootstrap)", "probe");
+      }
+    }
     if (fastBoot) {
       healthReady = true;
+    }
+    if (healthReadyOnListen && !deferRouteBoot) {
+      scheduleBootstrap("post-ready-startup");
     }
   });
 
   if (deferRouteBoot) {
     log("bootstrap deferred until first health check or request");
-  } else {
+  } else if (!healthReadyOnListen) {
     scheduleBootstrap("startup");
   }
 })();
