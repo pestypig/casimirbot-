@@ -35,6 +35,10 @@ const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1" || skipModuleInit;
 const netDiag = process.env.NET_DIAG === "1";
 const netDiagMaxConnections = 25;
 let netDiagConnectionsLogged = 0;
+let netReqSeq = 0;
+let netProbeLogCount = 0;
+let netProbeLimitLogged = false;
+const netProbeLogLimit = 50;
 const bootstrapDelayMsRaw = process.env.BOOTSTRAP_DELAY_MS;
 const bootstrapDelayMs = Number.isFinite(Number(bootstrapDelayMsRaw))
   ? Math.max(0, Number(bootstrapDelayMsRaw))
@@ -96,11 +100,6 @@ const isLivenessProbe = (req: HealthCheckRequest): boolean => {
   if (method !== "GET" && method !== "HEAD") return false;
   const path = getPathname(req.url);
   return path === "/" || path === "";
-};
-
-const isProbePath = (value?: string): boolean => {
-  const path = getPathname(value);
-  return path === "/" || path === "/healthz";
 };
 
 const replyPlain = (req: HealthCheckRequest, res: ServerResponse, statusCode: number, body: string): void => {
@@ -409,18 +408,22 @@ const selfCheck = (port: number) => {
   if (!netDiag) return;
   const runCheck = (label: string, url: string) => {
     const started = Date.now();
-    httpGet(url, (res) => {
+    const req = httpGet(url, (res) => {
       log(`[selfcheck] ${label} / -> ${res.statusCode} in ${Date.now() - started}ms`, "net");
       res.resume();
-    }).on("error", (error) => {
+    });
+    req.on("error", (error) => {
       log(`[selfcheck] ${label} failed: ${error.message}`, "net");
+    });
+    req.setTimeout(1500, () => {
+      req.destroy(new Error("timeout"));
     });
   };
 
-  runCheck("IPv4", `http://127.0.0.1:${port}/?selfcheck=1`);
+  runCheck("IPv4", `http://127.0.0.1:${port}/__selfcheck`);
   const containerIp = resolveContainerIPv4();
   if (containerIp) {
-    runCheck(`container ${containerIp}`, `http://${containerIp}:${port}/?selfcheck=1`);
+    runCheck(`container ${containerIp}`, `http://${containerIp}:${port}/__selfcheck`);
   } else {
     log("[selfcheck] container IPv4 not found", "net");
   }
@@ -494,6 +497,51 @@ app.use((req, res, next) => {
   log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} HOST=${host} FAST_BOOT=${fastBoot ? "1" : "0"}`);
 
   const server = createServer((req, res) => {
+    const method = (req.method ?? "GET").toUpperCase();
+    const pathname = getPathname(req.url);
+    if (netDiag) {
+      const isProbePath = pathname === "/" || pathname === "/healthz" || pathname === "/__selfcheck";
+      if (isProbePath && netProbeLogCount < netProbeLogLimit) {
+        netProbeLogCount += 1;
+        const id = ++netReqSeq;
+        const t0 = Date.now();
+        const remoteAddr = req.socket.remoteAddress ?? "?";
+        const remotePort = req.socket.remotePort ?? "?";
+        const localAddr = req.socket.localAddress ?? "?";
+        const localPort = req.socket.localPort ?? "?";
+        const remote = `${remoteAddr}:${remotePort}`;
+        const local = `${localAddr}:${localPort}`;
+        const ua = (req.headers["user-agent"] ?? "-").toString();
+        const hostHdr = (req.headers.host ?? "-").toString();
+        const elapsed = () => `${Date.now() - t0}ms`;
+
+        log(
+          `[req#${id}] start ${method} ${req.url ?? "/"} path=${pathname} ` +
+            `remote=${remote} local=${local} fam=${req.socket.remoteFamily ?? "?"} ` +
+            `host=${hostHdr} ua=${ua}`,
+          "net"
+        );
+
+        req.once("aborted", () => {
+          log(`[req#${id}] aborted after ${elapsed()}`, "net");
+        });
+
+        res.once("finish", () => {
+          log(`[res#${id}] finish ${method} ${req.url ?? "/"} -> ${res.statusCode} in ${elapsed()}`, "net");
+        });
+
+        res.once("close", () => {
+          log(
+            `[res#${id}] close ended=${res.writableEnded ? "yes" : "no"} ` +
+              `headersSent=${res.headersSent ? "yes" : "no"} after ${elapsed()}`,
+            "net"
+          );
+        });
+      } else if (isProbePath && !netProbeLimitLogged) {
+        netProbeLimitLogged = true;
+        log(`[req] probe log limit reached (${netProbeLogLimit})`, "net");
+      }
+    }
     if (isLivenessProbe(req)) {
       const start = Date.now();
       const ua = headerValue(req.headers["user-agent"]);
@@ -504,6 +552,10 @@ app.use((req, res, next) => {
       try {
         console.log(`[probe] responded 200 in ${Date.now() - start}ms`);
       } catch {}
+      return;
+    }
+    if ((method === "GET" || method === "HEAD") && pathname === "/__selfcheck") {
+      replyPlain(req, res, 200, "ok");
       return;
     }
     if (handleHealthCheck(req, res)) {
@@ -533,23 +585,7 @@ app.use((req, res, next) => {
       socket.destroy();
     });
 
-    const formatAddr = (addr?: string, port?: number) => {
-      if (!addr) return "unknown";
-      const portLabel = port ?? "unknown";
-      if (addr.includes(":")) {
-        return `[${addr}]:${portLabel}`;
-      }
-      return `${addr}:${portLabel}`;
-    };
-
-    server.on("request", (req) => {
-      if (isProbePath(req.url)) {
-        const remote = formatAddr(req.socket?.remoteAddress, req.socket?.remotePort);
-        const local = formatAddr(req.socket?.localAddress, req.socket?.localPort);
-        const family = req.socket?.remoteFamily ?? "unknown";
-        log(`[probe-start] ${req.method ?? "GET"} ${req.url ?? "/"} remote=${remote} local=${local} fam=${family}`, "net");
-      }
-    });
+    // Detailed per-request logs are wired inside createServer to capture lifecycle.
   }
 
   server.on("error", (err: NodeJS.ErrnoException) => {
