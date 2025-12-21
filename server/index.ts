@@ -125,7 +125,7 @@ const addProbeHeaders = (res: ServerResponse, handler: string): void => {
 
 const isPublicHealthRoute = (req: Request): boolean => {
   const normalized = normalizeHealthPath(req.path || req.originalUrl);
-  return normalized === "/" || normalized === "/healthz";
+  return normalized === "/" || normalized === "/healthz" || normalized === "/__selfcheck";
 };
 
 const isHealthCheckRequest = (req: HealthCheckRequest): boolean => {
@@ -550,11 +550,27 @@ app.use((req, res, next) => {
     const pathname = getPathname(req.url);
     const isRootPath = pathname === "/" || pathname === "";
     const isHealthCheck = isHealthCheckRequest(req);
+    const isSelfcheck = pathname === "/__selfcheck";
     const isProbePath =
       pathname === "/healthz" ||
-      pathname === "/__selfcheck" ||
+      isSelfcheck ||
       (isRootPath && isHealthCheck);
     const shouldStartBootstrap = deferRouteBoot && !bootstrapPromise;
+    const scheduleAfterResponse = (reason: string) => {
+      if (!shouldStartBootstrap) return;
+      let queued = false;
+      const queue = () => {
+        if (queued) return;
+        queued = true;
+        scheduleBootstrap(reason);
+      };
+      if (res.writableEnded) {
+        queue();
+        return;
+      }
+      res.once("finish", queue);
+      res.once("close", queue);
+    };
     if (netDiag) {
       if (isProbePath && netProbeLogCount < netProbeLogLimit) {
         netProbeLogCount += 1;
@@ -598,9 +614,7 @@ app.use((req, res, next) => {
       }
     }
     if (isLivenessProbe(req) && isHealthCheck) {
-      if (shouldStartBootstrap) {
-        scheduleBootstrap("liveness-probe");
-      }
+      scheduleAfterResponse("liveness-probe");
       addProbeHeaders(res, "raw-liveness");
       const start = Date.now();
       const ua = headerValue(req.headers["user-agent"]);
@@ -613,14 +627,14 @@ app.use((req, res, next) => {
       } catch {}
       return;
     }
-    if ((method === "GET" || method === "HEAD") && pathname === "/__selfcheck") {
+    if ((method === "GET" || method === "HEAD") && isSelfcheck) {
+      addProbeHeaders(res, "raw-selfcheck");
       replyPlain(req, res, 200, "ok");
+      scheduleAfterResponse("selfcheck-probe");
       return;
     }
     if (handleHealthCheck(req, res)) {
-      if (shouldStartBootstrap) {
-        scheduleBootstrap("healthz-probe");
-      }
+      scheduleAfterResponse("healthz-probe");
       return;
     }
     if (deferRouteBoot && !bootstrapPromise && !isProbePath) {
