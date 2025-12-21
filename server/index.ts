@@ -438,10 +438,15 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const fallbackPort = app.get("env") === "production" ? "5000" : "5173";
   const port = parseInt(process.env.PORT || fallbackPort, 10);
+  const hostEnv = process.env.HOST;
+  const host = hostEnv?.trim() ? hostEnv.trim() : "0.0.0.0";
   const isWin = process.platform === "win32";
-  const listenOpts: any = { port, host: "0.0.0.0" };
+  const listenOpts: any = { port, host };
+  if (typeof host === "string" && host.includes(":")) {
+    listenOpts.ipv6Only = false;
+  }
   if (!isWin) listenOpts.reusePort = true;
-  log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} FAST_BOOT=${fastBoot ? "1" : "0"}`);
+  log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} HOST=${host} FAST_BOOT=${fastBoot ? "1" : "0"}`);
 
   const server = createServer((req, res) => {
     if (isLivenessProbe(req)) {
@@ -553,7 +558,7 @@ app.use((req, res, next) => {
         : address
           ? `${address.address}:${address.port}`
           : `0.0.0.0:${port}`;
-    log(`serving on ${addressLabel}`);
+    log(`serving on ${addressLabel} (HOST=${host})`);
     if (fastBoot) {
       healthReady = true;
     }
