@@ -391,12 +391,12 @@ const resolveRouteLabel = (req: Request): string => {
 };
 
 const resolveContainerIPv4 = (): string | null => {
-  const nets = os.networkInterfaces();
-  for (const entries of Object.values(nets)) {
+  const nets = os.networkInterfaces() as NodeJS.Dict<os.NetworkInterfaceInfo[]>;
+  const entriesList = Object.values(nets) as Array<os.NetworkInterfaceInfo[] | undefined>;
+  for (const entries of entriesList) {
     if (!entries) continue;
     for (const net of entries) {
-      const family = typeof net.family === "string" ? net.family : String(net.family);
-      if ((family === "IPv4" || family === "4") && !net.internal) {
+      if (net.family === "IPv4" && !net.internal) {
         return net.address;
       }
     }
