@@ -32,6 +32,7 @@ const runtimeEnv = process.env.NODE_ENV ?? "development";
 const fastBoot = process.env.FAST_BOOT === "1";
 const skipModuleInit = process.env.SKIP_MODULE_INIT === "1";
 const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1";
+const probeDiag = process.env.PROBE_DIAG === "1";
 const netDiag = process.env.NET_DIAG === "1";
 const netDiagMaxConnections = 25;
 let netDiagConnectionsLogged = 0;
@@ -111,6 +112,15 @@ const replyPlain = (req: HealthCheckRequest, res: ServerResponse, statusCode: nu
     return;
   }
   res.end(body);
+};
+
+const addProbeHeaders = (res: ServerResponse, handler: string): void => {
+  if (!probeDiag) return;
+  const bootstrapped = appReady || healthReady;
+  const bootState = bootstrapped ? "done" : bootstrapPromise ? "booting" : "idle";
+  res.setHeader("X-Probe-Handler", handler);
+  res.setHeader("X-Probe-Bootstrapped", bootstrapped ? "1" : "0");
+  res.setHeader("X-Probe-Handler-Detail", `boot=${bootState};defer=${deferRouteBoot ? "1" : "0"}`);
 };
 
 const isPublicHealthRoute = (req: Request): boolean => {
@@ -267,6 +277,7 @@ const desktopRedirectHtml = `<!doctype html>
 </html>`;
 
 const rootHandler = (req: Request, res: Response) => {
+  addProbeHeaders(res, "express-root");
   // Health check: respond immediately with 200 for fastest possible response
   // This ensures deployment health checks pass quickly
   const isHealthCheck = isHealthCheckRequest(req);
@@ -298,6 +309,7 @@ const handleHealthCheck = (req: HealthCheckRequest, res: ServerResponse): boolea
   if (path === "/healthz") {
     const payload = healthPayload();
     const statusCode = payload.ready ? 200 : 503;
+    addProbeHeaders(res, "raw-healthz");
     if (method === "HEAD") {
       res.statusCode = statusCode;
       res.setHeader("Cache-Control", "no-store");
@@ -517,6 +529,21 @@ app.use((req, res, next) => {
   }
   if (!isWin && !isDeploy) listenOpts.reusePort = true;
   log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} HOST=${host} FAST_BOOT=${fastBoot ? "1" : "0"}`);
+  if (probeDiag) {
+    const buildId =
+      process.env.GIT_SHA ??
+      process.env.COMMIT_SHA ??
+      process.env.GITHUB_SHA ??
+      process.env.REPLIT_GIT_COMMIT ??
+      process.env.npm_package_version ??
+      "unknown";
+    log(
+      `[probe-diag] pid=${process.pid} NODE_ENV=${runtimeEnv} SKIP_MODULE_INIT=${process.env.SKIP_MODULE_INIT ?? "unset"} ` +
+        `DEFER_ROUTE_BOOT=${process.env.DEFER_ROUTE_BOOT ?? "unset"} deferRouteBoot=${deferRouteBoot ? "1" : "0"} ` +
+        `build=${buildId}`,
+      "probe"
+    );
+  }
 
   const server = createServer((req, res) => {
     const method = (req.method ?? "GET").toUpperCase();
@@ -574,6 +601,7 @@ app.use((req, res, next) => {
       if (shouldStartBootstrap) {
         scheduleBootstrap("liveness-probe");
       }
+      addProbeHeaders(res, "raw-liveness");
       const start = Date.now();
       const ua = headerValue(req.headers["user-agent"]);
       try {
