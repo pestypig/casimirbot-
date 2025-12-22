@@ -35,6 +35,7 @@ const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1";
 const healthReadyOnListen =
   process.env.HEALTH_READY_ON_LISTEN === "1" ||
   (process.env.HEALTH_READY_ON_LISTEN !== "0" && deferRouteBoot);
+const rootLivenessAlways = process.env.ROOT_LIVENESS_ALWAYS === "1";
 const probeDiag = process.env.PROBE_DIAG === "1";
 const netDiag = process.env.NET_DIAG === "1";
 const netDiagMaxConnections = 25;
@@ -619,6 +620,12 @@ app.use((req, res, next) => {
         netProbeLimitLogged = true;
         log(`[req] probe log limit reached (${netProbeLogLimit})`, "net");
       }
+    }
+    if (rootLivenessAlways && (method === "GET" || method === "HEAD") && isRootPath) {
+      scheduleAfterResponse("root-liveness");
+      addProbeHeaders(res, "raw-liveness");
+      replyPlain(req, res, 200, "ok");
+      return;
     }
     if (isLivenessProbe(req) && isHealthCheck) {
       scheduleAfterResponse("liveness-probe");
