@@ -24,10 +24,17 @@ run = [
   "dist/index.js"
 ]
 =======
+[deployment]
 deploymentTarget = "cloudrun"
-build = ["npm", "run", "build"]
+build = ["sh", "-c", "python -m pip install uv && python -m uv sync --no-install-project && npm run build"]
+run = ["sh", "-c", "env NODE_ENV=production PORT=5000 HOST=0.0.0.0 FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=.venv/bin/python SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=1 HEALTH_READY_ON_LISTEN=1 ROOT_LIVENESS_ALWAYS=0 BOOTSTRAP_DELAY_MS=0 NET_DIAG=0 node dist/index.js"]
+
+<<<<<<< HEAD
 run = ["sh", "-c", "env NODE_ENV=production PORT=5000 HOST=0.0.0.0 FAST_BOOT=0 SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=1 HEALTH_READY_ON_LISTEN=1 ROOT_LIVENESS_ALWAYS=1 BOOTSTRAP_DELAY_MS=0 NET_DIAG=0 node dist/index.js"]
 >>>>>>> e5384775 (Published your App)
+=======
+run = ["sh", "-c", "env NODE_ENV=production PORT=5000 HOST=0.0.0.0 FAST_BOOT=0 SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=1 HEALTH_READY_ON_LISTEN=1 ROOT_LIVENESS_ALWAYS=0 BOOTSTRAP_DELAY_MS=0 NET_DIAG=0 node dist/index.js"]
+>>>>>>> 439cefb9 (Published your App)
 
 [[ports]]
 localPort = 5000
