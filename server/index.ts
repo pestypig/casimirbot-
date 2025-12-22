@@ -83,6 +83,9 @@ const headerValue = (value: string | string[] | undefined): string => {
   return Array.isArray(value) ? value.join(",") : value;
 };
 
+const MOBILE_UA_REGEX =
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+
 const normalizeHealthPath = (value?: string): string => {
   if (!value) return "/";
   const base = value.split("?")[0] || "/";
@@ -153,6 +156,34 @@ const isHealthCheckRequest = (req: HealthCheckRequest): boolean => {
     userAgent.includes("elb-healthchecker") ||
     acceptsAny
   );
+};
+
+const resolveRootRedirectOverride = (req: Request): string | null => {
+  try {
+    const url = new URL(req.originalUrl ?? req.url ?? "/", "http://localhost");
+    const params = url.searchParams;
+    if (params.get("mobile") === "1") return "/mobile";
+    if (params.get("desktop") === "1") return "/desktop";
+  } catch {}
+  return null;
+};
+
+const isMobileRequest = (req: Request): boolean => {
+  const mobileHint = headerValue(req.headers["sec-ch-ua-mobile"]).trim();
+  if (mobileHint === "?1") return true;
+  if (mobileHint === "?0") return false;
+
+  const ua = headerValue(req.headers["user-agent"]);
+  if (!ua) return false;
+  if (MOBILE_UA_REGEX.test(ua)) return true;
+  const uaLower = ua.toLowerCase();
+  return uaLower.includes("macintosh") && uaLower.includes("mobile");
+};
+
+const resolveRootRedirectTarget = (req: Request): string => {
+  const override = resolveRootRedirectOverride(req);
+  if (override) return override;
+  return isMobileRequest(req) ? "/mobile" : "/desktop";
 };
 
 app.use(express.json());
@@ -271,15 +302,55 @@ app.use('/warp-engine*.js', (req, res, next) => {
   next();
 });
 
-const desktopRedirectHtml = `<!doctype html>
+const renderRootRedirectHtml = (target: string) => `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="refresh" content="0; url=/desktop">
+    <meta http-equiv="refresh" content="0; url=${target}">
     <title>CasimirBot</title>
   </head>
   <body>
-    <p>Redirecting to <a href="/desktop">/desktop</a>...</p>
+    <p>Redirecting to <a href="${target}">${target}</a>...</p>
+    <script>
+      window.location.replace(${JSON.stringify(target)});
+    </script>
+  </body>
+</html>`;
+
+const renderRootBootHtml = (target: string) => `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="5">
+    <meta name="robots" content="noindex">
+    <title>CasimirBot</title>
+  </head>
+  <body>
+    <p>Starting up... Redirecting to <a href="${target}">${target}</a> once ready.</p>
+    <script>
+      (function() {
+        var target = ${JSON.stringify(target)};
+        var retryMs = 500;
+        function schedule() {
+          setTimeout(check, retryMs);
+        }
+        function check() {
+          fetch("/healthz", { cache: "no-store" })
+            .then(function(res) {
+              return res.ok ? res.json() : null;
+            })
+            .then(function(payload) {
+              if (payload && payload.ready) {
+                window.location.replace(target);
+                return;
+              }
+              schedule();
+            })
+            .catch(schedule);
+        }
+        check();
+      })();
+    </script>
   </body>
 </html>`;
 
@@ -293,17 +364,30 @@ const rootHandler = (req: Request, res: Response) => {
     res.status(200).send("ok");
     return;
   }
-  
-  if (!appReady) {
-    res.status(200).send("starting");
-    return;
-  }
+  const redirectTarget = resolveRootRedirectTarget(req);
   const wantsHtml = Boolean(req.accepts(["html"]));
-  if (wantsHtml) {
-    res.status(200).type("html").send(desktopRedirectHtml);
+  if (!appReady) {
+    if (wantsHtml) {
+      res
+        .status(200)
+        .set("Cache-Control", "no-store")
+        .type("html")
+        .send(renderRootBootHtml(redirectTarget));
+      return;
+    }
+    res.status(200).json({ status: "starting", redirect: redirectTarget });
     return;
   }
-  res.status(200).json({ status: "ok", redirect: "/desktop" });
+  if (wantsHtml) {
+    res
+      .status(302)
+      .set("Location", redirectTarget)
+      .set("Cache-Control", "no-store")
+      .type("html")
+      .send(renderRootRedirectHtml(redirectTarget));
+    return;
+  }
+  res.status(200).json({ status: "ok", redirect: redirectTarget });
 };
 
 const handleHealthCheck = (req: HealthCheckRequest, res: ServerResponse): boolean => {
