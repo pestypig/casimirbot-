@@ -59,6 +59,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/luma/ops", lumaHceRouter);
   app.use("/api/luma", lumaRouter);
   registerLumaWhisperRoute(app);
+  app.use("/api/tools/remove-bg-edges", removeBgEdgesRouter);
 
   if (!fastBoot) {
     const { knowledgeRouter } = await import("./routes/knowledge");
@@ -71,7 +72,6 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/physics/warp", warpViabilityRouter);
     app.use("/api/physics/curvature", curvatureRouter);
     app.use("/api/vectorizer", vectorizerRouter);
-    app.use("/api/tools/remove-bg-edges", removeBgEdgesRouter);
 
     app.use("/api/orchestrator", orchestratorRouter);
     app.use(noiseGensRouter);
