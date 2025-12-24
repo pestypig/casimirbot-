@@ -20,4 +20,5 @@ dependencies = [
     "sunpy>=7.0.3",
     "zeep>=4.3.0",
     "vectorizer-ai>=0.2.0",
+    "opencv-python-headless>=4.11.0.86",
 ]
