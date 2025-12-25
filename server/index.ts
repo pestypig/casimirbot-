@@ -603,7 +603,8 @@ app.use((req, res, next) => {
 
   if (isDeploy) {
     const forcedPort = 5000;
-    const forcedHost = "0.0.0.0";
+    const forcedHostRaw = hostEnv?.trim() ? hostEnv.trim() : "0.0.0.0";
+    const forcedHost = forcedHostRaw === "0.0.0.0" ? "::" : forcedHostRaw;
     if (port !== forcedPort || host !== forcedHost) {
       log(
         `[deploy] forcing listen ${forcedHost}:${forcedPort} (was ${host}:${port}; env PORT=${process.env.PORT ?? "unset"} HOST=${process.env.HOST ?? "unset"})`
@@ -619,7 +620,11 @@ app.use((req, res, next) => {
     listenOpts.ipv6Only = false;
   }
   if (!isWin && !isDeploy) listenOpts.reusePort = true;
-  log(`boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} HOST=${host} FAST_BOOT=${fastBoot ? "1" : "0"}`);
+  log(
+    `boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} ` +
+      `HOST=${host} FAST_BOOT=${fastBoot ? "1" : "0"} ` +
+      `PROBE_DIAG=${process.env.PROBE_DIAG ?? "unset"} NET_DIAG=${process.env.NET_DIAG ?? "unset"}`
+  );
   if (probeDiag) {
     const buildId =
       process.env.GIT_SHA ??
