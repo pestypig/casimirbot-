@@ -140,21 +140,12 @@ const isPublicHealthRoute = (req: Request): boolean => {
 
 const isHealthCheckRequest = (req: HealthCheckRequest): boolean => {
   const userAgent = headerValue(req.headers["user-agent"]).toLowerCase();
-  const accept = headerValue(req.headers.accept).trim().toLowerCase();
-  const acceptTokens = accept
-    .split(",")
-    .map((token) => token.trim())
-    .filter(Boolean);
-  const acceptsAny =
-    acceptTokens.length === 0 ||
-    (acceptTokens.length === 1 && acceptTokens[0].startsWith("*/*"));
   return (
     req.method === "HEAD" ||
     req.headers["x-health-check"] !== undefined ||
     userAgent.includes("health") ||
     userAgent.includes("kube-probe") ||
-    userAgent.includes("elb-healthchecker") ||
-    acceptsAny
+    userAgent.includes("elb-healthchecker")
   );
 };
 
