@@ -8,7 +8,7 @@ packages = ["gmsh", "emscripten", "jq"]
 
 [deployment]
 deploymentTarget = "vm"
-build = ["bash", "-lc", "python -m pip install uv && UV_BIN=$(python -c 'import os, sysconfig; print(os.path.join(sysconfig.get_path(\"scripts\"), \"uv\"))') && $UV_BIN sync --no-install-project --active && npm run build"]
+build = ["npm", "run", "build"]
 run = [
   "env",
   "NODE_ENV=production",
