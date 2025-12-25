@@ -48,9 +48,11 @@ export async function removeBackgroundEdges(
   opts: RemoveBgEdgesOptions = {}
 ): Promise<Buffer> {
   const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "remove-bg-"));
-  const safeName = (filename || "image.png").replace(/[^a-zA-Z0-9._-]/g, "_");
-  const inputPath = path.join(tmpRoot, safeName || `${randomUUID()}.png`);
-  const outputPath = path.join(tmpRoot, safeName || "output.png");
+  const safeName = (filename || "image").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const baseName = safeName.replace(/\.[^/.]+$/, "") || randomUUID();
+  const outputName = `${baseName}.png`;
+  const inputPath = path.join(tmpRoot, outputName);
+  const outputPath = path.join(tmpRoot, outputName);
 
   await fs.writeFile(inputPath, buffer);
 
