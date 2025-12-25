@@ -19,9 +19,6 @@ run = [
   "SKIP_MODULE_INIT=1",
   "DEFER_ROUTE_BOOT=1",
   "HEALTH_READY_ON_LISTEN=1",
-  "ROOT_LIVENESS_ALWAYS=1",
-  "PROBE_DIAG=1",
-  "NET_DIAG=1",
   "node",
   "dist/index.js"
 ]
