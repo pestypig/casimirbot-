@@ -18,7 +18,9 @@ run = [
   "REMOVE_BG_PYTHON_BIN=python",
   "SKIP_MODULE_INIT=1",
   "DEFER_ROUTE_BOOT=1",
-  "NET_DIAG=1",
+  "HEALTH_READY_ON_LISTEN=1",
+  "ROOT_LIVENESS_ALWAYS=1",
+  "NET_DIAG=0",
   "node",
   "dist/index.js"
 ]
