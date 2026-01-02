@@ -1051,7 +1051,10 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "server/services/observability/gr-agent-loop-store.ts",
     stage: "diagnostic",
     notes: "GR agent loop audit log storage.",
-    checks: [{ type: "stability", path: "tests/gr-agent-loop.spec.ts" }],
+    checks: [
+      { type: "residual", path: "tests/gr-agent-loop.spec.ts" },
+      { type: "stability", path: "tests/gr-agent-loop.spec.ts" },
+    ],
   },
   {
     tag: "LOG_STORE",
