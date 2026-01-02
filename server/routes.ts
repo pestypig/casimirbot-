@@ -15,13 +15,20 @@ import { registerLumaWhisperRoute } from "./routes/luma-whispers";
 import { hceRouter } from "./routes/hce";
 import { getHorizonsElements } from "./utils/horizons-proxy";
 import { orchestratorRouter } from "./routes/orchestrator";
+import { analysisLoopRouter } from "./routes/analysis-loops";
 import noiseGensRouter from "./routes/noise-gens";
 import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
 import { helixQiRouter } from "./routes/helix/qi";
+import { helixMathRouter } from "./routes/helix/math";
 import { warpViabilityRouter } from "./routes/warp-viability";
 import { curvatureRouter } from "./routes/physics.curvature";
 import { collapseBenchmarksRouter } from "./routes/benchmarks.collapse";
+import { grAgentRouter } from "./routes/gr-agent";
+import { trainingTraceRouter } from "./routes/training-trace";
+import { adapterRouter } from "./routes/agi.adapter";
+import { constraintPacksRouter } from "./routes/agi.constraint-packs";
+import { requireJwtMiddleware } from "./auth/jwt";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { vectorizerRouter } from "./routes/vectorizer";
 import { removeBgEdgesRouter } from "./routes/remove-bg-edges";
@@ -74,6 +81,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/vectorizer", vectorizerRouter);
 
     app.use("/api/orchestrator", orchestratorRouter);
+    app.use("/api/analysis", analysisLoopRouter);
     app.use(noiseGensRouter);
     app.use("/api/hull/status", hullStatusRouter);
     if (flagEnabled(process.env.ENABLE_STAR_SERVICE ?? process.env.ENABLE_STAR, true)) {
@@ -109,13 +117,22 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     if (process.env.ENABLE_AGI === undefined) {
       console.warn("[routes] ENABLE_AGI not set; defaulting to enabled (set ENABLE_AGI=0 to disable).");
     }
+    const agiAuthEnabled = flagEnabled(
+      process.env.ENABLE_AGI_AUTH ?? process.env.ENABLE_AUTH,
+      false,
+    );
+    if (agiAuthEnabled) {
+      app.use("/api/agi", (req, res, next) =>
+        requireJwtMiddleware(req, res, next),
+      );
+    }
     const { personaRouter } = await import("./routes/agi.persona");
     const { memoryRouter } = await import("./routes/agi.memory");
     const { planRouter } = await import("./routes/agi.plan");
     const { evalRouter } = await import("./routes/agi.eval");
-    const { profileRouter } = await import("./routes/agi.profile");
-    const { starTelemetryRouter } = await import("./routes/agi.star");
-    const enableDebate = flagEnabled(process.env.ENABLE_DEBATE, false);
+    const { profileRouter } = await import("./routes/agi.profile");        
+    const { starTelemetryRouter } = await import("./routes/agi.star");     
+    const enableDebate = flagEnabled(process.env.ENABLE_DEBATE, false);    
     if (enableDebate) {
       const { debateRouter } = await import("./routes/agi.debate");
       app.use("/api/agi/debate", debateRouter);
@@ -123,6 +140,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi/persona", personaRouter);
     app.use("/api/agi/memory", memoryRouter);
     app.use("/api/agi/profile", profileRouter);
+    app.use("/api/agi", trainingTraceRouter);
+    app.use("/api/agi", constraintPacksRouter);
+    app.use("/api/agi/adapter", adapterRouter);
     if (process.env.ENABLE_AGI === "1" && process.env.ENABLE_TRACE_API === "1") {
       const { traceRouter } = await import("./routes/agi.trace");
       app.use("/api/agi/trace", traceRouter);
@@ -979,6 +999,15 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     getEnergySnapshot,
     getCurvatureBrick,
     getStressEnergyBrick,
+    getCasimirTileSummary,
+    getLapseBrick,
+    getGrRequest,
+    getGrInitialBrick,
+    getGrEvolveBrick,
+    getGrRegionStats,
+    getGrConstraintNetwork4d,
+    getGrConstraintContract,
+    getGrEvaluation,
     postCurvatureBrickDebugStamp,
     postCurvatureBrickDebugClear,
     getPhaseBiasTable,
@@ -1022,7 +1051,11 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.options("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
   app.post("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
   app.use("/api/helix/qi", helixQiRouter);
+  app.use("/api/helix/math", helixMathRouter);
   app.use("/api/helix/hull-preview", hullPreviewRouter);
+  app.use("/api/helix", grAgentRouter);
+  app.use("/api/helix", trainingTraceRouter);
+  app.use("/api/helix", constraintPacksRouter);
 
   app.get("/api/qisnap/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
@@ -1202,6 +1235,24 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post("/api/helix/curvature-brick", getCurvatureBrick);
   app.get("/api/helix/stress-energy-brick", getStressEnergyBrick);
   app.post("/api/helix/stress-energy-brick", getStressEnergyBrick);
+  app.get("/api/helix/casimir-tile-summary", getCasimirTileSummary);
+  app.post("/api/helix/casimir-tile-summary", getCasimirTileSummary);
+  app.get("/api/helix/lapse-brick", getLapseBrick);
+  app.post("/api/helix/lapse-brick", getLapseBrick);
+  app.get("/api/helix/gr-request", getGrRequest);
+  app.post("/api/helix/gr-request", getGrRequest);
+  app.get("/api/helix/gr-initial-brick", getGrInitialBrick);
+  app.post("/api/helix/gr-initial-brick", getGrInitialBrick);
+  app.get("/api/helix/gr-evolve-brick", getGrEvolveBrick);
+  app.post("/api/helix/gr-evolve-brick", getGrEvolveBrick);
+  app.get("/api/helix/gr-region-stats", getGrRegionStats);
+  app.post("/api/helix/gr-region-stats", getGrRegionStats);
+  app.get("/api/helix/gr-constraint-network-4d", getGrConstraintNetwork4d);     
+  app.post("/api/helix/gr-constraint-network-4d", getGrConstraintNetwork4d);    
+  app.get("/api/helix/gr-constraint-contract", getGrConstraintContract);        
+  app.post("/api/helix/gr-constraint-contract", getGrConstraintContract);       
+  app.get("/api/helix/gr-evaluation", getGrEvaluation);
+  app.post("/api/helix/gr-evaluation", getGrEvaluation);
   app.post("/api/helix/curvature-brick/debug-stamp", postCurvatureBrickDebugStamp);
   app.post("/api/helix/curvature-brick/debug-clear", postCurvatureBrickDebugClear);
   app.get("/api/helix/phase-bias", getPhaseBiasTable);
@@ -1273,3 +1324,5 @@ export const routes = [
   { path: '/inspector', name: 'inspector' }
 ];
 export default routes;
+
+

@@ -144,13 +144,13 @@ const boundsFromLines = (positions: Float32Array) => {
 const fixtures = [
   {
     label: "axis-aligned",
-    file: "ellipsoid-12x6x4.glb",
+    file: "needle-ellipsoid.glb",
     basis: null as BasisTransform | null,
     expectDims: [1007, 264, 173] as [number, number, number],
   },
   {
     label: "basis-swapped",
-    file: "ellipsoid-12x6x4-basis-swapped.glb",
+    file: "needle-ellipsoid-basis-swapped.glb",
     basis: {
       swap: { x: "z", y: "y", z: "x" },
       flip: { x: false, y: true, z: false },

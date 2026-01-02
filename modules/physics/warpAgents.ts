@@ -12,6 +12,19 @@ export interface WarpAgentsConstraint {
 export interface WarpAgentsConfig {
   version: number;
   constraints: WarpAgentsConstraint[];
+  grConstraintGate?: {
+    version: number;
+    thresholds: {
+      H_rms_max: number;
+      M_rms_max: number;
+      H_maxAbs_max?: number;
+      M_maxAbs_max?: number;
+    };
+    policy: {
+      mode: "all" | "hard-only";
+      unknownAsFail: boolean;
+    };
+  };
   requiredTests: string[];
   viabilityPolicy: {
     admissibleStatus: "ADMISSIBLE";

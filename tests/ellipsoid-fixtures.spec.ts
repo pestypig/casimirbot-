@@ -103,7 +103,7 @@ describe("ellipsoid GLB fixtures", () => {
   const root = path.resolve(__dirname, "..", "client", "public", "luma");
 
   it("axis-aligned fixture preserves expected OBB dims", () => {
-    const glb = loadGlb(path.join(root, "ellipsoid-12x6x4.glb"));
+    const glb = loadGlb(path.join(root, "needle-ellipsoid.glb"));
     const { mins, maxs, dims } = boundsFromAccessor(glb, 0);
     expect(mins).toEqual([-503.5, -132, -86.5]);
     expect(maxs).toEqual([503.5, 132, 86.5]);
@@ -113,7 +113,7 @@ describe("ellipsoid GLB fixtures", () => {
   });
 
   it("basis-swapped fixture applies swap/flip/scale to axes", () => {
-    const glb = loadGlb(path.join(root, "ellipsoid-12x6x4-basis-swapped.glb"));
+    const glb = loadGlb(path.join(root, "needle-ellipsoid-basis-swapped.glb"));
     const { mins, maxs, dims } = boundsFromAccessor(glb, 0);
     expect(mins).toEqual([-43.25, -165, -503.5]);
     expect(maxs).toEqual([43.25, 165, 503.5]);

@@ -7,6 +7,7 @@ import type {
   WarpViabilityCertificate,
   WarpViabilityPayload,
 } from "../types/warpViability";
+import { withSpan } from "../server/services/observability/otel-tracing.js";
 
 // Canonical JSON to make hashes stable and deterministic across runtimes.
 export function canonicalJson(value: unknown): string {
@@ -55,36 +56,57 @@ export async function issueWarpViabilityCertificate(
   config: WarpConfig,
   opts: CertOpts = {},
 ): Promise<WarpViabilityCertificate> {
-  const shouldUseLive = opts.useLiveSnapshot ?? envUseLiveSnapshot();
-  const live = shouldUseLive ? await pullSettledSnapshot(opts.livePull) : null;
-  const viability = await evaluateWarpViability(config, {
-    snapshot: live?.snap,
-    telemetrySource: live ? "pipeline-live" : "solver",
-    telemetryHeaders: live?.meta,
-  });
+  return withSpan(
+    "warp.viability.certificate",
+    {
+      spanKind: "internal",
+      attributes: {
+        "warp.use_live_snapshot": Boolean(opts.useLiveSnapshot ?? envUseLiveSnapshot()),
+      },
+    },
+    async (span) => {
+      const shouldUseLive = opts.useLiveSnapshot ?? envUseLiveSnapshot();
+      const live = shouldUseLive ? await pullSettledSnapshot(opts.livePull) : null;
+      const viability = await evaluateWarpViability(config, {
+        snapshot: live?.snap,
+        telemetrySource: live ? "pipeline-live" : "solver",
+        telemetryHeaders: live?.meta,
+      });
 
-  const payload: WarpViabilityPayload = {
-    status: viability.status,
-    config,
-    constraints: viability.constraints,
-    snapshot: viability.snapshot,
-    citations: viability.citations,
-    mitigation: viability.mitigation,
-  };
+      const payload: WarpViabilityPayload = {
+        status: viability.status,
+        config,
+        constraints: viability.constraints,
+        snapshot: viability.snapshot,
+        citations: viability.citations,
+        mitigation: viability.mitigation,
+      };
 
-  // 2. Build header and hashes.
-  const header = makeHeader("warp-viability");
-  const payloadStr = canonicalJson(payload);
-  const payloadHash = hashString(payloadStr);
+      // 2. Build header and hashes.
+      const header = makeHeader("warp-viability");
+      const payloadStr = canonicalJson(payload);
+      const payloadHash = hashString(payloadStr);
 
-  const certBase = { header, payload, payloadHash };
-  const certificateStr = canonicalJson(certBase);
-  const certificateHash = hashString(certificateStr);
+      const certBase = { header, payload, payloadHash };
+      const certificateStr = canonicalJson(certBase);
+      const certificateHash = hashString(certificateStr);
 
-  const cert: WarpViabilityCertificate = {
-    ...certBase,
-    certificateHash,
-  };
+      const cert: WarpViabilityCertificate = {
+        ...certBase,
+        certificateHash,
+      };
 
-  return cert;
+      span.addAttributes({
+        "warp.status": payload.status,
+        "warp.constraints.count": payload.constraints.length,
+        "warp.certificate.hash_present": Boolean(cert.certificateHash),
+      });
+      span.status =
+        payload.status === "ADMISSIBLE"
+          ? { code: "OK" }
+          : { code: "ERROR", message: `status=${payload.status}` };
+
+      return cert;
+    },
+  );
 }

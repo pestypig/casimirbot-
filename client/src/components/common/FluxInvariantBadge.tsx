@@ -40,8 +40,12 @@ export function FluxInvariantBadge({
 }: FluxInvariantBadgeProps) {
   const avgFlux = stats?.avgFluxMagnitude ?? null;
   const netFlux = stats?.netFlux ?? null;
-  const netFluxMag = netFlux ? Math.hypot(netFlux[0], netFlux[1], netFlux[2]) : null;
-  const divPeak = stats ? Math.max(Math.abs(stats.divMin ?? 0), Math.abs(stats.divMax ?? 0)) : null;
+  const netFluxMag =
+    stats?.conservation?.netFluxMagnitude ??
+    (netFlux ? Math.hypot(netFlux[0], netFlux[1], netFlux[2]) : null);
+  const divPeak =
+    stats?.conservation?.divMaxAbs ??
+    (stats ? Math.max(Math.abs(stats.divMin ?? 0), Math.abs(stats.divMax ?? 0)) : null);
 
   const dynamicNetLimit = netFluxLimit ?? (avgFlux ? Math.max(avgFlux * 0.02, 1e-6) : 1e-3);
   const dynamicDivLimit = divergenceLimit ?? (avgFlux ? Math.max(avgFlux * 0.05, 1e-6) : 5e-3);

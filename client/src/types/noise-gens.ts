@@ -130,3 +130,64 @@ export type OriginalUpload = {
   notes?: string;
   tempo?: TempoMeta;
 };
+
+export type NoiseFieldGateStatus = "pass" | "fail" | "unknown";
+
+export type NoiseFieldGate = {
+  status: NoiseFieldGateStatus;
+  residuals: Record<string, number>;
+  note?: string;
+};
+
+export type NoiseFieldConstraints = {
+  laplacianRms: number;
+  laplacianMaxAbs: number;
+};
+
+export type NoiseFieldThresholds = {
+  laplacianRmsMax: number;
+  laplacianMaxAbsMax: number;
+};
+
+export type NoiseFieldLoopAttempt = {
+  iteration: number;
+  accepted: boolean;
+  gate: NoiseFieldGate;
+  constraints: NoiseFieldConstraints;
+};
+
+export type NoiseFieldLoopRequest = {
+  width?: number;
+  height?: number;
+  seed?: number;
+  maxIterations?: number;
+  stepSize?: number;
+  thresholds?: Partial<NoiseFieldThresholds>;
+  clamp?: { min: number; max: number };
+  includeValues?: boolean;
+};
+
+export type NoiseFieldLoopResponse = {
+  config: {
+    width: number;
+    height: number;
+    seed: number;
+    maxIterations: number;
+    stepSize: number;
+    thresholds: NoiseFieldThresholds;
+    clamp?: { min: number; max: number } | null;
+  };
+  accepted: boolean;
+  acceptedIteration: number | null;
+  iterations: number;
+  attempts: NoiseFieldLoopAttempt[];
+  gate: NoiseFieldGate | null;
+  constraints: NoiseFieldConstraints | null;
+  finalState: {
+    width: number;
+    height: number;
+    encoding: "row-major";
+    values?: number[];
+  };
+  stats: { min: number; max: number; mean: number };
+};

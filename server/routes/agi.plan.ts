@@ -57,6 +57,7 @@ import { readmeHandler, readmeSpec } from "../skills/docs.readme";
 import { essenceMixHandler, essenceMixSpec } from "../skills/essence.mix";
 import { warpAskHandler, warpAskSpec } from "../skills/physics.warp.ask";
 import { warpViabilityHandler, warpViabilitySpec } from "../skills/physics.warp.viability";
+import { grGroundingHandler, grGroundingSpec } from "../skills/physics.gr.grounding";
 import { debateRunHandler, debateRunSpec } from "../skills/debate.run";
 import { docsEvidenceSearchMdHandler, docsEvidenceSearchMdSpec } from "../skills/docs.evidence.search.md";
 import { docsEvidenceSearchPdfHandler, docsEvidenceSearchPdfSpec } from "../skills/docs.evidence.search.pdf";
@@ -889,7 +890,12 @@ const addWarpAskStep = (
   const injected = [warpStep, ...rest];
 
   for (const step of injected) {
-    if (step.kind !== "tool.call" || step.tool === warpAskSpec.name || step.tool === warpViabilitySpec.name) {
+    if (
+      step.kind !== "tool.call" ||
+      step.tool === warpAskSpec.name ||
+      step.tool === warpViabilitySpec.name ||
+      step.tool === grGroundingSpec.name
+    ) {
       continue;
     }
     const extra = (step.extra ?? {}) as { appendSummaries?: string[] };
@@ -932,12 +938,77 @@ const addWarpViabilityStep = (
   const injected = [viabilityStep, ...rest];
 
   for (const step of injected) {
-    if (step.kind !== "tool.call" || step.tool === warpViabilitySpec.name || step.tool === warpAskSpec.name) {
+    if (
+      step.kind !== "tool.call" ||
+      step.tool === warpViabilitySpec.name ||
+      step.tool === warpAskSpec.name ||
+      step.tool === grGroundingSpec.name
+    ) {
       continue;
     }
     const extra = (step.extra ?? {}) as { appendSummaries?: string[] };
     const existingAppends = Array.isArray(extra.appendSummaries) ? extra.appendSummaries : [];
     const appendSummaries = Array.from(new Set([...existingAppends, viabilityStepId]));
+    step.extra = { ...extra, appendSummaries };
+  }
+
+  return injected;
+};
+
+const addGrGroundingStep = (
+  steps: ExecutorStep[],
+  goal: string,
+  warpParams?: Record<string, unknown>,
+  intent?: IntentFlags,
+): ExecutorStep[] => {
+  const existing = steps.find(
+    (step) => step.kind === "tool.call" && step.tool === grGroundingSpec.name,
+  );
+  const groundingIntent =
+    intent?.wantsWarp ||
+    intent?.wantsPhysics ||
+    isWarpOrPhysicsIntentGoal(goal) ||
+    isViabilityIntentGoal(goal) ||
+    (warpParams && Object.keys(warpParams).length > 0);
+  if (!groundingIntent && !existing) {
+    return steps;
+  }
+  const groundingStepId = existing?.id ?? `gr.grounding.${crypto.randomUUID()}`;
+  const groundingStep =
+    existing ??
+    ({
+      id: groundingStepId,
+      kind: "tool.call",
+      tool: grGroundingSpec.name,
+      summaryRef: undefined,
+      promptTemplate:
+        "Run physics.gr.grounding to capture GR residuals, constraints, and certificate references for the agent.",
+      extra:
+        warpParams && Object.keys(warpParams).length > 0
+          ? { warpConfig: warpParams }
+          : undefined,
+    } as ExecutorStep);
+  const rest = steps.filter(
+    (step) => !(step.kind === "tool.call" && step.tool === grGroundingSpec.name),
+  );
+  const injected = [groundingStep, ...rest];
+
+  for (const step of injected) {
+    if (
+      step.kind !== "tool.call" ||
+      step.tool === grGroundingSpec.name ||
+      step.tool === warpAskSpec.name ||
+      step.tool === warpViabilitySpec.name
+    ) {
+      continue;
+    }
+    const extra = (step.extra ?? {}) as { appendSummaries?: string[] };
+    const existingAppends = Array.isArray(extra.appendSummaries)
+      ? extra.appendSummaries
+      : [];
+    const appendSummaries = Array.from(
+      new Set([...existingAppends, groundingStepId]),
+    );
     step.extra = { ...extra, appendSummaries };
   }
 
@@ -966,6 +1037,9 @@ async function ensureDefaultTools(): Promise<void> {
   }
   if (!getTool(warpViabilitySpec.name)) {
     registerTool({ ...warpViabilitySpec, handler: warpViabilityHandler });
+  }
+  if (!getTool(grGroundingSpec.name)) {
+    registerTool({ ...grGroundingSpec, handler: grGroundingHandler });
   }
   if (!getTool(essenceMixSpec.name)) {
     registerTool({ ...essenceMixSpec, handler: essenceMixHandler });
@@ -1631,7 +1705,12 @@ planRouter.post("/plan", async (req, res) => {
     groundingReport = groundingHolder.groundingReport;
   }
   const executorStepsAll = addWarpAskStep(
-    addWarpViabilityStep(compilePlan(nodes), goal, warpParams, intent),
+    addWarpViabilityStep(
+      addGrGroundingStep(compilePlan(nodes), goal, warpParams, intent),
+      goal,
+      warpParams,
+      intent,
+    ),
     goal,
     warpParams,
     intent,
@@ -1822,7 +1901,12 @@ planRouter.post("/execute", async (req, res) => {
     return base;
   })();
   const executorStepsRuntime = addWarpAskStep(
-    addWarpViabilityStep(record.executorSteps, record.goal, undefined, runtimeIntent),
+    addWarpViabilityStep(
+      addGrGroundingStep(record.executorSteps, record.goal, undefined, runtimeIntent),
+      record.goal,
+      undefined,
+      runtimeIntent,
+    ),
     record.goal,
     undefined,
     runtimeIntent,

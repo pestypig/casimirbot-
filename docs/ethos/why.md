@@ -58,3 +58,17 @@ body: When evidence breaks the story, revise the story. The world does not owe u
 refs:
   - client/src/pages/why.tsx
 :::
+
+::: whisper
+id: X-ETHOS-CAPABILITY
+hashes:
+  - "#why"
+  - "#ethos"
+  - "#ledger"
+mode: bubble
+severity: hint
+zen: Capability is an amplifier; bind it to the ledger.
+body: Abundance expands the ambition gradient, so choose hard, measurable problems and keep provenance, liveness, and ledger discipline.
+refs:
+  - client/src/pages/why.tsx
+:::

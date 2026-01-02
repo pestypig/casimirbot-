@@ -87,14 +87,15 @@ type OverlayKey =
   | "showReciprocity";
 
 type OverlayFlags = Partial<Record<OverlayKey, boolean>>;
+const DEFAULT_OVERLAY_FLAGS: OverlayFlags = {
+  showPhaseTracer: true,
+};
 
 function OverlaysBlock({ className }: { className?: string }) {
   const queryClient = useQueryClient();
   const [overlays, setOverlays] = React.useState<OverlayFlags>(() => {
-    return (
-      (queryClient.getQueryData(["helix:overlays"]) as OverlayFlags | undefined) ??
-      {}
-    );
+    const stored = queryClient.getQueryData(["helix:overlays"]) as OverlayFlags | undefined;
+    return stored ?? { ...DEFAULT_OVERLAY_FLAGS };
   });
 
   React.useEffect(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { FrontProofsLedger } from "./FrontProofsLedger";
 import { NeedleCavityBubblePanel } from "./NeedleCavityBubblePanel";
+import TimeDilationLatticePanel from "./TimeDilationLatticePanel";
 import { MODE_CONFIGS, useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 import { PLANCK_LUMINOSITY_W } from "@/lib/physics-const";
 import { openDocPanel } from "@/lib/docs/openDocPanel";
@@ -111,6 +112,7 @@ const GR_RECIPE_CHECKLIST = [
   "Dipole shape exists before amplification: theta_GR flips fore/aft because it scales with beta * d/dx f.",
   "Drive ladder matches server audit: theta_scale_expected carries gamma_geo^3 * q * gammaV * d_eff on both server and client.",
   "Averaging story stays true: the HF strobe is cycle-averaged over tau_LC so kappa_drive is a proxy, not a raw solve.",
+  "Proxy semantics: kappa_drive uses inverse Planck power (c^5/G) to map flux into curvature intensity; it is not a full Einstein solve.",
   "Warp-module sanity gates stay green: geometry, amplification, quantum-safety, and stability checks stay within guardrails."
 ];
 
@@ -134,6 +136,10 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
       <>
         Hull area integrates <code>firstFundamentalForm</code> via <code>surfaceAreaEllipsoidMetric(...)</code> in{" "}
         <code>server/energy-pipeline.ts</code>.
+      </>,
+      <>
+        Triangle mesh area sum uses <code>0.5 * |(v1 - v0) x (v2 - v0)|</code> in{" "}
+        <code>client/src/lib/hull-metrics.ts</code>.
       </>,
     ],
     solved: [
@@ -233,6 +239,10 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
       </>,
       <>
         kappa_drive is a power-density proxy (HF-averaged), not a full Einstein solve.
+      </>,
+      <>
+        Citations: <code>shared/curvature-proxy.ts</code>, <code>client/src/physics/curvature.ts</code>,{" "}
+        <code>client/src/lib/warp-proof-math.ts</code>.
       </>,
       <>
         With <code>TS_ratio</code> ≈ 120 ≫ 1, GR sees ⟨T_{"{mu nu}"}⟩ over <code>tau_LC</code> (Isaacson HF regime); spikes are averaged.
@@ -436,6 +446,9 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
         chain.
       </>,
       <>Server-side <code>thetaScaleExpected</code> already carries <code>gamma_geo^3 * q * gamma_VdB * d_eff</code>.</>,
+      <>
+        Citations: <code>server/energy-pipeline.ts</code>.
+      </>,
     ],
     solved: [
       {
@@ -486,10 +499,18 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
         them through the API.
       </>,
       <>
+        Active window power uses <code>P_on = omega * |U_Q| / Q</code> and <code>P_ship = P_on * N * d_eff</code> in{" "}
+        <code>client/src/components/HelixCasimirAmplifier.tsx</code> and <code>warp-web/js/physics-core.js</code>.
+      </>,
+      <>
         Phoenix renders <code>kappa_drive(x)</code> from <code>P/A</code>, duty, and <code>gammaGeo</code> with a
         light-crossing average <code>tau_LC</code> per pixel.
       </>,
       <>Mode-dependent: P_target / P_cap and duty derive from <code>currentMode</code> guardrails.</>,
+      <>
+        Citations: <code>server/energy-pipeline.ts</code>, <code>modules/sim_core/static-casimir.ts</code>,{" "}
+        <code>shared/curvature-proxy.ts</code>, <code>client/src/lib/physics-const.ts</code>.
+      </>,
     ],
     solved: [
       {
@@ -584,7 +605,7 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
                 ) : null}
               </div>
               <div className="font-mono text-emerald-100">
-                P/(c^5/G)={fmtMaybe(planckRatio, 3)}
+                P/Planck power (c^5/G)={fmtMaybe(planckRatio, 3)}
               </div>
               <div className="font-mono text-emerald-100">
                 P_target={fmtMw(P_target_W)} · P_cap={fmtMw(P_cap_W)} · mechGuard_status={mechGuard?.status ?? "n/a"}
@@ -757,17 +778,27 @@ const GR_RECIPE_COPY: Record<string, GrRecipeCopy> = {
           <>Casimir per tile ladders to P_avg, divide by hull area for P/A, then apply duty and geometry gain to get the displayed kappa_drive heatmap.</>
         )
       },
-      {
-        label: "How it matters to the solution",
-        body: (
-          <>Larger hulls lower P/A unless power scales up; duty and geometry gain raise kappa_drive but are clamped by guardrails.</>
-        )
-      },
-      {
-        label: "Code mirror",
-        body: (
-          <>
-            <code>calculateStaticCasimir</code> gives per-tile scaling; pipeline publishes P_avg and hull area, and Phoenix renders{" "}
+        {
+          label: "How it matters to the solution",
+          body: (
+            <>Larger hulls lower P/A unless power scales up; duty and geometry gain raise kappa_drive but are clamped by guardrails.</>
+          )
+        },
+        {
+          label: "Astrophysics mapping",
+          body: (
+            <>
+              Treat P as luminosity (peak or averaged), A as the area you care about (often 4 pi R^2), d_eff as duty
+              cycle, and G_geom as beaming/geometry gain. The same proxy turns observables into a comparable kappa_drive
+              scale.
+            </>
+          )
+        },
+        {
+          label: "Code mirror",
+          body: (
+            <>
+              <code>calculateStaticCasimir</code> gives per-tile scaling; pipeline publishes P_avg and hull area, and Phoenix renders{" "}
             <code>kappa_drive = (8 pi G / c^5) * (P/A) * d_eff * G_geom</code> under the guard constraints.
           </>
         )
@@ -888,6 +919,11 @@ export default function PipelineProofPanel() {
           <NeedleCavityBubblePanel />
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
+          <div className="xl:col-span-2">
+            <InfoCard title="Spacetime lattice (WebGL)" subtitle="3D space with time dilation">
+              <TimeDilationLatticePanel pipeline={pipelineSnapshot ?? null} />
+            </InfoCard>
+          </div>
           <InfoCard title="Pipeline Status" subtitle={status?.capturedAt ? `Captured ${status.capturedAt}` : undefined}>
             {statusError ? (
               <ErrorText message={statusError} />
@@ -942,10 +978,10 @@ export default function PipelineProofPanel() {
             )}
           </InfoCard>
 
-          <InfoCard
-            title="Grounding Sources"
-            subtitle={planDebug?.goal ? `Last goal: ${planDebug.goal}` : undefined}
-          >
+            <InfoCard
+              title="Grounding Sources"
+              subtitle={planDebug?.goal ? `Last goal: ${planDebug.goal}` : undefined}
+            >
             {planError ? (
               <ErrorText message={planError} />
             ) : groundingSources.length ? (
@@ -956,11 +992,43 @@ export default function PipelineProofPanel() {
                   </li>
                 ))}
               </ul>
-            ) : (
-              <Placeholder text="No grounding data yet (debugSources off?)." />
-            )}
-          </InfoCard>
-        </div>
+              ) : (
+                <Placeholder text="No grounding data yet (debugSources off?)." />
+              )}
+            </InfoCard>
+
+            <InfoCard
+              title="Astrophysics adapter schema"
+              subtitle="Observables -> kappa_drive proxy"
+            >
+              <div className="space-y-3 text-sm text-slate-200">
+                <p>
+                  Minimal fields to map catalogs or light curves into the same
+                  kappa_drive proxy used in the pipeline.
+                </p>
+                <pre className="rounded-lg border border-white/5 bg-slate-900/70 p-3 text-xs text-slate-200">
+{`AstroKappaAdapter {
+  P_avg_W: number    // W, duty-averaged luminosity
+  P_on_W?: number    // W, peak/on-window luminosity
+  R_m: number        // m, emitting radius
+  A_m2?: number      // m^2, 4*pi*R_m^2
+  d_eff: number      // 0..1, duty fraction
+  G_geom: number     // beaming/geometry gain (dimensionless)
+  tau_LC_s?: number  // s, R_m / c (averaging window)
+}`}
+                </pre>
+                <div className="font-mono text-xs text-slate-300">
+                  kappa_drive_m2 = (8*pi*G/c^5) * (P_avg_W / A_m2) * d_eff *
+                  G_geom
+                </div>
+                <p className="text-xs text-slate-400">
+                  Notes: if only peaks are available, use P_avg_W = d_eff * P_on_W;
+                  if A_m2 is omitted, compute A_m2 = 4*pi*R_m^2. Keep the same
+                  G_geom convention as the display path you are comparing to.
+                </p>
+              </div>
+            </InfoCard>
+          </div>
 
         <InfoCard
           title="Last Plan & Resonance"
@@ -1198,9 +1266,13 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
         This ladder uses a high-frequency GR proxy: GR sees ⟨T_{"{mu nu}"}⟩ over τ_LC with TS ≫ 1, so kappa_drive and theta_drive
         are effective curvature proxies, not a full Einstein solve.
       </p>
-      <p className="text-[11px] text-cyan-300">
-        Guardrails: Mode {guardMode ?? "n/a"} | modelMode={modelMode ?? "n/a"} | P_target={fmtMw(guardTarget_W)} | P_cap={fmtMw(guardCap_W)} | physicsCap={fmtMw(physicsCap_W)} | TS={guardTS == null ? "n/a" : fmt(guardTS)} | zeta={guardZeta == null ? "n/a" : fmt(guardZeta, 4)}
-      </p>
+        <p className="text-[11px] text-cyan-200">
+          Proxy mapping: (8 pi G / c^5) = 8 pi / (c^5/G) so the prefactor reads as inverse Planck power. For astrophysics,
+          treat P as luminosity, A as 4 pi R^2, d_eff as duty cycle, and G_geom as beaming/geometry gain.
+        </p>
+        <p className="text-[11px] text-cyan-300">
+          Guardrails: Mode {guardMode ?? "n/a"} | modelMode={modelMode ?? "n/a"} | P_target={fmtMw(guardTarget_W)} | P_cap={fmtMw(guardCap_W)} | physicsCap={fmtMw(physicsCap_W)} | TS={guardTS == null ? "n/a" : fmt(guardTS)} | zeta={guardZeta == null ? "n/a" : fmt(guardZeta, 4)}
+        </p>
       <p className="text-[11px] text-cyan-300">
         Gaps: casimir_gap={fmt(gapCasimir_nm, 3)} nm | mech_guard_gap={fmt(gapGuard_nm, 3)} nm{mechStatus ? ` | mech_status=${mechStatus}` : ""}
       </p>

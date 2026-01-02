@@ -38,10 +38,28 @@ constraints pass and the viability oracle has produced an `ADMISSIBLE` status.
       "expression": "gamma_VdB in [gamma_min, gamma_max]"
     }
   ],
+  "grConstraintGate": {
+    "version": 1,
+    "thresholds": {
+      "H_rms_max": 0.01,
+      "M_rms_max": 0.001,
+      "H_maxAbs_max": 0.1,
+      "M_maxAbs_max": 0.01
+    },
+    "policy": {
+      "mode": "hard-only",
+      "unknownAsFail": true
+    }
+  },
   "requiredTests": [
     "tests/theory-checks.spec.ts",
     "tests/stress-energy-brick.spec.ts",
-    "tests/york-time.spec.ts"
+    "tests/york-time.spec.ts",
+    "tests/gr-agent-loop.spec.ts",
+    "tests/gr-agent-loop-baseline.spec.ts",
+    "tests/gr-constraint-gate.spec.ts",
+    "tests/gr-constraint-network.spec.ts",
+    "tests/stress-energy-matter.spec.ts"
   ],
   "viabilityPolicy": {
     "admissibleStatus": "ADMISSIBLE",

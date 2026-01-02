@@ -234,10 +234,14 @@ export default function EnergyFluxPanel() {
     const stats = activeSample?.stats;
     if (!stats) return null;
     const avgFlux = Number.isFinite(stats.avgFluxMagnitude) ? stats.avgFluxMagnitude : null;
+    const conservation = stats.conservation;
     const netFlux = stats.netFlux;
     const netFluxMag =
-      netFlux && Array.isArray(netFlux) ? Math.hypot(netFlux[0] ?? 0, netFlux[1] ?? 0, netFlux[2] ?? 0) : null;
-    const divPeak = Math.max(Math.abs(stats.divMin ?? 0), Math.abs(stats.divMax ?? 0));
+      conservation?.netFluxMagnitude ??
+      (netFlux && Array.isArray(netFlux) ? Math.hypot(netFlux[0] ?? 0, netFlux[1] ?? 0, netFlux[2] ?? 0) : null);
+    const divPeak =
+      conservation?.divMaxAbs ??
+      Math.max(Math.abs(stats.divMin ?? 0), Math.abs(stats.divMax ?? 0));
     const netLimit = avgFlux != null ? Math.max(avgFlux * 0.02, 1e-6) : 1e-3;
     const divLimit = avgFlux != null ? Math.max(avgFlux * 0.05, 1e-6) : 5e-3;
     const netExceeded = netFluxMag != null && netFluxMag > netLimit;

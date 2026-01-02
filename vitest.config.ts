@@ -12,7 +12,7 @@ export default defineConfig({
     environment: "node",
     include: [
       "tests/**/*.spec.ts",
-      "server/**/__tests__/**/*.spec.ts",
+      "server/**/__tests__/**/*.{spec,test}.ts",
       "tools/**/__tests__/**/*.spec.ts",
       "client/src/**/*.{spec,test}.ts?(x)",
     ],

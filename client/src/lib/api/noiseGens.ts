@@ -8,6 +8,8 @@ import type {
   HelixPacket,
   CoverJobRequest,
   CoverJob,
+  NoiseFieldLoopRequest,
+  NoiseFieldLoopResponse,
 } from "@/types/noise-gens";
 
 const BASE = "/api/noise-gens";
@@ -19,6 +21,7 @@ const endpoints = {
   generate: `${BASE}/generate`,
   upload: `${BASE}/upload`,
   jobStatus: (jobId: string) => `${BASE}/jobs/${encodeURIComponent(jobId)}`,
+  noiseField: `${BASE}/noise-field`,
 } as const;
 
 export type CreateCoverJobPayload = CoverJobRequest & {
@@ -162,4 +165,12 @@ export async function fetchCoverJob(
     signal,
   );
   return parseJson<CoverJob>(res);
+}
+
+export async function fetchNoiseField(
+  payload: NoiseFieldLoopRequest = {},
+  signal?: AbortSignal,
+): Promise<NoiseFieldLoopResponse> {
+  const res = await apiRequest("POST", endpoints.noiseField, payload, signal);
+  return parseJson<NoiseFieldLoopResponse>(res);
 }

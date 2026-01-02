@@ -284,6 +284,10 @@ export function WarpProofPanel() {
             <br />
             κ_drive ≈ (8πG / c⁵) · (P/A) · d_eff · γ_geo.
           </p>
+          <p className="mb-2 text-[11px] text-slate-300">
+            Proxy mapping: (8 pi G / c^5) = 8 pi / (c^5/G) so the prefactor reads as inverse Planck power. For
+            astrophysics, treat P as luminosity, A as 4 pi R^2, d_eff as duty cycle, and G_geo as beaming/geometry gain.
+          </p>
 
           <dl className="space-y-1 text-[11px]">
             <Row label="P (avg power)">

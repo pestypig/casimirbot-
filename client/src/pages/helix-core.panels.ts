@@ -70,7 +70,10 @@ const API = {
   helixMetrics: "GET /api/helix/metrics",
   helixDisplacement: "GET /api/helix/displacement",
   helixSpectrumRead: "GET /api/helix/spectrum",
-  helixSpectrumWrite: "POST /api/helix/spectrum"
+  helixSpectrumWrite: "POST /api/helix/spectrum",
+  grAgentLoop: "GET /api/helix/gr-agent-loop",
+  grAgentLoopKpis: "GET /api/helix/gr-agent-loop/kpis",
+  mathGraph: "GET /api/helix/math/graph"
 } as const;
 
 const PANEL_KEYWORDS: Record<string, string[]> = {
@@ -80,6 +83,24 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "microscopy": ["microscopy mode", "microprobe", "phase contrast", "nm scale", "Coulomb sweep"],
   "electron-orbital": ["orbital density", "Bohr k/q/g", "toroidal packets", "Coulomb probe", "iso-surface"],
   "drive-guards": ["I3_geo", "I3_VdB", "Q_cavity", "guard bands", "sector strobing"],
+  "gr-agent-loop-audit": ["gr agent loop", "residuals", "gate audit", "accepted config", "warp constraints"],
+  "gr-agent-loop-kpis": ["gr agent loop", "kpi", "success rate", "time to green", "constraint violations", "perf trend"],
+  "gr-agent-loop-learning": [
+    "learning loop",
+    "patch ladder",
+    "failure backlog",
+    "run comparison",
+    "accepted config history",
+    "residual trend",
+    "gate trend"
+  ],
+  "math-maturity-tree": [
+    "math maturity",
+    "math graph",
+    "stage ladder",
+    "unit coverage",
+    "repo audit"
+  ],
   "warp-ledger": ["km-scale ledger", "warp ledger", "bubble log", "warp km", "ledger bands"],
   "spectrum-tuner": ["spectrum tuner", "FFT", "frequency dial", "harmonics sweep", "waveform tuner"],
   "experiment-ladder": ["experiment ladder", "casimir", "phoenix", "ford-roman", "natario", "sector gating"],
@@ -126,13 +147,15 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "star-coherence": ["star coherence", "coherence governor", "tool budget", "collapse policy", "telemetry"],
   "collapse-monitor": ["collapse pressure", "collapse watcher", "coherence gate", "debate collapse", "star collapse"],
   "agi-task-history": ["task history", "AGI trace", "task log", "history queue", "trace timeline"],
+  "constraint-pack-policy": ["constraint packs", "policy profile", "budget overrides", "thresholds", "pack governance"],
   "essence-proposals": ["essence proposals", "proposal queue", "jobs board", "proposal actions", "proposal mgr"],
   "dresscode": ["dresscode", "pattern", "draft", "garment", "svg", "grid", "clip mask"],
   "stellar-lsr": ["stars", "lsr", "local standard of rest", "catalog", "nav", "stellar"],
   "model-silhouette": ["glb", "bbox", "ellipsoid", "scale", "axes", "grid"],
   "hull-metrics-vis": ["hull metrics", "natario", "alcubierre", "glb preview", "wireframe"],
   "collapse-benchmark-hud": ["collapse benchmark", "tau", "L_present", "kappa", "lattice hash", "relativity"],
-  "remove-bg-edges": ["background removal", "png alpha", "canny", "grabcut", "opencv", "mask"]
+  "remove-bg-edges": ["background removal", "png alpha", "canny", "grabcut", "opencv", "mask"],
+  "time-dilation-lattice": ["time dilation", "spacetime lattice", "clock rate", "alpha", "grid warp"]
 };
 
 function lazyPanel<T extends Record<string, unknown>>(
@@ -223,6 +246,47 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 920, h: 640 },
     defaultPosition: { x: 96, y: 64 },
     endpoints: [API.pipelineGet, API.helixMetrics]
+  },
+  {
+    id: "gr-agent-loop-audit",
+    title: "GR Agent Loop Audit",
+    icon: LineChart,
+    loader: lazyPanel(() => import("@/components/GrAgentLoopAuditPanel")),
+    defaultSize: { w: 720, h: 520 },
+    defaultPosition: { x: 220, y: 140 },
+    mobileReady: true,
+    endpoints: [API.grAgentLoop]
+  },
+  {
+    id: "gr-agent-loop-kpis",
+    title: "GR Loop KPIs",
+    icon: Gauge,
+    loader: lazyPanel(() => import("@/components/GrAgentLoopKpiPanel")),
+    defaultSize: { w: 640, h: 420 },
+    defaultPosition: { x: 240, y: 120 },
+    mobileReady: true,
+    endpoints: [API.grAgentLoopKpis]
+  },
+  {
+    id: "gr-agent-loop-learning",
+    title: "GR Loop Learning",
+    icon: ClipboardList,
+    loader: lazyPanel(() => import("@/components/GrAgentLoopLearningPanel")),
+    defaultSize: { w: 900, h: 660 },
+    defaultPosition: { x: 260, y: 160 },
+    mobileReady: true,
+    endpoints: [API.grAgentLoop]
+  },
+  {
+    id: "math-maturity-tree",
+    title: "Math Maturity Tree",
+    icon: Layers,
+    loader: lazyPanel(() => import("@/components/MathMaturityTreePanel")),
+    defaultSize: { w: 900, h: 680 },
+    defaultPosition: { x: 280, y: 180 },
+    mobileReady: true,
+    endpoints: [API.mathGraph],
+    keywords: PANEL_KEYWORDS["math-maturity-tree"]
   },
   {
     id: "tsn-sim",
@@ -457,6 +521,16 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 960, h: 520 },
     defaultPosition: { x: 300, y: 500 },
     endpoints: [API.pipelineGet, API.helixMetrics]
+  },
+  {
+    id: "time-dilation-lattice",
+    title: "Time Dilation Lattice",
+    icon: Timer,
+    loader: lazyPanel(() => import("@/components/TimeDilationLatticePanel")),
+    defaultSize: { w: 960, h: 640 },
+    defaultPosition: { x: 340, y: 520 },
+    endpoints: [API.pipelineGet],
+    keywords: PANEL_KEYWORDS["time-dilation-lattice"]
   },
   {
     id: "curvature-ledger",
@@ -694,6 +768,20 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 520, h: 600 },
     defaultPosition: { x: 1140, y: 140 },
     pinned: true
+  },
+  {
+    id: "constraint-pack-policy",
+    title: "Constraint Pack Policies",
+    icon: ClipboardList,
+    loader: lazyPanel(() => import("@/components/agi/ConstraintPackPolicyPanel")),
+    defaultSize: { w: 980, h: 680 },
+    defaultPosition: { x: 260, y: 140 },
+    mobileReady: true,
+    endpoints: [
+      "GET /api/agi/constraint-packs",
+      "GET /api/agi/constraint-packs/policies",
+      "POST /api/agi/constraint-packs/policies"
+    ]
   },
   {
     id: "remove-bg-edges",

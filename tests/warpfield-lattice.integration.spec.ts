@@ -36,7 +36,7 @@ const TYPE_COMPONENTS: Record<string, number> = {
 };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const GLB_PATH = path.resolve(__dirname, "..", "client", "public", "luma", "ellipsoid-12x6x4.glb");
+const GLB_PATH = path.resolve(__dirname, "..", "client", "public", "luma", "needle-ellipsoid.glb");
 const TARGET_LONG_AXIS_M = 3; // keep the lattice lightweight for CI
 
 const loadGlb = (file: string): GlbParsed => {

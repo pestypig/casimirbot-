@@ -11,6 +11,7 @@ import type {
   ViabilityResult,
   ViabilityStatus,
   WarpConfig,
+  WarpSolverGuardrails,
   WarpViabilitySnapshot,
 } from "../types/warpViability";
 import type { PipelineSnapshot } from "../types/pipeline";
@@ -27,9 +28,26 @@ const DEFAULT_MASS_TOL = 0.1; // ±10% band
 const VDB_MIN = 0;
 const VDB_MAX = 1e16;
 
+const parseEnvNumber = (value: string | undefined, fallback: number) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const GR_GUARDRAIL_THRESHOLDS = {
+  H_rms: parseEnvNumber(process.env.WARP_GR_H_RMS_MAX, 1e-3),
+  M_rms: parseEnvNumber(process.env.WARP_GR_M_RMS_MAX, 1e-3),
+  lapseFloor: parseEnvNumber(process.env.WARP_GR_LAPSE_FLOOR_MIN, 0.2),
+  betaMaxAbs: parseEnvNumber(process.env.WARP_GR_BETA_MAX_ABS, 1.0),
+};
+
 const toNumber = (value: unknown, fallback: number): number => {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
+};
+
+const toFinite = (value: unknown): number | undefined => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
 };
 
 const clamp01 = (value: number | undefined): number | undefined => {
@@ -100,6 +118,61 @@ const extractDutyEffective = (state: EnergyPipelineState): number | undefined =>
     state.dutyShip ??
     state.dutyCycle;
   return typeof dEff === "number" && Number.isFinite(dEff) ? dEff : undefined;
+};
+
+const buildGrGuardrails = (
+  pipeline: EnergyPipelineState,
+  liveSnapshot?: PipelineSnapshot,
+): WarpSolverGuardrails => {
+  const gr = (liveSnapshot as any)?.gr ?? (pipeline as any)?.gr;
+  const H_rms = toFinite(gr?.constraints?.H_constraint?.rms);
+  const H_maxAbs = toFinite(gr?.constraints?.H_constraint?.maxAbs);
+  const M_rms = toFinite(gr?.constraints?.M_constraint?.rms);
+  const M_maxAbs = toFinite(gr?.constraints?.M_constraint?.maxAbs);
+  const lapseMin = toFinite(gr?.gauge?.lapseMin);
+  const betaMaxAbs = toFinite(gr?.gauge?.betaMaxAbs);
+
+  const missing: string[] = [];
+  if (!Number.isFinite(H_rms)) missing.push("H_constraint_rms");
+  if (!Number.isFinite(M_rms)) missing.push("M_constraint_rms");
+  if (!Number.isFinite(lapseMin)) missing.push("lapse_floor");
+  if (!Number.isFinite(betaMaxAbs)) missing.push("beta_max_abs");
+
+  return {
+    source: gr ? "pipeline-gr" : "proxy",
+    proxy: missing.length > 0,
+    ...(missing.length ? { missing } : {}),
+    H_constraint: {
+      rms: H_rms,
+      maxAbs: H_maxAbs,
+      threshold: GR_GUARDRAIL_THRESHOLDS.H_rms,
+      exceeded: Number.isFinite(H_rms)
+        ? (H_rms as number) > GR_GUARDRAIL_THRESHOLDS.H_rms
+        : undefined,
+    },
+    M_constraint: {
+      rms: M_rms,
+      maxAbs: M_maxAbs,
+      threshold: GR_GUARDRAIL_THRESHOLDS.M_rms,
+      exceeded: Number.isFinite(M_rms)
+        ? (M_rms as number) > GR_GUARDRAIL_THRESHOLDS.M_rms
+        : undefined,
+    },
+    lapse: {
+      floor: lapseMin,
+      threshold: GR_GUARDRAIL_THRESHOLDS.lapseFloor,
+      exceeded: Number.isFinite(lapseMin)
+        ? (lapseMin as number) < GR_GUARDRAIL_THRESHOLDS.lapseFloor
+        : undefined,
+    },
+    beta: {
+      maxAbs: betaMaxAbs,
+      threshold: GR_GUARDRAIL_THRESHOLDS.betaMaxAbs,
+      exceeded: Number.isFinite(betaMaxAbs)
+        ? (betaMaxAbs as number) > GR_GUARDRAIL_THRESHOLDS.betaMaxAbs
+        : undefined,
+    },
+  };
 };
 
 type EvaluateOpts = {
@@ -265,6 +338,7 @@ export async function evaluateWarpViability(
   const tsTelemetry = tsParts.telemetry;
   const lightCrossing = tsParts.lc ?? {};
   const tauPulse_ms = tsParts.tauPulse_ms;
+  const grGuardrails = buildGrGuardrails(pipeline, liveSnapshot);
 
   const snapshot: WarpViabilitySnapshot = {
     bubbleRadius_m: config.bubbleRadius_m ?? pipeline.shipRadius_m,
@@ -289,6 +363,7 @@ export async function evaluateWarpViability(
     dwell_ms: Number.isFinite(lightCrossing.dwell_ms) ? Number(lightCrossing.dwell_ms) : undefined,
     burst_ms: Number.isFinite(tauPulse_ms) ? Number(tauPulse_ms) : undefined,
     ts: tsTelemetry,
+    grGuardrails,
     telemetrySource: liveSnapshot ? opts.telemetrySource ?? "pipeline-live" : opts.telemetrySource ?? "solver",
     pipelineHeaders: opts.telemetryHeaders,
   };

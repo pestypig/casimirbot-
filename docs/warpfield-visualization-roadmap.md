@@ -20,6 +20,17 @@ Use this as a working outline for Codex to ship a card-ready view that shows the
 
 
 
+## Golden-path checklist (canonical fields + visible fallbacks)
+
+- [x] Canonical field source is the lattice volume (`drive3D`/`dfdr3D`/`gate3D`) when available; analytic formulas are used only as fallback.
+
+- [x] Planar slice sampling uses lattice df/dr + drive channels when lattice is active; rho_GR stays analytic until a rho channel exists.
+
+- [x] Hull3D volume + spacetime grid sample lattice textures on the lattice path; analytic fallback remains when lattice is unavailable.
+
+- [x] Fallbacks are explicit in-scene via lattice path badges (analytic fallback, SDF missing, GPU downgrade) and persistent overlays.
+
+
 ## Current state (relevant parts)
 
 - Silhouette staging: `ModelSilhouettePanel` loads a GLB, measures OBB dims/area via PCA, fits to target dims, and writes preview payload (glbUrl, scale, targetDims, hullMetrics, area_m2/uncertainty, updatedAt) to `HULL_PREVIEW_STORAGE_KEY` + `phoenix-hull-preview` event.
@@ -136,7 +147,7 @@ Use this as a working outline for Codex to ship a card-ready view that shows the
 
     - [x] Known ellipsoid alignment:
 
-      - [x] Fixtures/presets/tests: axis-aligned and basis-swapped needle-sized ellipsoid GLBs at `client/public/luma/ellipsoid-12x6x4.glb` and `client/public/luma/ellipsoid-12x6x4-basis-swapped.glb`; guarded by `tests/ellipsoid-fixtures.spec.ts` and wired into `ModelSilhouettePanel` preset buttons.
+      - [x] Fixtures/presets/tests: axis-aligned and basis-swapped needle-sized ellipsoid GLBs at `client/public/luma/needle-ellipsoid.glb` and `client/public/luma/needle-ellipsoid-basis-swapped.glb`; guarded by `tests/ellipsoid-fixtures.spec.ts` and wired into `ModelSilhouettePanel` preset buttons.
 
       - [x] Preview: ModelSilhouettePanel measures expected OBB dims/area, basis shows swap/flip in HUD, and clampReasons stay empty for both fixtures.
 
@@ -145,6 +156,7 @@ Use this as a working outline for Codex to ship a card-ready view that shows the
       - [x] HUD/overlays: dims/axes labels match the resolved basis (front/right/up) and the bubbleBox bounds read back the expected size for each variant.
 
     - [x] Guardrails + toggles: clamp volume dims/resolution/step counts per profile (auto/low/medium/high + card export overrides), keep Preview vs Card quality toggles wired, and fall back to slices/wireframe/health-check messaging when GPU perf dips.
+    - [x] Readability stability (Halo 1 readable): DPR clamp `READABILITY_DPR_MAX` in `client/src/components/AlcubierrePanel.tsx`, wireframe overlay budgets + clamp reasons in `client/src/lib/resolve-wireframe-overlay.ts` (surfaced in `client/src/components/AlcubierrePanel.tsx`), and spacetime grid self-diagnostics via `window.__spacetimeGridDbg` in `client/src/components/Hull3DRenderer.ts` with badges in `client/src/components/AlcubierrePanel.tsx`.
 
 
 
@@ -250,7 +262,7 @@ Use this as a working outline for Codex to ship a card-ready view that shows the
 
     - [x] Probe tests at canonical points (on shell, off shell, in band) against analytic parity with tolerances.
 
-      - Canonical fixtures: axis-aligned and basis-swapped ellipsoid (12x6x4) plus a needle hull; sample front/right/up anchors at center, shell (SDF=0), +/- 1 voxel, and far-off points.
+      - Canonical fixtures: axis-aligned and basis-swapped needle ellipsoid plus a needle hull; sample front/right/up anchors at center, shell (SDF=0), +/- 1 voxel, and far-off points.
 
       - Assertions: lattice `drive/gate/dfdr` within abs 1e-4 or rel 1e-3 of analytic values; sign must match analytic in/out of shell; tolerances widen when 3D float fallback is R16F.
 
@@ -488,6 +500,8 @@ Use this as a working outline for Codex to ship a card-ready view that shows the
 - Gate overlay fusion: draw sector bands or duty overlays inside the volume to tie timing to spatial regions.
 
 - Annotation layer: add math snippets (integrals/constraints) and hull stats overlay to speed card authoring.
+
+- GLB surface area: optionally use mesh triangle area as `hullArea_m2` override (with uncertainty/roughness factor) so power density reflects mesh-level surface deviations.
 
 - Collapse benchmark backend (τ + light-cone footprint in κ units): `docs/collapse-benchmark-backend-roadmap.md`.
 

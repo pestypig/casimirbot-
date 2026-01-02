@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { IdeologyNode } from "@/lib/ideology-types";
 import { useIdeology } from "@/hooks/use-ideology";
+import { useIdeologyBeliefGraph } from "@/hooks/use-ideology-belief-graph";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -11,8 +12,25 @@ type IdeologyPanelProps = {
   className?: string;
 };
 
+const formatMetric = (value: number | null | undefined, digits = 3) =>
+  Number.isFinite(value) ? (value as number).toFixed(digits) : "--";
+
 export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
   const { data, isLoading, error, childrenOf, resolve } = useIdeology();
+  const beliefGraphRequest = useMemo(
+    () => ({
+      includeGraph: false,
+      includeAttempts: false,
+      includeSeeAlso: false,
+      edgeMode: "bidirectional" as const,
+    }),
+    [],
+  );
+  const {
+    data: beliefGraph,
+    isLoading: beliefLoading,
+    error: beliefError,
+  } = useIdeologyBeliefGraph(beliefGraphRequest);
   const initialQueryNode =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("node") ?? undefined
@@ -148,6 +166,15 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
   }
 
   const rootNode = resolve?.(data.rootId) ?? null;
+  const gateStatus = beliefGraph?.gate?.status ?? "unknown";
+  const gateLabel =
+    gateStatus === "pass" ? "PASS" : gateStatus === "fail" ? "FAIL" : "UNKNOWN";
+  const gateTone =
+    gateStatus === "pass"
+      ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-300"
+      : gateStatus === "fail"
+        ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
+        : "border-slate-500/40 bg-slate-500/10 text-slate-300";
 
   return (
     <div className={cn("grid h-full grid-cols-12 gap-3 p-3 text-slate-100 bg-slate-950/70", className)}>
@@ -291,6 +318,85 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
       </div>
 
       <div className="col-span-12 lg:col-span-3 space-y-3">
+        <Card className="p-4 bg-slate-950/60 border-white/10">
+          <div className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-300">
+            Belief graph
+          </div>
+          {beliefLoading ? (
+            <p className="mt-2 text-xs text-slate-400">Checking constraints...</p>
+          ) : beliefError || !beliefGraph ? (
+            <p className="mt-2 text-xs text-rose-300">
+              {beliefError instanceof Error
+                ? beliefError.message
+                : "Unable to load belief graph."}
+            </p>
+          ) : (
+            <>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge className={`border ${gateTone}`}>Gate {gateLabel}</Badge>
+                <Badge variant="secondary">
+                  Nodes {beliefGraph.summary.nodeCount}
+                </Badge>
+                <Badge variant="secondary">
+                  Edges {beliefGraph.summary.edgeCount}
+                </Badge>
+              </div>
+              <div className="mt-3 space-y-1 text-xs text-slate-300">
+                <div className="flex items-center justify-between">
+                  <span>Violations</span>
+                  <span>{beliefGraph.constraints?.violationCount ?? "--"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Weight</span>
+                  <span>{formatMetric(beliefGraph.constraints?.violationWeight, 2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Axiom</span>
+                  <span>{beliefGraph.constraints?.axiomViolations ?? "--"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Implies</span>
+                  <span>{beliefGraph.constraints?.impliesViolations ?? "--"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Excludes</span>
+                  <span>{beliefGraph.constraints?.excludesViolations ?? "--"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Max pressure</span>
+                  <span>{formatMetric(beliefGraph.constraints?.maxAbsPressure, 3)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Iterations</span>
+                  <span>{beliefGraph.iterations}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Accepted</span>
+                  <span>
+                    {beliefGraph.accepted
+                      ? `yes @${beliefGraph.acceptedIteration ?? 0}`
+                      : "no"}
+                  </span>
+                </div>
+              </div>
+              {(beliefGraph.summary.missingNodes.length > 0 ||
+                beliefGraph.summary.unknownIds.length > 0 ||
+                beliefGraph.summary.conflictIds.length > 0) && (
+                <div className="mt-3 text-[11px] text-slate-500">
+                  {beliefGraph.summary.missingNodes.length > 0
+                    ? `Missing nodes: ${beliefGraph.summary.missingNodes.length}. `
+                    : ""}
+                  {beliefGraph.summary.unknownIds.length > 0
+                    ? `Unknown ids: ${beliefGraph.summary.unknownIds.length}. `
+                    : ""}
+                  {beliefGraph.summary.conflictIds.length > 0
+                    ? `Conflicts: ${beliefGraph.summary.conflictIds.length}.`
+                    : ""}
+                </div>
+              )}
+            </>
+          )}
+        </Card>
         <Card className="p-4 bg-slate-950/60 border-white/10">
           <div className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-300">
             References

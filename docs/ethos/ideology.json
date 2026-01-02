@@ -9,7 +9,7 @@
       "excerpt": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.",
       "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.\n\nWhen measurements disagree with our story, we revise the story. The vow survives by truth, not by force.",
       "tags": ["stewardship", "compassion"],
-      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "integrity-protocols"],
+      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols"],
       "links": [
         { "rel": "see-also", "to": "bodhisattva-craft" },
         { "rel": "see-also", "to": "beginners-mind" },
@@ -21,6 +21,31 @@
       ],
       "actions": [
         { "label": "Read Source Essay", "action": { "kind": "openPanel", "panelId": "mission-ethos-source" } }
+      ]
+    },
+    {
+      "id": "capability-ambition-gradient",
+      "slug": "capability-ambition-gradient",
+      "title": "Capability & the Ambition Gradient",
+      "excerpt": "Abundance shifts what challenge means; warp capability expands the horizon, so we must choose worthy problems on purpose.",
+      "bodyMD": "When basic needs are met, the environment stops training us through scarcity. Without intentional practice, attention drifts and ambition decays into comfort loops.\n\nThe warp program is a deliberate replacement: not manufactured hardship, but voluntarily hard, measurable problems - curvature budgets, duty discipline, and falsifiable claims.\n\nCapability is expressed in hull geometry (Lx_m, Ly_m, Lz_m) and warp geometry kind/warpFieldType, so ideology must constrain how we choose to use that reach.\n\nWarp capability is an amplifier. It can widen compassion or widen coercion. So we bind it to the Stewardship Ledger: keep zeta <= 1, keep TS >= 1, compare kappa_drive vs kappa_body, and label provenance + liveness.\n\nIf/when a bubble can be manufactured, the goal is not conquest or escape from gravity - it is escape from narrow incentives: new objectives that reduce coercion, broaden agency, and replenish what we take.\n\nSee [[node:stewardship-ledger]], [[node:struggle-testament]], and [[node:integrity-protocols]].",
+      "tags": ["capability", "ambition", "discipline", "stewardship"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "stewardship-ledger" },
+        { "rel": "see-also", "to": "struggle-testament" },
+        { "rel": "see-also", "to": "integrity-protocols" }
+      ],
+      "references": [
+        { "kind": "doc", "title": "Mission Ethos Seeds", "path": "docs/ethos/why.md" },
+        { "kind": "panel", "title": "Helix Core", "panelId": "helix-core" },
+        { "kind": "panel", "title": "Vacuum Gap Heatmap", "panelId": "vacuum-gap-heatmap" }
+      ],
+      "actions": [
+        { "label": "Open Helix Core (capability + telemetry)", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Open Vacuum Gap Heatmap (kappa_drive)", "action": { "kind": "openPanel", "panelId": "vacuum-gap-heatmap" } },
+        { "label": "Return to Mission Ethos", "action": { "kind": "gotoNode", "to": "mission-ethos" } }
       ]
     },
     {
@@ -162,6 +187,26 @@
       "actions": [
         { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
         { "label": "Open Stewardship Ledger", "action": { "kind": "gotoNode", "to": "stewardship-ledger" } }
+      ]
+    },
+    {
+      "id": "values-over-images",
+      "slug": "values-over-images",
+      "title": "Values Over Images",
+      "excerpt": "Enduring values anchor the vow while images adapt to the moment.",
+      "bodyMD": "Well-defined ideology lasts because it conserves what stays true across cycles: compassion, truth, and the constraints we refuse to trade away. Images, status, and short-term gains shift fast, so they cannot be the root.\n\nSelf-first here means self-aligned: a steady center that lets the outer image adapt without collapse. When the anchor is internal, you can change presentation without losing the vow.\n\nIn the systems loop, constraints are the values; outputs are the images; verification is the self-check that keeps the core intact.\n\nThe swan is our emblem of this balance: grace without drift, selectivity without cruelty.\n\nSee [[node:worldview-integrity]] and [[node:integrity-protocols]].",
+      "tags": ["values", "image", "self", "zen", "constraints", "adaptation"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "worldview-integrity" },
+        { "rel": "see-also", "to": "integrity-protocols" }
+      ],
+      "references": [
+        { "kind": "doc", "title": "Product Narrative", "path": "docs/product-narrative.md" }
+      ],
+      "actions": [
+        { "label": "Return to Mission Ethos", "action": { "kind": "gotoNode", "to": "mission-ethos" } }
       ]
     },
     {

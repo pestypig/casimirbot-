@@ -3,6 +3,7 @@ import { isFlagEnabled } from "@/lib/envFlags";
 
 interface ApiRequestOptions {
   allowUnauthorized?: boolean;
+  headers?: Record<string, string>;
 }
 
 type FixedTuple3 = [number, number, number];
@@ -179,7 +180,114 @@ const buildStressMock = (dims: FixedTuple3) => {
   };
 };
 
+const buildLapseMock = (dims: FixedTuple3) => {
+  const total = dims[0] * dims[1] * dims[2];
+  const phi = new Float32Array(total);
+  const g_tt = new Float32Array(total);
+  const alpha = new Float32Array(total);
+  let phiMin = Number.POSITIVE_INFINITY;
+  let phiMax = Number.NEGATIVE_INFINITY;
+  let gttMin = Number.POSITIVE_INFINITY;
+  let gttMax = Number.NEGATIVE_INFINITY;
+  let alphaMin = Number.POSITIVE_INFINITY;
+  let alphaMax = Number.NEGATIVE_INFINITY;
+  for (let idx = 0; idx < total; idx += 1) {
+    const t = total > 1 ? idx / (total - 1) : 0;
+    const phiVal = Math.sin(t * Math.PI * 4) * 0.02;
+    const gttVal = -(1 + 0.5 * phiVal);
+    const alphaVal = Math.sqrt(Math.max(0, -gttVal));
+    phi[idx] = phiVal;
+    g_tt[idx] = gttVal;
+    alpha[idx] = alphaVal;
+    if (phiVal < phiMin) phiMin = phiVal;
+    if (phiVal > phiMax) phiMax = phiVal;
+    if (gttVal < gttMin) gttMin = gttVal;
+    if (gttVal > gttMax) gttMax = gttVal;
+    if (alphaVal < alphaMin) alphaMin = alphaVal;
+    if (alphaVal > alphaMax) alphaMax = alphaVal;
+  }
+  if (!Number.isFinite(phiMin)) phiMin = 0;
+  if (!Number.isFinite(phiMax)) phiMax = 0;
+  if (!Number.isFinite(gttMin)) gttMin = 0;
+  if (!Number.isFinite(gttMax)) gttMax = 0;
+  if (!Number.isFinite(alphaMin)) alphaMin = 0;
+  if (!Number.isFinite(alphaMax)) alphaMax = 0;
+  return {
+    dims,
+    channels: {
+      phi: { data: encodeFloat32ToBase64(phi), min: phiMin, max: phiMax },
+      g_tt: { data: encodeFloat32ToBase64(g_tt), min: gttMin, max: gttMax },
+      alpha: { data: encodeFloat32ToBase64(alpha), min: alphaMin, max: alphaMax },
+    },
+    stats: {
+      iterations: 48,
+      residual: 1e-4,
+      phiMin,
+      phiMax,
+      gttMin,
+      gttMax,
+      alphaMin,
+      alphaMax,
+      boundary: "dirichlet_zero",
+      solver: "jacobi",
+    },
+  };
+};
+
+const buildGrEvolveMock = (dims: FixedTuple3) => {
+  const total = dims[0] * dims[1] * dims[2];
+  const ones = new Float32Array(total);
+  const zeros = new Float32Array(total);
+  ones.fill(1);
+  const encodeChannel = (data: Float32Array, value: number) => ({
+    data: encodeFloat32ToBase64(data),
+    min: value,
+    max: value,
+  });
+  return {
+    dims,
+    voxelBytes: 4,
+    format: "r32f",
+    bounds: { min: [-1, -1, -1], max: [1, 1, 1] },
+    voxelSize_m: [2 / dims[0], 2 / dims[1], 2 / dims[2]],
+    time_s: 0,
+    dt_s: 0,
+    channels: {
+      alpha: encodeChannel(ones, 1),
+      beta_x: encodeChannel(zeros, 0),
+      beta_y: encodeChannel(zeros, 0),
+      beta_z: encodeChannel(zeros, 0),
+      gamma_xx: encodeChannel(ones, 1),
+      gamma_yy: encodeChannel(ones, 1),
+      gamma_zz: encodeChannel(ones, 1),
+      K_trace: encodeChannel(zeros, 0),
+      H_constraint: encodeChannel(zeros, 0),
+      M_constraint_x: encodeChannel(zeros, 0),
+      M_constraint_y: encodeChannel(zeros, 0),
+      M_constraint_z: encodeChannel(zeros, 0),
+    },
+    stats: {
+      steps: 0,
+      iterations: 0,
+      tolerance: 0,
+      cfl: 0,
+      H_rms: 0,
+      M_rms: 0,
+    },
+  };
+};
+
 const STRESS_ENERGY_MOCK = buildStressMock([12, 12, 12]);
+const LAPSE_MOCKS = {
+  low: buildLapseMock([8, 8, 8]),
+  medium: buildLapseMock([12, 12, 12]),
+  high: buildLapseMock([16, 16, 16]),
+} as const;
+const GR_EVOLVE_MOCKS = {
+  low: buildGrEvolveMock([8, 8, 8]),
+  medium: buildGrEvolveMock([12, 12, 12]),
+  high: buildGrEvolveMock([16, 16, 16]),
+} as const;
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -406,6 +514,55 @@ export async function apiRequest(
           generatedAt: now,
         };
       }
+      if (method === 'GET' && normalizedPath === '/api/helix/lapse-brick') {
+        const searchStart = normalizedUrl.indexOf("?");
+        const params = searchStart >= 0
+          ? new URLSearchParams(normalizedUrl.slice(searchStart + 1))
+          : undefined;
+        const qualityRaw = params?.get("quality")?.toLowerCase();
+        const quality =
+          qualityRaw === "low" || qualityRaw === "high"
+            ? qualityRaw
+            : "medium";
+        const mock = LAPSE_MOCKS[quality];
+        return {
+          dims: mock.dims,
+          voxelBytes: 4,
+          format: "r32f",
+          channels: mock.channels,
+          stats: mock.stats,
+          quality,
+          mock: true,
+          generatedAt: now,
+        };
+      }
+      if (method === 'GET' && normalizedPath === '/api/helix/gr-evolve-brick') {
+        const searchStart = normalizedUrl.indexOf("?");
+        const params = searchStart >= 0
+          ? new URLSearchParams(normalizedUrl.slice(searchStart + 1))
+          : undefined;
+        const qualityRaw = params?.get("quality")?.toLowerCase();
+        const quality =
+          qualityRaw === "low" || qualityRaw === "high"
+            ? qualityRaw
+            : "medium";
+        const mock = GR_EVOLVE_MOCKS[quality];
+        return {
+          kind: "gr-evolve-brick",
+          dims: mock.dims,
+          voxelBytes: mock.voxelBytes,
+          format: mock.format,
+          bounds: mock.bounds,
+          voxelSize_m: mock.voxelSize_m,
+          time_s: mock.time_s,
+          dt_s: mock.dt_s,
+          channels: mock.channels,
+          stats: mock.stats,
+          quality,
+          mock: true,
+          generatedAt: now,
+        };
+      }
       // Accept POSTs used by the UI with a no-op echo to avoid hard errors
       if (method === 'POST' && normalizedUrl.startsWith('/api/helix/hardware/')) {
         return { ok: true };
@@ -445,9 +602,14 @@ export async function apiRequest(
   try {
     releaseSlot = await waitForFetchSlot();
 
+    const headers = { ...(options.headers ?? {}) };
+    if (data && !headers["Content-Type"]) {
+      headers["Content-Type"] = "application/json";
+    }
+
     const res = await fetch(url, {
       method,
-      headers: data ? { "Content-Type": "application/json" } : {},
+      headers,
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
       signal,

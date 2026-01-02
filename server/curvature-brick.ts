@@ -29,6 +29,9 @@ export interface CurvBrickParams {
   debugBlockRadius?: number;
   debugBlockCenter?: Vec3;
   driveDir?: Vec3 | null;
+  hullAxes?: Vec3;
+  hullWall?: number;
+  radialMap?: HullRadialMap | null;
 }
 
 export interface CurvatureBrick {
@@ -43,20 +46,21 @@ export interface CurvatureBrick {
   qiMax?: number;
 }
 
+export type HullRadialMap = {
+  nTheta: number;
+  nPhi: number;
+  radii: Float32Array;
+  counts: Uint16Array;
+};
+
 const INV_TAU_FLOOR = 1e-12;
 const INV_TM_FLOOR = 1e-15;
+const CURVATURE_EMA_ALPHA = 0.18;
+const CURVATURE_RESIDUAL_MIN = -8.0;
+const CURVATURE_RESIDUAL_MAX = 8.0;
 const LAMBDA_DEFAULT = 0.25; // meters – tuned to Natário wall scale
 
 const tauWindow = (tauLC: number, Tm: number) => Math.max(tauLC, 5 * Tm);
-
-const ellipsoidRho = (p: Vec3, axes: Vec3) => {
-  const [x, y, z] = p;
-  const [a, b, c] = axes;
-  const nx = x / Math.max(a, 1e-9);
-  const ny = y / Math.max(b, 1e-9);
-  const nz = z / Math.max(c, 1e-9);
-  return Math.hypot(nx, ny, nz);
-};
 
 const ellipsoidRadiusAt = (dir: Vec3, axes: Vec3) => {
   const [a, b, c] = axes;
@@ -99,6 +103,63 @@ const gaussian = (x: number, sigma: number) => {
   const s = Math.max(sigma, 1e-4);
   const t = x / s;
   return Math.exp(-0.5 * t * t);
+};
+
+export const buildHullRadialMapFromPositions = (
+  positions: ArrayLike<number>,
+  opts?: { nTheta?: number; nPhi?: number; maxSamples?: number },
+): HullRadialMap | null => {
+  const length = Math.floor((positions?.length ?? 0) / 3);
+  if (length <= 0) return null;
+  const nTheta = Math.max(8, Math.floor(opts?.nTheta ?? 72));
+  const nPhi = Math.max(4, Math.floor(opts?.nPhi ?? 36));
+  const totalBins = nTheta * nPhi;
+  const radii = new Float32Array(totalBins);
+  const counts = new Uint16Array(totalBins);
+  const maxSamples = Math.max(1, Math.floor(opts?.maxSamples ?? 20000));
+  const step = length > maxSamples ? Math.ceil(length / maxSamples) : 1;
+  let used = 0;
+
+  for (let i = 0; i < length; i += step) {
+    const base = i * 3;
+    const x = Number(positions[base] ?? 0);
+    const y = Number(positions[base + 1] ?? 0);
+    const z = Number(positions[base + 2] ?? 0);
+    const r = Math.hypot(x, y, z);
+    if (!Number.isFinite(r) || r < 1e-6) continue;
+    const theta01 = wrap01((Math.atan2(z, x) / (2 * Math.PI)) + 0.5);
+    const phi = Math.atan2(y, Math.hypot(x, z));
+    const phi01 = Math.max(0, Math.min(1, (phi + Math.PI / 2) / Math.PI));
+    const ti = Math.min(nTheta - 1, Math.max(0, Math.floor(theta01 * nTheta)));
+    const pi = Math.min(nPhi - 1, Math.max(0, Math.floor(phi01 * nPhi)));
+    const idx = pi * nTheta + ti;
+    radii[idx] += r;
+    if (counts[idx] < 0xffff) counts[idx] += 1;
+    used += 1;
+  }
+
+  if (used === 0) return null;
+  for (let i = 0; i < totalBins; i += 1) {
+    if (counts[i] > 0) {
+      radii[i] /= counts[i];
+    }
+  }
+
+  return { nTheta, nPhi, radii, counts };
+};
+
+export const resolveHullRadius = (dir: Vec3, axes: Vec3, radialMap?: HullRadialMap | null) => {
+  const fallback = ellipsoidRadiusAt(dir, axes);
+  if (!radialMap) return fallback;
+  const theta01 = wrap01((Math.atan2(dir[2], dir[0]) / (2 * Math.PI)) + 0.5);
+  const phi = Math.atan2(dir[1], Math.hypot(dir[0], dir[2]));
+  const phi01 = Math.max(0, Math.min(1, (phi + Math.PI / 2) / Math.PI));
+  const ti = Math.min(radialMap.nTheta - 1, Math.max(0, Math.floor(theta01 * radialMap.nTheta)));
+  const pi = Math.min(radialMap.nPhi - 1, Math.max(0, Math.floor(phi01 * radialMap.nPhi)));
+  const idx = pi * radialMap.nTheta + ti;
+  if (radialMap.counts[idx] === 0) return fallback;
+  const r = radialMap.radii[idx];
+  return Number.isFinite(r) && r > 0 ? r : fallback;
 };
 
 const defaultHullBounds = () => {
@@ -255,7 +316,8 @@ const qiAllowance = (kExpect: number, params: { window: number; betaAmp: number 
 export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureBrick {
   const defaults = defaultHullBounds();
   const dims: [number, number, number] = input.dims ?? [128, 128, 128];
-  const bounds = input.bounds ?? { min: defaults.min, max: defaults.max };
+  const axes: Vec3 = input.hullAxes ?? defaults.axes;
+  const bounds = input.bounds ?? { min: [-axes[0], -axes[1], -axes[2]], max: [axes[0], axes[1], axes[2]] };
 
   const phase01 = wrap01(input.phase01 ?? 0);
   const sigmaSector = Math.max(input.sigmaSector ?? 0.05, 1e-3);
@@ -281,8 +343,7 @@ export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureB
   const dy = (bounds.max[1] - bounds.min[1]) / ny;
   const dz = (bounds.max[2] - bounds.min[2]) / nz;
 
-  const axes: Vec3 = defaults.axes;
-  const wallSigma = Math.max(defaults.wall, 0.1);
+  const wallSigma = Math.max(input.hullWall ?? defaults.wall, 0.1);
   const axesVec: Vec3 = [axes[0], axes[1], axes[2]];
   const driveDirInput = Array.isArray(input.driveDir) ? (input.driveDir as Vec3) : null;
   const driveDirUnit = driveDirInput ? normalize(driveDirInput) : null;
@@ -355,6 +416,8 @@ export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureB
     }
   }
 
+  const radialMap = input.radialMap ?? null;
+
   for (let k = 0; k < nz; k++) {
     const z = bounds.min[2] + (k + 0.5) * dz;
     for (let j = 0; j < ny; j++) {
@@ -383,10 +446,10 @@ export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureB
           continue;
         }
 
-        const rho = ellipsoidRho(pos, axesVec);
-        const dir = normalize(pos);
-        const radius = ellipsoidRadiusAt(dir, axesVec);
-        const centerDist = (rho - 1) * radius;
+        const pLen = Math.hypot(x, y, z);
+        const dir = pLen > 1e-9 ? ([x / pLen, y / pLen, z / pLen] as Vec3) : ([0, 0, 0] as Vec3);
+        const radius = resolveHullRadius(dir, axesVec, radialMap);
+        const centerDist = pLen - radius;
         const betaShiftMeters = betaShiftScale !== 0 ? betaShiftScale * radius : 0;
         let shiftedDist = centerDist - betaShiftMeters;
         if (dirBiasActive && driveDirUnit) {
@@ -479,6 +542,29 @@ export interface CurvatureBrickResponse {
   residualMax?: number;
 }
 
+export interface CurvatureBrickBinaryHeader {
+  kind: "curvature-brick";
+  version: 1;
+  dims: [number, number, number];
+  format: "r32f";
+  voxelBytes: number;
+  min: number;
+  max: number;
+  dataBytes: number;
+  qiMarginBytes: number;
+  qiMin?: number;
+  qiMax?: number;
+  emaAlpha: number;
+  residualMin: number;
+  residualMax: number;
+}
+
+export type CurvatureBrickBinaryPayload = {
+  header: CurvatureBrickBinaryHeader;
+  data: Buffer;
+  qiMargin?: Buffer;
+};
+
 export const serializeBrick = (brick: CurvatureBrick): CurvatureBrickResponse => {
   const baseData = Buffer.from(brick.data.buffer, brick.data.byteOffset, brick.data.byteLength).toString("base64");
   const response: CurvatureBrickResponse = {
@@ -488,9 +574,9 @@ export const serializeBrick = (brick: CurvatureBrick): CurvatureBrickResponse =>
     data: baseData,
     min: brick.min,
     max: brick.max,
-    emaAlpha: 0.18,
-    residualMin: -8.0,
-    residualMax: 8.0,
+    emaAlpha: CURVATURE_EMA_ALPHA,
+    residualMin: CURVATURE_RESIDUAL_MIN,
+    residualMax: CURVATURE_RESIDUAL_MAX,
   };
   if (brick.qiMargin) {
     response.qiMargin = Buffer.from(brick.qiMargin.buffer, brick.qiMargin.byteOffset, brick.qiMargin.byteLength).toString("base64");
@@ -498,4 +584,30 @@ export const serializeBrick = (brick: CurvatureBrick): CurvatureBrickResponse =>
     response.qiMax = brick.qiMax;
   }
   return response;
+};
+
+export const serializeBrickBinary = (brick: CurvatureBrick): CurvatureBrickBinaryPayload => {
+  const qiMarginBytes = brick.qiMargin ? brick.qiMargin.byteLength : 0;
+  return {
+    header: {
+      kind: "curvature-brick",
+      version: 1,
+      dims: brick.dims,
+      format: brick.format,
+      voxelBytes: brick.voxelBytes,
+      min: brick.min,
+      max: brick.max,
+      dataBytes: brick.data.byteLength,
+      qiMarginBytes,
+      qiMin: brick.qiMargin ? brick.qiMin : undefined,
+      qiMax: brick.qiMargin ? brick.qiMax : undefined,
+      emaAlpha: CURVATURE_EMA_ALPHA,
+      residualMin: CURVATURE_RESIDUAL_MIN,
+      residualMax: CURVATURE_RESIDUAL_MAX,
+    },
+    data: Buffer.from(brick.data.buffer, brick.data.byteOffset, brick.data.byteLength),
+    qiMargin: brick.qiMargin
+      ? Buffer.from(brick.qiMargin.buffer, brick.qiMargin.byteOffset, brick.qiMargin.byteLength)
+      : undefined,
+  };
 };

@@ -32,6 +32,30 @@ export type TsSnapshot = {
   autoscale?: Record<string, unknown> | null;
 };
 
+export type WarpSolverGuardrailConstraint = {
+  rms?: number;
+  maxAbs?: number;
+  threshold?: number;
+  exceeded?: boolean;
+};
+
+export type WarpSolverGuardrailScalar = {
+  floor?: number;
+  maxAbs?: number;
+  threshold?: number;
+  exceeded?: boolean;
+};
+
+export type WarpSolverGuardrails = {
+  source: "pipeline-gr" | "proxy";
+  proxy: boolean;
+  missing?: string[];
+  H_constraint?: WarpSolverGuardrailConstraint;
+  M_constraint?: WarpSolverGuardrailConstraint;
+  lapse?: WarpSolverGuardrailScalar;
+  beta?: WarpSolverGuardrailScalar;
+};
+
 export interface WarpSnapshot {
   TS_ratio?: number;
   gamma_VdB?: number;
@@ -46,6 +70,7 @@ export interface WarpSnapshot {
   dwell_ms?: number;
   burst_ms?: number;
   ts?: TsSnapshot | null;
+  grGuardrails?: WarpSolverGuardrails;
   [k: string]: unknown;
 }
 

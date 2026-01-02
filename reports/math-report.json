@@ -1,0 +1,343 @@
+{
+  "generatedAt": "2026-01-02T07:05:47.497Z",
+  "registryCount": 63,
+  "coverage": {
+    "exploratory": {
+      "count": 12,
+      "modules": [
+        "server/gr/gr-worker-client.ts",
+        "server/gr/gr-worker-types.ts",
+        "server/gr/gr-worker.ts",
+        "server/services/observability/tool-log-store.ts",
+        "modules/analysis/constraint-loop.ts",
+        "modules/analysis/noise-field-loop.ts",
+        "modules/analysis/diffusion-loop.ts",
+        "modules/analysis/belief-graph-loop.ts",
+        "server/routes/analysis-loops.ts",
+        "server/services/observability/otel-tracing.ts",
+        "server/services/observability/otel-middleware.ts",
+        "server/services/observability/otel-span-store.ts"
+      ]
+    },
+    "reduced-order": {
+      "count": 24,
+      "modules": [
+        "modules/gr/stress-energy.ts",
+        "server/gr/gr-constraint-policy.ts",
+        "server/gr/gr-agent-loop-schema.ts",
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+        "server/stress-energy-brick.ts",
+        "server/gr/evolution/stress-energy.ts",
+        "modules/dynamic/stress-energy-equations.ts",
+        "modules/dynamic/dynamic-casimir.ts",
+        "modules/dynamic/natario-metric.ts",
+        "server/energy-pipeline.ts",
+        "modules/physics/warpAgents.ts",
+        "server/routes/agi.plan.ts",
+        "server/routes/agi.eval.ts",
+        "server/routes/agi.memory.ts",
+        "server/routes/agi.memory.trace.ts",
+        "server/routes/agi.persona.ts",
+        "server/routes/agi.profile.ts",
+        "server/routes/agi.specialists.ts",
+        "server/routes/agi.star.ts",
+        "server/routes/agi.trace.ts",
+        "server/routes/agi.debate.ts",
+        "server/services/constraint-packs/constraint-pack-policy.ts",
+        "server/services/constraint-packs/constraint-pack-policy-store.ts"
+      ]
+    },
+    "diagnostic": {
+      "count": 20,
+      "modules": [
+        "modules/gr/bssn-state.ts",
+        "modules/gr/bssn-evolve.ts",
+        "server/gr/evolution/solver.ts",
+        "server/gr-evolve-brick.ts",
+        "modules/gr/rk4.ts",
+        "modules/gr/stencils.ts",
+        "server/gr-initial-brick.ts",
+        "server/gr/evolution.ts",
+        "server/gr/evolution/brick.ts",
+        "server/gr/evolution/initial-data.ts",
+        "server/gr/gr-constraint-network.ts",
+        "tools/warpViability.ts",
+        "server/services/observability/training-trace-store.ts",
+        "server/routes/training-trace.ts",
+        "server/services/observability/gr-agent-loop-store.ts",
+        "server/routes/agi.adapter.ts",
+        "server/services/observability/constraint-pack-evaluator.ts",
+        "server/services/observability/constraint-pack-normalizer.ts",
+        "server/services/observability/constraint-pack-telemetry.ts",
+        "server/routes/agi.constraint-packs.ts"
+      ]
+    },
+    "certified": {
+      "count": 7,
+      "modules": [
+        "server/gr/constraint-evaluator.ts",
+        "server/gr/gr-evaluation.ts",
+        "server/gr/gr-agent-loop.ts",
+        "tools/warpViabilityCertificate.ts",
+        "tools/verifyCertificate.ts",
+        "server/skills/physics.warp.viability.ts",
+        "server/routes/warp-viability.ts"
+      ]
+    }
+  },
+  "unstaged": {
+    "count": 0,
+    "modules": []
+  },
+  "evidenceIssues": {
+    "count": 18,
+    "items": [
+      {
+        "module": "modules/gr/rk4.ts",
+        "stage": "diagnostic",
+        "missing": [
+          "residual_check"
+        ]
+      },
+      {
+        "module": "modules/gr/stencils.ts",
+        "stage": "diagnostic",
+        "missing": [
+          "residual_check"
+        ]
+      },
+      {
+        "module": "server/gr-initial-brick.ts",
+        "stage": "diagnostic",
+        "missing": [
+          "residual_check"
+        ]
+      },
+      {
+        "module": "server/gr/evolution/brick.ts",
+        "stage": "diagnostic",
+        "missing": [
+          "residual_check"
+        ]
+      },
+      {
+        "module": "server/gr/evolution/initial-data.ts",
+        "stage": "diagnostic",
+        "missing": [
+          "residual_check"
+        ]
+      },
+      {
+        "module": "server/gr/gr-worker-client.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "server/gr/gr-worker-types.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "server/gr/gr-worker.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "server/services/observability/gr-agent-loop-store.ts",
+        "stage": "diagnostic",
+        "missing": [
+          "residual_check"
+        ]
+      },
+      {
+        "module": "server/services/observability/tool-log-store.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "modules/analysis/constraint-loop.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "modules/analysis/noise-field-loop.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "modules/analysis/diffusion-loop.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "modules/analysis/belief-graph-loop.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "server/routes/analysis-loops.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "server/services/observability/otel-tracing.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "server/services/observability/otel-middleware.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      },
+      {
+        "module": "server/services/observability/otel-span-store.ts",
+        "stage": "exploratory",
+        "missing": [
+          "sanity_checks"
+        ]
+      }
+    ]
+  },
+  "stageViolations": {
+    "edge": {
+      "count": 0,
+      "items": []
+    },
+    "pipeline": {
+      "count": 0,
+      "items": []
+    }
+  },
+  "unitCoverage": {
+    "entriesWithUnits": 14,
+    "entriesMissingUnits": [
+      "server/gr/gr-evaluation.ts",
+      "modules/gr/rk4.ts",
+      "modules/gr/stencils.ts",
+      "modules/gr/stress-energy.ts",
+      "server/gr-initial-brick.ts",
+      "server/gr/evolution.ts",
+      "server/gr/evolution/brick.ts",
+      "server/gr/evolution/initial-data.ts",
+      "server/gr/gr-constraint-network.ts",
+      "server/gr/gr-constraint-policy.ts",
+      "server/gr/gr-agent-loop-schema.ts",
+      "tools/warpViabilityCertificate.ts",
+      "tools/verifyCertificate.ts",
+      "server/skills/physics.warp.viability.ts",
+      "server/routes/warp-viability.ts",
+      "tools/warpViability.ts",
+      "modules/physics/warpAgents.ts",
+      "server/services/observability/training-trace-store.ts",
+      "server/routes/training-trace.ts",
+      "server/services/observability/gr-agent-loop-store.ts",
+      "server/routes/agi.adapter.ts",
+      "server/routes/agi.plan.ts",
+      "server/routes/agi.eval.ts",
+      "server/routes/agi.memory.ts",
+      "server/routes/agi.memory.trace.ts",
+      "server/routes/agi.persona.ts",
+      "server/routes/agi.profile.ts",
+      "server/routes/agi.specialists.ts",
+      "server/routes/agi.star.ts",
+      "server/routes/agi.trace.ts",
+      "server/routes/agi.debate.ts",
+      "server/services/observability/constraint-pack-evaluator.ts",
+      "server/services/observability/constraint-pack-normalizer.ts",
+      "server/services/observability/constraint-pack-telemetry.ts",
+      "server/routes/agi.constraint-packs.ts",
+      "server/services/constraint-packs/constraint-pack-policy.ts",
+      "server/services/constraint-packs/constraint-pack-policy-store.ts"
+    ],
+    "byStage": {
+      "exploratory": {
+        "total": 12,
+        "withUnits": 0,
+        "missing": []
+      },
+      "reduced-order": {
+        "total": 24,
+        "withUnits": 8,
+        "missing": [
+          "modules/gr/stress-energy.ts",
+          "server/gr/gr-constraint-policy.ts",
+          "server/gr/gr-agent-loop-schema.ts",
+          "modules/physics/warpAgents.ts",
+          "server/routes/agi.plan.ts",
+          "server/routes/agi.eval.ts",
+          "server/routes/agi.memory.ts",
+          "server/routes/agi.memory.trace.ts",
+          "server/routes/agi.persona.ts",
+          "server/routes/agi.profile.ts",
+          "server/routes/agi.specialists.ts",
+          "server/routes/agi.star.ts",
+          "server/routes/agi.trace.ts",
+          "server/routes/agi.debate.ts",
+          "server/services/constraint-packs/constraint-pack-policy.ts",
+          "server/services/constraint-packs/constraint-pack-policy-store.ts"
+        ]
+      },
+      "diagnostic": {
+        "total": 20,
+        "withUnits": 4,
+        "missing": [
+          "modules/gr/rk4.ts",
+          "modules/gr/stencils.ts",
+          "server/gr-initial-brick.ts",
+          "server/gr/evolution.ts",
+          "server/gr/evolution/brick.ts",
+          "server/gr/evolution/initial-data.ts",
+          "server/gr/gr-constraint-network.ts",
+          "tools/warpViability.ts",
+          "server/services/observability/training-trace-store.ts",
+          "server/routes/training-trace.ts",
+          "server/services/observability/gr-agent-loop-store.ts",
+          "server/routes/agi.adapter.ts",
+          "server/services/observability/constraint-pack-evaluator.ts",
+          "server/services/observability/constraint-pack-normalizer.ts",
+          "server/services/observability/constraint-pack-telemetry.ts",
+          "server/routes/agi.constraint-packs.ts"
+        ]
+      },
+      "certified": {
+        "total": 7,
+        "withUnits": 2,
+        "missing": [
+          "server/gr/gr-evaluation.ts",
+          "tools/warpViabilityCertificate.ts",
+          "tools/verifyCertificate.ts",
+          "server/skills/physics.warp.viability.ts",
+          "server/routes/warp-viability.ts"
+        ]
+      }
+    }
+  },
+  "unitViolations": {
+    "count": 0,
+    "errors": [],
+    "warnings": []
+  }
+}

@@ -1,0 +1,67 @@
+name: Casimir Verify
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+jobs:
+  casimir-verify:
+    runs-on: ubuntu-latest
+    env:
+      PORT: 5173
+      ENABLE_AGI: 1
+      ENABLE_ESSENCE: 1
+      ENABLE_AGI_AUTH: 0
+      AGI_TENANT_REQUIRED: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate math stages
+        run: npm run math:validate
+
+      - name: Start AGI API
+        run: |
+          npm run dev:agi:5173 > /tmp/agi.log 2>&1 &
+          node -e "const url='http://localhost:5173/api/agi/constraint-packs'; const timeoutMs=60000; const start=Date.now(); const delay=ms=>new Promise(r=>setTimeout(r,ms)); (async()=>{ while(true){ try { const res=await fetch(url); if(res.ok){ console.log('AGI API is up'); process.exit(0);} } catch {} if(Date.now()-start>timeoutMs){ console.error('Timed out waiting for AGI API'); process.exit(1);} await delay(1000);} })();"
+
+      - name: Run Casimir verify
+        run: |
+          mkdir -p artifacts
+          npm run casimir:verify -- --params '{"traceId":"ci:casimir","actions":[{"id":"ci-proposal","params":{"dutyEffectiveFR":0.0025}}],"budget":{"maxIterations":1,"maxTotalMs":60000}}' --trace-out artifacts/training-trace.jsonl --trace-limit 200 --url http://localhost:5173/api/agi/adapter/run
+
+      - name: Generate math report
+        if: always()
+        run: |
+          npm run math:report
+          mkdir -p artifacts
+          cp reports/math-report.json artifacts/math-report.json
+          cp reports/math-report.md artifacts/math-report.md
+
+      - name: Upload training trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-trace
+          path: artifacts/training-trace.jsonl
+          if-no-files-found: warn
+
+      - name: Upload math report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-report
+          path: |
+            artifacts/math-report.json
+            artifacts/math-report.md
+          if-no-files-found: warn

@@ -5,6 +5,7 @@ import { createServer, get as httpGet, type Server, type ServerResponse } from "
 import os from "os";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
+import { otelMiddleware } from "./services/observability/otel-middleware";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -180,6 +181,7 @@ const resolveRootRedirectTarget = (req: Request): string => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 registerMetricsEndpoint(app);
+app.use(otelMiddleware);
 
 app.use((req, res, next) => {
   if (isPublicHealthRoute(req)) {

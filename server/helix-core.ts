@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { Buffer } from "node:buffer";
 import { Request, Response } from "express";
 import { z } from "zod";
 // Use built-in fetch when available (Node ≥18), fallback to node-fetch
@@ -8,6 +9,7 @@ import {
   switchMode,
   updateParameters,
   computeEnergySnapshot,
+  buildGrRequestPayload,
   getGlobalPipelineState,
   setGlobalPipelineState,
   sampleDisplacementField,
@@ -37,9 +39,13 @@ import { C } from './utils/physics-const-safe';
 import { computeClocking } from "../shared/clocking.js";
 import {
   buildCurvatureBrick,
+  buildHullRadialMapFromPositions,
+  resolveHullRadius,
   serializeBrick,
+  serializeBrickBinary,
   type CurvBrickParams,
   type Vec3,
+  type HullRadialMap,
   type CurvDebugStamp,
   setCurvatureDebugStamp,
   clearCurvatureDebugStamp,
@@ -48,8 +54,42 @@ import {
 import {
   buildStressEnergyBrick,
   serializeStressEnergyBrick,
+  serializeStressEnergyBrickBinary,
   type StressEnergyBrickParams,
 } from "./stress-energy-brick";
+import {
+  buildLapseBrick,
+  serializeLapseBrick,
+  serializeLapseBrickBinary,
+  type LapseBrickParams,
+} from "./lapse-brick";
+import {
+  buildGrInitialBrick,
+  serializeGrInitialBrick,
+  serializeGrInitialBrickBinary,
+  type GrInitialBrick,
+  type GrInitialBrickParams,
+} from "./gr-initial-brick";
+import {
+  buildGrEvolveBrick,
+  buildGrDiagnostics,
+  serializeGrEvolveBrick,
+  serializeGrEvolveBrickBinary,
+  type GrEvolveBrick,
+  type GrEvolveBrickParams,
+} from "./gr-evolve-brick";
+import {
+  isGrWorkerEnabled,
+  runGrEvolveBrickInWorker,
+  runGrInitialBrickInWorker,
+} from "./gr/gr-worker-client";
+import { evaluateGrConstraintGateFromDiagnostics } from "./gr/constraint-evaluator.js";
+import { resolveGrConstraintPolicyBundle } from "./gr/gr-constraint-policy.js";
+import { runGrEvaluation } from "./gr/gr-evaluation.js";
+import { runGrConstraintNetwork4d } from "./gr/gr-constraint-network.js";
+import { runGrAgentLoop } from "./gr/gr-agent-loop.js";
+import { grAgentLoopOptionsSchema } from "./gr/gr-agent-loop-schema.js";
+import { recordGrAgentLoopRun } from "./services/observability/gr-agent-loop-store.js";
 import {
   dynamicConfigSchema,
   vacuumGapSweepConfigSchema,
@@ -67,6 +107,13 @@ import {
   hullPreviewPayloadSchema,
   cardMeshMetadataSchema,
   cardLatticeMetadataSchema,
+  grConstraintPolicySchema,
+  grConstraintThresholdSchema,
+  grConstraintContractSchema,
+  grConstraintNetworkSchema,
+  grEvaluationSchema,
+  grRegionStatsSchema,
+  casimirTileSummarySchema,
 } from "../shared/schema.js";
 import type {
   SweepSpec,
@@ -81,9 +128,13 @@ import type {
   HullPreviewPayload,
   AxisLabel,
   WarpGeometryFallback,
+  GrConstraintContract,
+  GrRegionStats,
 } from "../shared/schema.js";
+import type { WarpConfig } from "../types/warpViability";
 import {
   applyHullBasisToDims,
+  applyHullBasisToPositions,
   HULL_BASIS_IDENTITY,
   isIdentityHullBasis,
   resolveHullBasis,
@@ -833,6 +884,49 @@ const warpSdfPreviewSchema = z
   })
   .partial();
 
+const brickVec3Schema = z.tuple([z.number(), z.number(), z.number()]);
+
+const hullBrickChannelSchema = z.object({
+  data: z.string().min(1),
+  min: z.number().optional(),
+  max: z.number().optional(),
+});
+
+const hullBrickBoundsSchema = z
+  .object({
+    min: brickVec3Schema.optional(),
+    max: brickVec3Schema.optional(),
+    center: brickVec3Schema.optional(),
+    extent: brickVec3Schema.optional(),
+    axes: brickVec3Schema.optional(),
+    wall: z.number().optional(),
+  })
+  .partial();
+
+const hullBrickSchema = z
+  .object({
+    dims: z.tuple([z.number().int().positive(), z.number().int().positive(), z.number().int().positive()]),
+    voxelBytes: z.number().int().positive().optional(),
+    format: z.enum(["r32f"]).optional(),
+    channels: z
+      .object({
+        hullDist: hullBrickChannelSchema.optional(),
+        hullMask: hullBrickChannelSchema.optional(),
+      })
+      .partial(),
+    bounds: hullBrickBoundsSchema.optional(),
+    meta: z.record(z.any()).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.channels?.hullDist && !value.channels?.hullMask) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "hullBrick must include hullDist or hullMask channel",
+        path: ["channels"],
+      });
+    }
+  });
+
 const UpdateSchema = z.object({
   tileArea_cm2: z.number().min(0.01).max(10_000).optional(),
   gap_nm: z.number().min(0.1).max(1000).optional(),
@@ -855,15 +949,25 @@ const UpdateSchema = z.object({
   sdf: warpSdfPreviewSchema.nullable().optional(),
   previewLattice: cardLatticeMetadataSchema.nullable().optional(),
   lattice: cardLatticeMetadataSchema.nullable().optional(),
+  hullBrick: hullBrickSchema.nullable().optional(),
   beta_trans: z.number().min(0).max(1).optional(),
   powerFillCmd: z.number().min(0).max(1).optional(),
+  grEnabled: z.boolean().optional(),
   dynamicConfig: dynamicConfigUpdateSchema.optional(),
   negativeFraction: z.number().min(0).max(1).optional(),
   dutyCycle: z.number().min(0).max(1).optional(),
   localBurstFrac: z.number().min(0).max(1).optional(),
+  sectorCount: z.number().int().min(1).max(10_000).optional(),
   sectorsConcurrent: z.number().int().min(1).max(10_000).optional(),
   sectorStrobing: z.number().int().min(1).max(10_000).optional(),
+  strobeHz: z.number().min(0).max(1e9).optional(),
+  phase01: z.number().optional(),
+  sigmaSector: z.number().min(1e-6).max(1).optional(),
+  splitEnabled: z.boolean().optional(),
+  splitFrac: z.number().min(0).max(1).optional(),
   qSpoilingFactor: z.number().min(0).max(10).optional(),
+  gammaGeo: z.number().min(1e-6).max(1e6).optional(),
+  gammaVanDenBroeck: z.number().min(0).max(1e12).optional(),
   iPeakMaxMidi_A: z.number().min(0).max(1e9).optional(),
   iPeakMaxSector_A: z.number().min(0).max(1e9).optional(),
   iPeakMaxLauncher_A: z.number().min(0).max(1e9).optional(),
@@ -1368,6 +1472,20 @@ export function buildHelixCorePrompt(state: EnergyPipelineState): string {
 
 export const AVAILABLE_FUNCTIONS: any[] = [
   // Keep empty or list simple metadata; real function signatures are driven by FN_SCHEMAS
+  {
+    name: "run_gr_agent_loop",
+    description:
+      "Run the GR agent loop and return the evaluation plus an audit record.",
+    parameters: {
+      type: "object",
+      properties: {
+        maxIterations: { type: "integer", minimum: 1, maximum: 50 },
+        commitAccepted: { type: "boolean" },
+        useLiveSnapshot: { type: "boolean" },
+      },
+      additionalProperties: true,
+    },
+  },
 ];
 
 export const FN_SCHEMAS: Record<string, z.ZodSchema<any>> = {
@@ -1390,7 +1508,8 @@ export const FN_SCHEMAS: Record<string, z.ZodSchema<any>> = {
     load: z.enum(["sector", "midi", "launcher"]).optional(),
   }),
   check_metric_violation: z.object({ metricType: z.string() }),
-  load_document: z.object({ docId: z.string() })
+  load_document: z.object({ docId: z.string() }),
+  run_gr_agent_loop: grAgentLoopOptionsSchema
 };
 
 type PulseLoadKind = "midi" | "sector" | "launcher";
@@ -1564,6 +1683,18 @@ export async function handleHelixCommand(req: Request, res: Response) {
         case "simulate_pulse_cycle": functionResult = await simulatePulseCycle(args); break;
         case "check_metric_violation": functionResult = checkMetricViolation(args.metricType); break;
         case "load_document": functionResult = { docId: args.docId, status: "LOADED", message: "Document overlay ready for display" }; break;
+        case "run_gr_agent_loop": {
+          const start = Date.now();
+          const result = await runGrAgentLoop(args);
+          const durationMs = Date.now() - start;
+          const run = recordGrAgentLoopRun({
+            result,
+            options: args,
+            durationMs,
+          });
+          functionResult = { run, result };
+          break;
+        }
       }
       return res.json({ message, functionResult });
     }
@@ -2057,6 +2188,21 @@ export async function updatePipelineParams(req: Request, res: Response) {
     warpGeometry?: WarpGeometryInput;
   } & Record<string, any>;
   const params: PipelineParamInput = { ...parsed.data };
+  if (typeof params.phase01 === "number" && Number.isFinite(params.phase01)) {
+    params.phase01 = wrap01(params.phase01);
+  }
+  if (typeof params.sectorCount === "number" && Number.isFinite(params.sectorCount)) {
+    params.sectorCount = Math.max(1, Math.floor(params.sectorCount));
+  }
+  if (typeof params.strobeHz === "number" && Number.isFinite(params.strobeHz)) {
+    params.strobeHz = Math.max(0, params.strobeHz);
+  }
+  if (typeof params.sigmaSector === "number" && Number.isFinite(params.sigmaSector)) {
+    params.sigmaSector = Math.max(1e-6, Math.min(1, params.sigmaSector));
+  }
+  if (typeof params.splitFrac === "number" && Number.isFinite(params.splitFrac)) {
+    params.splitFrac = clamp01(params.splitFrac);
+  }
   const previewPayload = params.preview ?? null;
   const previewMesh = params.previewMesh ?? params.mesh ?? null;
   const previewSdf = params.previewSdf ?? params.sdf ?? null;
@@ -3211,6 +3357,42 @@ const parseBooleanParam = (value: unknown, fallback: boolean) => {
   return fallback;
 };
 
+const wantsBinaryResponse = (req: Request, query: Record<string, unknown>) => {
+  if (parseBooleanParam(query.binary, false)) return true;
+  const formatRaw =
+    typeof query.format === "string"
+      ? query.format
+      : typeof query.encoding === "string"
+        ? query.encoding
+        : undefined;
+  if (typeof formatRaw === "string") {
+    const format = formatRaw.toLowerCase();
+    if (format === "raw" || format === "bin" || format === "binary") return true;
+  }
+  const accept = req.get("accept")?.toLowerCase() ?? "";
+  return accept.includes("application/octet-stream") || accept.includes("application/x-helix-brick");
+};
+
+const writeBinaryPayload = (res: Response, header: object, buffers: Array<Buffer | undefined>) => {
+  const headerBytes = Buffer.from(JSON.stringify(header));
+  const headerLength = headerBytes.length;
+  const padding = (4 - (headerLength % 4)) % 4;
+  const prefix = Buffer.alloc(4);
+  prefix.writeUInt32LE(headerLength, 0);
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.write(prefix);
+  res.write(headerBytes);
+  if (padding) {
+    res.write(Buffer.alloc(padding));
+  }
+  for (const buffer of buffers) {
+    if (buffer && buffer.byteLength) {
+      res.write(buffer);
+    }
+  }
+  res.end();
+};
+
 const parseDimsParam = (value: unknown, fallback: [number, number, number]) => {
   if (Array.isArray(value) && value.length === 3) {
     const tuple = value.map((v) => parseNumberParam(v, NaN));
@@ -3317,26 +3499,574 @@ const dimsForQuality = (quality: string | undefined): [number, number, number] =
   }
 };
 
+const dimsCapForQuality = (quality: string | undefined): [number, number, number] => {
+  switch ((quality ?? "").toLowerCase()) {
+    case "low":
+      return [128, 128, 128];
+    case "medium":
+      return [256, 256, 256];
+    case "high":
+      return [1400, 600, 450];
+    default:
+      return [256, 256, 256];
+  }
+};
+
+const iterationsForQuality = (quality: string | undefined): number => {
+  switch ((quality ?? "").toLowerCase()) {
+    case "low":
+      return 80;
+    case "medium":
+      return 140;
+    case "high":
+      return 220;
+    default:
+      return 140;
+  }
+};
+
+const stepsForQuality = (quality: string | undefined): number => {
+  switch ((quality ?? "").toLowerCase()) {
+    case "low":
+      return 16;
+    case "medium":
+      return 32;
+    case "high":
+      return 64;
+    default:
+      return 32;
+  }
+};
+
+const clampDimsToQuality = (
+  dims: [number, number, number],
+  maxDims: [number, number, number],
+): [number, number, number] => [
+  Math.min(dims[0], maxDims[0]),
+  Math.min(dims[1], maxDims[1]),
+  Math.min(dims[2], maxDims[2]),
+];
+
+const clampStepsToQuality = (steps: number, maxSteps: number) =>
+  Number.isFinite(maxSteps) ? Math.min(steps, maxSteps) : steps;
+
+type GrBrickCacheEntry<T> = { createdAt: number; key: string; brick: T };
+
+const GR_BRICK_CACHE_TTL_MS = Math.max(
+  0,
+  parseNumberParam(process.env.GR_BRICK_CACHE_TTL_MS, 4000),
+);
+const GR_BRICK_CACHE_MAX = Math.max(
+  1,
+  Math.floor(parseNumberParam(process.env.GR_BRICK_CACHE_MAX, 4)),
+);
+
+const grInitialCache = new Map<string, GrBrickCacheEntry<GrInitialBrick>>();
+const grEvolveCache = new Map<string, GrBrickCacheEntry<GrEvolveBrick>>();
+
+const readGrBrickCache = <T>(
+  cache: Map<string, GrBrickCacheEntry<T>>,
+  key: string,
+): GrBrickCacheEntry<T> | null => {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  const now = Date.now();
+  if (GR_BRICK_CACHE_TTL_MS > 0 && now - cached.createdAt > GR_BRICK_CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  cached.createdAt = now;
+  cache.delete(key);
+  cache.set(key, cached);
+  return cached;
+};
+
+const writeGrBrickCache = <T>(
+  cache: Map<string, GrBrickCacheEntry<T>>,
+  entry: GrBrickCacheEntry<T>,
+) => {
+  if (cache.has(entry.key)) {
+    cache.delete(entry.key);
+  }
+  while (cache.size >= GR_BRICK_CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+    else break;
+  }
+  cache.set(entry.key, entry);
+};
+
+const resolvePipelineMatterInputs = (state: EnergyPipelineState) => {
+  const fallbackHull = { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
+  const hull = state.hull ?? fallbackHull;
+  const dutyRaw = state.dutyEffective_FR ?? (state as any).dutyEffectiveFR;
+  return {
+    dutyFR: parseNumberParam(dutyRaw, 0.0025),
+    q: parseNumberParam(state.qSpoilingFactor, 1),
+    gammaGeo: parseNumberParam(state.gammaGeo, 26),
+    gammaVdB: parseNumberParam(state.gammaVanDenBroeck, 1),
+    zeta: parseNumberParam(state.zeta, 0.84),
+    phase01: parseNumberParam(state.phase01, 0),
+    hull: {
+      Lx_m: Number.isFinite(hull.Lx_m) ? hull.Lx_m : fallbackHull.Lx_m,
+      Ly_m: Number.isFinite(hull.Ly_m) ? hull.Ly_m : fallbackHull.Ly_m,
+      Lz_m: Number.isFinite(hull.Lz_m) ? hull.Lz_m : fallbackHull.Lz_m,
+      wallThickness_m: Number.isFinite(hull.wallThickness_m)
+        ? (hull.wallThickness_m as number)
+        : fallbackHull.wallThickness_m,
+    },
+  };
+};
+
+const resolveStressEnergyPressureFactor = (state: EnergyPipelineState) => {
+  const stress =
+    (state as any)?.warp?.stressEnergyTensor ?? (state as any)?.stressEnergy;
+  const t00 = Number(stress?.T00);
+  const t11 = Number(stress?.T11);
+  if (!Number.isFinite(t00) || !Number.isFinite(t11) || t00 === 0) return undefined;
+  return t11 / t00;
+};
+
+const buildGrGeometrySignature = (
+  resolved: GeometryResolution,
+  state: EnergyPipelineState,
+  geometryKindRaw?: string | null,
+) => ({
+  kind: typeof geometryKindRaw === "string" ? geometryKindRaw : null,
+  meshHash: resolved.meshHash ?? null,
+  previewUpdatedAt: resolved.previewUpdatedAt ?? null,
+  warpGeometryAssetId: state.warpGeometryAssetId ?? null,
+});
+
+const RADIAL_MAP_DEFAULTS = { nTheta: 72, nPhi: 36, maxSamples: 25000 };
+
+const isArrayLikeView = (view: ArrayBufferView): view is ArrayBufferView & ArrayLike<number> =>
+  typeof (view as { length?: unknown }).length === "number";
+
+const toFloat32Array = (value: unknown): Float32Array | null => {
+  if (!value) return null;
+  if (value instanceof Float32Array) return value;
+  if (ArrayBuffer.isView(value)) {
+    if (!isArrayLikeView(value)) return null;
+    const out = new Float32Array(value.length);
+    for (let i = 0; i < value.length; i += 1) {
+      out[i] = Number(value[i] ?? 0);
+    }
+    return out;
+  }
+  if (Array.isArray(value)) {
+    const out = new Float32Array(value.length);
+    for (let i = 0; i < value.length; i += 1) {
+      out[i] = Number(value[i] ?? 0);
+    }
+    return out;
+  }
+  return null;
+};
+
+const pickPreviewPositions = (preview: HullPreviewPayload | null | undefined) => {
+  if (!preview) return null;
+  const candidates = [
+    preview.lodCoarse,
+    preview.mesh?.coarseLod,
+    preview.lodFull,
+    preview.mesh?.fullLod,
+    ...(preview.lods ?? []),
+    ...(preview.mesh?.lods ?? []),
+  ];
+  for (const lod of candidates) {
+    const positionsRaw = lod?.indexedGeometry?.positions;
+    const positions = toFloat32Array(positionsRaw);
+    if (positions && positions.length >= 6) {
+      return {
+        positions,
+        basis: preview.mesh?.basis ?? preview.basis,
+        scale: preview.scale,
+        targetDims: preview.targetDims ?? preview.hullMetrics?.dims_m ?? null,
+      };
+    }
+  }
+  return null;
+};
+
+const buildRadialMapFromPreview = (
+  preview: HullPreviewPayload | null | undefined,
+  targetDims: { Lx_m: number; Ly_m: number; Lz_m: number } | null,
+) => {
+  const picked = pickPreviewPositions(preview);
+  if (!picked) return null;
+  const transformed = applyHullBasisToPositions(picked.positions, {
+    basis: picked.basis,
+    extraScale: picked.scale,
+    targetDims: targetDims ?? picked.targetDims ?? undefined,
+  }).positions;
+  return buildHullRadialMapFromPositions(transformed, RADIAL_MAP_DEFAULTS);
+};
+
+const buildRadialMapFromWarpGeometry = (warpGeometry: any, geometryKind?: string | null) => {
+  if (!warpGeometry) return null;
+  if (geometryKind === "sdf") {
+    const samples = Array.isArray(warpGeometry.sdf?.samples) ? warpGeometry.sdf.samples : null;
+    if (!samples || samples.length === 0) return null;
+    const coords: number[] = [];
+    for (const sample of samples) {
+      const p = Array.isArray(sample?.p) ? sample.p : null;
+      if (!p || p.length < 3) continue;
+      const x = Number(p[0]);
+      const y = Number(p[1]);
+      const z = Number(p[2]);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+      coords.push(x, y, z);
+    }
+    return coords.length ? buildHullRadialMapFromPositions(coords, RADIAL_MAP_DEFAULTS) : null;
+  }
+  if (geometryKind === "radial") {
+    const samples = Array.isArray(warpGeometry.radial?.samples) ? warpGeometry.radial.samples : null;
+    if (!samples || samples.length === 0) return null;
+    const coords: number[] = [];
+    for (const sample of samples) {
+      const r = Number(sample?.r);
+      if (!Number.isFinite(r) || r <= 0) continue;
+      const theta = Number(sample?.theta ?? 0);
+      const phi = Number(sample?.phi ?? 0);
+      const cosPhi = Math.cos(phi);
+      coords.push(Math.cos(theta) * cosPhi * r, Math.sin(phi) * r, Math.sin(theta) * cosPhi * r);
+    }
+    return coords.length ? buildHullRadialMapFromPositions(coords, RADIAL_MAP_DEFAULTS) : null;
+  }
+  return null;
+};
+
+const resolveRadialMapForBrick = (
+  state: any,
+  preview: HullPreviewPayload | null | undefined,
+  targetDims: { Lx_m: number; Ly_m: number; Lz_m: number } | null,
+  geometryKind?: string | null,
+) => {
+  const kind = geometryKind === "sdf" || geometryKind === "radial" ? geometryKind : "ellipsoid";
+  if (kind === "ellipsoid") return null;
+  return buildRadialMapFromWarpGeometry(state?.warpGeometry, kind) ?? buildRadialMapFromPreview(preview, targetDims);
+};
+
+const wrap01 = (value: number) => {
+  const n = value % 1;
+  return n < 0 ? n + 1 : n;
+};
+
+const azimuth01 = (x: number, z: number) =>
+  wrap01((Math.atan2(z, x) / (2 * Math.PI)) + 0.5);
+
+const clampInt = (value: number, min: number, max: number) => {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, Math.floor(value)));
+};
+
+const resolveRadialMapWithSource = (
+  state: any,
+  preview: HullPreviewPayload | null | undefined,
+  targetDims: { Lx_m: number; Ly_m: number; Lz_m: number } | null,
+  geometryKind?: string | null,
+) => {
+  const kind =
+    geometryKind === "sdf" || geometryKind === "radial" ? geometryKind : "ellipsoid";
+  if (kind === "ellipsoid") {
+    return { radialMap: null, source: "none" as const };
+  }
+  const fromWarp = buildRadialMapFromWarpGeometry(state?.warpGeometry, kind);
+  if (fromWarp) {
+    return { radialMap: fromWarp, source: "warp-geometry" as const };
+  }
+  const fromPreview = buildRadialMapFromPreview(preview, targetDims);
+  if (fromPreview) {
+    return { radialMap: fromPreview, source: "preview" as const };
+  }
+  return { radialMap: null, source: "none" as const };
+};
+
+type RegionGridConfig = GrRegionStats["grid"];
+
+const resolveRegionGridConfig = (input: {
+  hull: { Lx_m: number; Ly_m: number; Lz_m: number };
+  strobeHz: number;
+  sectorPeriod_s: number;
+  targetRegions?: number;
+  thetaBins?: number;
+  longBins?: number;
+  phaseBins?: number;
+  radialBins?: number;
+  longAxis?: "x" | "y" | "z";
+  phase01?: number;
+}): RegionGridConfig => {
+  const axis = input.longAxis ?? "x";
+  const longLengthRaw =
+    axis === "y" ? input.hull.Ly_m : axis === "z" ? input.hull.Lz_m : input.hull.Lx_m;
+  const longLength = Number.isFinite(longLengthRaw) ? Math.max(0, longLengthRaw) : 0;
+  let strobePeriod_s = Number.isFinite(input.sectorPeriod_s) ? input.sectorPeriod_s : NaN;
+  let strobeHz = Number.isFinite(input.strobeHz) ? input.strobeHz : NaN;
+  if (!(strobePeriod_s > 0)) {
+    strobePeriod_s = strobeHz > 0 ? 1 / strobeHz : 1e-3;
+  }
+  if (!(strobeHz > 0)) {
+    strobeHz = strobePeriod_s > 0 ? 1 / strobePeriod_s : 0;
+  }
+  const lightCrossing_s = longLength > 0 ? longLength / C : 0;
+  const autoLongBins = Math.max(1, Math.ceil(lightCrossing_s / Math.max(1e-9, strobePeriod_s)));
+  const longBins = clampInt(input.longBins ?? autoLongBins, 1, 512);
+  const phaseBins = clampInt(input.phaseBins ?? 8, 1, 256);
+  const radialBins = clampInt(input.radialBins ?? 1, 1, 128);
+  const targetRegions =
+    input.targetRegions && input.targetRegions > 0 ? Math.floor(input.targetRegions) : undefined;
+  const autoThetaBins = targetRegions
+    ? Math.max(1, Math.ceil(targetRegions / Math.max(1, longBins * phaseBins * radialBins)))
+    : 20;
+  const thetaBins = clampInt(input.thetaBins ?? autoThetaBins, 1, 1024);
+  const totalRegions = thetaBins * longBins * phaseBins * radialBins;
+  const phase01 = Number.isFinite(input.phase01 as number) ? wrap01(input.phase01 as number) : undefined;
+  const phaseBin =
+    phase01 != null ? Math.min(phaseBins - 1, Math.max(0, Math.floor(phase01 * phaseBins))) : undefined;
+
+  return {
+    thetaBins,
+    longBins,
+    phaseBins,
+    radialBins,
+    totalRegions,
+    longAxis: axis,
+    targetRegions,
+    strobeHz,
+    strobePeriod_s,
+    lightCrossing_s,
+    phase01,
+    phaseBin,
+  };
+};
+
+type RegionAccumulator = {
+  neg: number;
+  pos: number;
+  volume: number;
+  voxels: number;
+  cx: number;
+  cy: number;
+  cz: number;
+};
+
+const decodeRegionIndices = (id: number, grid: RegionGridConfig) => {
+  const theta = id % grid.thetaBins;
+  let rem = Math.floor(id / grid.thetaBins);
+  const long = rem % grid.longBins;
+  rem = Math.floor(rem / grid.longBins);
+  const radial = rem % grid.radialBins;
+  const phase = Math.floor(rem / grid.radialBins);
+  return { theta, long, radial, phase };
+};
+
+const buildRegionKey = (indices: { theta: number; long: number; phase: number; radial: number }) =>
+  `t${indices.theta}-l${indices.long}-p${indices.phase}-r${indices.radial}`;
+
+const computeRegionStats = (input: {
+  dims: [number, number, number];
+  bounds: { min: Vec3; max: Vec3 };
+  hullAxes: Vec3;
+  hullWall: number;
+  radialMap: HullRadialMap | null;
+  rho: Float32Array;
+  detGamma?: Float32Array | null;
+  grid: RegionGridConfig;
+  maxVoxels: number;
+}) => {
+  const [nx, ny, nz] = input.dims;
+  const dx = (input.bounds.max[0] - input.bounds.min[0]) / Math.max(1, nx);
+  const dy = (input.bounds.max[1] - input.bounds.min[1]) / Math.max(1, ny);
+  const dz = (input.bounds.max[2] - input.bounds.min[2]) / Math.max(1, nz);
+  const voxelSize: Vec3 = [dx, dy, dz];
+  const totalVoxels = Math.max(0, nx * ny * nz);
+  const target = Number.isFinite(input.maxVoxels) ? Math.max(1, Math.floor(input.maxVoxels)) : totalVoxels;
+  const stride = totalVoxels > target ? Math.max(1, Math.floor(Math.cbrt(totalVoxels / target))) : 1;
+  const strideScale = stride * stride * stride;
+  const shellWidth = Math.max(input.hullWall, 1e-3);
+  const axisIndex =
+    input.grid.longAxis === "y" ? 1 : input.grid.longAxis === "z" ? 2 : 0;
+  const axisMin = input.bounds.min[axisIndex];
+  const axisSpan = input.bounds.max[axisIndex] - input.bounds.min[axisIndex];
+  const phaseIdx =
+    typeof input.grid.phaseBin === "number" && input.grid.phaseBin >= 0
+      ? Math.min(input.grid.phaseBins - 1, input.grid.phaseBin)
+      : 0;
+
+  const regions: RegionAccumulator[] = Array.from(
+    { length: Math.max(1, input.grid.totalRegions) },
+    () => ({ neg: 0, pos: 0, volume: 0, voxels: 0, cx: 0, cy: 0, cz: 0 }),
+  );
+
+  let negTotal = 0;
+  let posTotal = 0;
+  let negCx = 0;
+  let negCy = 0;
+  let negCz = 0;
+
+  let idx = 0;
+  for (let z = 0; z < nz; z += stride) {
+    const pz = input.bounds.min[2] + (z + 0.5) * dz;
+    for (let y = 0; y < ny; y += stride) {
+      const py = input.bounds.min[1] + (y + 0.5) * dy;
+      for (let x = 0; x < nx; x += stride) {
+        const px = input.bounds.min[0] + (x + 0.5) * dx;
+        idx = x + nx * (y + ny * z);
+        const rho = input.rho[idx] ?? 0;
+        if (!Number.isFinite(rho)) continue;
+        const detRaw = input.detGamma ? input.detGamma[idx] : 1;
+        const det = Number.isFinite(detRaw) && detRaw > 0 ? Math.sqrt(detRaw) : 1;
+        const volume = dx * dy * dz * det * strideScale;
+
+        const axisCoord = axisSpan > 0 ? (axisIndex === 0 ? px : axisIndex === 1 ? py : pz) : 0;
+        const long01 = axisSpan > 0 ? (axisCoord - axisMin) / axisSpan : 0.5;
+        const longIdx = Math.min(
+          input.grid.longBins - 1,
+          Math.max(0, Math.floor(clamp01(long01) * input.grid.longBins)),
+        );
+
+        const theta01 = azimuth01(px, pz);
+        const thetaIdx = Math.min(
+          input.grid.thetaBins - 1,
+          Math.max(0, Math.floor(theta01 * input.grid.thetaBins)),
+        );
+
+        let radialIdx = 0;
+        if (input.grid.radialBins > 1) {
+          const pLen = Math.hypot(px, py, pz);
+          const dir: Vec3 =
+            pLen > 1e-9 ? ([px / pLen, py / pLen, pz / pLen] as Vec3) : [0, 0, 0];
+          const radius = resolveHullRadius(dir, input.hullAxes, input.radialMap);
+          const centerDist = pLen - radius;
+          const radial01 = clamp01(0.5 + centerDist / Math.max(1e-6, shellWidth * 2));
+          radialIdx = Math.min(
+            input.grid.radialBins - 1,
+            Math.max(0, Math.floor(radial01 * input.grid.radialBins)),
+          );
+        }
+
+        const regionId =
+          (((phaseIdx * input.grid.radialBins + radialIdx) * input.grid.longBins + longIdx) *
+            input.grid.thetaBins) +
+          thetaIdx;
+        const region = regions[regionId];
+        if (!region) continue;
+
+        const neg = Math.max(-rho, 0) * volume;
+        const pos = Math.max(rho, 0) * volume;
+        region.neg += neg;
+        region.pos += pos;
+        region.volume += volume;
+        region.voxels += 1;
+        if (neg > 0) {
+          region.cx += neg * px;
+          region.cy += neg * py;
+          region.cz += neg * pz;
+          negCx += neg * px;
+          negCy += neg * py;
+          negCz += neg * pz;
+        }
+        negTotal += neg;
+        posTotal += pos;
+      }
+    }
+  }
+
+  const denom = negTotal + posTotal;
+  const negFraction = denom > 0 ? negTotal / denom : 0;
+  const negCentroid =
+    negTotal > 0 ? ([negCx / negTotal, negCy / negTotal, negCz / negTotal] as Vec3) : null;
+  let contractionVector: Vec3 | null = null;
+  if (negCentroid) {
+    const len = Math.hypot(negCentroid[0], negCentroid[1], negCentroid[2]);
+    if (len > 1e-6) {
+      contractionVector = [
+        negCentroid[0] / len,
+        negCentroid[1] / len,
+        negCentroid[2] / len,
+      ];
+    }
+  }
+
+  const topRegions = regions
+    .map((region, id) => ({ region, id }))
+    .filter(({ region }) => region.voxels > 0 && (region.neg > 0 || region.pos > 0))
+    .sort((a, b) => b.region.neg - a.region.neg)
+    .map(({ region, id }) => {
+      const indices = decodeRegionIndices(id, input.grid);
+      const negDenom = region.neg + region.pos;
+      const centroid =
+        region.neg > 0
+          ? ([region.cx / region.neg, region.cy / region.neg, region.cz / region.neg] as Vec3)
+          : null;
+      return {
+        id,
+        key: buildRegionKey(indices),
+        indices,
+        voxelCount: region.voxels,
+        volume: region.volume,
+        negEnergy: region.neg,
+        posEnergy: region.pos,
+        negFraction: negDenom > 0 ? region.neg / negDenom : 0,
+        negShare: negTotal > 0 ? region.neg / negTotal : 0,
+        centroid,
+      };
+    });
+
+  return {
+    voxelSize,
+    voxelCount: totalVoxels,
+    stride,
+    summary: {
+      negEnergy: negTotal,
+      posEnergy: posTotal,
+      negFraction,
+      contractionVector,
+      contractionMagnitude: negFraction,
+    },
+    topRegions,
+  };
+};
+
 export function getCurvatureBrick(req: Request, res: Response) {
   if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   try {
     const state = getGlobalPipelineState();
-    const hull = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
     const bounds: CurvBrickParams["bounds"] = {
       min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
       max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
     };
 
     const query = req.method === "GET" ? req.query : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const wantsBinary = wantsBinaryResponse(req, query as Record<string, unknown>);
+    const geometryKindRaw = typeof query.geometryKind === "string" ? query.geometryKind : state.warpGeometryKind;
+    const radialMap = resolveRadialMapForBrick(state, preview, hull, geometryKindRaw);
 
     const qualityDims = dimsForQuality(typeof query.quality === "string" ? query.quality : undefined);
     const dims = parseDimsParam(query.dims, qualityDims);
-    const phase01 = parseNumberParam(query.phase01, 0);
-    const sigmaSector = parseNumberParam(query.sigmaSector, 0.05);
-    const splitEnabled = parseBooleanParam(query.splitEnabled, false);
-    const splitFrac = parseNumberParam(query.splitFrac, 0.6);
+    const phase01Raw = parseNumberParam(
+      query.phase01,
+      parseNumberParam(state.phase01, 0),
+    );
+    const phase01 = wrap01(phase01Raw);
+    const sigmaSector = parseNumberParam(
+      query.sigmaSector,
+      parseNumberParam((state as any).sigmaSector, 0.05),
+    );
+    const splitEnabled = parseBooleanParam(
+      query.splitEnabled,
+      (state as any).splitEnabled ?? false,
+    );
+    const splitFrac = parseNumberParam(
+      query.splitFrac,
+      parseNumberParam((state as any).splitFrac, 0.6),
+    );
     const dutyFRState = (state as any).dutyEffectiveFR ?? (state as any).dutyEffective_FR ?? state.dutyCycle;
     const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
     const tauLCDerived = hull ? Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C : 0.000001;
@@ -3362,6 +4092,9 @@ export function getCurvatureBrick(req: Request, res: Response) {
     const params: Partial<CurvBrickParams> = {
       dims,
       bounds,
+      hullAxes: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+      hullWall: state.hull?.wallThickness_m ?? 0.45,
+      radialMap: radialMap ?? undefined,
       phase01,
       sigmaSector,
       splitEnabled,
@@ -3400,6 +4133,11 @@ export function getCurvatureBrick(req: Request, res: Response) {
     }
 
     const brick = buildCurvatureBrick(params);
+    if (wantsBinary) {
+      const binary = serializeBrickBinary(brick);
+      writeBinaryPayload(res, binary.header, [binary.data, binary.qiMargin]);
+      return;
+    }
     const payload = serializeBrick(brick);
     res.json(payload);
   } catch (err) {
@@ -3415,19 +4153,37 @@ export function getStressEnergyBrick(req: Request, res: Response) {
   res.setHeader("Cache-Control", "no-store");
   try {
     const state = getGlobalPipelineState();
-    const hull = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
     const bounds: StressEnergyBrickParams["bounds"] = {
       min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
       max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
     };
 
     const query = req.method === "GET" ? req.query : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const wantsBinary = wantsBinaryResponse(req, query as Record<string, unknown>);
+    const geometryKindRaw = typeof query.geometryKind === "string" ? query.geometryKind : state.warpGeometryKind;
+    const radialMap = resolveRadialMapForBrick(state, preview, hull, geometryKindRaw);
     const qualityDims = dimsForQuality(typeof query.quality === "string" ? query.quality : undefined);
     const dims = parseDimsParam(query.dims, qualityDims);
-    const phase01 = parseNumberParam(query.phase01, 0);
-    const sigmaSector = parseNumberParam(query.sigmaSector, 0.05);
-    const splitEnabled = parseBooleanParam(query.splitEnabled, false);
-    const splitFrac = parseNumberParam(query.splitFrac, 0.6);
+    const phase01Raw = parseNumberParam(
+      query.phase01,
+      parseNumberParam(state.phase01, 0),
+    );
+    const phase01 = wrap01(phase01Raw);
+    const sigmaSector = parseNumberParam(
+      query.sigmaSector,
+      parseNumberParam((state as any).sigmaSector, 0.05),
+    );
+    const splitEnabled = parseBooleanParam(
+      query.splitEnabled,
+      (state as any).splitEnabled ?? false,
+    );
+    const splitFrac = parseNumberParam(
+      query.splitFrac,
+      parseNumberParam((state as any).splitFrac, 0.6),
+    );
     const dutyFRState = (state as any).dutyEffectiveFR ?? (state as any).dutyEffective_FR ?? state.dutyCycle;
     const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
     const q = parseNumberParam(query.q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
@@ -3442,6 +4198,9 @@ export function getStressEnergyBrick(req: Request, res: Response) {
     const params: Partial<StressEnergyBrickParams> = {
       dims,
       bounds,
+      hullAxes: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+      hullWall: state.hull?.wallThickness_m ?? 0.45,
+      radialMap: radialMap ?? undefined,
       phase01,
       sigmaSector,
       splitEnabled,
@@ -3456,6 +4215,11 @@ export function getStressEnergyBrick(req: Request, res: Response) {
     };
 
     const brick = buildStressEnergyBrick(params);
+    if (wantsBinary) {
+      const binary = serializeStressEnergyBrickBinary(brick);
+      writeBinaryPayload(res, binary.header, binary.buffers);
+      return;
+    }
     const payload = serializeStressEnergyBrick(brick);
     res.json(payload);
   } catch (err) {
@@ -3465,6 +4229,1451 @@ export function getStressEnergyBrick(req: Request, res: Response) {
   }
 }
 
+export function getCasimirTileSummary(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? {
+      Lx_m: 1007,
+      Ly_m: 264,
+      Lz_m: 173,
+      wallThickness_m: 0.45,
+    };
+    const bounds: StressEnergyBrickParams["bounds"] = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+    };
+
+    const query = req.method === "GET"
+      ? req.query
+      : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const dimsRaw = parseDimsParam(query.dims, [32, 32, 32]);
+    const dims = clampDimsToQuality(dimsRaw, [96, 96, 96]);
+    const geometryKindRaw =
+      typeof query.geometryKind === "string" ? query.geometryKind : state.warpGeometryKind;
+    const radialMap = resolveRadialMapForBrick(state, preview, hull, geometryKindRaw);
+
+    const phase01 = wrap01(parseNumberParam(state.phase01, 0));
+    const sigmaSector = Math.max(
+      0,
+      parseNumberParam((state as any).sigmaSector, 0.05),
+    );
+    const splitEnabled = (state as any).splitEnabled ?? false;
+    const splitFrac = clamp01(parseNumberParam((state as any).splitFrac, 0.6));
+    const dutyFRState =
+      (state as any).dutyEffectiveFR ?? (state as any).dutyEffective_FR ?? state.dutyCycle;
+    const dutyFR = parseNumberParam(dutyFRState, 0.0025);
+    const q = Math.max(0, parseNumberParam(state.qSpoilingFactor, 1));
+    const gammaGeo = Math.max(0, parseNumberParam(state.gammaGeo, 26));
+    const gammaVdB = Math.max(0, parseNumberParam(state.gammaVanDenBroeck, 1e5));
+    const ampBase = parseNumberParam((state as any).ampBase, 0);
+    const zeta = parseNumberParam(state.zeta, 0.84);
+    const overrideDriveDir = parseVec3ParamOptional((query as any).driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
+
+    const params: Partial<StressEnergyBrickParams> = {
+      dims,
+      bounds,
+      hullAxes: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+      hullWall: state.hull?.wallThickness_m ?? 0.45,
+      radialMap: radialMap ?? undefined,
+      phase01,
+      sigmaSector,
+      splitEnabled,
+      splitFrac,
+      dutyFR: Math.max(dutyFR, 1e-8),
+      q: Math.max(q, 1e-6),
+      gammaGeo,
+      gammaVdB,
+      ampBase,
+      zeta,
+      driveDir: driveDir ?? undefined,
+    };
+    const brick = buildStressEnergyBrick(params);
+    const mapping = brick.stats.mapping;
+    const rhoAvg =
+      mapping && Number.isFinite(mapping.rho_avg) ? mapping.rho_avg : null;
+    const divRmsRaw = brick.stats.conservation?.divRms;
+    const divRms = Number.isFinite(divRmsRaw) ? (divRmsRaw as number) : 0;
+    const dutyEffectiveFR = clamp01(parseNumberParam(dutyFRState, 0));
+    const sectorDutyRaw = Number.isFinite(state.dutyBurst)
+      ? state.dutyBurst
+      : Number.isFinite((state as any).localBurstFrac)
+        ? (state as any).localBurstFrac
+        : state.dutyCycle;
+    const sectorDuty = clamp01(parseNumberParam(sectorDutyRaw, 0));
+    const sectorCount = Math.max(
+      1,
+      Math.floor(Number.isFinite(state.sectorCount) ? state.sectorCount : 1),
+    );
+    const strobeHz = Math.max(0, Number(state.strobeHz ?? 0));
+    const tileArea_cm2 = Number.isFinite(state.tileArea_cm2)
+      ? Math.max(0, state.tileArea_cm2 as number)
+      : 0;
+    const N_tiles = Number.isFinite(state.N_tiles)
+      ? Math.max(0, Math.floor(state.N_tiles))
+      : 0;
+    const qSpoil = Number.isFinite(state.qSpoilingFactor)
+      ? Math.max(0, state.qSpoilingFactor as number)
+      : 0;
+    const voxelSize_m: Vec3 = [
+      (bounds.max[0] - bounds.min[0]) / Math.max(1, dims[0]),
+      (bounds.max[1] - bounds.min[1]) / Math.max(1, dims[1]),
+      (bounds.max[2] - bounds.min[2]) / Math.max(1, dims[2]),
+    ];
+
+    const payload = {
+      kind: "casimir-tile-summary",
+      updatedAt: Date.now(),
+      source: {
+        brick: "stress-energy-brick",
+        proxy: mapping?.proxy ?? true,
+      },
+      sample: {
+        dims,
+        bounds,
+        voxelSize_m,
+      },
+      inputs: {
+        sectorCount,
+        sectorDuty,
+        strobeHz,
+        phase01,
+        splitEnabled,
+        splitFrac,
+        sigmaSector,
+        N_tiles,
+        tileArea_cm2,
+        gammaGeo,
+        gammaVdB,
+        qSpoil,
+      },
+      summary: {
+        dutyEffectiveFR,
+        rho_avg: rhoAvg,
+        T00_min: brick.channels.t00.min,
+        T00_max: brick.channels.t00.max,
+        netFlux: brick.stats.netFlux,
+        divRms,
+        strobePhase: brick.stats.strobePhase,
+      },
+    };
+
+    const parsed = casimirTileSummarySchema.parse(payload);
+    res.json(parsed);
+  } catch (err) {
+    console.error("[helix-core] casimir tile summary error:", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to build Casimir tile summary";
+    res.status(500).json({ error: "casimir-tile-summary-failed", message });
+  }
+}
+
+export function getLapseBrick(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
+    const bounds: LapseBrickParams["bounds"] = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+    };
+
+    const query = req.method === "GET" ? req.query : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const wantsBinary = wantsBinaryResponse(req, query as Record<string, unknown>);
+    const geometryKindRaw = typeof query.geometryKind === "string" ? query.geometryKind : state.warpGeometryKind;
+    const radialMap = resolveRadialMapForBrick(state, preview, hull, geometryKindRaw);
+
+    const quality = typeof query.quality === "string" ? query.quality : undefined;
+    const qualityDims = dimsForQuality(quality);
+    const dims = parseDimsParam(query.dims, qualityDims);
+    const phase01Raw = parseNumberParam(
+      query.phase01,
+      parseNumberParam(state.phase01, 0),
+    );
+    const phase01 = wrap01(phase01Raw);
+    const sigmaSector = parseNumberParam(
+      query.sigmaSector,
+      parseNumberParam((state as any).sigmaSector, 0.05),
+    );
+    const splitEnabled = parseBooleanParam(
+      query.splitEnabled,
+      (state as any).splitEnabled ?? false,
+    );
+    const splitFrac = parseNumberParam(
+      query.splitFrac,
+      parseNumberParam((state as any).splitFrac, 0.6),
+    );
+    const dutyFRState = (state as any).dutyEffectiveFR ?? (state as any).dutyEffective_FR ?? state.dutyCycle;
+    const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
+    const q = parseNumberParam(query.q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
+    const gammaGeo = parseNumberParam(query.gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
+    const gammaVdB = parseNumberParam(query.gammaVdB ?? state.gammaVanDenBroeck, state.gammaVanDenBroeck ?? 1e5);
+    const ampBase = parseNumberParam(query.ampBase, 0);
+    const zeta = parseNumberParam(query.zeta, 0.84);
+    const iterations = Math.max(0, Math.floor(parseNumberParam(query.iterations, iterationsForQuality(quality))));
+    const tolerance = Math.max(0, parseNumberParam(query.tolerance, 0));
+
+    const overrideDriveDir = parseVec3ParamOptional(query.driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
+
+    const params: Partial<LapseBrickParams> = {
+      dims,
+      bounds,
+      hullAxes: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+      hullWall: state.hull?.wallThickness_m ?? 0.45,
+      radialMap: radialMap ?? undefined,
+      phase01,
+      sigmaSector,
+      splitEnabled,
+      splitFrac,
+      dutyFR: Math.max(dutyFR, 1e-8),
+      q: Math.max(q, 1e-6),
+      gammaGeo,
+      gammaVdB,
+      ampBase,
+      zeta,
+      driveDir: driveDir ?? undefined,
+      iterations,
+      tolerance,
+    };
+
+    const brick = buildLapseBrick(params);
+    if (wantsBinary) {
+      const binary = serializeLapseBrickBinary(brick);
+      writeBinaryPayload(res, binary.header, binary.buffers);
+      return;
+    }
+    const payload = serializeLapseBrick(brick);
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] lapse brick error:", err);
+    const message = err instanceof Error ? err.message : "Failed to build lapse brick";
+    res.status(500).json({ error: message });
+  }
+}
+
+export function getGrRequest(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
+    const bounds = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2] as Vec3,
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2] as Vec3,
+    };
+
+    const query = req.method === "GET"
+      ? req.query
+      : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const quality = typeof query.quality === "string" ? query.quality : undefined;
+    const qualityDims = dimsForQuality(quality);
+    const dimsRaw = parseDimsParam(query.dims, qualityDims);
+    const dimsCap = dimsCapForQuality(quality);
+    const dims = clampDimsToQuality(dimsRaw, dimsCap);
+
+    const inputs = state.grRequest ?? buildGrRequestPayload(state);
+    res.json({
+      kind: "gr-request",
+      grid: { dims, bounds, ...(quality ? { quality } : {}) },
+      inputs,
+    });
+  } catch (err) {
+    console.error("[helix-core] gr request error:", err);
+    const message = err instanceof Error ? err.message : "Failed to build gr request payload";
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function getGrInitialBrick(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
+    const bounds: GrInitialBrickParams["bounds"] = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+    };
+
+    const query = req.method === "GET" ? req.query : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const wantsBinary = wantsBinaryResponse(req, query as Record<string, unknown>);
+    const geometryKindRaw = typeof query.geometryKind === "string" ? query.geometryKind : state.warpGeometryKind;
+    const radialMap = resolveRadialMapForBrick(state, preview, hull, geometryKindRaw);
+
+    const quality = typeof query.quality === "string" ? query.quality : undefined;
+    const qualityDims = dimsForQuality(quality);
+    const dimsRaw = parseDimsParam(query.dims, qualityDims);
+    const dimsCap = dimsCapForQuality(quality);
+    const dims = clampDimsToQuality(dimsRaw, dimsCap);
+    const phase01 = parseNumberParam(query.phase01, 0);
+    const sigmaSector = parseNumberParam(query.sigmaSector, 0.05);
+    const splitEnabled = parseBooleanParam(query.splitEnabled, false);
+    const splitFrac = parseNumberParam(query.splitFrac, 0.6);
+    const dutyFRState =
+      (state as any).dutyEffectiveFR ??
+      (state as any).dutyEffective_FR ??
+      state.dutyCycle;
+    const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
+    const q = parseNumberParam(query.q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
+    const gammaGeo = parseNumberParam(query.gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
+    const gammaVdB = parseNumberParam(
+      query.gammaVdB ?? state.gammaVanDenBroeck,
+      state.gammaVanDenBroeck ?? 1e5,
+    );
+    const ampBase = parseNumberParam(query.ampBase, 0);
+    const zeta = parseNumberParam(query.zeta, 0.84);
+    const iterations = Math.max(
+      0,
+      Math.floor(parseNumberParam(query.iterations, iterationsForQuality(quality))),
+    );
+    const tolerance = Math.max(0, parseNumberParam(query.tolerance, 0));
+    const includeExtra = parseBooleanParam(query.includeExtra, false);
+    const includeMatter = parseBooleanParam(query.includeMatter, includeExtra);
+    const includeKij = parseBooleanParam(query.includeKij, includeExtra);
+
+    const overrideDriveDir = parseVec3ParamOptional(query.driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);     
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);    
+
+    const hullAxes: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];       
+    const hullWall = state.hull?.wallThickness_m ?? 0.45;
+    const dutyFRValue = Math.max(dutyFR, 1e-8);
+    const qValue = Math.max(q, 1e-6);
+    const pressureFactor = resolveStressEnergyPressureFactor(state);
+    const sourceOptions =
+      pressureFactor !== undefined ? { pressureFactor } : undefined;
+
+    const sourceParams: Partial<StressEnergyBrickParams> = {
+      dims,
+      bounds,
+      hullAxes,
+      hullWall,
+      radialMap: radialMap ?? undefined,
+      phase01,
+      sigmaSector,
+      splitEnabled,
+      splitFrac,
+      dutyFR: dutyFRValue,
+      q: qValue,
+      gammaGeo,
+      gammaVdB,
+      ampBase,
+      zeta,
+      driveDir: driveDir ?? undefined,
+    };
+
+    const geometrySig = buildGrGeometrySignature(resolved, state, geometryKindRaw);
+    const sourceCacheKey = {
+      phase01,
+      sigmaSector,
+      splitEnabled,
+      splitFrac,
+      dutyFR: dutyFRValue,
+      q: qValue,
+      gammaGeo,
+      gammaVdB,
+      ampBase,
+      zeta,
+      pressureFactor: pressureFactor ?? null,
+      driveDir: driveDir ?? null,
+      hullAxes,
+      hullWall,
+    };
+    const cacheKey = JSON.stringify({
+      dims,
+      bounds,
+      iterations,
+      tolerance,
+      includeExtra,
+      includeMatter,
+      includeKij,
+      source: sourceCacheKey,
+      geometry: geometrySig,
+    });
+
+    const initialParams: Partial<GrInitialBrickParams> = {
+      dims,
+      bounds,
+      iterations,
+      tolerance,
+      includeExtra,
+      includeMatter,
+      includeKij,
+      sourceParams,
+      sourceOptions,
+    };
+
+    const cached = readGrBrickCache(grInitialCache, cacheKey);
+    let initialBrick = cached?.brick;
+    if (!initialBrick) {
+      if (isGrWorkerEnabled()) {
+        try {
+          initialBrick = await runGrInitialBrickInWorker(initialParams);
+        } catch (err) {
+          console.warn("[helix-core] gr-initial worker failed:", err);
+        }
+      }
+      if (!initialBrick) {
+        initialBrick = buildGrInitialBrick(initialParams);
+      }
+      writeGrBrickCache(grInitialCache, {
+        key: cacheKey,
+        createdAt: Date.now(),
+        brick: initialBrick,
+      });
+    }
+
+    if (initialBrick.stats.status === "NOT_CERTIFIED") {
+      const fallback = buildLapseBrick({
+        ...sourceParams,
+        iterations,
+        tolerance,
+      });
+      const fallbackMeta = {
+        status: "NOT_CERTIFIED",
+        reason: initialBrick.stats.reason ?? "constraint_solve_failed",
+        fallback: "gr-initial-brick",
+      };
+      fallback.meta =
+        fallback.meta && typeof fallback.meta === "object"
+          ? { ...(fallback.meta as Record<string, unknown>), ...fallbackMeta }
+          : fallbackMeta;
+      if (wantsBinary) {
+        const binary = serializeLapseBrickBinary(fallback);
+        writeBinaryPayload(res, binary.header, binary.buffers);
+        return;
+      }
+      const payload = serializeLapseBrick(fallback);
+      res.json(payload);
+      return;
+    }
+
+    if (wantsBinary) {
+      const binary = serializeGrInitialBrickBinary(initialBrick);
+      writeBinaryPayload(res, binary.header, binary.buffers);
+      return;
+    }
+    const payload = serializeGrInitialBrick(initialBrick);
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] gr-initial brick error:", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to build gr-initial brick";
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function getGrEvolveBrick(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 1173, wallThickness_m: 0.45 };
+    const bounds: GrEvolveBrickParams["bounds"] = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+    };
+
+    const query = req.method === "GET" ? req.query : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const wantsBinary = wantsBinaryResponse(req, query as Record<string, unknown>);
+    const quality = typeof query.quality === "string" ? query.quality : undefined;
+    const qualityDims = dimsForQuality(quality);
+    const dimsRaw = parseDimsParam(query.dims, qualityDims);
+    const dimsCap = dimsCapForQuality(quality);
+    const dims = clampDimsToQuality(dimsRaw, dimsCap);
+    const time_s = parseNumberParam(query.time_s, parseNumberParam(query.time, 0));
+    const dt_s = parseNumberParam(query.dt_s, parseNumberParam(query.dt, 0));
+    const stepsRaw = Math.max(0, Math.floor(parseNumberParam(query.steps, 0)));
+    const steps = clampStepsToQuality(stepsRaw, stepsForQuality(quality));
+    const iterations = Math.max(
+      0,
+      Math.floor(parseNumberParam(query.iterations, iterationsForQuality(quality))),
+    );
+    const tolerance = Math.max(0, parseNumberParam(query.tolerance, 0));
+    const initialIterations = Math.max(
+      0,
+      Math.floor(parseNumberParam(query.initialIterations, iterations)),
+    );
+    const initialTolerance = Math.max(
+      0,
+      parseNumberParam(query.initialTolerance, tolerance),
+    );
+    const lapseKappa = Math.max(
+      0,
+      parseNumberParam(query.kappa, parseNumberParam(query.lapseKappa, 2)),
+    );
+    const shiftEta = Math.max(
+      0,
+      parseNumberParam(query.eta, parseNumberParam(query.shiftEta, 1)),
+    );
+    const shiftGamma = Math.max(
+      0,
+      parseNumberParam(query.shiftGamma, 0.75),
+    );
+    const advect = parseBooleanParam(query.advect, true);
+    const includeExtra = parseBooleanParam(query.includeExtra, false);
+    const includeMatter = parseBooleanParam(query.includeMatter, includeExtra);
+    const includeKij = parseBooleanParam(query.includeKij, includeExtra);
+    const orderRaw = Math.max(2, Math.floor(parseNumberParam(query.order, 2)));
+    const order = orderRaw >= 4 ? 4 : 2;
+    const boundaryRaw =
+      typeof query.boundary === "string"
+        ? query.boundary
+        : typeof query.stencilBoundary === "string"
+          ? query.stencilBoundary
+          : undefined;
+    const boundary = boundaryRaw === "periodic" ? "periodic" : "clamp";
+
+    const pipelineInputs = resolvePipelineMatterInputs(state);
+    const hullAxes: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];
+    const hullWall = state.hull?.wallThickness_m ?? 0.45;
+    const dutyFRValue = Math.max(pipelineInputs.dutyFR, 1e-8);
+    const qValue = Math.max(pipelineInputs.q, 1e-6);
+    const pressureFactor = resolveStressEnergyPressureFactor(state);
+    const sourceOptions =
+      pressureFactor !== undefined ? { pressureFactor } : undefined;
+    const sourceParams: Partial<StressEnergyBrickParams> = {
+      bounds,
+      hullAxes,
+      hullWall,
+      dutyFR: dutyFRValue,
+      q: qValue,
+      gammaGeo: pipelineInputs.gammaGeo,
+      gammaVdB: pipelineInputs.gammaVdB,
+      zeta: pipelineInputs.zeta,
+      phase01: pipelineInputs.phase01,
+    };
+    const sourceCacheKey = {
+      dutyFR: dutyFRValue,
+      q: qValue,
+      gammaGeo: pipelineInputs.gammaGeo,
+      gammaVdB: pipelineInputs.gammaVdB,
+      zeta: pipelineInputs.zeta,
+      phase01: pipelineInputs.phase01,
+      pressureFactor: pressureFactor ?? null,
+      hullAxes,
+      hullWall,
+    };
+    const geometrySig = buildGrGeometrySignature(
+      resolved,
+      state,
+      typeof state.warpGeometryKind === "string" ? state.warpGeometryKind : null,
+    );
+
+    const params: Partial<GrEvolveBrickParams> = {
+      dims,
+      bounds,
+      time_s,
+      dt_s,
+      steps,
+      iterations,
+      tolerance,
+      useInitialData: true,
+      initialIterations,
+      initialTolerance,
+      gauge: {
+        lapseKappa,
+        shiftEta,
+        shiftGamma,
+        advect,
+      },
+      stencils: {
+        order,
+        boundary,
+      },
+      includeExtra,
+      includeMatter,
+      includeKij,
+      sourceParams,
+      sourceOptions,
+    };
+
+    const cacheKey = JSON.stringify({
+      dims,
+      bounds,
+      time_s,
+      dt_s,
+      steps,
+      iterations,
+      tolerance,
+      useInitialData: true,
+      initialIterations,
+      initialTolerance,
+      gauge: {
+        lapseKappa,
+        shiftEta,
+        shiftGamma,
+        advect,
+      },
+      stencils: {
+        order,
+        boundary,
+      },
+      includeExtra,
+      includeMatter,
+      includeKij,
+      grEnabled: state.grEnabled === true,
+      source: sourceCacheKey,
+      geometry: geometrySig,
+    });
+
+    const cached = readGrBrickCache(grEvolveCache, cacheKey);
+    let brick = cached?.brick;
+    if (!brick) {
+      if (isGrWorkerEnabled()) {
+        try {
+          brick = await runGrEvolveBrickInWorker(params);
+        } catch (err) {
+          console.warn("[helix-core] gr-evolve worker failed:", err);
+        }
+      }
+      if (!brick) {
+        brick = buildGrEvolveBrick(params);
+      }
+      writeGrBrickCache(grEvolveCache, {
+        key: cacheKey,
+        createdAt: Date.now(),
+        brick,
+      });
+    }
+
+    if (state.grEnabled === true) {
+      state.gr = buildGrDiagnostics(brick);
+    }
+    if (wantsBinary) {
+      const binary = serializeGrEvolveBrickBinary(brick);
+      writeBinaryPayload(res, binary.header, binary.buffers);
+      return;
+    }
+    const payload = serializeGrEvolveBrick(brick);
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] gr evolve brick error:", err);
+    const message = err instanceof Error ? err.message : "Failed to build GR evolve brick";
+    if (message.includes("GR initial data not certified")) {
+      res.status(409).json({ error: "gr-initial-not-certified", message });
+      return;
+    }
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function getGrRegionStats(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? {
+      Lx_m: 1007,
+      Ly_m: 264,
+      Lz_m: 173,
+      wallThickness_m: 0.45,
+    };
+    const bounds: { min: Vec3; max: Vec3 } = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+    };
+
+    const query = req.method === "GET"
+      ? req.query
+      : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+
+    const quality = typeof query.quality === "string" ? query.quality : undefined;
+    const qualityDims = dimsForQuality(quality);
+    const dimsRaw = parseDimsParam(query.dims, qualityDims);
+    const dimsCap = dimsCapForQuality(quality);
+    const dims = clampDimsToQuality(dimsRaw, dimsCap);
+
+    const geometryKindRaw =
+      typeof query.geometryKind === "string" ? query.geometryKind : state.warpGeometryKind;
+    const radialResolved = resolveRadialMapWithSource(state, preview, hull, geometryKindRaw);
+
+    const pipelineInputs = resolvePipelineMatterInputs(state);
+    const phase01Raw = num((query as any).phase01);
+    const phase01Value = wrap01(
+      Number.isFinite(phase01Raw) ? (phase01Raw as number) : pipelineInputs.phase01,
+    );
+    const targetRegionsRaw = num((query as any).targetRegions);
+    const targetRegions =
+      Number.isFinite(targetRegionsRaw) && (targetRegionsRaw as number) > 0
+        ? Math.floor(targetRegionsRaw as number)
+        : Math.max(1, Math.floor(num((state as any)?.sectorCount) ?? 400));
+    const thetaBins = num((query as any).thetaBins);
+    const longBins = num((query as any).longBins);
+    const phaseBins = num((query as any).phaseBins);
+    const radialBins = num((query as any).radialBins);
+    const longAxisRaw = typeof (query as any).longAxis === "string" ? (query as any).longAxis : undefined;
+    const longAxis = longAxisRaw === "y" || longAxisRaw === "z" ? longAxisRaw : "x";
+
+    const strobeHz = num((query as any).strobeHz) ?? num((state as any)?.strobeHz) ?? NaN;
+    const sectorPeriodMs =
+      num((query as any).sectorPeriod_ms) ??
+      num((query as any).sectorPeriodMs) ??
+      num((state as any)?.sectorPeriod_ms) ??
+      num((state as any)?.lightCrossing?.dwell_ms) ??
+      NaN;
+    const sectorPeriod_s =
+      num((query as any).sectorPeriod_s) ??
+      (Number.isFinite(sectorPeriodMs) ? (sectorPeriodMs as number) / 1000 : NaN);
+
+    const grid = resolveRegionGridConfig({
+      hull,
+      strobeHz: Number.isFinite(strobeHz) ? (strobeHz as number) : NaN,
+      sectorPeriod_s: Number.isFinite(sectorPeriod_s) ? (sectorPeriod_s as number) : NaN,
+      targetRegions,
+      thetaBins: Number.isFinite(thetaBins as number) ? (thetaBins as number) : undefined,
+      longBins: Number.isFinite(longBins as number) ? (longBins as number) : undefined,
+      phaseBins: Number.isFinite(phaseBins as number) ? (phaseBins as number) : undefined,
+      radialBins: Number.isFinite(radialBins as number) ? (radialBins as number) : undefined,
+      longAxis,
+      phase01: phase01Value,
+    });
+
+    const topN = clampInt(num((query as any).topN) ?? 8, 1, 50);
+    const maxVoxels = clampInt(num((query as any).maxVoxels) ?? 2_000_000, 1, 100_000_000);
+
+    const sourceRaw = typeof (query as any).source === "string" ? (query as any).source : "auto";
+    const source = sourceRaw === "gr" || sourceRaw === "stress" ? sourceRaw : "auto";
+    const requireCertified = parseBooleanParam((query as any).requireCertified, false);
+
+    let rho: Float32Array | null = null;
+    let detGamma: Float32Array | null = null;
+    let sourceBrick: "gr-evolve-brick" | "stress-energy-brick" | "missing" = "missing";
+    let proxy = true;
+    let certified: boolean | undefined = undefined;
+    const notes: string[] = [];
+
+    const hullAxes: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];
+    const hullWall = state.hull?.wallThickness_m ?? 0.45;
+
+    if (source !== "stress") {
+      try {
+        const time_s = parseNumberParam((query as any).time_s, parseNumberParam((query as any).time, 0));
+        const dt_s = parseNumberParam((query as any).dt_s, parseNumberParam((query as any).dt, 0));
+        const stepsRaw = Math.max(0, Math.floor(parseNumberParam((query as any).steps, 0)));
+        const steps = clampStepsToQuality(stepsRaw, stepsForQuality(quality));
+        const iterations = Math.max(
+          0,
+          Math.floor(parseNumberParam((query as any).iterations, iterationsForQuality(quality))),
+        );
+        const tolerance = Math.max(0, parseNumberParam((query as any).tolerance, 0));
+        const initialIterations = Math.max(
+          0,
+          Math.floor(parseNumberParam((query as any).initialIterations, iterations)),
+        );
+        const initialTolerance = Math.max(
+          0,
+          parseNumberParam((query as any).initialTolerance, tolerance),
+        );
+        const lapseKappa = Math.max(
+          0,
+          parseNumberParam((query as any).kappa, parseNumberParam((query as any).lapseKappa, 2)),
+        );
+        const shiftEta = Math.max(
+          0,
+          parseNumberParam((query as any).eta, parseNumberParam((query as any).shiftEta, 1)),
+        );
+        const shiftGamma = Math.max(0, parseNumberParam((query as any).shiftGamma, 0.75));
+        const advect = parseBooleanParam((query as any).advect, true);
+        const orderRaw = Math.max(2, Math.floor(parseNumberParam((query as any).order, 2)));
+        const order = orderRaw >= 4 ? 4 : 2;
+        const boundaryRaw =
+          typeof (query as any).boundary === "string"
+            ? (query as any).boundary
+            : typeof (query as any).stencilBoundary === "string"
+              ? (query as any).stencilBoundary
+              : undefined;
+        const boundary = boundaryRaw === "periodic" ? "periodic" : "clamp";
+
+        const dutyFRValue = Math.max(pipelineInputs.dutyFR, 1e-8);
+        const qValue = Math.max(pipelineInputs.q, 1e-6);
+        const pressureFactor = resolveStressEnergyPressureFactor(state);
+        const sourceOptions =
+          pressureFactor !== undefined ? { pressureFactor } : undefined;
+        const sourceParams: Partial<StressEnergyBrickParams> = {
+          bounds,
+          hullAxes,
+          hullWall,
+          dutyFR: dutyFRValue,
+          q: qValue,
+          gammaGeo: pipelineInputs.gammaGeo,
+          gammaVdB: pipelineInputs.gammaVdB,
+          zeta: pipelineInputs.zeta,
+          phase01: phase01Value,
+        };
+        const sourceCacheKey = {
+          dutyFR: dutyFRValue,
+          q: qValue,
+          gammaGeo: pipelineInputs.gammaGeo,
+          gammaVdB: pipelineInputs.gammaVdB,
+          zeta: pipelineInputs.zeta,
+          phase01: phase01Value,
+          pressureFactor: pressureFactor ?? null,
+          hullAxes,
+          hullWall,
+        };
+        const geometrySig = buildGrGeometrySignature(
+          resolved,
+          state,
+          typeof state.warpGeometryKind === "string" ? state.warpGeometryKind : null,
+        );
+
+        const params: Partial<GrEvolveBrickParams> = {
+          dims,
+          bounds,
+          time_s,
+          dt_s,
+          steps,
+          iterations,
+          tolerance,
+          useInitialData: true,
+          initialIterations,
+          initialTolerance,
+          gauge: {
+            lapseKappa,
+            shiftEta,
+            shiftGamma,
+            advect,
+          },
+          stencils: {
+            order,
+            boundary,
+          },
+          includeExtra: false,
+          includeMatter: true,
+          includeKij: false,
+          sourceParams,
+          sourceOptions,
+        };
+
+        const cacheKey = JSON.stringify({
+          dims,
+          bounds,
+          time_s,
+          dt_s,
+          steps,
+          iterations,
+          tolerance,
+          useInitialData: true,
+          initialIterations,
+          initialTolerance,
+          gauge: {
+            lapseKappa,
+            shiftEta,
+            shiftGamma,
+            advect,
+          },
+          stencils: {
+            order,
+            boundary,
+          },
+          includeExtra: false,
+          includeMatter: true,
+          includeKij: false,
+          grEnabled: state.grEnabled === true,
+          source: sourceCacheKey,
+          geometry: geometrySig,
+        });
+
+        const cached = readGrBrickCache(grEvolveCache, cacheKey);
+        let brick = cached?.brick;
+        if (!brick) {
+          if (isGrWorkerEnabled()) {
+            try {
+              brick = await runGrEvolveBrickInWorker(params);
+            } catch (err) {
+              console.warn("[helix-core] gr-region worker failed:", err);
+            }
+          }
+          if (!brick) {
+            brick = buildGrEvolveBrick(params);
+          }
+          writeGrBrickCache(grEvolveCache, {
+            key: cacheKey,
+            createdAt: Date.now(),
+            brick,
+          });
+        }
+
+        const rhoChannel = brick.channels.rho;
+        if (!rhoChannel) {
+          throw new Error("GR evolve brick missing rho channel");
+        }
+        rho = rhoChannel.data;
+        detGamma = brick.channels.det_gamma?.data ?? null;
+        sourceBrick = "gr-evolve-brick";
+        proxy = false;
+        certified = true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const isNotCertified = message.toLowerCase().includes("not certified");
+        notes.push(message);
+        if (source === "gr" && requireCertified && isNotCertified) {
+          res.status(409).json({ error: "gr-initial-not-certified", message });
+          return;
+        }
+      }
+    }
+
+    if (!rho) {
+      const sigmaSector = parseNumberParam((query as any).sigmaSector, 0.05);
+      const splitEnabled = parseBooleanParam((query as any).splitEnabled, false);
+      const splitFrac = parseNumberParam((query as any).splitFrac, 0.6);
+      const dutyFRState =
+        (state as any).dutyEffectiveFR ?? (state as any).dutyEffective_FR ?? state.dutyCycle;
+      const dutyFR = parseNumberParam((query as any).dutyFR, parseNumberParam(dutyFRState, 0.0025));
+      const q = parseNumberParam((query as any).q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
+      const gammaGeo = parseNumberParam((query as any).gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
+      const gammaVdB = parseNumberParam(
+        (query as any).gammaVdB ?? state.gammaVanDenBroeck,
+        state.gammaVanDenBroeck ?? 1e5,
+      );
+      const ampBase = parseNumberParam((query as any).ampBase, 0);
+      const zeta = parseNumberParam((query as any).zeta, 0.84);
+      const overrideDriveDir = parseVec3ParamOptional((query as any).driveDir);
+      const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+      const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
+
+      const params: Partial<StressEnergyBrickParams> = {
+        dims,
+        bounds,
+        hullAxes,
+        hullWall,
+        radialMap: radialResolved.radialMap ?? undefined,
+        phase01: phase01Value,
+        sigmaSector,
+        splitEnabled,
+        splitFrac,
+        dutyFR: Math.max(dutyFR, 1e-8),
+        q: Math.max(q, 1e-6),
+        gammaGeo,
+        gammaVdB,
+        ampBase,
+        zeta,
+        driveDir: driveDir ?? undefined,
+      };
+
+      const brick = buildStressEnergyBrick(params);
+      rho = brick.channels.t00.data;
+      detGamma = null;
+      sourceBrick = "stress-energy-brick";
+      proxy = true;
+    }
+
+    if (!rho) {
+      throw new Error("Missing matter field for region stats");
+    }
+
+    const stats = computeRegionStats({
+      dims,
+      bounds,
+      hullAxes,
+      hullWall,
+      radialMap: radialResolved.radialMap ?? null,
+      rho,
+      detGamma,
+      grid,
+      maxVoxels,
+    });
+
+    const payload: GrRegionStats = {
+      kind: "gr-region-stats",
+      updatedAt: Date.now(),
+      source: {
+        brick: sourceBrick,
+        proxy,
+        certified,
+        ...(notes.length ? { notes } : {}),
+      },
+      geometry: {
+        source: resolved.source,
+        meshHash: resolved.meshHash ?? null,
+        hull: {
+          Lx_m: hull.Lx_m,
+          Ly_m: hull.Ly_m,
+          Lz_m: hull.Lz_m,
+          wallThickness_m: hull.wallThickness_m ?? hullWall,
+        },
+        bounds,
+        radialMap: radialResolved.source,
+      },
+      grid,
+      sample: {
+        dims,
+        voxelSize_m: stats.voxelSize,
+        voxelCount: stats.voxelCount,
+        ...(stats.stride > 1 ? { stride: stats.stride } : {}),
+      },
+      summary: stats.summary,
+      topRegions: stats.topRegions.slice(0, topN),
+    };
+
+    const parsed = grRegionStatsSchema.parse(payload);
+    res.json(parsed);
+  } catch (err) {
+    console.error("[helix-core] gr region stats error:", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to build GR region stats";
+    res.status(500).json({ error: "gr-region-stats-failed", message });
+  }
+}
+
+export async function getGrConstraintNetwork4d(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? {
+      Lx_m: 1007,
+      Ly_m: 264,
+      Lz_m: 173,
+      wallThickness_m: 0.45,
+    };
+    const bounds = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2] as Vec3,
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2] as Vec3,
+    };
+
+    const query = req.method === "GET"
+      ? req.query
+      : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const body =
+      query && typeof query === "object" ? (query as Record<string, unknown>) : {};
+
+    const dimsRaw = parseDimsParam(body.dims, [32, 32, 32]);
+    const dims = clampDimsToQuality(dimsRaw, [128, 128, 128]);
+    const time_s = parseNumberParam(body.time_s, parseNumberParam(body.time, 0));
+    const dt_s = Math.max(0, parseNumberParam(body.dt_s, parseNumberParam(body.dt, 0.01)));
+    const stepsRaw = Math.max(0, Math.floor(parseNumberParam(body.steps, 8)));
+    const steps = clampStepsToQuality(stepsRaw, 128);
+    const initialIterations = Math.max(
+      0,
+      Math.floor(parseNumberParam(body.initialIterations, 80)),
+    );
+    const initialTolerance = Math.max(0, parseNumberParam(body.initialTolerance, 0));
+    const lapseKappa = Math.max(
+      0,
+      parseNumberParam(body.kappa, parseNumberParam(body.lapseKappa, 2)),
+    );
+    const shiftEta = Math.max(
+      0,
+      parseNumberParam(body.eta, parseNumberParam(body.shiftEta, 1)),
+    );
+    const shiftGamma = Math.max(0, parseNumberParam(body.shiftGamma, 0.75));
+    const advect = parseBooleanParam(body.advect, true);
+    const orderRaw = Math.max(2, Math.floor(parseNumberParam(body.order, 2)));
+    const order = orderRaw >= 4 ? 4 : 2;
+    const boundaryRaw =
+      typeof body.boundary === "string"
+        ? body.boundary
+        : typeof body.stencilBoundary === "string"
+          ? body.stencilBoundary
+          : undefined;
+    const boundary = boundaryRaw === "periodic" ? "periodic" : "clamp";
+    const includeSeries = parseBooleanParam(body.includeSeries, true);
+    const unitSystem =
+      typeof body.unitSystem === "string" && body.unitSystem.toLowerCase() === "geometric"
+        ? "geometric"
+        : "SI";
+    const usePipelineMatter = parseBooleanParam(body.usePipelineMatter, true);
+
+    const thresholdsParsed = grConstraintThresholdSchema
+      .partial()
+      .safeParse(body.thresholds);
+    const policyParsed = grConstraintPolicySchema.partial().safeParse(body.policy);
+    const policyBundle = await resolveGrConstraintPolicyBundle({
+      thresholds: thresholdsParsed.success ? thresholdsParsed.data : undefined,
+      policy: policyParsed.success ? policyParsed.data : undefined,
+    });
+
+    const pipelineInputs = resolvePipelineMatterInputs(state);
+    const hullAxes: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];
+    const hullWall = state.hull?.wallThickness_m ?? 0.45;
+    const pressureFactor = resolveStressEnergyPressureFactor(state);
+    const sourceOptions =
+      pressureFactor !== undefined ? { pressureFactor } : undefined;
+    const sourceParams: Partial<StressEnergyBrickParams> = {
+      bounds,
+      hullAxes,
+      hullWall,
+      dutyFR: pipelineInputs.dutyFR,
+      q: pipelineInputs.q,
+      gammaGeo: pipelineInputs.gammaGeo,
+      gammaVdB: pipelineInputs.gammaVdB,
+      zeta: pipelineInputs.zeta,
+      phase01: pipelineInputs.phase01,
+    };
+
+    const result = runGrConstraintNetwork4d({
+      dims,
+      bounds,
+      time_s,
+      dt_s,
+      steps,
+      unitSystem,
+      gauge: {
+        lapseKappa,
+        shiftEta,
+        shiftGamma,
+        advect,
+      },
+      stencils: {
+        order,
+        boundary,
+      },
+      thresholds: policyBundle.gate.thresholds,
+      policy: policyBundle.gate.policy,
+      initialIterations,
+      initialTolerance,
+      includeSeries,
+      usePipelineMatter,
+      sourceParams,
+      sourceOptions,
+    });
+
+    const payload = grConstraintNetworkSchema.parse(result);
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] gr constraint network error:", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to build GR constraint network";
+    res.status(500).json({ error: "gr-constraint-network-failed", message });
+  }
+}
+
+export async function getGrConstraintContract(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const gr = (state as any)?.gr;
+    const warpViability = (state as any)?.warpViability;
+    const certificate = warpViability?.certificate;
+    const integrityOk = warpViability?.integrityOk;
+    const certPayload = certificate?.payload;
+    const policyBundle = await resolveGrConstraintPolicyBundle();
+    type CertConstraint = {
+      id: string;
+      passed: boolean;
+      lhs?: number;
+      rhs?: number;
+      note?: string;
+      details?: string;
+    };
+    const certConstraints: CertConstraint[] = Array.isArray(certPayload?.constraints)
+      ? (certPayload.constraints as CertConstraint[])
+      : [];
+    const findCertConstraint = (id: string) =>
+      certConstraints.find((constraint) => constraint.id === id);
+    const firstFinite = (...values: Array<unknown>): number | null => {
+      for (const value of values) {
+        const num = typeof value === "number" ? value : Number(value);
+        if (Number.isFinite(num)) return num;
+      }
+      return null;
+    };
+
+    const zetaValue = firstFinite(
+      (state as any)?.zetaRaw,
+      (state as any)?.zeta,
+      (state as any)?.qiAutoscale?.rawZeta,
+      (state as any)?.qiAutoscale?.zeta,
+    );
+    const thetaCal = firstFinite((state as any)?.thetaCal);
+    const tsRatio = firstFinite(
+      (state as any)?.TS_ratio,
+      (state as any)?.TS_long,
+      (state as any)?.TS_geom,
+    );
+    const gammaVdB = firstFinite(
+      (state as any)?.gammaVanDenBroeck,
+      (state as any)?.gammaVdB,
+    );
+
+    const tsLimit = 1.5;
+    const tsStatus = tsRatio === null ? "unknown" : tsRatio >= tsLimit ? "pass" : "fail";
+
+    type GuardrailsState = NonNullable<GrConstraintContract["guardrails"]>;
+    const guardrails: GuardrailsState = {
+      fordRoman: zetaValue === null ? "missing" : "proxy",
+      thetaAudit: thetaCal === null ? "missing" : "proxy",
+      tsRatio: tsRatio === null ? "missing" : tsRatio >= tsLimit ? "ok" : "fail",
+      vdbBand: gammaVdB === null ? "missing" : "proxy",
+    };
+
+    const constraints: GrConstraintContract["constraints"] = [];
+    const notes: string[] = [];
+    const gateEval = evaluateGrConstraintGateFromDiagnostics(
+      gr?.constraints ?? null,
+      {
+        thresholds: policyBundle.gate.thresholds,
+        policy: policyBundle.gate.policy,
+      },
+    );
+    constraints.push(...gateEval.constraints);
+    if (gateEval.notes.length) {
+      notes.push(...gateEval.notes);
+    }
+    const pushConstraint = (entry: GrConstraintContract["constraints"][number]) => {
+      constraints.push(entry);
+    };
+
+    pushConstraint({
+      id: "FordRomanQI",
+      severity: "HARD",
+      status: "unknown",
+      limit: "int_T00_dt >= -K / tau^4",
+      ...(zetaValue !== null ? { value: zetaValue } : {}),
+      proxy: true,
+      note:
+        zetaValue === null
+          ? "Missing zeta/qi metric; cannot evaluate."
+          : "Proxy: using zeta margin ratio.",
+    });
+    pushConstraint({
+      id: "ThetaAudit",
+      severity: "HARD",
+      status: "unknown",
+      limit: "|thetaCal| <= theta_max",
+      ...(thetaCal !== null ? { value: thetaCal } : {}),
+      proxy: true,
+      note:
+        thetaCal === null
+          ? "Missing thetaCal; cannot evaluate."
+          : "Proxy: threshold not configured.",
+    });
+    pushConstraint({
+      id: "TS_ratio_min",
+      severity: "SOFT",
+      status: tsStatus,
+      limit: ">= 1.5",
+      ...(tsRatio !== null ? { value: tsRatio } : {}),
+      ...(tsRatio === null ? { note: "Missing TS_ratio; cannot evaluate." } : {}),
+    });
+    pushConstraint({
+      id: "VdB_band",
+      severity: "SOFT",
+      status: "unknown",
+      limit: "gamma_VdB in [gamma_min, gamma_max]",
+      ...(gammaVdB !== null ? { value: gammaVdB } : {}),
+      proxy: true,
+      note:
+        gammaVdB === null
+          ? "Missing gamma_VdB; cannot evaluate."
+          : "Proxy: band not configured.",
+    });
+
+    const certAvailable = Boolean(certificate) && integrityOk !== false;
+    if (certificate && integrityOk === false) {
+      notes.push("Warp viability certificate integrity check failed; treat as NOT_CERTIFIED.");
+    }
+    if (!certAvailable && policyBundle.certificate.treatMissingCertificateAsNotCertified) {
+      notes.push("Warp viability certificate missing; policy requires certification.");
+    }
+    if (!gr) {
+      notes.push("No GR diagnostics attached; run gr-evolve-brick with grEnabled=true.");
+    }
+    if (certAvailable && certConstraints.length) {
+      const applyCertificate = (
+        entry: GrConstraintContract["constraints"][number],
+      ): GrConstraintContract["constraints"][number] => {
+        const cert = findCertConstraint(entry.id);
+        if (!cert) return entry;
+        const value = Number.isFinite(cert.lhs) ? (cert.lhs as number) : entry.value;
+        const note = cert.note ?? cert.details ?? entry.note;
+        const status: GrConstraintContract["constraints"][number]["status"] =
+          cert.passed ? "pass" : "fail";
+        return {
+          ...entry,
+          status,
+          ...(value !== undefined ? { value } : {}),
+          proxy: false,
+          ...(note ? { note } : {}),
+        };
+      };
+      for (let i = 0; i < constraints.length; i += 1) {
+        constraints[i] = applyCertificate(constraints[i]);
+      }
+      const guardrailById: Record<string, keyof GuardrailsState> = {
+        FordRomanQI: "fordRoman",
+        ThetaAudit: "thetaAudit",
+        TS_ratio_min: "tsRatio",
+        VdB_band: "vdbBand",
+      };
+      for (const [id, key] of Object.entries(guardrailById)) {
+        const cert = findCertConstraint(id);
+        if (!cert) continue;
+        guardrails[key] = cert.passed ? "ok" : "fail";
+      }
+    }
+
+    if (guardrails.fordRoman === "proxy") {
+      notes.push("FordRomanQI uses proxy zeta; not a full QI integral.");
+    }
+    if (guardrails.thetaAudit === "proxy") {
+      notes.push("ThetaAudit uses thetaCal proxy; threshold not configured.");
+    }
+    if (guardrails.vdbBand === "proxy") {
+      notes.push("VdB band uses gamma_VdB proxy; band not configured.");
+    }
+
+    const grid = gr?.grid && gr?.grid?.bounds
+      ? {
+          dims: gr.grid.dims,
+          bounds: {
+            min: gr.grid.bounds.min,
+            max: gr.grid.bounds.max,
+          },
+          voxelSize_m: gr.grid.voxelSize_m,
+          time_s: gr.grid.time_s,
+          dt_s: gr.grid.dt_s,
+        }
+      : undefined;
+    const diagnostics = gr?.constraints
+      ? {
+          H_rms: gr.constraints.H_constraint?.rms,
+          M_rms: gr.constraints.M_constraint?.rms,
+          lapseMin: gr.gauge?.lapseMin,
+          lapseMax: gr.gauge?.lapseMax,
+          betaMaxAbs: gr.gauge?.betaMaxAbs,
+        }
+      : undefined;
+    const perf = gr?.perf
+      ? {
+          totalMs: gr.perf.totalMs,
+          evolveMs: gr.perf.evolveMs,
+          brickMs: gr.perf.brickMs,
+          voxels: gr.perf.voxels,
+          channelCount: gr.perf.channelCount,
+          bytesEstimate: gr.perf.bytesEstimate,
+          msPerStep: gr.perf.msPerStep,
+        }
+      : undefined;
+
+    const grSource = gr?.source === "gr-evolve-brick" ? "gr-evolve-brick" : gr ? "pipeline" : "missing";
+    const certificateStatus =
+      certAvailable ? (certPayload?.status ?? warpViability?.status ?? "NOT_CERTIFIED") : "NOT_CERTIFIED";
+    const certificateHash =
+      warpViability?.certificateHash ?? certificate?.certificateHash ?? null;
+    const certificateId =
+      warpViability?.certificateId ?? certificate?.header?.id ?? null;
+    const contract: GrConstraintContract = {
+      kind: "gr-constraint-contract",
+      version: 1,
+      updatedAt: Date.now(),
+      policy: policyBundle,
+      sources: {
+        grDiagnostics: grSource,
+        certificate: certAvailable ? "physics.warp.viability" : "missing",
+      },
+      ...(grid ? { grid } : {}),
+      ...(diagnostics ? { diagnostics } : {}),
+      ...(perf ? { perf } : {}),
+      gate: gateEval.gate,
+      guardrails,
+      constraints,
+      certificate: {
+        status: certificateStatus,
+        admissibleStatus: policyBundle.certificate.admissibleStatus,
+        hasCertificate: certAvailable,
+        certificateHash,
+        certificateId,
+      },
+      notes: notes.length ? notes : undefined,
+      proxy: constraints.some((entry) => entry.proxy),
+    };
+
+    const payload = grConstraintContractSchema.parse(contract);
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] gr constraint contract error:", err);
+    const message = err instanceof Error ? err.message : "Failed to build gr constraint contract";
+    res.status(500).json({ error: "gr-constraint-contract-failed", message });
+  }
+}
+
+export async function getGrEvaluation(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const query = req.method === "GET"
+      ? req.query
+      : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const body =
+      query && typeof query === "object" ? (query as Record<string, unknown>) : {};
+    const warpConfig =
+      (body.warpConfig && typeof body.warpConfig === "object"
+        ? body.warpConfig
+        : body.config && typeof body.config === "object"
+          ? body.config
+          : {}) as WarpConfig;
+    const thresholdsParsed = grConstraintThresholdSchema
+      .partial()
+      .safeParse(body.thresholds);
+    const policyParsed = grConstraintPolicySchema.partial().safeParse(body.policy);
+    const useLiveSnapshot = body.useLiveSnapshot === undefined
+      ? undefined
+      : parseBooleanParam(body.useLiveSnapshot, true);
+
+    const result = await runGrEvaluation({
+      diagnostics: (state as any)?.gr ?? null,
+      warpConfig,
+      thresholds: thresholdsParsed.success ? thresholdsParsed.data : undefined,
+      policy: policyParsed.success ? policyParsed.data : undefined,
+      useLiveSnapshot,
+    });
+
+    state.warpViability = {
+      certificate: result.certificate,
+      certificateHash: result.certificate.certificateHash,
+      certificateId: result.certificate.header?.id ?? null,
+      integrityOk: result.integrityOk,
+      status: result.certificate.payload?.status ?? "NOT_CERTIFIED",
+      constraints: result.certificate.payload?.constraints ?? [],
+      snapshot: result.certificate.payload?.snapshot ?? {},
+      updatedAt: Date.now(),
+    };
+    setGlobalPipelineState(state);
+
+    const payload = grEvaluationSchema.parse(result.evaluation);
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] gr evaluation error:", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to evaluate GR constraints";
+    res.status(500).json({ error: "gr-evaluation-failed", message });
+  }
+}
 export function postCurvatureBrickDebugStamp(req: Request, res: Response) {
   if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
   setCors(res);
@@ -3940,3 +6149,6 @@ export async function getEnergySnapshot(req: Request, res: Response) {
 export const VERSION = "helix-core-debug-0";
 export function noop() { /* noop for debug */ }
 export default { VERSION, noop };
+
+
+

@@ -1,0 +1,36 @@
+{
+  "name": "casimir-cli",
+  "version": "0.1.0",
+  "description": "Casimir verification CLI (adapter run + trace export).",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "casimir",
+    "verification",
+    "agents",
+    "constraints",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "casimir": "./bin/casimir.js",
+    "casimir-verify": "./bin/casimir-verify.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "typescript": "^5.6.3"
+  }
+}

@@ -363,3 +363,30 @@ export function encodeHullDistanceBandWeightsR8(grid: HullDistanceGrid): Uint8Ar
 
   return out;
 }
+
+export function encodeHullDistanceTsdfRG8(grid: HullDistanceGrid): Uint8Array {
+  const dims = grid.dims;
+  const totalVoxels = Math.max(1, dims[0] * dims[1] * dims[2]);
+  const bandRaw = Number(grid.band);
+  const band = Number.isFinite(bandRaw) && bandRaw > 0 ? bandRaw : 1.0;
+  const out = new Uint8Array(totalVoxels * 2);
+  out.fill(255);
+
+  const indices = grid.indices;
+  const distances = grid.distances;
+  const len = Math.min(indices.length, distances.length);
+  for (let i = 0; i < len; i++) {
+    const idx = indices[i];
+    if (idx >= totalVoxels) continue;
+    const distRaw = distances[i];
+    if (!Number.isFinite(distRaw)) continue;
+    const dist = Math.max(-band, Math.min(band, distRaw));
+    const u01 = 0.5 + 0.5 * (dist / band);
+    const q = Math.max(0, Math.min(65535, Math.round(u01 * 65535)));
+    const base = idx * 2;
+    out[base] = (q >> 8) & 255;
+    out[base + 1] = q & 255;
+  }
+
+  return out;
+}

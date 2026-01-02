@@ -4,6 +4,7 @@ import { hullPreviewPayloadSchema, type HullPreviewPayload, type HullPreviewMetr
 
 export const HULL_PREVIEW_STORAGE_KEY = "phoenixHullPreview";
 const PREVIEW_EVENT_NAME = "phoenix-hull-preview";
+const DEFAULT_PREVIEW_GLB_URL = "/luma/Butler.glb";
 
 const toFinite = (value: unknown): number | undefined => {
   const num = typeof value === "number" ? value : Number(value);
@@ -75,13 +76,33 @@ function parsePayload(raw: string | null): HullPreviewPayload | null {
   }
 }
 
+function ensureDefaultPreviewPayload(): HullPreviewPayload | null {
+  if (typeof window === "undefined") return null;
+  const existing = parsePayload(window.localStorage.getItem(HULL_PREVIEW_STORAGE_KEY));
+  if (existing?.glbUrl) return existing;
+  const payload: HullPreviewPayload = {
+    ...(existing ?? {}),
+    version: existing?.version ?? "v1",
+    glbUrl: DEFAULT_PREVIEW_GLB_URL,
+    provenance: existing?.provenance ?? "preview",
+    updatedAt: Number.isFinite(existing?.updatedAt as number) ? (existing?.updatedAt as number) : Date.now(),
+  };
+  try {
+    window.localStorage.setItem(HULL_PREVIEW_STORAGE_KEY, JSON.stringify(payload));
+    window.dispatchEvent(new CustomEvent(PREVIEW_EVENT_NAME));
+  } catch (err) {
+    console.warn("[useHullPreviewPayload] failed to seed default preview payload", err);
+  }
+  return payload;
+}
+
 export function useHullPreviewPayload() {
   const [payload, setPayload] = React.useState<HullPreviewPayload | null>(null);
   const lastTsRef = React.useRef<number>(0);
 
   const refresh = React.useCallback(() => {
     if (typeof window === "undefined") return;
-    const next = parsePayload(window.localStorage.getItem(HULL_PREVIEW_STORAGE_KEY));
+    const next = ensureDefaultPreviewPayload();
     if (!next) return;
     const updatedAt = Number(next.updatedAt ?? 0);
     if (!Number.isFinite(updatedAt) || updatedAt <= lastTsRef.current) return;

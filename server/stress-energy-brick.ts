@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import type { Vec3 } from "./curvature-brick";
+import { resolveHullRadius, type HullRadialMap, type Vec3 } from "./curvature-brick";
 import { getGlobalPipelineState } from "./energy-pipeline";
 import { enhancedAvgEnergyDensity, natarioShiftFromDensity } from "../modules/dynamic/stress-energy-equations.js";
 
@@ -17,6 +17,9 @@ export interface StressEnergyBrickParams {
   ampBase: number;
   zeta: number;
   driveDir?: Vec3 | null;
+  hullAxes?: Vec3;
+  hullWall?: number;
+  radialMap?: HullRadialMap | null;
 }
 
 export interface StressEnergyChannel {
@@ -35,6 +38,8 @@ export interface StressEnergyStats {
   dutyFR: number;
   strobePhase: number;
   natario?: NatarioDiagnostics;
+  conservation?: StressEnergyConservationStats;
+  mapping?: StressEnergyMappingStats;
 }
 
 export interface NatarioDiagnostics {
@@ -42,6 +47,38 @@ export interface NatarioDiagnostics {
   divBetaRms: number;
   gateLimit: number;
   gNatario: number;
+}
+
+export interface StressEnergyConservationStats {
+  divMean: number;
+  divAbsMean: number;
+  divRms: number;
+  divMaxAbs: number;
+  netFluxMagnitude: number;
+  netFluxNorm: number;
+  divRmsNorm: number;
+}
+
+export interface StressEnergyMappingStats {
+  rho_avg: number;
+  rho_inst: number;
+  gap_nm: number;
+  cavityQ: number;
+  qSpoil: number;
+  gammaGeo: number;
+  gammaVdB: number;
+  dutyFR: number;
+  ampBase: number;
+  zeta: number;
+  pressureFactor?: number;
+  pressureSource?: "pipeline" | "proxy" | "override";
+  anisotropyStrength?: number;
+  anisotropyMode?: "flux" | "radial";
+  conservationDamping?: number;
+  conservationNetFlux?: boolean;
+  conservationScale?: number;
+  source?: "pipeline" | "defaults";
+  proxy: boolean;
 }
 
 export interface StressEnergyBrick {
@@ -61,6 +98,7 @@ export interface StressEnergyBrick {
 const EPS = 1e-9;
 const TWO_PI = Math.PI * 2;
 const NATARIO_K_TOL = 1e-6;
+const STRESS_ENERGY_CHANNEL_ORDER = ["t00", "Sx", "Sy", "Sz", "divS"] as const;
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const wrap01 = (value: number) => {
@@ -101,23 +139,6 @@ const defaultHullBounds = () => {
     axes: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2] as Vec3,
     wall: hull.wallThickness_m ?? 0.45,
   };
-};
-
-const ellipsoidRho = (p: Vec3, axes: Vec3) => {
-  const [x, y, z] = p;
-  const [a, b, c] = axes;
-  const nx = x / Math.max(a, 1e-6);
-  const ny = y / Math.max(b, 1e-6);
-  const nz = z / Math.max(c, 1e-6);
-  return Math.hypot(nx, ny, nz);
-};
-
-const ellipsoidRadiusAt = (dir: Vec3, axes: Vec3) => {
-  const [a, b, c] = axes;
-  const [x, y, z] = dir;
-  const denom = (x * x) / (a * a) + (y * y) / (b * b) + (z * z) / (c * c);
-  if (denom <= 0) return Math.max(a, Math.max(b, c));
-  return 1 / Math.sqrt(denom);
 };
 
 const ellipsoidNormal = (pos: Vec3, axesSq: Vec3): Vec3 => {
@@ -309,7 +330,8 @@ const clampNatarioShift = (
 export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>): StressEnergyBrick {
   const defaults = defaultHullBounds();
   const dims: [number, number, number] = input.dims ?? [128, 128, 128];
-  const bounds = input.bounds ?? { min: defaults.min, max: defaults.max };
+  const axes: Vec3 = input.hullAxes ?? defaults.axes;
+  const bounds = input.bounds ?? { min: [-axes[0], -axes[1], -axes[2]], max: [axes[0], axes[1], axes[2]] };
 
   const phase01 = wrap01(input.phase01 ?? 0);
   const sigmaSector = Math.max(input.sigmaSector ?? 0.05, 1e-3);
@@ -330,7 +352,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const dutyEff = dutyFR;
   const qSpoil = Math.max(1e-6, state?.qSpoilingFactor ?? q);
 
-  const { rho_avg } = enhancedAvgEnergyDensity({
+  const { rho_avg, rho_inst } = enhancedAvgEnergyDensity({
     gap_m,
     gammaGeo,
     cavityQ,
@@ -346,13 +368,14 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const dy = (bounds.max[1] - bounds.min[1]) / ny;
   const dz = (bounds.max[2] - bounds.min[2]) / nz;
   const cellVolume = dx * dy * dz;
+  const mappingSource = state ? "pipeline" : "defaults";
 
-  const axes = defaults.axes;
   const axesSq: Vec3 = [axes[0] * axes[0], axes[1] * axes[1], axes[2] * axes[2]];
-  const wallSigma = Math.max(defaults.wall, 0.1);
+  const wallSigma = Math.max(input.hullWall ?? defaults.wall, 0.1);
   const totalVoxels = nx * ny * nz;
   const envelope = new Float32Array(totalVoxels);
   let envelopeSum = 0;
+  const radialMap = input.radialMap ?? null;
 
   const nowSeconds = Date.now() / 1000;
   const strobeHz = Number.isFinite(state?.strobeHz) ? Number(state!.strobeHz) : 1000;
@@ -367,10 +390,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
       for (let x = 0; x < nx; x++) {
         const px = bounds.min[0] + (x + 0.5) * dx;
         const pos: Vec3 = [px, py, pz];
-        const rho = ellipsoidRho(pos, axes);
-        const dir = normalize(pos);
-        const radius = ellipsoidRadiusAt(dir, axes);
-        const centerDist = (rho - 1) * radius;
+        const pLen = Math.hypot(px, py, pz);
+        const dir = pLen > 1e-9 ? ([px / pLen, py / pLen, pz / pLen] as Vec3) : ([0, 0, 0] as Vec3);
+        const radius = resolveHullRadius(dir, axes, radialMap);
+        const centerDist = pLen - radius;
         const wallEnvelope = Math.exp(-0.5 * Math.pow(centerDist / wallSigma, 2));
         const theta = azimuth01(px, pz);
         const sectorEnvelope = computeSectorEnvelope(theta, phase01, { sigma: sigmaSector, splitEnabled, splitFrac });
@@ -408,9 +431,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         if (density > t00Max) t00Max = density;
         sumT00 += density;
 
-        const dir = normalize(pos);
-        const radius = ellipsoidRadiusAt(dir, axes);
-        const normal = ellipsoidNormal(pos, axesSq);
+        const pLen = Math.hypot(px, py, pz);
+        const dir = pLen > 1e-9 ? ([px / pLen, py / pLen, pz / pLen] as Vec3) : ([0, 0, 0] as Vec3);
+        const radius = resolveHullRadius(dir, axes, radialMap);
+        const normal = radialMap ? dir : ellipsoidNormal(pos, axesSq);
         const betaDir = blendDirections(normal, driveDirUnit, 0.32);
         const betaAmp = natarioShiftFromDensity(Math.abs(density), Math.max(radius, 1e-3));
         const sign = density >= 0 ? 1 : -1;
@@ -508,6 +532,9 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const divS = new Float32Array(totalVoxels);
   let divMin = Number.POSITIVE_INFINITY;
   let divMax = Number.NEGATIVE_INFINITY;
+  let divSum = 0;
+  let divAbsSum = 0;
+  let divRmsSum = 0;
   idx = 0;
   for (let z = 0; z < nz; z++) {
     for (let y = 0; y < ny; y++) {
@@ -519,6 +546,9 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         divS[idx] = div;
         if (div < divMin) divMin = div;
         if (div > divMax) divMax = div;
+        divSum += div;
+        divAbsSum += Math.abs(div);
+        divRmsSum += div * div;
         idx += 1;
       }
     }
@@ -540,17 +570,51 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     netFlux[1] / voxelNorm,
     netFlux[2] / voxelNorm,
   ];
+  const avgFluxMagnitude = fluxMagSum / voxelNorm;
+  const divMaxAbs = Math.max(Math.abs(divMin), Math.abs(divMax));
+  const divMean = divSum / voxelNorm;
+  const divAbsMean = divAbsSum / voxelNorm;
+  const divRms = Math.sqrt(divRmsSum / voxelNorm);
+  const netFluxMagnitude = Math.hypot(netFlux[0], netFlux[1], netFlux[2]);
+  const normBase = Math.max(avgFluxMagnitude, EPS);
+  const netFluxNorm = netFluxMagnitude / normBase;
+  const divRmsNorm = divRms / normBase;
 
   const stats: StressEnergyStats = {
     totalEnergy_J: sumT00 * cellVolume,
     avgT00: sumT00 / Math.max(totalVoxels, 1),
-    avgFluxMagnitude: fluxMagSum / Math.max(totalVoxels, 1),
+    avgFluxMagnitude,
     netFlux,
     divMin,
     divMax,
     dutyFR,
     strobePhase,
     natario: natarioDiagnostics,
+    conservation: {
+      divMean: Number.isFinite(divMean) ? divMean : 0,
+      divAbsMean: Number.isFinite(divAbsMean) ? divAbsMean : 0,
+      divRms: Number.isFinite(divRms) ? divRms : 0,
+      divMaxAbs: Number.isFinite(divMaxAbs) ? divMaxAbs : 0,
+      netFluxMagnitude: Number.isFinite(netFluxMagnitude) ? netFluxMagnitude : 0,
+      netFluxNorm: Number.isFinite(netFluxNorm) ? netFluxNorm : 0,
+      divRmsNorm: Number.isFinite(divRmsNorm) ? divRmsNorm : 0,
+    },
+    mapping: {
+      rho_avg,
+      rho_inst,
+      gap_nm: gap_m * 1e9,
+      cavityQ,
+      qSpoil,
+      gammaGeo,
+      gammaVdB,
+      dutyFR,
+      ampBase,
+      zeta,
+      pressureFactor: -1,
+      pressureSource: "proxy",
+      source: mappingSource,
+      proxy: true,
+    },
   };
 
   return {
@@ -588,6 +652,28 @@ export interface StressEnergyBrickResponse {
   stats: StressEnergyStats;
 }
 
+export interface StressEnergyBrickBinaryHeader {
+  kind: "stress-energy-brick";
+  version: 1;
+  dims: [number, number, number];
+  voxelBytes: number;
+  format: "r32f";
+  channelOrder: typeof STRESS_ENERGY_CHANNEL_ORDER;
+  channels: {
+    t00: { min: number; max: number; bytes: number };
+    Sx: { min: number; max: number; bytes: number };
+    Sy: { min: number; max: number; bytes: number };
+    Sz: { min: number; max: number; bytes: number };
+    divS: { min: number; max: number; bytes: number };
+  };
+  stats: StressEnergyStats;
+}
+
+export type StressEnergyBrickBinaryPayload = {
+  header: StressEnergyBrickBinaryHeader;
+  buffers: Buffer[];
+};
+
 export const serializeStressEnergyBrick = (brick: StressEnergyBrick): StressEnergyBrickResponse => ({
   dims: brick.dims,
   voxelBytes: brick.voxelBytes,
@@ -601,3 +687,36 @@ export const serializeStressEnergyBrick = (brick: StressEnergyBrick): StressEner
   },
   stats: brick.stats,
 });
+
+export const serializeStressEnergyBrickBinary = (brick: StressEnergyBrick): StressEnergyBrickBinaryPayload => {
+  const t00 = brick.channels.t00;
+  const Sx = brick.channels.Sx;
+  const Sy = brick.channels.Sy;
+  const Sz = brick.channels.Sz;
+  const divS = brick.channels.divS;
+  return {
+    header: {
+      kind: "stress-energy-brick",
+      version: 1,
+      dims: brick.dims,
+      voxelBytes: brick.voxelBytes,
+      format: brick.format,
+      channelOrder: STRESS_ENERGY_CHANNEL_ORDER,
+      channels: {
+        t00: { min: t00.min, max: t00.max, bytes: t00.data.byteLength },
+        Sx: { min: Sx.min, max: Sx.max, bytes: Sx.data.byteLength },
+        Sy: { min: Sy.min, max: Sy.max, bytes: Sy.data.byteLength },
+        Sz: { min: Sz.min, max: Sz.max, bytes: Sz.data.byteLength },
+        divS: { min: divS.min, max: divS.max, bytes: divS.data.byteLength },
+      },
+      stats: brick.stats,
+    },
+    buffers: [
+      Buffer.from(t00.data.buffer, t00.data.byteOffset, t00.data.byteLength),
+      Buffer.from(Sx.data.buffer, Sx.data.byteOffset, Sx.data.byteLength),
+      Buffer.from(Sy.data.buffer, Sy.data.byteOffset, Sy.data.byteLength),
+      Buffer.from(Sz.data.buffer, Sz.data.byteOffset, Sz.data.byteLength),
+      Buffer.from(divS.data.buffer, divS.data.byteOffset, divS.data.byteLength),
+    ],
+  };
+};

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "description": "Canonical GR agent loop runs that must stay gate-green.",
+  "runs": [
+    {
+      "id": "baseline-hover",
+      "label": "hover baseline",
+      "metrics": {
+        "H_rms": 0.0025,
+        "M_rms": 0.00025,
+        "H_maxAbs": 0.04,
+        "M_maxAbs": 0.0025
+      }
+    },
+    {
+      "id": "baseline-cruise",
+      "label": "cruise steady",
+      "metrics": {
+        "H_rms": 0.006,
+        "M_rms": 0.0006,
+        "H_maxAbs": 0.07,
+        "M_maxAbs": 0.006
+      }
+    },
+    {
+      "id": "baseline-emergency",
+      "label": "emergency fallback",
+      "metrics": {
+        "H_rms": 0.001,
+        "M_rms": 0.00015,
+        "H_maxAbs": 0.02,
+        "M_maxAbs": 0.001
+      }
+    }
+  ]
+}

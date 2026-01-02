@@ -1,4 +1,8 @@
-import { type CardCameraPreset, type CardMeshMetadata } from "@shared/schema";
+import {
+  type CardCameraPreset,
+  type CardMeshMetadata,
+  type SpacetimeGridWarpField,
+} from "@shared/schema";
 import type { HullBasisResolved } from "@shared/hull-basis";
 import type { HullDistanceGrid } from "@/lib/lattice-sdf";
 import type { HullSurfaceVoxelVolume } from "@/lib/lattice-surface";
@@ -7,7 +11,14 @@ import { type StateCreator } from "zustand";
 import { createWithEqualityFn } from "zustand/traditional";
 
 export type HullGateSource = "schedule" | "blanket" | "combined";
-export type HullVolumeViz = "theta_gr" | "rho_gr" | "theta_drive" | "shear_gr" | "vorticity_gr";
+export type HullVolumeViz =
+  | "theta_gr"
+  | "rho_gr"
+  | "theta_drive"
+  | "shear_gr"
+  | "vorticity_gr"
+  | "alpha"
+  | "warp";
 export type HullVolumeDomain = "wallBand" | "bubbleBox";
 export type HullVolumeSource = "analytic" | "lattice" | "brick";
 export type HullQualityPreset = "auto" | "low" | "medium" | "high";
@@ -114,10 +125,14 @@ export interface HullOverlayConfig {
 
 export type HullSpacetimeGridMode = "slice" | "surface" | "volume";
 export type HullSpacetimeGridColorBy = "thetaSign" | "thetaMagnitude" | "warpStrength";
+export type HullSpacetimeGridStyle = "scientific" | "legacyDemo";
 export type HullSpacetimeGridStrengthMode =
   | "manual"
   | "autoThetaPk"
   | "autoThetaScaleExpected";
+export type HullSpacetimeGridBoundsMode = "lattice" | "domain";
+export type HullSpacetimeGridFieldSource = "volume" | "analytic";
+export type HullSpacetimeGridWarpField = SpacetimeGridWarpField;
 
 export interface HullSpacetimeGridPrefs {
   enabled: boolean;
@@ -126,8 +141,24 @@ export interface HullSpacetimeGridPrefs {
   warpStrength: number;
   falloff_m: number;
   colorBy: HullSpacetimeGridColorBy;
+  style?: HullSpacetimeGridStyle;
+  warpField?: HullSpacetimeGridWarpField;
+  warpGamma?: number;
+  useGradientDir?: boolean;
   useSdf: boolean;
   warpStrengthMode: HullSpacetimeGridStrengthMode;
+  signedDisplacement?: boolean;
+  boundsMode?: HullSpacetimeGridBoundsMode;
+  boundsExpand_m?: number;
+  fieldSource?: HullSpacetimeGridFieldSource;
+  legacyPulseEnabled?: boolean;
+  legacyPulseRate?: number;
+  legacyPulseSpatialFreq?: number;
+  legacyPointSize?: number;
+  legacyPaletteMix?: number;
+  legacyContrast?: number;
+  legacyLineAlpha?: number;
+  legacyPointAlpha?: number;
 }
 
 export type HullVoxelSliceAxis = "x" | "y" | "z";
@@ -269,6 +300,14 @@ const clamp01 = (value: number) => clamp(value, 0, 1);
 const SPACETIME_GRID_SPACING_RANGE: [number, number] = [0.05, 5];
 const SPACETIME_GRID_WARP_RANGE: [number, number] = [0, 5];
 const SPACETIME_GRID_FALLOFF_RANGE: [number, number] = [0.05, 6];
+const SPACETIME_GRID_WARP_GAMMA_RANGE: [number, number] = [0.1, 6];
+const LEGACY_PULSE_RATE_RANGE: [number, number] = [0, 6];
+const LEGACY_PULSE_SPATIAL_FREQ_RANGE: [number, number] = [0, 6];
+const LEGACY_POINT_SIZE_RANGE: [number, number] = [1, 24];
+const LEGACY_PALETTE_MIX_RANGE: [number, number] = [0, 1];
+const LEGACY_CONTRAST_RANGE: [number, number] = [0.1, 4];
+const LEGACY_LINE_ALPHA_RANGE: [number, number] = [0, 1];
+const LEGACY_POINT_ALPHA_RANGE: [number, number] = [0, 1];
 
 export const defaultSpacetimeGridPrefsForProfile = (
   profile: HullOverlayPrefProfile
@@ -280,8 +319,21 @@ export const defaultSpacetimeGridPrefsForProfile = (
     warpStrength: 1.0,
     falloff_m: 0.9,
     colorBy: "thetaSign",
+    style: "scientific",
+    warpField: "dfdr",
     useSdf: true,
     warpStrengthMode: "autoThetaPk",
+    warpGamma: 1.4,
+    useGradientDir: true,
+    signedDisplacement: false,
+    legacyPulseEnabled: true,
+    legacyPulseRate: 1.2,
+    legacyPulseSpatialFreq: 1.0,
+    legacyPointSize: 6,
+    legacyPaletteMix: 1.0,
+    legacyContrast: 1.0,
+    legacyLineAlpha: 0.45,
+    legacyPointAlpha: 0.9,
   };
   if (profile === "auto") {
     return {
@@ -343,9 +395,124 @@ const normalizeSpacetimeGridPrefs = (
     candidate.colorBy === "warpStrength"
       ? candidate.colorBy
       : base.colorBy;
+  const warpField =
+    candidate.warpField === "alpha" || candidate.warpField === "dfdr"
+      ? candidate.warpField
+      : base.warpField ?? "dfdr";
+  const style =
+    candidate.style === "legacyDemo" || candidate.style === "scientific"
+      ? candidate.style
+      : base.style ?? "scientific";
+  const warpGammaCandidate = candidate.warpGamma;
+  const warpGammaBase = base.warpGamma;
+  const warpGamma =
+    typeof warpGammaCandidate === "number" && Number.isFinite(warpGammaCandidate)
+      ? clamp(
+          warpGammaCandidate,
+          SPACETIME_GRID_WARP_GAMMA_RANGE[0],
+          SPACETIME_GRID_WARP_GAMMA_RANGE[1]
+        )
+      : typeof warpGammaBase === "number" && Number.isFinite(warpGammaBase)
+        ? clamp(
+            warpGammaBase,
+            SPACETIME_GRID_WARP_GAMMA_RANGE[0],
+            SPACETIME_GRID_WARP_GAMMA_RANGE[1]
+          )
+        : undefined;
+  const useGradientDir =
+    typeof candidate.useGradientDir === "boolean"
+      ? candidate.useGradientDir
+      : typeof base.useGradientDir === "boolean"
+        ? base.useGradientDir
+        : true;
   const spacingCandidate = candidate.spacing_m;
   const warpStrengthCandidate = candidate.warpStrength;
   const falloffCandidate = candidate.falloff_m;
+  const boundsExpandCandidate = candidate.boundsExpand_m;
+  const boundsExpandBase = base.boundsExpand_m;
+  const boundsExpand =
+    typeof boundsExpandCandidate === "number" && Number.isFinite(boundsExpandCandidate)
+      ? Math.max(0, boundsExpandCandidate)
+      : typeof boundsExpandBase === "number" && Number.isFinite(boundsExpandBase)
+        ? Math.max(0, boundsExpandBase)
+        : undefined;
+  const signedDisplacement =
+    typeof candidate.signedDisplacement === "boolean"
+      ? candidate.signedDisplacement
+      : typeof base.signedDisplacement === "boolean"
+        ? base.signedDisplacement
+        : false;
+  const legacyPulseEnabled =
+    typeof candidate.legacyPulseEnabled === "boolean"
+      ? candidate.legacyPulseEnabled
+      : typeof base.legacyPulseEnabled === "boolean"
+        ? base.legacyPulseEnabled
+        : true;
+  const legacyPulseRate = clamp(
+    typeof candidate.legacyPulseRate === "number" && Number.isFinite(candidate.legacyPulseRate)
+      ? candidate.legacyPulseRate
+      : typeof base.legacyPulseRate === "number" && Number.isFinite(base.legacyPulseRate)
+        ? (base.legacyPulseRate as number)
+        : 1.2,
+    LEGACY_PULSE_RATE_RANGE[0],
+    LEGACY_PULSE_RATE_RANGE[1]
+  );
+  const legacyPulseSpatialFreq = clamp(
+    typeof candidate.legacyPulseSpatialFreq === "number" &&
+      Number.isFinite(candidate.legacyPulseSpatialFreq)
+      ? candidate.legacyPulseSpatialFreq
+      : typeof base.legacyPulseSpatialFreq === "number" &&
+          Number.isFinite(base.legacyPulseSpatialFreq)
+        ? (base.legacyPulseSpatialFreq as number)
+        : 1.0,
+    LEGACY_PULSE_SPATIAL_FREQ_RANGE[0],
+    LEGACY_PULSE_SPATIAL_FREQ_RANGE[1]
+  );
+  const legacyPointSize = clamp(
+    typeof candidate.legacyPointSize === "number" && Number.isFinite(candidate.legacyPointSize)
+      ? candidate.legacyPointSize
+      : typeof base.legacyPointSize === "number" && Number.isFinite(base.legacyPointSize)
+        ? (base.legacyPointSize as number)
+        : 6,
+    LEGACY_POINT_SIZE_RANGE[0],
+    LEGACY_POINT_SIZE_RANGE[1]
+  );
+  const legacyPaletteMix = clamp(
+    typeof candidate.legacyPaletteMix === "number" && Number.isFinite(candidate.legacyPaletteMix)
+      ? candidate.legacyPaletteMix
+      : typeof base.legacyPaletteMix === "number" && Number.isFinite(base.legacyPaletteMix)
+        ? (base.legacyPaletteMix as number)
+        : 1.0,
+    LEGACY_PALETTE_MIX_RANGE[0],
+    LEGACY_PALETTE_MIX_RANGE[1]
+  );
+  const legacyContrast = clamp(
+    typeof candidate.legacyContrast === "number" && Number.isFinite(candidate.legacyContrast)
+      ? candidate.legacyContrast
+      : typeof base.legacyContrast === "number" && Number.isFinite(base.legacyContrast)
+        ? (base.legacyContrast as number)
+        : 1.0,
+    LEGACY_CONTRAST_RANGE[0],
+    LEGACY_CONTRAST_RANGE[1]
+  );
+  const legacyLineAlpha = clamp(
+    typeof candidate.legacyLineAlpha === "number" && Number.isFinite(candidate.legacyLineAlpha)
+      ? candidate.legacyLineAlpha
+      : typeof base.legacyLineAlpha === "number" && Number.isFinite(base.legacyLineAlpha)
+        ? (base.legacyLineAlpha as number)
+        : 0.45,
+    LEGACY_LINE_ALPHA_RANGE[0],
+    LEGACY_LINE_ALPHA_RANGE[1]
+  );
+  const legacyPointAlpha = clamp(
+    typeof candidate.legacyPointAlpha === "number" && Number.isFinite(candidate.legacyPointAlpha)
+      ? candidate.legacyPointAlpha
+      : typeof base.legacyPointAlpha === "number" && Number.isFinite(base.legacyPointAlpha)
+        ? (base.legacyPointAlpha as number)
+        : 0.9,
+    LEGACY_POINT_ALPHA_RANGE[0],
+    LEGACY_POINT_ALPHA_RANGE[1]
+  );
   return {
     enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : base.enabled,
     mode,
@@ -371,8 +538,22 @@ const normalizeSpacetimeGridPrefs = (
       SPACETIME_GRID_FALLOFF_RANGE[1]
     ),
     colorBy,
+    style,
+    warpField,
+    warpGamma,
+    useGradientDir,
     useSdf: typeof candidate.useSdf === "boolean" ? candidate.useSdf : base.useSdf,
     warpStrengthMode,
+    signedDisplacement,
+    boundsExpand_m: boundsExpand,
+    legacyPulseEnabled,
+    legacyPulseRate,
+    legacyPulseSpatialFreq,
+    legacyPointSize,
+    legacyPaletteMix,
+    legacyContrast,
+    legacyLineAlpha,
+    legacyPointAlpha,
   };
 };
 

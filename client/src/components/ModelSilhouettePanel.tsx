@@ -31,10 +31,10 @@ type Bounds = {
 type ScaleVec = [number, number, number];
 type HullDims = { Lx_m: number; Ly_m: number; Lz_m: number };
 
-const DEFAULT_MODEL = "/luma/Butler.glb";
+const DEFAULT_MODEL = "/luma/needle-ellipsoid.glb";
 const NEEDLE_HULL_DIMS: HullDims = { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
-const NEEDLE_AXIS_GLTF = "/luma/ellipsoid-12x6x4.glb";
-const NEEDLE_BASIS_GLTF = "/luma/ellipsoid-12x6x4-basis-swapped.glb";
+const NEEDLE_AXIS_GLTF = "/luma/needle-ellipsoid.glb";
+const NEEDLE_BASIS_GLTF = "/luma/needle-ellipsoid-basis-swapped.glb";
 const BASIS_IDENTITY: BasisTransform = {
   swap: { x: "x", y: "y", z: "z" },
   flip: { x: false, y: false, z: false },
@@ -649,7 +649,7 @@ function ModelScene({
 export default function ModelSilhouettePanel() {
   const [urlInput, setUrlInput] = useState<string>(DEFAULT_MODEL);
   const [activeGlbUrl, setActiveGlbUrl] = useState<string>(DEFAULT_MODEL);
-  const [modelName, setModelName] = useState<string>("Butler.glb");
+  const [modelName, setModelName] = useState<string>("needle-ellipsoid.glb");
   const [model, setModel] = useState<Group | null>(null);
   const [baseBounds, setBaseBounds] = useState<Bounds | null>(null);
   const [loading, setLoading] = useState(false);
@@ -910,7 +910,7 @@ export default function ModelSilhouettePanel() {
       }
       if (!loadedFromPreview && !disposed) {
         uploadBufferRef.current = null;
-        startLoad(DEFAULT_MODEL, "Butler.glb");
+        startLoad(DEFAULT_MODEL, "needle-ellipsoid.glb");
       }
     };
 
@@ -1061,6 +1061,15 @@ export default function ModelSilhouettePanel() {
     uploadBufferRef.current = null;
     setBasis(BASIS_IDENTITY);
     startLoad(trimmed, trimmed.split("/").pop() || "GLB");
+    setAutoFitPending(true);
+  };
+
+  const handleLoadPreset = () => {
+    const presetUrl = NEEDLE_AXIS_GLTF;
+    setUrlInput(presetUrl);
+    uploadBufferRef.current = null;
+    setBasis(BASIS_IDENTITY);
+    startLoad(presetUrl, presetUrl.split("/").pop() || "GLB");
     setAutoFitPending(true);
   };
 
@@ -1508,6 +1517,14 @@ export default function ModelSilhouettePanel() {
                   />
                   <Button size="sm" onClick={handleUrlSubmit} disabled={loading}>
                     Load
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleLoadPreset}
+                    disabled={loading}
+                  >
+                    Needle preset
                   </Button>
                 </div>
               </div>

@@ -8,7 +8,7 @@ Warp-field research cockpit that pairs a Helix Core operations console with the 
 - **Physics + scheduling services** - Energy pipeline modelling, curvature brick generation, and instrumentation endpoints implemented in the server (`server/energy-pipeline.ts`, `server/curvature-brick.ts`, `server/instruments/`).
 - **Lifshitz-aware Casimir chain** - Ideal/Drude/plasma stacks with Hamaker fallback, χ override/supercell/fallback diagnostics, and nominal vs. realistic energy/mass bands surfaced to the UI.
 - **Static research archives** - Halobank timeline and warp ledger microsites live under `warp-web/` with shared assets in `halobank-spore-timeline.js`.
-- **Design documentation** - Patch plans, focused reports, and sweep design notes in `PATCH_PLAN.md`, `REPORT.md`, and `docs/`.
+- **Design documentation** - Patch plans, focused reports, and sweep design notes in `PATCH_PLAN.md`, `REPORT.md`, and `docs/` (see `docs/gr-solver-progress.md` for the GR solver progress plan and open items; the full Einstein-field solve is not declared complete yet).
 
 ### Casimir tile narrative → implementation map
 
@@ -237,6 +237,16 @@ These references tie the UI behavior back to concrete implementation details and
 - `sim_core/` - Static calibration data (`phase_calibration.json`) bundled with the build.
 - `.cal/` - Runtime calibration logs dropped by the phase calibration utilities (ignored by Git by default).
 
+## Registering panels for Helix Start windows
+Helix Start lists launchable windows from `HELIX_PANELS` in `client/src/pages/helix-core.panels.ts`, and `/desktop` renders those entries as window panels via the desktop registry. To make a program discoverable:
+
+1. Create or expose the panel component under `client/src/components/` (or a page component you can import).
+2. Add a new entry in `client/src/pages/helix-core.panels.ts` using `lazyPanel`, with a unique `id`, user-facing `title`, and an icon (Lucide). Optionally set `defaultSize`, `defaultPosition`, `pinned`, and `endpoints`.
+3. Ensure the entry is part of `HELIX_PANELS` (not just `panelRegistry`) so it appears in Helix Start and the taskbar.
+4. For mobile availability, set `mobileReady: true`; otherwise it stays desktop-only.
+
+See `docs/helix-desktop-panels.md` for the full desktop/start wiring details and troubleshooting checklist.
+
 ## Getting started
 1. **Install prerequisites**
    - Node.js 20.x (the project uses native ESM and `tsx`)
@@ -254,7 +264,7 @@ npm run dev           # Express + Vite middleware with HMR (default)
 npm run dev:static    # requires a fresh `npm run build`
 ```
 
-The dev script launches the Express server with Vite middleware, so you should not need to run a separate `npx vite dev` process. Visit [http://localhost:5173](http://localhost:5173) for the client UI; API routes mount under the same origin via Express. The `dev:static` variant skips Vite and serves the prebuilt bundle, so rebuild after changes before using it.
+The dev script launches the Express server with Vite middleware, so you should not need to run a separate `npx vite dev` process. The default UI entry points are [http://localhost:5173/desktop](http://localhost:5173/desktop) for the desktop window manager and [http://localhost:5173/mobile](http://localhost:5173/mobile) for the mobile app panel window configuration. The root route (`/`) automatically redirects based on the current device; pass `?desktop=1` or `?mobile=1` to force a target. Treat the app panel as a window panel: follow the Helix panel template in `client/src/pages/helix-core.panels.ts` so it registers as a window and appears in Helix Start on `/desktop` (see `docs/helix-desktop-panels.md`). API routes mount under the same origin via Express. The `dev:static` variant skips Vite and serves the prebuilt bundle, so rebuild after changes before using it.
 
 ## Offline math upgrade loop
 - **Adapter-aware inference**: Configure Luma with `LUMA_PROVIDER`, `LUMA_MODEL`, and optionally `LORA_ADAPTER` to hot-load LoRA patches. The `/api/luma/chat/self-consistency` endpoint now wraps multi-sample decoding with majority voting on the `FINAL ANSWER` line.

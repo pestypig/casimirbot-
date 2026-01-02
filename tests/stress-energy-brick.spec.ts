@@ -38,4 +38,18 @@ describe("stress-energy brick builder", () => {
     expect(brick.stats.natario?.gateLimit).toBeGreaterThan(0);
     expect(Number.isFinite(brick.stats.natario?.divBetaMax)).toBe(true);
   });
+
+  it("reports conservation diagnostics", () => {
+    const brick = buildStressEnergyBrick(baseParams);
+    expect(brick.stats.conservation).toBeDefined();
+    expect(Number.isFinite(brick.stats.conservation?.divRms ?? NaN)).toBe(true);
+    expect(Number.isFinite(brick.stats.conservation?.netFluxMagnitude ?? NaN)).toBe(true);
+  });
+
+  it("reports mapping diagnostics", () => {
+    const brick = buildStressEnergyBrick(baseParams);
+    expect(brick.stats.mapping).toBeDefined();
+    expect(Number.isFinite(brick.stats.mapping?.rho_avg ?? NaN)).toBe(true);
+    expect(brick.stats.mapping?.proxy).toBe(true);
+  });
 });

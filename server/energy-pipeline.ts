@@ -10,6 +10,7 @@ const MODEL_MODE: 'calibrated' | 'raw' =
 import { HBAR } from "./physics-const.js";
 import { C } from "./utils/physics-const-safe";
 import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
+import type { StressEnergyStats } from "./stress-energy-brick";
 
 // Keep tau_LC (wall / c) aligned with modulation dwell unless overridden
 const DEFAULT_MODULATION_FREQ_GHZ = 15;
@@ -49,6 +50,12 @@ import type {
   CardLatticeMetadata,
   HullPreviewPayload,
 } from "../shared/schema.js";
+import type {
+  WarpViabilityCertificate,
+  ViabilityConstraint,
+  ViabilityStatus,
+  WarpSnapshot,
+} from "../types/warpViability";
 import { CARD_RECIPE_SCHEMA_VERSION } from "../shared/schema.js";
 import {
   applyQiAutothrottleStep,
@@ -554,6 +561,102 @@ export type SurfaceAreaEstimate = {
   };
 };
 
+export type HullBrickChannel = {
+  data: string;
+  min?: number;
+  max?: number;
+};
+
+export type HullBrickBounds = {
+  min?: [number, number, number];
+  max?: [number, number, number];
+  center?: [number, number, number];
+  extent?: [number, number, number];
+  axes?: [number, number, number];
+  wall?: number;
+};
+
+export type HullBrickPayload = {
+  dims: [number, number, number];
+  voxelBytes?: number;
+  format?: "r32f";
+  channels: {
+    hullDist?: HullBrickChannel;
+    hullMask?: HullBrickChannel;
+  };
+  bounds?: HullBrickBounds;
+  meta?: unknown;
+};
+
+export type GrConstraintDiagnostics = {
+  min: number;
+  max: number;
+  maxAbs: number;
+  rms?: number;
+};
+
+export type GrMomentumConstraintDiagnostics = {
+  rms: number;
+  maxAbs: number;
+  components: {
+    x: GrConstraintDiagnostics;
+    y: GrConstraintDiagnostics;
+    z: GrConstraintDiagnostics;
+  };
+};
+
+export type GrPipelineDiagnostics = {
+  updatedAt: number;
+  source: "gr-evolve-brick";
+  grid: {
+    dims: [number, number, number];
+    bounds: { min: Vec3; max: Vec3 };
+    voxelSize_m: Vec3;
+    time_s: number;
+    dt_s: number;
+  };
+  solver: {
+    steps: number;
+    iterations: number;
+    tolerance: number;
+    cfl: number;
+  };
+  gauge?: {
+    lapseMin: number;
+    lapseMax: number;
+    betaMaxAbs: number;
+  };
+  constraints: {
+    H_constraint: GrConstraintDiagnostics;
+    M_constraint: GrMomentumConstraintDiagnostics;
+  };
+  matter?: {
+    stressEnergy?: StressEnergyStats;
+  };
+  perf?: {
+    totalMs: number;
+    evolveMs: number;
+    brickMs: number;
+    voxels: number;
+    channelCount: number;
+    bytesEstimate: number;
+    msPerStep: number;
+  };
+};
+
+export type GrRequestPayload = {
+  P_avg_W: number;
+  dutyEffectiveFR: number;
+  gammaGeo: number;
+  gammaVdB: number;
+  qSpoil: number;
+  TS_ratio: number;
+  hull: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number };
+  hullArea_m2?: number;
+  N_tiles: number;
+  tilesPerSector: number;
+};
+
 export interface EnergyPipelineState {
   // Input parameters
   tileArea_cm2: number;
@@ -575,6 +678,7 @@ export interface EnergyPipelineState {
   warpGeometryKind?: GeometryKind;
   warpGeometryAssetId?: string;
   geometryPreview?: GeometryPreviewSnapshot | null;
+  hullBrick?: HullBrickPayload | null;
   bubble?: {
     R?: number;
     sigma?: number;
@@ -714,6 +818,21 @@ export interface EnergyPipelineState {
   mechanical?: MechanicalFeasibility;
   mechGuard?: MechanicalGuard;
 
+  // GR diagnostics (optional)
+  grEnabled?: boolean;
+  gr?: GrPipelineDiagnostics;
+  grRequest?: GrRequestPayload;
+  warpViability?: {
+    certificate: WarpViabilityCertificate;
+    certificateHash?: string;
+    certificateId?: string;
+    integrityOk?: boolean;
+    status?: ViabilityStatus;
+    constraints?: ViabilityConstraint[];
+    snapshot?: WarpSnapshot;
+    updatedAt?: number;
+  };
+
   // Strobing and timing properties
   strobeHz?: number;
   sectorPeriod_ms?: number;
@@ -721,6 +840,9 @@ export interface EnergyPipelineState {
   localBurstFrac?: number;
   dutyEffective_FR?: number;
   dutyMeasuredFR?: number;
+  sigmaSector?: number;
+  splitEnabled?: boolean;
+  splitFrac?: number;
   phase01?: number;
   pumpPhase_deg?: number;
   tauLC_ms?: number;
@@ -758,6 +880,58 @@ export interface EnergyPipelineState {
   qiAutothrottle?: QiAutothrottleState | null;
   qiAutoscale?: QiAutoscaleState | null;
 }
+
+export const buildGrRequestPayload = (state: EnergyPipelineState): GrRequestPayload => {
+  const shipRadius = Number.isFinite(state.shipRadius_m) ? state.shipRadius_m : 1;
+  const fallbackDim = shipRadius * 2;
+  const hullRaw = state.hull ?? { Lx_m: fallbackDim, Ly_m: fallbackDim, Lz_m: fallbackDim };
+  const hull = {
+    Lx_m: Number.isFinite(hullRaw.Lx_m) && hullRaw.Lx_m > 0 ? hullRaw.Lx_m : fallbackDim,
+    Ly_m: Number.isFinite(hullRaw.Ly_m) && hullRaw.Ly_m > 0 ? hullRaw.Ly_m : fallbackDim,
+    Lz_m: Number.isFinite(hullRaw.Lz_m) && hullRaw.Lz_m > 0 ? hullRaw.Lz_m : fallbackDim,
+    ...(Number.isFinite(hullRaw.wallThickness_m) && (hullRaw.wallThickness_m as number) > 0
+      ? { wallThickness_m: hullRaw.wallThickness_m as number }
+      : {}),
+  };
+
+  const pAvgRaw = (state as any).P_avg_W;
+  const P_avg_W = Number.isFinite(pAvgRaw)
+    ? Number(pAvgRaw)
+    : Number.isFinite(state.P_applied_W)
+    ? Number(state.P_applied_W)
+    : Number.isFinite(state.P_avg)
+    ? Number(state.P_avg) * 1e6
+    : 0;
+  const dutyRaw =
+    state.dutyEffective_FR ??
+    (state as any).dutyEffectiveFR ??
+    state.dutyShip ??
+    (state as any).dutyEff ??
+    state.dutyCycle;
+  const dutyEffectiveFR = Number.isFinite(dutyRaw) ? Number(dutyRaw) : 0;
+  const gammaGeo = Number.isFinite(state.gammaGeo) ? Number(state.gammaGeo) : 0;
+  const gammaVdB = Number.isFinite(state.gammaVanDenBroeck) ? Number(state.gammaVanDenBroeck) : 0;
+  const qSpoil = Number.isFinite(state.qSpoilingFactor) ? Number(state.qSpoilingFactor) : 0;
+  const TS_ratio = Number.isFinite(state.TS_ratio) ? Number(state.TS_ratio) : 0;
+  const hullArea_m2 = Number.isFinite(state.hullArea_m2) ? Number(state.hullArea_m2) : undefined;
+  const N_tiles = Number.isFinite(state.N_tiles) ? Math.round(state.N_tiles) : 0;
+  const tilesPerSector = Number.isFinite(state.tilesPerSector)
+    ? Math.round(state.tilesPerSector)
+    : 0;
+
+  return {
+    P_avg_W,
+    dutyEffectiveFR,
+    gammaGeo,
+    gammaVdB,
+    qSpoil,
+    TS_ratio,
+    hull,
+    hullArea_m2,
+    N_tiles,
+    tilesPerSector,
+  };
+};
 
 export function buildCardRecipeFromPipeline(state: EnergyPipelineState): CardRecipe {
   const clamp01 = (value: unknown) => {
@@ -2173,6 +2347,11 @@ export function initializePipelineState(): EnergyPipelineState {
     sectorStrobing: 1,       // Legacy alias
     qSpoilingFactor: 1,
     negativeFraction: DEFAULT_NEGATIVE_FRACTION,
+    strobeHz: Number(process.env.STROBE_HZ ?? 1000),
+    phase01: 0,
+    sigmaSector: 0.05,
+    splitEnabled: false,
+    splitFrac: 0.6,
 
     // Pulsed-load ceilings (defaults mirrored in docs; override when bench data lands)
     iPeakMaxMidi_A: DEFAULT_PULSED_CURRENT_LIMITS_A.midi,
@@ -3008,6 +3187,18 @@ export async function calculateEnergyPipeline(
     results: { thetaRaw, thetaCal }
   };
 
+  const grEnabled = state.grEnabled === true;
+  if (!grEnabled) {
+    delete (state as any).gr;
+  } else if (state.gr?.constraints) {
+    (state as any).uniformsExplain.thetaAudit.gr = {
+      H_constraint: state.gr.constraints.H_constraint,
+      M_constraint: state.gr.constraints.M_constraint,
+      updatedAt: state.gr.updatedAt,
+      source: state.gr.source,
+    };
+  }
+
   console.log('=┬â├╢├¼ ++-Scale Field Strength Audit (Raw vs Calibrated):', {
     mode: modelMode,
     formula: '++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff',
@@ -3091,7 +3282,11 @@ export async function calculateEnergyPipeline(
   state.U_cycle = state.U_Q * d_eff;
 
   // Expose timing details for metrics API (corrected naming)
-  state.strobeHz            = Number(process.env.STROBE_HZ ?? 1000); // sectors/sec (1ms macro-tick)
+  const strobeHzOverride = Number(state.strobeHz);
+  state.strobeHz =
+    Number.isFinite(strobeHzOverride) && strobeHzOverride > 0
+      ? strobeHzOverride
+      : Number(process.env.STROBE_HZ ?? 1000); // sectors/sec (1ms macro-tick)
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
   state.modelMode           = modelMode; // for client consistency
 
@@ -3369,7 +3564,13 @@ export async function calculateEnergyPipeline(
   const derivedPhase01 =
     sectorPeriodMs > 0 ? ((Date.now() % sectorPeriodMs) / sectorPeriodMs) : 0;
   const hwPhase01 = Number(hw?.phase01);
-  const phase01 = Number.isFinite(hwPhase01) ? normalizePhase01(hwPhase01) : derivedPhase01;
+  const overridePhase01 = Number(state.phase01);
+  const phase01 = Number.isFinite(hwPhase01)
+    ? normalizePhase01(hwPhase01)
+    : Number.isFinite(overridePhase01)
+      ? normalizePhase01(overridePhase01)
+      : derivedPhase01;
+  state.phase01 = phase01;
   const tauMs = Number.isFinite(state.qi?.tau_s_ms)
     ? Number(state.qi!.tau_s_ms)
     : DEFAULT_QI_SETTINGS.tau_s_ms;
@@ -3843,10 +4044,34 @@ export async function calculateEnergyPipeline(
       amps: ampFactors
     };
 
+    const sanitizeShiftVectorField = (field: Record<string, unknown>) => {
+      const sanitized: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(field)) {
+        if (typeof value === "function") continue;
+        sanitized[key] = value;
+      }
+      return sanitized;
+    };
+
+    const sanitizeWarpResult = (warpResult: unknown) => {
+      if (!warpResult || typeof warpResult !== "object") return warpResult;
+      const result = warpResult as Record<string, unknown>;
+      const shiftVectorField = result.shiftVectorField;
+      if (shiftVectorField && typeof shiftVectorField === "object") {
+        return {
+          ...result,
+          shiftVectorField: sanitizeShiftVectorField(
+            shiftVectorField as Record<string, unknown>,
+          ),
+        };
+      }
+      return result;
+    };
+
     const warp = await warpBubbleModule.calculate(warpParams);
 
     // Store warp results in state for API access
-    (state as any).warp = warp;
+    (state as any).warp = sanitizeWarpResult(warp);
     (state as any).beta_avg = warp?.betaAvg ?? warp?.natarioShiftAmplitude ?? (state as any).beta_avg;
   } catch (e) {
     if (DEBUG_PIPE) console.warn('Warp bubble calculation failed:', e);
@@ -3913,6 +4138,8 @@ export async function calculateEnergyPipeline(
   } catch (err) {
     if (DEBUG_PIPE) console.warn("[pipeline] card recipe build failed:", err);
   }
+
+  state.grRequest = buildGrRequestPayload(state);
 
   return state;
 }

@@ -26,6 +26,35 @@ export interface StressEnergyBrickStats {
     gateLimit: number;
     gNatario: number;
   };
+  conservation?: StressEnergyConservationStats;
+  mapping?: StressEnergyMappingStats;
+}
+
+export interface StressEnergyConservationStats {
+  divMean: number;
+  divAbsMean: number;
+  divRms: number;
+  divMaxAbs: number;
+  netFluxMagnitude: number;
+  netFluxNorm: number;
+  divRmsNorm: number;
+}
+
+export interface StressEnergyMappingStats {
+  rho_avg: number;
+  rho_inst: number;
+  gap_nm: number;
+  cavityQ: number;
+  qSpoil: number;
+  gammaGeo: number;
+  gammaVdB: number;
+  dutyFR: number;
+  ampBase: number;
+  zeta: number;
+  pressureFactor?: number;
+  pressureSource?: "pipeline" | "proxy" | "override";
+  source?: "pipeline" | "defaults";
+  proxy: boolean;
 }
 
 export interface StressEnergyBrickDecoded {
@@ -39,6 +68,219 @@ export interface StressEnergyBrickDecoded {
   };
   stats: StressEnergyBrickStats;
 }
+
+const BRICK_FORMAT = "raw";
+const BINARY_CONTENT_TYPES = ["application/octet-stream", "application/x-helix-brick"];
+const STRESS_CHANNEL_ORDER = ["t00", "Sx", "Sy", "Sz", "divS"] as const;
+const textDecoder = typeof TextDecoder !== "undefined" ? new TextDecoder() : null;
+
+const decodeUtf8 = (bytes: Uint8Array): string => {
+  if (textDecoder) return textDecoder.decode(bytes);
+  let result = "";
+  for (let i = 0; i < bytes.length; i += 1) {
+    result += String.fromCharCode(bytes[i]);
+  }
+  return result;
+};
+
+const decodeBinaryHeader = (buffer: ArrayBuffer): { header: any; dataOffset: number } | null => {
+  if (buffer.byteLength < 4) return null;
+  const view = new DataView(buffer);
+  const headerLength = view.getUint32(0, true);
+  if (!headerLength || headerLength < 2 || headerLength > buffer.byteLength - 4) {
+    return null;
+  }
+  const headerStart = 4;
+  const headerEnd = headerStart + headerLength;
+  const headerBytes = new Uint8Array(buffer, headerStart, headerLength);
+  let header: any;
+  try {
+    header = JSON.parse(decodeUtf8(headerBytes));
+  } catch {
+    return null;
+  }
+  const padding = (4 - (headerLength % 4)) % 4;
+  const dataOffset = headerEnd + padding;
+  if (dataOffset > buffer.byteLength) return null;
+  return { header, dataOffset };
+};
+
+const normalizeNatarioStats = (raw: any) => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const divBetaMax = Number(raw.divBetaMax ?? raw.divMax);
+  const divBetaRms = Number(raw.divBetaRms ?? raw.divRms);
+  const gateLimit = Number(raw.gateLimit ?? raw.kTol);
+  const gNatario = Number(raw.gNatario);
+  if (
+    !Number.isFinite(divBetaMax) &&
+    !Number.isFinite(divBetaRms) &&
+    !Number.isFinite(gateLimit) &&
+    !Number.isFinite(gNatario)
+  ) {
+    return undefined;
+  }
+  return {
+    divBetaMax,
+    divBetaRms,
+    gateLimit,
+    gNatario,
+  };
+};
+
+const normalizeConservationStats = (raw: any): StressEnergyConservationStats | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const divMean = Number(raw.divMean);
+  const divAbsMean = Number(raw.divAbsMean);
+  const divRms = Number(raw.divRms);
+  const divMaxAbs = Number(raw.divMaxAbs);
+  const netFluxMagnitude = Number(raw.netFluxMagnitude);
+  const netFluxNorm = Number(raw.netFluxNorm);
+  const divRmsNorm = Number(raw.divRmsNorm);
+  if (
+    !Number.isFinite(divMean) &&
+    !Number.isFinite(divAbsMean) &&
+    !Number.isFinite(divRms) &&
+    !Number.isFinite(divMaxAbs) &&
+    !Number.isFinite(netFluxMagnitude) &&
+    !Number.isFinite(netFluxNorm) &&
+    !Number.isFinite(divRmsNorm)
+  ) {
+    return undefined;
+  }
+  return {
+    divMean,
+    divAbsMean,
+    divRms,
+    divMaxAbs,
+    netFluxMagnitude,
+    netFluxNorm,
+    divRmsNorm,
+  };
+};
+
+const normalizeMappingStats = (
+  raw: any,
+  fallbackDutyFR: number,
+): StressEnergyMappingStats | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const pressureSourceRaw = typeof raw.pressureSource === "string" ? raw.pressureSource : undefined;
+  const pressureSource =
+    pressureSourceRaw === "pipeline" || pressureSourceRaw === "proxy" || pressureSourceRaw === "override"
+      ? pressureSourceRaw
+      : undefined;
+  const sourceRaw = typeof raw.source === "string" ? raw.source : undefined;
+  const source =
+    sourceRaw === "pipeline" || sourceRaw === "defaults"
+      ? sourceRaw
+      : undefined;
+  const proxy = typeof raw.proxy === "boolean" ? raw.proxy : Boolean(raw.proxy);
+  const rho_avg = Number(raw.rho_avg);
+  const rho_inst = Number(raw.rho_inst);
+  const gap_nm = Number(raw.gap_nm);
+  const cavityQ = Number(raw.cavityQ);
+  const qSpoil = Number(raw.qSpoil);
+  const gammaGeo = Number(raw.gammaGeo);
+  const gammaVdB = Number(raw.gammaVdB);
+  const dutyFR = Number(raw.dutyFR ?? fallbackDutyFR);
+  const ampBase = Number(raw.ampBase);
+  const zeta = Number(raw.zeta);
+  const pressureFactor = Number(raw.pressureFactor);
+  const hasData =
+    Number.isFinite(rho_avg) ||
+    Number.isFinite(rho_inst) ||
+    Number.isFinite(gap_nm) ||
+    Number.isFinite(cavityQ) ||
+    Number.isFinite(qSpoil) ||
+    Number.isFinite(gammaGeo) ||
+    Number.isFinite(gammaVdB) ||
+    Number.isFinite(dutyFR) ||
+    Number.isFinite(ampBase) ||
+    Number.isFinite(zeta) ||
+    Number.isFinite(pressureFactor) ||
+    pressureSource ||
+    source ||
+    typeof raw.proxy === "boolean";
+  if (!hasData) return undefined;
+  return {
+    rho_avg,
+    rho_inst,
+    gap_nm,
+    cavityQ,
+    qSpoil,
+    gammaGeo,
+    gammaVdB,
+    dutyFR,
+    ampBase,
+    zeta,
+    pressureFactor: Number.isFinite(pressureFactor) ? pressureFactor : undefined,
+    pressureSource,
+    source,
+    proxy,
+  };
+};
+
+const normalizeStats = (raw: any, fallbackDutyFR: number): StressEnergyBrickStats => ({
+  totalEnergy_J: Number(raw?.totalEnergy_J ?? 0),
+  avgT00: Number(raw?.avgT00 ?? 0),
+  avgFluxMagnitude: Number(raw?.avgFluxMagnitude ?? 0),
+  netFlux: Array.isArray(raw?.netFlux) && raw.netFlux.length === 3
+    ? [Number(raw.netFlux[0] ?? 0), Number(raw.netFlux[1] ?? 0), Number(raw.netFlux[2] ?? 0)]
+    : [0, 0, 0],
+  divMin: Number(raw?.divMin ?? 0),
+  divMax: Number(raw?.divMax ?? 0),
+  dutyFR: Number(raw?.dutyFR ?? fallbackDutyFR ?? 0),
+  strobePhase: Number(raw?.strobePhase ?? 0),
+  natario: normalizeNatarioStats(raw?.natario),
+  conservation: normalizeConservationStats(raw?.conservation),
+  mapping: normalizeMappingStats(raw?.mapping, fallbackDutyFR),
+});
+
+const decodeStressEnergyBrickBinary = (
+  buffer: ArrayBuffer,
+  fallbackDutyFR: number,
+): StressEnergyBrickDecoded | null => {
+  const parsed = decodeBinaryHeader(buffer);
+  if (!parsed) return null;
+  const { header, dataOffset } = parsed;
+  if (header?.kind !== "stress-energy-brick") return null;
+  const dims = Array.isArray(header.dims) ? header.dims : null;
+  if (!dims || dims.length !== 3) return null;
+  const voxelBytes = Number(header.voxelBytes ?? 4);
+  const total = Number(dims[0]) * Number(dims[1]) * Number(dims[2]);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const defaultBytes = total * (Number.isFinite(voxelBytes) && voxelBytes > 0 ? voxelBytes : 4);
+  let offset = dataOffset;
+  const channelsHeader = header.channels ?? {};
+
+  const decodeChannel = (key: typeof STRESS_CHANNEL_ORDER[number]): StressEnergyBrickChannel | null => {
+    const info = channelsHeader[key] ?? {};
+    const bytes = Number(info.bytes ?? defaultBytes);
+    if (!Number.isFinite(bytes) || bytes <= 0 || bytes % 4 !== 0) return null;
+    if (offset + bytes > buffer.byteLength) return null;
+    if (offset % 4 !== 0) return null;
+    const data = new Float32Array(buffer, offset, bytes / 4);
+    offset += bytes;
+    return {
+      data,
+      min: Number(info.min ?? 0),
+      max: Number(info.max ?? 0),
+    };
+  };
+
+  const t00 = decodeChannel("t00");
+  const Sx = decodeChannel("Sx");
+  const Sy = decodeChannel("Sy");
+  const Sz = decodeChannel("Sz");
+  const divS = decodeChannel("divS");
+  if (!t00 || !Sx || !Sy || !Sz || !divS) return null;
+
+  return {
+    dims: [Number(dims[0]), Number(dims[1]), Number(dims[2])],
+    t00,
+    flux: { Sx, Sy, Sz, divS },
+    stats: normalizeStats(header.stats, fallbackDutyFR),
+  };
+};
 
 const decodeBase64 = (payload: string | undefined): Uint8Array | undefined => {
   if (!payload) return undefined;
@@ -83,12 +325,24 @@ const buildQuery = (request: StressEnergyBrickRequest) => {
   params.set("gammaVdB", request.gammaVdB.toString());
   params.set("ampBase", request.ampBase.toString());
   params.set("zeta", request.zeta.toString());
+  params.set("format", BRICK_FORMAT);
   return params.toString();
 };
 
 export async function fetchStressEnergyBrick(request: StressEnergyBrickRequest, signal?: AbortSignal): Promise<StressEnergyBrickDecoded> {
   const query = buildQuery(request);
-  const res = await apiRequest("GET", `/api/helix/stress-energy-brick?${query}`, undefined, signal);
+  const res = await apiRequest("GET", `/api/helix/stress-energy-brick?${query}`, undefined, signal, {
+    headers: { Accept: "application/octet-stream, application/json" },
+  });
+  const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
+  if (BINARY_CONTENT_TYPES.some((type) => contentType.includes(type))) {
+    const buffer = await res.arrayBuffer();
+    const decoded = decodeStressEnergyBrickBinary(buffer, Number(request.dutyFR ?? 0));
+    if (!decoded) {
+      throw new Error("Failed to decode stress-energy brick binary payload");
+    }
+    return decoded;
+  }
   const json = await res.json();
   const dims = (json.dims ?? []) as number[];
   if (!Array.isArray(dims) || dims.length !== 3) {
@@ -108,47 +362,11 @@ export async function fetchStressEnergyBrick(request: StressEnergyBrickRequest, 
   const Sy = decodeChannel(json.channels?.Sy, "Sy");
   const Sz = decodeChannel(json.channels?.Sz, "Sz");
   const divS = decodeChannel(json.channels?.divS, "divS");
-  const natarioRaw = json.stats?.natario;
-  const natarioStats =
-    natarioRaw && typeof natarioRaw === "object"
-      ? (() => {
-          const divBetaMax = Number(natarioRaw.divBetaMax ?? natarioRaw.divMax);
-          const divBetaRms = Number(natarioRaw.divBetaRms ?? natarioRaw.divRms);
-          const gateLimit = Number(natarioRaw.gateLimit ?? natarioRaw.kTol);
-          const gNatario = Number(natarioRaw.gNatario);
-          if (
-            !Number.isFinite(divBetaMax) &&
-            !Number.isFinite(divBetaRms) &&
-            !Number.isFinite(gateLimit) &&
-            !Number.isFinite(gNatario)
-          ) {
-            return undefined;
-          }
-          return {
-            divBetaMax,
-            divBetaRms,
-            gateLimit,
-            gNatario,
-          };
-        })()
-      : undefined;
 
   return {
     dims: [dims[0], dims[1], dims[2]],
     t00,
     flux: { Sx, Sy, Sz, divS },
-    stats: {
-      totalEnergy_J: Number(json.stats?.totalEnergy_J ?? 0),
-      avgT00: Number(json.stats?.avgT00 ?? 0),
-      avgFluxMagnitude: Number(json.stats?.avgFluxMagnitude ?? 0),
-      netFlux: Array.isArray(json.stats?.netFlux) && json.stats.netFlux.length === 3
-        ? [Number(json.stats.netFlux[0] ?? 0), Number(json.stats.netFlux[1] ?? 0), Number(json.stats.netFlux[2] ?? 0)]
-        : [0, 0, 0],
-      divMin: Number(json.stats?.divMin ?? 0),
-      divMax: Number(json.stats?.divMax ?? 0),
-      dutyFR: Number(json.stats?.dutyFR ?? request.dutyFR ?? 0),
-      strobePhase: Number(json.stats?.strobePhase ?? 0),
-      natario: natarioStats,
-    },
+    stats: normalizeStats(json.stats, Number(request.dutyFR ?? 0)),
   };
 }

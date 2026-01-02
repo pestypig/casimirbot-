@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "description": "Math-critical dependency graph for GR/warp pipelines.",
+  "edges": [
+    {
+      "from": "server/gr/gr-agent-loop.ts",
+      "to": "server/gr/gr-evaluation.ts",
+      "reason": "GR loop uses gate evaluation for acceptance.",
+      "waiver": "Certified -> certified dependency for gate orchestration."
+    },
+    {
+      "from": "server/gr/gr-agent-loop.ts",
+      "to": "server/gr-evolve-brick.ts",
+      "reason": "GR loop builds diagnostics from evolve bricks.",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/gr-evolve-brick.ts",
+      "to": "server/gr/evolution/solver.ts",
+      "reason": "Evolve brick runs BSSN evolution with SI->geometric time conversion.",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/gr/gr-agent-loop.ts",
+      "to": "server/gr/evolution/solver.ts",
+      "reason": "GR loop runs BSSN evolution.",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/gr/evolution/solver.ts",
+      "to": "server/gr/evolution/stress-energy.ts",
+      "reason": "Solver builds stress-energy fields from pipeline matter (stress scale SI<->geometric).",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/gr/evolution/stress-energy.ts",
+      "to": "server/stress-energy-brick.ts",
+      "reason": "Stress-energy fields are built from the brick mapping (SI inputs scaled to geometric).",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/stress-energy-brick.ts",
+      "to": "modules/dynamic/stress-energy-equations.ts",
+      "reason": "Brick mapping uses dynamic stress-energy equations (nm->m, ms->s conversions).",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/stress-energy-brick.ts",
+      "to": "server/energy-pipeline.ts",
+      "reason": "Brick mapping reads pipeline state defaults (gap_nm->gap_m conversion).",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/gr/gr-agent-loop.ts",
+      "to": "server/energy-pipeline.ts",
+      "reason": "GR loop reads pipeline state and applies proposals.",
+      "unitKeyWarnings": true
+    },
+    {
+      "from": "server/energy-pipeline.ts",
+      "to": "modules/dynamic/dynamic-casimir.ts",
+      "reason": "Pipeline runs dynamic Casimir sweeps (GHz->Hz, us/ms->s conversions).",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/energy-pipeline.ts",
+      "to": "modules/dynamic/natario-metric.ts",
+      "reason": "Pipeline computes Natario metric proxies (gap_nm->m, GHz->Hz conversions).",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "server/energy-pipeline.ts",
+      "to": "modules/dynamic/stress-energy-equations.ts",
+      "reason": "Pipeline uses stress-energy equation helpers (gap_nm->m, ms->s conversions).",
+      "unitKeyWarnings": true,
+      "unitConversion": true
+    },
+    {
+      "from": "modules/dynamic/dynamic-casimir.ts",
+      "to": "modules/dynamic/stress-energy-equations.ts",
+      "reason": "Dynamic Casimir helpers use stress-energy equations.",
+      "unitKeyWarnings": true
+    },
+    {
+      "from": "server/gr/gr-evaluation.ts",
+      "to": "server/gr/constraint-evaluator.ts",
+      "reason": "GR evaluation derives gate status from diagnostics.",
+      "waiver": "Certified -> certified dependency for gate evaluation."
+    },
+    {
+      "from": "server/gr/gr-evaluation.ts",
+      "to": "tools/warpViabilityCertificate.ts",
+      "reason": "GR evaluation requires certificate integrity checks.",
+      "waiver": "Certified -> certified dependency for certificate issuance."
+    },
+    {
+      "from": "server/gr/constraint-evaluator.ts",
+      "to": "modules/gr/bssn-evolve.ts",
+      "reason": "Gate evaluation can compute constraints from BSSN fields."
+    },
+    {
+      "from": "server/gr-evolve-brick.ts",
+      "to": "modules/gr/bssn-evolve.ts",
+      "reason": "Diagnostics depend on constraint fields."
+    },
+    {
+      "from": "tools/warpViabilityCertificate.ts",
+      "to": "tools/warpViability.ts",
+      "reason": "Certificate is based on viability evaluation."
+    },
+    {
+      "from": "tools/warpViability.ts",
+      "to": "server/energy-pipeline.ts",
+      "reason": "Viability evaluation runs the energy pipeline."
+    },
+    {
+      "from": "tools/warpViability.ts",
+      "to": "modules/physics/warpAgents.ts",
+      "reason": "Viability evaluation loads warp guardrail constraints."
+    },
+    {
+      "from": "server/routes/warp-viability.ts",
+      "to": "tools/warpViabilityCertificate.ts",
+      "reason": "Warp viability route issues certificates.",
+      "waiver": "Certified -> certified dependency for viability route."
+    },
+    {
+      "from": "server/skills/physics.warp.viability.ts",
+      "to": "tools/warpViabilityCertificate.ts",
+      "reason": "Warp viability tool issues certificates.",
+      "waiver": "Certified -> certified dependency for viability tool."
+    }
+  ]
+}

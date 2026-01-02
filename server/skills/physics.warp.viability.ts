@@ -3,6 +3,8 @@ import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import { issueWarpViabilityCertificate } from "../../tools/warpViabilityCertificate";
 import { verifyCertificateIntegrity } from "../../tools/verifyCertificate";
 import type { ConstraintResult, ViabilityResult, WarpConfig, WarpViabilityCertificate } from "../../types/warpViability";
+import { loadWarpAgentsConfig } from "../../modules/physics/warpAgents";
+import { recordTrainingTrace } from "../services/observability/training-trace-store";
 import { SupplementSchema, type Supplement } from "../services/planner/supplements";
 
 const WarpViabilityInput = z
@@ -40,6 +42,36 @@ const TsSnapshotSchema = z
   })
   .partial();
 
+const GrGuardrailConstraintSchema = z
+  .object({
+    rms: z.number().optional(),
+    maxAbs: z.number().optional(),
+    threshold: z.number().optional(),
+    exceeded: z.boolean().optional(),
+  })
+  .partial();
+
+const GrGuardrailScalarSchema = z
+  .object({
+    floor: z.number().optional(),
+    maxAbs: z.number().optional(),
+    threshold: z.number().optional(),
+    exceeded: z.boolean().optional(),
+  })
+  .partial();
+
+const GrGuardrailsSchema = z
+  .object({
+    source: z.enum(["pipeline-gr", "proxy"]).optional(),
+    proxy: z.boolean().optional(),
+    missing: z.array(z.string()).optional(),
+    H_constraint: GrGuardrailConstraintSchema.optional(),
+    M_constraint: GrGuardrailConstraintSchema.optional(),
+    lapse: GrGuardrailScalarSchema.optional(),
+    beta: GrGuardrailScalarSchema.optional(),
+  })
+  .partial();
+
 const WarpViabilitySnapshotSchema = z
   .object({
     U_static: z.number().optional(),
@@ -54,6 +86,7 @@ const WarpViabilitySnapshotSchema = z
     dwell_ms: z.number().optional(),
     burst_ms: z.number().optional(),
     ts: TsSnapshotSchema.optional().nullable(),
+    grGuardrails: GrGuardrailsSchema.optional(),
   })
   .catchall(z.unknown().optional());
 
@@ -83,7 +116,7 @@ const WarpViabilityCertificateSchema = z.object({
 });
 
 const ViabilityResultSchema = z.object({
-  status: z.enum(["ADMISSIBLE", "MARGINAL", "INADMISSIBLE", "NOT_CERTIFIED"]),
+  status: z.enum(["ADMISSIBLE", "MARGINAL", "INADMISSIBLE", "NOT_CERTIFIED"]),  
   constraints: z.array(ConstraintResultSchema),
   snapshot: WarpViabilitySnapshotSchema,
   citations: z.array(z.string()).optional(),
@@ -95,7 +128,54 @@ const ViabilityResultSchema = z.object({
   certificateId: z.string().optional(),
 });
 
-const formatConstraintLine = (constraint: ConstraintResult): string => {
+const DEFAULT_VIABILITY_POLICY = {
+  admissibleStatus: "ADMISSIBLE",
+  allowMarginalAsViable: false,
+  policy: "warp-viability",
+  policyVersion: "default",
+};
+
+const resolveViabilityPolicy = async () => {
+  try {
+    const config = await loadWarpAgentsConfig();
+    return {
+      admissibleStatus:
+        config.viabilityPolicy?.admissibleStatus ??
+        DEFAULT_VIABILITY_POLICY.admissibleStatus,
+      allowMarginalAsViable:
+        config.viabilityPolicy?.allowMarginalAsViable ??
+        DEFAULT_VIABILITY_POLICY.allowMarginalAsViable,
+      policy: DEFAULT_VIABILITY_POLICY.policy,
+      policyVersion: String(config.version),
+    };
+  } catch {
+    return DEFAULT_VIABILITY_POLICY;
+  }
+};
+
+const buildFirstFail = (constraints: ConstraintResult[]) => {
+  const failing = constraints.find(
+    (constraint) => constraint.severity === "HARD" && !constraint.passed,
+  );
+  if (!failing) return undefined;
+  const limit =
+    typeof failing.rhs === "number" && Number.isFinite(failing.rhs)
+      ? String(failing.rhs)
+      : null;
+  return {
+    id: failing.id,
+    severity: failing.severity,
+    status: "fail",
+    value:
+      typeof failing.lhs === "number" && Number.isFinite(failing.lhs)
+        ? failing.lhs
+        : null,
+    limit,
+    note: failing.note ?? failing.details,
+  };
+};
+
+const formatConstraintLine = (constraint: ConstraintResult): string => {        
   const status = constraint.passed ? "PASS" : "FAIL";
   const lhs = constraint.lhs !== undefined ? constraint.lhs : "n/a";
   const rhs = constraint.rhs !== undefined ? constraint.rhs : "n/a";
@@ -172,8 +252,33 @@ export const warpViabilitySpec: ToolSpecShape = {
 };
 
 export const warpViabilityHandler: ToolHandler = async (rawInput) => {
-  const config = WarpViabilityInput.parse((rawInput ?? {}) as WarpConfig);
+  const config = WarpViabilityInput.parse((rawInput ?? {}) as WarpConfig);      
   const certificate = await issueWarpViabilityCertificate(config);
+  const integrityOk = verifyCertificateIntegrity(certificate);
+  const policy = await resolveViabilityPolicy();
+  const hasCertificate = Boolean(certificate.certificateHash);
+  const hardFailures = certificate.payload.constraints.filter(
+    (constraint) => constraint.severity === "HARD" && !constraint.passed,
+  );
+  const firstFail = buildFirstFail(certificate.payload.constraints);
+  const statusOk =
+    certificate.payload.status === policy.admissibleStatus ||
+    (policy.allowMarginalAsViable && certificate.payload.status === "MARGINAL");
+  const pass =
+    integrityOk && hasCertificate && statusOk && hardFailures.length === 0;
+  const notes = [`status=${certificate.payload.status}`];
+  if (!hasCertificate) {
+    notes.push("certificate_hash_missing");
+  }
+  if (!integrityOk) {
+    notes.push("certificate_integrity_failed");
+  }
+  if (!statusOk) {
+    notes.push("status_not_allowed");
+  }
+  if (hardFailures.length) {
+    notes.push(`hard_fail=${hardFailures.map((item) => item.id).join(",")}`);
+  }
 
   const result: ViabilityResult = {
     status: certificate.payload.status,
@@ -186,12 +291,45 @@ export const warpViabilityHandler: ToolHandler = async (rawInput) => {
   };
 
   const supplement = buildSupplement(result, certificate);
+  try {
+    recordTrainingTrace({
+      traceId: `warp-viability:${certificate.header.id}`,
+      source: {
+        system: "warp-viability",
+        component: "warp-viability-skill",
+        tool: warpViabilitySpec.name,
+        version: "v1",
+        proxy: false,
+      },
+      signal: {
+        kind: "warp-viability",
+        proxy: false,
+        ladder: {
+          tier: pass ? "certified" : "diagnostic",
+          policy: policy.policy,
+          policyVersion: policy.policyVersion,
+        },
+      },
+      pass,
+      deltas: [],
+      firstFail,
+      certificate: {
+        status: certificate.payload.status,
+        certificateHash: certificate.certificateHash ?? null,
+        certificateId: certificate.header.id ?? null,
+        integrityOk,
+      },
+      notes: notes.length ? notes : undefined,
+    });
+  } catch (error) {
+    console.warn("[warp-viability] training trace emit failed", error);
+  }
 
   return ViabilityResultSchema.parse({
     ...result,
     config: certificate.payload.config,
     certificate,
-    integrityOk: verifyCertificateIntegrity(certificate),
+    integrityOk,
     supplement,
   });
 };

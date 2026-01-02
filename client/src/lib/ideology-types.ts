@@ -32,3 +32,84 @@ export type IdeologyDoc = {
   rootId: string;
   nodes: IdeologyNode[];
 };
+
+export type IdeologyBeliefGraphEdgeKind = "implies" | "excludes";
+
+export type IdeologyBeliefGraphEdge = {
+  from: string;
+  to: string;
+  kind: IdeologyBeliefGraphEdgeKind;
+  weight?: number;
+  rel?: string;
+};
+
+export type IdeologyBeliefGraphNode = {
+  id: string;
+  title?: string;
+  score: number;
+  fixed?: boolean;
+};
+
+export type IdeologyBeliefGraphGate = {
+  status: "pass" | "fail" | "unknown";
+  residuals: Record<string, number>;
+  note?: string;
+};
+
+export type IdeologyBeliefGraphConstraints = {
+  violationCount: number;
+  violationWeight: number;
+  axiomViolations: number;
+  impliesViolations: number;
+  excludesViolations: number;
+  maxAbsPressure: number;
+};
+
+export type IdeologyBeliefGraphAttempt = {
+  iteration: number;
+  accepted: boolean;
+  gate: IdeologyBeliefGraphGate;
+  constraints: IdeologyBeliefGraphConstraints;
+};
+
+export type IdeologyBeliefGraphSummary = {
+  nodeCount: number;
+  edgeCount: number;
+  impliesEdges: number;
+  excludesEdges: number;
+  missingNodes: string[];
+  unknownIds: string[];
+  conflictIds: string[];
+};
+
+export type IdeologyBeliefGraphConfig = {
+  rootId: string;
+  rootFixed: boolean;
+  includeSeeAlso: boolean;
+  seeAlsoWeight: number;
+  edgeMode: "parent-to-child" | "child-to-parent" | "bidirectional";
+  stepSize: number;
+  maxIterations: number;
+  thresholds: {
+    violationMax: number;
+    violationWeightMax: number;
+  };
+  scoreClamp?: { min: number; max: number } | null;
+  trueIds: string[];
+  falseIds: string[];
+};
+
+export type IdeologyBeliefGraphResponse = {
+  config: IdeologyBeliefGraphConfig;
+  summary: IdeologyBeliefGraphSummary;
+  accepted: boolean;
+  acceptedIteration: number | null;
+  iterations: number;
+  gate: IdeologyBeliefGraphGate | null;
+  constraints: IdeologyBeliefGraphConstraints | null;
+  attempts?: IdeologyBeliefGraphAttempt[];
+  graph?: {
+    nodes: IdeologyBeliefGraphNode[];
+    edges: IdeologyBeliefGraphEdge[];
+  };
+};

@@ -34,6 +34,7 @@ import {
   ModeKey,
   useGreens,
   type EnergyPipelineState as PipelineState,
+  type HullBrickPayload,
 } from "@/hooks/use-energy-pipeline";
 import { useHullPreviewPayload } from "@/hooks/use-hull-preview-payload";
 import useTimeLapseRecorder from "@/hooks/useTimeLapseRecorder";
@@ -83,6 +84,8 @@ import { VIEWER_WIREFRAME_BUDGETS } from "@/lib/resolve-wireframe-overlay";
 import { buildCardSignatures, ensureCardRecipeSchemaVersion } from "@/lib/card-signatures";
 import { buildCardExportSidecar } from "@/lib/card-export-sidecar";
 import { buildLatticeTextureExports, extractCardLatticeMetadata } from "@/lib/lattice-export";
+import type { HullDistanceGrid } from "@/lib/lattice-sdf";
+import type { LatticeFrame } from "@/lib/lattice-frame";
 import DeepMixingSolarView from "@/components/DeepMixingSolarView";
 import DeepMixSweetSpot from "@/components/deepmix/DeepMixSweetSpot";
 const DeepMixGlobePanel = lazy(() => import("@/components/deepmix/DeepMixGlobePanel"));
@@ -138,6 +141,147 @@ const DEEP_MIXING_STATE_BADGE: Record<DeepMixingAutopilotState, string> = {
 };
 
 const DEEP_MIXING_SECONDS_PER_YEAR = 365.25 * 86400;
+
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+const encodeBytesToBase64 = (bytes: Uint8Array): string => {
+  const globalScope = globalThis as {
+    btoa?: (value: string) => string;
+    Buffer?: {
+      from?: (
+        input: Uint8Array,
+      ) => { toString: (encoding: string) => string };
+    };
+  };
+  if (typeof globalScope.btoa === "function") {
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+      binary += String.fromCharCode(...chunk);
+    }
+    return globalScope.btoa(binary);
+  }
+  const bufferFactory = globalScope.Buffer;
+  if (bufferFactory && typeof bufferFactory.from === "function") {
+    return bufferFactory.from(bytes).toString("base64");
+  }
+  let output = "";
+  let i = 0;
+  const { length } = bytes;
+  for (; i + 2 < length; i += 3) {
+    const chunk =
+      (bytes[i] << 16) |
+      (bytes[i + 1] << 8) |
+      bytes[i + 2];
+    output += BASE64_ALPHABET[(chunk >> 18) & 63];
+    output += BASE64_ALPHABET[(chunk >> 12) & 63];
+    output += BASE64_ALPHABET[(chunk >> 6) & 63];
+    output += BASE64_ALPHABET[chunk & 63];
+  }
+  const remaining = length - i;
+  if (remaining === 1) {
+    const chunk = bytes[i] << 16;
+    output += BASE64_ALPHABET[(chunk >> 18) & 63];
+    output += BASE64_ALPHABET[(chunk >> 12) & 63];
+    output += "==";
+  } else if (remaining === 2) {
+    const chunk =
+      (bytes[i] << 16) |
+      (bytes[i + 1] << 8);
+    output += BASE64_ALPHABET[(chunk >> 18) & 63];
+    output += BASE64_ALPHABET[(chunk >> 12) & 63];
+    output += BASE64_ALPHABET[(chunk >> 6) & 63];
+    output += "=";
+  }
+  return output;
+};
+
+const encodeFloat32ToBase64 = (values: Float32Array): string => {
+  const bytes = new Uint8Array(values.buffer, values.byteOffset, values.byteLength);
+  return encodeBytesToBase64(bytes);
+};
+
+const densifyHullDistanceGrid = (grid: HullDistanceGrid) => {
+  const dims = grid.dims;
+  const total = Math.max(1, dims[0] * dims[1] * dims[2]);
+  const bandRaw = Number(grid.band);
+  const band = Number.isFinite(bandRaw) && bandRaw > 0 ? bandRaw : 1;
+  const fillValue = Number.isFinite(grid.stats?.maxAbsDistance)
+    ? Math.max(grid.stats.maxAbsDistance, band)
+    : band;
+  const out = new Float32Array(total);
+  out.fill(fillValue);
+  let min = fillValue;
+  let max = fillValue;
+  const indices = grid.indices;
+  const distances = grid.distances;
+  const len = Math.min(indices.length, distances.length);
+  for (let i = 0; i < len; i += 1) {
+    const idx = indices[i];
+    if (idx >= total) continue;
+    const value = distances[i];
+    if (!Number.isFinite(value)) continue;
+    out[idx] = value;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  if (!Number.isFinite(min)) min = 0;
+  if (!Number.isFinite(max)) max = 0;
+  return { data: out, min, max };
+};
+
+const resolveHullBrickBounds = (grid: HullDistanceGrid, frame: LatticeFrame | null) => {
+  const half = frame?.bounds?.halfSize ?? [grid.bounds[0], grid.bounds[1], grid.bounds[2]];
+  const min: [number, number, number] = frame?.bounds?.minLattice ?? [-half[0], -half[1], -half[2]];
+  const max: [number, number, number] = frame?.bounds?.maxLattice ?? [half[0], half[1], half[2]];
+  const center: [number, number, number] = [
+    (min[0] + max[0]) * 0.5,
+    (min[1] + max[1]) * 0.5,
+    (min[2] + max[2]) * 0.5,
+  ];
+  const extent: [number, number, number] = [
+    Math.abs(max[0] - min[0]) * 0.5,
+    Math.abs(max[1] - min[1]) * 0.5,
+    Math.abs(max[2] - min[2]) * 0.5,
+  ];
+  const axes: [number, number, number] = [
+    Math.max(1e-6, Math.abs(extent[0])),
+    Math.max(1e-6, Math.abs(extent[1])),
+    Math.max(1e-6, Math.abs(extent[2])),
+  ];
+  return { min, max, center, extent, axes };
+};
+
+const buildHullBrickPayloadFromSdf = (
+  grid: HullDistanceGrid,
+  frame: LatticeFrame | null,
+  meshHashHint?: string | null,
+): HullBrickPayload => {
+  const { data, min, max } = densifyHullDistanceGrid(grid);
+  const bounds = resolveHullBrickBounds(grid, frame);
+  const meshHash = grid.meshHash ?? meshHashHint ?? null;
+  return {
+    dims: grid.dims,
+    voxelBytes: 4,
+    format: "r32f",
+    channels: {
+      hullDist: {
+        data: encodeFloat32ToBase64(data),
+        min,
+        max,
+      },
+    },
+    bounds,
+    meta: {
+      meshHash: meshHash ?? undefined,
+      basisSignature: grid.basisSignature ?? undefined,
+      band_m: grid.band,
+      voxelSize_m: grid.voxelSize,
+      source: "lattice-sdf",
+    },
+  };
+};
 
 const PANEL_HASHES = {
   fractionalRail: "fractional-coherence-rail",
@@ -802,6 +946,7 @@ import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
+import GrAgentLoopAuditPanel from "@/components/GrAgentLoopAuditPanel";
 import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
@@ -1079,8 +1224,9 @@ const [vizIntent, setVizIntent] = useState<VizIntent>({ rise: 0, planar: 0, yaw:
 const meshOverlayMeta = useHull3DSharedStore((state) => state.meshOverlay);
 const viewerState = useHull3DSharedStore((state) => state.viewer);
 const viewerPalette = useHull3DSharedStore((state) => state.palette);
-const overlayPrefs = useHull3DSharedStore((state) => state.overlayPrefs);
-const setSharedLattice = useHull3DSharedStore((state) => state.setLattice);
+const overlayPrefs = useHull3DSharedStore((state) => state.overlayPrefs);       
+const sharedLatticeState = useHull3DSharedStore((state) => state.lattice);
+const setSharedLattice = useHull3DSharedStore((state) => state.setLattice);     
 const setHullViewer = useHull3DSharedStore((state) => state.setViewer);
 const handleDirectionPadIntent = useCallback(
   ({ rise, planar }: { rise: number; planar: number }) => {
@@ -1149,7 +1295,9 @@ useEffect(() => {
   });
   const lastAutoApplySigRef = useRef<string | null>(null);
   const autoApplyBusyRef = useRef(false);
-  const pendingAutoPreviewRef = useRef<HullPreviewPayload | null>(null);
+  const pendingAutoPreviewRef = useRef<HullPreviewPayload | null>(null);        
+  const hullBrickUploadRef = useRef<string | null>(null);
+  const hullBrickSentRef = useRef<string | null>(null);
   const alcubierreRef = useRef<HTMLDivElement | null>(null);
 
   const pipeline = pipelineState as PipelineState;
@@ -1192,6 +1340,31 @@ useEffect(() => {
       /* noop */
     }
   }, []);
+
+  const resolveHullBrickCandidate = useCallback(
+    (requirePipelineMatch: boolean) => {
+      const sdf = sharedLatticeState?.sdf ?? null;
+      if (!sdf) return null;
+      const previewMeshHash =
+        hullPreview?.meshHash ?? hullPreview?.mesh?.meshHash ?? null;
+      const pipelineMeshHash =
+        (pipeline as any)?.geometryPreview?.mesh?.meshHash ??
+        (pipeline as any)?.geometryPreview?.preview?.meshHash ??
+        null;
+      if (requirePipelineMatch) {
+        if (!pipelineMeshHash) return null;
+        if (previewMeshHash && pipelineMeshHash !== previewMeshHash) return null;
+        if (sdf.meshHash && pipelineMeshHash !== sdf.meshHash) return null;
+      }
+      if (previewMeshHash && sdf.meshHash && previewMeshHash !== sdf.meshHash) return null;
+      const meshHash = previewMeshHash ?? sdf.meshHash ?? pipelineMeshHash ?? null;
+      const key = `${sdf.key}|${meshHash ?? "mesh:none"}`;
+      if (hullBrickSentRef.current === key || hullBrickUploadRef.current === key) return null;
+      const payload = buildHullBrickPayloadFromSdf(sdf, sharedLatticeState?.frame ?? null, meshHash);
+      return { key, payload };
+    },
+    [sharedLatticeState?.sdf, sharedLatticeState?.frame, hullPreview, pipeline],
+  );
 
   const buildPreviewUpdatePayload = useCallback(
     (preview: HullPreviewPayload | null) => {
@@ -1271,9 +1444,20 @@ useEffect(() => {
     async (preview: HullPreviewPayload) => {
       const payload = buildPreviewUpdatePayload(preview);
       if (!payload) return;
+      const hullBrickCandidate = resolveHullBrickCandidate(false);
+      if (hullBrickCandidate) {
+        (payload as any).hullBrick = hullBrickCandidate.payload;
+        hullBrickUploadRef.current = hullBrickCandidate.key;
+      }
       autoApplyBusyRef.current = true;
       try {
         const response = await updatePipeline.mutateAsync(payload as any);
+        if (hullBrickCandidate) {
+          hullBrickSentRef.current = hullBrickCandidate.key;
+          if (hullBrickUploadRef.current === hullBrickCandidate.key) {
+            hullBrickUploadRef.current = null;
+          }
+        }
         lastAutoApplySigRef.current = `${preview.meshHash ?? preview.mesh?.meshHash ?? "none"}|${preview.updatedAt ?? Date.now()}`;
         const fallback = (response as any)?.geometryFallback;
         const fallbackReasons = Array.isArray(fallback?.reasons) ? fallback.reasons.join(", ") : undefined;
@@ -1318,6 +1502,9 @@ useEffect(() => {
           requireSdf: Boolean(payload.previewSdf),
         });
       } catch (err: any) {
+        if (hullBrickCandidate && hullBrickUploadRef.current === hullBrickCandidate.key) {
+          hullBrickUploadRef.current = null;
+        }
         const fallback = err?.payload?.geometryFallback;
         const fallbackReasons = Array.isArray(fallback?.reasons) ? fallback.reasons.join(", ") : undefined;
         toast({
@@ -1338,8 +1525,39 @@ useEffect(() => {
         }
       }
     },
-    [buildPreviewUpdatePayload, updatePipeline, focusAlcubierrePanel, dispatchAutoViewEvent, hullDimsEffective?.basis, setHullViewer, viewerState?.bounds, setSharedLattice],
+    [
+      buildPreviewUpdatePayload,
+      resolveHullBrickCandidate,
+      updatePipeline,
+      focusAlcubierrePanel,
+      dispatchAutoViewEvent,
+      hullDimsEffective?.basis,
+      autoApplyFallbackMode,
+      setHullViewer,
+      viewerState?.bounds,
+      setSharedLattice,
+    ],
   );
+
+  useEffect(() => {
+    if (autoApplyBusyRef.current) return;
+    const candidate = resolveHullBrickCandidate(true);
+    if (!candidate) return;
+    hullBrickUploadRef.current = candidate.key;
+    updatePipeline
+      .mutateAsync({ hullBrick: candidate.payload } as any)
+      .then(() => {
+        hullBrickSentRef.current = candidate.key;
+      })
+      .catch((err) => {
+        console.warn("[Helix] hull brick upload failed", err);
+      })
+      .finally(() => {
+        if (hullBrickUploadRef.current === candidate.key) {
+          hullBrickUploadRef.current = null;
+        }
+      });
+  }, [resolveHullBrickCandidate, updatePipeline]);
 
   useEffect(() => {
     if (!autoApplyPreview || !hullPreview) return;
@@ -5286,9 +5504,10 @@ useEffect(() => {
                     </CardHeader>
                     <CardContent>
                       <Tabs defaultValue="chat" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
+                        <TabsList className="grid w-full grid-cols-3">
                           <TabsTrigger value="chat">AI Chat</TabsTrigger>
                           <TabsTrigger value="logs">System Logs</TabsTrigger>
+                          <TabsTrigger value="gr-audit">GR Audit</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="chat" className="space-y-3">
@@ -5369,6 +5588,12 @@ useEffect(() => {
                               ))}
                             </div>
                           </ScrollArea>
+                        </TabsContent>
+
+                        <TabsContent value="gr-audit" className="space-y-3">
+                          <div className="rounded-lg border border-slate-800/70 bg-slate-950/60 p-3">
+                            <GrAgentLoopAuditPanel variant="embedded" />
+                          </div>
                         </TabsContent>
                       </Tabs>
                     </CardContent>

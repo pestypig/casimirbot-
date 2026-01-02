@@ -3274,7 +3274,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-      plain: "(8?G/c^5)(P/A) * d_eff * G gives the cycle-averaged curvature proxy.",
+      plain: "(8?G/c^5)(P/A) * d_eff * G gives the cycle-averaged curvature proxy (prefactor = 8?/(c^5/G), inverse Planck power).",
 
 
 
@@ -3939,8 +3939,9 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
           </p>
-
-
+          <p className="text-xs text-slate-400">
+            Astrophysics mapping: treat P as luminosity (peak or averaged), A as 4 pi R^2, d_eff as duty cycle, and G as beaming/geometry gain.
+          </p>
 
           <div className="font-mono text-xs text-slate-300">kappa_drive ~= (8*pi*G/c^5)*(P/A)*d_eff*mathcalG</div>
 

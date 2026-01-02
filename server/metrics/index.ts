@@ -163,6 +163,66 @@ const httpRequestDuration = new Histogram({
   registers: [registry],
 });
 
+const grAgentLoopRunsTotal = new Counter({
+  name: "gr_agent_loop_runs_total",
+  help: "GR agent loop runs recorded",
+  labelNames: ["status"],
+  registers: [registry],
+});
+
+const grAgentLoopAttemptsTotal = new Counter({
+  name: "gr_agent_loop_attempts_total",
+  help: "GR agent loop attempts by gate status and acceptance",
+  labelNames: ["gate_status", "accepted"],
+  registers: [registry],
+});
+
+const grAgentLoopDurationMs = new Histogram({
+  name: "gr_agent_loop_duration_ms",
+  help: "Wall-clock duration of GR agent loops in milliseconds",
+  buckets: [50, 100, 250, 500, 1000, 2000, 5000, 10000, 20000, 60000],
+  registers: [registry],
+});
+
+const grAgentLoopAttemptsPerRun = new Histogram({
+  name: "gr_agent_loop_attempts_per_run",
+  help: "Number of attempts taken per GR agent loop run",
+  buckets: [1, 2, 3, 4, 5, 8, 12, 20, 50],
+  registers: [registry],
+});
+
+const grAgentLoopTimeToGreenMs = new Histogram({
+  name: "gr_agent_loop_time_to_green_ms",
+  help: "Time from last rejected run to next accepted run (ms)",
+  buckets: [1000, 2000, 5000, 10000, 30000, 60000, 300000, 900000],
+  registers: [registry],
+});
+
+const grAgentLoopSuccessRate = new Gauge({
+  name: "gr_agent_loop_success_rate",
+  help: "Accepted runs divided by total runs (since process start)",
+  registers: [registry],
+});
+
+const grAgentLoopConstraintViolationRate = new Gauge({
+  name: "gr_agent_loop_constraint_violation_rate",
+  help: "Gate failures or unknowns divided by total attempts (since process start)",
+  registers: [registry],
+});
+
+const grAgentLoopLastAcceptedIteration = new Gauge({
+  name: "gr_agent_loop_last_accepted_iteration",
+  help: "Iteration index that last passed the GR gate",
+  registers: [registry],
+});
+
+const grAgentLoopLastAcceptedResidual = new Gauge({
+  name: "gr_agent_loop_last_accepted_residual",
+  help: "Residual values from the last accepted attempt",
+  labelNames: ["metric"],
+  registers: [registry],
+});
+
 const normalizeStatus = (value?: boolean | string): "ok" | "error" => {
   if (typeof value === "boolean") {
     return value ? "ok" : "error";
@@ -174,6 +234,39 @@ const normalizeStatus = (value?: boolean | string): "ok" | "error" => {
     return "error";
   }
   return "ok";
+};
+
+type GrAgentLoopMetricsAttempt = {
+  gateStatus?: string;
+  accepted?: boolean;
+  iteration?: number;
+  residuals?: {
+    H_rms?: number;
+    M_rms?: number;
+    H_maxAbs?: number;
+    M_maxAbs?: number;
+  };
+};
+
+type GrAgentLoopMetricsInput = {
+  accepted: boolean;
+  durationMs?: number;
+  acceptedIteration?: number;
+  ts?: string;
+  attempts: GrAgentLoopMetricsAttempt[];
+};
+
+let grAgentLoopAcceptedCount = 0;
+let grAgentLoopRejectedCount = 0;
+let grAgentLoopGateFailures = 0;
+let grAgentLoopGateAttempts = 0;
+let lastGrAgentLoopFailureAt: number | null = null;
+
+const parseGateStatus = (value?: string): "pass" | "fail" | "unknown" => {
+  if (value === "pass" || value === "fail" || value === "unknown") {
+    return value;
+  }
+  return "unknown";
 };
 
 export const metrics = {
@@ -209,6 +302,89 @@ export const metrics = {
     const status = Number.isFinite(statusCode) ? String(statusCode) : "0";
     httpRequestsTotal.inc({ method: method || "GET", route: cleanRoute, status });
     httpRequestDuration.observe({ method: method || "GET", route: cleanRoute, status }, durationMs);
+  },
+  recordGrAgentLoopRun(input: GrAgentLoopMetricsInput): void {
+    const statusLabel = input.accepted ? "accepted" : "rejected";
+    grAgentLoopRunsTotal.inc({ status: statusLabel });
+    if (input.accepted) {
+      grAgentLoopAcceptedCount += 1;
+    } else {
+      grAgentLoopRejectedCount += 1;
+    }
+    const totalRuns = grAgentLoopAcceptedCount + grAgentLoopRejectedCount;
+    if (totalRuns > 0) {
+      grAgentLoopSuccessRate.set(grAgentLoopAcceptedCount / totalRuns);
+    }
+    if (Number.isFinite(input.durationMs as number) && (input.durationMs as number) >= 0) {
+      grAgentLoopDurationMs.observe(input.durationMs as number);
+    }
+    if (input.attempts.length > 0) {
+      grAgentLoopAttemptsPerRun.observe(input.attempts.length);
+    }
+
+    const endMs = (() => {
+      if (input.ts) {
+        const parsed = Date.parse(input.ts);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return Date.now();
+    })();
+
+    if (input.accepted && lastGrAgentLoopFailureAt !== null) {
+      const delta = endMs - lastGrAgentLoopFailureAt;
+      if (Number.isFinite(delta) && delta >= 0) {
+        grAgentLoopTimeToGreenMs.observe(delta);
+      }
+      lastGrAgentLoopFailureAt = null;
+    } else if (!input.accepted) {
+      lastGrAgentLoopFailureAt = endMs;
+    }
+
+    let acceptedAttempt: GrAgentLoopMetricsAttempt | undefined;
+    for (const attempt of input.attempts) {
+      const gateStatus = parseGateStatus(attempt.gateStatus);
+      const acceptedLabel = attempt.accepted ? "true" : "false";
+      grAgentLoopAttemptsTotal.inc({
+        gate_status: gateStatus,
+        accepted: acceptedLabel,
+      });
+      grAgentLoopGateAttempts += 1;
+      if (gateStatus !== "pass") {
+        grAgentLoopGateFailures += 1;
+      }
+      if (attempt.accepted) {
+        acceptedAttempt = attempt;
+      }
+    }
+
+    if (grAgentLoopGateAttempts > 0) {
+      grAgentLoopConstraintViolationRate.set(
+        grAgentLoopGateFailures / grAgentLoopGateAttempts,
+      );
+    }
+
+    if (input.accepted) {
+      const iteration =
+        input.acceptedIteration ??
+        (acceptedAttempt?.iteration as number | undefined);
+      if (Number.isFinite(iteration as number)) {
+        grAgentLoopLastAcceptedIteration.set(iteration as number);
+      }
+      const residuals = acceptedAttempt?.residuals;
+      if (residuals) {
+        const entries: Array<[string, number | undefined]> = [
+          ["H_rms", residuals.H_rms],
+          ["M_rms", residuals.M_rms],
+          ["H_maxAbs", residuals.H_maxAbs],
+          ["M_maxAbs", residuals.M_maxAbs],
+        ];
+        for (const [metric, value] of entries) {
+          if (Number.isFinite(value as number)) {
+            grAgentLoopLastAcceptedResidual.set({ metric }, value as number);
+          }
+        }
+      }
+    }
   },
   recordEvalRun(result: "ok" | "fail" | "skipped" | "error"): void {
     evalRunsTotal.inc({ result });

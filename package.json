@@ -29,11 +29,20 @@
     "ideology:extract": "tsx scripts/extract-ideology.ts",
     "test:watch": "vitest",
     "test:repo": "vitest --root . --run",
+    "gr:loop": "tsx cli/gr-agent-loop.ts",
+    "gr:loop:ci": "tsx cli/gr-agent-loop.ts --ci",
     "physics:ask": "tsx cli/physics-ask.ts",
     "physics:validate": "tsx cli/physics-validate.ts",
     "ops:relief": "tsx cli/qi-relief.ts",
     "collapse:bench": "tsx cli/collapse-bench.ts",
-    "precompute:lattice": "tsx scripts/precompute-lattice.ts"
+    "casimir:verify": "tsx cli/casimir-verify.ts",
+    "audit:bundle": "tsx scripts/audit-bundle.ts",
+    "sdk:build": "npm --prefix sdk run build",
+    "cli:build": "npm --prefix cli run build",
+    "precompute:lattice": "tsx scripts/precompute-lattice.ts",
+    "math:validate": "tsx scripts/validate-math-stage.ts",
+    "math:report": "tsx scripts/math-report.ts",
+    "math:trace": "tsx scripts/math-trace.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

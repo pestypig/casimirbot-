@@ -259,7 +259,14 @@ export const warpFieldTypeSchema = z.enum(["natario", "natario_sdf", "alcubierre
 export type WarpFieldType = z.infer<typeof warpFieldTypeSchema>;
 
 const cardGateSourceSchema = z.enum(["schedule", "blanket", "combined"]);
-const cardVolumeVizSchema = z.enum(["theta_drive", "theta_gr", "rho_gr", "shear_gr", "vorticity_gr"]);
+const cardVolumeVizSchema = z.enum([
+  "theta_drive",
+  "theta_gr",
+  "rho_gr",
+  "shear_gr",
+  "vorticity_gr",
+  "alpha",
+]);
 const cardVolumeDomainSchema = z.enum(["wallBand", "bubbleBox"]);
 const cardVolumeSourceSchema = z.enum(["analytic", "lattice", "brick"]);
 export type CardVolumeSource = z.infer<typeof cardVolumeSourceSchema>;
@@ -432,6 +439,9 @@ const cardRecipeSignaturesSchema = z.object({
 });
 export type CardRecipeSignatures = z.infer<typeof cardRecipeSignaturesSchema>;
 
+export const spacetimeGridWarpFieldSchema = z.enum(["dfdr", "alpha"]);
+export type SpacetimeGridWarpField = z.infer<typeof spacetimeGridWarpFieldSchema>;
+
 export const spacetimeGridPrefsSchema = z.object({
   enabled: z.boolean(),
   mode: z.enum(["slice", "surface", "volume"]),
@@ -439,8 +449,11 @@ export const spacetimeGridPrefsSchema = z.object({
   warpStrength: z.number().nonnegative(),
   falloff_m: z.number().positive(),
   colorBy: z.enum(["thetaSign", "thetaMagnitude", "warpStrength"]),
+  warpField: spacetimeGridWarpFieldSchema.optional(),
   useSdf: z.boolean(),
   warpStrengthMode: z.enum(["manual", "autoThetaPk", "autoThetaScaleExpected"]),
+  warpGamma: z.number().positive().optional(),
+  useGradientDir: z.boolean().optional(),
 });
 export type SpacetimeGridPrefs = z.infer<typeof spacetimeGridPrefsSchema>;
 
@@ -1241,6 +1254,401 @@ export interface VacuumContract {
   changed: VacuumContractField[];
   rule?: string;
 }
+// --- GR constraint contract (Helix agents) --------------------------------
+export const grConstraintSeveritySchema = z.enum(["HARD", "SOFT"]);
+export type GrConstraintSeverity = z.infer<typeof grConstraintSeveritySchema>;
+
+export const grConstraintStatusSchema = z.enum(["pass", "fail", "unknown"]);
+export type GrConstraintStatus = z.infer<typeof grConstraintStatusSchema>;
+
+const ladderTierSchema = z.enum(["diagnostic", "reduced-order", "certified"]);
+
+export const grConstraintEntrySchema = z.object({
+  id: z.string(),
+  severity: grConstraintSeveritySchema,
+  status: grConstraintStatusSchema,
+  value: z.number().nullable().optional(),
+  limit: z.string().nullable().optional(),
+  proxy: z.boolean().optional(),
+  note: z.string().optional(),
+});
+export type GrConstraintEntry = z.infer<typeof grConstraintEntrySchema>;
+
+export const grConstraintPolicySchema = z.object({
+  mode: z.enum(["all", "hard-only"]).default("hard-only"),
+  unknownAsFail: z.boolean().default(true),
+  minLadderTier: ladderTierSchema.optional(),
+});
+export type GrConstraintPolicy = z.infer<typeof grConstraintPolicySchema>;
+
+export const grConstraintThresholdSchema = z.object({
+  H_rms_max: z.number().nonnegative(),
+  M_rms_max: z.number().nonnegative(),
+  H_maxAbs_max: z.number().nonnegative().optional(),
+  M_maxAbs_max: z.number().nonnegative().optional(),
+});
+export type GrConstraintThresholds = z.infer<typeof grConstraintThresholdSchema>;
+
+export const grConstraintGateStatusSchema = z.enum(["pass", "fail", "unknown"]);
+export type GrConstraintGateStatus = z.infer<typeof grConstraintGateStatusSchema>;
+
+export const grConstraintGateSchema = z.object({
+  status: grConstraintGateStatusSchema,
+  evaluatedAt: z.number(),
+  thresholds: grConstraintThresholdSchema,
+  policy: grConstraintPolicySchema,
+});
+export type GrConstraintGate = z.infer<typeof grConstraintGateSchema>;
+
+export const grConstraintGateConfigSourceSchema = z.enum([
+  "warp-agents",
+  "default",
+]);
+export type GrConstraintGateConfigSource = z.infer<
+  typeof grConstraintGateConfigSourceSchema
+>;
+
+export const grConstraintGateConfigSchema = z.object({
+  version: z.number().int().positive(),
+  source: grConstraintGateConfigSourceSchema,
+  thresholds: grConstraintThresholdSchema,
+  policy: grConstraintPolicySchema,
+  overridesApplied: z.boolean().optional(),
+});
+export type GrConstraintGateConfig = z.infer<
+  typeof grConstraintGateConfigSchema
+>;
+
+export const grCertificatePolicySchema = z.object({
+  admissibleStatus: z.string(),
+  allowMarginalAsViable: z.boolean(),
+  treatMissingCertificateAsNotCertified: z.boolean(),
+});
+export type GrCertificatePolicy = z.infer<typeof grCertificatePolicySchema>;
+
+export const grConstraintPolicyBundleSchema = z.object({
+  gate: grConstraintGateConfigSchema,
+  certificate: grCertificatePolicySchema,
+});
+export type GrConstraintPolicyBundle = z.infer<
+  typeof grConstraintPolicyBundleSchema
+>;
+
+export const grGuardrailStatusSchema = z.enum(["ok", "fail", "proxy", "missing"]);
+export type GrGuardrailStatus = z.infer<typeof grGuardrailStatusSchema>;
+
+export const grGuardrailSchema = z.object({
+  fordRoman: grGuardrailStatusSchema,
+  thetaAudit: grGuardrailStatusSchema,
+  tsRatio: grGuardrailStatusSchema,
+  vdbBand: grGuardrailStatusSchema,
+});
+export type GrGuardrails = z.infer<typeof grGuardrailSchema>;
+
+export const grConstraintContractSchema = z.object({
+  kind: z.literal("gr-constraint-contract"),
+  version: z.number().int().positive(),
+  updatedAt: z.number(),
+  policy: grConstraintPolicyBundleSchema,
+  sources: z.object({
+    grDiagnostics: z.enum(["gr-evolve-brick", "pipeline", "missing"]),
+    certificate: z.enum(["physics.warp.viability", "missing"]),
+  }),
+  grid: z
+    .object({
+      dims: z.tuple([
+        z.number().int().positive(),
+        z.number().int().positive(),
+        z.number().int().positive(),
+      ]),
+      bounds: z.object({
+        min: vec3Schema,
+        max: vec3Schema,
+      }),
+      voxelSize_m: z.number().positive().optional(),
+      time_s: z.number().optional(),
+      dt_s: z.number().optional(),
+    })
+    .optional(),
+  diagnostics: z
+    .object({
+      H_rms: z.number().optional(),
+      M_rms: z.number().optional(),
+      lapseMin: z.number().optional(),
+      lapseMax: z.number().optional(),
+      betaMaxAbs: z.number().optional(),
+    })
+    .optional(),
+  perf: z
+    .object({
+      totalMs: z.number().optional(),
+      evolveMs: z.number().optional(),
+      brickMs: z.number().optional(),
+      voxels: z.number().int().optional(),
+      channelCount: z.number().int().optional(),
+      bytesEstimate: z.number().int().optional(),
+      msPerStep: z.number().optional(),
+    })
+    .optional(),
+  gate: grConstraintGateSchema.optional(),
+  guardrails: grGuardrailSchema.optional(),
+  constraints: z.array(grConstraintEntrySchema),
+  certificate: z.object({
+    status: z.string(),
+    admissibleStatus: z.string(),
+    hasCertificate: z.boolean(),
+    certificateHash: z.string().nullable(),
+    certificateId: z.string().nullable(),
+  }),
+  notes: z.array(z.string()).optional(),
+  proxy: z.boolean().optional(),
+});
+export type GrConstraintContract = z.infer<typeof grConstraintContractSchema>;
+
+export const grEvaluationSchema = z.object({
+  kind: z.literal("gr-evaluation"),
+  updatedAt: z.number(),
+  policy: grConstraintPolicyBundleSchema,
+  residuals: z.object({
+    H_rms: z.number().optional(),
+    M_rms: z.number().optional(),
+    H_maxAbs: z.number().optional(),
+    M_maxAbs: z.number().optional(),
+  }),
+  gate: grConstraintGateSchema,
+  constraints: z.array(grConstraintEntrySchema),
+  certificate: z.object({
+    status: z.string(),
+    admissibleStatus: z.string(),
+    hasCertificate: z.boolean(),
+    certificateHash: z.string().nullable(),
+    certificateId: z.string().nullable(),
+    integrityOk: z.boolean(),
+  }),
+  pass: z.boolean(),
+  notes: z.array(z.string()).optional(),
+});
+export type GrEvaluation = z.infer<typeof grEvaluationSchema>;
+
+export const grGroundingCertificateSchema = z.object({
+  status: z.string(),
+  admissibleStatus: z.string().optional(),
+  hasCertificate: z.boolean().optional(),
+  certificateHash: z.string().nullable(),
+  certificateId: z.string().nullable(),
+  integrityOk: z.boolean().optional(),
+});
+export type GrGroundingCertificate = z.infer<typeof grGroundingCertificateSchema>;
+
+export const grGroundingSchema = z.object({
+  kind: z.literal("gr-grounding"),
+  version: z.number().int().positive(),
+  updatedAt: z.number(),
+  policyVersion: z.string(),
+  residuals: grEvaluationSchema.shape.residuals,
+  constraints: z.array(grConstraintEntrySchema),
+  certificate: grGroundingCertificateSchema,
+  pass: z.boolean(),
+  notes: z.array(z.string()).optional(),
+  proxy: z.boolean().optional(),
+});
+export type GrGrounding = z.infer<typeof grGroundingSchema>;
+
+export const grConstraintMetricsSchema = z.object({
+  H_rms: z.number().nonnegative(),
+  M_rms: z.number().nonnegative(),
+  H_maxAbs: z.number().nonnegative(),
+  M_maxAbs: z.number().nonnegative(),
+});
+export type GrConstraintMetrics = z.infer<typeof grConstraintMetricsSchema>;
+
+export const grConstraintTrendSchema = z.object({
+  H_rms: z.number(),
+  M_rms: z.number(),
+  H_maxAbs: z.number(),
+  M_maxAbs: z.number(),
+});
+export type GrConstraintTrend = z.infer<typeof grConstraintTrendSchema>;
+
+export const grConstraintSeriesPointSchema = z.object({
+  step: z.number().int().nonnegative(),
+  time_s: z.number().nonnegative(),
+  metrics: grConstraintMetricsSchema,
+  gateStatus: grConstraintGateStatusSchema,
+});
+export type GrConstraintSeriesPoint = z.infer<typeof grConstraintSeriesPointSchema>;
+
+export const grConstraintNetworkSummarySchema = z.object({
+  max: grConstraintMetricsSchema,
+  final: grConstraintMetricsSchema,
+  trend: grConstraintTrendSchema,
+  steps: z.number().int().nonnegative(),
+});
+export type GrConstraintNetworkSummary = z.infer<typeof grConstraintNetworkSummarySchema>;
+
+export const grConstraintNetworkSchema = z.object({
+  kind: z.literal("gr-constraint-network-4d"),
+  version: z.number().int().positive(),
+  updatedAt: z.number(),
+  pass: z.boolean(),
+  grid: z.object({
+    dims: z.tuple([
+      z.number().int().positive(),
+      z.number().int().positive(),
+      z.number().int().positive(),
+    ]),
+    bounds: z.object({
+      min: vec3Schema,
+      max: vec3Schema,
+    }),
+    voxelSize_m: vec3Schema.optional(),
+    time_s: z.number(),
+    dt_s: z.number(),
+    steps: z.number().int().nonnegative(),
+  }),
+  initial: z.object({
+    status: z.enum(["CERTIFIED", "NOT_CERTIFIED"]),
+    iterations: z.number().int().nonnegative(),
+    residual: z.number().nonnegative(),
+    tolerance: z.number().nonnegative(),
+    reason: z.string().optional(),
+  }),
+  gate: grConstraintGateSchema,
+  constraints: z.array(grConstraintEntrySchema),
+  summary: grConstraintNetworkSummarySchema,
+  series: z.array(grConstraintSeriesPointSchema),
+  notes: z.array(z.string()).optional(),
+});
+export type GrConstraintNetwork4d = z.infer<typeof grConstraintNetworkSchema>;
+
+export const grRegionGridSchema = z.object({
+  thetaBins: z.number().int().positive(),
+  longBins: z.number().int().positive(),
+  phaseBins: z.number().int().positive(),
+  radialBins: z.number().int().positive(),
+  totalRegions: z.number().int().positive(),
+  longAxis: z.enum(["x", "y", "z"]),
+  targetRegions: z.number().int().positive().optional(),
+  strobeHz: z.number().nonnegative(),
+  strobePeriod_s: z.number().nonnegative(),
+  lightCrossing_s: z.number().nonnegative(),
+  phase01: z.number().optional(),
+  phaseBin: z.number().int().nonnegative().optional(),
+});
+export type GrRegionGrid = z.infer<typeof grRegionGridSchema>;
+
+export const grRegionStatsEntrySchema = z.object({
+  id: z.number().int().nonnegative(),
+  key: z.string(),
+  indices: z.object({
+    theta: z.number().int().nonnegative(),
+    long: z.number().int().nonnegative(),
+    phase: z.number().int().nonnegative(),
+    radial: z.number().int().nonnegative(),
+  }),
+  voxelCount: z.number().int().nonnegative(),
+  volume: z.number().nonnegative(),
+  negEnergy: z.number().nonnegative(),
+  posEnergy: z.number().nonnegative(),
+  negFraction: z.number().nonnegative(),
+  negShare: z.number().nonnegative(),
+  centroid: vec3Schema.nullable().optional(),
+});
+export type GrRegionStatsEntry = z.infer<typeof grRegionStatsEntrySchema>;
+
+export const grRegionStatsSchema = z.object({
+  kind: z.literal("gr-region-stats"),
+  updatedAt: z.number(),
+  source: z.object({
+    brick: z.enum(["gr-evolve-brick", "stress-energy-brick", "missing"]),
+    proxy: z.boolean(),
+    certified: z.boolean().optional(),
+    notes: z.array(z.string()).optional(),
+  }),
+  geometry: z.object({
+    source: z.enum(["preview", "pipeline"]),
+    meshHash: z.string().nullable().optional(),
+    hull: z.object({
+      Lx_m: z.number(),
+      Ly_m: z.number(),
+      Lz_m: z.number(),
+      wallThickness_m: z.number(),
+    }),
+    bounds: z.object({
+      min: vec3Schema,
+      max: vec3Schema,
+    }),
+    radialMap: z.enum(["warp-geometry", "preview", "none"]),
+  }),
+  grid: grRegionGridSchema,
+  sample: z.object({
+    dims: z.tuple([
+      z.number().int().positive(),
+      z.number().int().positive(),
+      z.number().int().positive(),
+    ]),
+    voxelSize_m: vec3Schema,
+    voxelCount: z.number().int().nonnegative(),
+    stride: z.number().int().positive().optional(),
+  }),
+  summary: z.object({
+    negEnergy: z.number().nonnegative(),
+    posEnergy: z.number().nonnegative(),
+    negFraction: z.number().nonnegative(),
+    contractionVector: vec3Schema.nullable().optional(),
+    contractionMagnitude: z.number().nonnegative(),
+  }),
+  topRegions: z.array(grRegionStatsEntrySchema),
+});
+export type GrRegionStats = z.infer<typeof grRegionStatsSchema>;
+
+export const casimirTileSummarySchema = z.object({
+  kind: z.literal("casimir-tile-summary"),
+  updatedAt: z.number(),
+  source: z.object({
+    brick: z.enum(["stress-energy-brick"]),
+    proxy: z.boolean(),
+    notes: z.array(z.string()).optional(),
+  }),
+  sample: z
+    .object({
+      dims: z.tuple([
+        z.number().int().positive(),
+        z.number().int().positive(),
+        z.number().int().positive(),
+      ]),
+      bounds: z.object({
+        min: vec3Schema,
+        max: vec3Schema,
+      }),
+      voxelSize_m: vec3Schema,
+    })
+    .optional(),
+  inputs: z.object({
+    sectorCount: z.number().int().positive(),
+    sectorDuty: z.number().nonnegative(),
+    strobeHz: z.number().nonnegative(),
+    phase01: z.number().optional(),
+    splitEnabled: z.boolean(),
+    splitFrac: z.number().min(0).max(1),
+    sigmaSector: z.number().nonnegative(),
+    N_tiles: z.number().int().nonnegative(),
+    tileArea_cm2: z.number().nonnegative(),
+    gammaGeo: z.number().nonnegative(),
+    gammaVdB: z.number().nonnegative(),
+    qSpoil: z.number().nonnegative(),
+  }),
+  summary: z.object({
+    dutyEffectiveFR: z.number().nonnegative(),
+    rho_avg: z.number().nullable(),
+    T00_min: z.number(),
+    T00_max: z.number(),
+    netFlux: vec3Schema,
+    divRms: z.number().nonnegative(),
+    strobePhase: z.number().nonnegative(),
+  }),
+});
+export type CasimirTileSummary = z.infer<typeof casimirTileSummarySchema>;
 
 // --- Material model selection for Casimir calculations --------------------
 export const materialModelSchema = z.enum(["ideal_retarded", "lifshitz_drude", "lifshitz_plasma", "auto"]);
@@ -1441,3 +1849,322 @@ export const DEFAULT_PHASE_MICRO_SWEEP: Pick<DynamicCasimirSweepConfig, "phase_d
   phase_deg: rng(-2, 2, 0.25),
   phaseMicroStep_deg: 0.25,
 };
+
+export const trainingTraceSourceSchema = z.object({
+  system: z.string().optional(),
+  component: z.string().optional(),
+  tool: z.string().optional(),
+  version: z.string().optional(),
+  proxy: z.boolean().optional(),
+});
+export type TrainingTraceSource = z.infer<typeof trainingTraceSourceSchema>;
+
+export const policyLadderTierSchema = ladderTierSchema;
+export type PolicyLadderTier = z.infer<typeof policyLadderTierSchema>;
+
+export const policyLadderSchema = z.object({
+  tier: policyLadderTierSchema,
+  policy: z.string().optional(),
+  policyVersion: z.string().optional(),
+});
+export type PolicyLadder = z.infer<typeof policyLadderSchema>;
+
+export const trainingTraceSignalSchema = z.object({
+  kind: z.string().optional(),
+  proxy: z.boolean().optional(),
+  ladder: policyLadderSchema.optional(),
+});
+export type TrainingTraceSignal = z.infer<typeof trainingTraceSignalSchema>;
+
+export const trainingTraceDeltaSchema = z.object({
+  key: z.string(),
+  from: z.number().nullable().optional(),
+  to: z.number().nullable().optional(),
+  delta: z.number().optional(),
+  unit: z.string().optional(),
+  change: z.enum(["added", "removed", "changed"]).optional(),
+});
+export type TrainingTraceDelta = z.infer<typeof trainingTraceDeltaSchema>;
+
+export const trainingTraceConstraintSchema = z.object({
+  id: z.string(),
+  severity: z.string().optional(),
+  status: z.string().optional(),
+  value: z.number().nullable().optional(),
+  limit: z.string().nullable().optional(),
+  note: z.string().optional(),
+});
+export type TrainingTraceConstraint = z.infer<typeof trainingTraceConstraintSchema>;
+
+export const trainingTraceCertificateSchema = z.object({
+  status: z.string().optional(),
+  certificateHash: z.string().nullable(),
+  certificateId: z.string().nullable().optional(),
+  integrityOk: z.boolean().optional(),
+});
+export type TrainingTraceCertificate = z.infer<typeof trainingTraceCertificateSchema>;
+
+export const trainingTraceSchema = z.object({
+  kind: z.literal("training-trace"),
+  version: z.number().int().positive(),
+  id: z.string(),
+  seq: z.number().int().nonnegative(),
+  ts: z.string(),
+  traceId: z.string().optional(),
+  tenantId: z.string().optional(),
+  source: trainingTraceSourceSchema.optional(),
+  signal: trainingTraceSignalSchema.optional(),
+  pass: z.boolean(),
+  deltas: z.array(trainingTraceDeltaSchema),
+  firstFail: trainingTraceConstraintSchema.optional(),
+  certificate: trainingTraceCertificateSchema.optional(),
+  notes: z.array(z.string()).optional(),
+});
+export type TrainingTraceRecord = z.infer<typeof trainingTraceSchema>;
+
+export const adapterActionSchema = z
+  .object({
+    id: z.string().optional(),
+    kind: z.string().optional(),
+    label: z.string().optional(),
+    params: z.record(z.unknown()).optional(),
+    note: z.string().optional(),
+  })
+  .passthrough();
+export type AdapterAction = z.infer<typeof adapterActionSchema>;
+
+export const adapterBudgetSchema = z.object({
+  maxIterations: z.number().int().positive().max(50).optional(),
+  maxTotalMs: z.number().nonnegative().optional(),
+  maxAttemptMs: z.number().nonnegative().optional(),
+});
+export type AdapterBudget = z.infer<typeof adapterBudgetSchema>;
+
+export const adapterPolicySchema = z.object({
+  thresholds: grConstraintThresholdSchema.partial().optional(),
+  gate: grConstraintPolicySchema.partial().optional(),
+});
+export type AdapterPolicy = z.infer<typeof adapterPolicySchema>;
+
+const adapterMetricValueSchema = z.union([
+  z.number(),
+  z.boolean(),
+  z.string(),
+  z.null(),
+]);
+
+const adapterMetricsSchema = z.record(adapterMetricValueSchema).optional();
+
+export const adapterModeSchema = z.enum(["gr", "constraint-pack"]);
+export type AdapterMode = z.infer<typeof adapterModeSchema>;
+
+export const adapterConstraintPackSchema = z.object({
+  id: z.string(),
+  customerId: z.string().optional(),
+  policyProfileId: z.string().optional(),
+  policyOverride: z.lazy(() => constraintPackOverrideInputSchema).optional(),
+  telemetry: z.record(z.unknown()).optional(),
+  metrics: adapterMetricsSchema,
+  certificate: z.lazy(() => constraintPackCertificateResultSchema).optional(),
+  deltas: z.array(trainingTraceDeltaSchema).optional(),
+  notes: z.array(z.string()).optional(),
+  proxy: z.boolean().optional(),
+  ladderTier: policyLadderTierSchema.optional(),
+  autoTelemetry: z.boolean().optional(),
+  telemetryPath: z.string().optional(),
+  junitPath: z.string().optional(),
+});
+export type AdapterConstraintPack = z.infer<typeof adapterConstraintPackSchema>;
+
+export const adapterArtifactRefSchema = z.object({
+  kind: z.string(),
+  ref: z.string(),
+  label: z.string().optional(),
+});
+export type AdapterArtifactRef = z.infer<typeof adapterArtifactRefSchema>;
+
+export const adapterRunRequestSchema = z.object({
+  traceId: z.string().optional(),
+  mode: adapterModeSchema.optional(),
+  pack: adapterConstraintPackSchema.optional(),
+  actions: z.array(adapterActionSchema).min(1).optional(),
+  budget: adapterBudgetSchema.optional(),
+  policy: adapterPolicySchema.optional(),
+});
+export type AdapterRunRequest = z.infer<typeof adapterRunRequestSchema>;
+
+export const adapterRunResponseSchema = z.object({
+  traceId: z.string().optional(),
+  runId: z.string(),
+  verdict: z.enum(["PASS", "FAIL"]),
+  pass: z.boolean(),
+  firstFail: trainingTraceConstraintSchema.nullable().optional(),
+  deltas: z.array(trainingTraceDeltaSchema),
+  artifacts: z.array(adapterArtifactRefSchema),
+});
+export type AdapterRunResponse = z.infer<typeof adapterRunResponseSchema>;
+
+export const constraintPackPolicySchema = z.object({
+  mode: z.enum(["all", "hard-only"]).default("hard-only"),
+  unknownAsFail: z.boolean().default(true),
+  minLadderTier: policyLadderTierSchema.optional(),
+});
+export type ConstraintPackPolicy = z.infer<typeof constraintPackPolicySchema>;
+
+export const constraintPackCertificatePolicySchema = z.object({
+  issuer: z.string().optional(),
+  admissibleStatus: z.string(),
+  allowMarginalAsViable: z.boolean(),
+  treatMissingCertificateAsNotCertified: z.boolean(),
+});
+export type ConstraintPackCertificatePolicy = z.infer<
+  typeof constraintPackCertificatePolicySchema
+>;
+
+export const constraintPackConstraintSchema = z.object({
+  id: z.string(),
+  severity: z.enum(["HARD", "SOFT"]),
+  description: z.string().optional(),
+  metric: z.string().optional(),
+  op: z.string().optional(),
+  limit: z.number().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  units: z.string().optional(),
+  source: z.string().optional(),
+  proxy: z.boolean().optional(),
+  note: z.string().optional(),
+});
+export type ConstraintPackConstraint = z.infer<
+  typeof constraintPackConstraintSchema
+>;
+
+export const constraintPackConstraintOverrideSchema = z.object({
+  id: z.string(),
+  severity: z.enum(["HARD", "SOFT"]).optional(),
+  description: z.string().optional(),
+  op: z.string().optional(),
+  limit: z.number().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  proxy: z.boolean().optional(),
+  note: z.string().optional(),
+});
+export type ConstraintPackConstraintOverride = z.infer<
+  typeof constraintPackConstraintOverrideSchema
+>;
+
+export const constraintPackOverrideSchema = z.object({
+  packId: z.string(),
+  policy: constraintPackPolicySchema.partial().optional(),
+  certificate: constraintPackCertificatePolicySchema.partial().optional(),
+  constraints: z.array(constraintPackConstraintOverrideSchema).optional(),
+  proxies: z.array(constraintPackConstraintOverrideSchema).optional(),
+});
+export type ConstraintPackOverride = z.infer<typeof constraintPackOverrideSchema>;
+
+export const constraintPackOverrideInputSchema =
+  constraintPackOverrideSchema.extend({
+    packId: z.string().optional(),
+  });
+export type ConstraintPackOverrideInput = z.infer<
+  typeof constraintPackOverrideInputSchema
+>;
+
+export const constraintPackSchema = z.object({
+  id: z.string(),
+  domain: z.string(),
+  version: z.number().int().positive(),
+  description: z.string().optional(),
+  signalKinds: z.object({
+    diagnostic: z.string(),
+    certified: z.string(),
+  }),
+  policy: constraintPackPolicySchema,
+  certificate: constraintPackCertificatePolicySchema,
+  constraints: z.array(constraintPackConstraintSchema),
+  proxies: z.array(constraintPackConstraintSchema).optional(),
+  traceMapping: z
+    .object({
+      passRule: z.string().optional(),
+      firstFailRule: z.string().optional(),
+      signalKindRule: z
+        .object({
+          certified: z.string().optional(),
+          diagnostic: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  artifacts: z
+    .object({
+      metricsRef: z.string().optional(),
+      reportRef: z.string().optional(),
+    })
+    .optional(),
+});
+export type ConstraintPack = z.infer<typeof constraintPackSchema>;
+
+export const constraintPackPolicyProfileSchema = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  version: z.number().int().positive(),
+  packs: z.array(constraintPackOverrideSchema).default([]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type ConstraintPackPolicyProfile = z.infer<
+  typeof constraintPackPolicyProfileSchema
+>;
+
+export const constraintPackPolicyProfileInputSchema = z.object({
+  id: z.string().optional(),
+  customerId: z.string(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  version: z.number().int().positive().optional(),
+  packs: z.array(constraintPackOverrideSchema).min(1),
+});
+export type ConstraintPackPolicyProfileInput = z.infer<
+  typeof constraintPackPolicyProfileInputSchema
+>;
+
+export const constraintPackConstraintResultSchema = z.object({
+  id: z.string(),
+  severity: z.enum(["HARD", "SOFT"]).optional(),
+  status: z.enum(["pass", "fail", "unknown"]).optional(),
+  value: z.number().nullable().optional(),
+  limit: z.union([z.string(), z.number()]).nullable().optional(),
+  proxy: z.boolean().optional(),
+  note: z.string().optional(),
+});
+export type ConstraintPackConstraintResult = z.infer<
+  typeof constraintPackConstraintResultSchema
+>;
+
+export const constraintPackCertificateResultSchema = z.object({
+  status: z.string().optional(),
+  certificateHash: z.string().nullable().optional(),
+  certificateId: z.string().nullable().optional(),
+  integrityOk: z.boolean().optional(),
+});
+export type ConstraintPackCertificateResult = z.infer<
+  typeof constraintPackCertificateResultSchema
+>;
+
+export const constraintPackEvaluationSchema = z.object({
+  pass: z.boolean().optional(),
+  constraints: z.array(constraintPackConstraintResultSchema).optional(),        
+  certificate: constraintPackCertificateResultSchema.optional(),
+  deltas: z.array(trainingTraceDeltaSchema).optional(),
+  firstFail: constraintPackConstraintResultSchema.optional(),
+  notes: z.array(z.string()).optional(),
+  proxy: z.boolean().optional(),
+  ladderTier: policyLadderTierSchema.optional(),
+});
+export type ConstraintPackEvaluation = z.infer<
+  typeof constraintPackEvaluationSchema
+>;
+

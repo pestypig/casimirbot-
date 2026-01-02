@@ -5,6 +5,7 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
 import VizDiagnosticsPanel from "@/components/warp/VizDiagnosticsPanel";
 import SplashCursor from "@/components/SplashCursor";
+import TimeDilationLatticePanel from "@/components/TimeDilationLatticePanel";
 import {
   PROFILE_STORAGE_KEY,
   useHelixStartSettings,
@@ -12,6 +13,7 @@ import {
 } from "@/hooks/useHelixStartSettings";
 import { ThemeInstrumentDeck } from "@/components/start/ThemeInstrumentDeck";
 import { useEssenceThemes } from "@/hooks/useEssenceThemes";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { DOC_VIEWER_PANEL_ID, saveDocViewerIntent, type DocViewerIntent } from "@/lib/docs/docViewer";
 
 const PENDING_PANEL_KEY = "helix:pending-panel";
@@ -70,6 +72,10 @@ export default function StartPortal() {
     error: themeError,
     refetch: refetchThemes
   } = useEssenceThemes();
+  const { data: pipelineSnapshot } = useEnergyPipeline({
+    staleTime: 5000,
+    refetchOnWindowFocus: false,
+  });
   const themeErrorMessage =
     themeIsError && themeError instanceof Error
       ? themeError.message
@@ -339,6 +345,24 @@ export default function StartPortal() {
             void refetchThemes();
           }}
         />
+
+        <section className="mt-10">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+              <div className="space-y-2 lg:max-w-sm">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-sky-300">Time dilation</p>
+                <h3 className="text-lg font-semibold text-white">Spacetime lattice preview</h3>
+                <p className="text-sm leading-relaxed text-slate-300/80">
+                  Visualize a 3D lattice warped by a shared potential field. Local clock pulses slow near mass while the
+                  grid deformation remains a visual cue, keeping space and time meanings separate.
+                </p>
+              </div>
+              <div className="flex-1">
+                <TimeDilationLatticePanel pipeline={pipelineSnapshot ?? null} />
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="mt-10">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">

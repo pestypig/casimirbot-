@@ -32,6 +32,7 @@ import type {
   QiAutoscaleClamp,
   QiGuardrail,
 } from "@/types/pipeline";
+import type { StressEnergyBrickStats } from "@/lib/stress-energy-brick";
 
 /**
  * TheoryRefs:
@@ -138,6 +139,102 @@ export type AmpFactors = {
   qCavity?: number;
 };
 
+export type HullBrickChannel = {
+  data: Float32Array | string;
+  min?: number;
+  max?: number;
+};
+
+export type HullBrickBounds = {
+  min?: [number, number, number];
+  max?: [number, number, number];
+  center?: [number, number, number];
+  extent?: [number, number, number];
+  axes?: [number, number, number];
+  wall?: number;
+};
+
+export type HullBrickPayload = {
+  dims: [number, number, number];
+  voxelBytes?: number;
+  format?: "r32f";
+  channels: {
+    hullDist?: HullBrickChannel;
+    hullMask?: HullBrickChannel;
+  };
+  bounds?: HullBrickBounds;
+  meta?: unknown;
+};
+
+export type GrConstraintDiagnostics = {
+  min: number;
+  max: number;
+  maxAbs: number;
+  rms?: number;
+};
+
+export type GrMomentumConstraintDiagnostics = {
+  rms: number;
+  maxAbs: number;
+  components: {
+    x: GrConstraintDiagnostics;
+    y: GrConstraintDiagnostics;
+    z: GrConstraintDiagnostics;
+  };
+};
+
+export type GrPipelineDiagnostics = {
+  updatedAt: number;
+  source: "gr-evolve-brick";
+  grid: {
+    dims: [number, number, number];
+    bounds: { min: [number, number, number]; max: [number, number, number] };
+    voxelSize_m: [number, number, number];
+    time_s: number;
+    dt_s: number;
+  };
+  solver: {
+    steps: number;
+    iterations: number;
+    tolerance: number;
+    cfl: number;
+  };
+  gauge?: {
+    lapseMin: number;
+    lapseMax: number;
+    betaMaxAbs: number;
+  };
+  constraints: {
+    H_constraint: GrConstraintDiagnostics;
+    M_constraint: GrMomentumConstraintDiagnostics;
+  };
+  matter?: {
+    stressEnergy?: StressEnergyBrickStats;
+  };
+  perf?: {
+    totalMs: number;
+    evolveMs: number;
+    brickMs: number;
+    voxels: number;
+    channelCount: number;
+    bytesEstimate: number;
+    msPerStep: number;
+  };
+};
+
+export type GrRequestPayload = {
+  P_avg_W: number;
+  dutyEffectiveFR: number;
+  gammaGeo: number;
+  gammaVdB: number;
+  qSpoil: number;
+  TS_ratio: number;
+  hull: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number };
+  hullArea_m2?: number;
+  N_tiles: number;
+  tilesPerSector: number;
+};
+
 export interface EnergyPipelineState {
   // Input parameters
   tileArea_cm2: number;
@@ -153,6 +250,7 @@ export interface EnergyPipelineState {
   cardRecipe?: CardRecipe;
   geometryPreview?: GeometryPreviewState | null;
   geometryFallback?: WarpGeometryFallback | null;
+  hullBrick?: HullBrickPayload | null;
   
   /** Post-scale for translational bias (0..1). 1 = full translation. */
   beta_trans?: number;
@@ -216,6 +314,9 @@ export interface EnergyPipelineState {
   deltaAOverA?: number;         // alias for qSpoilingFactor
   strobeHz?: number;
   phase01?: number;
+  sigmaSector?: number;
+  splitEnabled?: boolean;
+  splitFrac?: number;
   phaseSign?: number;
   phaseMode?: string;
   pumpPhase_deg?: number;
@@ -259,6 +360,11 @@ export interface EnergyPipelineState {
   mechanical?: MechanicalFeasibility;
   mechGuard?: MechanicalGuard;
   phaseSchedule?: PhaseScheduleTelemetry;
+
+  // GR diagnostics (optional)
+  grEnabled?: boolean;
+  gr?: GrPipelineDiagnostics;
+  grRequest?: GrRequestPayload;
 
   // Hull parameters for UI overlays
   hull?: {

@@ -49,7 +49,7 @@ const wireHelixApi = async (
     }
     if (url.includes("/api/helix/hull-preview/upload")) {
       const payload = opts?.uploadResponse ?? {
-        glbUrl: "/luma/ellipsoid-12x6x4.glb",
+        glbUrl: "/luma/needle-ellipsoid.glb",
         meshHash: "mesh-upload",
         updatedAt: Date.now(),
       };
@@ -109,7 +109,7 @@ test.describe("Spacetime grid overlays", () => {
 
     const previewPayload = {
       version: "v1",
-      glbUrl: "/luma/ellipsoid-12x6x4.glb",
+      glbUrl: "/luma/needle-ellipsoid.glb",
       meshHash: "mesh-e2e-grid",
       targetDims: { Lx_m: 2, Ly_m: 1, Lz_m: 1 },
       updatedAt: Date.now(),
@@ -157,7 +157,7 @@ test.describe("Spacetime grid overlays", () => {
     const updatedAt = Date.now();
     await wireHelixApi(page, {
       uploadResponse: {
-        glbUrl: "/luma/ellipsoid-12x6x4.glb",
+        glbUrl: "/luma/needle-ellipsoid.glb",
         meshHash: "mesh-uploaded-e2e",
         updatedAt,
       },
@@ -168,7 +168,7 @@ test.describe("Spacetime grid overlays", () => {
       window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "model-silhouette" } }));
     });
 
-    const glbPath = path.resolve(__dirname, "../public/luma/ellipsoid-12x6x4.glb");
+    const glbPath = path.resolve(__dirname, "../public/luma/needle-ellipsoid.glb");
     const fileInput = page.locator("#glb-file");
     await fileInput.waitFor({ state: "visible" });
     await fileInput.setInputFiles(glbPath);
@@ -184,7 +184,7 @@ test.describe("Spacetime grid overlays", () => {
           return false;
         }
       },
-      { expectedAt: updatedAt, expectedUrl: "/luma/ellipsoid-12x6x4.glb" },
+      { expectedAt: updatedAt, expectedUrl: "/luma/needle-ellipsoid.glb" },
       { timeout: 30_000 },
     );
 

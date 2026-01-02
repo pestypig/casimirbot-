@@ -3,10 +3,24 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import multer from "multer";
 import { listKnowledgeFilesByProjects } from "../db/knowledge";
+import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop.js";
 
 const router = Router();
 const upload = multer();
 const LOCAL_TTS_URL = process.env.LOCAL_TTS_URL ?? "http://127.0.0.1:8000/api/tts";
+const DEFAULT_NOISE_FIELD = {
+  width: 32,
+  height: 32,
+  seed: 1,
+  maxIterations: 6,
+  stepSize: 0.15,
+  thresholds: {
+    laplacianRmsMax: 0.12,
+    laplacianMaxAbsMax: 0.6,
+  },
+};
+const MAX_NOISE_FIELD_SIDE = 256;
+const MAX_NOISE_FIELD_STEPS = 25;
 
 const peakSchema = z.object({
   omega: z.number(),
@@ -93,6 +107,36 @@ const evidenceSchema = z
   })
   .strict();
 
+const noiseFieldThresholdSchema = z
+  .object({
+    laplacianRmsMax: z.number().positive(),
+    laplacianMaxAbsMax: z.number().positive(),
+  })
+  .partial()
+  .strict();
+
+const noiseFieldClampSchema = z
+  .object({
+    min: z.number(),
+    max: z.number(),
+  })
+  .refine((value) => value.max >= value.min, {
+    message: "clamp max must be >= min",
+  });
+
+const noiseFieldRequestSchema = z
+  .object({
+    width: z.number().int().min(2).max(MAX_NOISE_FIELD_SIDE).optional(),
+    height: z.number().int().min(2).max(MAX_NOISE_FIELD_SIDE).optional(),
+    seed: z.number().int().min(0).max(2_147_483_647).optional(),
+    maxIterations: z.number().int().min(1).max(MAX_NOISE_FIELD_STEPS).optional(),
+    stepSize: z.number().min(0.001).max(1).optional(),
+    thresholds: noiseFieldThresholdSchema.optional(),
+    clamp: noiseFieldClampSchema.optional(),
+    includeValues: z.boolean().optional(),
+  })
+  .strict();
+
 type JobStatus = "queued" | "processing" | "ready" | "error";
 
 type CoverJob = {
@@ -134,6 +178,22 @@ const isAudioMime = (mime: string | null | undefined): boolean => {
     lower.includes("flac") ||
     lower.includes("ogg")
   );
+};
+
+const summarizeNoiseValues = (values: Float32Array) => {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let sum = 0;
+  for (let i = 0; i < values.length; i += 1) {
+    const value = values[i];
+    if (value < min) min = value;
+    if (value > max) max = value;
+    sum += value;
+  }
+  if (!Number.isFinite(min)) min = 0;
+  if (!Number.isFinite(max)) max = 0;
+  const mean = values.length ? sum / values.length : 0;
+  return { min, max, mean };
 };
 
 router.get("/api/noise-gens/library", async (req, res) => {
@@ -257,10 +317,77 @@ router.put("/api/noise-gens/jobs/:id/error", (req, res) => {
   job.status = "error";
   job.updatedAt = Date.now();
   job.error =
-    typeof req.body?.error === "string" && req.body.error.trim().length > 0
+    typeof req.body?.error === "string" && req.body.error.trim().length > 0     
       ? req.body.error
       : "unknown";
   return res.json(job);
+});
+
+router.post("/api/noise-gens/noise-field", (req, res) => {
+  const parsed = noiseFieldRequestSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_noise_field_request", issues: parsed.error.issues });
+  }
+
+  const request = parsed.data;
+  const width = Math.max(2, request.width ?? DEFAULT_NOISE_FIELD.width);
+  const height = Math.max(2, request.height ?? DEFAULT_NOISE_FIELD.height);
+  const seed = request.seed ?? DEFAULT_NOISE_FIELD.seed;
+  const maxIterations =
+    request.maxIterations ?? DEFAULT_NOISE_FIELD.maxIterations;
+  const stepSize = request.stepSize ?? DEFAULT_NOISE_FIELD.stepSize;
+  const thresholds = {
+    ...DEFAULT_NOISE_FIELD.thresholds,
+    ...(request.thresholds ?? {}),
+  };
+  const includeValues = request.includeValues !== false;
+
+  const result = runNoiseFieldLoop({
+    width,
+    height,
+    seed,
+    maxIterations,
+    stepSize,
+    thresholds,
+    clamp: request.clamp,
+  });
+
+  const attempts = result.attempts.map((attempt) => ({
+    iteration: attempt.iteration,
+    accepted: attempt.accepted,
+    gate: attempt.gate,
+    constraints: attempt.constraints,
+  }));
+  const finalAttempt = attempts[attempts.length - 1] ?? null;
+  const stats = summarizeNoiseValues(result.finalState.values);
+  const values = includeValues ? Array.from(result.finalState.values) : undefined;
+
+  return res.json({
+    config: {
+      width,
+      height,
+      seed,
+      maxIterations,
+      stepSize,
+      thresholds,
+      clamp: request.clamp ?? null,
+    },
+    accepted: result.accepted,
+    acceptedIteration: result.acceptedIteration ?? null,
+    iterations: attempts.length,
+    attempts,
+    gate: finalAttempt?.gate ?? null,
+    constraints: finalAttempt?.constraints ?? null,
+    finalState: {
+      width: result.finalState.width,
+      height: result.finalState.height,
+      encoding: "row-major",
+      ...(includeValues ? { values } : {}),
+    },
+    stats,
+  });
 });
 
 const buildPromptFromJob = (job: CoverJob): string => {
