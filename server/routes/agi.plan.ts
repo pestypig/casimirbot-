@@ -1,6 +1,8 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { z } from "zod";
 import type { ToolManifestEntry } from "@shared/skills";
 import type { TCollapseTraceEntry, TTaskTrace } from "@shared/essence-persona";
@@ -11,6 +13,9 @@ import type { GroundingReport, GroundingSource } from "@shared/grounding";
 import { Routine, type TRoutine } from "@shared/agi-instructions";
 import { PROMPT_SPEC_SCHEMA_VERSION, type PromptSpec } from "@shared/prompt-spec";
 import { zLocalCallSpec, type LocalCallSpec } from "@shared/local-call-spec";
+import type { AnchorConfig, RetrieveCandidate } from "../../codex/anchors/types";
+import { routeIntent } from "../../codex/anchors/router";
+import { retrieveCandidates } from "../../codex/anchors/retriever";
 import {
   DEFAULT_SUMMARY_FOCUS,
   formatPlanDsl,
@@ -50,6 +55,14 @@ import { buildWhyBelongs } from "../services/planner/why-belongs";
 import { getTool, listTools, registerTool } from "../skills";
 import { llmLocalHandler, llmLocalSpec } from "../skills/llm.local";
 import { lumaGenerateHandler, lumaGenerateSpec } from "../skills/luma.generate";
+import {
+  noiseGenCoverHandler,
+  noiseGenCoverSpec,
+} from "../skills/noise.gen.cover";
+import {
+  noiseGenFingerprintHandler,
+  noiseGenFingerprintSpec,
+} from "../skills/noise.gen.fingerprint";
 import { badgeTelemetryHandler, badgeTelemetrySpec } from "../skills/telemetry.badges";
 import { panelSnapshotHandler, panelSnapshotSpec } from "../skills/telemetry.panels";
 import { sttWhisperHandler, sttWhisperSpec } from "../skills/stt.whisper";
@@ -85,7 +98,21 @@ import { repoPatchSimulateHandler, repoPatchSimulateSpec } from "../skills/repo.
 import { getTaskTrace, saveTaskTrace } from "../db/agi";
 import { metrics, sseConnections } from "../metrics";
 import { personaPolicy } from "../auth/policy";
-import { getToolLogs, getToolLogsSince, subscribeToolLogs, type ToolLogRecord } from "../services/observability/tool-log-store";
+import { guardTenant } from "../auth/tenant";
+import {
+  appendToolLog,
+  getToolLogs,
+  getToolLogsSince,
+  subscribeToolLogs,
+  type ToolLogPolicyFlags,
+  type ToolLogRecord,
+} from "../services/observability/tool-log-store";
+import {
+  createToolEventAdapter,
+  mapLangGraphToolEvent,
+} from "../services/observability/tool-event-adapters";
+import { stableJsonStringify } from "../utils/stable-json";
+import { sha256Hex } from "../utils/information-boundary";
 import { ensureSpecialistsRegistered } from "../specialists/bootstrap";
 import { hullModeEnabled, shouldRegisterExternalAdapter } from "../security/hull-guard";
 import { readKnowledgeConfig } from "../config/knowledge";
@@ -115,6 +142,7 @@ const TRACE_SSE_LIMIT = (() => {
   const clamped = Math.floor(raw);
   return Math.min(250, Math.max(1, clamped));
 })();
+const toolEventAdapter = createToolEventAdapter();
 const DEFAULT_DESKTOP_ID = "helix.desktop.main";
 const LOCAL_CALL_SPEC_URL =
   process.env.LOCAL_CALL_SPEC_URL ??
@@ -131,6 +159,69 @@ const LOCAL_STT_URL =
   "http://127.0.0.1:11434/api/stt";
 const LOCAL_TTS_TIMEOUT_MS = 5000;
 const LOCAL_STT_TIMEOUT_MS = 5000;
+const ANCHOR_CONFIG_PATH = path.resolve(process.cwd(), "codex/anchors/anchors.config.json");
+let anchorConfigCache: AnchorConfig | null = null;
+let anchorConfigLoadFailed = false;
+
+const loadAnchorConfig = (): AnchorConfig | null => {
+  if (anchorConfigLoadFailed) return null;
+  if (anchorConfigCache) return anchorConfigCache;
+  try {
+    const raw = fs.readFileSync(ANCHOR_CONFIG_PATH, "utf8");
+    anchorConfigCache = JSON.parse(raw) as AnchorConfig;
+    return anchorConfigCache;
+  } catch (error) {
+    anchorConfigLoadFailed = true;
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[plan] anchors config unavailable: ${message}`);
+    return null;
+  }
+};
+
+const mergeAnchorHints = (args: {
+  callSpec: LocalCallSpec | undefined;
+  candidates: RetrieveCandidate[];
+  goal: string;
+  knowledgeHints: string[];
+}): { callSpec: LocalCallSpec | undefined; knowledgeHints: string[] } => {
+  const { goal, candidates } = args;
+  if (candidates.length === 0) {
+    return { callSpec: args.callSpec, knowledgeHints: args.knowledgeHints };
+  }
+
+  const nextHints = [...args.knowledgeHints];
+  const resourceHints = [...(args.callSpec?.resourceHints ?? [])];
+  const seenPaths = new Set(
+    resourceHints
+      .map((hint) => hint.path)
+      .filter((pathValue): pathValue is string => typeof pathValue === "string" && pathValue.trim().length > 0),
+  );
+
+  for (const candidate of candidates) {
+    if (!nextHints.includes(candidate.path)) {
+      nextHints.push(candidate.path);
+    }
+    if (!seenPaths.has(candidate.path)) {
+      resourceHints.push({
+        type: "repo_file",
+        path: candidate.path,
+        reason: candidate.reason,
+      });
+      seenPaths.add(candidate.path);
+    }
+  }
+
+  const baseSpec: LocalCallSpec = args.callSpec ?? {
+    action: "call_remote",
+    premise: goal,
+    intent: [],
+  };
+
+  return {
+    callSpec: { ...baseSpec, resourceHints },
+    knowledgeHints: nextHints,
+  };
+};
 
 const parseDebugSourcesFlag = (bodyValue?: boolean, queryValue?: unknown): boolean => {
   if (typeof bodyValue === "boolean") {
@@ -851,6 +942,194 @@ const ToolLogsQuery = z.object({
     .optional(),
 });
 
+const ToolLogPolicyFlagSchema = z.union([z.boolean(), z.number()]);
+const ToolLogPolicyFlagsSchema = z
+  .object({
+    forbidden: ToolLogPolicyFlagSchema.optional(),
+    approvalMissing: ToolLogPolicyFlagSchema.optional(),
+    provenanceMissing: ToolLogPolicyFlagSchema.optional(),
+  })
+  .partial();
+const ToolLogDefaultsSchema = z.object({
+  traceId: z.string().min(1).optional(),
+  sessionId: z.string().min(1).optional(),
+  version: z.string().min(1).optional(),
+  policy: ToolLogPolicyFlagsSchema.optional(),
+});
+const ToolLogRecordSchema = z
+  .object({
+    tool: z.string().min(1),
+    ok: z.boolean(),
+    durationMs: z.coerce.number().nonnegative(),
+    paramsHash: z.string().optional(),
+    promptHash: z.string().optional(),
+    params: z.unknown().optional(),
+    version: z.string().optional(),
+    ts: z.union([z.string(), z.number(), z.date()]).optional(),
+    traceId: z.string().optional(),
+    sessionId: z.string().optional(),
+    stepId: z.string().optional(),
+    seed: z.unknown().optional(),
+    error: z.unknown().optional(),
+    policy: ToolLogPolicyFlagsSchema.optional(),
+    essenceId: z.string().optional(),
+    text: z.string().optional(),
+    debateId: z.string().optional(),
+    strategy: z.string().optional(),
+  })
+  .passthrough();
+const ToolEventSchema = z
+  .object({
+    kind: z.enum(["start", "success", "error"]),
+    runId: z.string().min(1),
+    tool: z.string().optional(),
+    traceId: z.string().optional(),
+    sessionId: z.string().optional(),
+    stepId: z.string().optional(),
+    version: z.string().optional(),
+    params: z.unknown().optional(),
+    paramsHash: z.string().optional(),
+    promptHash: z.string().optional(),
+    seed: z.unknown().optional(),
+    policy: ToolLogPolicyFlagsSchema.optional(),
+    essenceId: z.string().optional(),
+    text: z.string().optional(),
+    debateId: z.string().optional(),
+    strategy: z.string().optional(),
+    ts: z.union([z.string(), z.number(), z.date()]).optional(),
+    durationMs: z.coerce.number().nonnegative().optional(),
+    output: z.unknown().optional(),
+    error: z.unknown().optional(),
+  })
+  .passthrough();
+const LangGraphEventSchema = z.object({}).passthrough();
+const ToolLogIngestSchema = z.object({
+  defaults: ToolLogDefaultsSchema.optional(),
+  record: ToolLogRecordSchema.optional(),
+  records: z.array(ToolLogRecordSchema).optional(),
+  event: ToolEventSchema.optional(),
+  events: z.array(ToolEventSchema).optional(),
+  langGraphEvent: LangGraphEventSchema.optional(),
+  langGraphEvents: z.array(LangGraphEventSchema).optional(),
+});
+
+const parseBoundedInt = (
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(min, Math.floor(parsed)), max);
+};
+
+const TOOL_LOG_INGEST_MAX_BYTES = parseBoundedInt(
+  process.env.TOOL_LOG_INGEST_MAX_BYTES,
+  100000,
+  1024,
+  10000000,
+);
+const TOOL_LOG_INGEST_MAX_RECORDS = parseBoundedInt(
+  process.env.TOOL_LOG_INGEST_MAX_RECORDS,
+  200,
+  1,
+  5000,
+);
+const TOOL_LOG_INGEST_RPM = parseBoundedInt(
+  process.env.TOOL_LOG_INGEST_RPM,
+  0,
+  0,
+  60000,
+);
+const TOOL_LOG_INGEST_RATE_WINDOW_MS = parseBoundedInt(
+  process.env.TOOL_LOG_INGEST_RATE_WINDOW_MS,
+  60000,
+  1000,
+  3600000,
+);
+const TOOL_LOG_INGEST_RATE_MAX_KEYS = 5000;
+const toolLogIngestLimiter = new Map<string, { count: number; resetAt: number }>();
+
+const mergePolicyFlags = (
+  base?: ToolLogPolicyFlags,
+  override?: ToolLogPolicyFlags,
+): ToolLogPolicyFlags | undefined => {
+  if (!base && !override) return undefined;
+  return { ...(base ?? {}), ...(override ?? {}) };
+};
+
+const normalizeTimestamp = (
+  value?: string | number | Date,
+): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  if (Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+  return undefined;
+};
+
+const normalizeErrorValue = (value: unknown): string | undefined => {
+  if (!value) return undefined;
+  if (typeof value === "string") return value;
+  if (value instanceof Error) return value.message;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const resolveParamsHash = (paramsHash?: string, params?: unknown): string => {  
+  if (typeof paramsHash === "string" && paramsHash.trim()) {
+    return paramsHash.trim();
+  }
+  if (params === undefined) return "unknown";
+  try {
+    return sha256Hex(stableJsonStringify(params));
+  } catch {
+    return "unknown";
+  }
+};
+
+const estimateBodyBytes = (body: unknown): number | null => {
+  if (body === undefined) return 0;
+  try {
+    return Buffer.byteLength(JSON.stringify(body), "utf8");
+  } catch {
+    return null;
+  }
+};
+
+const checkToolLogIngestRate = (
+  key: string,
+): { ok: true } | { ok: false; retryAfterMs: number; limit: number } => {
+  if (TOOL_LOG_INGEST_RPM <= 0) {
+    return { ok: true };
+  }
+  const now = Date.now();
+  if (toolLogIngestLimiter.size > TOOL_LOG_INGEST_RATE_MAX_KEYS) {
+    for (const [entryKey, entry] of toolLogIngestLimiter.entries()) {
+      if (entry.resetAt <= now) {
+        toolLogIngestLimiter.delete(entryKey);
+      }
+    }
+  }
+  const existing = toolLogIngestLimiter.get(key);
+  const record =
+    existing && existing.resetAt > now
+      ? existing
+      : { count: 0, resetAt: now + TOOL_LOG_INGEST_RATE_WINDOW_MS };
+  record.count += 1;
+  toolLogIngestLimiter.set(key, record);
+  if (record.count > TOOL_LOG_INGEST_RPM) {
+    return { ok: false, retryAfterMs: record.resetAt - now, limit: TOOL_LOG_INGEST_RPM };
+  }
+  return { ok: true };
+};
+
 const PHYSICS_TOOL_NAME = "physics.curvature.unit";
 
 const repoToolsEnabled = (): boolean => process.env.ENABLE_REPO_TOOLS === "1";
@@ -1028,6 +1307,15 @@ async function ensureDefaultTools(): Promise<void> {
   }
   if (!getTool(lumaGenerateSpec.name)) {
     registerTool({ ...lumaGenerateSpec, handler: lumaGenerateHandler });
+  }
+  if (!getTool(noiseGenCoverSpec.name)) {
+    registerTool({ ...noiseGenCoverSpec, handler: noiseGenCoverHandler });
+  }
+  if (!getTool(noiseGenFingerprintSpec.name)) {
+    registerTool({
+      ...noiseGenFingerprintSpec,
+      handler: noiseGenFingerprintHandler,
+    });
   }
   if (!getTool(sttWhisperSpec.name)) {
     registerTool({ ...sttWhisperSpec, handler: sttWhisperHandler });
@@ -1496,6 +1784,29 @@ planRouter.post("/plan", async (req, res) => {
     resonanceSelection,
     intent,
   });
+  const anchorConfig = loadAnchorConfig();
+  if (anchorConfig) {
+    const anchorText = [goal, query].filter(Boolean).join("\n");
+    if (anchorText.trim().length > 0) {
+      const anchorIntent = routeIntent(anchorText, anchorConfig);
+      if (anchorIntent === "architecture" || anchorIntent === "hybrid") {
+        const anchorCandidates = retrieveCandidates({
+          userText: anchorText,
+          cfg: anchorConfig,
+          repoRoot: process.cwd(),
+          max: anchorConfig.anchors.maxPerAnswer,
+        });
+        const merged = mergeAnchorHints({
+          callSpec,
+          candidates: anchorCandidates,
+          goal,
+          knowledgeHints,
+        });
+        callSpec = merged.callSpec;
+        knowledgeHints = merged.knowledgeHints;
+      }
+    }
+  }
   const resourceHintPaths: string[] = [];
   if (callSpec?.resourceHints) {
     for (const hint of callSpec.resourceHints) {
@@ -2006,21 +2317,175 @@ planRouter.post("/execute", async (req, res) => {
 });
 
 planRouter.get("/tools/logs", (req, res) => {
+  const tenantGuard = guardTenant(req);
+  if (!tenantGuard.ok) {
+    return res.status(tenantGuard.status).json({ error: tenantGuard.error });
+  }
   const parsed = ToolLogsQuery.safeParse(req.query);
   if (!parsed.success) {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
   const { limit, tool } = parsed.data;
-  const logs = getToolLogs({ limit, tool });
+  const logs = getToolLogs({ limit, tool, tenantId: tenantGuard.tenantId });
   res.json({ logs, limit, tool });
 });
 
+planRouter.post("/tools/logs/ingest", (req, res) => {
+  const tenantGuard = guardTenant(req);
+  if (!tenantGuard.ok) {
+    return res.status(tenantGuard.status).json({ error: tenantGuard.error });
+  }
+  const contentLength = Number(req.get("content-length"));
+  if (
+    Number.isFinite(contentLength) &&
+    contentLength > TOOL_LOG_INGEST_MAX_BYTES
+  ) {
+    return res.status(413).json({
+      error: "payload_too_large",
+      limitBytes: TOOL_LOG_INGEST_MAX_BYTES,
+    });
+  }
+  const estimatedBytes = estimateBodyBytes(req.body);
+  if (estimatedBytes !== null && estimatedBytes > TOOL_LOG_INGEST_MAX_BYTES) {
+    return res.status(413).json({
+      error: "payload_too_large",
+      limitBytes: TOOL_LOG_INGEST_MAX_BYTES,
+    });
+  }
+  const parsed = ToolLogIngestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const defaults = parsed.data.defaults ?? {};
+  const records = [
+    ...(parsed.data.record ? [parsed.data.record] : []),
+    ...(parsed.data.records ?? []),
+  ];
+  const events = [
+    ...(parsed.data.event ? [parsed.data.event] : []),
+    ...(parsed.data.events ?? []),
+  ];
+  const langGraphEvents = [
+    ...(parsed.data.langGraphEvent ? [parsed.data.langGraphEvent] : []),        
+    ...(parsed.data.langGraphEvents ?? []),
+  ];
+  if (records.length === 0 && events.length === 0 && langGraphEvents.length === 0) {
+    return res.status(400).json({ error: "bad_request", details: [{ message: "no_events" }] });
+  }
+  const totalIngested = records.length + events.length + langGraphEvents.length;
+  if (totalIngested > TOOL_LOG_INGEST_MAX_RECORDS) {
+    return res.status(413).json({
+      error: "record_limit_exceeded",
+      limit: TOOL_LOG_INGEST_MAX_RECORDS,
+      received: totalIngested,
+    });
+  }
+  const rateKey = tenantGuard.tenantId ?? req.ip ?? "anonymous";
+  const rateResult = checkToolLogIngestRate(rateKey);
+  if (!rateResult.ok) {
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil(rateResult.retryAfterMs / 1000),
+    );
+    res.set("Retry-After", String(retryAfterSeconds));
+    return res.status(429).json({
+      error: "rate_limited",
+      limit: rateResult.limit,
+      retryAfterMs: rateResult.retryAfterMs,
+    });
+  }
+
+  const counts = {
+    records: 0,
+    events: 0,
+    langGraphEvents: 0,
+    starts: 0,
+    successes: 0,
+    errors: 0,
+    ignored: 0,
+  };
+
+  for (const record of records) {
+    const tool = record.tool.trim();
+    if (!tool) {
+      counts.ignored += 1;
+      continue;
+    }
+    const policy = mergePolicyFlags(defaults.policy, record.policy);
+    const paramsHash = resolveParamsHash(record.paramsHash, record.params);     
+    appendToolLog({
+      tool,
+      version: record.version ?? defaults.version ?? "unknown",
+      paramsHash,
+      promptHash: record.promptHash,
+      durationMs: record.durationMs,
+      tenantId: tenantGuard.tenantId,
+      sessionId: record.sessionId ?? defaults.sessionId,
+      traceId: record.traceId ?? defaults.traceId,
+      stepId: record.stepId,
+      seed: record.seed,
+      ok: record.ok,
+      error: record.ok ? undefined : normalizeErrorValue(record.error),
+      policy,
+      essenceId: record.essenceId,
+      text: record.text,
+      debateId: record.debateId,
+      strategy: record.strategy,
+      ts: normalizeTimestamp(record.ts),
+    });
+    counts.records += 1;
+  }
+
+  const applyEventDefaults = (event: z.infer<typeof ToolEventSchema>) => ({     
+    ...event,
+    tenantId: tenantGuard.tenantId,
+    traceId: event.traceId ?? defaults.traceId,
+    sessionId: event.sessionId ?? defaults.sessionId,
+    version: event.version ?? defaults.version,
+    policy: mergePolicyFlags(defaults.policy, event.policy),
+  });
+
+  const handleEvent = (event: z.infer<typeof ToolEventSchema>): void => {
+    const normalized = applyEventDefaults(event);
+    toolEventAdapter.handle(normalized);
+    if (normalized.kind === "start") counts.starts += 1;
+    if (normalized.kind === "success") counts.successes += 1;
+    if (normalized.kind === "error") counts.errors += 1;
+  };
+
+  for (const event of events) {
+    handleEvent(event);
+    counts.events += 1;
+  }
+
+  for (const rawEvent of langGraphEvents) {
+    const mapped = mapLangGraphToolEvent(rawEvent as any);
+    if (!mapped) {
+      counts.ignored += 1;
+      continue;
+    }
+    const normalized = applyEventDefaults(mapped);
+    toolEventAdapter.handle(normalized);
+    if (normalized.kind === "start") counts.starts += 1;
+    if (normalized.kind === "success") counts.successes += 1;
+    if (normalized.kind === "error") counts.errors += 1;
+    counts.langGraphEvents += 1;
+  }
+
+  res.json({ ok: true, counts });
+});
+
 planRouter.get("/tools/logs/stream", (req, res) => {
+  const tenantGuard = guardTenant(req);
+  if (!tenantGuard.ok) {
+    return res.status(tenantGuard.status).json({ error: tenantGuard.error });
+  }
   const parsed = ToolLogsQuery.safeParse(req.query);
   if (!parsed.success) {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
   const { limit, tool } = parsed.data;
+  const tenantId = tenantGuard.tenantId;
   const lastEventId = req.get("last-event-id") ?? req.get("Last-Event-ID");
   res.set({
     "Content-Type": "text/event-stream",
@@ -2042,20 +2507,23 @@ planRouter.get("/tools/logs/stream", (req, res) => {
 
   const sendEvent = (entry: ToolLogRecord): void => {
     try {
-      res.write(`id: ${entry.seq}\ndata: ${JSON.stringify(entry)}\n\n`);
+      res.write(`id: ${entry.seq}\ndata: ${JSON.stringify(entry)}\n\n`);        
     } catch {
       // connection closed, let close handler clean up
     }
   };
 
   const backlog = lastEventId
-    ? getToolLogsSince(lastEventId, { tool })
-    : getToolLogs({ limit, tool }).sort((a, b) => a.seq - b.seq);
+    ? getToolLogsSince(lastEventId, { tool, tenantId })
+    : getToolLogs({ limit, tool, tenantId }).sort((a, b) => a.seq - b.seq);
   for (const entry of backlog) {
     sendEvent(entry);
   }
 
   const unsubscribe = subscribeToolLogs((entry) => {
+    if (tenantId && entry.tenantId !== tenantId) {
+      return;
+    }
     if (tool && entry.tool !== tool) {
       return;
     }

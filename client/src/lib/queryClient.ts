@@ -273,6 +273,8 @@ const buildGrEvolveMock = (dims: FixedTuple3) => {
       cfl: 0,
       H_rms: 0,
       M_rms: 0,
+      thetaPeakAbs: 0,
+      thetaGrowthPerStep: 0,
     },
   };
 };

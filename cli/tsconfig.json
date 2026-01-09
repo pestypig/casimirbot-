@@ -11,5 +11,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["casimir-verify.ts"]
+  "include": ["casimir-verify.ts", "casimir-collect.ts", "shadow-of-intent.ts"]
 }

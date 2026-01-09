@@ -17,13 +17,16 @@ import { getHorizonsElements } from "./utils/horizons-proxy";
 import { orchestratorRouter } from "./routes/orchestrator";
 import { analysisLoopRouter } from "./routes/analysis-loops";
 import noiseGensRouter from "./routes/noise-gens";
+import { aiPlanRouter } from "./routes/ai.plan";
 import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
 import { helixQiRouter } from "./routes/helix/qi";
 import { helixMathRouter } from "./routes/helix/math";
+import { helixAuditTreeRouter } from "./routes/helix/audit-tree";
 import { warpViabilityRouter } from "./routes/warp-viability";
 import { curvatureRouter } from "./routes/physics.curvature";
-import { collapseBenchmarksRouter } from "./routes/benchmarks.collapse";
+import { tokamakRouter } from "./routes/physics.tokamak";
+import { collapseBenchmarksRouter } from "./routes/benchmarks.collapse";        
 import { grAgentRouter } from "./routes/gr-agent";
 import { trainingTraceRouter } from "./routes/training-trace";
 import { adapterRouter } from "./routes/agi.adapter";
@@ -38,6 +41,7 @@ import { qiControllerRouter, startQiController } from "./modules/qi/qi-controlle
 import { codeLatticeRouter } from "./routes/code-lattice";
 import { stellarRouter } from "./routes/stellar";
 import { starRouter } from "./routes/star";
+import { neuroRouter } from "./routes/neuro";
 import type { SimResult, Schedule, Flow, Faults, ClockModel } from "@shared/tsn-sim";
 import { DEFAULT_QBV_SCHEDULE, DEMO_FLOWS, simulate as simulateTsn } from "../simulations/tsn-sim";
 import { getGitFirstAppearances } from "./lib/git-first-appearance";
@@ -78,14 +82,17 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/benchmarks/collapse", collapseBenchmarksRouter);
     app.use("/api/physics/warp", warpViabilityRouter);
     app.use("/api/physics/curvature", curvatureRouter);
+    app.use("/api/physics/tokamak", tokamakRouter);
     app.use("/api/vectorizer", vectorizerRouter);
 
     app.use("/api/orchestrator", orchestratorRouter);
     app.use("/api/analysis", analysisLoopRouter);
     app.use(noiseGensRouter);
+    app.use("/api/ai", aiPlanRouter);
     app.use("/api/hull/status", hullStatusRouter);
     if (flagEnabled(process.env.ENABLE_STAR_SERVICE ?? process.env.ENABLE_STAR, true)) {
       app.use("/api/star", starRouter);
+      app.use("/api/neuro", neuroRouter);
     }
     if (process.env.HULL_MODE === "1" && process.env.ENABLE_CAPSULE_IMPORT === "1") {
       const { hullCapsules } = await import("./routes/hull.capsules");
@@ -130,9 +137,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     const { memoryRouter } = await import("./routes/agi.memory");
     const { planRouter } = await import("./routes/agi.plan");
     const { evalRouter } = await import("./routes/agi.eval");
-    const { profileRouter } = await import("./routes/agi.profile");        
-    const { starTelemetryRouter } = await import("./routes/agi.star");     
-    const enableDebate = flagEnabled(process.env.ENABLE_DEBATE, false);    
+    const { profileRouter } = await import("./routes/agi.profile");
+    const { starTelemetryRouter } = await import("./routes/agi.star");
+    const { contributionsRouter } = await import("./routes/agi.contributions");
+    const enableDebate = flagEnabled(process.env.ENABLE_DEBATE, false);
     if (enableDebate) {
       const { debateRouter } = await import("./routes/agi.debate");
       app.use("/api/agi/debate", debateRouter);
@@ -140,6 +148,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi/persona", personaRouter);
     app.use("/api/agi/memory", memoryRouter);
     app.use("/api/agi/profile", profileRouter);
+    app.use("/api/agi/contributions", contributionsRouter);
     app.use("/api/agi", trainingTraceRouter);
     app.use("/api/agi", constraintPacksRouter);
     app.use("/api/agi/adapter", adapterRouter);
@@ -990,6 +999,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     getDisplacementField,
     getDisplacementFieldGeometry,
     probeFieldOnHull,
+    getLatticeProbe,
     updatePipelineParams,
     ingestHardwareSweepPoint,
     ingestHardwareSectorState,
@@ -1044,6 +1054,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post("/api/helix/field-geometry", getDisplacementFieldGeometry);
   app.options("/api/helix/field-probe", probeFieldOnHull);
   app.post("/api/helix/field-probe", probeFieldOnHull);
+  app.get("/api/helix/lattice-probe", getLatticeProbe);
+  app.post("/api/helix/lattice-probe", getLatticeProbe);
   app.options("/api/helix/hardware/sweep-point", ingestHardwareSweepPoint);
   app.post("/api/helix/hardware/sweep-point", ingestHardwareSweepPoint);
   app.options("/api/helix/hardware/sector-state", ingestHardwareSectorState);
@@ -1052,6 +1064,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
   app.use("/api/helix/qi", helixQiRouter);
   app.use("/api/helix/math", helixMathRouter);
+  app.use("/api/helix/audit", helixAuditTreeRouter);
   app.use("/api/helix/hull-preview", hullPreviewRouter);
   app.use("/api/helix", grAgentRouter);
   app.use("/api/helix", trainingTraceRouter);

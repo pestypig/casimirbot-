@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { resolveHullRadius, type HullRadialMap, type Vec3 } from "./curvature-brick";
 import { getGlobalPipelineState } from "./energy-pipeline";
 import { enhancedAvgEnergyDensity, natarioShiftFromDensity } from "../modules/dynamic/stress-energy-equations.js";
+import { computeInvariantMassFromFluxTotals } from "../modules/gr/stress-energy-integrals.js";
 
 export interface StressEnergyBrickParams {
   dims: [number, number, number];
@@ -33,6 +34,10 @@ export interface StressEnergyStats {
   avgT00: number;
   avgFluxMagnitude: number;
   netFlux: Vec3;
+  totalMomentum_kg_m_s?: Vec3;
+  momentumMagnitude_kg_m_s?: number;
+  invariantMass_kg?: number;
+  invariantMassEnergy_J?: number;
   divMin: number;
   divMax: number;
   dutyFR: number;
@@ -45,6 +50,11 @@ export interface StressEnergyStats {
 export interface NatarioDiagnostics {
   divBetaMax: number;
   divBetaRms: number;
+  divBetaMaxPre?: number;
+  divBetaRmsPre?: number;
+  divBetaMaxPost?: number;
+  divBetaRmsPost?: number;
+  clampScale?: number;
   gateLimit: number;
   gNatario: number;
 }
@@ -299,6 +309,8 @@ const computeBetaDivergenceStats = (
   };
 };
 
+type BetaDivergenceStats = ReturnType<typeof computeBetaDivergenceStats>;
+
 const clampNatarioShift = (
   betaX: Float32Array,
   betaY: Float32Array,
@@ -309,8 +321,10 @@ const clampNatarioShift = (
   dx: number,
   dy: number,
   dz: number,
+  preStats?: BetaDivergenceStats,
 ) => {
-  const stats = computeBetaDivergenceStats(betaX, betaY, betaZ, nx, ny, nz, dx, dy, dz);
+  const stats =
+    preStats ?? computeBetaDivergenceStats(betaX, betaY, betaZ, nx, ny, nz, dx, dy, dz);
   if (stats.divBetaMaxAbs > NATARIO_K_TOL && stats.divBetaMaxAbs > 0) {
     const scale = NATARIO_K_TOL / stats.divBetaMaxAbs;
     for (let i = 0; i < betaX.length; i += 1) {
@@ -322,9 +336,10 @@ const clampNatarioShift = (
       divBetaMaxAbs: NATARIO_K_TOL,
       divBetaRms: stats.divBetaRms * scale,
       scaled: true,
+      scale,
     };
   }
-  return { ...stats, scaled: false };
+  return { ...stats, scaled: false, scale: 1 };
 };
 
 export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>): StressEnergyBrick {
@@ -467,7 +482,29 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     betaZ[i] *= scale;
   }
 
-  const natarioClamp = clampNatarioShift(betaX, betaY, betaZ, nx, ny, nz, dx, dy, dz);
+  const natarioPre = computeBetaDivergenceStats(
+    betaX,
+    betaY,
+    betaZ,
+    nx,
+    ny,
+    nz,
+    dx,
+    dy,
+    dz,
+  );
+  const natarioClamp = clampNatarioShift(
+    betaX,
+    betaY,
+    betaZ,
+    nx,
+    ny,
+    nz,
+    dx,
+    dy,
+    dz,
+    natarioPre,
+  );
   if (natarioClamp.scaled) {
     console.warn("[Natario] Divergence exceeds gate; scaling shift field", {
       divMax: natarioClamp.divBetaMaxAbs,
@@ -479,6 +516,11 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const natarioDiagnostics: NatarioDiagnostics = {
     divBetaMax: natarioClamp.divBetaMaxAbs,
     divBetaRms: natarioClamp.divBetaRms,
+    divBetaMaxPre: natarioPre.divBetaMaxAbs,
+    divBetaRmsPre: natarioPre.divBetaRms,
+    divBetaMaxPost: natarioClamp.divBetaMaxAbs,
+    divBetaRmsPost: natarioClamp.divBetaRms,
+    clampScale: natarioClamp.scale,
     gateLimit: NATARIO_K_TOL,
     gNatario: Math.max(0, 1 - natarioClamp.divBetaMaxAbs / NATARIO_K_TOL),
   };
@@ -493,7 +535,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   let SzMin = Number.POSITIVE_INFINITY;
   let SzMax = Number.NEGATIVE_INFINITY;
   let fluxMagSum = 0;
-  let netFlux: Vec3 = [0, 0, 0];
+  let netFluxSum: Vec3 = [0, 0, 0];
 
   idx = 0;
   for (let z = 0; z < nz; z++) {
@@ -519,10 +561,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         if (sZ > SzMax) SzMax = sZ;
         const mag = Math.hypot(sX, sY, sZ);
         fluxMagSum += mag;
-        netFlux = [
-          netFlux[0] + sX * cellVolume,
-          netFlux[1] + sY * cellVolume,
-          netFlux[2] + sZ * cellVolume,
+        netFluxSum = [
+          netFluxSum[0] + sX * cellVolume,
+          netFluxSum[1] + sY * cellVolume,
+          netFluxSum[2] + sZ * cellVolume,
         ];
         idx += 1;
       }
@@ -565,10 +607,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   if (!Number.isFinite(divMin)) divMin = 0;
   if (!Number.isFinite(divMax)) divMax = 0;
   const voxelNorm = Math.max(totalVoxels, 1);
-  netFlux = [
-    netFlux[0] / voxelNorm,
-    netFlux[1] / voxelNorm,
-    netFlux[2] / voxelNorm,
+  const netFlux: Vec3 = [
+    netFluxSum[0] / voxelNorm,
+    netFluxSum[1] / voxelNorm,
+    netFluxSum[2] / voxelNorm,
   ];
   const avgFluxMagnitude = fluxMagSum / voxelNorm;
   const divMaxAbs = Math.max(Math.abs(divMin), Math.abs(divMax));
@@ -579,12 +621,21 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const normBase = Math.max(avgFluxMagnitude, EPS);
   const netFluxNorm = netFluxMagnitude / normBase;
   const divRmsNorm = divRms / normBase;
+  const totalEnergy_J = sumT00 * cellVolume;
+  const invariantTotals = computeInvariantMassFromFluxTotals(
+    totalEnergy_J,
+    netFluxSum,
+  );
 
   const stats: StressEnergyStats = {
-    totalEnergy_J: sumT00 * cellVolume,
+    totalEnergy_J,
     avgT00: sumT00 / Math.max(totalVoxels, 1),
     avgFluxMagnitude,
     netFlux,
+    totalMomentum_kg_m_s: invariantTotals.totalMomentum_kg_m_s,
+    momentumMagnitude_kg_m_s: invariantTotals.momentumMagnitude_kg_m_s,
+    invariantMass_kg: invariantTotals.invariantMass_kg,
+    invariantMassEnergy_J: invariantTotals.invariantMassEnergy_J,
     divMin,
     divMax,
     dutyFR,

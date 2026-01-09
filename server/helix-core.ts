@@ -61,6 +61,7 @@ import {
   buildLapseBrick,
   serializeLapseBrick,
   serializeLapseBrickBinary,
+  type LapseBrick,
   type LapseBrickParams,
 } from "./lapse-brick";
 import {
@@ -114,7 +115,10 @@ import {
   grEvaluationSchema,
   grRegionStatsSchema,
   casimirTileSummarySchema,
+  experimentalSchema,
 } from "../shared/schema.js";
+import { kappa_drive_from_power } from "../shared/curvature-proxy.js";
+import { mathStageRegistry, type MathStage } from "../shared/math-stage.js";
 import type {
   SweepSpec,
   SweepProgressEvent,
@@ -937,6 +941,7 @@ const UpdateSchema = z.object({
   hullAreaOverride_m2: hullAreaOverrideSchema.shape.hullAreaOverride_m2,
   hullAreaOverride_uncertainty_m2: hullAreaOverrideSchema.shape.hullAreaOverride_uncertainty_m2,
   hullAreaPerSector_m2: hullAreaPerSectorSchema,
+  driveDir: brickVec3Schema.optional(),
   warpFieldType: z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]).optional(),
   warpGeometry: warpGeometrySchema.partial().optional(),
   warpGeometryKind: warpGeometryKindSchema.optional(),
@@ -954,6 +959,7 @@ const UpdateSchema = z.object({
   powerFillCmd: z.number().min(0).max(1).optional(),
   grEnabled: z.boolean().optional(),
   dynamicConfig: dynamicConfigUpdateSchema.optional(),
+  experimental: experimentalSchema.optional(),
   negativeFraction: z.number().min(0).max(1).optional(),
   dutyCycle: z.number().min(0).max(1).optional(),
   localBurstFrac: z.number().min(0).max(1).optional(),
@@ -968,6 +974,9 @@ const UpdateSchema = z.object({
   qSpoilingFactor: z.number().min(0).max(10).optional(),
   gammaGeo: z.number().min(1e-6).max(1e6).optional(),
   gammaVanDenBroeck: z.number().min(0).max(1e12).optional(),
+  massMode: z
+    .enum(["MODEL_DERIVED", "TARGET_CALIBRATED", "MEASURED_FORCE_INFERRED"])
+    .optional(),
   iPeakMaxMidi_A: z.number().min(0).max(1e9).optional(),
   iPeakMaxSector_A: z.number().min(0).max(1e9).optional(),
   iPeakMaxLauncher_A: z.number().min(0).max(1e9).optional(),
@@ -2266,6 +2275,23 @@ export async function updatePipelineParams(req: Request, res: Response) {
   const previewLatticePresent = previewLatticeProvided && previewLattice != null;
   const fallbackMode: "allow" | "warn" | "block" =
     fallbackModeRaw === "warn" || fallbackModeRaw === "block" ? fallbackModeRaw : "allow";
+  const warpFieldRequested =
+    params.warpFieldType ??
+    (params.dynamicConfig && typeof params.dynamicConfig === "object"
+      ? (params.dynamicConfig as any).warpFieldType
+      : undefined);
+  const applyPreview =
+    previewPayload != null ||
+    previewMesh != null ||
+    previewSdf != null ||
+    previewLattice != null;
+  if (applyPreview && !warpFieldRequested) {
+    params.warpFieldType = "alcubierre";
+    params.dynamicConfig = {
+      ...(params.dynamicConfig ?? {}),
+      warpFieldType: "alcubierre",
+    };
+  }
   if (previewProvided || previewMeshProvided || previewSdfProvided || previewLatticeProvided) {
     const validationReasons = validatePreview();
     if (validationReasons.length) {
@@ -3120,6 +3146,2085 @@ export function probeFieldOnHull(req: Request, res: Response) {
   } catch (e) {
     console.error("field probe endpoint error:", e);
     res.status(400).json({ error: "field-probe-failed" });
+  }
+}
+
+// --- Lattice probe (time-dilation) -----------------------------------------
+type MathStageLabel = MathStage | "unstaged";
+type ProbeSourcedNumber = { value: number; source: string; proxy: boolean };
+type ProbeGuardrailState = "ok" | "fail" | "proxy";
+type ProbeGuardrails = {
+  fordRoman: ProbeGuardrailState;
+  thetaAudit: ProbeGuardrailState;
+  tsRatio: ProbeGuardrailState;
+  vdbBand: ProbeGuardrailState;
+  multiplier: number;
+  proxy: boolean;
+  hardPass: boolean;
+};
+
+const LATTICE_PROBE_GRID_DIV = 12;
+const LATTICE_PROBE_GRID_SCALE = 1.2;
+const LATTICE_PROBE_MAX_VERTS = 200_000;
+const LATTICE_PROBE_ALPHA_MIN = 0.3;
+const LATTICE_PROBE_DEFAULT_VISUALS = {
+  phiScale: 0.45,
+  warpStrength: 0.12,
+  breathAmp: 0.08,
+  softening: 0.35,
+} as const;
+const LATTICE_PROBE_KAPPA_TUNING = {
+  logMin: -60,
+  logMax: -20,
+  phiMin: 0.25,
+  phiMax: 0.85,
+  warpMin: 0.08,
+  warpMax: 0.22,
+  breathMin: 0.05,
+  breathMax: 0.14,
+  softenMin: 0.22,
+  softenMax: 0.5,
+  smooth: 0.08,
+} as const;
+const LATTICE_PROBE_BETA_NEAR_REST_MAX = 0.25;
+const LATTICE_PROBE_TS_RATIO_MIN = 1.5;
+const LATTICE_PROBE_NATARIO_GEOM_WARP_SCALE = 0.05;
+const LATTICE_PROBE_METRIC_BLEND = 0.45;
+const LATTICE_PROBE_SHEAR_STRENGTH = 0.35;
+const LATTICE_PROBE_THETA_WARP_SCALE = 0.7;
+const LATTICE_PROBE_HULL_WARP_SCALE = 0.55;
+const LATTICE_PROBE_HULL_CONTOUR_SCALE = 1.2;
+const LATTICE_PROBE_HULL_CONTOUR_MIN = 0.05;
+const LATTICE_PROBE_DEFAULT_BUBBLE_SIGMA = 6;
+const LATTICE_PROBE_BREATH_RATE = 0.8;
+
+const LATTICE_PROBE_STAGE_RANK: Record<MathStageLabel, number> = {
+  unstaged: -1,
+  exploratory: 0,
+  "reduced-order": 1,
+  diagnostic: 2,
+  certified: 3,
+};
+
+const latticeProbeStageIndex = new Map<string, MathStageLabel>(
+  mathStageRegistry.map((entry) => [entry.module, entry.stage]),
+);
+const resolveLatticeProbeStage = (module: string): MathStageLabel =>
+  latticeProbeStageIndex.get(module) ?? "unstaged";
+const meetsLatticeProbeStage = (
+  stage: MathStageLabel,
+  minStage: MathStageLabel,
+) => LATTICE_PROBE_STAGE_RANK[stage] >= LATTICE_PROBE_STAGE_RANK[minStage];
+
+const probeFirstFinite = (...values: Array<unknown>): number | undefined => {
+  for (const value of values) {
+    const num = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(num)) return num;
+  }
+  return undefined;
+};
+
+const probePickSourcedNumber = (
+  candidates: Array<{ value: unknown; source: string; proxy?: boolean }>,
+): ProbeSourcedNumber | null => {
+  for (const candidate of candidates) {
+    const num = Number(candidate.value);
+    if (!Number.isFinite(num)) continue;
+    return {
+      value: num,
+      source: candidate.source,
+      proxy: Boolean(candidate.proxy),
+    };
+  }
+  return null;
+};
+
+const probeResolveBooleanStatus = (value: unknown): boolean | null => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const norm = value.toLowerCase();
+    if (["ok", "pass", "passed", "true", "admissible"].includes(norm)) return true;
+    if (["fail", "failed", "false", "inadmissible"].includes(norm)) return false;
+  }
+  return null;
+};
+
+const probeNormalizeLog = (value: number, min: number, max: number) => {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const logMin = Math.log10(min);
+  const logMax = Math.log10(max);
+  const logValue = Math.log10(value);
+  if (!Number.isFinite(logValue) || logMax <= logMin) return 0;
+  return clamp01((logValue - logMin) / (logMax - logMin));
+};
+
+const probeAverageFinite = (...values: Array<number | null | undefined>) => {
+  let sum = 0;
+  let count = 0;
+  for (const value of values) {
+    if (!Number.isFinite(value as number)) continue;
+    sum += value as number;
+    count += 1;
+  }
+  return count > 0 ? sum / count : 0;
+};
+
+const probeGetPowerW = (pipeline?: EnergyPipelineState | null): number => {
+  const watts = probeFirstFinite(
+    pipeline?.P_avg_W,
+    (pipeline as any)?.power_W,
+  );
+  if (Number.isFinite(watts)) return watts as number;
+  const megaWatts = probeFirstFinite((pipeline as any)?.P_avg_MW);
+  if (Number.isFinite(megaWatts)) return (megaWatts as number) * 1e6;
+  const raw = probeFirstFinite(pipeline?.P_avg, (pipeline as any)?.power);
+  if (!Number.isFinite(raw)) return Number.NaN;
+  if (raw === 0) return 0;
+  if (raw > 0 && raw < 1e4) return raw * 1e6;
+  return raw;
+};
+
+const probeResolvePowerW = (
+  pipeline?: EnergyPipelineState | null,
+): ProbeSourcedNumber => {
+  const watts = probePickSourcedNumber([
+    { value: pipeline?.P_avg_W, source: "P_avg_W" },
+    { value: (pipeline as any)?.power_W, source: "power_W" },
+  ]);
+  if (watts) return watts;
+  const megaWatts = probePickSourcedNumber([
+    { value: (pipeline as any)?.P_avg_MW, source: "P_avg_MW" },
+  ]);
+  if (megaWatts) return { ...megaWatts, value: megaWatts.value * 1e6 };
+  const raw = probePickSourcedNumber([
+    { value: pipeline?.P_avg, source: "P_avg", proxy: true },
+    { value: (pipeline as any)?.power, source: "power", proxy: true },
+  ]);
+  if (!raw) return { value: Number.NaN, source: "missing", proxy: true };
+  if (raw.value === 0) return raw;
+  if (raw.value > 0 && raw.value < 1e4) {
+    return { value: raw.value * 1e6, source: `${raw.source}_MW?`, proxy: true };
+  }
+  return raw;
+};
+
+const probeGetHullAreaM2 = (pipeline?: EnergyPipelineState | null): number => {
+  const area = probeFirstFinite(
+    pipeline?.hullArea_m2,
+    pipeline?.tiles?.hullArea_m2,
+    pipeline?.hullAreaOverride_m2,
+    (pipeline as any)?.__hullAreaEllipsoid_m2,
+  );
+  if (Number.isFinite(area) && (area as number) > 0) return area as number;
+  const tileAreaCm2 = probeFirstFinite(
+    pipeline?.tileArea_cm2,
+    pipeline?.tiles?.tileArea_cm2,
+  );
+  const nTiles = probeFirstFinite(
+    pipeline?.N_tiles,
+    pipeline?.tiles?.N_tiles,
+    pipeline?.tiles?.total,
+  );
+  if (
+    Number.isFinite(tileAreaCm2) &&
+    Number.isFinite(nTiles) &&
+    (tileAreaCm2 as number) > 0 &&
+    (nTiles as number) > 0
+  ) {
+    return (tileAreaCm2 as number) * 1e-4 * (nTiles as number);
+  }
+  return Number.NaN;
+};
+
+const probeGetDutyEffective = (pipeline?: EnergyPipelineState | null): number =>
+  clamp01(
+    probeFirstFinite(
+      pipeline?.dutyEffectiveFR,
+      pipeline?.dutyEffective_FR,
+      pipeline?.dutyShip,
+      pipeline?.dutyEff,
+      pipeline?.dutyCycle,
+      pipeline?.dutyFR,
+      pipeline?.dutyGate,
+    ) ?? 0,
+  );
+
+const probeResolveDutyEffective = (
+  pipeline?: EnergyPipelineState | null,
+): ProbeSourcedNumber => {
+  const direct = probePickSourcedNumber([
+    { value: (pipeline as any)?.d_eff, source: "d_eff" },
+    { value: pipeline?.dutyEffectiveFR, source: "dutyEffectiveFR" },
+    { value: pipeline?.dutyEffective_FR, source: "dutyEffective_FR" },
+    { value: pipeline?.dutyShip, source: "dutyShip", proxy: true },
+    { value: pipeline?.dutyEff, source: "dutyEff", proxy: true },
+    { value: pipeline?.dutyCycle, source: "dutyCycle", proxy: true },
+    { value: pipeline?.dutyFR, source: "dutyFR", proxy: true },
+    { value: pipeline?.dutyGate, source: "dutyGate", proxy: true },
+  ]);
+  if (direct) return { ...direct, value: clamp01(direct.value) };
+  return { value: 0, source: "missing", proxy: true };
+};
+
+const probeGetGeometryGain = (pipeline?: EnergyPipelineState | null): number => {
+  const gammaGeo = probeFirstFinite(
+    pipeline?.gammaGeo,
+    (pipeline as any)?.ampFactors?.gammaGeo,
+    (pipeline as any)?.amps?.gammaGeo,
+  );
+  return Number.isFinite(gammaGeo) && (gammaGeo as number) > 0
+    ? (gammaGeo as number)
+    : 1;
+};
+
+const probeComputeKappaDrive = (
+  pipeline?: EnergyPipelineState | null,
+): number => {
+  if (!pipeline) return Number.NaN;
+  const powerW = probeGetPowerW(pipeline);
+  const areaM2 = probeGetHullAreaM2(pipeline);
+  if (!Number.isFinite(powerW) || !Number.isFinite(areaM2) || areaM2 <= 0) {
+    return Number.NaN;
+  }
+  const dEff = probeGetDutyEffective(pipeline);
+  const gain = probeGetGeometryGain(pipeline);
+  return kappa_drive_from_power(powerW, areaM2, dEff, gain);
+};
+
+const probeNormalizeKappaTuning = (
+  input?: Partial<typeof LATTICE_PROBE_KAPPA_TUNING>,
+) => {
+  const base = LATTICE_PROBE_KAPPA_TUNING;
+  const logMinRaw = toFinite(input?.logMin, base.logMin);
+  const logMaxRaw = toFinite(input?.logMax, base.logMax);
+  const [logMin, logMax] =
+    logMaxRaw > logMinRaw ? [logMinRaw, logMaxRaw] : [base.logMin, base.logMax];
+  const phiMinRaw = toFinite(input?.phiMin, base.phiMin);
+  const phiMaxRaw = toFinite(input?.phiMax, base.phiMax);
+  const [phiMin, phiMax] =
+    phiMaxRaw > phiMinRaw ? [phiMinRaw, phiMaxRaw] : [base.phiMin, base.phiMax];
+  const warpMinRaw = toFinite(input?.warpMin, base.warpMin);
+  const warpMaxRaw = toFinite(input?.warpMax, base.warpMax);
+  const [warpMin, warpMax] =
+    warpMaxRaw > warpMinRaw
+      ? [warpMinRaw, warpMaxRaw]
+      : [base.warpMin, base.warpMax];
+  const breathMinRaw = toFinite(input?.breathMin, base.breathMin);
+  const breathMaxRaw = toFinite(input?.breathMax, base.breathMax);
+  const [breathMin, breathMax] =
+    breathMaxRaw > breathMinRaw
+      ? [breathMinRaw, breathMaxRaw]
+      : [base.breathMin, base.breathMax];
+  const softenMinRaw = toFinite(input?.softenMin, base.softenMin);
+  const softenMaxRaw = toFinite(input?.softenMax, base.softenMax);
+  const [softenMin, softenMax] =
+    softenMaxRaw > softenMinRaw
+      ? [softenMinRaw, softenMaxRaw]
+      : [base.softenMin, base.softenMax];
+  const smooth = clamp01(toFinite(input?.smooth, base.smooth));
+  return {
+    logMin,
+    logMax,
+    phiMin,
+    phiMax,
+    warpMin,
+    warpMax,
+    breathMin,
+    breathMax,
+    softenMin,
+    softenMax,
+    smooth,
+  };
+};
+
+const probeMapKappaToUnit = (
+  kappa: number,
+  tuning: ReturnType<typeof probeNormalizeKappaTuning>,
+): number | null => {
+  if (!Number.isFinite(kappa) || kappa <= 0) return null;
+  const logK = Math.log10(kappa);
+  if (!Number.isFinite(logK)) return null;
+  const denom = tuning.logMax - tuning.logMin;
+  if (!Number.isFinite(denom) || denom <= 0) return null;
+  return clamp01((logK - tuning.logMin) / denom);
+};
+
+const probeApplyKappaBlend = (
+  settings: {
+    phiScale: number;
+    warpStrength: number;
+    breathAmp: number;
+    softening: number;
+  },
+  blend: number,
+  tuning: ReturnType<typeof probeNormalizeKappaTuning>,
+) => {
+  const t = clamp01(blend);
+  settings.phiScale = tuning.phiMin + (tuning.phiMax - tuning.phiMin) * t;
+  settings.warpStrength = tuning.warpMin + (tuning.warpMax - tuning.warpMin) * t;
+  settings.breathAmp = tuning.breathMin + (tuning.breathMax - tuning.breathMin) * t;
+  const lengthBlend = 1 - t;
+  settings.softening =
+    tuning.softenMin + (tuning.softenMax - tuning.softenMin) * lengthBlend;
+};
+
+const probeComputeKappaSettings = (pipeline?: EnergyPipelineState | null) => {
+  const kappaDrive = probeComputeKappaDrive(pipeline ?? null);
+  const tuning = probeNormalizeKappaTuning();
+  const kappaBlend = probeMapKappaToUnit(kappaDrive, tuning);
+  const settings = { ...LATTICE_PROBE_DEFAULT_VISUALS };
+  if (kappaBlend !== null) {
+    probeApplyKappaBlend(settings, kappaBlend, tuning);
+  }
+  return { settings, kappaBlend, kappaDrive };
+};
+
+const probeResolveGammaGeo = (
+  pipeline?: EnergyPipelineState | null,
+): ProbeSourcedNumber => {
+  const direct = probePickSourcedNumber([
+    { value: pipeline?.gammaGeo, source: "gammaGeo" },
+    {
+      value: (pipeline as any)?.ampFactors?.gammaGeo,
+      source: "ampFactors.gammaGeo",
+      proxy: true,
+    },
+    { value: (pipeline as any)?.amps?.gammaGeo, source: "amps.gammaGeo", proxy: true },
+  ]);
+  if (direct) return { ...direct, value: Math.max(1e-6, direct.value) };
+  return { value: 1, source: "fallback", proxy: true };
+};
+
+const probeResolveGammaVdB = (
+  pipeline?: EnergyPipelineState | null,
+): ProbeSourcedNumber => {
+  const direct = probePickSourcedNumber([
+    { value: pipeline?.gammaVanDenBroeck_mass, source: "gammaVanDenBroeck_mass" },
+    { value: pipeline?.gammaVanDenBroeck, source: "gammaVanDenBroeck" },
+    {
+      value: pipeline?.gammaVanDenBroeck_vis,
+      source: "gammaVanDenBroeck_vis",
+      proxy: true,
+    },
+    { value: pipeline?.gammaVdB, source: "gammaVdB", proxy: true },
+    { value: pipeline?.gammaVdB_vis, source: "gammaVdB_vis", proxy: true },
+    { value: (pipeline as any)?.gamma_vdb, source: "gamma_vdb", proxy: true },
+  ]);
+  if (direct) return { ...direct, value: Math.max(1, direct.value) };
+  return { value: 1, source: "fallback", proxy: true };
+};
+
+const probeResolveQSpoiling = (
+  pipeline?: EnergyPipelineState | null,
+): ProbeSourcedNumber => {
+  const direct = probePickSourcedNumber([
+    { value: pipeline?.qSpoilingFactor, source: "qSpoilingFactor" },
+    { value: pipeline?.deltaAOverA, source: "deltaAOverA", proxy: true },
+    { value: pipeline?.qSpoil, source: "qSpoil", proxy: true },
+    { value: pipeline?.q, source: "q", proxy: true },
+  ]);
+  if (direct) return { ...direct, value: Math.max(0, direct.value) };
+  return { value: 1, source: "fallback", proxy: true };
+};
+
+const probeResolveTSRatio = (
+  pipeline?: EnergyPipelineState | null,
+): ProbeSourcedNumber => {
+  const direct = probePickSourcedNumber([
+    { value: pipeline?.TS_ratio, source: "TS_ratio" },
+    { value: pipeline?.TS_long, source: "TS_long", proxy: true },
+    { value: pipeline?.TS_geom, source: "TS_geom", proxy: true },
+    { value: (pipeline as any)?.ts?.ratio, source: "ts.ratio", proxy: true },
+    { value: (pipeline as any)?.timeScaleRatio, source: "timeScaleRatio", proxy: true },
+  ]);
+  if (direct) return { ...direct, value: Math.max(0, direct.value) };
+  return { value: Number.NaN, source: "missing", proxy: true };
+};
+
+const probeResolveThetaCal = (
+  pipeline: EnergyPipelineState | null,
+  inputs: {
+    gammaGeo: ProbeSourcedNumber;
+    qSpoil: ProbeSourcedNumber;
+    gammaVdB: ProbeSourcedNumber;
+    duty: ProbeSourcedNumber;
+  },
+): ProbeSourcedNumber => {
+  const direct = probePickSourcedNumber([
+    { value: (pipeline as any)?.thetaCal, source: "thetaCal" },
+    { value: (pipeline as any)?.thetaScaleExpected, source: "thetaScaleExpected" },
+    {
+      value: (pipeline as any)?.uniformsExplain?.thetaAudit?.results?.thetaCal,
+      source: "thetaAudit.thetaCal",
+    },
+  ]);
+  if (direct) return direct;
+  const gammaGeoCubed = Math.pow(Math.max(0, inputs.gammaGeo.value), 3);
+  const value =
+    gammaGeoCubed *
+    inputs.qSpoil.value *
+    inputs.gammaVdB.value *
+    inputs.duty.value;
+  const proxy =
+    inputs.gammaGeo.proxy ||
+    inputs.qSpoil.proxy ||
+    inputs.gammaVdB.proxy ||
+    inputs.duty.proxy;
+  return {
+    value: Number.isFinite(value) ? value : Number.NaN,
+    source: "computed",
+    proxy,
+  };
+};
+
+const probeResolveGuardrails = (
+  pipeline: EnergyPipelineState | null,
+  tsRatio: number,
+  gammaVdB: number,
+): ProbeGuardrails => {
+  const fordRomanFlag = pipeline?.fordRomanCompliance;
+  const fordRoman: ProbeGuardrailState =
+    typeof fordRomanFlag === "boolean" ? (fordRomanFlag ? "ok" : "fail") : "proxy";
+  const thetaAuditRaw =
+    (pipeline as any)?.uniformsExplain?.thetaAudit ??
+    (pipeline as any)?.thetaAudit ??
+    (pipeline as any)?.thetaCal;
+  const thetaAuditFlag = probeResolveBooleanStatus(
+    (thetaAuditRaw as any)?.status ??
+      (thetaAuditRaw as any)?.ok ??
+      (thetaAuditRaw as any)?.pass ??
+      (thetaAuditRaw as any)?.admissible,
+  );
+  const thetaAudit: ProbeGuardrailState =
+    thetaAuditFlag === null ? "proxy" : thetaAuditFlag ? "ok" : "fail";
+  const tsRatioState: ProbeGuardrailState = Number.isFinite(tsRatio)
+    ? tsRatio >= LATTICE_PROBE_TS_RATIO_MIN
+      ? "ok"
+      : "fail"
+    : "proxy";
+  const vdbGuard = pipeline?.gammaVanDenBroeckGuard;
+  let vdbBand: ProbeGuardrailState = "proxy";
+  if (
+    vdbGuard &&
+    Number.isFinite(gammaVdB) &&
+    Number.isFinite(vdbGuard.greenBand?.min) &&
+    Number.isFinite(vdbGuard.greenBand?.max)
+  ) {
+    const inBand =
+      gammaVdB >= vdbGuard.greenBand.min && gammaVdB <= vdbGuard.greenBand.max;
+    const guardPass = vdbGuard.admissible ? vdbGuard.admissible && inBand : inBand;
+    vdbBand = guardPass ? "ok" : "fail";
+  }
+  const hardFail = fordRoman === "fail" || thetaAudit === "fail";
+  const tsPenalty =
+    tsRatioState === "fail" && Number.isFinite(tsRatio)
+      ? clamp01(tsRatio / LATTICE_PROBE_TS_RATIO_MIN)
+      : 1;
+  const vdbPenalty = vdbBand === "fail" ? 0.7 : 1;
+  const multiplier = hardFail ? 0 : tsPenalty * vdbPenalty;
+  const proxy = [fordRoman, thetaAudit, tsRatioState, vdbBand].includes("proxy");
+  const hardPass = fordRoman === "ok" && thetaAudit === "ok";
+  return {
+    fordRoman,
+    thetaAudit,
+    tsRatio: tsRatioState,
+    vdbBand,
+    multiplier,
+    proxy,
+    hardPass,
+  };
+};
+
+const probeComputeActivation = (pipeline: EnergyPipelineState | null) => {
+  const power = probeResolvePowerW(pipeline);
+  const duty = probeResolveDutyEffective(pipeline);
+  const gammaGeo = probeResolveGammaGeo(pipeline);
+  const gammaVdB = probeResolveGammaVdB(pipeline);
+  const qSpoil = probeResolveQSpoiling(pipeline);
+  const tsRatio = probeResolveTSRatio(pipeline);
+  const thetaCal = probeResolveThetaCal(pipeline, {
+    gammaGeo,
+    qSpoil,
+    gammaVdB,
+    duty,
+  });
+  const powerNorm = probeNormalizeLog(power.value, 1e6, 1e12);
+  const thetaNorm = probeNormalizeLog(thetaCal.value, 1e8, 1e12);
+  const tsNorm = probeNormalizeLog(
+    tsRatio.value,
+    LATTICE_PROBE_TS_RATIO_MIN,
+    LATTICE_PROBE_TS_RATIO_MIN * 1e4,
+  );
+  const activationBase = probeAverageFinite(powerNorm, thetaNorm, tsNorm);
+  const guardrails = probeResolveGuardrails(
+    pipeline,
+    tsRatio.value,
+    gammaVdB.value,
+  );
+  const activation = clamp01(activationBase * guardrails.multiplier);
+  const activationProxy =
+    power.proxy ||
+    duty.proxy ||
+    gammaGeo.proxy ||
+    gammaVdB.proxy ||
+    qSpoil.proxy ||
+    tsRatio.proxy ||
+    thetaCal.proxy ||
+    guardrails.proxy;
+  return {
+    activation,
+    activationBase,
+    activationProxy,
+    guardrails,
+    power,
+    duty,
+    gammaGeo,
+    gammaVdB,
+    qSpoil,
+    tsRatio,
+    thetaCal,
+  };
+};
+
+const probeResolveBubbleCenter = (
+  pipeline?: EnergyPipelineState | null,
+): { value: Vec3; source: string; proxy: boolean } => {
+  const candidates = [
+    { value: (pipeline as any)?.bubble?.center, source: "bubble.center", proxy: false },
+    {
+      value: (pipeline as any)?.bubble?.centerMetric,
+      source: "bubble.centerMetric",
+      proxy: true,
+    },
+    { value: (pipeline as any)?.bubbleCenter, source: "bubbleCenter", proxy: true },
+    { value: (pipeline as any)?.center, source: "center", proxy: true },
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate.value) && candidate.value.length >= 3) {
+      const cx = Number(candidate.value[0]);
+      const cy = Number(candidate.value[1]);
+      const cz = Number(candidate.value[2]);
+      if ([cx, cy, cz].every((v) => Number.isFinite(v))) {
+        return { value: [cx, cy, cz], source: candidate.source, proxy: candidate.proxy };
+      }
+    }
+    if (candidate.value && typeof candidate.value === "object") {
+      const cx = Number((candidate.value as any).x);
+      const cy = Number((candidate.value as any).y);
+      const cz = Number((candidate.value as any).z);
+      if ([cx, cy, cz].every((v) => Number.isFinite(v))) {
+        return { value: [cx, cy, cz], source: candidate.source, proxy: candidate.proxy };
+      }
+    }
+  }
+  return { value: [0, 0, 0], source: "default", proxy: true };
+};
+
+const probeResolveBeta = (
+  pipeline?: EnergyPipelineState | null,
+): ProbeSourcedNumber => {
+  const direct = probePickSourcedNumber([
+    { value: (pipeline as any)?.bubble?.beta, source: "bubble.beta" },
+    { value: (pipeline as any)?.beta, source: "beta" },
+    { value: (pipeline as any)?.shipBeta, source: "shipBeta", proxy: true },
+    { value: (pipeline as any)?.beta_avg, source: "beta_avg", proxy: true },
+    { value: (pipeline as any)?.vShip, source: "vShip", proxy: true },
+  ]);
+  if (direct) {
+    return {
+      ...direct,
+      value: Math.max(0, Math.min(LATTICE_PROBE_BETA_NEAR_REST_MAX, direct.value)),
+    };
+  }
+  const mode = String(pipeline?.currentMode ?? "").toLowerCase();
+  let base = 0.08;
+  switch (mode) {
+    case "standby":
+    case "taxi":
+      base = 0.0;
+      break;
+    case "nearzero":
+      base = 0.01;
+      break;
+    case "hover":
+      base = 0.03;
+      break;
+    case "cruise":
+      base = 0.12;
+      break;
+    case "emergency":
+      base = 0.2;
+      break;
+    default:
+      base = 0.08;
+      break;
+  }
+  const betaTrans = clamp01(toFinite((pipeline as any)?.beta_trans, 1));
+  return {
+    value: Math.max(0, Math.min(LATTICE_PROBE_BETA_NEAR_REST_MAX, base * betaTrans)),
+    source: `mode:${mode || "default"}`,
+    proxy: true,
+  };
+};
+
+const probeResolveBubbleParams = (
+  pipeline: EnergyPipelineState | null,
+  axes: Vec3,
+) => {
+  const sigmaCandidate = probePickSourcedNumber([
+    { value: (pipeline as any)?.bubble?.sigma, source: "bubble.sigma" },
+    { value: (pipeline as any)?.sigma, source: "sigma" },
+    { value: (pipeline as any)?.warp?.sigma, source: "warp.sigma", proxy: true },
+    {
+      value: (pipeline as any)?.warp?.bubble?.sigma,
+      source: "warp.bubble.sigma",
+      proxy: true,
+    },
+  ]);
+  const sigmaSource = sigmaCandidate?.source ?? "default";
+  const sigmaProxy = sigmaCandidate?.proxy ?? true;
+  const sigma = Math.max(
+    1e-4,
+    toFinite(sigmaCandidate?.value, LATTICE_PROBE_DEFAULT_BUBBLE_SIGMA),
+  );
+  const radiusCandidate = probePickSourcedNumber([
+    { value: (pipeline as any)?.bubble?.R, source: "bubble.R" },
+    { value: (pipeline as any)?.bubble?.radius, source: "bubble.radius", proxy: true },
+    { value: (pipeline as any)?.R, source: "R", proxy: true },
+    { value: (pipeline as any)?.radius, source: "radius", proxy: true },
+  ]);
+  let R = Number.isFinite(radiusCandidate?.value)
+    ? Math.max(1, radiusCandidate!.value)
+    : Number.NaN;
+  let radiusSource = radiusCandidate?.source ?? "geom";
+  let radiusProxy = radiusCandidate?.proxy ?? true;
+  if (!Number.isFinite(R)) {
+    const geom = Math.cbrt(
+      Math.max(1e-3, axes[0]) * Math.max(1e-3, axes[1]) * Math.max(1e-3, axes[2]),
+    );
+    R = Math.max(1, geom);
+    radiusSource = "geom";
+    radiusProxy = true;
+  }
+  const beta = probeResolveBeta(pipeline);
+  const center = probeResolveBubbleCenter(pipeline);
+  return {
+    R,
+    sigma,
+    beta: beta.value,
+    center: center.value,
+    radiusSource,
+    sigmaSource,
+    betaSource: beta.source,
+    centerSource: center.source,
+    radiusProxy,
+    sigmaProxy,
+    betaProxy: beta.proxy,
+    centerProxy: center.proxy,
+  };
+};
+
+type ProbeBrickSample = {
+  dims: [number, number, number];
+  data: Float32Array;
+  bounds: { min: Vec3; max: Vec3; axes: Vec3 };
+};
+
+type ProbeHullFieldSample = {
+  sample: ProbeBrickSample;
+  mode: "dist" | "mask";
+  source: string;
+  wallThickness: number;
+};
+
+const probeBrickIndex = (x: number, y: number, z: number, nx: number, ny: number) =>
+  z * nx * ny + y * nx + x;
+
+const probeToVec3 = (value: unknown): Vec3 | null => {
+  if (!Array.isArray(value) || value.length < 3) return null;
+  const x = Number(value[0]);
+  const y = Number(value[1]);
+  const z = Number(value[2]);
+  if (![x, y, z].every((entry) => Number.isFinite(entry))) return null;
+  return [x, y, z];
+};
+
+const probeNormalizeBrickDims = (dims: unknown): [number, number, number] | null => {
+  if (!Array.isArray(dims) || dims.length < 3) return null;
+  const nx = Math.floor(Number(dims[0]));
+  const ny = Math.floor(Number(dims[1]));
+  const nz = Math.floor(Number(dims[2]));
+  if (![nx, ny, nz].every((value) => Number.isFinite(value) && value >= 2)) return null;
+  return [nx, ny, nz];
+};
+
+const probeResolveBrickBounds = (
+  brick: any,
+  fallback: { min: Vec3; max: Vec3; axes: Vec3 },
+): { min: Vec3; max: Vec3; axes: Vec3 } => {
+  const bounds = brick?.bounds ?? brick?.meta?.bounds;
+  if (bounds) {
+    const min = probeToVec3(bounds.min);
+    const max = probeToVec3(bounds.max);
+    if (min && max) {
+      const minFixed: Vec3 = [
+        Math.min(min[0], max[0]),
+        Math.min(min[1], max[1]),
+        Math.min(min[2], max[2]),
+      ];
+      const maxFixed: Vec3 = [
+        Math.max(min[0], max[0]),
+        Math.max(min[1], max[1]),
+        Math.max(min[2], max[2]),
+      ];
+      const axes: Vec3 = [
+        Math.max(1e-6, (maxFixed[0] - minFixed[0]) / 2),
+        Math.max(1e-6, (maxFixed[1] - minFixed[1]) / 2),
+        Math.max(1e-6, (maxFixed[2] - minFixed[2]) / 2),
+      ];
+      return { min: minFixed, max: maxFixed, axes };
+    }
+    const center = probeToVec3(bounds.center);
+    const extent = probeToVec3(bounds.extent ?? bounds.axes);
+    if (center && extent) {
+      const axes: Vec3 = [
+        Math.max(1e-6, Math.abs(extent[0])),
+        Math.max(1e-6, Math.abs(extent[1])),
+        Math.max(1e-6, Math.abs(extent[2])),
+      ];
+      const minFixed: Vec3 = [
+        center[0] - axes[0],
+        center[1] - axes[1],
+        center[2] - axes[2],
+      ];
+      const maxFixed: Vec3 = [
+        center[0] + axes[0],
+        center[1] + axes[1],
+        center[2] + axes[2],
+      ];
+      return { min: minFixed, max: maxFixed, axes };
+    }
+  }
+  return fallback;
+};
+
+const probeDecodeBase64 = (payload: string): Uint8Array | null => {
+  if (!payload) return null;
+  try {
+    const buf = Buffer.from(payload, "base64");
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+  } catch {
+    return null;
+  }
+};
+
+const probeCoerceFloat32 = (dataSource: unknown): Float32Array | null => {
+  if (!dataSource) return null;
+  if (dataSource instanceof Float32Array) return dataSource;
+  if (dataSource instanceof ArrayBuffer) return new Float32Array(dataSource);
+  if (Array.isArray(dataSource)) return new Float32Array(dataSource);
+  if (typeof dataSource === "string") {
+    const bytes = probeDecodeBase64(dataSource);
+    if (!bytes || bytes.byteLength % 4 !== 0) return null;
+    const view = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    return new Float32Array(view);
+  }
+  if (ArrayBuffer.isView(dataSource) && dataSource.buffer instanceof ArrayBuffer) {
+    if (dataSource.byteLength % 4 !== 0) return null;
+    return new Float32Array(
+      dataSource.buffer,
+      dataSource.byteOffset,
+      dataSource.byteLength / 4,
+    );
+  }
+  return null;
+};
+
+const probeBuildBrickSample = (
+  brick: any,
+  fallbackBounds: { min: Vec3; max: Vec3; axes: Vec3 },
+  channel = "alpha",
+): ProbeBrickSample | null => {
+  if (!brick) return null;
+  const dims = probeNormalizeBrickDims(brick.dims);
+  if (!dims) return null;
+  const total = dims[0] * dims[1] * dims[2];
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const channelDataRaw =
+    brick.channels?.[channel]?.data ??
+    brick.extraChannels?.[channel]?.data ??
+    brick.channels?.[channel] ??
+    brick.extraChannels?.[channel];
+  const channelData = probeCoerceFloat32(channelDataRaw);
+  if (!channelData || channelData.length < total) return null;
+  return {
+    dims,
+    data: channelData,
+    bounds: probeResolveBrickBounds(brick, fallbackBounds),
+  };
+};
+
+const probeSampleBrickScalar = (
+  sample: ProbeBrickSample,
+  pos: Vec3,
+  outside = 1,
+) => {
+  const [nx, ny, nz] = sample.dims;
+  if (nx < 2 || ny < 2 || nz < 2) return outside;
+  const { min, max } = sample.bounds;
+  const spanX = max[0] - min[0];
+  const spanY = max[1] - min[1];
+  const spanZ = max[2] - min[2];
+  if (!(spanX > 0 && spanY > 0 && spanZ > 0)) return outside;
+  const ux = (pos[0] - min[0]) / spanX;
+  const uy = (pos[1] - min[1]) / spanY;
+  const uz = (pos[2] - min[2]) / spanZ;
+  if (ux < 0 || ux > 1 || uy < 0 || uy > 1 || uz < 0 || uz > 1) return outside;
+  const fx = Math.min(Math.max(ux * (nx - 1), 0), nx - 1 - 1e-6);
+  const fy = Math.min(Math.max(uy * (ny - 1), 0), ny - 1 - 1e-6);
+  const fz = Math.min(Math.max(uz * (nz - 1), 0), nz - 1 - 1e-6);
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const z0 = Math.floor(fz);
+  const x1 = x0 + 1;
+  const y1 = y0 + 1;
+  const z1 = z0 + 1;
+  const tx = fx - x0;
+  const ty = fy - y0;
+  const tz = fz - z0;
+  const data = sample.data;
+  const i000 = data[probeBrickIndex(x0, y0, z0, nx, ny)] ?? 0;
+  const i100 = data[probeBrickIndex(x1, y0, z0, nx, ny)] ?? 0;
+  const i010 = data[probeBrickIndex(x0, y1, z0, nx, ny)] ?? 0;
+  const i110 = data[probeBrickIndex(x1, y1, z0, nx, ny)] ?? 0;
+  const i001 = data[probeBrickIndex(x0, y0, z1, nx, ny)] ?? 0;
+  const i101 = data[probeBrickIndex(x1, y0, z1, nx, ny)] ?? 0;
+  const i011 = data[probeBrickIndex(x0, y1, z1, nx, ny)] ?? 0;
+  const i111 = data[probeBrickIndex(x1, y1, z1, nx, ny)] ?? 0;
+  const ix00 = i000 * (1 - tx) + i100 * tx;
+  const ix10 = i010 * (1 - tx) + i110 * tx;
+  const ix01 = i001 * (1 - tx) + i101 * tx;
+  const ix11 = i011 * (1 - tx) + i111 * tx;
+  const ixy0 = ix00 * (1 - ty) + ix10 * ty;
+  const ixy1 = ix01 * (1 - ty) + ix11 * ty;
+  return ixy0 * (1 - tz) + ixy1 * tz;
+};
+
+const probeSampleBrickForVerts = (
+  verts: Float32Array,
+  sample: ProbeBrickSample,
+  gridScale: number,
+) => {
+  const [sx, sy, sz] = sample.bounds.axes;
+  const { min, max } = sample.bounds;
+  const centerX = (min[0] + max[0]) * 0.5;
+  const centerY = (min[1] + max[1]) * 0.5;
+  const centerZ = (min[2] + max[2]) * 0.5;
+  const out = new Float32Array(verts.length / 3);
+  const scaleX = gridScale * sx;
+  const scaleY = gridScale * sy;
+  const scaleZ = gridScale * sz;
+  for (let i = 0; i < out.length; i += 1) {
+    const base = i * 3;
+    const pos: Vec3 = [
+      verts[base] * scaleX + centerX,
+      verts[base + 1] * scaleY + centerY,
+      verts[base + 2] * scaleZ + centerZ,
+    ];
+    out[i] = probeSampleBrickScalar(sample, pos, 1);
+  }
+  return out;
+};
+
+const probeBuildClockRateSample = (
+  brick: any,
+  fallbackBounds: { min: Vec3; max: Vec3; axes: Vec3 },
+  mode: "eulerian" | "static",
+): ProbeBrickSample | null => {
+  if (mode !== "static") {
+    return probeBuildBrickSample(brick, fallbackBounds, "alpha");
+  }
+  const staticSample = probeBuildBrickSample(brick, fallbackBounds, "clockRate_static");
+  if (staticSample) return staticSample;
+  const gttSample = probeBuildBrickSample(brick, fallbackBounds, "g_tt");
+  if (!gttSample) return probeBuildBrickSample(brick, fallbackBounds, "alpha");
+  const data = new Float32Array(gttSample.data.length);
+  for (let i = 0; i < data.length; i += 1) {
+    const gtt = gttSample.data[i];
+    const rate = Math.sqrt(Math.max(0, -gtt));
+    data[i] = Number.isFinite(rate) ? rate : 0;
+  }
+  return {
+    dims: gttSample.dims,
+    data,
+    bounds: gttSample.bounds,
+  };
+};
+
+const probeBuildHullFieldSample = (
+  brick: any,
+  fallbackBounds: { min: Vec3; max: Vec3; axes: Vec3 },
+  wallThickness: number,
+): ProbeHullFieldSample | null => {
+  const distSample = probeBuildBrickSample(brick, fallbackBounds, "hullDist");
+  if (distSample) {
+    return { sample: distSample, mode: "dist", source: "hullDist", wallThickness };
+  }
+  const maskSample = probeBuildBrickSample(brick, fallbackBounds, "hullMask");
+  if (maskSample) {
+    return { sample: maskSample, mode: "mask", source: "hullMask", wallThickness };
+  }
+  return null;
+};
+
+const probeSampleHullFieldScalar = (
+  sample: ProbeBrickSample,
+  pos: Vec3,
+  mode: "dist" | "mask",
+  wallThickness: number,
+  outside: number,
+) => {
+  const raw = probeSampleBrickScalar(sample, pos, outside);
+  if (mode === "mask") {
+    const mask = clamp01(raw);
+    return (0.5 - mask) * 2 * wallThickness;
+  }
+  return raw;
+};
+
+const probeSampleHullFieldForVerts = (
+  verts: Float32Array,
+  field: ProbeHullFieldSample,
+  gridScale: number,
+) => {
+  const { sample, mode, wallThickness } = field;
+  const [sx, sy, sz] = sample.bounds.axes;
+  const { min, max } = sample.bounds;
+  const centerX = (min[0] + max[0]) * 0.5;
+  const centerY = (min[1] + max[1]) * 0.5;
+  const centerZ = (min[2] + max[2]) * 0.5;
+  const spanX = max[0] - min[0];
+  const spanY = max[1] - min[1];
+  const spanZ = max[2] - min[2];
+  const dx = spanX > 0 ? spanX / Math.max(1, sample.dims[0] - 1) : 1;
+  const dy = spanY > 0 ? spanY / Math.max(1, sample.dims[1] - 1) : 1;
+  const dz = spanZ > 0 ? spanZ / Math.max(1, sample.dims[2] - 1) : 1;
+  const outside = mode === "mask" ? 0 : Math.max(sx, sy, sz);
+  const outDist = new Float32Array(verts.length / 3);
+  const outGrad = new Float32Array(verts.length);
+  const scaleX = gridScale * sx;
+  const scaleY = gridScale * sy;
+  const scaleZ = gridScale * sz;
+  for (let i = 0; i < outDist.length; i += 1) {
+    const base = i * 3;
+    const pos: Vec3 = [
+      verts[base] * scaleX + centerX,
+      verts[base + 1] * scaleY + centerY,
+      verts[base + 2] * scaleZ + centerZ,
+    ];
+    const dist = probeSampleHullFieldScalar(sample, pos, mode, wallThickness, outside);
+    const dxVal =
+      probeSampleHullFieldScalar(sample, [pos[0] + dx, pos[1], pos[2]], mode, wallThickness, outside) -
+      probeSampleHullFieldScalar(sample, [pos[0] - dx, pos[1], pos[2]], mode, wallThickness, outside);
+    const dyVal =
+      probeSampleHullFieldScalar(sample, [pos[0], pos[1] + dy, pos[2]], mode, wallThickness, outside) -
+      probeSampleHullFieldScalar(sample, [pos[0], pos[1] - dy, pos[2]], mode, wallThickness, outside);
+    const dzVal =
+      probeSampleHullFieldScalar(sample, [pos[0], pos[1], pos[2] + dz], mode, wallThickness, outside) -
+      probeSampleHullFieldScalar(sample, [pos[0], pos[1], pos[2] - dz], mode, wallThickness, outside);
+    const len = Math.hypot(dxVal, dyVal, dzVal);
+    outDist[i] = dist;
+    outGrad[base] = len > 1e-6 ? dxVal / len : 0;
+    outGrad[base + 1] = len > 1e-6 ? dyVal / len : 0;
+    outGrad[base + 2] = len > 1e-6 ? dzVal / len : 0;
+  }
+  return { dist: outDist, grad: outGrad };
+};
+
+const probeInterleaveVec3 = (
+  x: Float32Array | null,
+  y: Float32Array | null,
+  z: Float32Array | null,
+) => {
+  if (!x || !y || !z) return null;
+  const len = Math.min(x.length, y.length, z.length);
+  const out = new Float32Array(len * 3);
+  for (let i = 0; i < len; i += 1) {
+    const base = i * 3;
+    out[base] = x[i];
+    out[base + 1] = y[i];
+    out[base + 2] = z[i];
+  }
+  return out;
+};
+
+const probeBuildShearForVerts = (
+  verts: Float32Array,
+  samples: {
+    K_xx: ProbeBrickSample;
+    K_yy: ProbeBrickSample;
+    K_zz: ProbeBrickSample;
+    K_xy: ProbeBrickSample;
+    K_xz: ProbeBrickSample;
+    K_yz: ProbeBrickSample;
+  },
+  gridScale: number,
+) => {
+  const kxx = probeSampleBrickForVerts(verts, samples.K_xx, gridScale);
+  const kyy = probeSampleBrickForVerts(verts, samples.K_yy, gridScale);
+  const kzz = probeSampleBrickForVerts(verts, samples.K_zz, gridScale);
+  const kxy = probeSampleBrickForVerts(verts, samples.K_xy, gridScale);
+  const kxz = probeSampleBrickForVerts(verts, samples.K_xz, gridScale);
+  const kyz = probeSampleBrickForVerts(verts, samples.K_yz, gridScale);
+  const len = Math.min(
+    kxx.length,
+    kyy.length,
+    kzz.length,
+    kxy.length,
+    kxz.length,
+    kyz.length,
+  );
+  const out = new Float32Array(len * 3);
+  for (let i = 0; i < len; i += 1) {
+    const base = i * 3;
+    const vx = verts[base];
+    const vy = verts[base + 1];
+    const vz = verts[base + 2];
+    const vlen = Math.hypot(vx, vy, vz);
+    const nx = vlen > 1e-6 ? vx / vlen : 0;
+    const ny = vlen > 1e-6 ? vy / vlen : 0;
+    const nz = vlen > 1e-6 ? vz / vlen : 0;
+    const sx = kxx[i] * nx + kxy[i] * ny + kxz[i] * nz;
+    const sy = kxy[i] * nx + kyy[i] * ny + kyz[i] * nz;
+    const sz = kxz[i] * nx + kyz[i] * ny + kzz[i] * nz;
+    out[base] = Number.isFinite(sx) ? sx : 0;
+    out[base + 1] = Number.isFinite(sy) ? sy : 0;
+    out[base + 2] = Number.isFinite(sz) ? sz : 0;
+  }
+  return out;
+};
+
+const probeMakeLatticeNodes = (div: number): Float32Array => {
+  const verts: number[] = [];
+  const step = 2 / div;
+  const min = -1;
+  for (let ix = 0; ix <= div; ix += 1) {
+    const x = min + ix * step;
+    for (let iy = 0; iy <= div; iy += 1) {
+      const y = min + iy * step;
+      for (let iz = 0; iz <= div; iz += 1) {
+        const z = min + iz * step;
+        verts.push(x, y, z);
+      }
+    }
+  }
+  return new Float32Array(verts);
+};
+
+const probeMakeLatticeSegments = (div: number): Float32Array => {
+  const verts: number[] = [];
+  const step = 2 / div;
+  const min = -1;
+  for (let iy = 0; iy <= div; iy += 1) {
+    const y = min + iy * step;
+    for (let iz = 0; iz <= div; iz += 1) {
+      const z = min + iz * step;
+      for (let ix = 0; ix < div; ix += 1) {
+        const x0 = min + ix * step;
+        const x1 = min + (ix + 1) * step;
+        verts.push(x0, y, z, x1, y, z);
+      }
+    }
+  }
+  for (let ix = 0; ix <= div; ix += 1) {
+    const x = min + ix * step;
+    for (let iz = 0; iz <= div; iz += 1) {
+      const z = min + iz * step;
+      for (let iy = 0; iy < div; iy += 1) {
+        const y0 = min + iy * step;
+        const y1 = min + (iy + 1) * step;
+        verts.push(x, y0, z, x, y1, z);
+      }
+    }
+  }
+  for (let ix = 0; ix <= div; ix += 1) {
+    const x = min + ix * step;
+    for (let iy = 0; iy <= div; iy += 1) {
+      const y = min + iy * step;
+      for (let iz = 0; iz < div; iz += 1) {
+        const z0 = min + iz * step;
+        const z1 = min + (iz + 1) * step;
+        verts.push(x, y, z0, x, y, z1);
+      }
+    }
+  }
+  return new Float32Array(verts);
+};
+
+const probeSafeNormalize = (v: Vec3): Vec3 => {
+  const len = Math.hypot(v[0], v[1], v[2]);
+  if (len < 1e-6) return [1, 0, 0];
+  return [v[0] / len, v[1] / len, v[2] / len];
+};
+
+const probeSmoothstep = (edge0: number, edge1: number, x: number) => {
+  if (edge0 === edge1) return x < edge0 ? 0 : 1;
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
+
+const probeTopHat = (r: number, sigma: number, R: number) => {
+  const den = Math.max(1e-6, 2 * Math.tanh(sigma * R));
+  return (Math.tanh(sigma * (r + R)) - Math.tanh(sigma * (r - R))) / den;
+};
+
+const probeEncodeFloat32 = (payload: Float32Array) =>
+  Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength).toString("base64");
+
+const probeSerializeScalar = (payload: Float32Array | null) =>
+  payload
+    ? { data: probeEncodeFloat32(payload), bytes: payload.byteLength, count: payload.length }
+    : null;
+
+const probeSerializeVec3 = (payload: Float32Array | null) =>
+  payload
+    ? {
+        data: probeEncodeFloat32(payload),
+        bytes: payload.byteLength,
+        count: Math.floor(payload.length / 3),
+        itemSize: 3,
+      }
+    : null;
+
+const probeWarpVerts = (
+  verts: Float32Array,
+  input: {
+    alpha?: Float32Array | null;
+    theta?: Float32Array | null;
+    hullDist?: Float32Array | null;
+    hullDir?: Float32Array | null;
+    beta?: Float32Array | null;
+    gamma?: Float32Array | null;
+    shear?: Float32Array | null;
+  },
+  settings: {
+    gridScale: number;
+    worldScale: Vec3;
+    bubbleCenter: Vec3;
+    bubbleR: number;
+    sigma: number;
+    betaScalar: number;
+    betaCenter: Vec3;
+    betaScale: number;
+    betaWarpWeight: number;
+    geomWarpScale: number;
+    phiScale: number;
+    alphaMin: number;
+    alphaScale: number;
+    thetaScale: number;
+    softening: number;
+    warpStrength: number;
+    breathAmp: number;
+    breathRate: number;
+    metricBlend: number;
+    shearStrength: number;
+    activation: number;
+    hullThickness: number;
+    hullBlend: number;
+    brickBlend: number;
+    driveDir: Vec3;
+    time_s: number;
+    hullFallback: number;
+  },
+) => {
+  const count = Math.floor(verts.length / 3);
+  const out = new Float32Array(verts.length);
+  if (count <= 0) return out;
+  const alphaArr = input.alpha ?? null;
+  const thetaArr = input.theta ?? null;
+  const hullDistArr = input.hullDist ?? null;
+  const hullDirArr = input.hullDir ?? null;
+  const betaArr = input.beta ?? null;
+  const gammaArr = input.gamma ?? null;
+  const shearArr = input.shear ?? null;
+  const gridScale = settings.gridScale;
+  const worldScale = settings.worldScale;
+  const bubbleCenter = settings.bubbleCenter;
+  const sigma = Math.max(1e-4, settings.sigma);
+  const R = Math.max(
+    1e-4,
+    settings.bubbleR * (1 + 0.1 * Math.max(0, settings.softening)),
+  );
+  const activation = clamp01(settings.activation);
+  const betaScalar = Math.max(0, Math.min(0.99, settings.betaScalar));
+  const phiScale = settings.phiScale;
+  const alphaMin = settings.alphaMin;
+  const alphaScale = settings.alphaScale;
+  const thetaScale = settings.thetaScale;
+  const warpStrength = settings.warpStrength;
+  const geomWarpScale = Math.max(0, settings.geomWarpScale);
+  const betaScale = Math.max(0, settings.betaScale);
+  const betaWarpWeight = Math.max(0, settings.betaWarpWeight);
+  const metricBlend = gammaArr ? Math.max(0, settings.metricBlend) : 0;
+  const shearStrength = shearArr ? Math.max(0, settings.shearStrength) : 0;
+  const hullThickness = Math.max(1e-4, settings.hullThickness);
+  const hullBlend = clamp01(settings.hullBlend);
+  const brickBlend = clamp01(settings.brickBlend);
+  const breathAmp = settings.breathAmp;
+  const breathRate = settings.breathRate;
+  const time_s = settings.time_s;
+  const dir = probeSafeNormalize(settings.driveDir);
+  const betaCenter = settings.betaCenter;
+  const hullFallback = settings.hullFallback;
+
+  for (let i = 0; i < count; i += 1) {
+    const base = i * 3;
+    const px = verts[base] * gridScale;
+    const py = verts[base + 1] * gridScale;
+    const pz = verts[base + 2] * gridScale;
+    const pWorldX = px * worldScale[0];
+    const pWorldY = py * worldScale[1];
+    const pWorldZ = pz * worldScale[2];
+    const relX = pWorldX - bubbleCenter[0];
+    const relY = pWorldY - bubbleCenter[1];
+    const relZ = pWorldZ - bubbleCenter[2];
+    const r = Math.hypot(relX, relY, relZ);
+    const f = probeTopHat(r, sigma, R);
+    const betaShift = betaScalar * f;
+    const alphaAnalytic = Math.sqrt(
+      Math.max(alphaMin * alphaMin, 1 - betaShift * betaShift * phiScale),
+    );
+    const brickAlphaRaw = alphaArr && alphaArr.length > i ? alphaArr[i] : 1;
+    const brickAlpha = Math.min(1, Math.max(alphaMin, brickAlphaRaw));
+    const alpha = alphaAnalytic * (1 - brickBlend) + brickAlpha * brickBlend;
+    const thetaRaw = thetaArr && thetaArr.length > i ? thetaArr[i] : 0;
+    const thetaNorm =
+      Math.max(-1, Math.min(1, thetaRaw * thetaScale)) * brickBlend;
+    const thetaWarp = thetaNorm * alphaScale * activation;
+
+    const radial = probeSafeNormalize([relX, relY, relZ]);
+    const thetaVecX =
+      radial[0] * thetaWarp * warpStrength * LATTICE_PROBE_THETA_WARP_SCALE;
+    const thetaVecY =
+      radial[1] * thetaWarp * warpStrength * LATTICE_PROBE_THETA_WARP_SCALE;
+    const thetaVecZ =
+      radial[2] * thetaWarp * warpStrength * LATTICE_PROBE_THETA_WARP_SCALE;
+
+    const betaBase = base;
+    const betaX = betaArr ? betaArr[betaBase] ?? 0 : 0;
+    const betaY = betaArr ? betaArr[betaBase + 1] ?? 0 : 0;
+    const betaZ = betaArr ? betaArr[betaBase + 2] ?? 0 : 0;
+    const betaRelX = (betaX - betaCenter[0]) * betaScale;
+    const betaRelY = (betaY - betaCenter[1]) * betaScale;
+    const betaRelZ = (betaZ - betaCenter[2]) * betaScale;
+    const betaWarpX = betaRelX * betaWarpWeight * activation * warpStrength;
+    const betaWarpY = betaRelY * betaWarpWeight * activation * warpStrength;
+    const betaWarpZ = betaRelZ * betaWarpWeight * activation * warpStrength;
+
+    let gammaX = gammaArr ? gammaArr[betaBase] ?? 1 : 1;
+    let gammaY = gammaArr ? gammaArr[betaBase + 1] ?? 1 : 1;
+    let gammaZ = gammaArr ? gammaArr[betaBase + 2] ?? 1 : 1;
+    gammaX = Math.max(0, gammaX);
+    gammaY = Math.max(0, gammaY);
+    gammaZ = Math.max(0, gammaZ);
+    let gammaScaleX = Math.sqrt(gammaX);
+    let gammaScaleY = Math.sqrt(gammaY);
+    let gammaScaleZ = Math.sqrt(gammaZ);
+    gammaScaleX = Math.min(1.6, Math.max(0.6, gammaScaleX));
+    gammaScaleY = Math.min(1.6, Math.max(0.6, gammaScaleY));
+    gammaScaleZ = Math.min(1.6, Math.max(0.6, gammaScaleZ));
+    gammaScaleX = 1 + (gammaScaleX - 1) * metricBlend;
+    gammaScaleY = 1 + (gammaScaleY - 1) * metricBlend;
+    gammaScaleZ = 1 + (gammaScaleZ - 1) * metricBlend;
+
+    const shearX = shearArr ? shearArr[betaBase] ?? 0 : 0;
+    const shearY = shearArr ? shearArr[betaBase + 1] ?? 0 : 0;
+    const shearZ = shearArr ? shearArr[betaBase + 2] ?? 0 : 0;
+    const shearVecX = shearX * shearStrength * activation;
+    const shearVecY = shearY * shearStrength * activation;
+    const shearVecZ = shearZ * shearStrength * activation;
+
+    const twistX = dir[1] * shearVecZ - dir[2] * shearVecY;
+    const twistY = dir[2] * shearVecX - dir[0] * shearVecZ;
+    const twistZ = dir[0] * shearVecY - dir[1] * shearVecX;
+
+    const hullDist =
+      hullDistArr && hullDistArr.length > i ? hullDistArr[i] : hullFallback;
+    const hullBand =
+      1 - probeSmoothstep(hullThickness * 0.5, hullThickness, Math.abs(hullDist));
+    const hullWeight = hullBand * hullBlend;
+    let hullDirX = hullDirArr ? hullDirArr[betaBase] ?? 0 : 0;
+    let hullDirY = hullDirArr ? hullDirArr[betaBase + 1] ?? 0 : 0;
+    let hullDirZ = hullDirArr ? hullDirArr[betaBase + 2] ?? 0 : 0;
+    const hullDirLen = Math.hypot(hullDirX, hullDirY, hullDirZ);
+    if (hullDirLen > 1e-4) {
+      hullDirX /= hullDirLen;
+      hullDirY /= hullDirLen;
+      hullDirZ /= hullDirLen;
+    } else {
+      hullDirX = radial[0];
+      hullDirY = radial[1];
+      hullDirZ = radial[2];
+    }
+    const hullSign = hullDist >= 0 ? 1 : -1;
+    const hullWarpX =
+      hullDirX * hullSign * hullWeight * activation * LATTICE_PROBE_HULL_WARP_SCALE;
+    const hullWarpY =
+      hullDirY * hullSign * hullWeight * activation * LATTICE_PROBE_HULL_WARP_SCALE;
+    const hullWarpZ =
+      hullDirZ * hullSign * hullWeight * activation * LATTICE_PROBE_HULL_WARP_SCALE;
+
+    const warpX =
+      (betaWarpX + thetaVecX + hullWarpX * warpStrength + shearVecX + twistX) *
+      geomWarpScale;
+    const warpY =
+      (betaWarpY + thetaVecY + hullWarpY * warpStrength + shearVecY + twistY) *
+      geomWarpScale;
+    const warpZ =
+      (betaWarpZ + thetaVecZ + hullWarpZ * warpStrength + shearVecZ + twistZ) *
+      geomWarpScale;
+    const breath =
+      (1 - alpha) *
+      breathAmp *
+      Math.sin(time_s * breathRate) *
+      activation *
+      geomWarpScale;
+
+    out[base] = (px + warpX + dir[0] * breath) * gammaScaleX;
+    out[base + 1] = (py + warpY + dir[1] * breath) * gammaScaleY;
+    out[base + 2] = (pz + warpZ + dir[2] * breath) * gammaScaleZ;
+  }
+
+  return out;
+};
+
+export async function getLatticeProbe(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const preview = state.geometryPreview?.preview ?? null;
+    const resolved = resolveGeometryForSampling(preview, state.hull);
+    const hull = resolved.hull ?? state.hull ?? {
+      Lx_m: 1007,
+      Ly_m: 264,
+      Lz_m: 173,
+      wallThickness_m: 0.45,
+    };
+    const bounds = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2] as Vec3,
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2] as Vec3,
+    };
+    const axes: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];
+    const fallbackBounds = { min: bounds.min, max: bounds.max, axes };
+
+    const query = req.method === "GET"
+      ? req.query
+      : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const gridDivBase = Math.max(
+      1,
+      Math.floor(parseNumberParam((query as any).gridDiv ?? (query as any).div, LATTICE_PROBE_GRID_DIV)),
+    );
+    const densityRaw = parseNumberParam((query as any).density ?? (query as any).probeDensity, 1);
+    const density = Number.isFinite(densityRaw) ? Math.max(0.1, densityRaw) : 1;
+    const maxDiv = Math.max(1, Math.floor(parseNumberParam((query as any).maxDiv, 512)));
+    let div = Math.max(1, Math.floor(gridDivBase * density));
+    div = Math.min(div, maxDiv);
+    const includeLines = parseBooleanParam((query as any).includeLines, true);
+    const includeNodes = parseBooleanParam((query as any).includeNodes, true);
+    const maxVerts = Math.max(
+      1,
+      Math.floor(parseNumberParam((query as any).maxVerts, LATTICE_PROBE_MAX_VERTS)),
+    );
+    const countForDiv = (d: number) => {
+      const nodeCount = includeNodes ? Math.pow(d + 1, 3) : 0;
+      const lineCount = includeLines ? 6 * d * Math.pow(d + 1, 2) : 0;
+      return nodeCount + lineCount;
+    };
+    const requestedDiv = div;
+    let totalVerts = countForDiv(div);
+    let clamped = false;
+    while (div > 1 && maxVerts > 0 && totalVerts > maxVerts) {
+      div = Math.max(1, div - 1);
+      totalVerts = countForDiv(div);
+      clamped = true;
+    }
+    const densityApplied = gridDivBase > 0 ? div / gridDivBase : density;
+    const gridScale = Math.max(
+      1e-3,
+      parseNumberParam((query as any).gridScale, LATTICE_PROBE_GRID_SCALE),
+    );
+
+    const clockModeRaw =
+      typeof (query as any).clockMode === "string" ? (query as any).clockMode : "eulerian";
+    const clockMode = clockModeRaw === "static" ? "static" : "eulerian";
+    const alphaScale = Math.max(0, parseNumberParam((query as any).alphaScale, 1));
+    const betaScale = Math.max(0, parseNumberParam((query as any).betaScale, 1));
+    const time_s = parseNumberParam((query as any).time_s, parseNumberParam((query as any).time, 0));
+
+    const warpFieldRaw =
+      (state as any)?.warpFieldType ??
+      (state as any)?.dynamicConfig?.warpFieldType;
+    const warpFieldType =
+      typeof warpFieldRaw === "string" && warpFieldRaw.length
+        ? warpFieldRaw.toLowerCase()
+        : "natario";
+    const warpGeometry =
+      warpFieldType === "alcubierre"
+        ? { geomScale: 1, betaWeight: 1 }
+        : warpFieldType === "natario" || warpFieldType === "natario_sdf"
+          ? { geomScale: LATTICE_PROBE_NATARIO_GEOM_WARP_SCALE, betaWeight: 0 }
+          : { geomScale: 1, betaWeight: 0 };
+
+    const activationState = probeComputeActivation(state);
+    const kappaSettings = probeComputeKappaSettings(state);
+    const bubbleParams = probeResolveBubbleParams(state, axes);
+    const visuals = {
+      ...kappaSettings.settings,
+      phiScale: parseNumberParam((query as any).phiScale, kappaSettings.settings.phiScale),
+      warpStrength: parseNumberParam(
+        (query as any).warpStrength,
+        kappaSettings.settings.warpStrength,
+      ),
+      breathAmp: parseNumberParam(
+        (query as any).breathAmp,
+        kappaSettings.settings.breathAmp,
+      ),
+      softening: parseNumberParam(
+        (query as any).softening,
+        kappaSettings.settings.softening,
+      ),
+    };
+
+    const overrideDriveDir = parseVec3ParamOptional((query as any).driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir) ?? [1, 0, 0];
+
+    const quality = typeof (query as any).quality === "string" ? (query as any).quality : undefined;
+    const qualityDims = dimsForQuality(quality);
+    const dimsCap = dimsCapForQuality(quality);
+    const targetDx = Math.max(
+      1e-3,
+      parseNumberParam((query as any).targetDx ?? (query as any).target_dx, 5),
+    );
+    const dimsFromDx: [number, number, number] = [
+      Math.max(1, Math.ceil((axes[0] * 2) / targetDx)),
+      Math.max(1, Math.ceil((axes[1] * 2) / targetDx)),
+      Math.max(1, Math.ceil((axes[2] * 2) / targetDx)),
+    ];
+    const hasDimsOverride =
+      (query as any).dims !== undefined && (query as any).dims !== null;
+    const dimsRaw = hasDimsOverride
+      ? parseDimsParam((query as any).dims, qualityDims)
+      : dimsFromDx;
+    const dims = clampDimsToQuality(dimsRaw, dimsCap);
+
+    const time_s_gr = parseNumberParam((query as any).time_s, parseNumberParam((query as any).time, 0));
+    const dt_s = parseNumberParam((query as any).dt_s, parseNumberParam((query as any).dt, 0));
+    const stepsRaw = Math.max(0, Math.floor(parseNumberParam((query as any).steps, 0)));
+    const steps = clampStepsToQuality(stepsRaw, stepsForQuality(quality));
+    const iterations = Math.max(
+      0,
+      Math.floor(parseNumberParam((query as any).iterations, iterationsForQuality(quality))),
+    );
+    const tolerance = Math.max(0, parseNumberParam((query as any).tolerance, 0));
+    const initialIterations = Math.max(
+      0,
+      Math.floor(parseNumberParam((query as any).initialIterations, iterations)),
+    );
+    const initialTolerance = Math.max(
+      0,
+      parseNumberParam((query as any).initialTolerance, tolerance),
+    );
+    const lapseKappa = Math.max(
+      0,
+      parseNumberParam((query as any).kappa, parseNumberParam((query as any).lapseKappa, 2)),
+    );
+    const shiftEta = Math.max(
+      0,
+      parseNumberParam((query as any).eta, parseNumberParam((query as any).shiftEta, 1)),
+    );
+    const shiftGamma = Math.max(
+      0,
+      parseNumberParam((query as any).shiftGamma, 0.75),
+    );
+    const advect = parseBooleanParam((query as any).advect, true);
+    const includeExtra = parseBooleanParam((query as any).includeExtra, false);
+    const includeMatter = parseBooleanParam((query as any).includeMatter, includeExtra);
+    const includeKij = parseBooleanParam((query as any).includeKij, true) || includeExtra;
+    const orderRaw = Math.max(2, Math.floor(parseNumberParam((query as any).order, 2)));
+    const order = orderRaw >= 4 ? 4 : 2;
+    const boundaryRaw =
+      typeof (query as any).boundary === "string"
+        ? (query as any).boundary
+        : typeof (query as any).stencilBoundary === "string"
+          ? (query as any).stencilBoundary
+          : undefined;
+    const boundary = boundaryRaw === "periodic" ? "periodic" : "clamp";
+
+    const pipelineInputs = resolvePipelineMatterInputs(state);
+    const hullWall = state.hull?.wallThickness_m ?? 0.45;
+    const dutyFRValue = Math.max(pipelineInputs.dutyFR, 1e-8);
+    const qValue = Math.max(pipelineInputs.q, 1e-6);
+    const pressureFactor = resolveStressEnergyPressureFactor(state);
+    const sourceOptions =
+      pressureFactor !== undefined ? { pressureFactor } : undefined;
+    const sourceParams: Partial<StressEnergyBrickParams> = {
+      bounds,
+      hullAxes: axes,
+      hullWall,
+      dutyFR: dutyFRValue,
+      q: qValue,
+      gammaGeo: pipelineInputs.gammaGeo,
+      gammaVdB: pipelineInputs.gammaVdB,
+      zeta: pipelineInputs.zeta,
+      phase01: pipelineInputs.phase01,
+      driveDir: driveDir ?? undefined,
+    };
+
+    const grEnabled = parseBooleanParam((query as any).grEnabled, state.grEnabled === true);
+    const geometrySig = buildGrGeometrySignature(
+      resolved,
+      state,
+      typeof state.warpGeometryKind === "string" ? state.warpGeometryKind : null,
+    );
+    const sourceCacheKey = {
+      dutyFR: dutyFRValue,
+      q: qValue,
+      gammaGeo: pipelineInputs.gammaGeo,
+      gammaVdB: pipelineInputs.gammaVdB,
+      zeta: pipelineInputs.zeta,
+      phase01: pipelineInputs.phase01,
+      pressureFactor: pressureFactor ?? null,
+      driveDir: driveDir ?? null,
+      hullAxes: axes,
+      hullWall,
+    };
+    const cacheKey = JSON.stringify({
+      dims,
+      bounds,
+      time_s: time_s_gr,
+      dt_s,
+      steps,
+      iterations,
+      tolerance,
+      useInitialData: true,
+      initialIterations,
+      initialTolerance,
+      gauge: {
+        lapseKappa,
+        shiftEta,
+        shiftGamma,
+        advect,
+      },
+      stencils: {
+        order,
+        boundary,
+      },
+      includeExtra,
+      includeMatter,
+      includeKij,
+      grEnabled,
+      source: sourceCacheKey,
+      geometry: geometrySig,
+    });
+
+    const errors: string[] = [];
+    let grBrick: GrEvolveBrick | null = null;
+    if (grEnabled) {
+      const cached = readGrBrickCache(grEvolveCache, cacheKey);
+      grBrick = cached?.brick ?? null;
+      if (!grBrick) {
+        const params: Partial<GrEvolveBrickParams> = {
+          dims,
+          bounds,
+          time_s: time_s_gr,
+          dt_s,
+          steps,
+          iterations,
+          tolerance,
+          useInitialData: true,
+          initialIterations,
+          initialTolerance,
+          gauge: {
+            lapseKappa,
+            shiftEta,
+            shiftGamma,
+            advect,
+          },
+          stencils: {
+            order,
+            boundary,
+          },
+          includeExtra,
+          includeMatter,
+          includeKij,
+          sourceParams,
+          sourceOptions,
+        };
+        if (isGrWorkerEnabled()) {
+          try {
+            grBrick = await runGrEvolveBrickInWorker(params);
+          } catch (err) {
+            console.warn("[helix-core] lattice probe gr-evolve worker failed:", err);
+          }
+        }
+        if (!grBrick) {
+          grBrick = buildGrEvolveBrick(params);
+        }
+        writeGrBrickCache(grEvolveCache, {
+          key: cacheKey,
+          createdAt: Date.now(),
+          brick: grBrick,
+        });
+      }
+    }
+
+    let lapseBrick: LapseBrick | null = null;
+    if (!grBrick) {
+      try {
+        const geometryKindRaw =
+          typeof (query as any).geometryKind === "string"
+            ? (query as any).geometryKind
+            : state.warpGeometryKind;
+        const radialMap = resolveRadialMapForBrick(state, preview, hull, geometryKindRaw);
+        const lapseParams: Partial<LapseBrickParams> = {
+          dims,
+          bounds,
+          hullAxes: axes,
+          hullWall,
+          radialMap: radialMap ?? undefined,
+          phase01: pipelineInputs.phase01,
+          sigmaSector: parseNumberParam((query as any).sigmaSector, 0.05),
+          splitEnabled: parseBooleanParam((query as any).splitEnabled, false),
+          splitFrac: parseNumberParam((query as any).splitFrac, 0.6),
+          dutyFR: dutyFRValue,
+          q: qValue,
+          gammaGeo: pipelineInputs.gammaGeo,
+          gammaVdB: pipelineInputs.gammaVdB,
+          ampBase: parseNumberParam((query as any).ampBase, 0),
+          zeta: pipelineInputs.zeta,
+          driveDir: driveDir ?? undefined,
+          iterations,
+          tolerance,
+        };
+        lapseBrick = buildLapseBrick(lapseParams);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to build lapse brick";
+        errors.push(message);
+      }
+    }
+
+    const activeBrick = grBrick ?? lapseBrick;
+    const brickSource = grBrick ? "gr-evolve-brick" : lapseBrick ? "lapse-brick" : "missing";
+    const clockRateSample = activeBrick
+      ? probeBuildClockRateSample(activeBrick, fallbackBounds, clockMode)
+      : null;
+    const thetaSample = grBrick
+      ? probeBuildBrickSample(grBrick, fallbackBounds, "theta")
+      : null;
+    const betaSamples = grBrick
+      ? (() => {
+          const sampleX = probeBuildBrickSample(grBrick, fallbackBounds, "beta_x");
+          const sampleY = probeBuildBrickSample(grBrick, fallbackBounds, "beta_y");
+          const sampleZ = probeBuildBrickSample(grBrick, fallbackBounds, "beta_z");
+          return sampleX && sampleY && sampleZ ? { sampleX, sampleY, sampleZ } : null;
+        })()
+      : null;
+    const gammaSamples = grBrick
+      ? (() => {
+          const sampleX = probeBuildBrickSample(grBrick, fallbackBounds, "gamma_xx");
+          const sampleY = probeBuildBrickSample(grBrick, fallbackBounds, "gamma_yy");
+          const sampleZ = probeBuildBrickSample(grBrick, fallbackBounds, "gamma_zz");
+          return sampleX && sampleY && sampleZ ? { sampleX, sampleY, sampleZ } : null;
+        })()
+      : null;
+    const kijSamples = grBrick
+      ? (() => {
+          const K_xx = probeBuildBrickSample(grBrick, fallbackBounds, "K_xx");
+          const K_yy = probeBuildBrickSample(grBrick, fallbackBounds, "K_yy");
+          const K_zz = probeBuildBrickSample(grBrick, fallbackBounds, "K_zz");
+          const K_xy = probeBuildBrickSample(grBrick, fallbackBounds, "K_xy");
+          const K_xz = probeBuildBrickSample(grBrick, fallbackBounds, "K_xz");
+          const K_yz = probeBuildBrickSample(grBrick, fallbackBounds, "K_yz");
+          return K_xx && K_yy && K_zz && K_xy && K_xz && K_yz
+            ? { K_xx, K_yy, K_zz, K_xy, K_xz, K_yz }
+            : null;
+        })()
+      : null;
+
+    const lineVerts = includeLines ? probeMakeLatticeSegments(div) : new Float32Array(0);
+    const nodeVerts = includeNodes ? probeMakeLatticeNodes(div) : new Float32Array(0);
+    const lineCount = Math.floor(lineVerts.length / 3);
+    const nodeCount = Math.floor(nodeVerts.length / 3);
+
+    const lineAlpha = includeLines && clockRateSample
+      ? probeSampleBrickForVerts(lineVerts, clockRateSample, gridScale)
+      : null;
+    const nodeAlpha = includeNodes && clockRateSample
+      ? probeSampleBrickForVerts(nodeVerts, clockRateSample, gridScale)
+      : null;
+    const lineTheta = includeLines && thetaSample
+      ? probeSampleBrickForVerts(lineVerts, thetaSample, gridScale)
+      : null;
+    const nodeTheta = includeNodes && thetaSample
+      ? probeSampleBrickForVerts(nodeVerts, thetaSample, gridScale)
+      : null;
+    const lineBeta = includeLines && betaSamples
+      ? probeInterleaveVec3(
+          probeSampleBrickForVerts(lineVerts, betaSamples.sampleX, gridScale),
+          probeSampleBrickForVerts(lineVerts, betaSamples.sampleY, gridScale),
+          probeSampleBrickForVerts(lineVerts, betaSamples.sampleZ, gridScale),
+        )
+      : null;
+    const nodeBeta = includeNodes && betaSamples
+      ? probeInterleaveVec3(
+          probeSampleBrickForVerts(nodeVerts, betaSamples.sampleX, gridScale),
+          probeSampleBrickForVerts(nodeVerts, betaSamples.sampleY, gridScale),
+          probeSampleBrickForVerts(nodeVerts, betaSamples.sampleZ, gridScale),
+        )
+      : null;
+    const lineGamma = includeLines && gammaSamples
+      ? probeInterleaveVec3(
+          probeSampleBrickForVerts(lineVerts, gammaSamples.sampleX, gridScale),
+          probeSampleBrickForVerts(lineVerts, gammaSamples.sampleY, gridScale),
+          probeSampleBrickForVerts(lineVerts, gammaSamples.sampleZ, gridScale),
+        )
+      : null;
+    const nodeGamma = includeNodes && gammaSamples
+      ? probeInterleaveVec3(
+          probeSampleBrickForVerts(nodeVerts, gammaSamples.sampleX, gridScale),
+          probeSampleBrickForVerts(nodeVerts, gammaSamples.sampleY, gridScale),
+          probeSampleBrickForVerts(nodeVerts, gammaSamples.sampleZ, gridScale),
+        )
+      : null;
+    const lineShear = includeLines && kijSamples
+      ? probeBuildShearForVerts(lineVerts, kijSamples, gridScale)
+      : null;
+    const nodeShear = includeNodes && kijSamples
+      ? probeBuildShearForVerts(nodeVerts, kijSamples, gridScale)
+      : null;
+
+    const hullBrickPayload = (state as any)?.hullBrick ?? lapseBrick ?? null;
+    const hullField = hullBrickPayload
+      ? probeBuildHullFieldSample(hullBrickPayload, fallbackBounds, hullWall)
+      : null;
+    const latticeBounds = hullField?.sample.bounds ?? fallbackBounds;
+    const lineHull = includeLines && hullField
+      ? probeSampleHullFieldForVerts(lineVerts, hullField, gridScale)
+      : null;
+    const nodeHull = includeNodes && hullField
+      ? probeSampleHullFieldForVerts(nodeVerts, hullField, gridScale)
+      : null;
+    const hullFallbackDistance = Math.max(
+      latticeBounds.axes[0],
+      latticeBounds.axes[1],
+      latticeBounds.axes[2],
+    ) * 2;
+    const defaultLineHullDist = includeLines
+      ? new Float32Array(lineCount).fill(hullFallbackDistance)
+      : null;
+    const defaultNodeHullDist = includeNodes
+      ? new Float32Array(nodeCount).fill(hullFallbackDistance)
+      : null;
+    const defaultLineHullDir = includeLines ? new Float32Array(lineCount * 3) : null;
+    const defaultNodeHullDir = includeNodes ? new Float32Array(nodeCount * 3) : null;
+
+    const lineHullDist = lineHull?.dist ?? defaultLineHullDist;
+    const lineHullDir = lineHull?.grad ?? defaultLineHullDir;
+    const nodeHullDist = nodeHull?.dist ?? defaultNodeHullDist;
+    const nodeHullDir = nodeHull?.grad ?? defaultNodeHullDir;
+
+    const betaCenter: Vec3 = betaSamples
+      ? [
+          probeSampleBrickScalar(betaSamples.sampleX, bubbleParams.center, 0),
+          probeSampleBrickScalar(betaSamples.sampleY, bubbleParams.center, 0),
+          probeSampleBrickScalar(betaSamples.sampleZ, bubbleParams.center, 0),
+        ].map((value) => (Number.isFinite(value) ? value : 0)) as Vec3
+      : [0, 0, 0];
+
+    const grDiagnostics = grBrick ? buildGrDiagnostics(grBrick) : null;
+    const betaMaxAbs = grDiagnostics?.gauge?.betaMaxAbs;
+    const betaFromGr =
+      Number.isFinite(betaMaxAbs) ? Math.abs(betaMaxAbs as number) : Number.NaN;
+    const betaField = Number.isFinite(betaFromGr)
+      ? {
+          value: Math.min(LATTICE_PROBE_BETA_NEAR_REST_MAX, betaFromGr),
+          source: "gr-beta",
+          proxy: false,
+        }
+      : {
+          value: bubbleParams.beta,
+          source: bubbleParams.betaSource,
+          proxy: bubbleParams.betaProxy,
+        };
+    const betaEffective = betaField.value * activationState.activation * betaScale;
+
+    const thetaChannel = grBrick?.channels?.theta;
+    const thetaRange = thetaChannel && Number.isFinite(thetaChannel.min) && Number.isFinite(thetaChannel.max)
+      ? {
+          min: thetaChannel.min,
+          max: thetaChannel.max,
+          maxAbs: Math.max(Math.abs(thetaChannel.min), Math.abs(thetaChannel.max)),
+        }
+      : null;
+    const thetaScale = thetaRange && thetaRange.maxAbs > 0 ? 1 / thetaRange.maxAbs : 0;
+
+    const hullThickness = Math.min(
+      Math.max(LATTICE_PROBE_HULL_CONTOUR_MIN, hullWall * LATTICE_PROBE_HULL_CONTOUR_SCALE),
+      Math.min(latticeBounds.axes[0], latticeBounds.axes[1], latticeBounds.axes[2]) * 0.5,
+    );
+
+    const warpSettings = {
+      gridScale,
+      worldScale: latticeBounds.axes,
+      bubbleCenter: bubbleParams.center,
+      bubbleR: bubbleParams.R,
+      sigma: bubbleParams.sigma,
+      betaScalar: betaEffective,
+      betaCenter,
+      betaScale,
+      betaWarpWeight: warpGeometry.betaWeight,
+      geomWarpScale: warpGeometry.geomScale,
+      phiScale: visuals.phiScale,
+      alphaMin: LATTICE_PROBE_ALPHA_MIN,
+      alphaScale,
+      thetaScale,
+      softening: visuals.softening,
+      warpStrength: visuals.warpStrength,
+      breathAmp: visuals.breathAmp,
+      breathRate: LATTICE_PROBE_BREATH_RATE,
+      metricBlend: LATTICE_PROBE_METRIC_BLEND,
+      shearStrength: LATTICE_PROBE_SHEAR_STRENGTH,
+      activation: activationState.activation,
+      hullThickness,
+      hullBlend: hullField ? 1 : 0,
+      brickBlend: activeBrick ? 1 : 0,
+      driveDir,
+      time_s,
+      hullFallback: hullFallbackDistance,
+    };
+
+    const lineWarped = includeLines
+      ? probeWarpVerts(
+          lineVerts,
+          {
+            alpha: lineAlpha,
+            theta: lineTheta,
+            hullDist: lineHullDist,
+            hullDir: lineHullDir,
+            beta: lineBeta,
+            gamma: lineGamma,
+            shear: lineShear,
+          },
+          warpSettings,
+        )
+      : null;
+    const nodeWarped = includeNodes
+      ? probeWarpVerts(
+          nodeVerts,
+          {
+            alpha: nodeAlpha,
+            theta: nodeTheta,
+            hullDist: nodeHullDist,
+            hullDir: nodeHullDir,
+            beta: nodeBeta,
+            gamma: nodeGamma,
+            shear: nodeShear,
+          },
+          warpSettings,
+        )
+      : null;
+
+    const stageRequirements: Array<{ module: string; minStage: MathStageLabel }> = [
+      { module: "server/energy-pipeline.ts", minStage: "reduced-order" },
+    ];
+    if (grBrick) {
+      stageRequirements.push(
+        { module: "server/gr-evolve-brick.ts", minStage: "diagnostic" },
+        { module: "server/stress-energy-brick.ts", minStage: "reduced-order" },
+      );
+    }
+    const gateReasons: string[] = [];
+    const gateModules = stageRequirements.map((entry) => {
+      const stage = resolveLatticeProbeStage(entry.module);
+      const ok = meetsLatticeProbeStage(stage, entry.minStage);
+      if (!ok) {
+        gateReasons.push(`stage blocked: ${entry.module} (${stage} < ${entry.minStage})`);
+      }
+      return {
+        module: entry.module,
+        stage,
+        minStage: entry.minStage,
+        ok,
+      };
+    });
+
+    const natarioStats = grBrick?.stats?.stressEnergy?.natario ?? null;
+    const alphaRange = (() => {
+      const values = nodeAlpha ?? lineAlpha;
+      if (!values || values.length === 0) return null;
+      let min = Number.POSITIVE_INFINITY;
+      let max = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i < values.length; i += 1) {
+        const v = values[i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+      return { min, max };
+    })();
+
+    const spacing_m: Vec3 = [
+      (2 * gridScale * latticeBounds.axes[0]) / Math.max(1, div),
+      (2 * gridScale * latticeBounds.axes[1]) / Math.max(1, div),
+      (2 * gridScale * latticeBounds.axes[2]) / Math.max(1, div),
+    ];
+
+    const payload = {
+      kind: "lattice-probe",
+      version: 1,
+      updatedAt: Date.now(),
+      grid: {
+        div,
+        gridDivBase,
+        densityRequested: density,
+        densityApplied,
+        gridScale,
+        spacing_m,
+        counts: {
+          nodes: nodeCount,
+          lines: lineCount,
+          total: totalVerts,
+          maxVerts,
+        },
+        includeNodes,
+        includeLines,
+        requestedDiv,
+        clamped,
+      },
+      bounds: latticeBounds,
+      geometry: {
+        source: resolved.source,
+        meshHash: resolved.meshHash ?? null,
+        previewUpdatedAt: resolved.previewUpdatedAt ?? null,
+        clampReasons: resolved.clampReasons,
+        basis: resolved.basis,
+      },
+      mathGate: {
+        allowed: gateReasons.length === 0,
+        reasons: gateReasons,
+        modules: gateModules,
+      },
+      sources: {
+        brick: brickSource,
+        clockMode,
+        warpFieldType,
+        alphaSource: clockRateSample ? brickSource : "analytic",
+        thetaSource: thetaSample ? "gr-evolve-brick" : "missing",
+        hullField: hullField?.source ?? "none",
+      },
+      ranges: {
+        alpha: alphaRange,
+        theta: thetaRange,
+        betaMaxAbs: Number.isFinite(betaMaxAbs) ? betaMaxAbs : null,
+      },
+      kappa: {
+        drive: kappaSettings.kappaDrive,
+        blend: kappaSettings.kappaBlend,
+      },
+      activation: {
+        value: activationState.activation,
+        base: activationState.activationBase,
+        proxy: activationState.activationProxy,
+        guardrails: activationState.guardrails,
+        power: activationState.power,
+        duty: activationState.duty,
+        gammaGeo: activationState.gammaGeo,
+        gammaVdB: activationState.gammaVdB,
+        qSpoil: activationState.qSpoil,
+        tsRatio: activationState.tsRatio,
+        thetaCal: activationState.thetaCal,
+      },
+      bubble: {
+        R: bubbleParams.R,
+        sigma: bubbleParams.sigma,
+        beta: betaField.value,
+        center: bubbleParams.center,
+        sources: {
+          radius: bubbleParams.radiusSource,
+          sigma: bubbleParams.sigmaSource,
+          beta: betaField.source,
+          center: bubbleParams.centerSource,
+        },
+        proxy: {
+          radius: bubbleParams.radiusProxy,
+          sigma: bubbleParams.sigmaProxy,
+          beta: betaField.proxy,
+          center: bubbleParams.centerProxy,
+        },
+      },
+      warp: {
+        geomScale: warpGeometry.geomScale,
+        betaWeight: warpGeometry.betaWeight,
+        betaScale,
+        betaEffective,
+        warpStrength: visuals.warpStrength,
+        phiScale: visuals.phiScale,
+        breathAmp: visuals.breathAmp,
+        softening: visuals.softening,
+        alphaMin: LATTICE_PROBE_ALPHA_MIN,
+        alphaScale,
+        thetaScale,
+        thetaWarpScale: LATTICE_PROBE_THETA_WARP_SCALE,
+        metricBlend: LATTICE_PROBE_METRIC_BLEND,
+        shearStrength: LATTICE_PROBE_SHEAR_STRENGTH,
+        hullThickness,
+      },
+      diagnostics: natarioStats
+        ? {
+            divBetaMaxPre: natarioStats.divBetaMaxPre ?? natarioStats.divBetaMax,
+            divBetaMaxPost: natarioStats.divBetaMaxPost ?? natarioStats.divBetaMax,
+            clampScale: natarioStats.clampScale,
+          }
+        : null,
+      nodes: includeNodes
+        ? {
+            count: nodeCount,
+            positions: probeSerializeVec3(nodeVerts),
+            warped: probeSerializeVec3(nodeWarped),
+            alpha: probeSerializeScalar(nodeAlpha),
+            theta: probeSerializeScalar(nodeTheta),
+            beta: probeSerializeVec3(nodeBeta),
+            gamma: probeSerializeVec3(nodeGamma),
+            shear: probeSerializeVec3(nodeShear),
+            hullDist: probeSerializeScalar(nodeHullDist),
+            hullDir: probeSerializeVec3(nodeHullDir),
+          }
+        : null,
+      lines: includeLines
+        ? {
+            count: lineCount,
+            positions: probeSerializeVec3(lineVerts),
+            warped: probeSerializeVec3(lineWarped),
+            alpha: probeSerializeScalar(lineAlpha),
+            theta: probeSerializeScalar(lineTheta),
+            beta: probeSerializeVec3(lineBeta),
+            gamma: probeSerializeVec3(lineGamma),
+            shear: probeSerializeVec3(lineShear),
+            hullDist: probeSerializeScalar(lineHullDist),
+            hullDir: probeSerializeVec3(lineHullDir),
+          }
+        : null,
+      errors: errors.length ? errors : undefined,
+    };
+
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] lattice probe error:", err);
+    const message = err instanceof Error ? err.message : "Failed to build lattice probe";
+    res.status(500).json({ error: "lattice-probe-failed", message });
   }
 }
 
@@ -4735,6 +6840,9 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
     const includeExtra = parseBooleanParam(query.includeExtra, false);
     const includeMatter = parseBooleanParam(query.includeMatter, includeExtra);
     const includeKij = parseBooleanParam(query.includeKij, includeExtra);
+    const overrideDriveDir = parseVec3ParamOptional(query.driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
     const orderRaw = Math.max(2, Math.floor(parseNumberParam(query.order, 2)));
     const order = orderRaw >= 4 ? 4 : 2;
     const boundaryRaw =
@@ -4763,6 +6871,7 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       gammaVdB: pipelineInputs.gammaVdB,
       zeta: pipelineInputs.zeta,
       phase01: pipelineInputs.phase01,
+      driveDir: driveDir ?? undefined,
     };
     const sourceCacheKey = {
       dutyFR: dutyFRValue,
@@ -4772,6 +6881,7 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       zeta: pipelineInputs.zeta,
       phase01: pipelineInputs.phase01,
       pressureFactor: pressureFactor ?? null,
+      driveDir: driveDir ?? null,
       hullAxes,
       hullWall,
     };
@@ -4897,10 +7007,17 @@ export async function getGrRegionStats(req: Request, res: Response) {
       min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
       max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
     };
+    const hullWallThickness =
+      "wallThickness_m" in hull && typeof hull.wallThickness_m === "number"
+        ? hull.wallThickness_m
+        : undefined;
 
     const query = req.method === "GET"
       ? req.query
       : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const overrideDriveDir = parseVec3ParamOptional((query as any).driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
 
     const quality = typeof query.quality === "string" ? query.quality : undefined;
     const qualityDims = dimsForQuality(quality);
@@ -5024,6 +7141,7 @@ export async function getGrRegionStats(req: Request, res: Response) {
           gammaVdB: pipelineInputs.gammaVdB,
           zeta: pipelineInputs.zeta,
           phase01: phase01Value,
+          driveDir: driveDir ?? undefined,
         };
         const sourceCacheKey = {
           dutyFR: dutyFRValue,
@@ -5033,6 +7151,7 @@ export async function getGrRegionStats(req: Request, res: Response) {
           zeta: pipelineInputs.zeta,
           phase01: phase01Value,
           pressureFactor: pressureFactor ?? null,
+          driveDir: driveDir ?? null,
           hullAxes,
           hullWall,
         };
@@ -5154,9 +7273,6 @@ export async function getGrRegionStats(req: Request, res: Response) {
       );
       const ampBase = parseNumberParam((query as any).ampBase, 0);
       const zeta = parseNumberParam((query as any).zeta, 0.84);
-      const overrideDriveDir = parseVec3ParamOptional((query as any).driveDir);
-      const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
-      const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
 
       const params: Partial<StressEnergyBrickParams> = {
         dims,
@@ -5216,7 +7332,7 @@ export async function getGrRegionStats(req: Request, res: Response) {
           Lx_m: hull.Lx_m,
           Ly_m: hull.Ly_m,
           Lz_m: hull.Lz_m,
-          wallThickness_m: hull.wallThickness_m ?? hullWall,
+          wallThickness_m: hullWallThickness ?? hullWall,
         },
         bounds,
         radialMap: radialResolved.source,
@@ -5314,6 +7430,9 @@ export async function getGrConstraintNetwork4d(req: Request, res: Response) {
     });
 
     const pipelineInputs = resolvePipelineMatterInputs(state);
+    const overrideDriveDir = parseVec3ParamOptional(body.driveDir);
+    const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
+    const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
     const hullAxes: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];
     const hullWall = state.hull?.wallThickness_m ?? 0.45;
     const pressureFactor = resolveStressEnergyPressureFactor(state);
@@ -5329,6 +7448,7 @@ export async function getGrConstraintNetwork4d(req: Request, res: Response) {
       gammaVdB: pipelineInputs.gammaVdB,
       zeta: pipelineInputs.zeta,
       phase01: pipelineInputs.phase01,
+      driveDir: driveDir ?? undefined,
     };
 
     const result = runGrConstraintNetwork4d({
@@ -5884,6 +8004,264 @@ export async function ingestHardwareSweepPoint(req: Request, res: Response) {
   res.status(200).json({ ok: true, totals });
 }
 
+function normalizeHardwareSectorStateInput(
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...input };
+  const aliasMap: Record<string, string> = {
+    dwell: "dwell_ms",
+    dwellMs: "dwell_ms",
+    burst: "burst_ms",
+    burstMs: "burst_ms",
+    strobe: "strobeHz",
+    strobe_hz: "strobeHz",
+    sector: "currentSector",
+    sectorIdx: "currentSector",
+    sectors: "activeSectors",
+    sectorCount: "sectorCount",
+    sectorsTotal: "sectorCount",
+    sectors_total: "sectorCount",
+    totalSectors: "sectorCount",
+    phase_cont: "phaseCont",
+    pump_deg: "pumpPhase_deg",
+    tau_lc_ms: "tauLC_ms",
+  };
+
+  for (const [alias, canonical] of Object.entries(aliasMap)) {
+    if (out[canonical] == null && input[alias] != null) {
+      out[canonical] = input[alias];
+    }
+  }
+
+  const burstUs = pick(
+    num((input as any).burst_us),
+    num((input as any).burstLength_us),
+    num((input as any).burstLengthUs),
+  );
+  const burstNs = pick(
+    num((input as any).burst_ns),
+    num((input as any).burstLength_ns),
+    num((input as any).burstLengthNs),
+  );
+  if (!Number.isFinite(num(out.burst_ms)) && Number.isFinite(burstUs)) {
+    out.burst_ms = (burstUs as number) / 1000;
+  }
+  if (!Number.isFinite(num(out.burst_ms)) && Number.isFinite(burstNs)) {
+    out.burst_ms = (burstNs as number) / 1e6;
+  }
+
+  const dwellUs = pick(
+    num((input as any).dwell_us),
+    num((input as any).dwellLength_us),
+    num((input as any).dwellLengthUs),
+  );
+  const dwellNs = pick(
+    num((input as any).dwell_ns),
+    num((input as any).dwellLength_ns),
+    num((input as any).dwellLengthNs),
+  );
+  if (!Number.isFinite(num(out.dwell_ms)) && Number.isFinite(dwellUs)) {
+    out.dwell_ms = (dwellUs as number) / 1000;
+  }
+  if (!Number.isFinite(num(out.dwell_ms)) && Number.isFinite(dwellNs)) {
+    out.dwell_ms = (dwellNs as number) / 1e6;
+  }
+
+  const tauUs = pick(num((input as any).tauLC_us), num((input as any).tau_lc_us));
+  if (!Number.isFinite(num(out.tauLC_ms)) && Number.isFinite(tauUs)) {
+    out.tauLC_ms = (tauUs as number) / 1000;
+  }
+
+  const setMeasured = (key: string, value: number | undefined) => {
+    if (!Number.isFinite(value)) return;
+    if (Number.isFinite(num(out[key]))) return;
+    out[key] = value;
+  };
+
+  const modulationGHz = pick(
+    num((input as any).measuredModulationFreqGHz),
+    num((input as any).modulationFreqGHz),
+    num((input as any).modulationFreq_GHz),
+    num((input as any).modulation_freq_ghz),
+    num((input as any).mod_freq_ghz),
+    num((input as any).drive_freq_ghz),
+    num((input as any).driveFreqGHz),
+  );
+  const modulationHz = pick(
+    num((input as any).modulationFreqHz),
+    num((input as any).modulationFreq_Hz),
+    num((input as any).modulation_freq_hz),
+    num((input as any).mod_freq_hz),
+    num((input as any).drive_freq_hz),
+    num((input as any).driveFreqHz),
+  );
+  if (Number.isFinite(modulationGHz)) {
+    setMeasured("measuredModulationFreqGHz", modulationGHz as number);
+  } else if (Number.isFinite(modulationHz)) {
+    setMeasured("measuredModulationFreqGHz", (modulationHz as number) / 1e9);
+  }
+
+  const pulseGHz = pick(
+    num((input as any).measuredPulseFrequencyGHz),
+    num((input as any).pulseFrequencyGHz),
+    num((input as any).pulseFrequency_GHz),
+    num((input as any).pulse_freq_ghz),
+    num((input as any).pulseFreqGHz),
+  );
+  const pulseHz = pick(
+    num((input as any).pulseFrequencyHz),
+    num((input as any).pulseFrequency_Hz),
+    num((input as any).pulse_freq_hz),
+    num((input as any).pulseFreqHz),
+  );
+  if (Number.isFinite(pulseGHz)) {
+    setMeasured("measuredPulseFrequencyGHz", pulseGHz as number);
+  } else if (Number.isFinite(pulseHz)) {
+    setMeasured("measuredPulseFrequencyGHz", (pulseHz as number) / 1e9);
+  }
+
+  const cycleUs = pick(
+    num((input as any).measuredCycleLengthUs),
+    num((input as any).cycleLengthUs),
+    num((input as any).cycleLength_us),
+    num((input as any).cycle_us),
+  );
+  const cycleMs = pick(
+    num((input as any).cycleLengthMs),
+    num((input as any).cycleLength_ms),
+    num((input as any).cycle_ms),
+  );
+  const cycleNs = pick(
+    num((input as any).cycleLengthNs),
+    num((input as any).cycleLength_ns),
+    num((input as any).cycle_ns),
+  );
+  if (Number.isFinite(cycleUs)) {
+    setMeasured("measuredCycleLengthUs", cycleUs as number);
+  } else if (Number.isFinite(cycleNs)) {
+    setMeasured("measuredCycleLengthUs", (cycleNs as number) / 1e3);
+  } else if (Number.isFinite(cycleMs)) {
+    setMeasured("measuredCycleLengthUs", (cycleMs as number) * 1000);
+  } else if (Number.isFinite(num(out.dwell_ms))) {
+    setMeasured("measuredCycleLengthUs", (num(out.dwell_ms) as number) * 1000);
+  }
+
+  const burstLengthUs = pick(
+    num((input as any).measuredBurstLengthUs),
+    num((input as any).burstLengthUs),
+    num((input as any).burstLength_us),
+    num((input as any).burst_us),
+  );
+  if (Number.isFinite(burstLengthUs)) {
+    setMeasured("measuredBurstLengthUs", burstLengthUs as number);
+  } else if (Number.isFinite(burstNs)) {
+    setMeasured("measuredBurstLengthUs", (burstNs as number) / 1e3);
+  } else if (Number.isFinite(num(out.burst_ms))) {
+    setMeasured("measuredBurstLengthUs", (num(out.burst_ms) as number) * 1000);
+  }
+
+  const dutyCycle = pick(
+    num((input as any).measuredDutyCycle),
+    num((input as any).dutyCycle),
+    num((input as any).duty_cycle),
+    num((input as any).duty),
+  );
+  if (Number.isFinite(dutyCycle)) {
+    setMeasured("measuredDutyCycle", clamp01(dutyCycle as number));
+  } else if (
+    Number.isFinite(num(out.burst_ms)) &&
+    Number.isFinite(num(out.dwell_ms)) &&
+    (num(out.dwell_ms) as number) > 0
+  ) {
+    setMeasured(
+      "measuredDutyCycle",
+      clamp01((num(out.burst_ms) as number) / (num(out.dwell_ms) as number)),
+    );
+  }
+
+  const sectorDuty = pick(
+    num((input as any).measuredSectorDuty),
+    num((input as any).sectorDuty),
+    num((input as any).dutyEffectiveFR),
+    num((input as any).dutyEffective_FR),
+    num((input as any).dutyEffective),
+    num((input as any).dutyShip),
+  );
+  if (Number.isFinite(sectorDuty)) {
+    setMeasured("measuredSectorDuty", clamp01(sectorDuty as number));
+  }
+
+  const sectorCount = pick(
+    num(out.sectorCount),
+    num((input as any).measuredSectorCount),
+  );
+  if (Number.isFinite(sectorCount)) {
+    const total = Math.max(1, Math.round(sectorCount as number));
+    out.sectorCount = out.sectorCount ?? total;
+    setMeasured("measuredSectorCount", total);
+  }
+
+  const cavityQ = pick(
+    num((input as any).measuredCavityQ),
+    num((input as any).cavityQ),
+    num((input as any).qCavity),
+    num((input as any).q_cavity),
+    num((input as any).QL),
+    num((input as any).q_loaded),
+    num((input as any).Q_loaded),
+  );
+  if (Number.isFinite(cavityQ)) {
+    setMeasured("measuredCavityQ", cavityQ as number);
+  }
+
+  const gammaGeo = pick(
+    num((input as any).measuredGammaGeo),
+    num((input as any).gammaGeo),
+    num((input as any).gamma_geo),
+  );
+  if (Number.isFinite(gammaGeo)) {
+    setMeasured("measuredGammaGeo", gammaGeo as number);
+  }
+
+  const gammaVdB = pick(
+    num((input as any).measuredGammaVanDenBroeck),
+    num((input as any).gammaVanDenBroeck),
+    num((input as any).gammaVdB),
+    num((input as any).gamma_vdb),
+    num((input as any).gamma_vdB),
+  );
+  if (Number.isFinite(gammaVdB)) {
+    setMeasured("measuredGammaVanDenBroeck", gammaVdB as number);
+  }
+
+  const qSpoil = pick(
+    num((input as any).measuredQSpoilingFactor),
+    num((input as any).qSpoilingFactor),
+    num((input as any).q_spoiling),
+    num((input as any).q_spoil),
+    num((input as any).qSpoil),
+  );
+  if (Number.isFinite(qSpoil)) {
+    setMeasured("measuredQSpoilingFactor", qSpoil as number);
+  }
+
+  const qMechanical = pick(
+    num((input as any).measuredQMechanical),
+    num((input as any).qMechanical),
+    num((input as any).q_mechanical),
+    num((input as any).qMech),
+  );
+  if (Number.isFinite(qMechanical)) {
+    setMeasured("measuredQMechanical", qMechanical as number);
+  }
+
+  if (out.provenance == null && input.provenance == null) {
+    out.provenance = "hardware";
+  }
+
+  return out;
+}
+
 export async function ingestHardwareSectorState(req: Request, res: Response) {
   if (req.method === "OPTIONS") {
     setCors(res);
@@ -5895,13 +8273,17 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Access-Control-Allow-Methods", "OPTIONS,POST");
 
-  const body = req.body && typeof req.body === "object" ? req.body : null;
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : null;
   if (!body) {
     res.status(400).json({ error: "invalid-sector-state" });
     return;
   }
 
-  const parsed = hardwareSectorStateSchema.safeParse(body);
+  const normalized = normalizeHardwareSectorStateInput(body);
+  const parsed = hardwareSectorStateSchema.safeParse(normalized);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid-sector-state", details: parsed.error.flatten() });
     return;
@@ -5958,6 +8340,81 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
   try {
     await pipeMutex.lock(async () => {
       const current = getGlobalPipelineState();
+      const nextDynamic = {
+        ...(current.dynamicConfig ?? {}),
+      } as NonNullable<EnergyPipelineState["dynamicConfig"]>;
+      const nextAmp = {
+        ...((current.ampFactors ?? (current as any).amps ?? {}) as NonNullable<
+          EnergyPipelineState["ampFactors"]
+        >),
+      };
+      let hasDynamicMeasured = false;
+      let hasAmpMeasured = false;
+      const setDynamicMeasured = (key: string, value: number | undefined) => {
+        if (!Number.isFinite(value)) return;
+        nextDynamic[key] = value as number;
+        hasDynamicMeasured = true;
+      };
+      const setAmpMeasured = (key: string, value: number | undefined) => {
+        if (!Number.isFinite(value)) return;
+        nextAmp[key] = value as number;
+        hasAmpMeasured = true;
+      };
+
+      setDynamicMeasured(
+        "measuredModulationFreqGHz",
+        num((payload as any).measuredModulationFreqGHz),
+      );
+      setDynamicMeasured(
+        "measuredPulseFrequencyGHz",
+        num((payload as any).measuredPulseFrequencyGHz),
+      );
+      setDynamicMeasured(
+        "measuredBurstLengthUs",
+        num((payload as any).measuredBurstLengthUs),
+      );
+      setDynamicMeasured(
+        "measuredCycleLengthUs",
+        num((payload as any).measuredCycleLengthUs),
+      );
+      setDynamicMeasured(
+        "measuredDutyCycle",
+        num((payload as any).measuredDutyCycle),
+      );
+      setDynamicMeasured(
+        "measuredSectorDuty",
+        num((payload as any).measuredSectorDuty),
+      );
+      setDynamicMeasured(
+        "measuredSectorCount",
+        num((payload as any).measuredSectorCount),
+      );
+      setDynamicMeasured(
+        "measuredCavityQ",
+        num((payload as any).measuredCavityQ),
+      );
+
+      setAmpMeasured(
+        "measuredGammaGeo",
+        num((payload as any).measuredGammaGeo),
+      );
+      setAmpMeasured(
+        "measuredGammaVanDenBroeck",
+        num((payload as any).measuredGammaVanDenBroeck),
+      );
+      setAmpMeasured(
+        "measuredQSpoilingFactor",
+        num((payload as any).measuredQSpoilingFactor),
+      );
+      setAmpMeasured(
+        "measuredQMechanical",
+        num((payload as any).measuredQMechanical),
+      );
+      setAmpMeasured(
+        "measuredCavityQ",
+        num((payload as any).measuredCavityQ),
+      );
+
       const payloadTsRaw =
         typeof payload.timestamp === "number" || typeof payload.timestamp === "string"
           ? Number(payload.timestamp)
@@ -5965,6 +8422,7 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
       const sampleTs = Number.isFinite(payloadTsRaw) ? payloadTsRaw : now;
       const sectorTotalResolved =
         pick(
+          num((payload as any).measuredSectorCount),
           num((payload as any).sectorCount),
           num((current.hardwareTruth as any)?.strobeDuty?.sTotal),
           current.sectorCount,
@@ -5976,8 +8434,11 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
       const sLive = Math.max(0, sLiveResolved);
       const burstMs = num(payload.burst_ms);
       const dwellMs = num(payload.dwell_ms);
+      const measuredDutyCycle = num((payload as any).measuredDutyCycle);
       const dutyLocal = clamp01(
-        Number.isFinite(burstMs) && Number.isFinite(dwellMs) && (dwellMs as number) > 0
+        Number.isFinite(measuredDutyCycle)
+          ? (measuredDutyCycle as number)
+          : Number.isFinite(burstMs) && Number.isFinite(dwellMs) && (dwellMs as number) > 0
           ? (burstMs as number) / (dwellMs as number)
           : pick(current.dutyBurst, (current as any).localBurstFrac, PAPER_DUTY.BURST_DUTY_LOCAL) ??
               PAPER_DUTY.BURST_DUTY_LOCAL,
@@ -6001,6 +8462,8 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
         sectorCount: sectorTotal,
         dutyEffective_FR: dutyEffMeasured,
         dutyEffectiveFR: dutyEffMeasured as any,
+        dynamicConfig: hasDynamicMeasured ? nextDynamic : current.dynamicConfig,
+        ampFactors: hasAmpMeasured ? nextAmp : current.ampFactors,
         hardwareTruth: {
           ...(current.hardwareTruth ?? {}),
           sectorState: { ...payload, updatedAt: now },

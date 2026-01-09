@@ -2,7 +2,7 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import { EssenceEnvelope } from "@shared/essence-schema";
-import { putEnvelope } from "../services/essence/store";
+import { putEnvelopeWithPolicy } from "./provenance";
 import { essenceHub } from "../services/essence/events";
 import { putBlob } from "../storage";
 import { persistEssencePacket } from "../db/essence";
@@ -160,7 +160,7 @@ async function runLocalLumaGeneration(rawInput: unknown, ctx: any) {
       },
     });
 
-    await putEnvelope(envelope);
+    await putEnvelopeWithPolicy(envelope);
     await persistEssencePacket({
       id: `${essenceId}:image`,
       envelope_id: essenceId,

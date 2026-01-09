@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+  <path class="fill" d="M80 120 H920 V720 L760 900 H80 Z" />
+  <path class="fill-soft" d="M140 180 H860 V260 H140 Z" />
+  <path class="fill-soft" d="M140 620 H520 V680 H140 Z" />
+</svg>

@@ -1,2 +1,3 @@
 #!/usr/bin/env node
-import "../dist/casimir-verify.js";
+console.warn("[shadow-of-intent] casimir is deprecated; use shadow-of-intent instead.");
+import "../dist/shadow-of-intent.js";

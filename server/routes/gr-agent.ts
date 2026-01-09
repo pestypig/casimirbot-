@@ -14,6 +14,10 @@ import {
   getGrAgentLoopKpis,
   recordGrAgentLoopRun,
 } from "../services/observability/gr-agent-loop-store.js";
+import {
+  getGrOsPayloadById,
+  getGrOsPayloads,
+} from "../services/observability/gr-os-payload-store.js";
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -75,6 +79,31 @@ grAgentRouter.get("/gr-agent-loop/:id", (req: Request, res: Response) => {
     return res.status(404).json({ error: "gr-agent-loop-not-found" });
   }
   return res.json({ run: record });
+});
+
+grAgentRouter.get("/gr-os-payloads", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const parsed = listQuerySchema.safeParse(req.query ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: "invalid-query",
+      details: parsed.error.flatten(),
+    });
+  }
+  const { limit } = parsed.data;
+  const payloads = getGrOsPayloads(limit);
+  return res.json({ payloads, limit: payloads.length });
+});
+
+grAgentRouter.get("/gr-os-payloads/:id", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const record = getGrOsPayloadById(req.params.id);
+  if (!record) {
+    return res.status(404).json({ error: "gr-os-payload-not-found" });
+  }
+  return res.json({ payload: record });
 });
 
 grAgentRouter.post("/gr-agent-loop", async (req: Request, res: Response) => {

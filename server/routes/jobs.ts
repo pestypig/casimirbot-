@@ -1,9 +1,23 @@
 import { Router } from "express";
 import { z } from "zod";
 import { discoverJobs, addUserJob } from "../services/jobs/engine";
-import { awardTokens, getTokenBalance } from "../services/jobs/token-budget";
+import { awardEarnings, getTokenBalance } from "../services/jobs/token-budget";
+import {
+  fundUbiPool,
+  listPayouts,
+  requestPayout,
+  runUbiDistribution,
+  updatePayoutStatus,
+} from "../services/jobs/payouts";
 import { listProposals } from "../services/proposals/engine";
-import { jobProposalSchema, type DesktopPanelProposal, type Job, type JobProposal } from "@shared/jobs";
+import {
+  jobProposalSchema,
+  payoutKindSchema,
+  payoutStatusSchema,
+  type DesktopPanelProposal,
+  type Job,
+  type JobProposal,
+} from "@shared/jobs";
 import type { EssenceProposal } from "@shared/proposals";
 import { recordTask } from "../metrics";
 
@@ -12,12 +26,58 @@ export const jobsRouter = Router();
 const resolveOwnerId = (req: any): string | null =>
   (req?.auth?.sub as string | undefined) ?? (req?.auth?.personaId as string | undefined) ?? null;
 
+const requirePayoutAdmin = (req: any, res: any): boolean => {
+  const token = process.env.ESSENCE_PAYOUT_ADMIN_TOKEN?.trim();
+  if (!token) {
+    return true;
+  }
+  const header = req.headers?.["x-payout-admin-token"];
+  if (typeof header === "string" && header === token) {
+    return true;
+  }
+  res.status(403).json({ error: "payout_forbidden" });
+  return false;
+};
+
 const isPanelSeedProposal = (
   proposal: EssenceProposal,
 ): proposal is EssenceProposal & { target: { type: "panel-seed"; componentPath: string } } =>
   proposal.kind === "panel" && proposal.target.type === "panel-seed";
 
 const CompleteRequest = z.object({ jobId: z.string().min(1), evidence: z.string().min(1).max(4000).optional() });
+const PayoutRequest = z
+  .object({
+    amount: z.number().int().nonnegative(),
+    destination: z.string().min(1).max(200).optional(),
+    reason: z.string().min(1).max(200).optional(),
+  })
+  .strict();
+const PayoutListQuery = z
+  .object({
+    kind: payoutKindSchema.optional(),
+    status: payoutStatusSchema.optional(),
+    limit: z.coerce.number().int().min(1).max(200).optional(),
+  })
+  .partial();
+const PayoutStatusRequest = z
+  .object({
+    status: payoutStatusSchema,
+    note: z.string().min(1).max(500).optional(),
+  })
+  .strict();
+const UbiRunRequest = z
+  .object({
+    minBalance: z.number().int().nonnegative().optional(),
+    minPayout: z.number().int().nonnegative().optional(),
+    maxUsers: z.number().int().positive().optional(),
+  })
+  .strict();
+const UbiFundRequest = z
+  .object({
+    amount: z.number().int().nonnegative(),
+    reason: z.string().min(1).max(200).optional(),
+  })
+  .strict();
 
 jobsRouter.get("/list", (_req, res) => {
   const { jobs, generatedAt } = discoverJobs();
@@ -49,6 +109,88 @@ jobsRouter.get("/budget", (req, res) => {
   res.json(balance);
 });
 
+jobsRouter.get("/payouts", (req, res) => {
+  const userId = resolveOwnerId(req) ?? "anon";
+  const parsed = PayoutListQuery.safeParse(req.query ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const payouts = listPayouts({
+    userId,
+    kind: parsed.data.kind,
+    status: parsed.data.status,
+    limit: parsed.data.limit,
+  });
+  res.json({ payouts, total: payouts.length, generatedAt: Date.now() });
+});
+
+jobsRouter.post("/payouts/request", (req, res) => {
+  const userId = resolveOwnerId(req) ?? "anon";
+  const parsed = PayoutRequest.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const result = requestPayout({
+    userId,
+    amount: parsed.data.amount,
+    destination: parsed.data.destination,
+    reason: parsed.data.reason,
+  });
+  if (!result.ok) {
+    return res.status(result.error === "invalid_amount" ? 400 : 409).json({ error: result.error });
+  }
+  return res.json({ ok: true, payout: result.payout });
+});
+
+jobsRouter.post("/payouts/:id/status", (req, res) => {
+  if (!requirePayoutAdmin(req, res)) {
+    return;
+  }
+  const id = req.params.id;
+  if (!id) {
+    return res.status(400).json({ error: "bad_request" });
+  }
+  const parsed = PayoutStatusRequest.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const updated = updatePayoutStatus(id, parsed.data.status, parsed.data.note);
+  if (!updated) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  return res.json({ ok: true, payout: updated });
+});
+
+jobsRouter.post("/ubi/run", (req, res) => {
+  if (!requirePayoutAdmin(req, res)) {
+    return;
+  }
+  const parsed = UbiRunRequest.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const result = runUbiDistribution(parsed.data);
+  if (!result.ok) {
+    return res.status(409).json({ error: result.reason });
+  }
+  return res.json({ ok: true, ...result });
+});
+
+jobsRouter.post("/ubi/fund", (req, res) => {
+  if (!requirePayoutAdmin(req, res)) {
+    return;
+  }
+  const parsed = UbiFundRequest.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const result = fundUbiPool({ amount: parsed.data.amount, reason: parsed.data.reason });
+  if (!result.ok) {
+    return res.status(400).json({ error: result.error });
+  }
+  return res.json({ ok: true, balance: result.balance });
+});
+
 jobsRouter.post("/complete", (req, res) => {
   const parsed = CompleteRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -63,7 +205,13 @@ jobsRouter.post("/complete", (req, res) => {
   }
   // Award tokens for completion; trusting operator validation for now
   const award = Math.max(0, job.rewardTokens || 0);
-  const bal = awardTokens(String(userId), award, `completed:${job.title}`, job.id);
+  const bal = awardEarnings(
+    String(userId),
+    award,
+    `job:complete:${job.id}`,
+    job.id,
+    { source: "job", ref: job.id, evidence: parsed.data.evidence },
+  );
   try { recordTask(award > 0 ? "ok" : "fail"); } catch {}
   res.json({ ok: true, award, balance: bal });
 });

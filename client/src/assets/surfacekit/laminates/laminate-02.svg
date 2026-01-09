@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+  <rect class="fill" x="90" y="130" width="640" height="520" rx="28" />
+  <rect class="fill-soft" x="260" y="260" width="640" height="560" rx="32" />
+  <path class="fill-soft" d="M130 720 H600 V780 H130 Z" />
+</svg>

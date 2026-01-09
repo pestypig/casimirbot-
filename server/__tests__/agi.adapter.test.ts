@@ -37,6 +37,7 @@ const mockResult = {
         certificate: {
           certificateHash: "cert-hash",
           certificateId: "cert-id",
+          integrityOk: true,
         },
       },
     },
@@ -90,6 +91,8 @@ describe("agi adapter API", () => {
         { kind: "warp-certificate-hash", ref: "cert-hash" },
       ]),
     );
+    expect(response.body?.certificate?.certificateHash).toBe("cert-hash");
+    expect(response.body?.certificate?.integrityOk).toBe(true);
   });
 
   it("evaluates constraint pack runs via adapter", async () => {
@@ -120,5 +123,7 @@ describe("agi adapter API", () => {
         { kind: "training-trace-export", ref: "/api/agi/training-trace/export" },
       ]),
     );
+    expect(response.body?.certificate?.certificateHash).toBeTruthy();
+    expect(response.body?.certificate?.integrityOk).toBe(true);
   });
 });

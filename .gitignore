@@ -38,6 +38,10 @@ ehthumbs.db
 *.7z
 *.rar
 
+# External Casimir source dumps (raw extract, keep repo lean)
+datasets/casimir/casimir-repulsion-figure-data/
+datasets/casimir/plane-sphere-pfa-data/
+
 # Coverage / test artifacts
 coverage/
 .nyc_output/

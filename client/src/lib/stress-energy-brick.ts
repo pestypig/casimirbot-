@@ -13,6 +13,8 @@ export interface StressEnergyBrickChannel {
 
 export interface StressEnergyBrickStats {
   totalEnergy_J: number;
+  invariantMass_kg?: number;
+  invariantMassEnergy_J?: number;
   avgT00: number;
   avgFluxMagnitude: number;
   netFlux: [number, number, number];
@@ -23,6 +25,11 @@ export interface StressEnergyBrickStats {
   natario?: {
     divBetaMax: number;
     divBetaRms: number;
+    divBetaMaxPre?: number;
+    divBetaRmsPre?: number;
+    divBetaMaxPost?: number;
+    divBetaRmsPost?: number;
+    clampScale?: number;
     gateLimit: number;
     gNatario: number;
   };
@@ -109,11 +116,21 @@ const normalizeNatarioStats = (raw: any) => {
   if (!raw || typeof raw !== "object") return undefined;
   const divBetaMax = Number(raw.divBetaMax ?? raw.divMax);
   const divBetaRms = Number(raw.divBetaRms ?? raw.divRms);
+  const divBetaMaxPre = Number(raw.divBetaMaxPre ?? raw.divBetaMaxBefore ?? raw.divMaxPre);
+  const divBetaRmsPre = Number(raw.divBetaRmsPre ?? raw.divRmsPre);
+  const divBetaMaxPost = Number(raw.divBetaMaxPost ?? divBetaMax);
+  const divBetaRmsPost = Number(raw.divBetaRmsPost ?? divBetaRms);
+  const clampScale = Number(raw.clampScale ?? raw.clampRatio);
   const gateLimit = Number(raw.gateLimit ?? raw.kTol);
   const gNatario = Number(raw.gNatario);
   if (
     !Number.isFinite(divBetaMax) &&
     !Number.isFinite(divBetaRms) &&
+    !Number.isFinite(divBetaMaxPre) &&
+    !Number.isFinite(divBetaRmsPre) &&
+    !Number.isFinite(divBetaMaxPost) &&
+    !Number.isFinite(divBetaRmsPost) &&
+    !Number.isFinite(clampScale) &&
     !Number.isFinite(gateLimit) &&
     !Number.isFinite(gNatario)
   ) {
@@ -122,6 +139,11 @@ const normalizeNatarioStats = (raw: any) => {
   return {
     divBetaMax,
     divBetaRms,
+    divBetaMaxPre,
+    divBetaRmsPre,
+    divBetaMaxPost,
+    divBetaRmsPost,
+    clampScale,
     gateLimit,
     gNatario,
   };
@@ -221,6 +243,12 @@ const normalizeMappingStats = (
 
 const normalizeStats = (raw: any, fallbackDutyFR: number): StressEnergyBrickStats => ({
   totalEnergy_J: Number(raw?.totalEnergy_J ?? 0),
+  invariantMass_kg: Number.isFinite(Number(raw?.invariantMass_kg))
+    ? Number(raw?.invariantMass_kg)
+    : undefined,
+  invariantMassEnergy_J: Number.isFinite(Number(raw?.invariantMassEnergy_J))
+    ? Number(raw?.invariantMassEnergy_J)
+    : undefined,
   avgT00: Number(raw?.avgT00 ?? 0),
   avgFluxMagnitude: Number(raw?.avgFluxMagnitude ?? 0),
   netFlux: Array.isArray(raw?.netFlux) && raw.netFlux.length === 3

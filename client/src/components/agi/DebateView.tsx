@@ -377,6 +377,10 @@ export default function DebateView({ traceId, debateId, open, onClose, variant }
     latestReferee?.text ??
     outcome?.verdict ??
     (status === "running" ? "Referee: awaiting outcome..." : `Status: ${status}`);
+  const refereeEssenceIds = useMemo(
+    () => dedupeIds(latestReferee?.essenceIds ?? []),
+    [latestReferee?.essenceIds],
+  );
 
   const telemetry = telemetryData?.telemetry;
   const collapseConfidence = telemetryData?.confidence;
@@ -438,8 +442,24 @@ export default function DebateView({ traceId, debateId, open, onClose, variant }
   );
 
   const refereeStrip = (
-    <div className="px-4 py-2 text-xs border-b border-white/10 opacity-80">
-      {refereeText}
+    <div className="px-4 py-2 text-xs border-b border-white/10 opacity-80 flex flex-wrap items-center gap-2">
+      <span>{refereeText}</span>
+      {refereeEssenceIds.length > 0 && (
+        <>
+          <span className="opacity-60">Refs:</span>
+          {refereeEssenceIds.map((eid) => (
+            <a
+              key={eid}
+              className="underline opacity-80 hover:opacity-100"
+              href={`/api/essence/${eid}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {eid.slice(0, 8)}...
+            </a>
+          ))}
+        </>
+      )}
     </div>
   );
 
@@ -1046,6 +1066,7 @@ function TurnCard({ turn }: { turn: DebateTurnPayload }) {
 
 
 function RefereeCard({ turn }: { turn: DebateTurnPayload }) {
+  const refs = dedupeIds([turn.essence_id, ...turn.citations]);
 
   return (
 
@@ -1060,6 +1081,23 @@ function RefereeCard({ turn }: { turn: DebateTurnPayload }) {
       </div>
 
       <div className="text-sm whitespace-pre-wrap leading-relaxed">{turn.text}</div>
+
+      {refs.length > 0 && (
+        <div className="text-[11px] space-x-2">
+          <span className="opacity-70">Refs:</span>
+          {refs.map((cid) => (
+            <a
+              key={cid}
+              className="underline opacity-80 hover:opacity-100"
+              href={`/api/essence/${cid}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {cid.slice(0, 8)}...
+            </a>
+          ))}
+        </div>
+      )}
 
       {turn.verifier_results.length > 0 && (
 
@@ -1098,6 +1136,13 @@ function RefereeCard({ turn }: { turn: DebateTurnPayload }) {
 }
 
 
+
+function dedupeIds(values: Array<string | undefined | null>): string[] {
+  const trimmed = values
+    .map((value) => (value ? value.trim() : ""))
+    .filter((value) => value.length > 0);
+  return Array.from(new Set(trimmed));
+}
 
 const upsertTurn = (
 

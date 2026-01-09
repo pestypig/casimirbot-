@@ -21,6 +21,21 @@ const dTopHatDr = (r: number, sigma: number, R: number) => {
 
 const DFDR_PEAK = dTopHatDr(1, SIGMA, R_METRIC);
 
+const mulMat4PointCM = (m: Float32Array, p: Vec3): Vec3 => {
+  const x = p[0];
+  const y = p[1];
+  const z = p[2];
+  const x2 = m[0] * x + m[4] * y + m[8] * z + m[12];
+  const y2 = m[1] * x + m[5] * y + m[9] * z + m[13];
+  const z2 = m[2] * x + m[6] * y + m[10] * z + m[14];
+  const w2 = m[3] * x + m[7] * y + m[11] * z + m[15];
+  if (Math.abs(w2) > 1e-6 && Math.abs(w2 - 1) > 1e-6) {
+    const inv = 1 / w2;
+    return [x2 * inv, y2 * inv, z2 * inv];
+  }
+  return [x2, y2, z2];
+};
+
 type Fixture = {
   label: string;
   dims: { Lx_m: number; Ly_m: number; Lz_m: number };
@@ -137,10 +152,13 @@ const sampleVolume = (
 ) => {
   const min = frame.bounds.minLattice;
   const v = frame.voxelSize_m;
-  const p: Vec3 = [dir[0] * distance, dir[1] * distance, dir[2] * distance];
-  const ix = Math.floor((p[0] - min[0]) / v);
-  const iy = Math.floor((p[1] - min[1]) / v);
-  const iz = Math.floor((p[2] - min[2]) / v);
+  const pWorld: Vec3 = [dir[0] * distance, dir[1] * distance, dir[2] * distance];
+  const pLattice = frame.worldToLattice
+    ? mulMat4PointCM(frame.worldToLattice, pWorld)
+    : pWorld;
+  const ix = Math.floor((pLattice[0] - min[0]) / v);
+  const iy = Math.floor((pLattice[1] - min[1]) / v);
+  const iz = Math.floor((pLattice[2] - min[2]) / v);
   if (ix < 0 || iy < 0 || iz < 0 || ix >= frame.dims[0] || iy >= frame.dims[1] || iz >= frame.dims[2]) {
     return null;
   }

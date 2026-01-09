@@ -18,6 +18,14 @@ export type KnowledgeProjectRecord = KnowledgeProjectMeta & {
   updatedAt: number;
 };
 
+export type KnowledgeFileAnalysis = {
+  durationSec?: number;
+  rms?: number;
+  peak?: number;
+  zcr?: number;
+  brightness?: number;
+};
+
 export type KnowledgeFileRecord = {
   id: string;
   name: string;
@@ -31,6 +39,8 @@ export type KnowledgeFileRecord = {
   kind: KnowledgeFileKind;
   path?: string;
   tags?: string[];
+  autoTags?: string[];
+  analysis?: KnowledgeFileAnalysis;
   data: Blob;
 };
 
@@ -370,6 +380,22 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   return globalThis.btoa ? globalThis.btoa(binary) : binary;
 };
 
+const normalizeTags = (tags: string[] | undefined): string[] => {
+  if (!Array.isArray(tags)) return [];
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const entry of tags) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(trimmed);
+  }
+  return normalized;
+};
+
 export async function extractKnowledgePdfText(record: KnowledgeFileRecord): Promise<string | null> {
   return getPdfText(record);
 }
@@ -492,6 +518,60 @@ export async function saveKnowledgeFiles(files: File[], options: { projectId?: s
   }
   await txDone(tx);
   return records;
+}
+
+export async function updateKnowledgeFileTags(
+  fileId: string,
+  tags: string[] | undefined,
+): Promise<KnowledgeFileRecord> {
+  const db = await openKnowledgeDB();
+  const tx = db.transaction(STORE_FILES, "readwrite");
+  const store = tx.objectStore(STORE_FILES);
+  const existing = (await requestResult(store.get(fileId))) as
+    | KnowledgeFileRecord
+    | undefined;
+  if (!existing) {
+    throw new Error(`Knowledge file ${fileId} not found`);
+  }
+  const next: KnowledgeFileRecord = {
+    ...existing,
+    tags: normalizeTags(tags),
+    updatedAt: Date.now(),
+  };
+  store.put(next);
+  await txDone(tx);
+  return next;
+}
+
+export async function updateKnowledgeFileAnalysis(
+  fileId: string,
+  options: {
+    analysis?: KnowledgeFileAnalysis | null;
+    autoTags?: string[] | null;
+  },
+): Promise<KnowledgeFileRecord> {
+  const db = await openKnowledgeDB();
+  const tx = db.transaction(STORE_FILES, "readwrite");
+  const store = tx.objectStore(STORE_FILES);
+  const existing = (await requestResult(store.get(fileId))) as
+    | KnowledgeFileRecord
+    | undefined;
+  if (!existing) {
+    throw new Error(`Knowledge file ${fileId} not found`);
+  }
+  const next: KnowledgeFileRecord = {
+    ...existing,
+    analysis:
+      options.analysis === null ? undefined : options.analysis ?? existing.analysis,
+    autoTags:
+      options.autoTags === null
+        ? undefined
+        : normalizeTags(options.autoTags ?? existing.autoTags),
+    updatedAt: Date.now(),
+  };
+  store.put(next);
+  await txDone(tx);
+  return next;
 }
 
 export async function listKnowledgeFiles(): Promise<KnowledgeFileRecord[]> {

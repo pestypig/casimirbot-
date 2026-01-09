@@ -17,6 +17,19 @@ export interface MaterialModelOptions {
   temperature_K?: number;
 }
 
+export type AdiabaticGuardStatus = "PASS" | "WARN" | "FAIL" | "UNKNOWN";
+
+export interface AdiabaticGuard {
+  status: AdiabaticGuardStatus;
+  driveHz?: number;
+  materialResponseHz?: number;
+  gapResponseHz?: number;
+  ratioDriveToMaterial?: number;
+  ratioDriveToGap?: number;
+  criteria?: string;
+  note?: string;
+}
+
 export interface StaticCasimirResult {
   totalEnergy: number;
   energyPerArea: number;
@@ -43,13 +56,19 @@ export interface StaticCasimirResult {
   couplingNote?: string;
   tilePitch_m?: number;
   supercellRatio?: number;
+  adiabaticGuard?: AdiabaticGuard;
 }
 
+const TWO_PI = 2 * Math.PI;
 const EV_TO_J = 1.602176634e-19;
+const ADIABATIC_PASS = 1e-3;
+const ADIABATIC_WARN = 1e-2;
+const ADIABATIC_CRITERIA =
+  "PASS if drive/response < 1e-3 for both material and gap; WARN if < 1e-2; else FAIL.";
 const DEFAULT_MATERIAL: Required<MaterialModelOptions> = {
   plasmaFrequency_eV: 9.0,  // gold-like plasma frequency
   damping_eV: 0.035,        // typical room-temp relaxation (Drude)
-  hamaker_zJ: 40,           // Au-silica in air ballpark Hamaker constant
+  hamaker_zJ: 40,           // Au-silica in air ballpark Hamaker constant       
   roughness_nm: 0.3,        // sub-nm polished film
   temperature_K: 300,       // lab ambient unless overridden
 };
@@ -58,6 +77,78 @@ const LIFSHITZ_SAMPLES_NM = [1, 2, 5, 10];
 function clamp01(x: number): number {
   if (!Number.isFinite(x)) return 0;
   return Math.max(0, Math.min(1, x));
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function resolveDriveHz(params: SimulationParameters): number | null {
+  const dyn = params.dynamicConfig;
+  const driveGHz =
+    finiteNumber(dyn?.measuredModulationFreqGHz) ??
+    finiteNumber(dyn?.modulationFreqGHz) ??
+    finiteNumber(dyn?.measuredPulseFrequencyGHz) ??
+    finiteNumber(dyn?.pulseFrequencyGHz);
+  return driveGHz != null ? driveGHz * 1e9 : null;
+}
+
+function buildAdiabaticGuard(opts: {
+  driveHz: number | null;
+  gap_m: number;
+  materialProps: MaterialModelOptions;
+  tempK: number;
+}): AdiabaticGuard {
+  if (!Number.isFinite(opts.driveHz) || (opts.driveHz as number) <= 0) {
+    return {
+      status: "UNKNOWN",
+      criteria: ADIABATIC_CRITERIA,
+      note: "No drive frequency provided; assuming equilibrium Casimir.",
+    };
+  }
+
+  const material = {
+    ...DEFAULT_MATERIAL,
+    ...opts.materialProps,
+    temperature_K: Number.isFinite(opts.materialProps.temperature_K)
+      ? (opts.materialProps.temperature_K as number)
+      : opts.tempK,
+  };
+  const plasma_eV = Number.isFinite(material.plasmaFrequency_eV)
+    ? material.plasmaFrequency_eV
+    : DEFAULT_MATERIAL.plasmaFrequency_eV;
+  const omega_p = (plasma_eV * EV_TO_J) / PHYSICS_CONSTANTS.HBAR;
+  const materialResponseHz = Math.abs(omega_p) / TWO_PI;
+  const gapResponseHz = PHYSICS_CONSTANTS.C / Math.max(opts.gap_m, 1e-12);
+  const ratioDriveToMaterial =
+    (opts.driveHz as number) / Math.max(materialResponseHz, 1e-12);
+  const ratioDriveToGap =
+    (opts.driveHz as number) / Math.max(gapResponseHz, 1e-12);
+
+  let status: AdiabaticGuardStatus = "FAIL";
+  if (ratioDriveToMaterial <= ADIABATIC_PASS && ratioDriveToGap <= ADIABATIC_PASS) {
+    status = "PASS";
+  } else if (ratioDriveToMaterial <= ADIABATIC_WARN && ratioDriveToGap <= ADIABATIC_WARN) {
+    status = "WARN";
+  }
+
+  const note =
+    status === "PASS"
+      ? "Drive well below response scales; quasi-static assumption likely."
+      : status === "WARN"
+      ? "Drive approaching response scales; non-equilibrium effects may matter."
+      : "Drive not slow relative to response scales; equilibrium Casimir likely invalid.";
+
+  return {
+    status,
+    driveHz: opts.driveHz as number,
+    materialResponseHz,
+    gapResponseHz,
+    ratioDriveToMaterial,
+    ratioDriveToGap,
+    criteria: ADIABATIC_CRITERIA,
+    note,
+  };
 }
 
 function lifshitzEnergyForGap(
@@ -343,6 +434,13 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
   const arraySpacing_um = Number.isFinite((params as any)?.arrayConfig?.spacing)
     ? ((params as any).arrayConfig.spacing as number)
     : undefined;
+  const driveHz = resolveDriveHz(params);
+  const adiabaticGuard = buildAdiabaticGuard({
+    driveHz,
+    gap_m: gapMeters,
+    materialProps,
+    tempK: tempKelvin,
+  });
 
   const nominalEnergy = casimirEnergy * temperatureFactor;
   const nominalForce = casimirForce * temperatureFactor;
@@ -439,6 +537,7 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
     couplingNote: couplingResult.note,
     tilePitch_m: couplingResult.pitch_m,
     supercellRatio: couplingResult.supercellRatio,
+    adiabaticGuard,
     ...geometrySpecific
   };
 }

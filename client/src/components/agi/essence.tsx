@@ -45,6 +45,10 @@ import { fetchLocalCallSpec } from "@/lib/agi/localCallSpec";
 
 const DEFAULT_PERSONA: PersonaSummary = { id: "default", display_name: "Default" };
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const sumCounts = (counts?: Record<string, number> | null): number => {
+  if (!counts) return 0;
+  return Object.values(counts).reduce((sum, value) => sum + (value ?? 0), 0);
+};
 const KNOWLEDGE_ATTACHMENTS_ENABLED = isFlagEnabled("ENABLE_KNOWLEDGE_PROJECTS", true);
 const INFERENCE_PANEL_ENABLED = isFlagEnabled("ENABLE_INFERENCE_PANEL", true);
 const DEBATE_LAST_ID_KEY = "debate:last-id";
@@ -112,7 +116,20 @@ export default function EssenceConsole() {
   const [profileDraft, setProfileDraft] = useState<EssenceProfileUpdate>({});
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [hull, setHull] = useState<
-    { hull_mode: boolean; llm_policy: string; llm_runtime?: string | null; llm_http?: { url: string; allowed: boolean } | null } | null
+    {
+      hull_mode: boolean;
+      llm_policy: string;
+      llm_runtime?: string | null;
+      llm_http?: { url: string; allowed: boolean } | null;
+      allow_hosts?: string[] | null;
+      queue?: {
+        backend?: string;
+        active?: Record<string, number>;
+        pending?: Record<string, number> | null;
+      } | null;
+      queue_depth?: number | null;
+      approvals_outstanding?: number | null;
+    } | null
   >(null);
   const [debateId, setDebateId] = useState<string | null>(null);
   const [planHasDebate, setPlanHasDebate] = useState(false);
@@ -143,6 +160,30 @@ export default function EssenceConsole() {
     if (hull?.llm_http) return "online";
     return "degraded";
   }, [hull]);
+  const queueActive = sumCounts(hull?.queue?.active);
+  const queuePending = sumCounts(hull?.queue?.pending);
+  const queueDepth =
+    typeof hull?.queue_depth === "number"
+      ? hull.queue_depth
+      : queueActive + queuePending;
+  const approvalsOutstanding =
+    typeof hull?.approvals_outstanding === "number"
+      ? hull.approvals_outstanding
+      : null;
+  const llmLabel = [hull?.llm_policy, hull?.llm_runtime].filter(Boolean).join("/");
+  const llmTitle = hull?.llm_http?.url
+    ? `${hull.llm_http.allowed ? "Allowed" : "Blocked"} ${hull.llm_http.url}`
+    : undefined;
+  const hullTitle =
+    hull?.allow_hosts && hull.allow_hosts.length > 0
+      ? `Allow: ${hull.allow_hosts.join(", ")}`
+      : undefined;
+  const queueTitle =
+    hull?.queue != null
+      ? `Active ${queueActive} / Pending ${queuePending}`
+      : undefined;
+  const hasQueueData =
+    hull?.queue != null || typeof hull?.queue_depth === "number";
   const profileTargetId = personaId || null;
   const {
     profile,
@@ -481,6 +522,13 @@ export default function EssenceConsole() {
           llm_policy: String(data.llm_policy ?? ""),
           llm_runtime: data.llm_runtime ?? null,
           llm_http: data.llm_http ?? null,
+          allow_hosts: Array.isArray(data.allow_hosts) ? data.allow_hosts : null,
+          queue: data.queue ?? null,
+          queue_depth: typeof data.queue_depth === "number" ? data.queue_depth : null,
+          approvals_outstanding:
+            typeof data.approvals_outstanding === "number"
+              ? data.approvals_outstanding
+              : null,
         });
       })
       .catch(() => undefined);
@@ -494,6 +542,14 @@ export default function EssenceConsole() {
             llm_policy: String(data.llm_policy ?? ""),
             llm_runtime: data.llm_runtime ?? null,
             llm_http: data.llm_http ?? null,
+            allow_hosts: Array.isArray(data.allow_hosts) ? data.allow_hosts : null,
+            queue: data.queue ?? null,
+            queue_depth:
+              typeof data.queue_depth === "number" ? data.queue_depth : null,
+            approvals_outstanding:
+              typeof data.approvals_outstanding === "number"
+                ? data.approvals_outstanding
+                : null,
           });
         })
         .catch(() => undefined);
@@ -860,10 +916,46 @@ export default function EssenceConsole() {
             </button>
             <ContextMeter pct={contextPct} tokens={contextTotals.tokens} />
             {hull && (
-              <span className="ml-2 rounded px-2 py-0.5 text-[11px] border border-white/15 opacity-80">
-                Hull:{hull.hull_mode ? "ON" : "OFF"} | {hull.llm_policy}
-                {hull.llm_runtime ? `/${hull.llm_runtime}` : ""}
-              </span>
+              <div className="ml-2 flex flex-wrap items-center gap-2 text-[11px]">
+                <span
+                  className={`rounded-full border px-2 py-0.5 ${
+                    hull.hull_mode
+                      ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
+                      : "border-rose-400/40 bg-rose-500/10 text-rose-100"
+                  }`}
+                  title={hullTitle}
+                >
+                  Hull {hull.hull_mode ? "ON" : "OFF"}
+                </span>
+                {llmLabel && (
+                  <span
+                    className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-slate-200"
+                    title={llmTitle}
+                  >
+                    LLM {llmLabel}
+                  </span>
+                )}
+                {hasQueueData && (
+                  <span
+                    className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-slate-200"
+                    title={queueTitle}
+                  >
+                    Queue {queueDepth}
+                  </span>
+                )}
+                {approvalsOutstanding !== null && (
+                  <span
+                    className={`rounded-full border px-2 py-0.5 ${
+                      approvalsOutstanding > 0
+                        ? "border-amber-400/40 bg-amber-500/10 text-amber-100"
+                        : "border-white/10 bg-white/5 text-slate-200"
+                    }`}
+                    title="Pending approvals"
+                  >
+                    Approvals {approvalsOutstanding}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </header>

@@ -271,11 +271,18 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   debugLog('[WarpModule] Duty factor calculation:', dutyFactor);
 
   // **CRITICAL FIX**: Pass through calibrated pipeline mass to avoid independent calculation
-  const exoticMassTarget_kg = Number.isFinite(+(params as any).exoticMassTarget_kg) 
-    ? +(params as any).exoticMassTarget_kg 
+  const exoticMassTarget_kg = Number.isFinite(+(params as any).exoticMassTarget_kg)
+    ? +(params as any).exoticMassTarget_kg
     : undefined;
+  const invariantMass_kg = Number.isFinite(+(params as any).invariantMass_kg)
+    ? +(params as any).invariantMass_kg
+    : undefined;
+  const allowMassOverride = (params as any).allowMassOverride === true;
+  const massMode = (params as any).massMode;
   
   debugLog('[WarpModule] Exotic mass target from pipeline:', exoticMassTarget_kg);
+  debugLog('[WarpModule] Invariant mass from pipeline:', invariantMass_kg);
+  debugLog('[WarpModule] Mass override guard:', { allowMassOverride, massMode });
 
   const finalParams = {
     // Geometry (Natário warp currently expects µm & nm)
@@ -314,8 +321,11 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     tileArea_m2,
     P_avg_W,
     referenceQ: 1e9,
-    // **Pass calibrated pipeline mass instead of calculating independently**
+    // **Pass calibrated pipeline mass instead of calculating independently**   
     exoticMassTarget_kg,
+    invariantMass_kg,
+    allowMassOverride,
+    massMode,
     // Optional knobs (left undefined unless you want to enforce targets)
     // powerTarget_W: MODE_POLICY[...]?.P_target_W, // not available here
     // powerTolerance: 0.10,

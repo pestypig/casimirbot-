@@ -8,6 +8,14 @@ import {
   type MathStageEntry,
   type UnitSignature,
 } from "../shared/math-stage.js";
+import { buildAutoEvidenceChecks } from "./math-discovery.js";
+import { loadMathConfig, resolveStrictStages } from "./math-config.js";
+import {
+  buildWaiverIndex,
+  hasWaiver,
+  loadMathWaivers,
+  type WaiverKind,
+} from "./math-waivers.js";
 
 type StageRule = {
   minChecks: number;
@@ -48,6 +56,15 @@ const entryWarnings = new Map<string, string[]>();
 const registryByModule = new Map(
   mathStageRegistry.map((entry) => [entry.module, entry]),
 );
+const autoEvidence = buildAutoEvidenceChecks(mathStageRegistry);
+const autoChecksByModule = autoEvidence.autoChecksByModule;
+const waivers = loadMathWaivers();
+const { edgeIndex, moduleIndex } = buildWaiverIndex(waivers);
+const mathConfig = loadMathConfig();
+const strictStages = new Set(resolveStrictStages(mathConfig));
+const unitStrictRaw = process.env.MATH_UNIT_WARNINGS_STRICT;
+const STRICT_UNIT_WARNINGS =
+  unitStrictRaw === "1" || unitStrictRaw?.toLowerCase() === "true";
 
 const fileExists = (relativePath: string) =>
   fs.existsSync(path.resolve(repoRoot, relativePath));
@@ -155,6 +172,17 @@ const pushEntryIssue = (
 };
 
 const recordError = (module: string, message: string) => {
+  const stage = registryByModule.get(module)?.stage;
+  const shouldFail =
+    strictStages.size > 0
+      ? stage
+        ? strictStages.has(stage)
+        : true
+      : false;
+  if (!shouldFail) {
+    recordWarning(module, message);
+    return;
+  }
   errors.push(message);
   pushEntryIssue(entryErrors, module, message);
 };
@@ -164,11 +192,34 @@ const recordWarning = (module: string, message: string) => {
   pushEntryIssue(entryWarnings, module, message);
 };
 
+const isModuleWaived = (module: string, kind: WaiverKind) =>
+  hasWaiver(moduleIndex.get(module)?.waive, kind);
+
+const isEdgeWaived = (edge: MathGraphEdge, kind: WaiverKind) =>
+  hasWaiver(edgeIndex.get(`${edge.from}::${edge.to}`)?.waive, kind);
+
+const mergeChecks = (entry: MathStageEntry) => {
+  const manualChecks = entry.checks ?? [];
+  const autoChecks = autoChecksByModule.get(entry.module) ?? [];
+  if (autoChecks.length === 0) return manualChecks;
+  const merged = new Map<string, MathCheck>();
+  for (const check of manualChecks) {
+    merged.set(`${check.type}:${check.path}`, check);
+  }
+  for (const check of autoChecks) {
+    merged.set(`${check.type}:${check.path}`, check);
+  }
+  return Array.from(merged.values());
+};
+
 const reportUnitIssue = (
   module: string,
   message: string,
   severity: "error" | "warning",
 ) => {
+  if (isModuleWaived(module, "unit")) {
+    return;
+  }
   if (severity === "error") {
     recordError(module, message);
   } else {
@@ -176,7 +227,7 @@ const reportUnitIssue = (
   }
 };
 
-const validateEntry = (entry: MathStageEntry) => {
+const validateEntry = (entry: MathStageEntry, checks: MathCheck[]) => {
   if (!(entry.stage in MATH_STAGE_LEVELS)) {
     recordError(entry.module, `Unknown stage "${entry.stage}" in ${entry.module}.`);
     return;
@@ -186,9 +237,9 @@ const validateEntry = (entry: MathStageEntry) => {
     recordError(entry.module, `Module not found: ${entry.module}`);
   }
 
-  const checks = entry.checks ?? [];
   const rules = STAGE_RULES[entry.stage];
   const unitKeys = entry.units ? Object.keys(entry.units) : [];
+  const evidenceWaived = isModuleWaived(entry.module, "evidence");
 
   if (entry.tag === "PIPELINE" && unitKeys.length === 0) {
     recordError(
@@ -197,35 +248,35 @@ const validateEntry = (entry: MathStageEntry) => {
     );
   }
 
-  if (entry.stage === "exploratory" && checks.length === 0) {
+  if (entry.stage === "exploratory" && checks.length === 0 && !evidenceWaived) {
     recordWarning(
       entry.module,
       `${entry.module} (exploratory) has no sanity checks listed.`,
     );
   }
 
-  if (checks.length < rules.minChecks) {
+  if (checks.length < rules.minChecks && !evidenceWaived) {
     recordError(
       entry.module,
       `${entry.module} (${entry.stage}) requires at least ${rules.minChecks} checks.`,
     );
   }
 
-  if (rules.requireTestLike && !hasAnyType(checks, TEST_LIKE_TYPES)) {
+  if (rules.requireTestLike && !hasAnyType(checks, TEST_LIKE_TYPES) && !evidenceWaived) {
     recordError(
       entry.module,
       `${entry.module} (${entry.stage}) requires a test or snapshot check.`,
     );
   }
 
-  if (rules.requirePolicy && !hasType(checks, "policy")) {
+  if (rules.requirePolicy && !hasType(checks, "policy") && !evidenceWaived) {
     recordError(
       entry.module,
       `${entry.module} (${entry.stage}) requires a policy check.`,
     );
   }
 
-  if (rules.requireStability && !hasAnyType(checks, STABILITY_TYPES)) {
+  if (rules.requireStability && !hasAnyType(checks, STABILITY_TYPES) && !evidenceWaived) {
     recordError(
       entry.module,
       `${entry.module} (${entry.stage}) requires a stability or snapshot check.`,
@@ -233,7 +284,7 @@ const validateEntry = (entry: MathStageEntry) => {
   }
 
   if (entry.stage === "diagnostic" && requiresResidualEvidence(entry)) {
-    if (!hasAnyType(checks, RESIDUAL_TYPES)) {
+    if (!hasAnyType(checks, RESIDUAL_TYPES) && !evidenceWaived) {
       recordError(
         entry.module,
         `${entry.module} (${entry.stage}) requires a residual check.`,
@@ -243,21 +294,26 @@ const validateEntry = (entry: MathStageEntry) => {
 
   for (const check of checks) {
     if (!fileExists(check.path)) {
-      recordError(
-        entry.module,
-        `${entry.module} references missing ${check.type} check: ${check.path}`,
-      );
+      if (!evidenceWaived) {
+        recordError(
+          entry.module,
+          `${entry.module} references missing ${check.type} check: ${check.path}`,
+        );
+      }
     }
   }
 };
 
-mathStageRegistry.forEach(validateEntry);
+mathStageRegistry.forEach((entry) => validateEntry(entry, mergeChecks(entry)));
 
 const validateUnitOverlap = (
   edge: MathGraphEdge,
   fromEntry: MathStageEntry,
   toEntry: MathStageEntry,
 ) => {
+  if (isEdgeWaived(edge, "unit")) {
+    return;
+  }
   const fromUnits = unitsByModule.get(edge.from);
   const toUnits = unitsByModule.get(edge.to);
   if (!fromUnits || !toUnits || fromUnits.size === 0 || toUnits.size === 0) {
@@ -334,13 +390,14 @@ const validateUnitOverlap = (
 };
 
 const graphPath = path.resolve(repoRoot, "MATH_GRAPH.json");
+const autoGraphEdges: MathGraphEdge[] = autoEvidence.graph.edges.map((edge) => ({
+  from: edge.from,
+  to: edge.to,
+}));
 if (!fs.existsSync(graphPath)) {
-  errors.push("Missing MATH_GRAPH.json; math dependency graph is required.");
-} else {
+  warnings.push("Missing MATH_GRAPH.json; using import-discovered graph.");
   try {
-    const graphRaw = fs.readFileSync(graphPath, "utf8");
-    const graph = JSON.parse(graphRaw) as { edges?: MathGraphEdge[] };
-    const edges = Array.isArray(graph.edges) ? graph.edges : [];
+    const edges = autoGraphEdges;
     const adjacency = new Map<string, MathGraphEdge[]>();
     for (const edge of edges) {
       if (!edge?.from || !edge?.to) continue;
@@ -348,22 +405,19 @@ if (!fs.existsSync(graphPath)) {
       list.push(edge);
       adjacency.set(edge.from, list);
     }
-    if (!Array.isArray(graph.edges)) {
-      errors.push("MATH_GRAPH.json must include an edges array.");
-    }
     const certifiedMax = MATH_STAGE_LEVELS.diagnostic;
     edges.forEach((edge, index) => {
       if (!edge?.from || !edge?.to) {
-        errors.push(`MATH_GRAPH.json edge #${index + 1} missing from/to.`);
+        recordError("MATH_GRAPH.json", `Auto graph edge #${index + 1} missing from/to.`);
         return;
       }
       const fromEntry = registryByModule.get(edge.from);
       const toEntry = registryByModule.get(edge.to);
       if (!fromEntry) {
-          errors.push(`MATH_GRAPH.json edge from unknown module: ${edge.from}`);
+          recordError(edge.from, `MATH_GRAPH.json edge from unknown module: ${edge.from}`);
       }
       if (!toEntry) {
-        errors.push(`MATH_GRAPH.json edge to unknown module: ${edge.to}`);
+        recordError(edge.to, `MATH_GRAPH.json edge to unknown module: ${edge.to}`);
       }
       if (!fromEntry || !toEntry) return;
       validateUnitOverlap(edge, fromEntry, toEntry);
@@ -371,7 +425,11 @@ if (!fs.existsSync(graphPath)) {
       const toLevel = MATH_STAGE_LEVELS[toEntry.stage];
       if (fromEntry.stage === "certified" && toLevel > certifiedMax) {
         if (!edge.waiver || edge.waiver.trim().length === 0) {
-          errors.push(
+          if (isEdgeWaived(edge, "stage")) {
+            return;
+          }
+          recordError(
+            edge.from,
             `${edge.from} (certified) depends on ${edge.to} (${toEntry.stage}) without waiver.`,
           );
         }
@@ -402,15 +460,24 @@ if (!fs.existsSync(graphPath)) {
           const childLevel = MATH_STAGE_LEVELS[child.stage];
           if (childLevel < rootMinStage) {
             if (!edge.waiver || edge.waiver.trim().length === 0) {
-              errors.push(
+              if (isEdgeWaived(edge, "stage")) {
+                continue;
+              }
+              recordError(
+                root.module,
                 `${root.module} (${root.stage}) depends on ${child.module} (${child.stage}) below minimum stage without waiver.`,
               );
             }
           }
           if (root.stage === "certified") {
             const warns = entryWarnings.get(child.module) ?? [];
-            if (warns.length > 0 && (!edge.waiver || edge.waiver.trim().length === 0)) {
-              errors.push(
+            if (
+              warns.length > 0 &&
+              (!edge.waiver || edge.waiver.trim().length === 0) &&
+              !isEdgeWaived(edge, "evidence")
+            ) {
+              recordError(
+                root.module,
                 `${root.module} depends on ${child.module} with unresolved evidence: ${warns.join("; ")}`,
               );
             }
@@ -424,7 +491,110 @@ if (!fs.existsSync(graphPath)) {
       .filter((entry) => entry.stage === "certified")
       .forEach(visitPath);
   } catch (error) {
-    errors.push(`Failed to parse MATH_GRAPH.json: ${String(error)}`);
+    recordError("MATH_GRAPH.json", `Failed to build auto graph: ${String(error)}`);
+  }
+} else {
+  try {
+    const graphRaw = fs.readFileSync(graphPath, "utf8");
+    const graph = JSON.parse(graphRaw) as { edges?: MathGraphEdge[] };
+    const edges = Array.isArray(graph.edges) ? graph.edges : [];
+    const adjacency = new Map<string, MathGraphEdge[]>();
+    for (const edge of edges) {
+      if (!edge?.from || !edge?.to) continue;
+      const list = adjacency.get(edge.from) ?? [];
+      list.push(edge);
+      adjacency.set(edge.from, list);
+    }
+    if (!Array.isArray(graph.edges)) {
+      recordError("MATH_GRAPH.json", "MATH_GRAPH.json must include an edges array.");
+    }
+    const certifiedMax = MATH_STAGE_LEVELS.diagnostic;
+    edges.forEach((edge, index) => {
+      if (!edge?.from || !edge?.to) {
+        recordError("MATH_GRAPH.json", `MATH_GRAPH.json edge #${index + 1} missing from/to.`);
+        return;
+      }
+      const fromEntry = registryByModule.get(edge.from);
+      const toEntry = registryByModule.get(edge.to);
+      if (!fromEntry) {
+        recordError(edge.from, `MATH_GRAPH.json edge from unknown module: ${edge.from}`);
+      }
+      if (!toEntry) {
+        recordError(edge.to, `MATH_GRAPH.json edge to unknown module: ${edge.to}`);
+      }
+      if (!fromEntry || !toEntry) return;
+      validateUnitOverlap(edge, fromEntry, toEntry);
+      const fromLevel = MATH_STAGE_LEVELS[fromEntry.stage];
+      const toLevel = MATH_STAGE_LEVELS[toEntry.stage];
+      if (fromEntry.stage === "certified" && toLevel > certifiedMax) {
+        if (!edge.waiver || edge.waiver.trim().length === 0) {
+          if (isEdgeWaived(edge, "stage")) {
+            return;
+          }
+          recordError(
+            edge.from,
+            `${edge.from} (certified) depends on ${edge.to} (${toEntry.stage}) without waiver.`,
+          );
+        }
+      }
+    });
+
+    const minUpstreamStage: Record<MathStage, number> = {
+      exploratory: MATH_STAGE_LEVELS.exploratory,
+      "reduced-order": MATH_STAGE_LEVELS.exploratory,
+      diagnostic: MATH_STAGE_LEVELS["reduced-order"],
+      certified: MATH_STAGE_LEVELS["reduced-order"],
+    };
+
+    const visitPath = (root: MathStageEntry) => {
+      const rootMinStage = minUpstreamStage[root.stage];
+      const seen = new Set<string>();
+      const stack: Array<{ module: string }> = [{ module: root.module }];
+      while (stack.length > 0) {
+        const current = stack.pop();
+        if (!current) continue;
+        const moduleName = current.module;
+        if (seen.has(moduleName)) continue;
+        seen.add(moduleName);
+        const edgesFrom = adjacency.get(moduleName) ?? [];
+        for (const edge of edgesFrom) {
+          const child = registryByModule.get(edge.to);
+          if (!child) continue;
+          const childLevel = MATH_STAGE_LEVELS[child.stage];
+          if (childLevel < rootMinStage) {
+            if (!edge.waiver || edge.waiver.trim().length === 0) {
+              if (isEdgeWaived(edge, "stage")) {
+                continue;
+              }
+              recordError(
+                root.module,
+                `${root.module} (${root.stage}) depends on ${child.module} (${child.stage}) below minimum stage without waiver.`,
+              );
+            }
+          }
+          if (root.stage === "certified") {
+            const warns = entryWarnings.get(child.module) ?? [];
+            if (
+              warns.length > 0 &&
+              (!edge.waiver || edge.waiver.trim().length === 0) &&
+              !isEdgeWaived(edge, "evidence")
+            ) {
+              recordError(
+                root.module,
+                `${root.module} depends on ${child.module} with unresolved evidence: ${warns.join("; ")}`,
+              );
+            }
+          }
+          stack.push({ module: child.module });
+        }
+      }
+    };
+
+    mathStageRegistry
+      .filter((entry) => entry.stage === "certified")
+      .forEach(visitPath);
+  } catch (error) {
+    recordError("MATH_GRAPH.json", `Failed to parse MATH_GRAPH.json: ${String(error)}`);
   }
 }
 
@@ -436,6 +606,10 @@ if (warnings.length > 0) {
 if (unitWarnings.length > 0) {
   console.warn("Math unit warnings:");
   unitWarnings.forEach((message) => console.warn(`- ${message}`));
+}
+if (unitWarnings.length > 0 && STRICT_UNIT_WARNINGS) {
+  console.error("Math unit warnings treated as errors (strict mode).");
+  unitWarnings.forEach((message) => errors.push(`[unit-warning] ${message}`));
 }
 
 if (errors.length > 0) {

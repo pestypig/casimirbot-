@@ -3,7 +3,7 @@ import { FrontProofsLedger } from "./FrontProofsLedger";
 import { NeedleCavityBubblePanel } from "./NeedleCavityBubblePanel";
 import TimeDilationLatticePanel from "./TimeDilationLatticePanel";
 import { MODE_CONFIGS, useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
-import { PLANCK_LUMINOSITY_W } from "@/lib/physics-const";
+import { C, G, PI, PLANCK_LUMINOSITY_W } from "@/lib/physics-const";
 import { openDocPanel } from "@/lib/docs/openDocPanel";
 import { Button } from "@/components/ui/button";
 import {
@@ -1252,6 +1252,100 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
     const n = num(value);
     return n === null ? "n/a" : `${fmt(n / 1e6)} MW`;
   };
+  const trace = (() => {
+    if (!pipeline) return null;
+    const modulationGHz = num((pipeline as any)?.modulationFreq_GHz ?? (pipeline as any)?.modulationFreqGHz);
+    const f_Hz = modulationGHz != null ? modulationGHz * 1e9 : null;
+    const omega = f_Hz != null ? 2 * PI * f_Hz : null;
+    const qCavity = num((pipeline as any)?.qCavity);
+    const qMechanical = num((pipeline as any)?.qMechanical);
+    const gammaGeo = num((pipeline as any)?.gammaGeo);
+    const gammaVdB = num((pipeline as any)?.gammaVanDenBroeck ?? (pipeline as any)?.gammaVdB);
+    const qSpoil = num(
+      (pipeline as any)?.qSpoilingFactor ??
+      (pipeline as any)?.qSpoil ??
+      (pipeline as any)?.deltaAOverA,
+    );
+    const U_static = num((pipeline as any)?.U_static);
+    const U_geo =
+      num((pipeline as any)?.U_geo) ??
+      (U_static != null && gammaGeo != null ? U_static * Math.pow(gammaGeo, 3) : null);
+    const U_Q =
+      num((pipeline as any)?.U_Q) ??
+      (U_geo != null && qMechanical != null ? U_geo * qMechanical : null);
+    const P_loss =
+      omega != null && U_Q != null && qCavity != null
+        ? Math.abs(U_Q) * omega / Math.max(qCavity, 1e-12)
+        : null;
+
+    const tileArea_cm2 = pos((pipeline as any)?.tileArea_cm2);
+    const gap_nm = pos((pipeline as any)?.gap_nm ?? (pipeline as any)?.mechanical?.casimirGap_nm);
+    const tileArea_m2 = tileArea_cm2 != null ? tileArea_cm2 * 1e-4 : null;
+    const gap_m = gap_nm != null ? gap_nm * 1e-9 : null;
+    const V_tile = tileArea_m2 != null && gap_m != null ? tileArea_m2 * gap_m : null;
+    const rho_flat = U_static != null && V_tile != null ? U_static / V_tile : null;
+    const qGain = qCavity != null ? Math.sqrt(Math.max(0, qCavity) / 1e9) : null;
+    const rho_inst =
+      rho_flat != null && gammaGeo != null && gammaVdB != null && qGain != null && qSpoil != null
+        ? rho_flat * Math.pow(gammaGeo, 3) * gammaVdB * qGain * qSpoil
+        : null;
+
+    const dutyFromPipeline = num(
+      (pipeline as any)?.dutyEffective_FR ??
+      (pipeline as any)?.dutyEffectiveFR ??
+      (pipeline as any)?.dutyShip ??
+      (pipeline as any)?.dutyEff,
+    );
+    const dutyLocalRaw = num((pipeline as any)?.dutyCycle ?? (pipeline as any)?.dutyBurst) ?? 0.01;
+    const dutyLocal = Math.max(0, Math.min(1, dutyLocalRaw));
+    const sectorsTotal = Math.max(1, Math.round(num((pipeline as any)?.sectorCount ?? 400) ?? 400));
+    const sectorsLiveRaw =
+      num(
+        (pipeline as any)?.sectorStrobing ??
+        (pipeline as any)?.concurrentSectors ??
+        (pipeline as any)?.activeSectors ??
+        1,
+      ) ?? 1;
+    const sectorsLive = Math.max(0, sectorsLiveRaw);
+    const dutyFallback = dutyLocal * (sectorsLive / Math.max(1, sectorsTotal));
+    const dutyEffective = dutyFromPipeline != null ? dutyFromPipeline : dutyFallback;
+    const rho_avg = rho_inst != null ? rho_inst * dutyEffective : null;
+
+    const tauLC_snapshot_s =
+      num((pipeline as any)?.tauLC_ms) != null
+        ? (num((pipeline as any)?.tauLC_ms) as number) * 1e-3
+        : null;
+    const tauLC_used_s = 1e-7;
+    const T_p = f_Hz != null ? 1 / f_Hz : null;
+    const ratio = T_p != null ? T_p / tauLC_used_s : null;
+    const exp = ratio != null ? Math.exp(-ratio) : null;
+    const einstein = (8 * PI * G) / (C ** 4);
+    const curvature = rho_avg != null ? einstein * Math.abs(rho_avg) * (exp ?? 1) : null;
+
+    return {
+      modulationGHz,
+      omega,
+      U_static,
+      U_geo,
+      U_Q,
+      P_loss,
+      qCavity,
+      rho_flat,
+      rho_inst,
+      rho_avg,
+      dutyEffective,
+      gammaGeo,
+      gammaVdB,
+      qSpoil,
+      tileArea_m2,
+      gap_nm,
+      V_tile,
+      tauLC_snapshot_s,
+      tauLC_used_s,
+      ratio,
+      curvature,
+    };
+  })();
 
   return (
     <div className="space-y-3 text-sm">
@@ -1276,6 +1370,28 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
       <p className="text-[11px] text-cyan-300">
         Gaps: casimir_gap={fmt(gapCasimir_nm, 3)} nm | mech_guard_gap={fmt(gapGuard_nm, 3)} nm{mechStatus ? ` | mech_status=${mechStatus}` : ""}
       </p>
+      <div className="rounded-lg border border-indigo-500/20 bg-indigo-950/30 p-3 text-slate-100">
+        <p className="text-[11px] uppercase tracking-wide text-indigo-200">Numeric trace: f_m -&gt; omega -&gt; P_loss -&gt; T00_avg -&gt; curvature</p>
+        {trace ? (
+          <div className="mt-2 space-y-1 font-mono text-indigo-100">
+            <div>f_m={fmt(trace.modulationGHz)} GHz -&gt; omega={fmt(trace.omega)} rad/s</div>
+            <div>U_static={fmt(trace.U_static)} J -&gt; U_geo={fmt(trace.U_geo)} J -&gt; U_Q={fmt(trace.U_Q)} J</div>
+            <div>P_loss_raw=|U_Q| * omega / Q = {fmt(trace.P_loss)} W (Q={fmt(trace.qCavity)})</div>
+            <div>
+              T00_avg={fmt(trace.rho_avg)} J/m^3 | rho_flat={fmt(trace.rho_flat)} J/m^3 | rho_inst={fmt(trace.rho_inst)} J/m^3 | d_eff={fmt(trace.dutyEffective)}
+            </div>
+            <div>
+              tau_LC_used={fmt(trace.tauLC_used_s, 4)} s{trace.tauLC_snapshot_s != null ? ` | tau_LC_snapshot=${fmt(trace.tauLC_snapshot_s, 4)} s` : ""} | ratio=T_p/tau_LC={fmt(trace.ratio, 4)}
+            </div>
+            <div>curvature_proxy=(8*pi*G/c^4)*|T00_avg|*exp(-ratio)={fmt(trace.curvature)} 1/m^2</div>
+            <div className="text-[11px] text-indigo-200">
+              Note: tau_LC_used follows the Natario default (1e-7 s) unless the model wires an explicit light-crossing term.
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-indigo-200">Snapshot not loaded yet; trace will populate once the pipeline responds.</p>
+        )}
+      </div>
       <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3 text-slate-100">
         <p className="text-[11px] uppercase tracking-wide text-cyan-300">{GR_RECIPE_MINDSET.headline}</p>
         <ul className="mt-2 list-disc space-y-1 pl-4 text-slate-200">

@@ -6,12 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { listKnowledgeFiles } from "@/lib/agi/knowledge-store";
 import {
   createCoverJob,
   fetchCoverJob,
   fetchJobStatus,
   requestGeneration,
 } from "@/lib/api/noiseGens";
+import { isAudioKnowledgeFile } from "@/lib/knowledge/audio";
+import {
+  applyAtomSelectionToPlan,
+  buildAtomIndex,
+} from "@/lib/knowledge/atom-curation";
+import {
+  analyzeOriginalForPlan,
+  type PlanAnalysis,
+} from "@/lib/noise/plan-analysis";
+import { resolveAbletonPlanFeatures } from "@/lib/noise/ableton-analysis";
 import type {
   JobStatus,
   MoodPreset,
@@ -23,9 +34,15 @@ import type {
   TempoMeta,
   KBTexture,
   KBMatch,
+  RenderPlan,
+  CoverEvidence,
 } from "@/types/noise-gens";
 import { cn } from "@/lib/utils";
-import { fulfillCoverJob, canFulfillLocally } from "@/lib/noise/cover-runner";
+import {
+  fulfillCoverJob,
+  canFulfillLocally,
+  scoreRenderPlan,
+} from "@/lib/noise/cover-runner";
 import { autoMatchTexture, resolveTextureById } from "@/lib/noise/kb-autoselect";
 import {
   COVER_FLOW_EVENT,
@@ -43,9 +60,26 @@ export type RenderJobUpdate = {
   previewUrl?: string | null;
   sourceLabel?: string;
   startedAt?: number;
+  evidence?: CoverEvidence;
 };
 
 export type RenderJobResult = RenderJobUpdate & { completedAt: number };
+
+type PlanRankCandidate = {
+  id: string;
+  seed: string;
+  plan?: RenderPlan;
+  status: "planning" | "scoring" | "scored" | "error";
+  idi?: number;
+  confidence?: number;
+  score?: number;
+  error?: string;
+};
+
+type PlanAnalysisBundle = {
+  analysis: PlanAnalysis | null;
+  key?: string;
+};
 
 type CoverCreatorProps = {
   selectedOriginal: Original | null;
@@ -78,7 +112,65 @@ const clamp01 = (value: number): number => {
   return value;
 };
 
+type PlanWindowAnalysis = NonNullable<PlanAnalysis["windows"]>[number];
+
+const planWindowKey = (startBar: number, bars: number) => `${startBar}:${bars}`;
+
+const mergePlanAnalyses = (
+  primary: PlanAnalysis | null,
+  fallback: PlanAnalysis | null,
+): PlanAnalysis | null => {
+  if (!primary && !fallback) return null;
+  if (!primary) return fallback;
+  if (!fallback) return primary;
+
+  const windowMap = new Map<string, PlanWindowAnalysis>();
+  const addWindow = (window: PlanWindowAnalysis) => {
+    const key = planWindowKey(window.startBar, window.bars);
+    windowMap.set(key, { ...window });
+  };
+  fallback.windows?.forEach(addWindow);
+  primary.windows?.forEach((window) => {
+    const key = planWindowKey(window.startBar, window.bars);
+    const existing = windowMap.get(key);
+    windowMap.set(key, {
+      startBar: window.startBar,
+      bars: window.bars,
+      energy:
+        typeof window.energy === "number" ? window.energy : existing?.energy,
+      density:
+        typeof window.density === "number" ? window.density : existing?.density,
+      brightness:
+        typeof window.brightness === "number"
+          ? window.brightness
+          : existing?.brightness,
+    });
+  });
+
+  const windows = windowMap.size
+    ? Array.from(windowMap.values()).sort(
+        (a, b) => a.startBar - b.startBar || a.bars - b.bars,
+      )
+    : undefined;
+
+  const energyByBar = primary.energyByBar?.length
+    ? primary.energyByBar
+    : fallback.energyByBar;
+  const sections = primary.sections?.length ? primary.sections : fallback.sections;
+  const energyCurve = primary.energyCurve?.length
+    ? primary.energyCurve
+    : fallback.energyCurve;
+
+  return {
+    ...(windows ? { windows } : {}),
+    ...(energyByBar?.length ? { energyByBar } : {}),
+    ...(sections?.length ? { sections } : {}),
+    ...(energyCurve?.length ? { energyCurve } : {}),
+  };
+};
+
 const TEMPO_STORAGE_KEY = "noisegen:tempo";
+const RENDER_PLAN_STORAGE_KEY = "noisegen:renderPlanDraft";
 
 const readStoredTempo = (): TempoMeta | null => {
   if (typeof window === "undefined") return null;
@@ -93,6 +185,40 @@ const readStoredTempo = (): TempoMeta | null => {
     return null;
   }
   return null;
+};
+
+const readStoredRenderPlan = (): string => {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(RENDER_PLAN_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+};
+
+type ParsedRenderPlan = { plan: RenderPlan | null; error?: string };
+
+const parseRenderPlan = (value: string): ParsedRenderPlan => {
+  const trimmed = value.trim();
+  if (!trimmed) return { plan: null };
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== "object") {
+      return { plan: null, error: "RenderPlan must be a JSON object." };
+    }
+    if (!Array.isArray((parsed as RenderPlan).windows)) {
+      return { plan: null, error: "RenderPlan.windows must be an array." };
+    }
+    if ((parsed as RenderPlan).windows.length === 0) {
+      return { plan: null, error: "RenderPlan.windows must include at least one entry." };
+    }
+    return { plan: parsed as RenderPlan };
+  } catch (error) {
+    return {
+      plan: null,
+      error: error instanceof Error ? error.message : "RenderPlan JSON is invalid.",
+    };
+  }
 };
 
 const KB_TEXTURE_MANIFEST = "/kb-textures/index.json";
@@ -110,6 +236,7 @@ export function CoverCreator({
   onRenderJobComplete,
 }: CoverCreatorProps) {
   const { toast } = useToast();
+  const initialRenderPlanDraft = useMemo(() => readStoredRenderPlan(), []);
   const [seed, setSeed] = useState<string>("");
   const [startBar, setStartBar] = useState<number>(1);
   const [endBar, setEndBar] = useState<number>(9);
@@ -120,6 +247,22 @@ export function CoverCreator({
   const [sampleInfluence, setSampleInfluence] = useState<number>(0.7);
   const [styleInfluence, setStyleInfluence] = useState<number>(0.3);
   const [weirdness, setWeirdness] = useState<number>(0.2);
+  const [renderPlanDraft, setRenderPlanDraft] = useState<string>(initialRenderPlanDraft);
+  const [renderPlan, setRenderPlan] = useState<RenderPlan | null>(null);
+  const [renderPlanEnabled, setRenderPlanEnabled] = useState(false);
+  const [renderPlanError, setRenderPlanError] = useState<string | null>(null);
+  const [renderPlanOpen, setRenderPlanOpen] = useState<boolean>(
+    () => Boolean(initialRenderPlanDraft),
+  );
+  const [atomAutoFillRunning, setAtomAutoFillRunning] = useState(false);
+  const [atomAutoFillStatus, setAtomAutoFillStatus] = useState<string | null>(
+    null,
+  );
+  const [planRankCount, setPlanRankCount] = useState<number>(3);
+  const [planRankCandidates, setPlanRankCandidates] = useState<PlanRankCandidate[]>([]);
+  const [planRanking, setPlanRanking] = useState(false);
+  const [planRankError, setPlanRankError] = useState<string | null>(null);
+  const [planRankStatus, setPlanRankStatus] = useState<string | null>(null);
   const [job, setJob] = useState<JobTracker | null>(null);
   const [jobMessage, setJobMessage] = useState<string | null>(null);
   const [renderProgress, setRenderProgress] = useState<{ pct: number; stage: string } | null>(null);
@@ -129,6 +272,9 @@ export function CoverCreator({
   const lastPlanTriggerRef = useRef<string | null>(null);
   const lastPreviewUrlRef = useRef<string | null>(null);
   const lastCompletedJobRef = useRef<string | null>(null);
+  const planAnalysisCacheRef = useRef<Map<string, PlanAnalysisBundle | null>>(
+    new Map(),
+  );
   const { isOver, setNodeRef } = useDroppable({ id: COVER_DROPPABLE_ID });
 
   const { mutateAsync: queueGeneration, isPending: isRequesting } = useMutation({
@@ -179,6 +325,31 @@ export function CoverCreator({
       // ignore persistence issues
     }
   }, [sessionTempo]);
+
+  useEffect(() => {
+    if (!initialRenderPlanDraft.trim()) return;
+    const { plan, error } = parseRenderPlan(initialRenderPlanDraft);
+    if (plan) {
+      setRenderPlan(plan);
+      setRenderPlanEnabled(true);
+      setRenderPlanError(null);
+    } else if (error) {
+      setRenderPlanError(error);
+    }
+  }, [initialRenderPlanDraft]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (renderPlanDraft.trim()) {
+        window.localStorage.setItem(RENDER_PLAN_STORAGE_KEY, renderPlanDraft);
+      } else {
+        window.localStorage.removeItem(RENDER_PLAN_STORAGE_KEY);
+      }
+    } catch {
+      // ignore persistence issues
+    }
+  }, [renderPlanDraft]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -353,7 +524,6 @@ export function CoverCreator({
     if (job.status !== "processing") return undefined;
     if (!job.snapshot) return undefined;
     if (job.forceRemote || job.snapshot.request?.forceRemote) return undefined;
-    if (job.snapshot.request?.knowledgeFileIds?.length) return undefined;
     if (job.snapshot.previewUrl) return undefined;
     if (fulfillingJobId && fulfillingJobId !== job.id) return undefined;
     if (!canFulfillLocally()) return undefined;
@@ -501,7 +671,251 @@ export function CoverCreator({
     );
   }, [immersionEvidence]);
 
-  const weirdnessLocked = includeHelixPacket && Boolean(helixPacket);
+  const barWindowRange = useMemo(() => {
+    const start = barWindows[0]?.startBar ?? 1;
+    const end = barWindows[0]?.endBar ?? start + 1;
+    return { start, end };
+  }, [barWindows]);
+
+  const renderPlanSummary = useMemo(() => {
+    if (!renderPlan) return null;
+    const windows = renderPlan.windows ?? [];
+    let minStart: number | null = null;
+    let maxEnd: number | null = null;
+    let materialCount = 0;
+    let textureCount = 0;
+    let eqCount = 0;
+    let fxCount = 0;
+    for (const window of windows) {
+      if (window.material) materialCount += 1;
+      if (window.texture) textureCount += 1;
+      if (window.texture?.eqPeaks?.length) eqCount += 1;
+      if (window.texture?.fx) fxCount += 1;
+      const start = Number(window.startBar);
+      const bars = Number(window.bars);
+      if (Number.isFinite(start) && Number.isFinite(bars)) {
+        const end = start + bars;
+        minStart = minStart === null ? start : Math.min(minStart, start);
+        maxEnd = maxEnd === null ? end : Math.max(maxEnd, end);
+      }
+    }
+    return {
+      windowCount: windows.length,
+      minStart,
+      maxEnd,
+      materialCount,
+      textureCount,
+      eqCount,
+      fxCount,
+      bpm: renderPlan.global?.bpm,
+      sectionCount: renderPlan.global?.sections?.length ?? 0,
+      energyPoints: renderPlan.global?.energyCurve?.length ?? 0,
+    };
+  }, [renderPlan]);
+
+  const applyRenderPlanDraft = useCallback(() => {
+    const { plan, error } = parseRenderPlan(renderPlanDraft);
+    if (plan) {
+      setRenderPlan(plan);
+      setRenderPlanEnabled(true);
+      setRenderPlanError(null);
+      return;
+    }
+    setRenderPlan(null);
+    setRenderPlanEnabled(false);
+    setRenderPlanError(error ?? "RenderPlan JSON is invalid.");
+  }, [renderPlanDraft]);
+
+  const formatRenderPlanDraft = useCallback(() => {
+    const { plan, error } = parseRenderPlan(renderPlanDraft);
+    if (!plan) {
+      setRenderPlanError(error ?? "RenderPlan JSON is invalid.");
+      return;
+    }
+    setRenderPlanDraft(JSON.stringify(plan, null, 2));
+    setRenderPlanError(null);
+  }, [renderPlanDraft]);
+
+  const clearRenderPlanDraft = useCallback(() => {
+    setRenderPlanDraft("");
+    setRenderPlan(null);
+    setRenderPlanEnabled(false);
+    setRenderPlanError(null);
+  }, []);
+
+  const autoFillPlanAtoms = useCallback(async () => {
+    setAtomAutoFillStatus(null);
+    const { plan, error } = parseRenderPlan(renderPlanDraft);
+    if (!plan) {
+      setRenderPlanError(error ?? "RenderPlan JSON is invalid.");
+      setAtomAutoFillStatus(
+        "Paste a RenderPlan JSON before auto-filling atoms.",
+      );
+      return;
+    }
+    setAtomAutoFillRunning(true);
+    try {
+      const files = await listKnowledgeFiles();
+      const audioFiles = files.filter(isAudioKnowledgeFile);
+      if (!audioFiles.length) {
+        setAtomAutoFillStatus(
+          "No audio files found in the knowledge library.",
+        );
+        return;
+      }
+      const index = buildAtomIndex(audioFiles);
+      const tempo =
+        sessionTempo ??
+        selectedOriginal?.tempo ??
+        readStoredTempo() ??
+        undefined;
+      let result = applyAtomSelectionToPlan(plan, index, {
+        tempo,
+        requireAtomTag: true,
+      });
+      let fallbackNote = "";
+      if (result.appliedCount === 0) {
+        const fallback = applyAtomSelectionToPlan(plan, index, {
+          tempo,
+          requireAtomTag: false,
+        });
+        if (fallback.appliedCount > 0) {
+          result = fallback;
+          fallbackNote = " using untagged audio";
+        }
+      }
+      if (result.appliedCount === 0) {
+        setAtomAutoFillStatus(
+          "No atom-tagged audio found. Tag atoms or run analysis first.",
+        );
+        return;
+      }
+      setRenderPlan(result.plan);
+      setRenderPlanDraft(JSON.stringify(result.plan, null, 2));
+      setRenderPlanEnabled(true);
+      setRenderPlanError(null);
+      setAtomAutoFillStatus(
+        `Filled ${result.appliedCount} window(s)${fallbackNote}.`,
+      );
+    } catch (error) {
+      setAtomAutoFillStatus(
+        error instanceof Error ? error.message : "Auto-fill failed.",
+      );
+    } finally {
+      setAtomAutoFillRunning(false);
+    }
+  }, [renderPlanDraft, selectedOriginal, sessionTempo]);
+
+  const resolvePlanAnalysis = useCallback(
+    async (coverRequest: CoverJobRequest): Promise<PlanAnalysisBundle | null> => {
+      const tempoMeta =
+        coverRequest.tempo ??
+        sessionTempo ??
+        selectedOriginal?.tempo ??
+        readStoredTempo();
+      const normalizedWindows = coverRequest.barWindows.map((window) => ({
+        startBar: Math.max(1, Math.floor(window.startBar)),
+        endBar: Math.max(Math.floor(window.endBar), Math.floor(window.startBar) + 1),
+      }));
+      const knowledgeFileIds = coverRequest.knowledgeFileIds ?? coverFlowPayload?.knowledgeFileIds;
+      const normalizedKnowledgeIds = Array.isArray(knowledgeFileIds)
+        ? Array.from(new Set(knowledgeFileIds)).sort()
+        : [];
+      const trackId = coverFlowPayload?.trackId;
+      const trackName = coverFlowPayload?.trackName ?? selectedOriginal?.title;
+      const key = JSON.stringify({
+        originalId: coverRequest.originalId,
+        tempo: tempoMeta
+          ? {
+              bpm: tempoMeta.bpm,
+              timeSig: tempoMeta.timeSig,
+              offsetMs: tempoMeta.offsetMs,
+              barsInLoop: tempoMeta.barsInLoop,
+              quantized: tempoMeta.quantized ?? true,
+            }
+          : null,
+        barWindows: normalizedWindows,
+        knowledgeFileIds: normalizedKnowledgeIds,
+        trackId,
+        trackName,
+      });
+      if (planAnalysisCacheRef.current.has(key)) {
+        return planAnalysisCacheRef.current.get(key) ?? null;
+      }
+      const abletonFeatures = await resolveAbletonPlanFeatures({
+        knowledgeFileIds: normalizedKnowledgeIds,
+        trackId,
+        trackName,
+        barWindows: coverRequest.barWindows,
+        tempo: tempoMeta ?? null,
+      });
+      const audioAnalysis = tempoMeta
+        ? await analyzeOriginalForPlan({
+            originalId: coverRequest.originalId,
+            barWindows: coverRequest.barWindows,
+            tempo: tempoMeta,
+          })
+        : null;
+      const mergedAnalysis = mergePlanAnalyses(
+        abletonFeatures?.analysis ?? null,
+        audioAnalysis,
+      );
+      const bundle =
+        mergedAnalysis || abletonFeatures?.key
+          ? { analysis: mergedAnalysis, key: abletonFeatures?.key }
+          : null;
+      planAnalysisCacheRef.current.set(key, bundle);
+      return bundle;
+    },
+    [coverFlowPayload, selectedOriginal, sessionTempo],
+  );
+
+  const applyPlanCandidate = useCallback((candidate: PlanRankCandidate) => {
+    if (!candidate.plan) return;
+    setRenderPlan(candidate.plan);
+    setRenderPlanDraft(JSON.stringify(candidate.plan, null, 2));
+    setRenderPlanEnabled(true);
+    setRenderPlanOpen(true);
+    setRenderPlanError(null);
+  }, []);
+
+  const requestPlanCandidate = useCallback(
+    async (
+      coverRequest: CoverJobRequest,
+      seedValue: string,
+      analysisBundle?: PlanAnalysisBundle | null,
+    ): Promise<RenderPlan> => {
+      const payload = {
+        originalId: coverRequest.originalId,
+        barWindows: coverRequest.barWindows,
+        tempo: coverRequest.tempo ?? undefined,
+        kbTexture: coverRequest.kbTexture ?? null,
+        base: {
+          sampleInfluence: coverRequest.sampleInfluence ?? 0.7,
+          styleInfluence: coverRequest.styleInfluence ?? 0.3,
+          weirdness: coverRequest.weirdness ?? 0.2,
+        },
+        analysis: analysisBundle?.analysis ?? undefined,
+        key: analysisBundle?.key ?? undefined,
+        seed: seedValue,
+      };
+      const response = await fetch("/api/ai/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Plan request failed (${response.status})`);
+      }
+      const json = (await response.json()) as { renderPlan?: RenderPlan };
+      if (!json?.renderPlan || !Array.isArray(json.renderPlan.windows)) {
+        throw new Error("Plan response missing renderPlan windows.");
+      }
+      return json.renderPlan;
+    },
+    [],
+  );
 
   const buildCoverRequest = useCallback(() => {
     if (!selectedOriginal) return null;
@@ -515,14 +929,17 @@ export function CoverCreator({
         : clamp01(weirdness);
     const autoTextureId = autoMatch?.kb.id ?? null;
     const coverFlowTextureId = coverFlowPayload?.kbTexture ?? null;
-    const resolvedTexture = kbTexture === "auto" ? autoTextureId ?? coverFlowTextureId : kbTexture;
+    const resolvedTexture =
+      kbTexture === "auto" ? autoTextureId ?? coverFlowTextureId : kbTexture;
     const tempoMeta = sessionTempo ?? selectedOriginal.tempo ?? readStoredTempo();
     const kbConfidence =
       kbTexture === "auto" && typeof autoMatch?.confidence === "number"
         ? autoMatch.confidence
         : undefined;
     const knowledgeFileIds = coverFlowPayload?.knowledgeFileIds;
-    const forceRemote = Boolean(coverFlowPayload?.forceRemote || (knowledgeFileIds?.length ?? 0) > 0);
+    const forceRemote = Boolean(coverFlowPayload?.forceRemote);
+    const resolvedRenderPlan =
+      renderPlanEnabled && renderPlan ? renderPlan : undefined;
 
     const coverRequest: CoverJobRequest = {
       originalId: selectedOriginal.id,
@@ -534,6 +951,7 @@ export function CoverCreator({
       styleInfluence: resolvedStyleInfluence,
       weirdness: resolvedWeirdness,
       tempo: tempoMeta ?? undefined,
+      renderPlan: resolvedRenderPlan,
     };
     if (typeof kbConfidence === "number") {
       coverRequest.kbConfidence = kbConfidence;
@@ -559,7 +977,106 @@ export function CoverCreator({
     styleInfluence,
     weirdness,
     coverFlowPayload,
+    renderPlan,
+    renderPlanEnabled,
   ]);
+
+  const runPlanRanking = useCallback(async () => {
+    setPlanRankError(null);
+    setPlanRankStatus(null);
+    setPlanRankCandidates([]);
+
+    if (!selectedOriginal) {
+      setPlanRankError("Select an original before ranking plans.");
+      return;
+    }
+    if (!canFulfillLocally()) {
+      setPlanRankError("Offline rendering is not supported in this browser.");
+      return;
+    }
+    const bundle = buildCoverRequest();
+    if (!bundle) {
+      setPlanRankError("Configure bar windows before ranking plans.");
+      return;
+    }
+
+    const count = Math.max(1, Math.min(6, Math.round(planRankCount)));
+    const baseSeed = seed.trim() ? seed.trim() : selectedOriginal.id;
+    const timestamp = Date.now().toString(36);
+    const results: PlanRankCandidate[] = [];
+    setPlanRanking(true);
+
+    setPlanRankStatus("Analyzing source for plan...");
+    const analysisBundle = await resolvePlanAnalysis(bundle.coverRequest);
+
+    for (let index = 0; index < count; index += 1) {
+      const candidateId = `candidate-${index + 1}`;
+      const seedValue = `${baseSeed}-${timestamp}-${index + 1}`;
+      let candidate: PlanRankCandidate = {
+        id: candidateId,
+        seed: seedValue,
+        status: "planning",
+      };
+      results.push(candidate);
+      setPlanRankCandidates([...results]);
+      setPlanRankStatus(`Generating plan ${index + 1} of ${count}...`);
+
+      try {
+        const plan = await requestPlanCandidate(
+          bundle.coverRequest,
+          seedValue,
+          analysisBundle,
+        );
+        candidate = { ...candidate, plan, status: "scoring" };
+        results[index] = candidate;
+        setPlanRankCandidates([...results]);
+        setPlanRankStatus(`Scoring plan ${index + 1} of ${count}...`);
+
+        const score = await scoreRenderPlan(
+          { ...bundle.coverRequest, renderPlan: undefined },
+          plan,
+        );
+        const idi = score.idi;
+        const confidence = score.idiConfidence;
+        const weightedScore = idi * confidence;
+        candidate = {
+          ...candidate,
+          status: "scored",
+          idi,
+          confidence,
+          score: weightedScore,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Plan ranking failed.";
+        candidate = { ...candidate, status: "error", error: message };
+      }
+
+      results[index] = candidate;
+      setPlanRankCandidates([...results]);
+    }
+
+    const best = results
+      .filter((entry) => entry.status === "scored" && entry.plan)
+      .sort((a, b) => (b.score ?? b.idi ?? 0) - (a.score ?? a.idi ?? 0))[0];
+    if (best) {
+      applyPlanCandidate(best);
+    } else if (results.length > 0) {
+      setPlanRankError("No plan scored successfully. Check the console or try fewer candidates.");
+    }
+    setPlanRanking(false);
+    setPlanRankStatus(null);
+  }, [
+    applyPlanCandidate,
+    buildCoverRequest,
+    planRankCount,
+    resolvePlanAnalysis,
+    requestPlanCandidate,
+    scoreRenderPlan,
+    seed,
+    selectedOriginal,
+  ]);
+
+  const weirdnessLocked = includeHelixPacket && Boolean(helixPacket);
 
   type SubmitCoverJobOptions = {
     coverRequest: CoverJobRequest;
@@ -609,6 +1126,7 @@ export function CoverCreator({
           previewUrl: null,
           sourceLabel,
           startedAt,
+          evidence: snapshot.evidence,
         });
         setJobMessage(coverRequest.forceRemote ? "Queued for remote rendering" : "Queued for local rendering");
         setRenderProgress({ pct: 0.05, stage: "Queued" });
@@ -659,6 +1177,7 @@ export function CoverCreator({
             previewUrl: null,
             sourceLabel: fallbackPreset.label,
             startedAt,
+            evidence: undefined,
           });
           toast({
             title: "Legacy render queued",
@@ -708,6 +1227,7 @@ export function CoverCreator({
       previewUrl,
       sourceLabel: job.sourceLabel,
       startedAt: job.startedAt,
+      evidence: job.snapshot?.evidence,
     });
   }, [job, localPreviewUrl, onRenderJobUpdate, selectedOriginal]);
 
@@ -725,6 +1245,7 @@ export function CoverCreator({
       sourceLabel: job.sourceLabel,
       startedAt: job.startedAt,
       completedAt: Date.now(),
+      evidence: job.snapshot?.evidence,
     });
   }, [job, localPreviewUrl, onRenderJobComplete, selectedOriginal]);
 
@@ -1108,6 +1629,230 @@ export function CoverCreator({
                   ) : null}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  RenderPlan
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Inspect or edit per-window plans before rendering.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border-white/20 text-slate-200",
+                    renderPlanEnabled ? "border-emerald-400/50 text-emerald-200" : "",
+                  )}
+                >
+                  {renderPlanEnabled
+                    ? "Plan enabled"
+                    : renderPlan
+                      ? "Plan loaded"
+                      : "No plan"}
+                </Badge>
+                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={renderPlanEnabled}
+                    onChange={(event) => setRenderPlanEnabled(event.target.checked)}
+                    disabled={!renderPlan}
+                  />
+                  Use plan
+                </label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRenderPlanOpen((current) => !current)}
+                >
+                  {renderPlanOpen ? "Hide" : "Edit"}
+                </Button>
+              </div>
+            </div>
+            {renderPlanSummary ? (
+              <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                    Windows {renderPlanSummary.windowCount}
+                  </Badge>
+                  <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                    Texture {renderPlanSummary.textureCount}
+                  </Badge>
+                  <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                    Material {renderPlanSummary.materialCount}
+                  </Badge>
+                  <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                    EQ {renderPlanSummary.eqCount}
+                  </Badge>
+                  <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                    FX {renderPlanSummary.fxCount}
+                  </Badge>
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Render bars {barWindowRange.start}-{Math.max(barWindowRange.start, barWindowRange.end - 1)} (end exclusive)
+                  {renderPlanSummary.minStart != null && renderPlanSummary.maxEnd != null
+                    ? ` · Plan bars ${renderPlanSummary.minStart}-${Math.max(
+                        renderPlanSummary.minStart,
+                        renderPlanSummary.maxEnd - 1,
+                      )}`
+                    : ""}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Global: bpm {renderPlanSummary.bpm ?? "--"} · sections {renderPlanSummary.sectionCount} · energy points {renderPlanSummary.energyPoints}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Paste a RenderPlan JSON to preview per-window routing.
+              </p>
+            )}
+            {renderPlanError ? (
+              <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                {renderPlanError}
+              </div>
+            ) : null}
+            {renderPlanOpen ? (
+              <div className="mt-3 space-y-2">
+                <textarea
+                  className="min-h-[160px] w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-white focus:border-sky-500 focus:outline-none"
+                  placeholder='{"windows":[{"startBar":1,"bars":4,"texture":{"sampleInfluence":0.7}}]}'
+                  value={renderPlanDraft}
+                  onChange={(event) => setRenderPlanDraft(event.target.value)}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" onClick={applyRenderPlanDraft}>
+                    Apply plan
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={formatRenderPlanDraft}>
+                    Format JSON
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void autoFillPlanAtoms()}
+                    disabled={atomAutoFillRunning}
+                  >
+                    {atomAutoFillRunning ? "Filling atoms..." : "Auto-fill atoms"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={clearRenderPlanDraft}>
+                    Clear
+                  </Button>
+                </div>
+                {atomAutoFillStatus ? (
+                  <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[11px] text-slate-200">
+                    {atomAutoFillStatus}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/40 p-3 text-xs text-slate-300">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    Plan ranking
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Generate candidates from /api/ai/plan, score with immersion, apply the best.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void runPlanRanking()}
+                  disabled={planRanking}
+                >
+                  {planRanking ? "Ranking..." : "Generate + Rank"}
+                </Button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label className="text-[11px] text-slate-400">Candidates</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={6}
+                  value={planRankCount}
+                  onChange={(event) => {
+                    const next = Number(event.target.value);
+                    if (Number.isNaN(next)) return;
+                    setPlanRankCount(Math.max(1, Math.min(6, Math.round(next))));
+                  }}
+                  className="h-8 w-20 bg-slate-950/60 text-xs"
+                />
+                {planRankStatus ? (
+                  <span className="text-[11px] text-slate-500">{planRankStatus}</span>
+                ) : null}
+              </div>
+              {planRankError ? (
+                <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                  {planRankError}
+                </div>
+              ) : null}
+              {planRankCandidates.length ? (
+                <div className="mt-3 space-y-2">
+                  {planRankCandidates.map((candidate) => {
+                    const scoreLabel =
+                      typeof candidate.score === "number"
+                        ? `${Math.round(candidate.score * 100)}%`
+                        : candidate.status === "scored"
+                          ? "--"
+                          : "";
+                    return (
+                      <div
+                        key={candidate.id}
+                        className="rounded-lg border border-white/10 bg-black/30 px-3 py-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[11px] text-slate-400">
+                            Seed {candidate.seed}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                              {candidate.status}
+                            </Badge>
+                            {candidate.status === "scored" ? (
+                              <Badge
+                                variant="secondary"
+                                className="bg-emerald-500/10 text-emerald-200"
+                              >
+                                {scoreLabel || "scored"}
+                              </Badge>
+                            ) : null}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!candidate.plan}
+                              onClick={() => applyPlanCandidate(candidate)}
+                            >
+                              Use
+                            </Button>
+                          </div>
+                        </div>
+                        {candidate.status === "scored" ? (
+                          <div className="mt-1 text-[11px] text-slate-400">
+                            IDI {Math.round((candidate.idi ?? 0) * 100)}% / conf{" "}
+                            {Math.round((candidate.confidence ?? 0) * 100)}%
+                          </div>
+                        ) : null}
+                        {candidate.status === "error" ? (
+                          <div className="mt-1 text-[11px] text-amber-200">
+                            {candidate.error}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 text-[11px] text-slate-500">
+                  No candidates yet. Generate a few to rank.
+                </p>
+              )}
             </div>
           </div>
 

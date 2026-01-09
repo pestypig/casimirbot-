@@ -35,6 +35,17 @@ For our code, the review provides the **conceptual justification** for:
 
 ---
 
+## 1.5 Engineering vs speculative layers
+
+This repo keeps two layers distinct:
+
+- **Engineering truth (required):** equilibrium is defined operationally by gamma-band phase locking, low dispersion, and a minimum hold time. This is what the governor and telemetry gates act on.
+- **Speculative physics (optional):** Orch-OR, microtubule time-crystals, and DP/OR are treated as hypotheses until they have their own measurement pipeline.
+
+Operationally, the engineering defaults live in `shared/neuro-config.ts` and flow into the star telemetry and governor; the speculative layer remains doc-only until validated.
+
+---
+
 ## 2. Core Orch‑OR ingredients
 
 ### 2.1 Objective reduction (OR)
@@ -209,4 +220,3 @@ This review is the conceptual backbone for:
    - using that as a weak host‑curvature knob to tilt EG/τ.
 
 This doc plus `stellar-consciousness-ii.md` gives you a **paper‑anchored justification** for the physics‑tuned coherent star simulation, without needing to quote the original PDFs inline.
-

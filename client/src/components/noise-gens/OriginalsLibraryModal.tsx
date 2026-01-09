@@ -15,6 +15,7 @@ import {
 } from "@/store/useKnowledgeProjectsStore";
 import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
 import { isAudioKnowledgeFile } from "@/lib/knowledge/audio";
+import { collectTags } from "@/lib/knowledge/atom-curation";
 
 const formatBytes = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -103,7 +104,7 @@ export function OriginalsLibraryModal({
         if (!trimmedSearch) return true;
         return (
           file.name.toLowerCase().includes(trimmedSearch) ||
-          file.tags?.some((tag) => tag.toLowerCase().includes(trimmedSearch))
+          collectTags(file).some((tag) => tag.toLowerCase().includes(trimmedSearch))
         );
       })
       .sort((a, b) => b.updatedAt - a.updatedAt);

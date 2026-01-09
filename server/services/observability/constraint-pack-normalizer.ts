@@ -16,12 +16,14 @@ import {
   recordTrainingTrace,
   type TrainingTraceInput,
 } from "./training-trace-store.js";
+import type { ConstraintPackMetricMap } from "./constraint-pack-evaluator.js";
 
 export type NormalizeConstraintPackTraceInput = {
   traceId?: string;
   tenantId?: string;
   pack: ConstraintPack;
   evaluation: ConstraintPackEvaluation;
+  metrics?: ConstraintPackMetricMap;
   source?: TrainingTraceSource;
   deltas?: TrainingTraceDelta[];
   notes?: string[];
@@ -120,6 +122,18 @@ const resolveCertificatePass = (
   return statusOk;
 };
 
+const resolveProxyFlag = (
+  constraints: ConstraintPackConstraintResult[],
+): boolean => {
+  const hasRealData = constraints.some(
+    (entry) => !entry.proxy && entry.status !== "unknown",
+  );
+  const hasProxyData = constraints.some(
+    (entry) => entry.proxy && entry.status !== "unknown",
+  );
+  return !hasRealData && hasProxyData;
+};
+
 const LADDER_ORDER: PolicyLadderTier[] = [
   "reduced-order",
   "diagnostic",
@@ -169,6 +183,18 @@ const resolveSignal = (
   };
 };
 
+const sanitizeMetrics = (
+  metrics?: ConstraintPackMetricMap,
+): Record<string, number | boolean | string | null> | undefined => {
+  if (!metrics) return undefined;
+  const cleaned: Record<string, number | boolean | string | null> = {};
+  for (const [key, value] of Object.entries(metrics)) {
+    if (value === undefined) continue;
+    cleaned[key] = value;
+  }
+  return Object.keys(cleaned).length ? cleaned : undefined;
+};
+
 export function normalizeConstraintPackTrace(
   input: NormalizeConstraintPackTraceInput,
 ): TrainingTraceInput {
@@ -182,7 +208,7 @@ export function normalizeConstraintPackTrace(
   const proxy =
     typeof evaluation.proxy === "boolean"
       ? evaluation.proxy
-      : constraints.some((entry) => entry.proxy);
+      : resolveProxyFlag(constraints);
   const firstFail = evaluation.firstFail
     ? toTrainingTraceConstraint(evaluation.firstFail)
     : pickFirstFailingHardConstraint(constraints);
@@ -190,6 +216,12 @@ export function normalizeConstraintPackTrace(
     ...(evaluation.notes ?? []),
     ...(input.notes ?? []),
   ].filter((note): note is string => typeof note === "string" && note.trim().length > 0);
+  const certificate = evaluation.certificate
+    ? {
+        ...evaluation.certificate,
+        certificateHash: evaluation.certificate.certificateHash ?? null,
+      }
+    : undefined;
   const deltas = input.deltas ?? evaluation.deltas ?? [];
   const signal = resolveSignal(pack, evaluation, pass, proxy);
   return {
@@ -199,8 +231,9 @@ export function normalizeConstraintPackTrace(
     signal,
     pass,
     deltas,
+    metrics: sanitizeMetrics(input.metrics),
     firstFail,
-    certificate: evaluation.certificate,
+    certificate,
     notes: mergedNotes.length ? mergedNotes : undefined,
     ts: input.ts,
     id: input.id,

@@ -76,6 +76,37 @@ const buildAreaHistogram = (
   return { hist, total, hist01 };
 };
 
+const isIdentityMatrix = (m: Float32Array, eps = 1e-6) =>
+  Math.abs(m[0] - 1) < eps &&
+  Math.abs(m[5] - 1) < eps &&
+  Math.abs(m[10] - 1) < eps &&
+  Math.abs(m[15] - 1) < eps &&
+  Math.abs(m[1]) < eps &&
+  Math.abs(m[2]) < eps &&
+  Math.abs(m[3]) < eps &&
+  Math.abs(m[4]) < eps &&
+  Math.abs(m[6]) < eps &&
+  Math.abs(m[7]) < eps &&
+  Math.abs(m[8]) < eps &&
+  Math.abs(m[9]) < eps &&
+  Math.abs(m[11]) < eps &&
+  Math.abs(m[12]) < eps &&
+  Math.abs(m[13]) < eps &&
+  Math.abs(m[14]) < eps;
+
+const transformPositions = (positions: Float32Array, m: Float32Array) => {
+  const out = new Float32Array(positions.length);
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i] ?? 0;
+    const y = positions[i + 1] ?? 0;
+    const z = positions[i + 2] ?? 0;
+    out[i] = m[0] * x + m[4] * y + m[8] * z + m[12];
+    out[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+    out[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+  }
+  return out;
+};
+
 export function buildHullSurfaceStrobe(
   payload: HullPreviewPayload | null | undefined,
   opts?: { surface?: HullSurfaceMeshOptions },
@@ -539,7 +570,11 @@ export const voxelizeHullSurfaceStrobe = (
       ? params.sectorWeights
       : new Float32Array(Math.max(1, surface.sectorCount || 1)).fill(1);
 
-  const vertexCount = surface.vertexCount ?? Math.floor(surface.positions.length / 3);
+  const positions =
+    frame.worldToLattice && !isIdentityMatrix(frame.worldToLattice)
+      ? transformPositions(surface.positions, frame.worldToLattice)
+      : surface.positions;
+  const vertexCount = surface.vertexCount ?? Math.floor(positions.length / 3);
   const vertexGate = new Float32Array(vertexCount);
   const vertexDfdr = new Float32Array(vertexCount);
   const dfdrDefault = typeof params.perVertexDfdr === "number" ? params.perVertexDfdr : 1;
@@ -613,22 +648,22 @@ export const voxelizeHullSurfaceStrobe = (
     const aBase = ia * 3;
     const bBase = ib * 3;
     const cBase = ic * 3;
-    const ax = surface.positions[aBase] ?? 0;
-    const ay = surface.positions[aBase + 1] ?? 0;
-    const az = surface.positions[aBase + 2] ?? 0;
-    const bx = surface.positions[bBase] ?? 0;
-    const by = surface.positions[bBase + 1] ?? 0;
-    const bz = surface.positions[bBase + 2] ?? 0;
-    const cx = surface.positions[cBase] ?? 0;
-    const cy = surface.positions[cBase + 1] ?? 0;
-    const cz = surface.positions[cBase + 2] ?? 0;
+    const ax = positions[aBase] ?? 0;
+    const ay = positions[aBase + 1] ?? 0;
+    const az = positions[aBase + 2] ?? 0;
+    const bx = positions[bBase] ?? 0;
+    const by = positions[bBase + 1] ?? 0;
+    const bz = positions[bBase + 2] ?? 0;
+    const cx = positions[cBase] ?? 0;
+    const cy = positions[cBase + 1] ?? 0;
+    const cz = positions[cBase + 2] ?? 0;
 
-    const triMinX = Math.min(ax, bx, cx);
-    const triMaxX = Math.max(ax, bx, cx);
-    const triMinY = Math.min(ay, by, cy);
-    const triMaxY = Math.max(ay, by, cy);
-    const triMinZ = Math.min(az, bz, cz);
-    const triMaxZ = Math.max(az, bz, cz);
+    const triMinX = Math.min(ax, bx, cx) - shellThickness;
+    const triMaxX = Math.max(ax, bx, cx) + shellThickness;
+    const triMinY = Math.min(ay, by, cy) - shellThickness;
+    const triMaxY = Math.max(ay, by, cy) + shellThickness;
+    const triMinZ = Math.min(az, bz, cz) - shellThickness;
+    const triMaxZ = Math.max(az, bz, cz) + shellThickness;
 
     const ix0 = clampIndex(Math.floor((triMinX - min[0]) * invVoxel), dims[0]);
     const iy0 = clampIndex(Math.floor((triMinY - min[1]) * invVoxel), dims[1]);

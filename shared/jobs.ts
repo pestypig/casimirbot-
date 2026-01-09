@@ -44,12 +44,25 @@ export const jobListResponseSchema = z.object({
 });
 export type JobListResponse = z.infer<typeof jobListResponseSchema>;
 
+export const tokenLedgerSourceSchema = z.enum([
+  "job",
+  "contribution",
+  "proposal",
+  "ubi",
+  "payout",
+  "adjustment",
+]);
+export type TokenLedgerSource = z.infer<typeof tokenLedgerSourceSchema>;
+
 export const tokenLedgerEntrySchema = z.object({
   id: z.string(),
   at: z.number().int(),
   delta: z.number().int(),
   reason: z.string(),
   jobId: z.string().optional(),
+  source: tokenLedgerSourceSchema.optional(),
+  ref: z.string().optional(),
+  evidence: z.string().optional(),
 });
 export type TokenLedgerEntry = z.infer<typeof tokenLedgerEntrySchema>;
 
@@ -61,6 +74,39 @@ export const tokenBalanceSchema = z.object({
   ledger: z.array(tokenLedgerEntrySchema).optional(),
 });
 export type TokenBalance = z.infer<typeof tokenBalanceSchema>;
+
+export const payoutKindSchema = z.enum(["withdrawal", "ubi"]);
+export type PayoutKind = z.infer<typeof payoutKindSchema>;
+
+export const payoutStatusSchema = z.enum([
+  "pending",
+  "completed",
+  "failed",
+  "canceled",
+]);
+export type PayoutStatus = z.infer<typeof payoutStatusSchema>;
+
+export const payoutRecordSchema = z.object({
+  id: z.string(),
+  seq: z.number().int(),
+  createdAt: z.number().int(),
+  updatedAt: z.number().int(),
+  userId: z.string().optional(),
+  kind: payoutKindSchema,
+  status: payoutStatusSchema,
+  amount: z.number().int().nonnegative(),
+  reason: z.string().optional(),
+  distributionId: z.string().optional(),
+  destination: z.string().optional(),
+  meta: z.record(z.unknown()).optional(),
+});
+export type PayoutRecord = z.infer<typeof payoutRecordSchema>;
+
+export const payoutListResponseSchema = z.object({
+  payouts: z.array(payoutRecordSchema),
+  generatedAt: z.number().int(),
+});
+export type PayoutListResponse = z.infer<typeof payoutListResponseSchema>;
 
 // --- User proposal flow ------------------------------------------------------
 

@@ -223,9 +223,98 @@ export const toolUseBudgetPack: ConstraintPack = {
   },
 };
 
+export const provenanceSafetyPack: ConstraintPack = {
+  id: "provenance-safety",
+  domain: "audit",
+  version: 1,
+  description:
+    "Audit-tag safety: provenance + verification coverage for risky IO/security surfaces.",
+  signalKinds: {
+    diagnostic: "audit-diagnostic",
+    certified: "audit-certified",
+  },
+  policy: {
+    mode: "hard-only",
+    unknownAsFail: true,
+  },
+  certificate: {
+    issuer: "casimir-audit",
+    admissibleStatus: "SAFE",
+    allowMarginalAsViable: false,
+    treatMissingCertificateAsNotCertified: true,
+  },
+  constraints: [
+    {
+      id: "unknown_audit_tags",
+      severity: "HARD",
+      description: "No unknown audit tags.",
+      metric: "audit.unknown_tags.count",
+      op: "<=",
+      max: 0,
+      units: "count",
+      source: "audit",
+    },
+    {
+      id: "audit_violations",
+      severity: "HARD",
+      description: "No explicit audit violations.",
+      metric: "audit.violations.count",
+      op: "<=",
+      max: 0,
+      units: "count",
+      source: "audit",
+    },
+    {
+      id: "provenance_coverage",
+      severity: "HARD",
+      description: "Provenance protocol present when risk tags exist.",
+      metric: "audit.provenance.coverage",
+      op: "eq",
+      limit: 1,
+      units: "boolean",
+      source: "audit",
+      note: "1=covered, 0=missing",
+    },
+    {
+      id: "safety_coverage",
+      severity: "HARD",
+      description: "Verification checklist present when risk tags exist.",
+      metric: "audit.safety.coverage",
+      op: "eq",
+      limit: 1,
+      units: "boolean",
+      source: "audit",
+      note: "1=covered, 0=missing",
+    },
+    {
+      id: "untagged_files",
+      severity: "SOFT",
+      description: "All files have at least one audit tag.",
+      metric: "audit.untagged.count",
+      op: "<=",
+      max: 0,
+      units: "count",
+      source: "audit",
+    },
+  ],
+  traceMapping: {
+    passRule: "All HARD constraints pass; SOFT constraints are diagnostic.",
+    firstFailRule: "First HARD failure in list order.",
+    signalKindRule: {
+      certified: "pass + certificate hash + integrity OK",
+      diagnostic: "otherwise",
+    },
+  },
+  artifacts: {
+    metricsRef: "provenance-safety:metrics",
+    reportRef: "provenance-safety:report",
+  },
+};
+
 export const constraintPacks: ConstraintPack[] = [
   repoConvergencePack,
   toolUseBudgetPack,
+  provenanceSafetyPack,
 ];
 
 export const getConstraintPackById = (id: string): ConstraintPack | undefined =>

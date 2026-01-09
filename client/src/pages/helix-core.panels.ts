@@ -73,7 +73,10 @@ const API = {
   helixSpectrumWrite: "POST /api/helix/spectrum",
   grAgentLoop: "GET /api/helix/gr-agent-loop",
   grAgentLoopKpis: "GET /api/helix/gr-agent-loop/kpis",
-  mathGraph: "GET /api/helix/math/graph"
+  mathGraph: "GET /api/helix/math/graph",
+  auditTree: "GET /api/helix/audit/tree",
+  tokamakState: "GET /api/physics/tokamak/sim",
+  tokamakCommand: "POST /api/physics/tokamak/command"
 } as const;
 
 const PANEL_KEYWORDS: Record<string, string[]> = {
@@ -83,6 +86,14 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "microscopy": ["microscopy mode", "microprobe", "phase contrast", "nm scale", "Coulomb sweep"],
   "electron-orbital": ["orbital density", "Bohr k/q/g", "toroidal packets", "Coulomb probe", "iso-surface"],
   "drive-guards": ["I3_geo", "I3_VdB", "Q_cavity", "guard bands", "sector strobing"],
+  "mass-provenance": [
+    "mass provenance",
+    "mass source",
+    "dataset id",
+    "fit residuals",
+    "invariant mass",
+    "override warnings"
+  ],
   "gr-agent-loop-audit": ["gr agent loop", "residuals", "gate audit", "accepted config", "warp constraints"],
   "gr-agent-loop-kpis": ["gr agent loop", "kpi", "success rate", "time to green", "constraint violations", "perf trend"],
   "gr-agent-loop-learning": [
@@ -101,12 +112,28 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "unit coverage",
     "repo audit"
   ],
+  "universal-audit-tree": [
+    "audit tree",
+    "ideology tags",
+    "repo audit",
+    "integrity map",
+    "verification map"
+  ],
   "warp-ledger": ["km-scale ledger", "warp ledger", "bubble log", "warp km", "ledger bands"],
   "spectrum-tuner": ["spectrum tuner", "FFT", "frequency dial", "harmonics sweep", "waveform tuner"],
   "experiment-ladder": ["experiment ladder", "casimir", "phoenix", "ford-roman", "natario", "sector gating"],
   "vacuum-gap-heatmap": ["vacuum gap", "Casimir gap", "nm gap map", "heatmap", "gap stress"],
   "star-hydrostatic": ["HR map", "Gamow window", "potato threshold", "polytrope", "stellar ledger"],
   "star-watcher": ["Solar feed", "Coherence overlay", "Motion metrics"],
+  "tokamak-sim": [
+    "tokamak",
+    "sparc",
+    "plasma",
+    "coherence diagnostics",
+    "k-metrics",
+    "ridge tracking",
+    "precursor"
+  ],
   "vacuum-gap-sweep": ["gap sweep", "delta gap", "scan HUD", "nm sweep", "sweep HUD"],
   "cavity-mechanism": ["cavity frame", "mechanism view", "design layers", "actuator layout", "mechanism CAD"],
   "fractional-coherence-rail": ["fractional coherence", "xi rail", "coherence rail", "phase rail", "coherence band"],
@@ -144,6 +171,14 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "hull-status": ["runtime ops", "plan b", "runtime policy", "endpoint guard", "queue telemetry"],
   "agi-debate-view": ["AGI debate", "debate SSE", "argument stream", "multi agent debate", "debate dashboard"],
   "agi-essence-console": ["Essence console", "AGI console", "plan execute", "tools logs", "command console"],
+  "agi-contribution-workbench": [
+    "contribution",
+    "receipt",
+    "VCU",
+    "review queue",
+    "verification",
+    "evidence"
+  ],
   "star-coherence": ["star coherence", "coherence governor", "tool budget", "collapse policy", "telemetry"],
   "collapse-monitor": ["collapse pressure", "collapse watcher", "coherence gate", "debate collapse", "star collapse"],
   "agi-task-history": ["task history", "AGI trace", "task log", "history queue", "trace timeline"],
@@ -248,6 +283,19 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     endpoints: [API.pipelineGet, API.helixMetrics]
   },
   {
+    id: "mass-provenance",
+    title: "Mass Provenance",
+    icon: ClipboardList,
+    loader: lazyPanel(() => import("@/components/MassProvenancePanel")),
+    pinned: true,
+    defaultOpen: true,
+    defaultSize: { w: 520, h: 360 },
+    defaultPosition: { x: 140, y: 120 },
+    mobileReady: true,
+    endpoints: [API.pipelineGet],
+    keywords: PANEL_KEYWORDS["mass-provenance"]
+  },
+  {
     id: "gr-agent-loop-audit",
     title: "GR Agent Loop Audit",
     icon: LineChart,
@@ -281,12 +329,23 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     id: "math-maturity-tree",
     title: "Math Maturity Tree",
     icon: Layers,
-    loader: lazyPanel(() => import("@/components/MathMaturityTreePanel")),
+    loader: lazyPanel(() => import("@/components/MathMaturityTreePanel")),      
     defaultSize: { w: 900, h: 680 },
     defaultPosition: { x: 280, y: 180 },
     mobileReady: true,
     endpoints: [API.mathGraph],
     keywords: PANEL_KEYWORDS["math-maturity-tree"]
+  },
+  {
+    id: "universal-audit-tree",
+    title: "Universal Audit Tree",
+    icon: Shield,
+    loader: lazyPanel(() => import("@/components/UniversalAuditTreePanel")),
+    defaultSize: { w: 900, h: 680 },
+    defaultPosition: { x: 320, y: 200 },
+    mobileReady: true,
+    endpoints: [API.auditTree],
+    keywords: PANEL_KEYWORDS["universal-audit-tree"]
   },
   {
     id: "tsn-sim",
@@ -370,6 +429,15 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/pages/star-watcher-panel")),
     defaultSize: { w: 1200, h: 740 },
     defaultPosition: { x: 180, y: 140 }
+  },
+  {
+    id: "tokamak-sim",
+    title: "Tokamak Simulation",
+    icon: RadioTower,
+    loader: lazyPanel(() => import("@/components/TokamakSimulationPanel")),
+    defaultSize: { w: 720, h: 640 },
+    defaultPosition: { x: 240, y: 160 },
+    endpoints: [API.tokamakState, API.tokamakCommand]
   },
   {
     id: "vacuum-gap-sweep",
@@ -729,6 +797,7 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/agi/StarCoherencePanel"), "StarCoherencePanel"),
     defaultSize: { w: 520, h: 520 },
     defaultPosition: { x: 220, y: 140 },
+    mobileReady: true,
     endpoints: ["GET /api/agi/star/telemetry"]
   },
   {
@@ -782,6 +851,28 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
       "GET /api/agi/constraint-packs/policies",
       "POST /api/agi/constraint-packs/policies"
     ]
+  },
+  {
+    id: "agi-contribution-workbench",
+    title: "Contribution Workbench",
+    icon: ClipboardList,
+    loader: lazyPanel(() => import("@/components/agi/ContributionWorkbenchPanel")),
+    defaultSize: { w: 1100, h: 720 },
+    defaultPosition: { x: 300, y: 160 },
+    endpoints: [
+      "GET /api/agi/contributions/drafts",
+      "POST /api/agi/contributions/ingest",
+      "POST /api/agi/contributions/drafts/:id/verify",
+      "POST /api/agi/contributions/drafts/:id/receipt",
+      "GET /api/agi/contributions/receipts",
+      "GET /api/agi/contributions/receipts/:id/disputes",
+      "POST /api/agi/contributions/receipts/:id/disputes",
+      "POST /api/agi/contributions/disputes/:id/resolve",
+      "POST /api/agi/contributions/receipts/:id/review",
+      "POST /api/agi/contributions/receipts/:id/mint",
+      "POST /api/agi/contributions/receipts/:id/revoke"
+    ],
+    keywords: PANEL_KEYWORDS["agi-contribution-workbench"]
   },
   {
     id: "remove-bg-edges",

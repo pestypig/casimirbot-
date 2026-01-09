@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "anchors": {
+    "minPerAnswer": 3,
+    "maxPerAnswer": 7,
+    "modePolicy": {
+      "chat": { "missingAnchorBehavior": "warn-and-drop" },
+      "patch": { "missingAnchorBehavior": "error" }
+    }
+  },
+  "ideology": {
+    "ideologyJsonPath": "docs/ethos/ideology.json",
+    "maxNodes": 7
+  },
+  "architecture": {
+    "defaultBundle": [
+      { "path": "README.md", "why": "Top-level map and entry points." },
+      { "path": "docs/QUICKSTART.md", "why": "Setup and how to run." },
+      { "path": "docs/CODEX_QUICKSTART.md", "why": "Codex usage and workflows." },
+      { "path": "docs/warp-console-architecture.md", "why": "System and UX architecture." },
+      { "path": "docs/PACKAGES.md", "why": "Package boundaries and integration expectations." },
+      { "path": "docs/ADAPTER-CONTRACT.md", "why": "Adapter interface contracts." },
+      { "path": "docs/TRACE-API.md", "why": "Trace API interface and semantics." },
+      { "path": "docs/TRAINING-TRACE-API.md", "why": "Training trace API specifics." },
+      { "path": "docs/CONSTRAINT-PACKS.md", "why": "Constraint pack definitions and usage." },
+      { "path": "WARP_AGENTS.md", "why": "Warp/agent structure when relevant." }
+    ],
+    "subsystemRoots": [
+      { "name": "server", "keywords": ["server", "backend", "api"], "paths": ["server/"] },
+      { "name": "client", "keywords": ["client"], "paths": ["client/"] },
+      { "name": "ui", "keywords": ["ui", "frontend", "component"], "paths": ["ui/"] },
+      { "name": "warp-web", "keywords": ["warp-web", "warp web"], "paths": ["warp-web/"] },
+      { "name": "packages", "keywords": ["packages", "package"], "paths": ["packages/"] },
+      { "name": "modules", "keywords": ["modules", "module"], "paths": ["modules/"] },
+      { "name": "sdk", "keywords": ["sdk"], "paths": ["sdk/"] },
+      { "name": "cli", "keywords": ["cli", "command line"], "paths": ["cli/"] },
+      { "name": "shared", "keywords": ["shared", "common"], "paths": ["shared/"] },
+      { "name": "sim_core", "keywords": ["sim_core", "sim core", "simulation core"], "paths": ["sim_core/"] },
+      { "name": "simulations", "keywords": ["simulations", "simulation"], "paths": ["simulations/"] }
+    ],
+    "topicBundles": [
+      {
+        "name": "warp-constraints",
+        "keywords": ["warp", "gr", "constraints", "constraint pack"],
+        "paths": ["docs/CONSTRAINT-PACKS.md", "WARP_AGENTS.md"]
+      },
+      {
+        "name": "adapters-traces",
+        "keywords": ["adapter", "trace", "verifier", "verification", "training trace"],
+        "paths": ["docs/ADAPTER-CONTRACT.md", "docs/TRACE-API.md", "docs/TRAINING-TRACE-API.md"]
+      }
+    ]
+  },
+  "router": {
+    "architectureKeywords": [
+      "codebase",
+      "repo",
+      "repository",
+      "where should this live",
+      "preferred pattern",
+      "module owns",
+      "convention",
+      "how should we implement",
+      "how do we implement",
+      "best way to implement",
+      "in this repo",
+      "in this codebase",
+      "architecture"
+    ],
+    "ideologyKeywords": [
+      "should i",
+      "what would you recommend",
+      "most rewarding",
+      "help me decide",
+      "values",
+      "ethics",
+      "meaning",
+      "how do i approach",
+      "what's the best way",
+      "best way",
+      "guidance"
+    ],
+    "hybridTieBreak": "architecture-first"
+  },
+  "security": {
+    "allowedAnchorRoots": [
+      "README.md",
+      "WARP_AGENTS.md",
+      "docs/",
+      "server/",
+      "client/",
+      "ui/",
+      "warp-web/",
+      "packages/",
+      "modules/",
+      "sdk/",
+      "cli/",
+      "shared/",
+      "sim_core/",
+      "simulations/"
+    ]
+  }
+}

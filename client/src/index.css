@@ -128,6 +128,57 @@
   }
 }
 
+/* SurfaceKit layers */
+.surface-stack {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.surface-layer {
+  position: absolute;
+  inset: -4%;
+  transform-origin: center;
+}
+
+.surface-layer[data-kind="base"] {
+  inset: 0;
+}
+
+.surface-svg,
+.surface-svg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.surface-stack svg .ink {
+  stroke: var(--surface-ink, #8fbfd0);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.surface-stack svg .ink-soft {
+  stroke: var(--surface-ink-soft, #4d6570);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.surface-stack svg .fill {
+  fill: var(--surface-laminate, #1b2a33);
+}
+
+.surface-stack svg .fill-soft {
+  fill: var(--surface-laminate-soft, #223540);
+}
+
+.surface-stack svg .dot {
+  fill: var(--surface-ink-soft, #4d6570);
+}
+
 /* Desktop window chrome + blending */
 .desktop-window {
   background: transparent;

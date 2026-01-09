@@ -2,9 +2,15 @@ import {
   InformationEvent,
   TelemetrySnapshot,
   CollapseDecision,
+  type TInformationEvent,
   type TTelemetrySnapshot,
   type TCollapseDecision,
 } from "../../../shared/star-telemetry";
+import {
+  EQUILIBRIUM_DISPERSION_MAX,
+  EQUILIBRIUM_HOLD_MS,
+  EQUILIBRIUM_R_STAR,
+} from "../../../shared/neuro-config";
 import { buildInformationBoundary } from "../../utils/information-boundary";
 
 type PhaseState = {
@@ -20,6 +26,7 @@ type StarState = {
   recentMasses: number[];
   recentDrivers: number[];
   prethermalLoad: number;
+  equilibriumHoldMs: number;
   rng: () => number;
 };
 
@@ -65,6 +72,11 @@ const DRIVER_HISTORY_MIN = 8; // bins of history required before trusting disper
 
 // Reference collapse timescale (ms) for dpEnergyNorm = 1.
 const TAU_REF_MS = 50;
+const GAMMA_SYNC_Z_FLOOR = 1;
+const GAMMA_RESONANCE_WEIGHT = 0.5;
+const GAMMA_DISPERSION_WEIGHT = 0.35;
+const GAMMA_PRESSURE_WEIGHT = 0.08;
+const GAMMA_ARTIFACT_PASS_MIN = 0.5;
 
 type HostEigenmode = { freq_hz: number; q: number; weight: number };
 
@@ -116,6 +128,14 @@ const clamp = (value: number, min: number, max: number): number => {
   if (value > max) return max;
   return value;
 };
+
+const normalizeGammaSyncZ = (gammaSyncZ: number): number =>
+  clamp(
+    (gammaSyncZ - GAMMA_SYNC_Z_FLOOR) /
+      Math.max(1, EQUILIBRIUM_R_STAR - GAMMA_SYNC_Z_FLOOR),
+    0,
+    1,
+  );
 
 const hashStringToSeed = (input: string): number => {
   let h = 2166136261 >>> 0;
@@ -213,6 +233,55 @@ const classifySearchRegime = (coherence: number, dispersion: number): "ballistic
   return "mixed";
 };
 
+const resolveGammaSyncZ = (event: TInformationEvent): number | undefined => {
+  const direct = event.gamma_sync_z;
+  if (typeof direct === "number" && Number.isFinite(direct)) return direct;
+  const meta = event.metadata as Record<string, unknown> | undefined;
+  const metaValue = meta?.gamma_sync_z;
+  if (typeof metaValue === "number" && Number.isFinite(metaValue)) {
+    return metaValue;
+  }
+  return undefined;
+};
+
+const resolvePhaseDispersion = (
+  event: TInformationEvent,
+): number | undefined => {
+  const direct = event.phase_dispersion;
+  if (typeof direct === "number" && Number.isFinite(direct)) return direct;
+  const meta = event.metadata as Record<string, unknown> | undefined;
+  const metaValue = meta?.phase_dispersion;
+  if (typeof metaValue === "number" && Number.isFinite(metaValue)) {
+    return metaValue;
+  }
+  return undefined;
+};
+
+const resolveArtifactFlags = (
+  event: TInformationEvent,
+): Record<string, number> | undefined => {
+  const direct = event.artifact_flags;
+  if (direct && typeof direct === "object" && !Array.isArray(direct)) {
+    return direct as Record<string, number>;
+  }
+  const meta = event.metadata as Record<string, unknown> | undefined;
+  const metaFlags = meta?.artifact_flags;
+  if (metaFlags && typeof metaFlags === "object" && !Array.isArray(metaFlags)) {
+    return metaFlags as Record<string, number>;
+  }
+  return undefined;
+};
+
+const resolveGammaArtifactPass = (
+  flags?: Record<string, number>,
+): boolean => {
+  const value = flags?.gamma_artifact_pass;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value >= GAMMA_ARTIFACT_PASS_MIN;
+  }
+  return true;
+};
+
 const resolveBandFrequencies = (hostMode?: string): BandFrequencies => {
   const modeKey = (hostMode ?? defaultHostContext.host_mode) as keyof typeof BAND_PRESETS;
   return BAND_PRESETS[modeKey] ?? BAND_PRESETS.other;
@@ -264,6 +333,7 @@ const ensureSnapshot = (sessionId: string, sessionType?: string): StarState => {
       recentMasses: state.recentMasses ?? [],
       recentDrivers: state.recentDrivers ?? [],
       prethermalLoad: state.prethermalLoad ?? 0,
+      equilibriumHoldMs: state.equilibriumHoldMs ?? state.snapshot.equilibrium_hold_ms ?? 0,
       rng: state.rng ?? gaussianForSession(key),
     };
   };
@@ -293,6 +363,11 @@ const ensureSnapshot = (sessionId: string, sessionType?: string): StarState => {
     collapse_pressure: 0.2,
     phase_dispersion: 0.4,
     energy_budget: 0,
+    equilibrium: false,
+    equilibrium_hold_ms: 0,
+    equilibrium_r_star: EQUILIBRIUM_R_STAR,
+    equilibrium_dispersion_max: EQUILIBRIUM_DISPERSION_MAX,
+    equilibrium_hold_ms_threshold: EQUILIBRIUM_HOLD_MS,
     updated_at: now,
   });
   const state: StarState = {
@@ -302,6 +377,7 @@ const ensureSnapshot = (sessionId: string, sessionType?: string): StarState => {
     recentMasses: [],
     recentDrivers: [],
     prethermalLoad: 0,
+    equilibriumHoldMs: 0,
     rng: gaussianForSession(key),
   };
   sessions.set(key, state);
@@ -350,7 +426,8 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
   const driver_p90 = Math.max(computePercentile(absDrivers, 0.9), FALLBACK_P_MODE_P90);
   const p_mode_ready = historyReady;
   const p_mode_power_norm_raw = clamp(Math.abs(driver) / driver_p90, 0, 1);
-  const dispersion_ready = historyReady;
+  const observedDispersion = resolvePhaseDispersion(event);
+  const dispersion_ready = historyReady || observedDispersion !== undefined;
 
   const hostFromEvent: HostContext = {
     host_id: event.host_id,
@@ -399,9 +476,41 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
 
   // Normalize coherence and dispersion against the rolling driver stats.
   const dispersionModel = clamp(sdeStep(prevDispersion, dt, dispersionDrift, dispersionDiff, rng), 0, 1);
-  const dispersion_for_dynamics = dispersion_ready ? disp_norm_raw : dispersionModel;
-  const dispersion = clamp(dispersion_for_dynamics, 0, 1);
+  const dispersion_for_dynamics =
+    observedDispersion !== undefined
+      ? clamp(observedDispersion, 0, 1)
+      : dispersion_ready
+        ? disp_norm_raw
+        : dispersionModel;
+  const artifactFlags = resolveArtifactFlags(event);
+  const gammaArtifactPass = resolveGammaArtifactPass(artifactFlags);
+  const gammaSyncZ = resolveGammaSyncZ(event);
+  const gammaSyncNorm =
+    gammaArtifactPass && gammaSyncZ !== undefined
+      ? normalizeGammaSyncZ(gammaSyncZ)
+      : undefined;
+  let dispersion = clamp(dispersion_for_dynamics, 0, 1);
+  if (gammaSyncNorm !== undefined) {
+    dispersion = clamp(
+      dispersion * (1 - GAMMA_DISPERSION_WEIGHT) +
+        (1 - gammaSyncNorm) * GAMMA_DISPERSION_WEIGHT,
+      0,
+      1,
+    );
+  }
   const coherence_effective = clamp(coherence * (1 - dispersion), 0, 1);
+  const equilibriumCandidate =
+    dispersion_ready &&
+    gammaArtifactPass &&
+    gammaSyncZ !== undefined &&
+    gammaSyncZ >= EQUILIBRIUM_R_STAR &&
+    dispersion <= EQUILIBRIUM_DISPERSION_MAX;
+  const equilibriumHoldMs = equilibriumCandidate
+    ? Math.max(0, state.equilibriumHoldMs + dt)
+    : 0;
+  const equilibrium =
+    equilibriumCandidate && equilibriumHoldMs >= EQUILIBRIUM_HOLD_MS;
+  state.equilibriumHoldMs = equilibriumHoldMs;
 
   // Multi-scale bands and phase cascade
   const bands = resolveBandFrequencies(resolvedHost.host_mode);
@@ -417,10 +526,25 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
     1,
   );
 
-  const resonance_score = computeResonanceScore(resolvedHost, now);
+  const baseResonanceScore = computeResonanceScore(resolvedHost, now);
+  const resonance_score =
+    gammaSyncNorm !== undefined
+      ? clamp(
+          baseResonanceScore * (1 - GAMMA_RESONANCE_WEIGHT) +
+            gammaSyncNorm * GAMMA_RESONANCE_WEIGHT,
+          0,
+          1,
+        )
+      : baseResonanceScore;
   const off_resonant = 1 - Math.abs(driver);
   const collapse_gain = clamp(off_resonant * edge_of_chaos, 0, 1);
-  const pressure = clamp(basePressure + 0.15 * collapse_gain + 0.1 * resonance_score, 0, 1);
+  const gammaPressureBoost =
+    gammaSyncNorm !== undefined ? GAMMA_PRESSURE_WEIGHT * gammaSyncNorm : 0;
+  const pressure = clamp(
+    basePressure + 0.15 * collapse_gain + 0.1 * resonance_score + gammaPressureBoost,
+    0,
+    1,
+  );
 
   const levels = {
     micro: clamp(coherence_effective + 0.05 * complexity * Math.cos(state.phase.micro), 0, 1),
@@ -488,6 +612,13 @@ export function handleInformationEvent(eventInput: unknown): TTelemetrySnapshot 
     global_coherence: coherence_effective,
     levels,
     phase_dispersion: dispersion,
+    gamma_sync_z: gammaSyncZ,
+    artifact_flags: artifactFlags,
+    equilibrium,
+    equilibrium_hold_ms: equilibriumHoldMs,
+    equilibrium_r_star: EQUILIBRIUM_R_STAR,
+    equilibrium_dispersion_max: EQUILIBRIUM_DISPERSION_MAX,
+    equilibrium_hold_ms_threshold: EQUILIBRIUM_HOLD_MS,
     collapse_pressure: pressure,
     multi_fractal_index,
     resonance_score,

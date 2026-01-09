@@ -27,8 +27,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify ideology verifiers pack
+        run: npm run verify:ideology-verifiers
+
       - name: Validate math stages
+        env:
+          MATH_UNIT_WARNINGS_STRICT: "1"
         run: npm run math:validate
+
+      - name: Generate CI reports
+        run: npm run reports:ci
 
       - name: Start AGI API
         run: |

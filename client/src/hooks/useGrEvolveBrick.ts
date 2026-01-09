@@ -24,6 +24,7 @@ export interface UseGrEvolveBrickOptions {
   includeExtra?: boolean;
   includeMatter?: boolean;
   includeKij?: boolean;
+  driveDir?: [number, number, number] | null;
   refetchMs?: number;
 }
 
@@ -45,6 +46,7 @@ export function useGrEvolveBrick(options: UseGrEvolveBrickOptions = {}) {
     includeExtra,
     includeMatter,
     includeKij,
+    driveDir,
     refetchMs = 2000,
   } = options;
 
@@ -66,6 +68,7 @@ export function useGrEvolveBrick(options: UseGrEvolveBrickOptions = {}) {
       includeExtra,
       includeMatter,
       includeKij,
+      driveDir,
     }),
     [
       quality,
@@ -84,6 +87,7 @@ export function useGrEvolveBrick(options: UseGrEvolveBrickOptions = {}) {
       includeExtra,
       includeMatter,
       includeKij,
+      driveDir,
     ],
   );
 

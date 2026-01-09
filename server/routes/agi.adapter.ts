@@ -21,14 +21,17 @@ import {
 import {
   buildRepoConvergenceMetrics,
   buildToolUseBudgetMetrics,
+  buildAuditSafetyMetrics,
   evaluateConstraintPackFromMetrics,
   type ConstraintPackMetricMap,
+  type AuditSafetyTelemetry,
   type RepoConvergenceTelemetry,
   type ToolUseBudgetTelemetry,
 } from "../services/observability/constraint-pack-evaluator.js";
 import {
   collectRepoConvergenceTelemetry,
   collectToolUseBudgetTelemetry,
+  collectAuditSafetyTelemetry,
   isAutoTelemetryEnabled,
 } from "../services/observability/constraint-pack-telemetry.js";
 import { recordConstraintPackTrace } from "../services/observability/constraint-pack-normalizer.js";
@@ -195,12 +198,30 @@ const resolveAutoTelemetry = (input: {
   autoTelemetry?: boolean;
   telemetryPath?: string;
   junitPath?: string;
+  vitestPath?: string;
+  jestPath?: string;
+  eslintPath?: string;
+  tscPath?: string;
+  toolLogTraceId?: string;
+  toolLogWindowMs?: number;
+  toolLogLimit?: number;
 }): boolean => {
+  const hasAutoHint = !!(
+    input.telemetryPath ||
+    input.junitPath ||
+    input.vitestPath ||
+    input.jestPath ||
+    input.eslintPath ||
+    input.tscPath ||
+    input.toolLogTraceId ||
+    input.toolLogWindowMs ||
+    input.toolLogLimit
+  );
   if (input.autoTelemetry === true) return true;
   if (input.autoTelemetry === false) {
-    return !!(input.telemetryPath || input.junitPath);
+    return hasAutoHint;
   }
-  if (input.telemetryPath || input.junitPath) return true;
+  if (hasAutoHint) return true;
   return isAutoTelemetryEnabled();
 };
 
@@ -385,25 +406,51 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         );
       }
     }
-    const shouldAutoTelemetry = resolveAutoTelemetry({
-      autoTelemetry: pack.autoTelemetry,
-      telemetryPath: pack.telemetryPath,
-      junitPath: pack.junitPath,
-    });
+    const shouldAutoTelemetry =
+      effectivePack.id === "provenance-safety"
+        ? pack.autoTelemetry !== false
+        : resolveAutoTelemetry({
+            autoTelemetry: pack.autoTelemetry,
+            telemetryPath: pack.telemetryPath,
+            junitPath: pack.junitPath,
+            vitestPath: pack.vitestPath,
+            jestPath: pack.jestPath,
+            eslintPath: pack.eslintPath,
+            tscPath: pack.tscPath,
+            toolLogTraceId: pack.toolLogTraceId,
+            toolLogWindowMs: pack.toolLogWindowMs,
+            toolLogLimit: pack.toolLogLimit,
+          });
     let telemetry = pack.telemetry;
     const autoTelemetryNotes: string[] = [];
     if (shouldAutoTelemetry) {
       if (effectivePack.id === "repo-convergence") {
         const collected = await collectRepoConvergenceTelemetry({
+          autoTelemetry: shouldAutoTelemetry,
           explicit: telemetry as RepoConvergenceTelemetry,
           telemetryPath: pack.telemetryPath,
           junitPath: pack.junitPath,
+          vitestPath: pack.vitestPath,
+          jestPath: pack.jestPath,
+          eslintPath: pack.eslintPath,
+          tscPath: pack.tscPath,
         });
         telemetry = collected.telemetry;
         autoTelemetryNotes.push(...collected.notes);
       } else if (effectivePack.id === "tool-use-budget") {
         const collected = await collectToolUseBudgetTelemetry({
           explicit: telemetry as ToolUseBudgetTelemetry,
+          telemetryPath: pack.telemetryPath,
+          toolLogTraceId: pack.toolLogTraceId,
+          toolLogWindowMs: pack.toolLogWindowMs,
+          toolLogLimit: pack.toolLogLimit,
+        });
+        telemetry = collected.telemetry;
+        autoTelemetryNotes.push(...collected.notes);
+      } else if (effectivePack.id === "provenance-safety") {
+        const collected = await collectAuditSafetyTelemetry({
+          autoTelemetry: shouldAutoTelemetry,
+          explicit: telemetry as AuditSafetyTelemetry,
           telemetryPath: pack.telemetryPath,
         });
         telemetry = collected.telemetry;
@@ -420,7 +467,9 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
     const metrics =
       effectivePack.id === "repo-convergence"
         ? buildRepoConvergenceMetrics(telemetry as RepoConvergenceTelemetry)
-        : buildToolUseBudgetMetrics(telemetry as ToolUseBudgetTelemetry);
+        : effectivePack.id === "tool-use-budget"
+          ? buildToolUseBudgetMetrics(telemetry as ToolUseBudgetTelemetry)
+          : buildAuditSafetyMetrics(telemetry as AuditSafetyTelemetry);
     mergeMetricOverrides(metrics, pack.metrics);
     const evaluationNotes = [
       ...(pack.notes ?? []),
@@ -440,6 +489,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
       tenantId: effectiveTenantId,
       pack: effectivePack,
       evaluation,
+      metrics,
       source: {
         system: "constraint-pack",
         component: "adapter",
@@ -460,6 +510,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
       pass: trace.pass,
       firstFail: trace.firstFail ?? null,
       deltas: trace.deltas,
+      certificate: evaluation.certificate ?? null,
       artifacts,
     });
   }
@@ -525,6 +576,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
       pass: result.accepted,
       firstFail: firstFail ?? null,
       deltas,
+      certificate: terminalAttempt?.evaluation.certificate ?? null,
       artifacts,
     });
   } catch (err) {

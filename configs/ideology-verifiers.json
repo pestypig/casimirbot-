@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "mappings": [
+    {
+      "nodeId": "verification-checklist",
+      "outcomes": [
+        "Every mintable contribution has a training-trace record",
+        "Trace verdict/deltas/certificates are attached to the receipt",
+        "Failures are non-minting and leave audit breadcrumbs"
+      ],
+      "evidence": [
+        { "kind": "test", "refs": ["tests/training-trace-roundtrip"] },
+        { "kind": "audit", "refs": ["AUDIT_TREE.json#trace-sampler"] }
+      ],
+      "invalidators": [
+        "Receipt mints VCUs without a traceId",
+        "Trace verdict is fail but payout is non-zero",
+        "Certificate required by tier but missing"
+      ],
+      "defaultTier": "L1",
+      "risk": "medium",
+      "verifiers": [
+        { "kind": "test", "ref": "tests/training-trace-roundtrip", "required": true },
+        {
+          "kind": "tool",
+          "ref": "server/specialists/verifiers/training-trace",
+          "required": true
+        }
+      ]
+    },
+    {
+      "nodeId": "data-dignity",
+      "outcomes": [
+        "Data minimization: only required evidence leaves the device/service boundary",
+        "Local-first receipts: user can hold receipts locally with selective disclosure",
+        "Retention limits and redress path exist and are enforceable"
+      ],
+      "evidence": [
+        { "kind": "audit", "refs": ["AUDIT_TREE.json#privacy-review"] },
+        { "kind": "test", "refs": ["tests/pii-leakage", "tests/retention-limits"] },
+        { "kind": "attestation", "refs": ["attestations/user-consent-receipt"] }
+      ],
+      "invalidators": [
+        "Raw logs exported by default",
+        "PII included in receipts beyond declared policy",
+        "No user-facing mechanism to revoke/shareLevel or request deletion where applicable"
+      ],
+      "defaultTier": "L2",
+      "risk": "high",
+      "verifiers": [
+        { "kind": "tool", "ref": "server/specialists/verifiers/pii-scan", "required": true },
+        { "kind": "manual", "ref": "AUDIT_TREE.json#privacy-review", "required": true }
+      ]
+    },
+    {
+      "nodeId": "capture-resistance",
+      "outcomes": [
+        "Rate limits, cooldowns, and diminishing returns prevent contribution farming",
+        "Multi-review required for L2/L3 minting paths",
+        "Concentration monitoring exists (anti-capture telemetry that does not violate data-dignity)"
+      ],
+      "evidence": [
+        { "kind": "test", "refs": ["tests/payout-caps", "tests/rate-limit-cooldown"] },
+        { "kind": "metric", "refs": ["metrics/vcu-concentration-index"] },
+        { "kind": "audit", "refs": ["AUDIT_TREE.json#review-logs"] }
+      ],
+      "invalidators": [
+        "A single contributor can mint unbounded VCUs",
+        "Minting bypasses multi-review for high-risk nodes",
+        "Payout policy changes without provenance and review"
+      ],
+      "defaultTier": "L2",
+      "risk": "systemic",
+      "verifiers": [
+        { "kind": "test", "ref": "tests/payout-caps", "required": true },
+        { "kind": "manual", "ref": "AUDIT_TREE.json#review-logs", "required": true }
+      ]
+    },
+    {
+      "nodeId": "interbeing-systems",
+      "outcomes": [
+        "Dependency graph framing is available for cross-sector plans and promises",
+        "Second-order effects are recorded as assumptions and revisited",
+        "Critical dependency gaps are detectable before rollout"
+      ],
+      "evidence": [
+        { "kind": "test", "refs": ["tests/dependency-graph-consistency"] },
+        { "kind": "audit", "refs": ["AUDIT_TREE.json#dependency-map-review"] },
+        { "kind": "metric", "refs": ["metrics/dependency-coverage"] }
+      ],
+      "invalidators": [
+        "Known critical dependency missing from map",
+        "Plan claims resilience without second-order checks",
+        "Graph changes lack provenance"
+      ],
+      "defaultTier": "L1",
+      "risk": "medium",
+      "verifiers": [
+        {
+          "kind": "test",
+          "ref": "tests/dependency-graph-consistency",
+          "required": true
+        }
+      ]
+    },
+    {
+      "nodeId": "right-speech-infrastructure",
+      "outcomes": [
+        "Trusted channels exist with rapid, independent follow-up",
+        "Channel design resists coercion, doxxing, and retaliation",
+        "Public aggregate reporting exists without privacy violations"
+      ],
+      "evidence": [
+        {
+          "kind": "metric",
+          "refs": [
+            "metrics/follow-up-sla",
+            "metrics/closure-with-independent-confirmation"
+          ]
+        },
+        { "kind": "audit", "refs": ["AUDIT_TREE.json#case-sample-audit"] }
+      ],
+      "invalidators": [
+        "Reports closed without independent confirmation when policy requires it",
+        "Retaliation risk not mitigated",
+        "Channel becomes a coercion surface"
+      ],
+      "defaultTier": "L2",
+      "risk": "high",
+      "verifiers": [
+        {
+          "kind": "tool",
+          "ref": "server/specialists/verifiers/channel-integrity",
+          "required": true
+        },
+        { "kind": "manual", "ref": "AUDIT_TREE.json#case-sample-audit", "required": true }
+      ]
+    }
+  ]
+}

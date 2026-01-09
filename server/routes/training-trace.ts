@@ -6,6 +6,7 @@ import {
   trainingTraceCertificateSchema,
   trainingTraceConstraintSchema,
   trainingTraceDeltaSchema,
+  trainingTraceMetricsSchema,
   trainingTraceSignalSchema,
   trainingTraceSourceSchema,
 } from "../../shared/schema.js";
@@ -45,6 +46,7 @@ const trainingTraceInputSchema = z.object({
   signal: trainingTraceSignalSchema.optional(),
   pass: z.boolean(),
   deltas: z.array(trainingTraceDeltaSchema).optional(),
+  metrics: trainingTraceMetricsSchema.optional(),
   firstFail: trainingTraceConstraintSchema.optional(),
   certificate: trainingTraceCertificateSchema.optional(),
   notes: z.array(z.string()).optional(),

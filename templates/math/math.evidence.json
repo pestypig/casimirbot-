@@ -1,0 +1,51 @@
+{
+  "profiles": [
+    {
+      "name": "sanity_checks",
+      "label": "Sanity checks",
+      "checkType": "test",
+      "testGlobs": [
+        "**/*sanity*.spec.ts",
+        "**/*sanity*.test.ts",
+        "**/*smoke*.spec.ts",
+        "**/*smoke*.test.ts",
+        "**/*canary*.spec.ts",
+        "**/*canary*.test.ts"
+      ],
+      "commands": ["npm run lint", "npm test -- --run '*sanity*'"]
+    },
+    {
+      "name": "regression",
+      "label": "Regression tests",
+      "checkType": "snapshot",
+      "testGlobs": ["**/*.spec.ts", "**/*.test.ts"],
+      "commands": ["npm test"]
+    },
+    {
+      "name": "residual_check",
+      "label": "Residual checks",
+      "checkType": "residual",
+      "testGlobs": [
+        "**/*residual*.spec.ts",
+        "**/*residual*.test.ts",
+        "**/*constraint*.spec.ts",
+        "**/*constraint*.test.ts",
+        "**/*gate*.spec.ts",
+        "**/*gate*.test.ts"
+      ],
+      "commands": ["npm run math:validate", "npm test -- --run '*constraint*'"]
+    },
+    {
+      "name": "certificate",
+      "label": "Certificate / policy checks",
+      "checkType": "test",
+      "testGlobs": [
+        "**/*certificate*.spec.ts",
+        "**/*certificate*.test.ts",
+        "**/*viability*.spec.ts",
+        "**/*viability*.test.ts"
+      ],
+      "commands": ["npm run casimir:verify"]
+    }
+  ]
+}

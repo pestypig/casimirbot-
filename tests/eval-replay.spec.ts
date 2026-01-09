@@ -82,4 +82,18 @@ describe("eval replay route", () => {
     expect(mockExeca).toHaveBeenCalled();
     expect(capturedEnvelopes.length).toBeGreaterThan(0);
   });
+
+  it("records essence targets in replay envelopes", async () => {
+    process.env.ENABLE_EVAL_REPLAY = "1";
+    const response = await fetch(`${baseUrl}/api/agi/eval/replay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ essenceId: "essence-test-123" }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as { essenceId?: string };
+    expect(payload.essenceId).toBe("essence-test-123");
+    const envelope = capturedEnvelopes[0];
+    expect(envelope?.header?.source?.uri).toBe("eval://replay/essence/essence-test-123");
+  });
 });

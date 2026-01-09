@@ -5,7 +5,7 @@ import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import { EssenceEnvelope } from "@shared/essence-schema";
 import { appendToolLog } from "../services/observability/tool-log-store";
 import { putBlob } from "../storage";
-import { putEnvelope } from "../services/essence/store";
+import { putEnvelopeWithPolicy } from "./provenance";
 import { beginLlMJob } from "../services/hardware/gpu-scheduler";
 import { llmLocalSpawnCalls, llmLocalSpawnLatency } from "../metrics";
 
@@ -189,7 +189,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       signatures: [],
     },
   });
-  await putEnvelope(envelope);
+  await putEnvelopeWithPolicy(envelope);
 
   const durationMs = Date.now() - started;
   llmLocalSpawnLatency.observe(durationMs);

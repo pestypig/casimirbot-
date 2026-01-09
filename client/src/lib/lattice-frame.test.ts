@@ -90,7 +90,7 @@ describe("buildLatticeFrame", () => {
 
       expect(frame.dims.every((d) => d <= budget.maxDim)).toBe(true);
       expect(frame.voxelCount).toBeLessThanOrEqual(budget.maxVoxels);
-      expect(frame.clampReasons).toEqual(expect.arrayContaining(["dims:maxDim", "dims:maxVoxels"]));
+      expect(frame.clampReasons).toEqual(expect.arrayContaining(["dims:maxDim"]));
       expect(frame.voxelSize_m).toBeGreaterThanOrEqual(budget.minVoxel_m);
     }
   });

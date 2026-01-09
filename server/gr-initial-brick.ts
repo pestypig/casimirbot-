@@ -43,7 +43,8 @@ export interface GrInitialBrick extends GrEvolutionBrick {
   stats: GrInitialBrickStats;
 }
 
-export interface GrInitialBrickResponse extends GrEvolutionBrickResponse {
+export interface GrInitialBrickResponse
+  extends Omit<GrEvolutionBrickResponse, "kind" | "stats"> {
   kind: "gr-initial-brick";
   stats: GrInitialBrickStats;
 }

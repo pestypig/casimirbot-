@@ -1,11 +1,11 @@
 {
-  "name": "casimir-cli",
+  "name": "shadow-of-intent",
   "version": "0.1.0",
-  "description": "Casimir verification CLI (adapter run + trace export).",
+  "description": "Shadow of Intent verification CLI (adapter run + trace export).",
   "type": "module",
   "license": "MIT",
   "keywords": [
-    "casimir",
+    "shadow-of-intent",
     "verification",
     "agents",
     "constraints",
@@ -15,8 +15,9 @@
     "access": "public"
   },
   "bin": {
-    "casimir": "./bin/casimir.js",
-    "casimir-verify": "./bin/casimir-verify.js"
+    "shadow-of-intent": "./bin/shadow-of-intent.js",
+    "shadow-of-intent-collect": "./bin/shadow-of-intent-collect.js",
+    "shadow-of-intent-verify": "./bin/shadow-of-intent-verify.js"
   },
   "files": [
     "dist",

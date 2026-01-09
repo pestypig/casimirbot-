@@ -1,4 +1,23 @@
-import type { CoverEvidence, CoverJob, ImmersionScores, TempoMeta } from "@/types/noise-gens";
+import type {
+  CoverEvidence,
+  CoverJob,
+  ImmersionScores,
+  KnowledgeAudioSource,
+  KnowledgeGrooveSource,
+  KnowledgeMacroSource,
+  KnowledgeMidiSource,
+  MidiMotif,
+  RenderPlan,
+  TempoMeta,
+  CoverJobRequest,
+} from "@/types/noise-gens";
+import { listKnowledgeFiles } from "@/lib/agi/knowledge-store";
+import { isAudioKnowledgeFile } from "@/lib/knowledge/audio";
+import { normalizeMidiMotifPayload } from "@/lib/noise/midi-motif";
+import {
+  normalizeGrooveTemplatePayload,
+  normalizeMacroCurvePayload,
+} from "@/lib/noise/symbolic-templates";
 import { apiRequest } from "@/lib/queryClient";
 
 const WORKER_URL = new URL("../../workers/cover-worker.ts", import.meta.url);
@@ -25,6 +44,13 @@ export interface FulfillResult {
   evidence: CoverEvidence;
 }
 
+export type RenderPlanScore = {
+  idi: number;
+  idiConfidence: number;
+  immersion: ImmersionScores;
+  duration: number;
+};
+
 export function canFulfillLocally(): boolean {
   if (typeof window === "undefined") return false;
   return typeof Worker !== "undefined" && typeof (window as Window & typeof globalThis).OfflineAudioContext !== "undefined";
@@ -48,6 +74,18 @@ export async function fulfillCoverJob(job: CoverJob, options: FulfillOptions = {
 
   const tempo = resolveTempo(job);
   const original = await resolveOriginalAudio(job.request.originalId);
+  const materialIds = collectMaterialIds(job.request.renderPlan);
+  const mergedKnowledgeIds = mergeKnowledgeIds(
+    job.request.knowledgeFileIds,
+    materialIds,
+  );
+  const [knowledgeAudio, midiMotifs, grooveTemplates, macroCurves] =
+    await Promise.all([
+      resolveKnowledgeAudio(mergedKnowledgeIds),
+      resolveKnowledgeMotifs(mergedKnowledgeIds),
+      resolveKnowledgeGrooves(mergedKnowledgeIds),
+      resolveKnowledgeMacros(mergedKnowledgeIds),
+    ]);
   const payload = {
     t: "render" as const,
     jobId: job.id,
@@ -59,6 +97,11 @@ export async function fulfillCoverJob(job: CoverJob, options: FulfillOptions = {
     sampleInfluence: job.request.sampleInfluence ?? 0.7,
     styleInfluence: job.request.styleInfluence ?? 0.3,
     weirdness: job.request.weirdness ?? 0.2,
+    renderPlan: job.request.renderPlan,
+    knowledgeAudio: knowledgeAudio.sources,
+    midiMotifs,
+    grooveTemplates,
+    macroCurves,
   };
 
   const ready = new Promise<FulfillResult>((resolve, reject) => {
@@ -110,6 +153,114 @@ export async function fulfillCoverJob(job: CoverJob, options: FulfillOptions = {
     );
     return result;
   } finally {
+    knowledgeAudio.revoke();
+    options.signal?.removeEventListener?.("abort", abortListener);
+    cleanup();
+  }
+}
+
+export async function scoreRenderPlan(
+  request: CoverJobRequest,
+  renderPlan: RenderPlan,
+  options: FulfillOptions & { barWindows?: RenderPlan["windows"] } = {},
+): Promise<RenderPlanScore> {
+  if (!canFulfillLocally()) {
+    throw new Error("Offline rendering is not supported in this browser");
+  }
+
+  const worker = new Worker(WORKER_URL, { type: "module", name: `cover-score:${request.originalId}` });
+  let settled = false;
+
+  const cleanup = () => {
+    if (settled) return;
+    settled = true;
+    worker.onerror = null;
+    worker.onmessage = null;
+    worker.terminate();
+  };
+
+  const tempo = resolveTempoFromRequest(request);
+  const original = await resolveOriginalAudio(request.originalId);
+  const materialIds = collectMaterialIds(renderPlan);
+  const mergedKnowledgeIds = mergeKnowledgeIds(
+    request.knowledgeFileIds,
+    materialIds,
+  );
+  const [knowledgeAudio, midiMotifs, grooveTemplates, macroCurves] =
+    await Promise.all([
+      resolveKnowledgeAudio(mergedKnowledgeIds),
+      resolveKnowledgeMotifs(mergedKnowledgeIds),
+      resolveKnowledgeGrooves(mergedKnowledgeIds),
+      resolveKnowledgeMacros(mergedKnowledgeIds),
+    ]);
+  const jobId = `plan-score:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`;
+  const payload = {
+    t: "render" as const,
+    jobId,
+    original,
+    tempo,
+    barWindows: request.barWindows,
+    helix: request.helix,
+    kbTexture: request.kbTexture ?? null,
+    sampleInfluence: request.sampleInfluence ?? 0.7,
+    styleInfluence: request.styleInfluence ?? 0.3,
+    weirdness: request.weirdness ?? 0.2,
+    renderPlan,
+    knowledgeAudio: knowledgeAudio.sources,
+    midiMotifs,
+    grooveTemplates,
+    macroCurves,
+  };
+
+  const ready = new Promise<RenderPlanScore>((resolve, reject) => {
+    worker.onerror = (event) => {
+      cleanup();
+      reject(event instanceof ErrorEvent ? event.error ?? new Error(event.message) : new Error("cover worker error"));
+    };
+
+    worker.onmessage = (event: MessageEvent<CoverWorkerEvent>) => {
+      const message = event.data;
+      if (!message) return;
+      if (message.t === "progress") {
+        options.onProgress?.(message.pct, message.stage);
+        return;
+      }
+      if (message.t === "error") {
+        cleanup();
+        reject(new Error(message.error || "cover render failed"));
+        return;
+      }
+      if (message.t === "ready") {
+        cleanup();
+        resolve({
+          idi: message.immersion.idi,
+          idiConfidence: message.immersion.confidence,
+          immersion: message.immersion,
+          duration: message.duration,
+        });
+      }
+    };
+  });
+
+  const abortListener = () => {
+    worker.postMessage({ t: "abort", jobId });
+    cleanup();
+  };
+
+  if (options.signal) {
+    if (options.signal.aborted) {
+      abortListener();
+      throw new DOMException("Render aborted", "AbortError");
+    }
+    options.signal.addEventListener("abort", abortListener, { once: true });
+  }
+
+  worker.postMessage(payload);
+
+  try {
+    return await ready;
+  } finally {
+    knowledgeAudio.revoke();
     options.signal?.removeEventListener?.("abort", abortListener);
     cleanup();
   }
@@ -144,6 +295,254 @@ async function resolveOriginalAudio(originalId: string): Promise<{ instrumentalU
   };
 }
 
+type KnowledgeAudioLookup = {
+  sources: KnowledgeAudioSource[];
+  revoke: () => void;
+};
+
+const revokeObjectUrls = (urls: string[]) => {
+  for (const url of urls) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      // ignore revoke failures
+    }
+  }
+};
+
+async function resolveKnowledgeAudio(
+  knowledgeFileIds?: string[],
+): Promise<KnowledgeAudioLookup> {
+  if (!Array.isArray(knowledgeFileIds) || knowledgeFileIds.length === 0) {
+    return { sources: [], revoke: () => {} };
+  }
+  if (typeof window === "undefined" || typeof URL === "undefined") {
+    return { sources: [], revoke: () => {} };
+  }
+  try {
+    const files = await listKnowledgeFiles();
+    const audioFiles = files.filter(isAudioKnowledgeFile);
+    const byId = new Map(audioFiles.map((record) => [record.id, record]));
+    const sources: KnowledgeAudioSource[] = [];
+    const urls: string[] = [];
+    const seen = new Set<string>();
+    for (const rawId of knowledgeFileIds) {
+      const id = typeof rawId === "string" ? rawId.trim() : "";
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const record = byId.get(id);
+      if (!record) continue;
+      const url = URL.createObjectURL(record.data);
+      urls.push(url);
+      sources.push({
+        id: record.id,
+        name: record.name,
+        mime: record.mime,
+        url,
+        projectId: record.projectId,
+      });
+    }
+    return { sources, revoke: () => revokeObjectUrls(urls) };
+  } catch {
+    return { sources: [], revoke: () => {} };
+  }
+}
+
+const normalizeMotifKey = (value: unknown) =>
+  typeof value === "string" ? value.trim().toLowerCase() : "";
+
+const isMotifCandidate = (record: { mime?: string; name?: string; kind?: string }) => {
+  if (record.kind === "json") return true;
+  if (record.mime?.includes("json")) return true;
+  if (record.mime?.startsWith("text/")) return true;
+  if (record.name?.toLowerCase().endsWith(".json")) return true;
+  return false;
+};
+
+const isSymbolicCandidate = isMotifCandidate;
+
+async function resolveKnowledgeMotifs(
+  knowledgeFileIds?: string[],
+): Promise<KnowledgeMidiSource[]> {
+  if (!Array.isArray(knowledgeFileIds) || knowledgeFileIds.length === 0) {
+    return [];
+  }
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const files = await listKnowledgeFiles();
+    const byKey = new Map<string, (typeof files)[number]>();
+    for (const record of files) {
+      const idKey = normalizeMotifKey(record.id);
+      if (idKey) byKey.set(idKey, record);
+      const nameKey = normalizeMotifKey(record.name);
+      if (nameKey) byKey.set(nameKey, record);
+    }
+    const motifs: KnowledgeMidiSource[] = [];
+    const processed = new Set<string>();
+    for (const rawId of knowledgeFileIds) {
+      const key = normalizeMotifKey(rawId);
+      if (!key) continue;
+      const record = byKey.get(key);
+      if (!record || processed.has(record.id)) continue;
+      processed.add(record.id);
+      if (!isMotifCandidate(record)) continue;
+      let parsed: unknown;
+      try {
+        const text = await record.data.text();
+        parsed = JSON.parse(text);
+      } catch {
+        continue;
+      }
+      const motif = normalizeMidiMotifPayload(parsed, record.name);
+      if (!motif) continue;
+      motifs.push({
+        id: record.id,
+        name: record.name,
+        projectId: record.projectId,
+        motif: motif as MidiMotif,
+      });
+    }
+    return motifs;
+  } catch {
+    return [];
+  }
+}
+
+async function resolveKnowledgeGrooves(
+  knowledgeFileIds?: string[],
+): Promise<KnowledgeGrooveSource[]> {
+  if (!Array.isArray(knowledgeFileIds) || knowledgeFileIds.length === 0) {
+    return [];
+  }
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const files = await listKnowledgeFiles();
+    const byKey = new Map<string, (typeof files)[number]>();
+    for (const record of files) {
+      const idKey = normalizeMotifKey(record.id);
+      if (idKey) byKey.set(idKey, record);
+      const nameKey = normalizeMotifKey(record.name);
+      if (nameKey) byKey.set(nameKey, record);
+    }
+    const grooves: KnowledgeGrooveSource[] = [];
+    const processed = new Set<string>();
+    for (const rawId of knowledgeFileIds) {
+      const key = normalizeMotifKey(rawId);
+      if (!key) continue;
+      const record = byKey.get(key);
+      if (!record || processed.has(record.id)) continue;
+      processed.add(record.id);
+      if (!isSymbolicCandidate(record)) continue;
+      let parsed: unknown;
+      try {
+        const text = await record.data.text();
+        parsed = JSON.parse(text);
+      } catch {
+        continue;
+      }
+      const groove = normalizeGrooveTemplatePayload(parsed, record.name);
+      if (!groove) continue;
+      grooves.push({
+        id: record.id,
+        name: record.name,
+        projectId: record.projectId,
+        groove,
+      });
+    }
+    return grooves;
+  } catch {
+    return [];
+  }
+}
+
+async function resolveKnowledgeMacros(
+  knowledgeFileIds?: string[],
+): Promise<KnowledgeMacroSource[]> {
+  if (!Array.isArray(knowledgeFileIds) || knowledgeFileIds.length === 0) {
+    return [];
+  }
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const files = await listKnowledgeFiles();
+    const byKey = new Map<string, (typeof files)[number]>();
+    for (const record of files) {
+      const idKey = normalizeMotifKey(record.id);
+      if (idKey) byKey.set(idKey, record);
+      const nameKey = normalizeMotifKey(record.name);
+      if (nameKey) byKey.set(nameKey, record);
+    }
+    const macros: KnowledgeMacroSource[] = [];
+    const processed = new Set<string>();
+    for (const rawId of knowledgeFileIds) {
+      const key = normalizeMotifKey(rawId);
+      if (!key) continue;
+      const record = byKey.get(key);
+      if (!record || processed.has(record.id)) continue;
+      processed.add(record.id);
+      if (!isSymbolicCandidate(record)) continue;
+      let parsed: unknown;
+      try {
+        const text = await record.data.text();
+        parsed = JSON.parse(text);
+      } catch {
+        continue;
+      }
+      const curves = normalizeMacroCurvePayload(parsed, record.name);
+      if (!curves?.length) continue;
+      macros.push({
+        id: record.id,
+        name: record.name,
+        projectId: record.projectId,
+        curves,
+      });
+    }
+    return macros;
+  } catch {
+    return [];
+  }
+}
+
+function collectMaterialIds(plan?: RenderPlan): string[] {
+  if (!plan?.windows?.length) return [];
+  const ids: string[] = [];
+  for (const window of plan.windows) {
+    if (!window?.material) continue;
+    if (Array.isArray(window.material.audioAtomIds)) {
+      ids.push(...window.material.audioAtomIds);
+    }
+    if (Array.isArray(window.material.midiMotifIds)) {
+      ids.push(...window.material.midiMotifIds);
+    }
+    if (Array.isArray(window.material.grooveTemplateIds)) {
+      ids.push(...window.material.grooveTemplateIds);
+    }
+    if (Array.isArray(window.material.macroCurveIds)) {
+      ids.push(...window.material.macroCurveIds);
+    }
+  }
+  return ids;
+}
+
+function mergeKnowledgeIds(baseIds?: string[], extraIds?: string[]) {
+  const merged = new Set<string>();
+  const pushIds = (values?: string[]) => {
+    if (!Array.isArray(values)) return;
+    for (const raw of values) {
+      const id = typeof raw === "string" ? raw.trim() : "";
+      if (id) merged.add(id);
+    }
+  };
+  pushIds(baseIds);
+  pushIds(extraIds);
+  return Array.from(merged);
+}
+
 const resourceCache = new Map<string, Promise<boolean>>();
 
 async function resourceExists(url: string): Promise<boolean> {
@@ -158,9 +557,13 @@ async function resourceExists(url: string): Promise<boolean> {
 }
 
 function resolveTempo(job: CoverJob): TempoMeta {
-  const fromJob = (job.request as { tempo?: TempoMeta }).tempo;
+  return resolveTempoFromRequest(job.request);
+}
+
+function resolveTempoFromRequest(request: CoverJobRequest): TempoMeta {
+  const fromRequest = request.tempo;
   const fromStorage = readStoredTempo();
-  const candidate = fromJob ?? fromStorage;
+  const candidate = fromRequest ?? fromStorage;
   if (candidate) {
     return {
       bpm: clampNumber(candidate.bpm, 40, 240),

@@ -5,6 +5,9 @@ Always read and follow those requirements when working on warp/GR features.
 
 ## Required: Casimir verification gate for any patch
 
+All agents must run this verification for every patch and report the PASS
+verdict plus certificate hash/integrity status in the response.
+
 When you make any code/config change:
 
 1) Propose the patch (diff) as usual.
@@ -34,3 +37,8 @@ When you make any code/config change:
 ## Math maturity (informal)
 - Treat math as staged: exploratory -> reduced-order -> diagnostic -> certified.
 - Match claims and checks to maturity; don’t over-claim results from early stages.
+
+## Ideology references
+When a user asks for ideology references, anchor to the base of the ideology tree
+(`docs/ethos/ideology.json`) and use the relevant branches to relate wisdom to
+the scenario presented for advice.

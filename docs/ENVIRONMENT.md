@@ -23,11 +23,24 @@ Notes:
 
 ## Constraint pack telemetry ingestion
 - `CASIMIR_AUTO_TELEMETRY`: set to `1` to auto-ingest telemetry from env/files.
+- `CASIMIR_AUTO_CI_REPORTS`: set to `1` to auto-scan report directories when
+  auto-telemetry is enabled (defaults to `reports/`).
+- `CASIMIR_AUTO_CI_REPORTS_DIRS`: comma-separated report directories for auto
+  scan (relative to repo).
+- `CASIMIR_AUTO_CI_REPORTS_DIR`: single report directory override.
 - `CASIMIR_TELEMETRY_PATH`: default JSON telemetry path (relative to repo).
 - `CASIMIR_REPO_TELEMETRY_PATH`: repo convergence JSON telemetry path.
 - `CASIMIR_TOOL_TELEMETRY_PATH`: tool-use budget JSON telemetry path.
+- `CASIMIR_AUDIT_TELEMETRY_PATH`: audit/provenance safety JSON telemetry path.
 - `CASIMIR_TEST_JUNIT_PATH`: JUnit XML path (repo convergence).
 - `JUNIT_PATH`: fallback JUnit XML path.
+- `CASIMIR_TEST_VITEST_PATH`: Vitest JSON report path.
+- `CASIMIR_TEST_JEST_PATH`: Jest JSON report path.
+- `CASIMIR_LINT_ESLINT_PATH`: ESLint JSON report path.
+- `CASIMIR_TYPECHECK_TSC_PATH`: tsc output path (text).
+- `CASIMIR_TOOL_LOG_TRACE_ID`: trace id filter for tool log ingestion.
+- `CASIMIR_TOOL_LOG_WINDOW_MS`: lookback window for tool log ingestion.
+- `CASIMIR_TOOL_LOG_LIMIT`: max tool log entries to scan.
 - `CONSTRAINT_PACK_TELEMETRY_MAX_BYTES`: max JSON/XML size (default 5MB).
 - Repo convergence envs:
   `CASIMIR_BUILD_STATUS`, `CASIMIR_BUILD_OK`, `CASIMIR_BUILD_EXIT_CODE`,

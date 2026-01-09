@@ -20,8 +20,34 @@ export async function listJobs(): Promise<JobsListResponse> {
   return (await res.json()) as JobsListResponse;
 }
 
-export type TokenLedgerEntry = { id: string; at: number; delta: number; reason: string; jobId?: string };
+export type TokenLedgerEntry = {
+  id: string;
+  at: number;
+  delta: number;
+  reason: string;
+  jobId?: string;
+  source?: "job" | "contribution" | "proposal" | "ubi" | "payout" | "adjustment";
+  ref?: string;
+  evidence?: string;
+};
 export type TokenBalance = { userId: string; balance: number; dailyBase: number; nextResetAt: number; ledger?: TokenLedgerEntry[] };
+
+export type PayoutKind = "withdrawal" | "ubi";
+export type PayoutStatus = "pending" | "completed" | "failed" | "canceled";
+export type PayoutRecord = {
+  id: string;
+  seq: number;
+  createdAt: number;
+  updatedAt: number;
+  userId?: string;
+  kind: PayoutKind;
+  status: PayoutStatus;
+  amount: number;
+  reason?: string;
+  distributionId?: string;
+  destination?: string;
+  meta?: Record<string, unknown>;
+};
 
 export async function getBudget(): Promise<TokenBalance> {
   const res = await fetch("/api/jobs/budget");
@@ -37,6 +63,53 @@ export async function completeJob(jobId: string, evidence?: string): Promise<{ o
     body: JSON.stringify({ jobId, evidence }),
   });
   if (!res.ok) throw new Error(`complete_failed: ${res.status}`);
+  return (await res.json()) as any;
+}
+
+export async function listPayouts(): Promise<{ payouts: PayoutRecord[]; total: number; generatedAt: number }> {
+  const res = await fetch("/api/jobs/payouts");
+  if (!res.ok) throw new Error(`payouts_failed: ${res.status}`);
+  return (await res.json()) as any;
+}
+
+export async function requestPayout(
+  amount: number,
+  destination?: string,
+  reason?: string,
+): Promise<{ ok: boolean; payout?: PayoutRecord; error?: string }> {
+  const res = await fetch("/api/jobs/payouts/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount, destination, reason }),
+  });
+  if (!res.ok) throw new Error(`payout_request_failed: ${res.status}`);
+  return (await res.json()) as any;
+}
+
+export async function runUbiDistribution(input?: {
+  minBalance?: number;
+  minPayout?: number;
+  maxUsers?: number;
+}): Promise<Record<string, unknown>> {
+  const res = await fetch("/api/jobs/ubi/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input ?? {}),
+  });
+  if (!res.ok) throw new Error(`ubi_run_failed: ${res.status}`);
+  return (await res.json()) as any;
+}
+
+export async function fundUbiPool(
+  amount: number,
+  reason?: string,
+): Promise<{ ok: boolean; balance?: TokenBalance; error?: string }> {
+  const res = await fetch("/api/jobs/ubi/fund", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount, reason }),
+  });
+  if (!res.ok) throw new Error(`ubi_fund_failed: ${res.status}`);
   return (await res.json()) as any;
 }
 

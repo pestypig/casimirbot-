@@ -22,7 +22,13 @@ export function roleFromTool(tool?: string): DebateRole {
   // Proponent = proposing/creating/generating evidence
   if (t.includes("proponent")) return "proponent";
   if (t.startsWith("solver:")) return "proponent";
-  if (t.startsWith("llm.") || t.startsWith("luma.") || t.startsWith("docs.readme")) return "proponent";
+  if (
+    t.startsWith("llm.") ||
+    t.startsWith("luma.") ||
+    t.startsWith("noise.") ||
+    t.startsWith("docs.readme")
+  )
+    return "proponent";
   if (t.startsWith("stt.") || t.startsWith("ingest")) return "proponent";
   // Unknown / orchestration / approvals → referee
   return "referee";

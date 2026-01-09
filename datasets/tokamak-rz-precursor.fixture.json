@@ -1,0 +1,825 @@
+{
+  "schema_version": "tokamak_precursor_dataset/1",
+  "kind": "tokamak_precursor_dataset",
+  "created_at": "2025-01-01T00:00:00.000Z",
+  "name": "tokamak-rz-precursor-fixture",
+  "description": "Synthetic R-Z tokamak snapshots with an edge-crash onset label.",
+  "frames": [
+    {
+      "id": "frame-0",
+      "timestamp_iso": "2025-01-01T00:00:00.000Z",
+      "snapshot": {
+        "schema_version": "tokamak_rz_snapshot/1",
+        "device_id": "sparc-sim",
+        "shot_id": "shot-precursor-01",
+        "timestamp_iso": "2025-01-01T00:00:00.000Z",
+        "data_cutoff_iso": "2025-01-01T00:00:00.000Z",
+        "grid": {
+          "nx": 4,
+          "ny": 3,
+          "dx_m": 0.05,
+          "dy_m": 0.05,
+          "thickness_m": 1
+        },
+        "frame": {
+          "kind": "rz-plane",
+          "r_min_m": 1,
+          "r_max_m": 1.15,
+          "z_min_m": -0.05,
+          "z_max_m": 0.05,
+          "axis_order": [
+            "r",
+            "z"
+          ]
+        },
+        "separatrix_mask": {
+          "encoding": "base64",
+          "dtype": "float32",
+          "endian": "little",
+          "order": "row-major",
+          "data_b64": "AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/"
+        },
+        "equilibrium": {
+          "b_eq_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBA"
+          },
+          "p_eq_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpE"
+          },
+          "psi_N": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcxMPs3MTD8AAIA/mpmZP83MTD7NzEw/AACAP5qZmT/NzEw+zcxMPwAAgD+amZk/"
+          }
+        },
+        "perturbations": {
+          "b_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "iUGgQE5ioEASg6BA16OgQKVOoEBpb6BALpCgQPKwoECJQaBATmKgQBKDoEDXo6BA"
+          },
+          "p_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RABAekQAgHpEAMB6RAAAekQAQHpEAIB6RADAekQAAHpEAEB6RACAekQAwHpE"
+          },
+          "j_A_m2": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcxMPpqZmT7NzMw+AAAAP83MTD6amZk+zczMPgAAAD/NzEw+mpmZPs3MzD4AAAA/"
+          },
+          "rad_W_m3": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACAPwAAgD8AAABAAAAAQAAAgD8AAIA/AAAAQAAAAEAAAIA/AACAPwAAAEAAAABA"
+          }
+        },
+        "manifest": {
+          "schema_version": "tokamak_channel_manifest/1",
+          "version": "v1",
+          "device_id": "sparc-sim",
+          "channels": [
+            {
+              "key": "u_deltaB_Jm3",
+              "weight": 1,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "J/m^3"
+            },
+            {
+              "key": "u_gradp",
+              "weight": 0.2,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "Pa/m"
+            },
+            {
+              "key": "u_J",
+              "weight": 0.05,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "A^2/m^4"
+            },
+            {
+              "key": "u_rad",
+              "weight": 0.01,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "W/m^3"
+            }
+          ],
+          "total_policy": {
+            "method": "weighted-sum",
+            "normalize_weights": false
+          }
+        }
+      },
+      "label": {
+        "event_present": false,
+        "event_type": "edge_crash"
+      }
+    },
+    {
+      "id": "frame-1",
+      "timestamp_iso": "2025-01-01T00:00:10.000Z",
+      "snapshot": {
+        "schema_version": "tokamak_rz_snapshot/1",
+        "device_id": "sparc-sim",
+        "shot_id": "shot-precursor-01",
+        "timestamp_iso": "2025-01-01T00:00:10.000Z",
+        "data_cutoff_iso": "2025-01-01T00:00:10.000Z",
+        "grid": {
+          "nx": 4,
+          "ny": 3,
+          "dx_m": 0.05,
+          "dy_m": 0.05,
+          "thickness_m": 1
+        },
+        "frame": {
+          "kind": "rz-plane",
+          "r_min_m": 1,
+          "r_max_m": 1.15,
+          "z_min_m": -0.05,
+          "z_max_m": 0.05,
+          "axis_order": [
+            "r",
+            "z"
+          ]
+        },
+        "separatrix_mask": {
+          "encoding": "base64",
+          "dtype": "float32",
+          "endian": "little",
+          "order": "row-major",
+          "data_b64": "AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/"
+        },
+        "equilibrium": {
+          "b_eq_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBA"
+          },
+          "p_eq_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpE"
+          },
+          "psi_N": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcxMPs3MTD8AAIA/mpmZP83MTD7NzEw/AACAP5qZmT/NzEw+zcxMPwAAgD+amZk/"
+          }
+        },
+        "perturbations": {
+          "b_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "ukmgQJhuoEB1k6BAUrigQHlYoEBWfaBANKKgQBHHoEC6SaBAmG6gQHWToEBSuKBA"
+          },
+          "p_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RABAekQAgHpEAMB6RAAAekQAQHpEAIB6RADAekQAAHpEAEB6RACAekQAwHpE"
+          },
+          "j_A_m2": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcxMPpqZmT7NzMw+AAAAP83MTD6amZk+zczMPgAAAD/NzEw+mpmZPs3MzD4AAAA/"
+          },
+          "rad_W_m3": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACAPwAAgD8AAABAAAAAQAAAgD8AAIA/AAAAQAAAAEAAAIA/AACAPwAAAEAAAABA"
+          }
+        },
+        "manifest": {
+          "schema_version": "tokamak_channel_manifest/1",
+          "version": "v1",
+          "device_id": "sparc-sim",
+          "channels": [
+            {
+              "key": "u_deltaB_Jm3",
+              "weight": 1,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "J/m^3"
+            },
+            {
+              "key": "u_gradp",
+              "weight": 0.2,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "Pa/m"
+            },
+            {
+              "key": "u_J",
+              "weight": 0.05,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "A^2/m^4"
+            },
+            {
+              "key": "u_rad",
+              "weight": 0.01,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "W/m^3"
+            }
+          ],
+          "total_policy": {
+            "method": "weighted-sum",
+            "normalize_weights": false
+          }
+        }
+      },
+      "label": {
+        "event_present": false,
+        "event_type": "edge_crash"
+      }
+    },
+    {
+      "id": "frame-2",
+      "timestamp_iso": "2025-01-01T00:00:20.000Z",
+      "snapshot": {
+        "schema_version": "tokamak_rz_snapshot/1",
+        "device_id": "sparc-sim",
+        "shot_id": "shot-precursor-01",
+        "timestamp_iso": "2025-01-01T00:00:20.000Z",
+        "data_cutoff_iso": "2025-01-01T00:00:20.000Z",
+        "grid": {
+          "nx": 4,
+          "ny": 3,
+          "dx_m": 0.05,
+          "dy_m": 0.05,
+          "thickness_m": 1
+        },
+        "frame": {
+          "kind": "rz-plane",
+          "r_min_m": 1,
+          "r_max_m": 1.15,
+          "z_min_m": -0.05,
+          "z_max_m": 0.05,
+          "axis_order": [
+            "r",
+            "z"
+          ]
+        },
+        "separatrix_mask": {
+          "encoding": "base64",
+          "dtype": "float32",
+          "endian": "little",
+          "order": "row-major",
+          "data_b64": "AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/"
+        },
+        "equilibrium": {
+          "b_eq_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBA"
+          },
+          "p_eq_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpE"
+          },
+          "psi_N": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcxMPs3MTD8AAIA/mpmZP83MTD7NzEw/AACAP5qZmT/NzEw+zcxMPwAAgD+amZk/"
+          }
+        },
+        "perturbations": {
+          "b_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "7FGgQOF6oEDXo6BAzcygQE5ioEBEi6BAObSgQC/doEDsUaBA4XqgQNejoEDNzKBA"
+          },
+          "p_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RDNDekRmhnpEmsl6RAAAekQzQ3pEZoZ6RJrJekQAAHpEM0N6RGaGekSayXpE"
+          },
+          "j_A_m2": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "PQpXPq5HoT49Ctc+ZmYGPz0KVz6uR6E+PQrXPmZmBj89Clc+rkehPj0K1z5mZgY/"
+          },
+          "rad_W_m3": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcyMP83MjD/NzAxAzcwMQM3MjD/NzIw/zcwMQM3MDEDNzIw/zcyMP83MDEDNzAxA"
+          }
+        },
+        "manifest": {
+          "schema_version": "tokamak_channel_manifest/1",
+          "version": "v1",
+          "device_id": "sparc-sim",
+          "channels": [
+            {
+              "key": "u_deltaB_Jm3",
+              "weight": 1,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "J/m^3"
+            },
+            {
+              "key": "u_gradp",
+              "weight": 0.2,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "Pa/m"
+            },
+            {
+              "key": "u_J",
+              "weight": 0.05,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "A^2/m^4"
+            },
+            {
+              "key": "u_rad",
+              "weight": 0.01,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "W/m^3"
+            }
+          ],
+          "total_policy": {
+            "method": "weighted-sum",
+            "normalize_weights": false
+          }
+        }
+      },
+      "label": {
+        "event_present": false,
+        "event_type": "edge_crash"
+      }
+    },
+    {
+      "id": "frame-3",
+      "timestamp_iso": "2025-01-01T00:00:30.000Z",
+      "snapshot": {
+        "schema_version": "tokamak_rz_snapshot/1",
+        "device_id": "sparc-sim",
+        "shot_id": "shot-precursor-01",
+        "timestamp_iso": "2025-01-01T00:00:30.000Z",
+        "data_cutoff_iso": "2025-01-01T00:00:30.000Z",
+        "grid": {
+          "nx": 4,
+          "ny": 3,
+          "dx_m": 0.05,
+          "dy_m": 0.05,
+          "thickness_m": 1
+        },
+        "frame": {
+          "kind": "rz-plane",
+          "r_min_m": 1,
+          "r_max_m": 1.15,
+          "z_min_m": -0.05,
+          "z_max_m": 0.05,
+          "axis_order": [
+            "r",
+            "z"
+          ]
+        },
+        "separatrix_mask": {
+          "encoding": "base64",
+          "dtype": "float32",
+          "endian": "little",
+          "order": "row-major",
+          "data_b64": "AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/"
+        },
+        "equilibrium": {
+          "b_eq_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBA"
+          },
+          "p_eq_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpE"
+          },
+          "psi_N": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcxMPs3MTD8AAIA/mpmZP83MTD7NzEw/AACAP5qZmT/NzEw+zcxMPwAAgD+amZk/"
+          }
+        },
+        "perturbations": {
+          "b_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "HVqgQCuHoEA5tKBASOGgQCJsoEAxmaBAP8agQE3zoEAdWqBAK4egQDm0oEBI4aBA"
+          },
+          "p_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RGZGekTNjHpEM9N6RAAAekRmRnpEzYx6RDPTekQAAHpEZkZ6RM2MekQz03pE"
+          },
+          "j_A_m2": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "rkdhPsP1qD6uR+E+zcwMP65HYT7D9ag+rkfhPs3MDD+uR2E+w/WoPq5H4T7NzAw/"
+          },
+          "rad_W_m3": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "mpmZP5qZmT+amRlAmpkZQJqZmT+amZk/mpkZQJqZGUCamZk/mpmZP5qZGUCamRlA"
+          }
+        },
+        "manifest": {
+          "schema_version": "tokamak_channel_manifest/1",
+          "version": "v1",
+          "device_id": "sparc-sim",
+          "channels": [
+            {
+              "key": "u_deltaB_Jm3",
+              "weight": 1,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "J/m^3"
+            },
+            {
+              "key": "u_gradp",
+              "weight": 0.2,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "Pa/m"
+            },
+            {
+              "key": "u_J",
+              "weight": 0.05,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "A^2/m^4"
+            },
+            {
+              "key": "u_rad",
+              "weight": 0.01,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "W/m^3"
+            }
+          ],
+          "total_policy": {
+            "method": "weighted-sum",
+            "normalize_weights": false
+          }
+        }
+      },
+      "label": {
+        "event_present": false,
+        "event_type": "edge_crash"
+      }
+    },
+    {
+      "id": "frame-4",
+      "timestamp_iso": "2025-01-01T00:00:40.000Z",
+      "snapshot": {
+        "schema_version": "tokamak_rz_snapshot/1",
+        "device_id": "sparc-sim",
+        "shot_id": "shot-precursor-01",
+        "timestamp_iso": "2025-01-01T00:00:40.000Z",
+        "data_cutoff_iso": "2025-01-01T00:00:40.000Z",
+        "grid": {
+          "nx": 4,
+          "ny": 3,
+          "dx_m": 0.05,
+          "dy_m": 0.05,
+          "thickness_m": 1
+        },
+        "frame": {
+          "kind": "rz-plane",
+          "r_min_m": 1,
+          "r_max_m": 1.15,
+          "z_min_m": -0.05,
+          "z_max_m": 0.05,
+          "axis_order": [
+            "r",
+            "z"
+          ]
+        },
+        "separatrix_mask": {
+          "encoding": "base64",
+          "dtype": "float32",
+          "endian": "little",
+          "order": "row-major",
+          "data_b64": "AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/"
+        },
+        "equilibrium": {
+          "b_eq_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBA"
+          },
+          "p_eq_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpE"
+          },
+          "psi_N": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcxMPs3MTD8AAIA/mpmZP83MTD7NzEw/AACAP5qZmT/NzEw+zcxMPwAAgD+amZk/"
+          }
+        },
+        "perturbations": {
+          "b_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "EoOgQJzEoEAlBqFArkehQEmdoEDT3qBAXCChQOVhoUASg6BAnMSgQCUGoUCuR6FA"
+          },
+          "p_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RDNTekRmpnpEmvl6RAAAekQzU3pEZqZ6RJr5ekQAAHpEM1N6RGamekSa+XpE"
+          },
+          "j_A_m2": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "uB6FPhSuxz64HgU/ZmYmP7gehT4Ursc+uB4FP2ZmJj+4HoU+FK7HPrgeBT9mZiY/"
+          },
+          "rad_W_m3": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AADAPwAAwD8AAEBAAABAQAAAwD8AAMA/AABAQAAAQEAAAMA/AADAPwAAQEAAAEBA"
+          }
+        },
+        "manifest": {
+          "schema_version": "tokamak_channel_manifest/1",
+          "version": "v1",
+          "device_id": "sparc-sim",
+          "channels": [
+            {
+              "key": "u_deltaB_Jm3",
+              "weight": 1,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "J/m^3"
+            },
+            {
+              "key": "u_gradp",
+              "weight": 0.2,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "Pa/m"
+            },
+            {
+              "key": "u_J",
+              "weight": 0.05,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "A^2/m^4"
+            },
+            {
+              "key": "u_rad",
+              "weight": 0.01,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "W/m^3"
+            }
+          ],
+          "total_policy": {
+            "method": "weighted-sum",
+            "normalize_weights": false
+          }
+        }
+      },
+      "label": {
+        "event_present": true,
+        "event_type": "edge_crash"
+      }
+    },
+    {
+      "id": "frame-5",
+      "timestamp_iso": "2025-01-01T00:00:50.000Z",
+      "snapshot": {
+        "schema_version": "tokamak_rz_snapshot/1",
+        "device_id": "sparc-sim",
+        "shot_id": "shot-precursor-01",
+        "timestamp_iso": "2025-01-01T00:00:50.000Z",
+        "data_cutoff_iso": "2025-01-01T00:00:50.000Z",
+        "grid": {
+          "nx": 4,
+          "ny": 3,
+          "dx_m": 0.05,
+          "dy_m": 0.05,
+          "thickness_m": 1
+        },
+        "frame": {
+          "kind": "rz-plane",
+          "r_min_m": 1,
+          "r_max_m": 1.15,
+          "z_min_m": -0.05,
+          "z_max_m": 0.05,
+          "axis_order": [
+            "r",
+            "z"
+          ]
+        },
+        "separatrix_mask": {
+          "encoding": "base64",
+          "dtype": "float32",
+          "endian": "little",
+          "order": "row-major",
+          "data_b64": "AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/"
+        },
+        "equilibrium": {
+          "b_eq_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBAAACgQAAAoEAAAKBA"
+          },
+          "p_eq_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpEAAB6RAAAekQAAHpE"
+          },
+          "psi_N": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zcxMPs3MTD8AAIA/mpmZP83MTD7NzEw/AACAP5qZmT/NzEw+zcxMPwAAgD+amZk/"
+          }
+        },
+        "perturbations": {
+          "b_T": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "16OgQMP1oECuR6FAmpmhQJzEoECHFqFAc2ihQF66oUDXo6BAw/WgQK5HoUCamaFA"
+          },
+          "p_Pa": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAB6RABgekQAwHpEACB7RAAAekQAYHpEAMB6RAAge0QAAHpEAGB6RADAekQAIHtE"
+          },
+          "j_A_m2": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "CtejPo/C9T4K1yM/zcxMPwrXoz6PwvU+CtcjP83MTD8K16M+j8L1PgrXIz/NzEw/"
+          },
+          "rad_W_m3": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "ZmbmP2Zm5j9mZmZAZmZmQGZm5j9mZuY/ZmZmQGZmZkBmZuY/ZmbmP2ZmZkBmZmZA"
+          }
+        },
+        "manifest": {
+          "schema_version": "tokamak_channel_manifest/1",
+          "version": "v1",
+          "device_id": "sparc-sim",
+          "channels": [
+            {
+              "key": "u_deltaB_Jm3",
+              "weight": 1,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "J/m^3"
+            },
+            {
+              "key": "u_gradp",
+              "weight": 0.2,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "Pa/m"
+            },
+            {
+              "key": "u_J",
+              "weight": 0.05,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "A^2/m^4"
+            },
+            {
+              "key": "u_rad",
+              "weight": 0.01,
+              "normalization": {
+                "method": "none"
+              },
+              "units": "W/m^3"
+            }
+          ],
+          "total_policy": {
+            "method": "weighted-sum",
+            "normalize_weights": false
+          }
+        }
+      },
+      "label": {
+        "event_present": true,
+        "event_type": "edge_crash"
+      }
+    }
+  ]
+}

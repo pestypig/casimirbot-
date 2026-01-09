@@ -55,12 +55,14 @@ evalRouter.post("/smoke", async (req, res) => {
 
 const ReplayRequest = z.object({
   traceId: z.string().trim().min(1).optional(),
+  essenceId: z.string().trim().min(1).optional(),
   baseUrl: z.string().trim().min(1).optional(),
 });
 
 type EvalReplayRecord = {
   kind: "eval.replay";
   traceId?: string;
+  essenceId?: string;
   ok: boolean;
   exitCode: number | null;
   timedOut: boolean;
@@ -81,7 +83,7 @@ evalRouter.post("/replay", async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
-  const { traceId, baseUrl: requestedBase } = parsed.data;
+  const { traceId, essenceId: targetEssenceId, baseUrl: requestedBase } = parsed.data;
   const baseUrl = requestedBase || process.env.EVAL_BASE_URL || inferBaseUrl(req);
   const startedAt = Date.now();
   const startedIso = new Date(startedAt).toISOString();
@@ -105,6 +107,7 @@ evalRouter.post("/replay", async (req, res) => {
     const record: EvalReplayRecord = {
       kind: "eval.replay",
       traceId,
+      essenceId: targetEssenceId,
       ok,
       exitCode: typeof child.exitCode === "number" ? child.exitCode : null,
       timedOut: Boolean(child.timedOut),
@@ -116,7 +119,7 @@ evalRouter.post("/replay", async (req, res) => {
       started_at: startedIso,
       finished_at: new Date().toISOString(),
     };
-    const essenceId = await persistEvalReplayEnvelope(record);
+    const envelopeId = await persistEvalReplayEnvelope(record);
     res.json({
       ok,
       exitCode: typeof child.exitCode === "number" ? child.exitCode : null,
@@ -124,8 +127,9 @@ evalRouter.post("/replay", async (req, res) => {
       timed_out: Boolean(child.timedOut),
       stdout,
       stderr,
-      essence_id: essenceId,
+      essence_id: envelopeId,
       traceId,
+      essenceId: targetEssenceId,
     });
   } catch (error) {
     const duration = Date.now() - startedAt;
@@ -163,6 +167,7 @@ function collectEvalEnvFlags(): Record<string, unknown> {
 
 async function persistEvalReplayEnvelope(record: EvalReplayRecord): Promise<string> {
   const digest = createHash("sha256").update(JSON.stringify(record)).digest("hex");
+  const sourceUri = buildReplaySourceUri(record.traceId, record.essenceId);
   const envelope = EssenceEnvelope.parse({
     header: {
       id: randomUUID(),
@@ -170,7 +175,7 @@ async function persistEvalReplayEnvelope(record: EvalReplayRecord): Promise<stri
       modality: "text",
       created_at: record.finished_at,
       source: {
-        uri: `eval://replay/${record.traceId ?? "detached"}`,
+        uri: sourceUri,
         original_hash: { algo: "sha256", value: digest },
         creator_id: "system/eval-replay",
         license: "CC-BY-4.0",
@@ -205,6 +210,16 @@ async function persistEvalReplayEnvelope(record: EvalReplayRecord): Promise<stri
   await putEnvelope(envelope);
   essenceHub.emit("created", { type: "created", essenceId: envelope.header.id });
   return envelope.header.id;
+}
+
+function buildReplaySourceUri(traceId?: string, essenceId?: string): string {
+  if (traceId) {
+    return `eval://replay/trace/${traceId}`;
+  }
+  if (essenceId) {
+    return `eval://replay/essence/${essenceId}`;
+  }
+  return "eval://replay/detached";
 }
 
 export { evalRouter };

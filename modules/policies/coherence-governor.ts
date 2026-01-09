@@ -1,4 +1,9 @@
 import { TelemetrySnapshot, TTelemetrySnapshot } from "../../shared/star-telemetry";
+import {
+  EQUILIBRIUM_DISPERSION_MAX,
+  EQUILIBRIUM_HOLD_MS,
+  EQUILIBRIUM_R_STAR,
+} from "../../shared/neuro-config";
 
 export type CoherenceAction = "explore_more" | "collapse" | "branch" | "ask_clarification";
 
@@ -23,6 +28,45 @@ const SESSION_PROFILES = {
   agent: { collapseMult: 0.8, branchBias: -0.1 },
 };
 
+const resolveEquilibriumStatus = (
+  snapshot: TTelemetrySnapshot,
+): { equilibrium: boolean; holdMs: number } => {
+  const holdMs =
+    typeof snapshot.equilibrium_hold_ms === "number" &&
+    Number.isFinite(snapshot.equilibrium_hold_ms)
+      ? snapshot.equilibrium_hold_ms
+      : 0;
+  if (snapshot.equilibrium === true) {
+    return { equilibrium: true, holdMs };
+  }
+  const gammaSyncZ = snapshot.gamma_sync_z;
+  const dispersion = snapshot.phase_dispersion;
+  const equilibriumCandidate =
+    typeof gammaSyncZ === "number" &&
+    Number.isFinite(gammaSyncZ) &&
+    typeof dispersion === "number" &&
+    Number.isFinite(dispersion) &&
+    holdMs >= EQUILIBRIUM_HOLD_MS &&
+    gammaSyncZ >= EQUILIBRIUM_R_STAR &&
+    dispersion <= EQUILIBRIUM_DISPERSION_MAX;
+  return { equilibrium: equilibriumCandidate, holdMs };
+};
+
+const resolveBlockedCollapseAction = (
+  dispersion: number,
+  energy: number,
+  coherence: number,
+  cfg: CoherenceGovernorOptions,
+): CoherenceAction => {
+  if (dispersion > cfg.highDispersionThreshold) {
+    return "ask_clarification";
+  }
+  if (energy > cfg.energyBudgetCeiling && coherence < 0.6) {
+    return "branch";
+  }
+  return "explore_more";
+};
+
 /**
  * Decide the next coarse action to take based on telemetry returned by the star backend.
  * Keeps the policy lightweight and declarative so other modules can reuse it.
@@ -37,13 +81,28 @@ export const decideCoherenceAction = (
   const coherence = parsed.global_coherence ?? 0.5;
   const dispersion = parsed.phase_dispersion ?? 0;
   const energy = parsed.energy_budget ?? 0;
+  const { equilibrium } = resolveEquilibriumStatus(parsed);
 
-  if (parsed.recommended_action) return parsed.recommended_action;
-  if (collapsePressure >= cfg.collapsePressureThreshold) return "collapse";
-  if (coherence < cfg.lowCoherenceThreshold && dispersion > cfg.highDispersionThreshold)
-    return "ask_clarification";
-  if (energy > cfg.energyBudgetCeiling && coherence < 0.6) return "branch";
-  return "explore_more";
+  if (parsed.recommended_action) {
+    if (parsed.recommended_action === "collapse" && !equilibrium) {
+      return resolveBlockedCollapseAction(dispersion, energy, coherence, cfg);
+    }
+    return parsed.recommended_action;
+  }
+
+  let action: CoherenceAction = "explore_more";
+  if (collapsePressure >= cfg.collapsePressureThreshold) {
+    action = "collapse";
+  } else if (coherence < cfg.lowCoherenceThreshold && dispersion > cfg.highDispersionThreshold) {
+    action = "ask_clarification";
+  } else if (energy > cfg.energyBudgetCeiling && coherence < 0.6) {
+    action = "branch";
+  }
+
+  if (action === "collapse" && !equilibrium) {
+    return resolveBlockedCollapseAction(dispersion, energy, coherence, cfg);
+  }
+  return action;
 };
 
 export const collapseConfidence = (snapshot: TTelemetrySnapshot): number => {
@@ -86,6 +145,7 @@ export const governFromTelemetry = (
 ): CoherenceGovernorDecision => {
   const cfg = { ...DEFAULTS, ...options };
   const parsed = TelemetrySnapshot.parse(snapshot);
+  const { equilibrium } = resolveEquilibriumStatus(parsed);
 
   const sessionTypeKey = (parsed.session_type ?? "debate") as keyof typeof SESSION_PROFILES;
   const profile = SESSION_PROFILES[sessionTypeKey] ?? SESSION_PROFILES.debate;
@@ -127,6 +187,9 @@ export const governFromTelemetry = (
   if (multiFractal > 0.6) {
     adjustedCollapseThreshold += 0.05; // delay collapse in turbulent regime
   }
+  if (!equilibrium) {
+    adjustedCollapseThreshold += 0.15;
+  }
   adjustedCollapseThreshold = clamp01(adjustedCollapseThreshold);
 
   // Per-round tool budget and branching hints.
@@ -159,10 +222,20 @@ export const governFromTelemetry = (
     action = "ask_clarification";
   }
 
-  if (profile.branchBias > 0 && action === "continue" && energy > 0.7) {
+  if (profile.branchBias > 0 && action === "continue" && energy > 0.7) {        
     action = "branch";
-  } else if (profile.branchBias < 0 && action === "branch" && energy < 0.7) {
+  } else if (profile.branchBias < 0 && action === "branch" && energy < 0.7) {   
     action = "continue";
+  }
+
+  if (action === "collapse" && !equilibrium) {
+    const fallback = resolveBlockedCollapseAction(
+      dispersion,
+      energy,
+      coherence,
+      cfg,
+    );
+    action = fallback === "explore_more" ? "continue" : fallback;
   }
 
   if (action === "collapse") {

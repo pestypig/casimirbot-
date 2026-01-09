@@ -1,0 +1,104 @@
+{
+  "schema_version": "dataset_manifest/1",
+  "kind": "dataset_manifest",
+  "created_at": "2025-01-01T00:00:00.000Z",
+  "name": "tokamak-rz-energy-fixture",
+  "description": "Deterministic tokamak R-Z energy field fixture (3x2 grid).",
+  "entries": [
+    {
+      "id": "tokamak-rz:fixture:v1",
+      "pipeline": "tokamak_energy_field",
+      "input": {
+        "schema_version": "tokamak_rz_input/1",
+        "device_id": "sparc-sim",
+        "shot_id": "shot-0001",
+        "timestamp_iso": "2025-01-01T00:00:00.000Z",
+        "data_cutoff_iso": "2025-01-01T00:00:00.000Z",
+        "grid": { "nx": 3, "ny": 2, "dx_m": 0.1, "dy_m": 0.2, "thickness_m": 1 },
+        "frame": {
+          "kind": "rz-plane",
+          "r_min_m": 1.0,
+          "r_max_m": 1.2,
+          "z_min_m": -0.1,
+          "z_max_m": 0.1,
+          "axis_order": ["r", "z"]
+        },
+        "separatrix_mask": {
+          "encoding": "base64",
+          "dtype": "float32",
+          "endian": "little",
+          "order": "row-major",
+          "data_b64": "AACAPwAAgD8AAIA/AACAPwAAAAAAAAAA"
+        },
+        "channels": {
+          "u_deltaB_Jm3": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AACAPwAAAEAAAEBAAACAQAAAoEAAAMBA"
+          },
+          "u_gradp": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "zczMPc3MTD6amZk+zczMPgAAAD+amRk/"
+          },
+          "u_J": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "AAAAQAAAgD8AAAAAAACAPwAAAEAAAEBA"
+          },
+          "u_rad": {
+            "encoding": "base64",
+            "dtype": "float32",
+            "endian": "little",
+            "order": "row-major",
+            "data_b64": "CtcjPArXozyPwvU8CtcjPc3MTD2PwnU9"
+          }
+        },
+        "manifest": {
+          "schema_version": "tokamak_channel_manifest/1",
+          "version": "v1",
+          "device_id": "sparc-sim",
+          "channels": [
+            {
+              "key": "u_deltaB_Jm3",
+              "weight": 1,
+              "normalization": { "method": "none" },
+              "units": "J/m^3"
+            },
+            {
+              "key": "u_gradp",
+              "weight": 0.5,
+              "normalization": { "method": "scale_offset", "scale": 10 },
+              "units": "proxy"
+            },
+            {
+              "key": "u_J",
+              "weight": 0.25,
+              "normalization": { "method": "scale_offset", "scale": 1, "offset": 0 },
+              "units": "proxy"
+            },
+            {
+              "key": "u_rad",
+              "weight": 0.1,
+              "normalization": { "method": "scale_offset", "scale": 100 },
+              "units": "proxy"
+            }
+          ],
+          "total_policy": { "method": "weighted-sum", "normalize_weights": false }
+        }
+      },
+      "expected": {
+        "hashes": {
+          "inputs_hash": "sha256:508885ae7dc2f4355fdb07a6e46762a6b446e45c788322ff4ba0bd5e537685b3",
+          "features_hash": "sha256:0974a0e3ab69f7abd4741712e39f55aeed7cfe9970938e803bd062ed8d7c375d"
+        }
+      }
+    }
+  ]
+}

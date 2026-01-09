@@ -65,7 +65,7 @@ jobs:
           npm install
           npm version "${{ inputs.version }}" --no-git-tag-version
           npm run build
-          chmod +x bin/casimir.js bin/casimir-verify.js
+          chmod +x bin/shadow-of-intent.js bin/shadow-of-intent-verify.js
           echo "CLI_VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_ENV"
 
       - name: Commit + tag
@@ -79,10 +79,10 @@ jobs:
             git commit -m "chore(release): bump packages"
           fi
           if [ -n "${SDK_VERSION:-}" ]; then
-            git tag "casimir-sdk-v${SDK_VERSION}"
+            git tag "shadow-of-intent-sdk-v${SDK_VERSION}"
           fi
           if [ -n "${CLI_VERSION:-}" ]; then
-            git tag "casimir-cli-v${CLI_VERSION}"
+            git tag "shadow-of-intent-v${CLI_VERSION}"
           fi
           git push origin "HEAD:${{ github.ref_name }}"
           git push origin --tags

@@ -104,6 +104,12 @@ Stage 3 (Certified / Policy-gated)
 | AGI_TRACE | server/routes/agi.trace.ts | Stage 1 | Trace/log streaming routes. | tests/trace-api.spec.ts |
 | AGI_DEBATE | server/routes/agi.debate.ts | Stage 1 | Debate routing. | tests/debate-orchestrator.spec.ts |
 
+## Neuro Coherence Modules
+
+| Tag | Module | Stage | Notes | Checks |
+| --- | --- | --- | --- | --- |
+| NEURO | shared/neuro-config.ts | Stage 0 | Neuro coherence defaults (gamma band + equilibrium thresholds). | docs/stellar-consciousness-orch-or-review.md |
+
 ## Observability + Audit Modules (Tagged)
 
 | Tag | Module | Stage | Notes | Checks |
@@ -116,6 +122,15 @@ Stage 3 (Certified / Policy-gated)
 - Canonical metadata lives in `shared/math-stage.ts`.
 - Validator: `npm run math:validate`
 - Dependency graph: `MATH_GRAPH.json` (stage inheritance + waivers).
+- Default stage policy: `math.config.json` (path-based stage suggestions).
+- Inline overrides: optional file headers like `// math-stage: diagnostic` (first
+  few lines) to override the path defaults.
+- Evidence profiles: `math.evidence.json` (default evidence types + commands).
+- Starter templates: `templates/math/` (copy `MATH_STATUS.md`, `math.config.json`,
+  and `math.evidence.json` into a new repo).
+- Waivers: `math.waivers.json` (local exceptions for stage/evidence/unit).
+- Strictness: `math.config.json` `strictStages` (default warn-only). Override
+  with `MATH_STRICT=1` or `MATH_STRICT_STAGES=diagnostic,certified`.
 - Report: `npm run math:report` (writes `reports/math-report.json` and `.md`).
 - Traceback: `npm run math:trace -- gr` (prints chain + stage + evidence).
 - Unit signatures: `shared/math-stage.ts` `units` fields (dimension expectations).

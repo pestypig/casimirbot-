@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+if [ "${SKIP_VERIFY}" = "1" ]; then
+  echo "SKIP_VERIFY=1 set; skipping local verification."
+  exit 0
+fi
+
+npm run verify:local

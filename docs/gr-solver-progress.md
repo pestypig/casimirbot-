@@ -170,6 +170,86 @@ Summary: Remaining work to reach a fully stable, production-grade GR evolution l
 - [ ] Long-run/high-dims perf sweeps with recorded results and failure modes.
 - [ ] GPU/WASM exploration if needed.
 
+## Minimal GR-to-OS constraint interface
+Summary: Define the smallest contract the OS can consume without over-claiming GR results.
+
+Step-by-step build
+1. Enumerate required GR signals (constraints, stress-energy, gauge, stability, provenance).
+2. Bind signals to the WARP_AGENTS.md hard gate and certificate policy.
+3. Emit a single JSON payload per solve and attach it to TaskTrace + Essence.
+4. Enforce safe defaults: diagnostic-only unless HARD constraints pass and certificate is ADMISSIBLE.
+
+Proposed payload (gr-os/0.1)
+```json
+{
+  "schema_version": "gr-os/0.1",
+  "stage": "diagnostic|reduced-order|certified",
+  "timestamp": "<iso>",
+  "grid": { "nx": 0, "ny": 0, "nz": 0, "dx_m": 0.0 },
+  "constraints": {
+    "gate": { "mode": "hard-only", "unknownAsFail": true },
+    "status": "PASS|FAIL|WARN",
+    "metrics": {
+      "H_rms": 0.0,
+      "M_rms": 0.0,
+      "H_max_abs": 0.0,
+      "M_max_abs": 0.0
+    },
+    "hard_fail_ids": []
+  },
+  "stress_energy": {
+    "div_mean": 0.0,
+    "div_rms": 0.0,
+    "div_max_abs": 0.0,
+    "net_flux_norm": 0.0
+  },
+  "gauge": {
+    "lapse_min": 0.0,
+    "lapse_max": 0.0,
+    "shift_rms": 0.0,
+    "K_trace_mean": 0.0
+  },
+  "stability": {
+    "cfl": 0.0,
+    "step_ms": 0.0,
+    "steps": 0,
+    "nan_count": 0
+  },
+  "viability": {
+    "status": "ADMISSIBLE|NOT_CERTIFIED|FAIL",
+    "certificate_hash": "sha256:<hex>",
+    "integrity_ok": true
+  },
+  "provenance": {
+    "essence_id": "<uuid>",
+    "information_boundary": { "schema_version": "ib/1", "inputs_hash": "sha256:<hex>" }
+  },
+  "actions": [ { "type": "throttle|halt|notify", "reason": "..." } ]
+}
+```
+
+OS consumption rules
+- Use as diagnostics only unless HARD constraints pass and certificate is ADMISSIBLE.
+- If any hard constraint fails or integrity_ok is false, force safe-mode (no viability claims).
+- Persist the payload as an Essence envelope and include its ID in TaskTrace.steps.
+
+## Evaluation metrics (minimum set)
+Summary: Metrics are grouped so tests and dashboards can report health without over-claiming physics.
+
+Step-by-step build
+1. Bind constraint metrics to the grConstraintGate thresholds (H_rms, M_rms, H_max_abs, M_max_abs).
+2. Add conservation checks (div_mean, div_rms, div_max_abs, net_flux_norm).
+3. Track gauge stability (lapse/shift extrema, K_trace drift) and numeric health (nan_count).
+4. Record performance stats (step_ms, total_ms, voxels, channel_count) for regressions.
+5. Compare against analytic-limit fixtures and report deltas vs baseline traces.
+
+Suggested dashboards/tests
+- Constraint gate: PASS/FAIL with firstFail id and delta.
+- Conservation: div_rms, div_max_abs, net_flux_norm trends per solve.
+- Gauge stability: lapse_min/max, shift_rms, K_trace_mean deltas.
+- Solver health: nan_count, cfl, step_ms, total_ms, cache hit rate.
+- Provenance coverage: Essence envelope count per solve and information_boundary presence.
+
 ## Founder notes and product framing (draft)
 Summary: Strategic framing for why the GR solve exists and how it connects to AI productization.
 - Vision: build an agent grounded in a full GR solve to relate energy, space, and time, then use those outputs as system-level constraints for downstream AI generation.
@@ -178,3 +258,56 @@ Summary: Strategic framing for why the GR solve exists and how it connects to AI
 - Trickle-down: distill GR outputs into compact invariants and surrogate models so later generations can run fast while staying bounded.
 - Compute limits: treat predictions as bounded by finite factors; layer the system (physics core -> reduced models -> generative layers) with falsification checks between layers.
 - Open questions: define the minimal GR-to-OS interface, evaluation metrics for "reality match," and which layers must be certified versus exploratory.
+
+## SPARC-class digital twin integration requirements (curvature diagnostics track)
+Summary: Define the telemetry contract, minimum data shape, and artifacts needed to plug curvature diagnostics into a Siemens/NVIDIA-style digital twin.
+
+System placement
+- Pipeline fit: (NX geometry + metadata) -> (OpenUSD scene) + (sensor/sim fields) -> curvature diagnostics -> K-metrics + spines -> control/ML dashboards.
+- Guardrail: curvature outputs are derived features; they do not replace raw physics channels or alter fusion rates.
+
+Required input telemetry (device-agnostic)
+- Grid and frame: R-Z 2D grid (v1), extents, spacing, coordinate frame, separatrix mask, and boundary condition metadata.
+- Channel manifest: u_total plus channel defs (u_deltaB, u_gradp, u_J, u_rad or other proxies), weights, normalization, and units per channel.
+- Provenance: instrument or simulation ID, reconstruction method, uncertainty bounds, timestamp, and ingest pipeline version.
+- Time alignment: support multi-rate channels (fast, medium, slow) with explicit resampling rules in the manifest.
+
+Minimum grid/time resolution (v1 targets)
+- Grid: accept 2D R-Z with non-square spacing; target >= 128x256 for ridge tracking stability, prefer 256x512 when available.
+- Time: ingest fast channels at kHz order, medium at 10-100 Hz, slow at <= 1 Hz; record cadence per channel in the manifest.
+- Determinism: same manifest and inputs produce identical hashes and metric outputs.
+
+Essence envelope artifacts (results of record)
+- Input bundle: raw channel fields (or references), mask, grid spec, constants version, normalization, weights, and boundary conditions.
+- Output bundle: phi, grad phi, laplacian phi, residual fields, K0-K3, ridge spines, stability stats, and solver diagnostics.
+- Integrity: sha256 hashes for inputs and outputs, information_boundary payload, and a stable result hash for retrieval.
+
+OpenUSD/Omniverse hooks
+- Volumes/textures: export phi, grad phi, laplacian phi, residual as USD volume textures or 2D plane textures.
+- Geometry: export ridge spines as USD curves with stable IDs and timestamps.
+- Telemetry: export K-metrics time series as JSON for dashboards and trigger overlays.
+
+Build checklist (Phase 0-4)
+Phase 0 - Contract + provenance
+- Define canonical u_field schema (grid extents, R-Z frame, separatrix mask, channel manifest, weights, normalization).
+- Persist manifest + hashes with every run (Essence envelope linkage).
+- Add a small synthetic R-Z fixture and a determinism test.
+
+Phase 1 - Curvature unit v2 (raster fields + BC controls)
+- Add 2D R-Z solver path and mask-aware boundary conditions.
+- Emit phi, grad phi, laplacian phi, residuals, and stability stats.
+- Add analytic field tests (Gaussian, known Poisson) for stability and repeatability.
+
+Phase 2 - K-metrics + ridge tracking
+- Implement K0-K3, ridge extraction, and ridge tracking (IDs, lifetime, fragmentation).
+- Add synthetic tests for ridge translation/rotation and metric stability.
+
+Phase 3 - Tokamak adapter + dataset
+- Ingest equilibrium recon + perturbation channels and construct u_deltaB, u_gradp, u_J, u_rad with weighted u_total.
+- Add a synthetic R-Z dataset with an onset label (edge crash or tearing onset).
+- Provide an offline CLI to compute precursor curves and baseline ROC/AUC.
+
+Phase 4 - Curvature Diagnostics Service (CDS)
+- Endpoints: run, result by hash, live stream of K-metrics.
+- Attach Essence envelope + provenance to each run.
+- Add telemetry and contract tests for the GR-to-agent constraint payload.

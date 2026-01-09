@@ -1,7 +1,19 @@
 /* eslint-disable no-restricted-globals */
 import { computeImmersion } from "@/lib/noise/immersion";
 import type { ImmersionScores } from "@/lib/noise/immersion";
-import type { BarWindow, HelixPacket, TempoMeta } from "@/types/noise-gens";
+import type {
+  BarWindow,
+  HelixPacket,
+  KnowledgeAudioSource,
+  KnowledgeGrooveSource,
+  KnowledgeMacroSource,
+  KnowledgeMidiSource,
+  GrooveTemplate,
+  MacroCurve,
+  MidiMotif,
+  RenderPlan,
+  TempoMeta,
+} from "@/types/noise-gens";
 import type { TextureFingerprint } from "@/lib/noise/texture-map";
 import { textureFrom, createDeterministicRng } from "@/lib/noise/texture-map";
 import {
@@ -23,6 +35,11 @@ type CoverRenderRequest = {
   sampleInfluence: number;
   styleInfluence: number;
   weirdness: number;
+  renderPlan?: RenderPlan;
+  knowledgeAudio?: KnowledgeAudioSource[];
+  midiMotifs?: KnowledgeMidiSource[];
+  grooveTemplates?: KnowledgeGrooveSource[];
+  macroCurves?: KnowledgeMacroSource[];
   sampleRate?: number;
 };
 
@@ -37,6 +54,10 @@ type WorkerError = { t: "error"; error: string };
 type WorkerOutbound = WorkerProgress | WorkerReady | WorkerError;
 
 type ManifestRecord = Record<string, TextureFingerprint>;
+type AudioAtomBank = Map<string, AudioBuffer>;
+type MidiMotifBank = Map<string, MidiMotif>;
+type GrooveTemplateBank = Map<string, GrooveTemplate>;
+type MacroCurveBank = Map<string, MacroCurve[]>;
 
 const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -68,7 +89,8 @@ async function handleRender(request: CoverRenderRequest) {
     const manifest = await loadManifest();
     checkAborted(jobId);
 
-    const tempo = sanitizeTempo(request.tempo);
+    let tempo = sanitizeTempo(request.tempo);
+    tempo = applyPlanTempoOverride(tempo, request.renderPlan?.global?.bpm);
     const barWindows = sanitizeBarWindows(request.barWindows, tempo);
     if (!barWindows.length) {
       throw new Error("No valid bar windows provided");
@@ -87,28 +109,92 @@ async function handleRender(request: CoverRenderRequest) {
         : instrumental.sampleRate;
 
     const helixPeaks = extractHelixPeaks(request.helix);
-    const kbTexture = request.kbTexture ? manifest[request.kbTexture] : undefined;
-    const seed = computeSeed(request.helix, request.sampleInfluence, request.styleInfluence, request.weirdness);
-
-    postProgress(0.18, "Blending texture");
-    const texture = textureFrom(helixPeaks, kbTexture, {
-      sampleInfluence: request.sampleInfluence,
-      styleInfluence: request.styleInfluence,
-      weirdness: request.weirdness,
-      seed,
-    });
-
-    const impulse = await loadImpulse(texture.irName, sampleRate);
+    const baseSampleInfluence = clamp01(request.sampleInfluence);
+    const baseStyleInfluence = clamp01(request.styleInfluence);
+    const baseWeirdness = clamp01(request.weirdness);
+    const baseKbTexture = request.kbTexture ? manifest[request.kbTexture] : undefined;
+    const planWindows = request.renderPlan?.windows;
+    const planSections = normalizeSections(request.renderPlan?.global?.sections);
+    const energyCurve = normalizeEnergyCurve(
+      request.renderPlan?.global?.energyCurve,
+    );
+    const planWindowMap =
+      Array.isArray(planWindows) && planWindows.length
+        ? buildPlanWindowMap(planWindows)
+        : null;
+    const usePlan = Boolean(planWindowMap);
+    const renderWindows = usePlan
+      ? resolveRenderWindows(barWindows, planWindows, tempo)
+      : barWindows;
+    const audioAtomBank = usePlan
+      ? await loadAudioAtomBank(request.knowledgeAudio, planWindows)
+      : new Map<string, AudioBuffer>();
+    const midiMotifBank = usePlan
+      ? buildMidiMotifBank(request.midiMotifs)
+      : new Map<string, MidiMotif>();
+    const grooveTemplateBank = usePlan
+      ? buildGrooveTemplateBank(request.grooveTemplates)
+      : new Map<string, GrooveTemplate>();
+    const macroCurveBank = usePlan
+      ? buildMacroCurveBank(request.macroCurves)
+      : new Map<string, MacroCurve[]>();
     checkAborted(jobId);
 
-    postProgress(0.26, "Rendering bars");
+    postProgress(0.18, usePlan ? "Preparing window textures" : "Blending texture");
+    let baseTexture: ReturnType<typeof textureFrom> | null = null;
+    let baseImpulse: AudioBuffer | null = null;
+    if (!usePlan) {
+      const seed = computeSeed(
+        request.helix,
+        baseSampleInfluence,
+        baseStyleInfluence,
+        baseWeirdness,
+      );
+      baseTexture = textureFrom(helixPeaks, baseKbTexture, {
+        sampleInfluence: baseSampleInfluence,
+        styleInfluence: baseStyleInfluence,
+        weirdness: baseWeirdness,
+        seed,
+      });
+      baseImpulse = await loadImpulse(baseTexture.irName, sampleRate);
+      checkAborted(jobId);
+    }
+
+    postProgress(0.26, usePlan ? "Rendering plan windows" : "Rendering bars");
     const segments = [];
     let totalLength = 0;
 
-    for (let index = 0; index < barWindows.length; index += 1) {
-      const window = barWindows[index];
-      const pct = 0.26 + (0.6 * index) / Math.max(1, barWindows.length);
-      postProgress(pct, `Rendering bars ${window.startBar}-${window.endBar - 1}`);
+    for (let index = 0; index < renderWindows.length; index += 1) {
+      const window = renderWindows[index];
+      const pct = 0.26 + (0.6 * index) / Math.max(1, renderWindows.length);
+      const sectionLabel = resolveSectionLabel(planSections, window);
+      const stageLabel = sectionLabel
+        ? `Rendering ${sectionLabel} bars ${window.startBar}-${window.endBar - 1}`
+        : `Rendering bars ${window.startBar}-${window.endBar - 1}`;
+      postProgress(pct, stageLabel);
+
+      const planWindow = usePlan
+        ? resolvePlanWindow(planWindowMap, window)
+        : undefined;
+      const windowEnergy = resolveWindowEnergy(window, energyCurve);
+      const texture = usePlan
+        ? buildWindowTexture({
+            window,
+            planWindowMap,
+            helix: request.helix,
+            helixPeaks,
+            baseKbTexture,
+            baseSampleInfluence,
+            baseStyleInfluence,
+            baseWeirdness,
+            manifest,
+            energy: windowEnergy,
+          })
+        : baseTexture!;
+      const impulse = usePlan
+        ? await loadImpulse(texture.irName, sampleRate)
+        : baseImpulse!;
+      checkAborted(jobId);
 
       const segment = await renderWindow({
         window,
@@ -118,6 +204,12 @@ async function handleRender(request: CoverRenderRequest) {
         sampleRate,
         texture,
         impulse,
+        material: planWindow?.material,
+        audioAtoms: audioAtomBank,
+        midiMotifs: midiMotifBank,
+        grooveTemplates: grooveTemplateBank,
+        macroCurves: macroCurveBank,
+        energy: windowEnergy,
         jobId,
       });
       segments.push(segment);
@@ -223,6 +315,119 @@ async function fetchAudioBuffer(url: string): Promise<AudioBuffer> {
   return audioBuffer;
 }
 
+async function loadAudioAtomBank(
+  knowledgeAudio: KnowledgeAudioSource[] | undefined,
+  planWindows: RenderPlan["windows"] | undefined,
+): Promise<AudioAtomBank> {
+  const bank: AudioAtomBank = new Map();
+  if (!knowledgeAudio?.length || !planWindows?.length) return bank;
+
+  const requested = collectMaterialIds(planWindows);
+  if (!requested.length) return bank;
+
+  const sourcesByKey = new Map<string, KnowledgeAudioSource>();
+  for (const source of knowledgeAudio) {
+    const idKey = normalizeMaterialKey(source.id);
+    if (idKey) sourcesByKey.set(idKey, source);
+    const nameKey = normalizeMaterialKey(source.name);
+    if (nameKey) sourcesByKey.set(nameKey, source);
+  }
+
+  const bufferById = new Map<string, AudioBuffer>();
+  const requestedKeys = new Set<string>(
+    requested.map(normalizeMaterialKey).filter(Boolean),
+  );
+  for (const key of requestedKeys) {
+    if (bank.has(key)) continue;
+    const source = sourcesByKey.get(key);
+    if (!source) continue;
+    let buffer = bufferById.get(source.id);
+    if (!buffer) {
+      buffer = await fetchAudioBuffer(source.url);
+      bufferById.set(source.id, buffer);
+    }
+    bank.set(key, buffer);
+    const idKey = normalizeMaterialKey(source.id);
+    if (idKey) bank.set(idKey, buffer);
+    const nameKey = normalizeMaterialKey(source.name);
+    if (nameKey) bank.set(nameKey, buffer);
+  }
+
+  return bank;
+}
+
+function buildMidiMotifBank(
+  sources: KnowledgeMidiSource[] | undefined,
+): MidiMotifBank {
+  const bank: MidiMotifBank = new Map();
+  if (!sources?.length) return bank;
+  for (const source of sources) {
+    if (!source?.motif) continue;
+    const idKey = normalizeMaterialKey(source.id);
+    if (idKey) bank.set(idKey, source.motif);
+    const nameKey = normalizeMaterialKey(source.name);
+    if (nameKey) bank.set(nameKey, source.motif);
+  }
+  return bank;
+}
+
+function buildGrooveTemplateBank(
+  sources: KnowledgeGrooveSource[] | undefined,
+): GrooveTemplateBank {
+  const bank: GrooveTemplateBank = new Map();
+  if (!sources?.length) return bank;
+  for (const source of sources) {
+    if (!source?.groove) continue;
+    const idKey = normalizeMaterialKey(source.id);
+    if (idKey) bank.set(idKey, source.groove);
+    const nameKey = normalizeMaterialKey(source.name);
+    if (nameKey) bank.set(nameKey, source.groove);
+    const grooveId = normalizeMaterialKey(source.groove.id);
+    if (grooveId) bank.set(grooveId, source.groove);
+    const grooveName = normalizeMaterialKey(source.groove.name);
+    if (grooveName) bank.set(grooveName, source.groove);
+  }
+  return bank;
+}
+
+const addMacroCurves = (
+  bank: MacroCurveBank,
+  key: string | undefined,
+  curves: MacroCurve[],
+) => {
+  const normalized = normalizeMaterialKey(key);
+  if (!normalized) return;
+  const existing = bank.get(normalized) ?? [];
+  const seen = new Set(
+    existing.map((curve) => curve.id ?? curve.name ?? curve.target),
+  );
+  for (const curve of curves) {
+    const identity = curve.id ?? curve.name ?? curve.target;
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    existing.push(curve);
+  }
+  bank.set(normalized, existing);
+};
+
+function buildMacroCurveBank(
+  sources: KnowledgeMacroSource[] | undefined,
+): MacroCurveBank {
+  const bank: MacroCurveBank = new Map();
+  if (!sources?.length) return bank;
+  for (const source of sources) {
+    const curves = source?.curves ?? [];
+    if (!curves.length) continue;
+    addMacroCurves(bank, source.id, curves);
+    addMacroCurves(bank, source.name, curves);
+    for (const curve of curves) {
+      addMacroCurves(bank, curve.id, [curve]);
+      addMacroCurves(bank, curve.name, [curve]);
+    }
+  }
+  return bank;
+}
+
 type RenderWindowParams = {
   window: BarWindow;
   instrumental: AudioBuffer;
@@ -231,6 +436,12 @@ type RenderWindowParams = {
   sampleRate: number;
   texture: ReturnType<typeof textureFrom>;
   impulse: AudioBuffer;
+  material?: RenderPlanWindow["material"];
+  audioAtoms?: AudioAtomBank;
+  midiMotifs?: MidiMotifBank;
+  grooveTemplates?: GrooveTemplateBank;
+  macroCurves?: MacroCurveBank;
+  energy?: number;
   jobId: string;
 };
 
@@ -242,6 +453,12 @@ async function renderWindow({
   sampleRate,
   texture,
   impulse,
+  material,
+  audioAtoms,
+  midiMotifs,
+  grooveTemplates,
+  macroCurves,
+  energy,
   jobId,
 }: RenderWindowParams): Promise<AudioBuffer> {
   const { startTimeSec, durationSec } = windowToSeconds(window, tempo);
@@ -271,7 +488,37 @@ async function renderWindow({
 
   // Pre-headroom
   const preGain = context.createGain();
-  preGain.gain.value = dbToGain(-3);
+  const energyAmount = resolveEnergyAmount(energy);
+  const preGainDb =
+    energyAmount == null
+      ? -3
+      : clamp(-3 + (energyAmount - 0.5) * 4, -6, 0);
+  preGain.gain.value = dbToGain(preGainDb);
+
+  if (material && audioAtoms && audioAtoms.size) {
+    scheduleMaterialAtoms({
+      context,
+      material,
+      audioAtoms,
+      destination: preGain,
+      durationSec,
+    });
+  }
+  if (material && midiMotifs && midiMotifs.size) {
+    const grooveTemplate = resolveGrooveTemplate(material, grooveTemplates);
+    const macroCurvesForWindow = resolveMacroCurves(material, macroCurves);
+    scheduleMidiMotifs({
+      context,
+      material,
+      midiMotifs,
+      destination: preGain,
+      durationSec,
+      tempo,
+      windowBars: Math.max(1, window.endBar - window.startBar),
+      grooveTemplate,
+      macroCurves: macroCurvesForWindow,
+    });
+  }
 
   const eqOutput = applyEq(context, preGain, texture.eqPeaks);
   const chorus = applyChorus(
@@ -282,21 +529,31 @@ async function renderWindow({
   );
   const saturator = applySaturation(context, chorus.output, texture.sat.drive);
   const compressor = context.createDynamicsCompressor();
-  compressor.threshold.value = -12;
-  compressor.ratio.value = 2.6;
+  const compAmount = resolveFxAmount(texture.comp);
+  compressor.threshold.value =
+    compAmount == null ? -12 : lerp(-18, -8, compAmount);
+  compressor.ratio.value = compAmount == null ? 2.6 : lerp(1.6, 4.5, compAmount);
   compressor.attack.value = 0.006;
   compressor.release.value = 0.24;
   saturator.connect(compressor);
 
   const reverbGain = context.createGain();
-  reverbGain.gain.value = 0.22 + clamp01(texture.sat.drive) * 0.18;
+  const reverbSend = resolveFxAmount(texture.reverbSend);
+  const reverbGainValue =
+    reverbSend == null
+      ? 0.22 + clamp01(texture.sat.drive) * 0.18
+      : clamp(0.05 + reverbSend * 0.55, 0.05, 0.6);
+  reverbGain.gain.value = reverbGainValue;
   const convolver = context.createConvolver();
   convolver.buffer = impulse;
   eqOutput.connect(convolver);
   convolver.connect(reverbGain);
 
   const dryGain = context.createGain();
-  dryGain.gain.value = 0.84;
+  dryGain.gain.value =
+    reverbSend == null
+      ? 0.84
+      : clamp(0.95 - reverbSend * 0.45, 0.35, 0.95);
   compressor.connect(dryGain);
 
   const masterGain = context.createGain();
@@ -582,6 +839,11 @@ function sanitizeTempo(raw: TempoMeta): TempoMeta {
   return { bpm, timeSig, offsetMs, barsInLoop, quantized: raw?.quantized ?? true };
 }
 
+function applyPlanTempoOverride(tempo: TempoMeta, bpm?: number): TempoMeta {
+  if (!Number.isFinite(bpm)) return tempo;
+  return { ...tempo, bpm: clampNumber(bpm, 40, 240) };
+}
+
 function sanitizeBarWindows(windows: BarWindow[], tempo: TempoMeta): BarWindow[] {
   const seen = new Set<string>();
   const sanitized: BarWindow[] = [];
@@ -597,6 +859,779 @@ function sanitizeBarWindows(windows: BarWindow[], tempo: TempoMeta): BarWindow[]
   sanitized.sort((a, b) => a.startBar - b.startBar || a.endBar - b.endBar);
   return sanitized;
 }
+
+type RenderPlanWindow = RenderPlan["windows"][number];
+
+const planWindowKey = (startBar: number, bars: number) => `${startBar}:${bars}`;
+
+const buildPlanWindowMap = (windows: RenderPlan["windows"]) => {
+  const map = new Map<string, RenderPlanWindow>();
+  for (const window of windows) {
+    if (!window) continue;
+    const startBar = Number(window.startBar);
+    const bars = Number(window.bars);
+    if (!Number.isFinite(startBar) || !Number.isFinite(bars) || bars <= 0) {
+      continue;
+    }
+    map.set(planWindowKey(Math.floor(startBar), Math.floor(bars)), window);
+  }
+  return map;
+};
+
+const resolveRenderWindows = (
+  requested: BarWindow[],
+  planWindows: RenderPlan["windows"] | undefined,
+  tempo: TempoMeta,
+) => {
+  if (!Array.isArray(planWindows) || planWindows.length === 0) return requested;
+  const rawPlanWindows = planWindows.map((window) => ({
+    startBar: window.startBar,
+    endBar: window.startBar + window.bars,
+  }));
+  const sanitizedPlans = sanitizeBarWindows(rawPlanWindows, tempo);
+  const filteredPlans = sanitizedPlans.filter((planWindow) =>
+    requested.some(
+      (jobWindow) =>
+        planWindow.startBar >= jobWindow.startBar &&
+        planWindow.endBar <= jobWindow.endBar,
+    ),
+  );
+  return filteredPlans.length ? filteredPlans : requested;
+};
+
+const resolvePlanWindow = (
+  planWindowMap: Map<string, RenderPlanWindow> | null,
+  window: BarWindow,
+) => {
+  if (!planWindowMap) return undefined;
+  const bars = Math.max(1, Math.floor(window.endBar - window.startBar));
+  return planWindowMap.get(planWindowKey(Math.floor(window.startBar), bars));
+};
+
+type EnergyPoint = { bar: number; energy: number };
+type PlanEnergyCurve = NonNullable<RenderPlan["global"]>["energyCurve"];
+type PlanSections = NonNullable<RenderPlan["global"]>["sections"];
+type PlanSection = { name: string; startBar: number; bars: number };
+
+const normalizeEnergyCurve = (
+  energyCurve: PlanEnergyCurve | undefined,
+): EnergyPoint[] => {
+  if (!Array.isArray(energyCurve)) return [];
+  const byBar = new Map<number, number>();
+  for (const point of energyCurve) {
+    const bar = Math.max(1, Math.floor(point.bar));
+    const energy = Number(point.energy);
+    if (!Number.isFinite(energy)) continue;
+    byBar.set(bar, clamp01(energy));
+  }
+  return Array.from(byBar.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([bar, energy]) => ({ bar, energy }));
+};
+
+const resolveEnergyAtBar = (curve: EnergyPoint[], bar: number) => {
+  if (!curve.length) return null;
+  let resolved = curve[0].energy;
+  for (const point of curve) {
+    if (point.bar > bar) break;
+    resolved = point.energy;
+  }
+  return resolved;
+};
+
+const resolveWindowEnergy = (window: BarWindow, curve: EnergyPoint[]) => {
+  if (!curve.length) return null;
+  const startBar = Math.max(1, Math.floor(window.startBar));
+  const endBar = Math.max(startBar + 1, Math.floor(window.endBar));
+  let sum = 0;
+  let count = 0;
+  for (let bar = startBar; bar < endBar; bar += 1) {
+    const energy = resolveEnergyAtBar(curve, bar);
+    if (energy == null) continue;
+    sum += energy;
+    count += 1;
+  }
+  return count ? sum / count : null;
+};
+
+const normalizeSections = (
+  sections: PlanSections | undefined,
+): PlanSection[] => {
+  if (!Array.isArray(sections)) return [];
+  return sections
+    .map((section) => {
+      const name = typeof section.name === "string" ? section.name.trim() : "";
+      const startBar = Math.max(1, Math.floor(section.startBar));
+      const bars = Math.max(1, Math.floor(section.bars));
+      if (!name) return null;
+      return { name, startBar, bars };
+    })
+    .filter((section): section is PlanSection => Boolean(section))
+    .sort((a, b) => a.startBar - b.startBar);
+};
+
+const resolveSectionLabel = (
+  sections: PlanSection[],
+  window: BarWindow,
+) => {
+  if (!sections.length) return null;
+  const startBar = Math.max(1, Math.floor(window.startBar));
+  for (const section of sections) {
+    const endBar = section.startBar + section.bars;
+    if (startBar >= section.startBar && startBar < endBar) {
+      return section.name;
+    }
+  }
+  return null;
+};
+
+const resolvePlanKbTexture = (
+  input: RenderPlanWindow["texture"]?.["kbTexture"] | undefined,
+  manifest: ManifestRecord,
+  fallback?: TextureFingerprint,
+) => {
+  if (!input) return fallback;
+  if (typeof input === "string") {
+    return manifest[input] ?? fallback;
+  }
+  const weights = input?.weights;
+  if (!weights || typeof weights !== "object") return fallback;
+  let bestKey: string | null = null;
+  let bestWeight = Number.NEGATIVE_INFINITY;
+  for (const [key, value] of Object.entries(weights)) {
+    if (!Number.isFinite(value)) continue;
+    if (value > bestWeight) {
+      bestWeight = value;
+      bestKey = key;
+    }
+  }
+  if (bestKey && manifest[bestKey]) {
+    return manifest[bestKey];
+  }
+  return fallback;
+};
+
+const normalizeMaterialKey = (value: unknown) => {
+  if (typeof value !== "string") return "";
+  return value.trim().toLowerCase();
+};
+
+const resolveGrooveTemplate = (
+  material: RenderPlanWindow["material"] | undefined,
+  bank: GrooveTemplateBank | undefined,
+) => {
+  if (!material?.grooveTemplateIds?.length || !bank?.size) return null;
+  for (const rawId of material.grooveTemplateIds) {
+    const key = normalizeMaterialKey(rawId);
+    if (!key) continue;
+    const groove = bank.get(key);
+    if (groove) return groove;
+  }
+  return null;
+};
+
+const resolveMacroCurves = (
+  material: RenderPlanWindow["material"] | undefined,
+  bank: MacroCurveBank | undefined,
+): MacroCurve[] => {
+  if (!material?.macroCurveIds?.length || !bank?.size) return [];
+  const curves: MacroCurve[] = [];
+  const seen = new Set<string>();
+  for (const rawId of material.macroCurveIds) {
+    const key = normalizeMaterialKey(rawId);
+    if (!key) continue;
+    const bucket = bank.get(key);
+    if (!bucket?.length) continue;
+    for (const curve of bucket) {
+      const identity = curve.id ?? curve.name ?? curve.target;
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+      curves.push(curve);
+    }
+  }
+  return curves;
+};
+
+const collectMaterialIds = (windows: RenderPlan["windows"]) => {
+  const ids: string[] = [];
+  for (const window of windows) {
+    if (!window?.material) continue;
+    if (Array.isArray(window.material.audioAtomIds)) {
+      ids.push(...window.material.audioAtomIds);
+    }
+    if (Array.isArray(window.material.midiMotifIds)) {
+      ids.push(...window.material.midiMotifIds);
+    }
+  }
+  return ids;
+};
+
+type WindowTextureRequest = {
+  window: BarWindow;
+  planWindowMap: Map<string, RenderPlanWindow> | null;
+  helix: HelixPacket | undefined;
+  helixPeaks: Array<{ f: number; q: number; gain: number }>;
+  baseKbTexture: TextureFingerprint | undefined;
+  baseSampleInfluence: number;
+  baseStyleInfluence: number;
+  baseWeirdness: number;
+  manifest: ManifestRecord;
+  energy?: number;
+};
+
+const buildWindowTexture = ({
+  window,
+  planWindowMap,
+  helix,
+  helixPeaks,
+  baseKbTexture,
+  baseSampleInfluence,
+  baseStyleInfluence,
+  baseWeirdness,
+  manifest,
+  energy,
+}: WindowTextureRequest) => {
+  const planWindow = resolvePlanWindow(planWindowMap, window);
+  const textureConfig = planWindow?.texture;
+  const energyLevel = resolveEnergyAmount(energy);
+  const sampleInfluence = clamp01(
+    textureConfig?.sampleInfluence ??
+      applyEnergyToInfluence(baseSampleInfluence, energyLevel, 0.2),
+  );
+  const styleInfluence = clamp01(
+    textureConfig?.styleInfluence ??
+      applyEnergyToInfluence(baseStyleInfluence, energyLevel, -0.15),
+  );
+  const weirdness = clamp01(
+    textureConfig?.weirdness ??
+      applyEnergyToInfluence(baseWeirdness, energyLevel, 0.25),
+  );
+  const kbTexture = resolvePlanKbTexture(
+    textureConfig?.kbTexture,
+    manifest,
+    baseKbTexture,
+  );
+  const seed = computeSeed(helix, sampleInfluence, styleInfluence, weirdness);
+  return textureFrom(helixPeaks, kbTexture, {
+    sampleInfluence,
+    styleInfluence,
+    weirdness,
+    seed,
+    eqPeaks: textureConfig?.eqPeaks,
+    fx: textureConfig?.fx,
+  });
+};
+
+type ScheduleMaterialAtomsParams = {
+  context: OfflineAudioContext;
+  material: RenderPlanWindow["material"];
+  audioAtoms: AudioAtomBank;
+  destination: AudioNode;
+  durationSec: number;
+};
+
+const scheduleMaterialAtoms = ({
+  context,
+  material,
+  audioAtoms,
+  destination,
+  durationSec,
+}: ScheduleMaterialAtomsParams) => {
+  const buffers = resolveMaterialBuffers(material, audioAtoms);
+  if (!buffers.length) return;
+
+  const playbackRate = resolveMaterialPlaybackRate(material);
+  const spacingSec = durationSec / Math.max(1, buffers.length + 1);
+  const gainValue = clamp(0.25 / Math.sqrt(buffers.length), 0.05, 0.35);
+
+  for (let index = 0; index < buffers.length; index += 1) {
+    const buffer = buffers[index];
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = playbackRate;
+
+    const gain = context.createGain();
+    gain.gain.value = gainValue;
+    source.connect(gain);
+    gain.connect(destination);
+
+    const startAt = Math.min(
+      spacingSec * index,
+      Math.max(0, durationSec - 0.01),
+    );
+    const remaining = Math.max(0.01, durationSec - startAt);
+    const effectiveDuration = buffer.duration / Math.max(0.01, playbackRate);
+    if (effectiveDuration < remaining) {
+      source.loop = true;
+      source.loopStart = 0;
+      source.loopEnd = buffer.duration;
+    }
+    source.start(startAt, 0, remaining);
+  }
+};
+
+type MidiNoteEvent = {
+  startBeat: number;
+  durationBeats: number;
+  pitch: number;
+  velocity: number;
+};
+
+type SynthSettings = {
+  waveform: OscillatorType;
+  detune: number;
+  attackSec: number;
+  decaySec: number;
+  sustain: number;
+  releaseSec: number;
+  gain: number;
+};
+
+const DEFAULT_MIDI_VELOCITY = 0.8;
+const DEFAULT_MIDI_GAIN = 0.18;
+const DEFAULT_MIDI_GATE = 0.85;
+const DEFAULT_QUANTIZE_BEATS = 0.25;
+
+const parseStepBeats = (value: string | number | undefined, fallback: number) => {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const fraction = trimmed.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+    if (fraction) {
+      const num = Number(fraction[1]);
+      const den = Number(fraction[2]);
+      if (Number.isFinite(num) && Number.isFinite(den) && den > 0) {
+        return (4 * num) / den;
+      }
+    }
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return fallback;
+};
+
+const resolveLoopBeats = (motif: MidiMotif, beatsPerBar: number) => {
+  if (typeof motif.lengthBeats === "number" && motif.lengthBeats > 0) {
+    return motif.lengthBeats;
+  }
+  if (typeof motif.bars === "number" && motif.bars > 0) {
+    return motif.bars * beatsPerBar;
+  }
+  let maxEnd = 0;
+  for (const note of motif.notes) {
+    const end = note.startBeat + note.durationBeats;
+    if (Number.isFinite(end)) {
+      maxEnd = Math.max(maxEnd, end);
+    }
+  }
+  return maxEnd > 0 ? maxEnd : beatsPerBar * 4;
+};
+
+const quantizeBeat = (value: number, grid: number) => {
+  if (grid <= 0) return value;
+  return Math.round(value / grid) * grid;
+};
+
+const applySwing = (value: number, grid: number, swing: number) => {
+  if (grid <= 0 || swing <= 0) return value;
+  const index = Math.round(value / grid);
+  if (index % 2 === 1) {
+    return value + grid * clamp01(swing) * 0.5;
+  }
+  return value;
+};
+
+const quantizeDuration = (value: number, grid: number) => {
+  if (grid <= 0) return Math.max(0.05, value);
+  return Math.max(grid * 0.25, Math.round(value / grid) * grid);
+};
+
+const buildArpPattern = (pitches: number[], mode: string | undefined) => {
+  if (!pitches.length) return [];
+  const unique = Array.from(new Set(pitches)).sort((a, b) => a - b);
+  if (mode === "down") return unique.slice().reverse();
+  if (mode === "updown") {
+    const up = unique.slice();
+    const down = unique.slice(1, -1).reverse();
+    return up.concat(down.length ? down : up);
+  }
+  return unique;
+};
+
+const resolveSynthSettings = (motif: MidiMotif): SynthSettings => {
+  const waveformRaw = motif.synth?.waveform;
+  const waveform =
+    waveformRaw === "sine" ||
+    waveformRaw === "triangle" ||
+    waveformRaw === "square" ||
+    waveformRaw === "sawtooth"
+      ? waveformRaw
+      : "triangle";
+  const detune = clampNumber(motif.synth?.detune ?? 0, -1200, 1200);
+  const attackSec = clampNumber((motif.synth?.attackMs ?? 8) / 1000, 0.001, 1);
+  const decaySec = clampNumber((motif.synth?.decayMs ?? 80) / 1000, 0.001, 1);
+  const sustain = clamp01(motif.synth?.sustain ?? 0.6);
+  const releaseSec = clampNumber((motif.synth?.releaseMs ?? 120) / 1000, 0.001, 2);
+  const gain = clamp01(motif.synth?.gain ?? DEFAULT_MIDI_GAIN);
+  return { waveform, detune, attackSec, decaySec, sustain, releaseSec, gain };
+};
+
+const resolveGrooveGrid = (
+  groove: GrooveTemplate | null | undefined,
+  fallbackGrid: number,
+) => parseStepBeats(groove?.grid, fallbackGrid);
+
+const applyGrooveTemplate = (
+  events: MidiNoteEvent[],
+  groove: GrooveTemplate | null | undefined,
+  grid: number,
+) => {
+  if (!groove) return events;
+  const offsets = groove.offsets ?? [];
+  const velocities = groove.velocities ?? [];
+  const swing = clamp01(groove.swing ?? 0);
+  const stepBeats = resolveGrooveGrid(groove, grid);
+  if (stepBeats <= 0) return events;
+  if (!offsets.length && !velocities.length && swing <= 0) return events;
+  return events.map((event) => {
+    let startBeat = event.startBeat;
+    if (swing > 0) {
+      startBeat = applySwing(startBeat, stepBeats, swing);
+    }
+    if (offsets.length) {
+      const index = Math.floor(startBeat / stepBeats) % offsets.length;
+      const offset = clamp(offsets[index] ?? 0, -0.5, 0.5) * stepBeats;
+      startBeat = Math.max(0, startBeat + offset);
+    }
+    let velocity = event.velocity;
+    if (velocities.length) {
+      const index = Math.floor(startBeat / stepBeats) % velocities.length;
+      const scale = clamp(velocities[index] ?? 1, 0, 2);
+      velocity = clamp01(velocity * scale);
+    }
+    return { ...event, startBeat, velocity };
+  });
+};
+
+type MacroState = {
+  gain?: number;
+  detune?: number;
+  attackSec?: number;
+  decaySec?: number;
+  releaseSec?: number;
+  sustain?: number;
+};
+
+const resolveMacroValue = (
+  curve: MacroCurve,
+  beat: number,
+  windowBeats: number,
+) => {
+  const points = curve.points ?? [];
+  if (!points.length) return null;
+  const maxBeat = windowBeats > 0 ? windowBeats : points[points.length - 1].beat;
+  const localBeat = maxBeat > 0 ? beat % maxBeat : beat;
+  if (localBeat <= points[0].beat) return points[0].value;
+  for (let index = 1; index < points.length; index += 1) {
+    const prev = points[index - 1];
+    const next = points[index];
+    if (localBeat <= next.beat) {
+      const span = Math.max(0.0001, next.beat - prev.beat);
+      const t = clamp01((localBeat - prev.beat) / span);
+      return prev.value + (next.value - prev.value) * t;
+    }
+  }
+  return points[points.length - 1].value;
+};
+
+const resolveMacroState = (
+  curves: MacroCurve[] | undefined,
+  beat: number,
+  windowBeats: number,
+): MacroState => {
+  const state: MacroState = {};
+  if (!curves?.length) return state;
+  for (const curve of curves) {
+    const value = resolveMacroValue(curve, beat, windowBeats);
+    if (value == null) continue;
+    switch (curve.target) {
+      case "gain":
+        state.gain = value;
+        break;
+      case "detune":
+        state.detune = value;
+        break;
+      case "attackMs":
+        state.attackSec = value / 1000;
+        break;
+      case "decayMs":
+        state.decaySec = value / 1000;
+        break;
+      case "releaseMs":
+        state.releaseSec = value / 1000;
+        break;
+      case "sustain":
+        state.sustain = value;
+        break;
+    }
+  }
+  return state;
+};
+
+const applyMacroState = (base: SynthSettings, state: MacroState): SynthSettings => {
+  const gainMultiplier =
+    typeof state.gain === "number" ? clamp(state.gain, 0, 2) : 1;
+  const detuneOffset =
+    typeof state.detune === "number" ? clamp(state.detune, -1200, 1200) : 0;
+  const attackSec =
+    typeof state.attackSec === "number"
+      ? clamp(state.attackSec, 0.001, 2)
+      : base.attackSec;
+  const decaySec =
+    typeof state.decaySec === "number"
+      ? clamp(state.decaySec, 0.001, 2)
+      : base.decaySec;
+  const releaseSec =
+    typeof state.releaseSec === "number"
+      ? clamp(state.releaseSec, 0.001, 3)
+      : base.releaseSec;
+  const sustain =
+    typeof state.sustain === "number" ? clamp01(state.sustain) : base.sustain;
+  return {
+    ...base,
+    detune: clamp(base.detune + detuneOffset, -1200, 1200),
+    gain: clamp01(base.gain * gainMultiplier),
+    attackSec,
+    decaySec,
+    releaseSec,
+    sustain,
+  };
+};
+
+const buildMotifEvents = (
+  motif: MidiMotif,
+  tempo: TempoMeta,
+  windowBars: number,
+  material: RenderPlanWindow["material"] | undefined,
+  grooveTemplate: GrooveTemplate | null | undefined,
+): { events: MidiNoteEvent[]; loopBeats: number } => {
+  const beatsPerBar = Number(tempo.timeSig.split("/")[0] || "4");
+  const windowBeats = windowBars * beatsPerBar;
+  const grid = parseStepBeats(motif.quantize, DEFAULT_QUANTIZE_BEATS);
+  const swing = clamp01(motif.swing ?? 0);
+  const stretch = clampNumber(material?.timeStretch ?? 1, 0.25, 4);
+  const transpose = clampNumber(material?.transposeSemitones ?? 0, -24, 24);
+  const loopBeats = resolveLoopBeats(motif, beatsPerBar) * stretch;
+
+  const events: MidiNoteEvent[] = [];
+  const avgVelocity =
+    motif.notes.reduce((acc, note) => acc + (note.velocity ?? DEFAULT_MIDI_VELOCITY), 0) /
+    Math.max(1, motif.notes.length);
+
+  if (motif.arp) {
+    const octaveCount = clampNumber(motif.arp.octaves ?? 1, 1, 4);
+    const chordPitches: number[] = [];
+    for (const note of motif.notes) {
+      chordPitches.push(note.pitch);
+    }
+    const basePattern = buildArpPattern(chordPitches, motif.arp.mode);
+    const arpPattern: number[] = [];
+    for (let octave = 0; octave < octaveCount; octave += 1) {
+      for (const pitch of basePattern) {
+        arpPattern.push(pitch + octave * 12);
+      }
+    }
+    if (!arpPattern.length) {
+      arpPattern.push(60);
+    }
+    const rateBeats = parseStepBeats(motif.arp.rate, grid);
+    const gate = clampNumber(motif.arp.gate ?? DEFAULT_MIDI_GATE, 0.05, 1);
+    const steps = Math.max(1, Math.ceil(loopBeats / rateBeats));
+    for (let step = 0; step < steps; step += 1) {
+      const baseStart = step * rateBeats;
+      const startBeat = applySwing(baseStart, rateBeats, swing);
+      const durationBeats = Math.max(0.05, rateBeats * gate);
+      const pitch = arpPattern[step % arpPattern.length] + transpose;
+      events.push({
+        startBeat,
+        durationBeats,
+        pitch,
+        velocity: clamp01(avgVelocity),
+      });
+    }
+  } else {
+    for (const note of motif.notes) {
+      const startBeat = applySwing(
+        quantizeBeat(note.startBeat, grid),
+        grid,
+        swing,
+      );
+      const durationBeats = quantizeDuration(note.durationBeats, grid);
+      events.push({
+        startBeat,
+        durationBeats,
+        pitch: note.pitch + transpose,
+        velocity: clamp01(note.velocity ?? DEFAULT_MIDI_VELOCITY),
+      });
+    }
+  }
+
+  const repeated: MidiNoteEvent[] = [];
+  if (loopBeats <= 0 || windowBeats <= 0) {
+    return { events: [], loopBeats: Math.max(loopBeats, 1) };
+  }
+  const loops = Math.max(1, Math.ceil(windowBeats / loopBeats));
+  for (let loop = 0; loop < loops; loop += 1) {
+    const offset = loop * loopBeats;
+    for (const event of events) {
+      const startBeat = event.startBeat + offset;
+      if (startBeat >= windowBeats) continue;
+      repeated.push({ ...event, startBeat });
+    }
+  }
+  const grooved = applyGrooveTemplate(repeated, grooveTemplate, grid);
+  return { events: grooved, loopBeats };
+};
+
+const scheduleSynthNote = (
+  context: OfflineAudioContext,
+  destination: AudioNode,
+  startSec: number,
+  durationSec: number,
+  pitch: number,
+  velocity: number,
+  synth: SynthSettings,
+) => {
+  if (!Number.isFinite(startSec) || !Number.isFinite(durationSec)) return;
+  const safeDuration = Math.max(0.02, durationSec);
+  const noteEnd = startSec + safeDuration;
+  const attackEnd = startSec + synth.attackSec;
+  const decayEnd = attackEnd + synth.decaySec;
+  const releaseStart = Math.max(decayEnd, noteEnd - synth.releaseSec);
+
+  const osc = context.createOscillator();
+  osc.type = synth.waveform;
+  osc.frequency.value = 440 * 2 ** ((pitch - 69) / 12);
+  if (synth.detune) {
+    osc.detune.value = synth.detune;
+  }
+
+  const gain = context.createGain();
+  const baseGain = clamp01(velocity) * synth.gain;
+  gain.gain.setValueAtTime(0, startSec);
+  gain.gain.linearRampToValueAtTime(baseGain, attackEnd);
+  gain.gain.linearRampToValueAtTime(baseGain * synth.sustain, decayEnd);
+  gain.gain.setValueAtTime(baseGain * synth.sustain, releaseStart);
+  gain.gain.linearRampToValueAtTime(0, noteEnd);
+
+  osc.connect(gain);
+  gain.connect(destination);
+  osc.start(startSec);
+  osc.stop(noteEnd + 0.05);
+};
+
+type ScheduleMidiMotifsParams = {
+  context: OfflineAudioContext;
+  material: RenderPlanWindow["material"];
+  midiMotifs: MidiMotifBank;
+  destination: AudioNode;
+  durationSec: number;
+  tempo: TempoMeta;
+  windowBars: number;
+  grooveTemplate?: GrooveTemplate | null;
+  macroCurves?: MacroCurve[];
+};
+
+const scheduleMidiMotifs = ({
+  context,
+  material,
+  midiMotifs,
+  destination,
+  durationSec,
+  tempo,
+  windowBars,
+  grooveTemplate,
+  macroCurves,
+}: ScheduleMidiMotifsParams) => {
+  if (!material?.midiMotifIds?.length || midiMotifs.size === 0) return;
+  const beatSeconds = 60 / tempo.bpm;
+  const beatsPerBar = Number(tempo.timeSig.split("/")[0] || "4");
+  const windowBeats = Math.max(1, windowBars * beatsPerBar);
+  const synthCache = new Map<MidiMotif, SynthSettings>();
+  for (const rawId of material.midiMotifIds) {
+    const key = normalizeMaterialKey(rawId);
+    if (!key) continue;
+    const motif = midiMotifs.get(key);
+    if (!motif) continue;
+    const { events } = buildMotifEvents(
+      motif,
+      tempo,
+      windowBars,
+      material,
+      grooveTemplate,
+    );
+    if (!events.length) continue;
+    let synth = synthCache.get(motif);
+    if (!synth) {
+      synth = resolveSynthSettings(motif);
+      synthCache.set(motif, synth);
+    }
+    for (const event of events) {
+      const startSec = event.startBeat * beatSeconds;
+      if (startSec >= durationSec) continue;
+      const noteDurationSec = event.durationBeats * beatSeconds;
+      const remaining = Math.max(0.02, durationSec - startSec);
+      const clampedDuration = Math.min(noteDurationSec, remaining);
+      const macroState = resolveMacroState(macroCurves, event.startBeat, windowBeats);
+      const synthForEvent = applyMacroState(synth, macroState);
+      scheduleSynthNote(
+        context,
+        destination,
+        startSec,
+        clampedDuration,
+        event.pitch,
+        event.velocity,
+        synthForEvent,
+      );
+    }
+  }
+};
+
+const resolveMaterialPlaybackRate = (
+  material: RenderPlanWindow["material"],
+) => {
+  const semitones = clampNumber(material?.transposeSemitones ?? 0, -24, 24);
+  const stretch = clampNumber(material?.timeStretch ?? 1, 0.25, 4);
+  const rate = Math.pow(2, semitones / 12) / stretch;
+  return clamp(rate, 0.25, 4);
+};
+
+const resolveMaterialBuffers = (
+  material: RenderPlanWindow["material"],
+  audioAtoms: AudioAtomBank,
+) => {
+  const ids: string[] = [];
+  if (Array.isArray(material?.audioAtomIds)) {
+    ids.push(...material.audioAtomIds);
+  }
+  if (Array.isArray(material?.midiMotifIds)) {
+    ids.push(...material.midiMotifIds);
+  }
+  const buffers: AudioBuffer[] = [];
+  const seen = new Set<string>();
+  for (const id of ids) {
+    const key = normalizeMaterialKey(id);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const buffer = audioAtoms.get(key);
+    if (buffer) {
+      buffers.push(buffer);
+    }
+  }
+  return buffers;
+};
 
 function windowToSeconds(window: BarWindow, tempo: TempoMeta) {
   const beatsPerBar = Number.parseInt(tempo.timeSig.split("/")[0] || "4", 10);
@@ -655,6 +1690,27 @@ function clamp(value: number, min: number, max: number) {
 
 function clamp01(value: number) {
   return clamp(value, 0, 1);
+}
+
+function resolveEnergyAmount(value: number | undefined) {
+  return Number.isFinite(value) ? clamp01(value) : null;
+}
+
+function applyEnergyToInfluence(
+  base: number,
+  energy: number | null,
+  scale: number,
+) {
+  if (energy == null) return base;
+  return base + (energy - 0.5) * scale;
+}
+
+function resolveFxAmount(value: number | undefined) {
+  return Number.isFinite(value) ? clamp01(value) : null;
+}
+
+function lerp(start: number, end: number, t: number) {
+  return start + (end - start) * t;
 }
 
 function clampNumber(value: number, min: number, max: number) {

@@ -1,6 +1,6 @@
 # Constraint Packs
 
-Two starter packs are shipped to make the verifier immediately useful in
+Three starter packs are shipped to make the verifier immediately useful in
 enterprise agent stacks. Each pack defines constraint IDs, severities, and the
 signal kinds used for policy laddering.
 
@@ -42,6 +42,11 @@ Pack B: Tool-Use + Budget Pack (`tool-use-budget`)
 - Approval-required operations.
 - Provenance requirements for external data/tools.
 
+Pack C: Provenance + Safety Pack (`provenance-safety`)
+- Audit-tag coverage for risky IO/security surfaces.
+- Provenance protocol presence when risk tags exist.
+- Verification checklist presence when risk tags exist.
+
 Evaluate examples
 
 Repo convergence (CI/build telemetry):
@@ -61,13 +66,16 @@ POST /api/agi/constraint-packs/repo-convergence/evaluate
 }
 ```
 
-Repo convergence (auto-ingest from env/JUnit/JSON):
+Repo convergence (auto-ingest from env/JUnit/Vitest/ESLint/tsc/JSON):
 ```json
 POST /api/agi/constraint-packs/repo-convergence/evaluate
 {
   "traceId": "ci:auto-4821",
   "autoTelemetry": true,
   "junitPath": "reports/junit.xml",
+  "vitestPath": "reports/vitest.json",
+  "eslintPath": "reports/eslint.json",
+  "tscPath": "reports/tsc.txt",
   "telemetryPath": "reports/repo-telemetry.json"
 }
 ```
@@ -86,6 +94,63 @@ POST /api/agi/constraint-packs/tool-use-budget/evaluate
     "tools": { "calls": 6 }
   }
 }
+```
+
+Tool-use + budget (auto-ingest from tool logs + env):
+```json
+POST /api/agi/constraint-packs/tool-use-budget/evaluate
+{
+  "traceId": "agent:session-19",
+  "autoTelemetry": true,
+  "toolLogTraceId": "trace-19",
+  "toolLogWindowMs": 600000
+}
+```
+
+Provenance + safety (audit tags via auto-scan):
+```json
+POST /api/agi/constraint-packs/provenance-safety/evaluate
+{
+  "traceId": "audit:repo-1",
+  "autoTelemetry": true
+}
+```
+
+Provenance + safety (explicit audit telemetry):
+```json
+POST /api/agi/constraint-packs/provenance-safety/evaluate
+{
+  "traceId": "audit:repo-1",
+  "telemetry": {
+    "audit": {
+      "files": { "total": 120, "tagged": 118, "untagged": 2 },
+      "tags": { "unknown": 0 },
+      "violations": { "count": 0 },
+      "risk": { "files": 12 },
+      "provenance": { "files": 4, "coverage": 1 },
+      "safety": { "files": 3, "coverage": 1 }
+    }
+  }
+}
+```
+
+GitHub Actions helper (one step)
+```yaml
+- name: Shadow of Intent pack eval
+  uses: ./.github/actions/shadow-of-intent-pack-eval
+  with:
+    pack: repo-convergence
+    reports-path: reports
+    trace-out: artifacts/training-trace.jsonl
+```
+
+GitHub Actions helper (collect + verify)
+```yaml
+- name: Shadow of Intent collect + verify
+  uses: ./.github/actions/shadow-of-intent-collect-verify
+  with:
+    reports-path: reports
+    trace-out: artifacts/training-trace.jsonl
 ```
 
 Policy profile example
@@ -125,10 +190,21 @@ POST /api/agi/constraint-packs/tool-use-budget/evaluate
 
 Notes
 - Auto-ingest is enabled when `autoTelemetry` is true, when a telemetry path is
-  provided, or when `CASIMIR_AUTO_TELEMETRY=1`.
-- Auto-ingest reads JSON telemetry (`telemetryPath`, `CASIMIR_TELEMETRY_PATH`,
-  `CASIMIR_REPO_TELEMETRY_PATH`, `CASIMIR_TOOL_TELEMETRY_PATH`) and JUnit XML
-  (`junitPath`, `CASIMIR_TEST_JUNIT_PATH`, `JUNIT_PATH`) for repo convergence.
+  provided, or when `CASIMIR_AUTO_TELEMETRY=1` / `CASIMIR_AUTO_CI_REPORTS=1`.
+- When enabled, auto-ingest scans `reports/` for junit/vitest/eslint/tsc outputs
+  by default (override dirs via `CASIMIR_AUTO_CI_REPORTS_DIRS`).
+- Auto-ingest reads JSON telemetry (`telemetryPath`, `CASIMIR_TELEMETRY_PATH`,  
+  `CASIMIR_REPO_TELEMETRY_PATH`, `CASIMIR_TOOL_TELEMETRY_PATH`,
+  `CASIMIR_AUDIT_TELEMETRY_PATH`) and JUnit XML (`junitPath`,
+  `CASIMIR_TEST_JUNIT_PATH`, `JUNIT_PATH`) for repo convergence.
+- Auto-ingest also parses Vitest/Jest JSON (`vitestPath`, `jestPath`) plus ESLint
+  (`eslintPath`) and tsc output (`tscPath`) for repo convergence.
+- Tool-use auto-ingest can pull tool logs using `toolLogTraceId`,
+  `toolLogWindowMs`, or `toolLogLimit`.
+- Provenance/safety auto-ingest scans the repo audit tree when enabled (set
+  `autoTelemetry: false` to require explicit telemetry).
+- Tool-use policy violations are derived from explicit tool log flags
+  (`policy.forbidden`, `policy.approvalMissing`, `policy.provenanceMissing`).
 - Environment variables can supply telemetry directly; see `docs/ENVIRONMENT.md`
   for the list of `CASIMIR_*` keys.
 - `metrics` may be supplied as a flat override map (e.g., `"metrics":{"build.status":1}`).
@@ -139,3 +215,6 @@ Notes
 - When `policyProfileId` is provided, the response includes `policyProfile` metadata.
 - Packs are definitions; evaluators map runtime metrics to the pack's
   constraint IDs, then normalize with `constraint-pack-normalizer.ts`.
+- Evaluations auto-issue a constraint-pack certificate hash (with `integrityOk`)
+  when telemetry is present; certified signal kinds require hash + integrity and
+  non-proxy data.

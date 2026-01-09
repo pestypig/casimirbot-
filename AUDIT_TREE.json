@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "sourceGlobs": [
+    "server/**/*.{ts,tsx,js,jsx}",
+    "client/**/*.{ts,tsx,js,jsx}",
+    "modules/**/*.{ts,tsx,js,jsx}",
+    "shared/**/*.{ts,tsx,js,jsx}",
+    "tools/**/*.{ts,tsx,js,jsx,py}",
+    "scripts/**/*.{ts,tsx,js,jsx}",
+    "cli/**/*.{ts,tsx,js,jsx}",
+    "sdk/src/**/*.{ts,tsx,js,jsx}"
+  ],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/external/**",
+    "**/.cal/**",
+    "**/reports/**",
+    "**/__tests__/**",
+    "**/*.d.ts"
+  ],
+  "auto": {
+    "enabled": true,
+    "contentMaxBytes": 24000,
+    "toolRisks": true,
+    "rules": [
+      {
+        "id": "auto-api-surface",
+        "matchPath": "(^|/)(routes|api)(/|\\.)",
+        "tags": ["surface.api"]
+      },
+      {
+        "id": "auto-network-content",
+        "matchContent": "\\b(fetch|axios|node-fetch|undici)\\b",
+        "tags": ["io.network"]
+      },
+      {
+        "id": "auto-fs-content",
+        "matchContent": "\\b(node:fs|fs/promises|fs\\.writeFile|fs\\.rm|fs\\.unlink|fs\\.createWriteStream|writeFileSync)\\b",
+        "tags": ["io.disk"]
+      },
+      {
+        "id": "auto-process-content",
+        "matchContent": "\\b(child_process|spawn\\(|exec\\(|execFile\\(|fork\\()\\b",
+        "tags": ["io.process"]
+      },
+      {
+        "id": "auto-crypto-content",
+        "matchContent": "\\b(crypto|jsonwebtoken|jwt)\\b",
+        "tags": ["security.crypto"]
+      },
+      {
+        "id": "auto-ai-content",
+        "matchContent": "\\b(openai|llm|chat\\s*completions|vision-http|diffusion|whisper)\\b",
+        "tags": ["ai.inference"]
+      },
+      {
+        "id": "auto-provenance-content",
+        "matchContent": "\\b(provenance|EssenceEnvelope|essence)\\b",
+        "tags": ["provenance-protocol"]
+      },
+      {
+        "id": "auto-auth-path",
+        "matchPath": "(auth|jwt|tenant|session|passport)",
+        "tags": ["security.auth"]
+      },
+      {
+        "id": "auto-auth-content",
+        "matchContent": "\\b(auth|jwt|token|passport|session)\\b",
+        "tags": ["security.auth"]
+      },
+      {
+        "id": "auto-telemetry-content",
+        "matchContent": "\\b(metrics|telemetry|observability|trace)\\b",
+        "tags": ["observability.telemetry"]
+      },
+      {
+        "id": "auto-validation-content",
+        "matchContent": "\\b(zod|schema|validate|validator)\\b",
+        "tags": ["contract.validation"]
+      },
+      {
+        "id": "auto-guardrails-content",
+        "matchContent": "\\b(guardrail|certificate|viability|verify|constraint)\\b",
+        "tags": ["verification-checklist"]
+      },
+      {
+        "id": "auto-nondeterminism",
+        "matchContent": "\\b(Math\\.random|randomUUID|randomInt|Date\\.now|new Date\\()\\b",
+        "tags": ["determinism.nondeterministic"]
+      }
+    ]
+  },
+  "rules": [
+    {
+      "id": "integrity-policy",
+      "matchPath": "(auth|jwt|tenant|policy)",
+      "tags": ["integrity-protocols"]
+    },
+    {
+      "id": "verification-gates",
+      "matchPath": "(constraint|guard|verify|certificate|viability)",
+      "tags": ["verification-checklist", "promise-trials"]
+    },
+    {
+      "id": "telemetry-audit",
+      "matchPath": "(telemetry|metrics|trace|audit|log)",
+      "tags": ["liveness-or-it-didnt-happen", "stewardship-ledger"]
+    },
+    {
+      "id": "provenance",
+      "matchPath": "provenance|source",
+      "tags": ["provenance-protocol"]
+    },
+    {
+      "id": "feedback-loops",
+      "matchPath": "(feedback|loop|training|evaluation)",
+      "tags": ["feedback-loop-hygiene"]
+    }
+  ],
+  "entries": [
+    {
+      "path": "server/routes/agi.adapter.ts",
+      "tags": ["verification-checklist", "integrity-protocols"]
+    },
+    {
+      "path": "server/routes/agi.constraint-packs.ts",
+      "tags": ["verification-checklist", "integrity-protocols"]
+    },
+    {
+      "path": "server/services/observability/training-trace-store.ts",
+      "tags": ["liveness-or-it-didnt-happen", "stewardship-ledger"]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { panelRegistry, getPanelDef } from "@/lib/desktop/panelRegistry";
 import { useDesktopStore } from "@/store/useDesktopStore";
@@ -15,6 +15,8 @@ import {
 import { decodeLayout, resolvePanelIds, type DesktopLayoutHash } from "@/lib/desktop/shareState";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference } from "@/lib/agi/preferences";
+import { SurfaceStack } from "@/components/surface/SurfaceStack";
+import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -82,6 +84,15 @@ export default function DesktopPage() {
   }));
   const hashAppliedRef = useRef(false);
   const environmentAppliedRef = useRef(false);
+  const wallpaperRecipe = useMemo(
+    () =>
+      generateSurfaceRecipe({
+        seed: "helix-wallpaper-v1",
+        context: "desktop-wallpaper",
+        density: "medium",
+      }),
+    [],
+  );
 
   useEffect(() => {
     registerFromManifest(panelRegistry);
@@ -259,7 +270,8 @@ export default function DesktopPage() {
       }}
     >
       {userSettings.enableSplashCursor && <SplashCursor />}
-      <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-b from-slate-950 via-[#07122b] to-slate-900 text-slate-100">
+      <div className="relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-100">
+        <SurfaceStack recipe={wallpaperRecipe} />
         <div className="pointer-events-none absolute left-0 right-0 top-4 flex items-center justify-end gap-2 pr-4">
           <p className="hidden text-xs uppercase tracking-[0.25em] text-slate-400 md:block">
             Helix Controls
@@ -274,8 +286,6 @@ export default function DesktopPage() {
             </button>
           </DialogTrigger>
         </div>
-
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(59,130,246,0.12)_1px,transparent_1px)] [background-size:32px_32px] opacity-40 pointer-events-none" />
 
         {Object.values(windows)
           .filter((w) => w.isOpen)

@@ -9,6 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MathMaturityTree } from "@/components/MathMaturityTreePanel";
+import { UniversalAuditTree } from "@/components/UniversalAuditTreePanel";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 
@@ -121,7 +123,7 @@ const formatGateValue = (value?: number) => {
 };
 
 const formatDeltaValue = (value?: number) => {
-  if (!Number.isFinite(value)) return "--";
+  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
   const sign = value > 0 ? "+" : "";
   const abs = Math.abs(value);
   const formatted =
@@ -141,11 +143,11 @@ const summarizeResiduals = (residuals?: GrAgentLoopAttemptAudit["residuals"]) =>
   let topValue = 0;
   for (const key of RESIDUAL_KEYS) {
     const value = residuals[key];
-    if (!Number.isFinite(value)) continue;
-    const abs = Math.abs(value as number);
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    const abs = Math.abs(value);
     if (abs >= Math.abs(topValue)) {
       topKey = key;
-      topValue = value as number;
+      topValue = value;
     }
   }
   if (!topKey) return "no residuals";
@@ -294,6 +296,7 @@ export default function GrAgentLoopAuditPanel({
 
   const [leftRunId, setLeftRunId] = useState<string | null>(null);
   const [rightRunId, setRightRunId] = useState<string | null>(null);
+  const [treeOverlay, setTreeOverlay] = useState<"math" | "audit">("math");
 
   useEffect(() => {
     if (!leftRunId && runs.length > 0) {
@@ -709,6 +712,34 @@ export default function GrAgentLoopAuditPanel({
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-slate-500">
+              <span>Tree overlay</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={treeOverlay === "math" ? "secondary" : "outline"}
+                  onClick={() => setTreeOverlay("math")}
+                  className="text-[10px] uppercase"
+                >
+                  Math
+                </Button>
+                <Button
+                  size="sm"
+                  variant={treeOverlay === "audit" ? "secondary" : "outline"}
+                  onClick={() => setTreeOverlay("audit")}
+                  className="text-[10px] uppercase"
+                >
+                  Audit
+                </Button>
+              </div>
+            </div>
+            {treeOverlay === "math" ? (
+              <MathMaturityTree variant="embedded" />
+            ) : (
+              <UniversalAuditTree variant="embedded" />
             )}
           </div>
           <div className="rounded-lg border border-slate-800/70 bg-slate-950/60 p-3">

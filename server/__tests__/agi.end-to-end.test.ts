@@ -38,7 +38,7 @@ beforeAll(async () => {
   resetStore = store.__resetTrainingTraceStore;
   app = express();
   app.use(express.json());
-  app.use("/api/agi", adapter.adapterRouter);
+  app.use("/api/agi/adapter", adapter.adapterRouter);
   app.use("/api/agi", training.trainingTraceRouter);
 });
 

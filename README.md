@@ -2,13 +2,19 @@
 
 Warp-field research cockpit that pairs a Helix Core operations console with the supporting physics services, simulation assets, and archival "warp web" experiments. The repository contains both the real-time React client and the Express/TypeScript backend that brokers drive telemetry, curvature bricks, and pump controls.
 
+## Verification-first agents
+We’re building the grading, proof, and trace layer agents need to verify work across domains — starting with GR and constraint packs.
+- SDK + API adapters for agent runtimes.
+- Deterministic verdicts with policy ladders and certificates.
+- JSONL training traces for audits and learning.
+
 ## Features
-- **Helix Core dashboard** - Modular panels for sector duty coordination, parametric sweeps, spectrum tuning, and live warp visualisation (see `client/src/pages/helix-core.tsx`).
+- **Helix Core desktop + mobile panels** - Modular windows for sector duty coordination, parametric sweeps, spectrum tuning, and live warp visualisation (see `client/src/pages/helix-core.panels.ts`). All new UI must ship as Helix panels so it appears in `/desktop` and `/mobile`; do not add UI to the deprecated `client/src/pages/helix-core.tsx` page.
 - **Hull 3D renderer** - WebGL2 ray-marcher with curvature, sector, and overlay diagnostics driven by the shared hull store (`client/src/components/Hull3DRenderer.ts`).
 - **Physics + scheduling services** - Energy pipeline modelling, curvature brick generation, and instrumentation endpoints implemented in the server (`server/energy-pipeline.ts`, `server/curvature-brick.ts`, `server/instruments/`).
 - **Lifshitz-aware Casimir chain** - Ideal/Drude/plasma stacks with Hamaker fallback, χ override/supercell/fallback diagnostics, and nominal vs. realistic energy/mass bands surfaced to the UI.
 - **Static research archives** - Halobank timeline and warp ledger microsites live under `warp-web/` with shared assets in `halobank-spore-timeline.js`.
-- **Design documentation** - Patch plans, focused reports, and sweep design notes in `PATCH_PLAN.md`, `REPORT.md`, and `docs/` (see `docs/gr-solver-progress.md` for the GR solver progress plan and open items; the full Einstein-field solve is not declared complete yet).
+- **Design documentation** - Patch plans, focused reports, and sweep design notes in `PATCH_PLAN.md`, `REPORT.md`, and `docs/` (see `docs/gr-solver-progress.md` for the GR solver progress plan and open items; the full Einstein-field solve is not declared complete yet). Mass provenance rules live in `docs/mass-semantics.md`.
 
 ### Casimir tile narrative → implementation map
 
@@ -18,7 +24,7 @@ If you need to prove that the Mk.1 Needle Hull story (Casimir tiles → ellipsoi
 
 HELIX-CORE advertises itself as the **Needle Hull Mainframe System**, meaning the console is pre-wired to the Mk 1 Natário geometry, Ford–Roman duty guards, and AI-assisted terminal tooling:
 
-- `client/src/pages/helix-core.tsx` renders the branded dashboard, log terminal, Hull3D renderer, and sweep HUDs, all bound to `useEnergyPipeline`.
+- Helix Desktop/Mobile panels are declared in `client/src/pages/helix-core.panels.ts` and implemented in `client/src/components/` for the windowed UI.
 - `server/energy-pipeline.ts` seeds the global state with the canonical 1.007 km × 264 m × 173 m hull and 400-sector scheduler, while `modules/warp/warp-module.ts` keeps those semi-axes as the fallback for any Natário conversion.
 - `/api/helix/command` (implemented in `server/helix-core.ts`) provides the mainframe chat endpoint so operators can pulse sectors, request diagnostics, or load documents with function-call auditing.
 
@@ -238,6 +244,7 @@ These references tie the UI behavior back to concrete implementation details and
 - `.cal/` - Runtime calibration logs dropped by the phase calibration utilities (ignored by Git by default).
 
 ## Registering panels for Helix Start windows
+All new UI must be shipped as a Helix panel. Do not add standalone page routes for new UI work. The legacy page at `client/src/pages/helix-core.tsx` is deprecated and should not be used for new UI work.
 Helix Start lists launchable windows from `HELIX_PANELS` in `client/src/pages/helix-core.panels.ts`, and `/desktop` renders those entries as window panels via the desktop registry. To make a program discoverable:
 
 1. Create or expose the panel component under `client/src/components/` (or a page component you can import).
@@ -248,6 +255,7 @@ Helix Start lists launchable windows from `HELIX_PANELS` in `client/src/pages/he
 See `docs/helix-desktop-panels.md` for the full desktop/start wiring details and troubleshooting checklist.
 
 ## Getting started
+For the fastest product path, see [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 1. **Install prerequisites**
    - Node.js 20.x (the project uses native ESM and `tsx`)
    - npm 10.x (ships with Node 20)
@@ -256,6 +264,20 @@ See `docs/helix-desktop-panels.md` for the full desktop/start wiring details and
    ```bash
    npm install
    ```
+3. **Start the stack (UI + API)**
+   ```bash
+   npm run dev
+   ```
+   This launches the Express server with Vite middleware on port 5173, so you
+   should not start a separate Vite process. Use `/desktop` or `/mobile` for the
+   UI. For AGI routes, run `npm run dev:agi` (or set `ENABLE_AGI=1` and
+   `ENABLE_ESSENCE=1`).
+4. **(Recommended) Enable local verification hooks**
+   ```bash
+   npm run hooks:install
+   ```
+   This wires Git to run `npm run verify:local` on each commit (set `SKIP_VERIFY=1`
+   to bypass in emergencies).
 
 ## Running locally
 ```bash

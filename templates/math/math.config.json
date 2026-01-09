@@ -1,0 +1,13 @@
+{
+  "defaultStage": "exploratory",
+  "strictStages": [],
+  "pathStages": [
+    { "pattern": "src/gr/**", "stage": "diagnostic" },
+    { "pattern": "src/warp/**", "stage": "reduced-order" },
+    { "pattern": "src/analysis/**", "stage": "exploratory" },
+    { "pattern": "src/pipeline/**", "stage": "reduced-order" },
+    { "pattern": "src/routes/**", "stage": "reduced-order" },
+    { "pattern": "src/tools/**", "stage": "diagnostic" },
+    { "pattern": "src/cert/**", "stage": "certified" }
+  ]
+}

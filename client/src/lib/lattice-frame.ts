@@ -168,6 +168,10 @@ export function buildLatticeFrame(input: LatticeFrameInput): LatticeFrame {
 
   const padding_m: Vec3 = vec3();
   const clampReasons: string[] = [];
+  const hasPaddingOverride =
+    typeof input.overrides?.paddingPct === "number" ||
+    typeof input.overrides?.paddingMin_m === "number" ||
+    typeof input.overrides?.paddingMax_m === "number";
 
   for (let i = 0; i < 3; i += 1) {
     const pctPad = scaledDims[i] * budget.paddingPct;
@@ -177,9 +181,6 @@ export function buildLatticeFrame(input: LatticeFrameInput): LatticeFrame {
       clampReasons.push("padding:max");
     }
   }
-
-  const paddedDims = addVec(scaledDims, scaleVec(padding_m, 2));
-  const paddedHalf = scaleVec(paddedDims, 0.5);
 
   const clampVoxelSizeSoft = (size: number) => clamp(size, budget.minVoxel_m, budget.maxVoxel_m);
   const clampVoxelSizeForBudget = (size: number) => Math.max(size, budget.minVoxel_m);
@@ -192,34 +193,64 @@ export function buildLatticeFrame(input: LatticeFrameInput): LatticeFrame {
     Math.max(1, Math.ceil(paddedDims[2] / voxelSize)),
   ];
 
+  let paddedDims = addVec(scaledDims, scaleVec(padding_m, 2));
+  let paddedHalf = scaleVec(paddedDims, 0.5);
   let voxelSize = targetVoxel;
   let dims = dimsFromVoxel(voxelSize);
-  const enforceMaxDim = () => {
-    const need = Math.max(
-      paddedDims[0] / budget.maxDim,
-      paddedDims[1] / budget.maxDim,
-      paddedDims[2] / budget.maxDim,
-    );
-    if (Math.max(...dims) > budget.maxDim || voxelSize < need) {
-      voxelSize = clampVoxelSizeForBudget(Math.max(voxelSize, need) * (1 + 1e-9));
-      dims = dimsFromVoxel(voxelSize);
-      clampReasons.push("dims:maxDim");
-    }
+
+  const recomputeFromPadding = () => {
+    paddedDims = addVec(scaledDims, scaleVec(padding_m, 2));
+    paddedHalf = scaleVec(paddedDims, 0.5);
+    voxelSize = targetVoxel;
+    dims = dimsFromVoxel(voxelSize);
+    const enforceMaxDim = () => {
+      const need = Math.max(
+        paddedDims[0] / budget.maxDim,
+        paddedDims[1] / budget.maxDim,
+        paddedDims[2] / budget.maxDim,
+      );
+      if (Math.max(...dims) > budget.maxDim || voxelSize < need) {
+        voxelSize = clampVoxelSizeForBudget(Math.max(voxelSize, need) * (1 + 1e-9));
+        dims = dimsFromVoxel(voxelSize);
+        clampReasons.push("dims:maxDim");
+      }
+    };
+
+    const enforceVoxelBudget = () => {
+      const voxels = dims[0] * dims[1] * dims[2];
+      if (voxels > budget.maxVoxels) {
+        const scale = Math.cbrt(voxels / budget.maxVoxels);
+        voxelSize = clampVoxelSizeForBudget(voxelSize * scale * (1 + 1e-9));
+        dims = dimsFromVoxel(voxelSize);
+        clampReasons.push("dims:maxVoxels");
+      }
+    };
+
+    enforceMaxDim();
+    enforceVoxelBudget();
+    enforceMaxDim();
   };
 
-  const enforceVoxelBudget = () => {
-    const voxels = dims[0] * dims[1] * dims[2];
-    if (voxels > budget.maxVoxels) {
-      const scale = Math.cbrt(voxels / budget.maxVoxels);
-      voxelSize = clampVoxelSizeForBudget(voxelSize * scale * (1 + 1e-9));
-      dims = dimsFromVoxel(voxelSize);
-      clampReasons.push("dims:maxVoxels");
-    }
-  };
+  recomputeFromPadding();
 
-  enforceMaxDim();
-  enforceVoxelBudget();
-  enforceMaxDim();
+  if (!hasPaddingOverride) {
+    const minPaddingVoxels = 4.5;
+    let adjusted = false;
+    for (let iter = 0; iter < 5; iter += 1) {
+      const requiredPadding = voxelSize * minPaddingVoxels;
+      let changed = false;
+      for (let i = 0; i < 3; i += 1) {
+        if (padding_m[i] < requiredPadding) {
+          padding_m[i] = requiredPadding;
+          changed = true;
+        }
+      }
+      if (!changed) break;
+      adjusted = true;
+      recomputeFromPadding();
+    }
+    if (adjusted) clampReasons.push("padding:margin");
+  }
 
   const voxelCount = dims[0] * dims[1] * dims[2];
 

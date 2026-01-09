@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import { EssenceEnvelope } from "@shared/essence-schema";
-import { putEnvelope } from "../services/essence/store";
+import { putEnvelopeWithPolicy } from "./provenance";
 import { essenceHub } from "../services/essence/events";
 import { putBlob } from "../storage";
 import { persistEssencePacket } from "../db/essence";
@@ -141,7 +141,7 @@ export const sttWhisperHandler: ToolHandler = async (rawInput, ctx): Promise<Stt
       },
     });
 
-    await putEnvelope(envelope);
+  await putEnvelopeWithPolicy(envelope);
     await persistEssencePacket({
       id: `${essenceId}:transcript`,
       envelope_id: essenceId,

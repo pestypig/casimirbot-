@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type {
   ConstraintPack,
   ConstraintPackConstraint,
@@ -5,11 +6,41 @@ import type {
   ConstraintPackEvaluation,
   ConstraintPackCertificateResult,
   TrainingTraceDelta,
-  type PolicyLadderTier,
+  PolicyLadderTier,
 } from "../../../shared/schema.js";
 
 type MetricValue = number | boolean | string | null | undefined;
 export type ConstraintPackMetricMap = Record<string, MetricValue>;
+
+const canonicalJson = (value: unknown): string =>
+  JSON.stringify(value, (_key, v) => (v === undefined ? null : v));
+
+const hashPayload = (value: unknown): string =>
+  crypto.createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
+
+const issueConstraintPackCertificate = (input: {
+  pack: ConstraintPack;
+  metrics: ConstraintPackMetricMap;
+  constraints: ConstraintPackConstraintResult[];
+  proxy?: boolean;
+}): ConstraintPackCertificateResult => {
+  const payload = {
+    packId: input.pack.id,
+    packVersion: input.pack.version,
+    metrics: input.metrics,
+    constraints: input.constraints,
+    proxy: input.proxy ?? null,
+  };
+  const certificateHash = hashPayload(payload);
+  return {
+    certificateHash,
+    certificateId: `constraint-pack:${input.pack.id}:${certificateHash.slice(
+      0,
+      12,
+    )}`,
+    integrityOk: true,
+  };
+};
 
 export type RepoConvergenceTelemetry = {
   build?: {
@@ -63,6 +94,37 @@ export type ToolUseBudgetTelemetry = {
   tools?: {
     calls?: number;
     total?: number;
+  };
+  metrics?: ConstraintPackMetricMap;
+};
+
+export type AuditSafetyTelemetry = {
+  audit?: {
+    files?: {
+      total?: number;
+      tagged?: number;
+      untagged?: number;
+    };
+    tags?: {
+      unknown?: number;
+    };
+    violations?: {
+      count?: number;
+    };
+    risk?: {
+      files?: number;
+    };
+    provenance?: {
+      files?: number;
+      coverage?: number;
+    };
+    safety?: {
+      files?: number;
+      coverage?: number;
+    };
+    critical?: {
+      files?: number;
+    };
   };
   metrics?: ConstraintPackMetricMap;
 };
@@ -289,6 +351,51 @@ export const buildToolUseBudgetMetrics = (
   return metrics;
 };
 
+export const buildAuditSafetyMetrics = (
+  telemetry?: AuditSafetyTelemetry,
+): ConstraintPackMetricMap => {
+  const metrics: ConstraintPackMetricMap = {};
+  if (!telemetry) return metrics;
+
+  const audit = telemetry.audit;
+  if (audit?.files?.total !== undefined) {
+    metrics["audit.files.total"] = audit.files.total;
+  }
+  if (audit?.files?.tagged !== undefined) {
+    metrics["audit.tagged.count"] = audit.files.tagged;
+  }
+  if (audit?.files?.untagged !== undefined) {
+    metrics["audit.untagged.count"] = audit.files.untagged;
+  }
+  if (audit?.tags?.unknown !== undefined) {
+    metrics["audit.unknown_tags.count"] = audit.tags.unknown;
+  }
+  if (audit?.violations?.count !== undefined) {
+    metrics["audit.violations.count"] = audit.violations.count;
+  }
+  if (audit?.risk?.files !== undefined) {
+    metrics["audit.risk.files"] = audit.risk.files;
+  }
+  if (audit?.provenance?.files !== undefined) {
+    metrics["audit.provenance.files"] = audit.provenance.files;
+  }
+  if (audit?.provenance?.coverage !== undefined) {
+    metrics["audit.provenance.coverage"] = audit.provenance.coverage;
+  }
+  if (audit?.safety?.files !== undefined) {
+    metrics["audit.safety.files"] = audit.safety.files;
+  }
+  if (audit?.safety?.coverage !== undefined) {
+    metrics["audit.safety.coverage"] = audit.safety.coverage;
+  }
+  if (audit?.critical?.files !== undefined) {
+    metrics["audit.critical.files"] = audit.critical.files;
+  }
+
+  mergeMetrics(metrics, telemetry.metrics);
+  return metrics;
+};
+
 const formatLimitLabel = (
   constraint: ConstraintPackConstraint,
   threshold?: number,
@@ -481,7 +588,15 @@ export const evaluateConstraintPackFromMetrics = (
   let pass = resolvePass(pack, constraintResults);
   const firstFail = resolveFirstFail(constraintResults);
   const proxy = resolveProxyFlag(input.proxy, allConstraints);
-  const certificate = input.certificate;
+  const autoCertificate = !input.certificate;
+  let certificate =
+    input.certificate ??
+    issueConstraintPackCertificate({
+      pack,
+      metrics,
+      constraints: allConstraints,
+      proxy,
+    });
   const certificateHash = certificate?.certificateHash ?? null;
   const hasCertificate =
     typeof certificateHash === "string" && certificateHash.trim().length > 0;
@@ -500,10 +615,18 @@ export const evaluateConstraintPackFromMetrics = (
       ladderNotes.push(`ladder_actual=${ladderTier}`);
     }
   }
+  if (autoCertificate && certificate) {
+    const status = pass
+      ? proxy
+        ? "PROXY"
+        : pack.certificate.admissibleStatus
+      : "FAIL";
+    certificate = { ...certificate, status };
+  }
   const mergedNotes = [
     ...(input.notes ?? []),
     ...ladderNotes,
-  ].filter((note): note is string => typeof note === "string" && note.length);
+  ].filter((note): note is string => typeof note === "string" && note.length > 0);
 
   return {
     pass,

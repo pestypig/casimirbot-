@@ -108,12 +108,14 @@ curl -s http://localhost:5173/api/agi/training-trace/export \
 ```
 
 Notes:
-- The export streams the persisted JSONL file when present; otherwise it emits
+- The export streams the persisted JSONL file when present; otherwise it emits  
   the in-memory buffer.
-- When tenant isolation is enabled, list/export are filtered to the resolved
+- When tenant isolation is enabled, list/export are filtered to the resolved    
   tenant id (from JWT claims or `X-Tenant-Id`/`X-Customer-Id` headers).
-- If a training signal comes from a proxy/qualitative source (e.g., lattice
-  visual cues), set `signal.proxy=true` (and optionally `source.proxy=true`) to
+- Traces may include a `metrics` map (for example `audit.*` values from the    
+  provenance-safety pack auto-scan).
+- If a training signal comes from a proxy/qualitative source (e.g., lattice     
+  visual cues), set `signal.proxy=true` (and optionally `source.proxy=true`) to 
   prevent overclaiming.
 - `signal.ladder.tier` makes the policy ladder explicit: `reduced-order` and
   `diagnostic` are learning tiers (not safe to ship), while `certified` means

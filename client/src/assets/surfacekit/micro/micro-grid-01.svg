@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+  <path
+    class="ink-soft"
+    d="M125 0 V1000 M250 0 V1000 M375 0 V1000 M500 0 V1000 M625 0 V1000 M750 0 V1000 M875 0 V1000 M0 125 H1000 M0 250 H1000 M0 375 H1000 M0 500 H1000 M0 625 H1000 M0 750 H1000 M0 875 H1000"
+    fill="none"
+    stroke-width="1"
+    vector-effect="non-scaling-stroke"
+  />
+</svg>

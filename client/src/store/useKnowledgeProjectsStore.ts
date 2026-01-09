@@ -9,6 +9,8 @@ import {
   listFilesByProject,
   listProjects,
   saveKnowledgeFiles,
+  updateKnowledgeFileAnalysis,
+  updateKnowledgeFileTags,
   updateProject as updateProjectRecord,
   countFilesForProject,
   DEFAULT_PROJECT_ID,
@@ -48,6 +50,16 @@ type KnowledgeProjectsState = {
   saveFiles: (projectId: string, files: FileList | File[]) => Promise<void>;
   deleteFile: (projectId: string, fileId: string) => Promise<void>;
   moveFiles: (fileIds: string[], fromId: string, toId: string) => Promise<void>;
+  updateFileTags: (
+    projectId: string,
+    fileId: string,
+    tags: string[] | undefined,
+  ) => Promise<void>;
+  updateFileAnalysis: (
+    projectId: string,
+    fileId: string,
+    options: Parameters<typeof updateKnowledgeFileAnalysis>[1],
+  ) => Promise<void>;
   createProject: (payload: Parameters<typeof createProjectRecord>[0]) => Promise<ProjectWithStats>;
   updateProject: (payload: KnowledgeProjectRecord) => Promise<ProjectWithStats>;
   deleteProject: (projectId: string) => Promise<void>;
@@ -177,6 +189,44 @@ export const useKnowledgeProjectsStore = createWithEqualityFn<KnowledgeProjectsS
             return project;
           }),
         }));
+      },
+
+      updateFileTags: async (
+        projectId: string,
+        fileId: string,
+        tags: string[] | undefined,
+      ) => {
+        const updated = await updateKnowledgeFileTags(fileId, tags);
+        set((state) => {
+          const current = state.projectFiles[projectId] ?? [];
+          if (current.length === 0) return state;
+          const nextFiles = current.map((file) =>
+            file.id === fileId ? { ...file, ...updated } : file,
+          );
+          return {
+            projectFiles: {
+              ...state.projectFiles,
+              [projectId]: sortFiles(nextFiles),
+            },
+          };
+        });
+      },
+
+      updateFileAnalysis: async (projectId, fileId, options) => {
+        const updated = await updateKnowledgeFileAnalysis(fileId, options);
+        set((state) => {
+          const current = state.projectFiles[projectId] ?? [];
+          if (current.length === 0) return state;
+          const nextFiles = current.map((file) =>
+            file.id === fileId ? { ...file, ...updated } : file,
+          );
+          return {
+            projectFiles: {
+              ...state.projectFiles,
+              [projectId]: sortFiles(nextFiles),
+            },
+          };
+        });
       },
 
       createProject: async (payload) => {

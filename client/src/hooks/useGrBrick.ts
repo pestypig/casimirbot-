@@ -25,6 +25,7 @@ export interface UseGrBrickOptions {
   includeExtra?: boolean;
   includeMatter?: boolean;
   includeKij?: boolean;
+  driveDir?: [number, number, number] | null;
   refetchMs?: number;
   enabled?: boolean;
 }
@@ -47,6 +48,7 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
     includeExtra,
     includeMatter,
     includeKij,
+    driveDir,
     refetchMs = 2000,
     enabled,
   } = options;
@@ -71,6 +73,7 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
       includeExtra,
       includeMatter,
       includeKij,
+      driveDir,
     }),
     [
       quality,
@@ -89,6 +92,7 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
       includeExtra,
       includeMatter,
       includeKij,
+      driveDir,
     ],
   );
 

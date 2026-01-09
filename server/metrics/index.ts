@@ -148,6 +148,36 @@ export const sseConnections = new Gauge({
   registers: [registry],
 });
 
+const contributionVcuTotal = new Gauge({
+  name: "contribution_vcu_total",
+  help: "VCUs minted over the active window",
+  registers: [registry],
+});
+
+const contributionVcuContributorCount = new Gauge({
+  name: "contribution_vcu_contributor_count",
+  help: "Unique contributors in the active VCU window",
+  registers: [registry],
+});
+
+const contributionVcuTopShare = new Gauge({
+  name: "contribution_vcu_top_share",
+  help: "Top contributor share of VCUs in the active window (0..1)",
+  registers: [registry],
+});
+
+const contributionVcuHhi = new Gauge({
+  name: "contribution_vcu_hhi",
+  help: "HHI concentration index for VCUs (0..1)",
+  registers: [registry],
+});
+
+const contributionVcuConcentrationMasked = new Gauge({
+  name: "contribution_vcu_concentration_masked",
+  help: "1 when concentration metrics are masked due to privacy thresholds",
+  registers: [registry],
+});
+
 const httpRequestsTotal = new Counter({
   name: "http_requests_total",
   help: "Total HTTP requests processed by Express",
@@ -400,6 +430,23 @@ export const metrics = {
       return;
     }
     debateWallMs.observe(durationMs);
+  },
+  setContributionConcentration(input: {
+    totalVcu: number;
+    contributorCount: number;
+    topShare: number;
+    hhi: number;
+    masked?: boolean;
+  }): void {
+    contributionVcuTotal.set(Math.max(0, input.totalVcu));
+    contributionVcuContributorCount.set(
+      Math.max(0, input.contributorCount),
+    );
+    contributionVcuTopShare.set(
+      Number.isFinite(input.topShare) ? input.topShare : 0,
+    );
+    contributionVcuHhi.set(Number.isFinite(input.hhi) ? input.hhi : 0);
+    contributionVcuConcentrationMasked.set(input.masked ? 1 : 0);
   },
 };
 

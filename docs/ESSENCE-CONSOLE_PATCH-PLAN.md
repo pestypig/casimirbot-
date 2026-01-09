@@ -268,12 +268,14 @@ All work must stay additive and env-gated. Priorities follow the required order:
 - **Problem**: Console header lacks runtime posture.
 - **Minimal fix**: Add `/api/hull/status` returning `{ hullMode, llmPolicy, queueDepth, approvalsOutstanding }` and render chips in `essence.tsx`.
 - **Acceptance**: `tests/hull-status.spec.ts`; chip updates when env flags change.
+- **Status**: implemented in `server/routes/hull.status.ts`, `client/src/components/agi/essence.tsx`, `tests/hull-status.spec.ts` (pending verification gate).
 
 ## PR-EC7 â€” Creative tool provenance polish
 
 - **Problem**: NoiseGen tools arenâ€™t registered, and Debate referee cards lack Essence links.
 - **Minimal fix**: Register `noise.gen.cover` + `noise.gen.fingerprint` tools, ensure they emit Essence IDs, and add badges in `TraceDrawer` + `DebateView` linking to `/api/essence/:id`.
 - **Acceptance**: `tests/noise-tools.spec.ts`; Debate referee cards show citations.
+- **Status**: implemented in `server/skills/noise.gen.cover.ts`, `server/skills/noise.gen.fingerprint.ts`, `server/routes/agi.plan.ts`, `client/src/components/agi/TraceDrawer.tsx`, `client/src/components/agi/DebateView.tsx`, `tests/noise-tools.spec.ts` (pending verification gate).
 ## PR-EC8 — Tokenizer guardrails + canary
 
 - **Problem**: Swapping GGUF builds or tokenizer assets mutates token counts silently; Hull never notices until truncation corrupts a trace.
@@ -284,6 +286,7 @@ All work must stay additive and env-gated. Priorities follow the required order:
   4. Wire the CLI + canary test into CI (pnpm tsx tools/tokenizer-verify.ts … + pnpm vitest run tests/tokenizer-canary.spec.ts) so deploys fail fast when metadata drifts.
 - **Files touched**: docs/ESSENCE-CONSOLE_GAP-REPORT.md, docs/tokenizer-guardrails.md, 	ools/tokenizer-verify.ts, 	ests/tokenizer-canary.spec.ts, 	ests/fixtures/tokenizer-canary.json.
 - **Env gate(s)**: none; runs in CI and local smoke.
+- **Status**: guardrails already in repo via `docs/tokenizer-guardrails.md`, `tools/tokenizer-verify.ts`, `tools/generate-tokenizer-canary.ts`, `tests/tokenizer-canary.spec.ts`, `tests/fixtures/tokenizer-canary.json`.
 - **Acceptance**:
   - pnpm tsx tools/tokenizer-verify.ts --gguf ./models/local.gguf --tokenizer-json ./tokenizers/local/tokenizer.json --merges ./tokenizers/local/merges.txt --canary tests/fixtures/tokenizer-canary.json exits 0 when metadata matches.
   - pnpm vitest run tests/tokenizer-canary.spec.ts fails if the prompt hash or token IDs drift.

@@ -29,6 +29,7 @@ export interface GrEvolveBrickRequest {
   includeExtra?: boolean;
   includeMatter?: boolean;
   includeKij?: boolean;
+  driveDir?: [number, number, number] | null;
 }
 
 export interface GrEvolveBrickChannel {
@@ -44,6 +45,8 @@ export interface GrEvolveBrickStats {
   cfl: number;
   H_rms: number;
   M_rms: number;
+  thetaPeakAbs?: number;
+  thetaGrowthPerStep?: number;
   stressEnergy?: StressEnergyBrickStats;
   perf?: GrEvolveBrickPerfStats;
 }
@@ -177,6 +180,8 @@ const normalizeStats = (raw: any): GrEvolveBrickStats => ({
   cfl: Number(raw?.cfl ?? 0),
   H_rms: Number(raw?.H_rms ?? 0),
   M_rms: Number(raw?.M_rms ?? 0),
+  thetaPeakAbs: Number(raw?.thetaPeakAbs ?? 0),
+  thetaGrowthPerStep: Number(raw?.thetaGrowthPerStep ?? 0),
   stressEnergy: normalizeStressEnergyStats(raw?.stressEnergy),
   perf: normalizePerfStats(raw?.perf),
 });
@@ -198,9 +203,8 @@ const decodeGrEvolveBrickBinary = (buffer: ArrayBuffer): GrEvolveBrickDecoded | 
     ? header.channelOrder
     : GR_EVOLVE_CHANNEL_ORDER;
 
-  const decodeChannel = (key: string): GrEvolveBrickChannel | null => {
-    const info = channelsHeader[key] ?? {};
-    const bytes = Number(info.bytes ?? defaultBytes);
+  const decodeChannel = (info: any): GrEvolveBrickChannel | null => {
+    const bytes = Number(info?.bytes ?? defaultBytes);
     if (!Number.isFinite(bytes) || bytes <= 0 || bytes % 4 !== 0) return null;
     if (offset + bytes > buffer.byteLength) return null;
     if (offset % 4 !== 0) return null;
@@ -208,14 +212,16 @@ const decodeGrEvolveBrickBinary = (buffer: ArrayBuffer): GrEvolveBrickDecoded | 
     offset += bytes;
     return {
       data,
-      min: Number(info.min ?? 0),
-      max: Number(info.max ?? 0),
+      min: Number(info?.min ?? 0),
+      max: Number(info?.max ?? 0),
     };
   };
 
   const decoded: Record<string, GrEvolveBrickChannel> = {};
   for (const key of channelOrder) {
-    const channel = decodeChannel(key);
+    const info = channelsHeader[key];
+    if (!info) continue;
+    const channel = decodeChannel(info);
     if (!channel) return null;
     decoded[key] = channel;
   }
@@ -337,6 +343,12 @@ const buildQuery = (request: GrEvolveBrickRequest) => {
   if (request.order === 4 || request.order === 2) params.set("order", String(request.order));
   if (request.boundary === "periodic" || request.boundary === "clamp") {
     params.set("boundary", request.boundary);
+  }
+  if (Array.isArray(request.driveDir) && request.driveDir.length >= 3) {
+    const parts = request.driveDir.slice(0, 3).map((value) => Number(value));
+    if (parts.every((value) => Number.isFinite(value))) {
+      params.set("driveDir", parts.join(","));
+    }
   }
   params.set("format", BRICK_FORMAT);
   return params.toString();

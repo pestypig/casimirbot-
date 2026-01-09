@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { InformationBoundary } from "./information-boundary";
+import { grOsPayloadSchema } from "./schema";
 
 export const COLLAPSE_SPACE = "collapse/unified-1024" as const;
 
@@ -180,6 +181,128 @@ export const CodeFeature = z.object({
   tags: z.array(z.string()).optional(),
 });
 
+const PhysicsCurvatureFeature = z.object({
+  kind: z.literal("curvature-unit"),
+  summary: z.object({
+    total_energy_J: z.number(),
+    mass_equivalent_kg: z.number(),
+    residual_rms: z.number(),
+    stability: z
+      .object({
+        iterations: z.number().int().nonnegative(),
+        nan_count: z.number().int().nonnegative(),
+        phi_min: z.number(),
+        phi_max: z.number(),
+        grad_rms: z.number().nonnegative(),
+        laplacian_rms: z.number().nonnegative(),
+        residual_max_abs: z.number().nonnegative(),
+        mask_coverage: z.number().min(0).max(1).optional(),
+      })
+      .optional(),
+    k_metrics: z
+      .object({
+        k0: z.number().nonnegative(),
+        k1: z.number().nonnegative(),
+        k2: z.number().nonnegative(),
+        k3: z.number().min(0).max(1).optional(),
+      })
+      .optional(),
+    ridge_summary: z
+      .object({
+        ridge_count: z.number().int().nonnegative(),
+        ridge_point_count: z.number().int().nonnegative(),
+        ridge_length_m: z.number().nonnegative(),
+        ridge_density: z.number().nonnegative(),
+        fragmentation_index: z.number().nonnegative(),
+        thresholds: z.object({
+          high: z.number().nonnegative(),
+          low: z.number().nonnegative(),
+        }),
+      })
+      .optional(),
+    roots_count: z.number(),
+  }),
+    artifacts: z.object({
+      potential_url: z.string(),
+      potential_cid: z.string().optional(),
+      energy_field_url: z.string().optional(),
+      energy_field_cid: z.string().optional(),
+      manifest_url: z.string().optional(),
+      manifest_cid: z.string().optional(),
+      grad_mag_url: z.string().optional(),
+      grad_mag_cid: z.string().optional(),
+      laplacian_url: z.string().optional(),
+      laplacian_cid: z.string().optional(),
+    residual_url: z.string().optional(),
+    residual_cid: z.string().optional(),
+    mask_url: z.string().optional(),
+    mask_cid: z.string().optional(),
+    ridge_spines_url: z.string().optional(),
+    ridge_spines_cid: z.string().optional(),
+  }),
+});
+
+const PhysicsEnergyFieldArtifacts = z.object({
+  energy_field_url: z.string(),
+  energy_field_cid: z.string().optional(),
+  mask_url: z.string().optional(),
+  mask_cid: z.string().optional(),
+  manifest_url: z.string().optional(),
+  manifest_cid: z.string().optional(),
+});
+
+const PhysicsSolarEnergyFieldFeature = z.object({
+  kind: z.literal("solar-energy-field"),
+  summary: z.object({
+    calibration_version: z.string().nullable().optional(),
+    instrument: z.string().nullable().optional(),
+    wavelength_A: z.number().nullable().optional(),
+    window_start: z.string().nullable().optional(),
+    window_end: z.string().nullable().optional(),
+  }),
+  artifacts: PhysicsEnergyFieldArtifacts,
+});
+
+const PhysicsTokamakEnergyFieldFeature = z.object({
+  kind: z.literal("tokamak-energy-field"),
+  summary: z.object({
+    device_id: z.string().nullable().optional(),
+    shot_id: z.string().nullable().optional(),
+    manifest_hash: z.string().optional(),
+    channel_count: z.number().int().nonnegative().optional(),
+  }),
+  artifacts: PhysicsEnergyFieldArtifacts,
+});
+
+const PhysicsTokamakAddedValueFeature = z.object({
+  kind: z.literal("tokamak-added-value"),
+  summary: z.object({
+    dataset_path: z.string().nullable().optional(),
+    report_hash: z.string().optional(),
+    recall_target: z.number().min(0).max(1).optional(),
+    physics_only_auc: z.number().min(0).max(1).nullable().optional(),
+    combined_auc: z.number().min(0).max(1).nullable().optional(),
+    delta_auc: z.number().nullable().optional(),
+  }),
+  artifacts: z.object({
+    report_url: z.string(),
+    report_cid: z.string().optional(),
+  }),
+});
+
+const PhysicsGrOsFeature = z.object({
+  kind: z.literal("gr-os"),
+  payload: grOsPayloadSchema,
+});
+
+const PhysicsFeature = z.discriminatedUnion("kind", [
+  PhysicsCurvatureFeature,
+  PhysicsSolarEnergyFieldFeature,
+  PhysicsTokamakEnergyFieldFeature,
+  PhysicsTokamakAddedValueFeature,
+  PhysicsGrOsFeature,
+]);
+
 export const Features = z.object({
   text: z
     .object({
@@ -225,21 +348,7 @@ export const Features = z.object({
 
   code: CodeFeature.optional(),
 
-  physics: z
-    .object({
-      kind: z.literal("curvature-unit"),
-      summary: z.object({
-        total_energy_J: z.number(),
-        mass_equivalent_kg: z.number(),
-        residual_rms: z.number(),
-        roots_count: z.number(),
-      }),
-      artifacts: z.object({
-        potential_url: z.string(),
-        energy_field_url: z.string().optional(),
-      }),
-    })
-    .optional(),
+  physics: PhysicsFeature.optional(),
 
   mixer: z
     .object({

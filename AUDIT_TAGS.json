@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "tags": [
+    {
+      "id": "integrity-protocols",
+      "title": "Integrity protocols",
+      "category": "governance",
+      "severity": "critical",
+      "description": "Policies that require provenance, liveness, and revision discipline.",
+      "ideology": ["integrity-protocols"]
+    },
+    {
+      "id": "verification-checklist",
+      "title": "Verification checklist",
+      "category": "governance",
+      "severity": "critical",
+      "description": "Constraint gates, certification checks, or audit verdicts.",
+      "ideology": ["integrity-protocols", "promise-trials"]
+    },
+    {
+      "id": "promise-trials",
+      "title": "Promise trials",
+      "category": "governance",
+      "severity": "warn",
+      "description": "Test suites or falsification loops that prove a claim.",
+      "ideology": ["promise-trials"]
+    },
+    {
+      "id": "liveness-or-it-didnt-happen",
+      "title": "Liveness or it didn't happen",
+      "category": "observability",
+      "severity": "warn",
+      "description": "Telemetry, metrics, or traces used to prove activity.",
+      "ideology": ["liveness-or-it-didnt-happen"]
+    },
+    {
+      "id": "stewardship-ledger",
+      "title": "Stewardship ledger",
+      "category": "governance",
+      "severity": "warn",
+      "description": "Ledgering of costs, duty, and resource obligations.",
+      "ideology": ["stewardship-ledger"]
+    },
+    {
+      "id": "provenance-protocol",
+      "title": "Provenance protocol",
+      "category": "governance",
+      "severity": "critical",
+      "description": "Source, method, and scope tracking for outputs.",
+      "ideology": ["provenance-protocol"]
+    },
+    {
+      "id": "feedback-loop-hygiene",
+      "title": "Feedback loop hygiene",
+      "category": "governance",
+      "severity": "warn",
+      "description": "Evaluation loops, training traces, and repair ladders.",
+      "ideology": ["feedback-loop-hygiene"]
+    },
+    {
+      "id": "surface.api",
+      "title": "API surface",
+      "category": "surface",
+      "severity": "warn",
+      "description": "Route handlers or public interfaces that accept input."
+    },
+    {
+      "id": "io.network",
+      "title": "Network IO",
+      "category": "io",
+      "severity": "warn",
+      "description": "Outbound network access or external API calls.",
+      "ideology": ["integrity-protocols"]
+    },
+    {
+      "id": "io.disk",
+      "title": "Disk IO",
+      "category": "io",
+      "severity": "warn",
+      "description": "Writes or deletes local files or stored artifacts.",
+      "ideology": ["stewardship-ledger"]
+    },
+    {
+      "id": "io.process",
+      "title": "Process execution",
+      "category": "io",
+      "severity": "warn",
+      "description": "Spawns external processes or shells.",
+      "ideology": ["integrity-protocols"]
+    },
+    {
+      "id": "security.crypto",
+      "title": "Cryptography",
+      "category": "security",
+      "severity": "warn",
+      "description": "Cryptographic operations or token handling.",
+      "ideology": ["integrity-protocols"]
+    },
+    {
+      "id": "security.auth",
+      "title": "Authentication / authorization",
+      "category": "security",
+      "severity": "critical",
+      "description": "Auth, tenancy, or access control decisions.",
+      "ideology": ["integrity-protocols"]
+    },
+    {
+      "id": "security.privileged",
+      "title": "Privileged operations",
+      "category": "security",
+      "severity": "critical",
+      "description": "Privileged or sensitive operations gated by policy.",
+      "ideology": ["integrity-protocols"]
+    },
+    {
+      "id": "observability.telemetry",
+      "title": "Observability telemetry",
+      "category": "observability",
+      "severity": "warn",
+      "description": "Tracing, metrics, or audit logging.",
+      "ideology": ["liveness-or-it-didnt-happen"]
+    },
+    {
+      "id": "ai.inference",
+      "title": "AI inference",
+      "category": "ai",
+      "severity": "warn",
+      "description": "Model inference or generative systems.",
+      "ideology": ["promise-trials"]
+    },
+    {
+      "id": "contract.validation",
+      "title": "Contract validation",
+      "category": "validation",
+      "severity": "info",
+      "description": "Schema or contract validation logic."
+    },
+    {
+      "id": "determinism.nondeterministic",
+      "title": "Non-deterministic behavior",
+      "category": "determinism",
+      "severity": "warn",
+      "description": "Randomness or time-sensitive behavior.",
+      "ideology": ["promise-trials"]
+    }
+  ]
+}

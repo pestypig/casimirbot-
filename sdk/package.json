@@ -1,11 +1,11 @@
 {
-  "name": "casimir-sdk",
+  "name": "shadow-of-intent-sdk",
   "version": "0.1.0",
-  "description": "Casimir verification SDK (adapter + traces + constraint packs)",
+  "description": "Shadow of Intent verification SDK (adapter + traces + constraint packs)",
   "type": "module",
   "license": "MIT",
   "keywords": [
-    "casimir",
+    "shadow-of-intent",
     "verification",
     "agents",
     "constraints",

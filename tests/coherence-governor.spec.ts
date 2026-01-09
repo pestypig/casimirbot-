@@ -19,6 +19,9 @@ describe("coherence governor", () => {
       global_coherence: 0.8,
       collapse_pressure: 0.9,
       phase_dispersion: 0.1,
+      gamma_sync_z: 4,
+      equilibrium: true,
+      equilibrium_hold_ms: 120,
     });
 
     const decision = governFromTelemetry(snap);
@@ -52,5 +55,43 @@ describe("coherence governor", () => {
 
     expect(decision.toolBudgetHints.maxToolsPerRound).toBeGreaterThan(0);
     expect(decision.toolBudgetHints.branchFactor).toBeGreaterThanOrEqual(1);
+  });
+
+  it("blocks collapse until equilibrium holds", () => {
+    const base = baseSnapshot({
+      global_coherence: 0.8,
+      collapse_pressure: 0.9,
+      phase_dispersion: 0.1,
+      gamma_sync_z: 4,
+    });
+
+    const withoutEquilibrium = governFromTelemetry({
+      ...base,
+      equilibrium: false,
+      equilibrium_hold_ms: 0,
+    });
+    const withEquilibrium = governFromTelemetry({
+      ...base,
+      equilibrium: true,
+      equilibrium_hold_ms: 120,
+    });
+
+    expect(withEquilibrium.action).toBe("collapse");
+    expect(withoutEquilibrium.action).not.toBe("collapse");
+  });
+
+  it("overrides recommended collapse when equilibrium is false", () => {
+    const snap = baseSnapshot({
+      global_coherence: 0.7,
+      collapse_pressure: 0.9,
+      phase_dispersion: 0.8,
+      recommended_action: "collapse",
+      equilibrium: false,
+      equilibrium_hold_ms: 0,
+    });
+
+    const decision = governFromTelemetry(snap);
+
+    expect(decision.action).toBe("ask_clarification");
   });
 });

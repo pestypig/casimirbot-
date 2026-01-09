@@ -38,8 +38,14 @@ If you want to reproduce or tweak the numbers, these are the only inputs that ma
 - `sag_nm` -> optional sag passed to the Lifshitz call.
 - `temperature_K` -> temperature in K.
 - `modulationFreq_GHz` -> only relevant if you test dynamic/parametric modes.
+- `massMode` -> mass provenance selector (`MODEL_DERIVED` default, `MEASURED_FORCE_INFERRED` uses measured force data, `TARGET_CALIBRATED` retunes gamma_VdB to `exoticMassTarget_kg`).
+- `experimental.casimirForce` -> measured force dataset with `datasetId`, `geometry`, `separation_m`, `force_N`, optional `sigmaForce_N`/`sigmaSep_m`, and `area_m2` or `radius_m`. Sign handling defaults to attractionNegative; set `forceSignConvention` or `allowForceSignAutoFlip` explicitly.
+- `ampFactors.measured*` -> measured overrides for `gammaGeo`, `gammaVanDenBroeck`, `qSpoilingFactor`, `qMechanical`, `cavityQ`.
+- `dynamicConfig.measured*` -> measured overrides for `modulationFreqGHz`, `pulseFrequencyGHz`, `burstLengthUs`, `cycleLengthUs`, `dutyCycle`, `sectorDuty`, `sectorCount`, and `cavityQ`.
+- `allowMassOverride` + `exoticMassTarget_kg` -> only applied when override is explicitly allowed; otherwise the target is ignored and provenance remains model- or measurement-derived.
 
 The Lifshitz call also needs a plate radius: `tileRadius_m = sqrt(tileArea_m2 / pi)`, passed in microns as `radius: tileRadius_m * 1e6`.
+When `experimental.casimirForce` is used with `massMode=MEASURED_FORCE_INFERRED`, the pipeline attaches `casimirForceInference` (kCasimir, sigmaK, residuals, forceSign diagnostics), stamps `massSource=measured`, and reports provenance in `massMode`/`massSource` fields (see `docs/mass-semantics.md`).
 
 ---
 

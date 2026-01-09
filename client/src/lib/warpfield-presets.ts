@@ -1,7 +1,9 @@
 import type { HullPaletteState, HullVolumeViz } from "@/store/useHull3DSharedStore";
 
+type Hull3DVolumeViz = Exclude<HullVolumeViz, "warp">;
+
 export type GeoVisThetaPreset = {
-  hullVolumeViz: HullVolumeViz;
+  hullVolumeViz: Hull3DVolumeViz;
   planarVizMode: 3;
   thetaSign: 1 | -1;
   palette: Pick<HullPaletteState, "id" | "encodeBetaSign" | "legend">;

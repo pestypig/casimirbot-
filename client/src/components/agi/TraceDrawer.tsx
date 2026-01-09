@@ -127,6 +127,7 @@ type StepRow = {
   id: string;
   kind: string;
   title: string;
+  tool?: string;
   status: "ok" | "error" | "pending";
   latencyMs?: number;
   essenceIds: string[];
@@ -136,6 +137,31 @@ type StepRow = {
 const MAX_LOG_LINES = 200;
 const PROMPT_PREVIEW_LIMIT = 600;
 export const TRACE_DRAWER_WIDTH = 420;
+const CREATIVE_BADGES: Record<string, { label: string; className: string }> = {
+  "luma.generate": {
+    label: "Luma",
+    className: "border-indigo-400/40 bg-indigo-500/10 text-indigo-100",
+  },
+  "luma.http.generate": {
+    label: "Luma HTTP",
+    className: "border-indigo-400/40 bg-indigo-500/10 text-indigo-100",
+  },
+  "noise.gen.cover": {
+    label: "NoiseGen cover",
+    className: "border-sky-400/40 bg-sky-500/10 text-sky-100",
+  },
+  "noise.gen.fingerprint": {
+    label: "NoiseGen fingerprint",
+    className: "border-sky-400/40 bg-sky-500/10 text-sky-100",
+  },
+};
+
+const resolveCreativeBadge = (
+  tool?: string,
+): { label: string; className: string } | null => {
+  if (!tool) return null;
+  return CREATIVE_BADGES[tool.toLowerCase()] ?? null;
+};
 
 type ToolLogEntry = {
   seq?: number;
@@ -316,10 +342,12 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
         (plan?.solver ? `solver:${plan.solver}` : plan?.verifier ? `verifier:${plan.verifier}` : step.kind ?? "step");
       const kind = step.kind ?? plan?.kind ?? "step";
       const essenceIds = Array.isArray(step.essence_ids) ? step.essence_ids.filter(Boolean) : [];
+      const tool = typeof plan?.tool === "string" ? plan.tool : undefined;
       return {
         id,
         kind,
         title: label,
+        tool,
         status: step.ok === false ? "error" : step.ok === true ? "ok" : "pending",
         latencyMs: typeof step.latency_ms === "number" ? step.latency_ms : undefined,
         essenceIds,
@@ -782,55 +810,68 @@ export default function TraceDrawer({ traceId, open, onClose, variant = "drawer"
             ))}
           </div>
         )}
-        {rows.map((row) => (
-          <div
-            key={row.id}
-            className="rounded border border-white/10 p-3 space-y-2"
-            data-trace-step={row.id}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm truncate">{row.title}</div>
-              <div
-                className={`text-xs uppercase ${
-                  row.status === "ok" ? "text-green-400" : row.status === "error" ? "text-red-400" : "text-yellow-300"
-                }`}
-              >
-                {row.status}
+        {rows.map((row) => {
+          const policyReason = row.error?.policy?.reason;
+          const policyTag = row.error?.policy?.tool ?? row.error?.policy?.capability;
+          const creativeBadge = resolveCreativeBadge(row.tool);
+          return (
+            <div
+              key={row.id}
+              className="rounded border border-white/10 p-3 space-y-2"
+              data-trace-step={row.id}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm truncate">{row.title}</div>
+                <div
+                  className={`text-xs uppercase ${
+                    row.status === "ok" ? "text-green-400" : row.status === "error" ? "text-red-400" : "text-yellow-300"
+                  }`}
+                >
+                  {row.status}
+                </div>
               </div>
+              <div className="text-[11px] opacity-70 flex flex-wrap gap-2">
+                <span>{row.kind}</span>
+                {typeof row.latencyMs === "number" && <span>{row.latencyMs} ms</span>}
+              </div>
+              {row.essenceIds.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="opacity-70">
+                    {creativeBadge ? "Creative" : "Essence"}
+                  </span>
+                  {row.essenceIds.map((eid) => (
+                    <a
+                      key={eid}
+                      className={`rounded-full border px-2 py-0.5 ${
+                        creativeBadge?.className ??
+                        "border-white/10 bg-white/5 text-slate-200"
+                      }`}
+                      href={`/api/essence/${eid}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={creativeBadge ? `${creativeBadge.label} output` : "Essence envelope"}
+                    >
+                      {creativeBadge
+                        ? `${creativeBadge.label} ${eid.slice(0, 8)}`
+                        : `${eid.slice(0, 8)}...`}
+                    </a>
+                  ))}
+                </div>
+              )}
+              {row.error && (
+                <div className="space-y-1">
+                  <div className="text-[11px] text-red-300">{row.error.message}</div>
+                  {policyReason && (
+                    <div className="rounded border border-yellow-400/50 bg-yellow-500/10 text-[11px] text-yellow-100 px-2 py-1">
+                      {policyReason}
+                      {policyTag && <span className="ml-1 opacity-70">({policyTag})</span>}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="text-[11px] opacity-70 flex flex-wrap gap-2">
-              <span>{row.kind}</span>
-              {typeof row.latencyMs === "number" && <span>{row.latencyMs} ms</span>}
-            </div>
-            {row.essenceIds.length > 0 && (
-              <div className="text-[11px]">
-                Essence:
-                {row.essenceIds.map((eid) => (
-                  <a
-                    key={eid}
-                    className="underline opacity-90 hover:opacity-100 ml-2"
-                    href={`/api/essence/${eid}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {eid.slice(0, 8)}…
-                  </a>
-                ))}
-              </div>
-            )}
-            {row.error && (
-              <div className="space-y-1">
-                <div className="text-[11px] text-red-300">{row.error.message}</div>
-                {row.error.type === "approval_denied" && row.error.policy?.reason && (
-                  <div className="rounded border border-yellow-400/50 bg-yellow-500/10 text-[11px] text-yellow-100 px-2 py-1">
-                    {row.error.policy.reason}
-                    {row.error.policy.tool && <span className="ml-1 opacity-70">({row.error.policy.tool})</span>}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="border-t border-white/10 p-3 h-[160px] overflow-auto text-[11px] opacity-80 bg-black/20 space-y-2">
         {logEntries.length === 0 && lines.length === 0 && <div className="opacity-60">Waiting for tool logs…</div>}

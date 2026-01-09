@@ -70,6 +70,45 @@ type GrDerivedMetrics = {
 
 type BrickChannel = LapseBrickChannel | GrEvolveBrickChannel;
 
+type MathStageLabel =
+  | "exploratory"
+  | "reduced-order"
+  | "diagnostic"
+  | "certified"
+  | "unstaged";
+
+type MathTreeNode = {
+  id: string;
+  stage?: MathStageLabel;
+  children?: MathTreeNode[];
+};
+
+type MathGraphResponse = {
+  root: MathTreeNode;
+};
+
+const buildMathNodeIndex = (root?: MathTreeNode) => {
+  const map = new Map<string, MathTreeNode>();
+  if (!root) return map;
+  const walk = (node: MathTreeNode) => {
+    map.set(node.id, node);
+    node.children?.forEach(walk);
+  };
+  walk(root);
+  return map;
+};
+
+const STAGE_RANK: Record<MathStageLabel, number> = {
+  unstaged: -1,
+  exploratory: 0,
+  "reduced-order": 1,
+  diagnostic: 2,
+  certified: 3,
+};
+
+const meetsStage = (stage: MathStageLabel, minStage: MathStageLabel) =>
+  STAGE_RANK[stage] >= STAGE_RANK[minStage];
+
 const getBrickChannel = (
   brick: LapseBrickDecoded | GrEvolveBrickDecoded | null | undefined,
   key: string,
@@ -171,7 +210,9 @@ const DEFAULT_KAPPA_TUNING: KappaTuning = {
 const DEFAULT_HULL_AXES: [number, number, number] = [503.5, 132, 86.5];
 const DEFAULT_BUBBLE_SIGMA = 6;
 const BRICK_BLEND_TAU = 0.3;
-const GR_TARGET_DX_M = 1;
+const GR_TARGET_DX_M = 5;
+const GR_DEFAULT_STEPS = 2;
+const GR_DEFAULT_DT_S = 0.002;
 const REGION_TARGET_DX_M = 8;
 const REGION_MAX_VOXELS = 2_000_000;
 const REGION_GRID_LINE_WIDTH = 0.08;
@@ -188,9 +229,10 @@ const HULL_CONTOUR_SCALE = 1.2;
 const HULL_CONTOUR_MIN = 0.05;
 const HULL_GLOW_SCALE = 0.6;
 const HULL_WARP_SCALE = 0.55;
-const WALL_WARP_SCALE = 0.65;
+const NATARIO_GEOM_WARP_SCALE = 0.05;
 const METRIC_BLEND = 0.45;
 const SHEAR_STRENGTH = 0.35;
+const THETA_WARP_SCALE = 0.7;
 const CONSTRAINT_ISO_LEVEL = 0.7;
 const CONSTRAINT_ISO_WIDTH = 0.08;
 const DEFAULT_VISUAL_TUNING = {
@@ -223,9 +265,10 @@ layout(location=3) in vec3 a_hullDir;
 layout(location=4) in vec3 a_beta;
 layout(location=5) in vec3 a_gamma;
 layout(location=6) in vec3 a_shear;
-layout(location=7) in float a_constraint;
-layout(location=8) in float a_region;
-layout(location=9) in float a_regionGrid;
+  layout(location=7) in float a_constraint;
+  layout(location=8) in float a_region;
+  layout(location=9) in float a_regionGrid;
+  layout(location=10) in float a_theta;
 
 uniform mat4 u_mvp;
 uniform float u_time;
@@ -235,10 +278,16 @@ uniform vec3 u_driveDir;
 uniform vec3 u_bubbleCenter;
 uniform float u_bubbleR;
 uniform float u_sigma;
-uniform float u_beta;
-uniform float u_phiScale;
-uniform float u_alphaMin;
-uniform float u_softening;
+  uniform float u_beta;
+  uniform vec3 u_betaCenter;
+  uniform float u_betaScale;
+  uniform float u_betaWarpWeight;
+  uniform float u_geomWarpScale;
+  uniform float u_phiScale;
+  uniform float u_alphaMin;
+  uniform float u_alphaScale;
+  uniform float u_thetaScale;
+  uniform float u_softening;
 uniform float u_warpStrength;
 uniform float u_breathAmp;
 uniform float u_breathRate;
@@ -255,9 +304,10 @@ uniform float u_hullBlend;
 out float v_alpha;
 out float v_pulse;
 out float v_hullWeight;
-out float v_constraint;
-out float v_region;
-out float v_regionGrid;
+  out float v_constraint;
+  out float v_region;
+  out float v_regionGrid;
+  out float v_theta;
 
 vec3 safeNormalize(vec3 v) {
   float len = length(v);
@@ -281,50 +331,42 @@ void main() {
   float f = topHat(r, sigma, R);
   float activation = clamp(u_activation, 0.0, 1.0);
   float betaShift = clamp(u_beta, 0.0, 0.99) * f;
-  float alphaAnalytic = sqrt(max(u_alphaMin * u_alphaMin, 1.0 - betaShift * betaShift * u_phiScale));
-  float brickAlpha = clamp(a_alpha, u_alphaMin, 1.0);
-  float brickBlend = clamp(u_brickBlend, 0.0, 1.0);
-  float alpha = mix(alphaAnalytic, brickAlpha, brickBlend);
+    float alphaAnalytic = sqrt(max(u_alphaMin * u_alphaMin, 1.0 - betaShift * betaShift * u_phiScale));
+    float brickAlpha = clamp(a_alpha, u_alphaMin, 1.0);
+    float brickBlend = clamp(u_brickBlend, 0.0, 1.0);
+    float alpha = mix(alphaAnalytic, brickAlpha, brickBlend);
+    float thetaNorm = clamp(a_theta * u_thetaScale, -1.0, 1.0) * brickBlend;
 
   vec3 dir = safeNormalize(u_driveDir);
   float hullThickness = max(1e-4, u_hullThickness);
   float hullBlend = clamp(u_hullBlend, 0.0, 1.0);
   float hullDist = a_hull;
-  float hullBand = 1.0 - smoothstep(hullThickness * 0.5, hullThickness, abs(hullDist));
-  float hullWeight = hullBand * hullBlend;
-  vec3 hullDir = length(a_hullDir) > 1e-4 ? normalize(a_hullDir) : safeNormalize(rel);
-  float hullSign = hullDist >= 0.0 ? 1.0 : -1.0;
-  vec3 hullWarp = hullDir * hullSign * hullWeight * activation * ${HULL_WARP_SCALE.toFixed(2)};
-  vec3 betaVec = a_beta;
-  float betaLen = length(betaVec);
-  vec3 betaDir = betaLen > 1e-4 ? betaVec / betaLen : dir;
-  float betaLocal = clamp(betaLen, 0.0, 0.99);
-  vec3 shiftWarp = -betaDir * betaLocal * u_warpStrength * activation;
-  float warpMag = mix(betaShift, (1.0 - alpha) * activation, brickBlend);
-  float wall = exp(-pow((r - R) * sigma, 2.0));
-  float wallPhase = mix(-1.0, 1.0, step(r, R));
-  float wallWarp = wall * (1.0 - alpha) * activation;
+    float hullBand = 1.0 - smoothstep(hullThickness * 0.5, hullThickness, abs(hullDist));
+    float hullWeight = hullBand * hullBlend;
+    vec3 hullDir = length(a_hullDir) > 1e-4 ? normalize(a_hullDir) : safeNormalize(rel);
+    float hullSign = hullDist >= 0.0 ? 1.0 : -1.0;
+    vec3 hullWarp = hullDir * hullSign * hullWeight * activation * ${HULL_WARP_SCALE.toFixed(2)};
+    float thetaWarp = thetaNorm * u_alphaScale * activation;
   vec3 gamma = max(a_gamma, vec3(0.0));
   vec3 gammaScale = sqrt(max(gamma, vec3(0.0)));
   gammaScale = clamp(gammaScale, vec3(0.6), vec3(1.6));
-  float metricBlend = max(0.0, u_metricBlend);
-  gammaScale = vec3(1.0) + (gammaScale - vec3(1.0)) * metricBlend;
-  vec3 shear = a_shear * u_shearStrength * activation;
-  vec3 twist = cross(dir, shear);
-  vec3 radial = safeNormalize(rel);
-  vec3 warp = -dir * warpMag * u_warpStrength
-    + radial * wallPhase * wallWarp * u_warpStrength * ${WALL_WARP_SCALE.toFixed(2)}
-    + hullWarp * u_warpStrength
-    + shiftWarp * brickBlend
-    + shear
-    + twist;
-  float breath = (1.0 - alpha) * u_breathAmp * sin(u_time * u_breathRate) * activation;
+    float metricBlend = max(0.0, u_metricBlend);
+    gammaScale = vec3(1.0) + (gammaScale - vec3(1.0)) * metricBlend;
+    vec3 shear = a_shear * u_shearStrength * activation;
+    vec3 twist = cross(dir, shear);
+    vec3 betaRel = (a_beta - u_betaCenter) * u_betaScale;
+    vec3 betaWarp = betaRel * u_betaWarpWeight * activation * u_warpStrength;
+    vec3 radial = safeNormalize(rel);
+    vec3 thetaVec = radial * thetaWarp * u_warpStrength * ${THETA_WARP_SCALE.toFixed(2)};
+    vec3 warp = (betaWarp + thetaVec + hullWarp * u_warpStrength + shear + twist) * u_geomWarpScale;
+  float breath = (1.0 - alpha) * u_breathAmp * sin(u_time * u_breathRate) * activation * u_geomWarpScale;
   vec3 warped = (p + warp + dir * breath) * gammaScale;
 
   float localRate = mix(0.3, 1.0, alpha);
-  v_pulse = 0.5 + 0.5 * sin(u_time * u_pulseRate * localRate + dot(p, vec3(1.7, 2.3, 1.1)));
-  v_alpha = alpha;
-  v_hullWeight = hullWeight;
+    v_pulse = 0.5 + 0.5 * sin(u_time * u_pulseRate * localRate + dot(p, vec3(1.7, 2.3, 1.1)));
+    v_alpha = alpha;
+    v_theta = thetaNorm;
+    v_hullWeight = hullWeight;
   v_constraint = clamp(abs(a_constraint) * u_constraintScale, 0.0, 1.0);
   v_region = clamp(a_region, 0.0, 1.0);
   v_regionGrid = clamp(a_regionGrid, 0.0, 1.0);
@@ -342,34 +384,39 @@ uniform float u_alphaScale;
 uniform float u_pointPass;
 uniform float u_constraintIso;
 uniform float u_constraintWidth;
-uniform float u_regionTint;
-uniform float u_regionTintScale;
-uniform float u_regionGrid;
-uniform float u_regionGridAlpha;
+  uniform float u_regionTint;
+  uniform float u_regionTintScale;
+  uniform float u_regionGrid;
+  uniform float u_regionGridAlpha;
 
-in float v_alpha;
-in float v_pulse;
-in float v_hullWeight;
-in float v_constraint;
-in float v_region;
-in float v_regionGrid;
-out vec4 outColor;
-
-vec3 palette(float t) {
-  vec3 fast = vec3(0.20, 0.62, 0.98);
-  vec3 slow = vec3(0.98, 0.64, 0.22);
-  return mix(fast, slow, t);
-}
-
-void main() {
-  if (u_pointPass > 0.5) {
-    vec2 c = gl_PointCoord * 2.0 - 1.0;
-    if (dot(c, c) > 1.0) discard;
+  in float v_alpha;
+  in float v_pulse;
+  in float v_hullWeight;
+  in float v_constraint;
+  in float v_region;
+  in float v_regionGrid;
+  in float v_theta;
+  out vec4 outColor;
+  
+  vec3 palette(float theta) {
+    vec3 contract = vec3(0.22, 0.62, 0.98);
+    vec3 expand = vec3(0.98, 0.42, 0.22);
+    float t = clamp(theta * 0.5 + 0.5, 0.0, 1.0);
+    return mix(contract, expand, t);
   }
 
-  float depth = clamp(((1.0 - v_alpha) * u_alphaScale) / max(1e-4, 1.0 - u_alphaMin), 0.0, 1.0);
-  vec3 color = palette(depth);
-  float pulse = mix(0.35, 1.0, v_pulse);
+  void main() {
+    if (u_pointPass > 0.5) {
+      vec2 c = gl_PointCoord * 2.0 - 1.0;
+      if (dot(c, c) > 1.0) discard;
+    }
+
+    float theta = clamp(v_theta, -1.0, 1.0);
+    float strength = clamp(abs(theta) * u_alphaScale, 0.0, 1.0);
+    vec3 signedColor = palette(theta);
+    vec3 neutral = vec3(0.82, 0.86, 0.92);
+    vec3 color = mix(neutral, signedColor, strength);
+    float pulse = mix(0.35, 1.0, v_pulse);
   float hullGlow = clamp(v_hullWeight * ${HULL_GLOW_SCALE.toFixed(2)}, 0.0, 1.0);
   vec3 hullColor = vec3(0.92, 0.96, 1.0);
   color = mix(color, hullColor, hullGlow);
@@ -537,7 +584,9 @@ function normalizeDir(v: unknown): [number, number, number] {
   return [x / len, y / len, z / len];
 }
 
-const dotVec3 = (a: [number, number, number], b: [number, number, number]) =>
+const DEFAULT_DRIVE_DIR: [number, number, number] = [1, 0, 0];
+
+const dotVec3 = (a: [number, number, number], b: [number, number, number]) =>   
   a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const crossVec3 = (a: [number, number, number], b: [number, number, number]) =>
   [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]] as [
@@ -1187,6 +1236,21 @@ function resolvePreviewDims(preview: HullPreviewPayload | null | undefined): Hul
     }
   }
   return null;
+}
+
+function resolveDriveDirFromHullDims(dims: HullDims | null): [number, number, number] {
+  if (!dims) return DEFAULT_DRIVE_DIR;
+  const values = [dims.Lx_m, dims.Ly_m, dims.Lz_m];
+  if (!values.every((value) => Number.isFinite(value) && value > 0)) {
+    return DEFAULT_DRIVE_DIR;
+  }
+  let maxIndex = 0;
+  for (let i = 1; i < values.length; i += 1) {
+    if (values[i] > values[maxIndex]) maxIndex = i;
+  }
+  if (maxIndex === 1) return [0, 1, 0];
+  if (maxIndex === 2) return [0, 0, 1];
+  return DEFAULT_DRIVE_DIR;
 }
 
 function buildPreviewArtifacts(preview: HullPreviewPayload) {
@@ -1955,6 +2019,8 @@ export default function TimeDilationLatticePanel({
   const nodeVboRef = useRef<WebGLBuffer | null>(null);
   const lineAlphaVboRef = useRef<WebGLBuffer | null>(null);
   const nodeAlphaVboRef = useRef<WebGLBuffer | null>(null);
+  const lineThetaVboRef = useRef<WebGLBuffer | null>(null);
+  const nodeThetaVboRef = useRef<WebGLBuffer | null>(null);
   const lineHullVboRef = useRef<WebGLBuffer | null>(null);
   const nodeHullVboRef = useRef<WebGLBuffer | null>(null);
   const lineHullDirVboRef = useRef<WebGLBuffer | null>(null);
@@ -2026,6 +2092,18 @@ export default function TimeDilationLatticePanel({
   const [casimirGammaVdB, setCasimirGammaVdB] = useState(0);
   const [casimirQSpoil, setCasimirQSpoil] = useState(1);
   const [visualTuning, setVisualTuning] = useState(DEFAULT_VISUAL_TUNING);
+  useEffect(() => {
+    setGrEnabled(true);
+  }, []);
+  const mathGraphQuery = useQuery({
+    queryKey: ["/api/helix/math/graph"],
+    staleTime: 30_000,
+  });
+  const mathGraph = mathGraphQuery.data as MathGraphResponse | undefined;
+  const mathNodeIndex = useMemo(
+    () => buildMathNodeIndex(mathGraph?.root),
+    [mathGraph?.root],
+  );
   const hullAssetsQuery = useQuery({
     queryKey: ["helix:hull-assets"],
     queryFn: ({ signal }) => fetchHullAssets(signal),
@@ -2069,6 +2147,7 @@ export default function TimeDilationLatticePanel({
   const assetsErrorMessage =
     hullAssetsQuery.error instanceof Error ? hullAssetsQuery.error.message : null;
   const buildGeometryUpdatePayload = React.useCallback(() => {
+    const driveDir = resolveDriveDirFromHullDims(previewDims ?? hullDims);
     if (geometrySource === "pipeline") {
       return {
         preview: null,
@@ -2076,6 +2155,12 @@ export default function TimeDilationLatticePanel({
         previewSdf: null,
         previewLattice: null,
         warpGeometryKind: "ellipsoid" as const,
+        warpFieldType: "alcubierre",
+        dynamicConfig: {
+          warpFieldType: "alcubierre",
+        },
+        driveDir,
+        grEnabled: true,
       };
     }
     if (!selectedAsset) return null;
@@ -2094,11 +2179,24 @@ export default function TimeDilationLatticePanel({
       previewSdf,
       previewLattice,
       warpGeometryKind: "sdf" as const,
+      warpFieldType: "alcubierre",
+      dynamicConfig: {
+        warpFieldType: "alcubierre",
+      },
+      driveDir,
+      grEnabled: true,
     };
     payload.warpGeometryAssetId = selectedAsset.meshHash ?? selectedAsset.id;
     if (usePreviewObb && previewDims) payload.hull = previewDims;
     return payload;
-  }, [geometrySource, previewCandidate, selectedAsset, usePreviewObb, previewDims]);
+  }, [
+    geometrySource,
+    previewCandidate,
+    selectedAsset,
+    usePreviewObb,
+    previewDims,
+    hullDims,
+  ]);
   const applyGeometrySelection = React.useCallback(async () => {
     const payload = buildGeometryUpdatePayload();
     if (!payload) return;
@@ -2397,6 +2495,26 @@ export default function TimeDilationLatticePanel({
 
   const gridScale = 1.2;
   const driveDir = useMemo(() => normalizeDir((pipelineState as any)?.driveDir), [pipelineState]);
+  const warpFieldType = useMemo(() => {
+    const raw =
+      (pipelineState as any)?.warpFieldType ??
+      (pipelineState as any)?.dynamicConfig?.warpFieldType;
+    if (typeof raw !== "string" || raw.length === 0) return "natario";
+    return raw.toLowerCase();
+  }, [pipelineState]);
+  const warpGeometry = useMemo(() => {
+    if (warpFieldType === "alcubierre") {
+      return { geomScale: 1, betaWeight: 1 };
+    }
+    if (warpFieldType === "natario" || warpFieldType === "natario_sdf") {
+      return { geomScale: NATARIO_GEOM_WARP_SCALE, betaWeight: 0 };
+    }
+    return { geomScale: 1, betaWeight: 0 };
+  }, [warpFieldType]);
+  const warpGeometryRef = useRef(warpGeometry);
+  useEffect(() => {
+    warpGeometryRef.current = warpGeometry;
+  }, [warpGeometry]);
   const driveDirRef = useRef(driveDir);
   useEffect(() => {
     driveDirRef.current = driveDir;
@@ -2561,11 +2679,19 @@ export default function TimeDilationLatticePanel({
     return regionQuery.error instanceof Error ? regionQuery.error.message : String(regionQuery.error);
   }, [regionQuery.error]);
   const useGrBrickData = Boolean(grQuery.data && grRequested);
-  const activeBrick = useGrBrickData ? grQuery.data : lapseQuery.data;
+  const activeBrick = grRequested ? (useGrBrickData ? grQuery.data : null) : lapseQuery.data;
 
-  const clockRateSample = useMemo(
-    () => buildClockRateSample(activeBrick, latticeBounds, clockMode),
-    [activeBrick, latticeBounds, clockMode],
+  const clockRateSample = useMemo(() => {
+    if (grRequested && !useGrBrickData) return null;
+    if (!activeBrick) return null;
+    return buildClockRateSample(activeBrick, latticeBounds, clockMode);
+  }, [activeBrick, latticeBounds, clockMode, grRequested, useGrBrickData]);
+  const thetaSample = useMemo(
+    () =>
+      useGrBrickData
+        ? buildBrickSample(activeBrick, latticeBounds, "theta")
+        : null,
+    [activeBrick, latticeBounds, useGrBrickData],
   );
 
   const lineAlpha = useMemo(
@@ -2577,6 +2703,14 @@ export default function TimeDilationLatticePanel({
     () =>
       clockRateSample ? sampleBrickForVerts(nodeVerts, clockRateSample, gridScale) : null,
     [clockRateSample, nodeVerts, gridScale],
+  );
+  const lineTheta = useMemo(
+    () => (thetaSample ? sampleBrickForVerts(lineVerts, thetaSample, gridScale) : null),
+    [lineVerts, thetaSample, gridScale],
+  );
+  const nodeTheta = useMemo(
+    () => (thetaSample ? sampleBrickForVerts(nodeVerts, thetaSample, gridScale) : null),
+    [nodeVerts, thetaSample, gridScale],
   );
   const betaSamples = useMemo(() => {
     if (!useGrBrickData || !grQuery.data) return null;
@@ -2595,11 +2729,23 @@ export default function TimeDilationLatticePanel({
   }, [betaSamples, lineVerts, gridScale]);
   const nodeBeta = useMemo(() => {
     if (!betaSamples) return null;
-    const bx = sampleBrickForVerts(nodeVerts, betaSamples.sampleX, gridScale);
-    const by = sampleBrickForVerts(nodeVerts, betaSamples.sampleY, gridScale);
-    const bz = sampleBrickForVerts(nodeVerts, betaSamples.sampleZ, gridScale);
+    const bx = sampleBrickForVerts(nodeVerts, betaSamples.sampleX, gridScale);  
+    const by = sampleBrickForVerts(nodeVerts, betaSamples.sampleY, gridScale);  
+    const bz = sampleBrickForVerts(nodeVerts, betaSamples.sampleZ, gridScale);  
     return interleaveVec3(bx, by, bz);
   }, [betaSamples, nodeVerts, gridScale]);
+  const betaCenter = useMemo<[number, number, number]>(() => {
+    if (!betaSamples) return [0, 0, 0];
+    const center = bubbleParams.center;
+    const bx = sampleBrickScalar(betaSamples.sampleX, center, 0);
+    const by = sampleBrickScalar(betaSamples.sampleY, center, 0);
+    const bz = sampleBrickScalar(betaSamples.sampleZ, center, 0);
+    return [toFiniteNumber(bx, 0), toFiniteNumber(by, 0), toFiniteNumber(bz, 0)];
+  }, [betaSamples, bubbleParams.center]);
+  const betaCenterRef = useRef(betaCenter);
+  useEffect(() => {
+    betaCenterRef.current = betaCenter;
+  }, [betaCenter]);
   const defaultLineAlpha = useMemo(() => {
     const out = new Float32Array(lineCount);
     out.fill(1);
@@ -2610,6 +2756,8 @@ export default function TimeDilationLatticePanel({
     out.fill(1);
     return out;
   }, [nodeCount]);
+  const defaultLineTheta = useMemo(() => new Float32Array(lineCount), [lineCount]);
+  const defaultNodeTheta = useMemo(() => new Float32Array(nodeCount), [nodeCount]);
   const defaultLineBeta = useMemo(() => new Float32Array(lineCount * 3), [lineCount]);
   const defaultNodeBeta = useMemo(() => new Float32Array(nodeCount * 3), [nodeCount]);
   const defaultLineGamma = useMemo(() => {
@@ -2720,18 +2868,141 @@ export default function TimeDilationLatticePanel({
   const nodeRegion = nodeRegionOverlay.weights;
   const lineRegionGrid = lineRegionOverlay.grid;
   const nodeRegionGrid = nodeRegionOverlay.grid;
-  const constraintScale = useMemo(() => {
-    if (!useGrBrickData || !grQuery.data) return 0;
-    const h = grQuery.data.channels?.H_constraint;
-    const min = Number(h?.min ?? 0);
-    const max = Number(h?.max ?? 0);
-    const maxAbs = Math.max(Math.abs(min), Math.abs(max));
-    return maxAbs > 0 ? 1 / maxAbs : 0;
-  }, [useGrBrickData, grQuery.data]);
-  const constraintScaleRef = useRef(constraintScale);
-  useEffect(() => {
-    constraintScaleRef.current = constraintScale;
-  }, [constraintScale]);
+    const constraintScale = useMemo(() => {
+      if (!useGrBrickData || !grQuery.data) return 0;
+      const h = grQuery.data.channels?.H_constraint;
+      const min = Number(h?.min ?? 0);
+      const max = Number(h?.max ?? 0);
+      const maxAbs = Math.max(Math.abs(min), Math.abs(max));
+      return maxAbs > 0 ? 1 / maxAbs : 0;
+    }, [useGrBrickData, grQuery.data]);
+    const thetaRange = useMemo(() => {
+      const theta = getBrickChannel(activeBrick, "theta");
+      if (!theta) return null;
+      const min = toFiniteNumber(theta.min, 0);
+      const max = toFiniteNumber(theta.max, 0);
+      const maxAbs = Math.max(Math.abs(min), Math.abs(max));
+      return { min, max, maxAbs };
+    }, [activeBrick]);
+    const thetaScale = useMemo(() => {
+      if (!thetaRange || !Number.isFinite(thetaRange.maxAbs)) return 0;
+      return thetaRange.maxAbs > 0 ? 1 / thetaRange.maxAbs : 0;
+    }, [thetaRange]);
+    const constraintScaleRef = useRef(constraintScale);
+    const thetaScaleRef = useRef(thetaScale);
+    useEffect(() => {
+      constraintScaleRef.current = constraintScale;
+    }, [constraintScale]);
+    useEffect(() => {
+      thetaScaleRef.current = thetaScale;
+    }, [thetaScale]);
+  const thetaDipoleCheck = useMemo(() => {
+    if (warpFieldType !== "alcubierre") return null;
+    if (!thetaSample) {
+      return {
+        status: "pending",
+        reason: "missing theta channel",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: grProxy,
+      };
+    }
+    const radius = Number(bubbleParams.R);
+    if (!Number.isFinite(radius) || radius <= 0) {
+      return {
+        status: "pending",
+        reason: "missing bubble radius",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: grProxy,
+      };
+    }
+    const dirLen = Math.hypot(driveDir[0], driveDir[1], driveDir[2]);
+    if (!(dirLen > 1e-6)) {
+      return {
+        status: "pending",
+        reason: "missing drive direction",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: grProxy,
+      };
+    }
+    const dist = Math.max(1e-6, radius);
+    const center = bubbleParams.center;
+    const aheadPos: [number, number, number] = [
+      center[0] + driveDir[0] * dist,
+      center[1] + driveDir[1] * dist,
+      center[2] + driveDir[2] * dist,
+    ];
+    const behindPos: [number, number, number] = [
+      center[0] - driveDir[0] * dist,
+      center[1] - driveDir[1] * dist,
+      center[2] - driveDir[2] * dist,
+    ];
+    const ahead = sampleBrickScalar(thetaSample, aheadPos, Number.NaN);
+    const behind = sampleBrickScalar(thetaSample, behindPos, Number.NaN);
+    if (!Number.isFinite(ahead) || !Number.isFinite(behind)) {
+      return {
+        status: "pending",
+        reason: "sample out of bounds",
+        ahead: Number.isFinite(ahead) ? ahead : null,
+        behind: Number.isFinite(behind) ? behind : null,
+        threshold: null,
+        proxy: grProxy,
+      };
+    }
+    const maxAbs = thetaRange?.maxAbs ?? Math.max(Math.abs(ahead), Math.abs(behind));
+    const threshold = Math.max(1e-12, maxAbs * 0.05);
+    const aheadStrong = Math.abs(ahead) >= threshold;
+    const behindStrong = Math.abs(behind) >= threshold;
+    if (!aheadStrong || !behindStrong) {
+      return {
+        status: "weak",
+        reason: "signal below threshold",
+        ahead,
+        behind,
+        threshold,
+        proxy: grProxy,
+      };
+    }
+    return {
+      status: ahead * behind < 0 ? "pass" : "fail",
+      reason: ahead * behind < 0 ? undefined : "no sign flip",
+      ahead,
+      behind,
+      threshold,
+      proxy: grProxy,
+    };
+  }, [
+    warpFieldType,
+    thetaSample,
+    bubbleParams,
+    driveDir,
+    thetaRange,
+    grProxy,
+  ]);
+  const thetaExpectation = useMemo(() => {
+    if (warpFieldType === "alcubierre") {
+      return {
+        mode: warpFieldType,
+        note: "θ dipole sign-flip check",
+        dipole: thetaDipoleCheck,
+      };
+    }
+    if (warpFieldType === "natario" || warpFieldType === "natario_sdf") {
+      return {
+        mode: warpFieldType,
+        note: "θ expected near 0",
+      };
+    }
+    return {
+      mode: warpFieldType,
+      note: "θ expectation: n/a",
+    };
+  }, [warpFieldType, thetaDipoleCheck]);
   const grDerived = useMemo(
     () => (grRequested && grQuery.data ? deriveGrMetrics(grQuery.data, debugEnabled) : null),
     [grRequested, grQuery.data, debugEnabled],
@@ -2788,6 +3059,8 @@ export default function TimeDilationLatticePanel({
 
   const lineAlphaRef = useRef<Float32Array | null>(lineAlpha);
   const nodeAlphaRef = useRef<Float32Array | null>(nodeAlpha);
+  const lineThetaRef = useRef<Float32Array | null>(lineTheta);
+  const nodeThetaRef = useRef<Float32Array | null>(nodeTheta);
   const lineBetaRef = useRef<Float32Array | null>(lineBeta);
   const nodeBetaRef = useRef<Float32Array | null>(nodeBeta);
   const lineGammaRef = useRef<Float32Array | null>(lineGamma);
@@ -2806,10 +3079,20 @@ export default function TimeDilationLatticePanel({
     }
   }, [lineAlpha]);
   useEffect(() => {
+    if (lineTheta) {
+      lineThetaRef.current = lineTheta;
+    }
+  }, [lineTheta]);
+  useEffect(() => {
     if (nodeAlpha) {
       nodeAlphaRef.current = nodeAlpha;
     }
   }, [nodeAlpha]);
+  useEffect(() => {
+    if (nodeTheta) {
+      nodeThetaRef.current = nodeTheta;
+    }
+  }, [nodeTheta]);
   useEffect(() => {
     if (lineBeta) {
       lineBetaRef.current = lineBeta;
@@ -2929,6 +3212,21 @@ export default function TimeDilationLatticePanel({
       gl.bufferData(gl.ARRAY_BUFFER, nodeAlpha, gl.DYNAMIC_DRAW);
     }
   }, [lineAlpha, nodeAlpha]);
+  useEffect(() => {
+    const gl = glRef.current;
+    if (!gl) return;
+    const lineThetaVbo = lineThetaVboRef.current;
+    const nodeThetaVbo = nodeThetaVboRef.current;
+    if (!lineThetaVbo || !nodeThetaVbo) return;
+    if (lineTheta) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, lineThetaVbo);
+      gl.bufferData(gl.ARRAY_BUFFER, lineTheta, gl.DYNAMIC_DRAW);
+    }
+    if (nodeTheta) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, nodeThetaVbo);
+      gl.bufferData(gl.ARRAY_BUFFER, nodeTheta, gl.DYNAMIC_DRAW);
+    }
+  }, [lineTheta, nodeTheta]);
 
   useEffect(() => {
     const gl = glRef.current;
@@ -3118,12 +3416,13 @@ export default function TimeDilationLatticePanel({
   }, [pipelineState]);
 
   const alphaSource = useMemo(() => {
+    if (grRequested && !useGrBrickData) return "gr-pending";
     if (useGrBrickData && lineBrickReady && nodeBrickReady) return "gr-brick";
     if (useGrBrickData && (lineBrickReady || nodeBrickReady)) return "gr-mixed";
-    if (lineBrickReady && nodeBrickReady) return "lapse-brick";
-    if (lineBrickReady || nodeBrickReady) return "mixed";
+    if (!grRequested && lineBrickReady && nodeBrickReady) return "lapse-brick";
+    if (!grRequested && (lineBrickReady || nodeBrickReady)) return "mixed";
     return "analytic";
-  }, [useGrBrickData, lineBrickReady, nodeBrickReady]);
+  }, [grRequested, useGrBrickData, lineBrickReady, nodeBrickReady]);
 
   const clockRateSource = useMemo(() => {
     if (clockMode !== "static") return "alpha";
@@ -3141,6 +3440,114 @@ export default function TimeDilationLatticePanel({
         ? "static (sqrt(-g_tt))"
         : "eulerian (alpha)";
   }, [clockMode, clockRateSource]);
+  const gateRequirements = useMemo(() => {
+    const entries: Array<{ module: string; minStage: MathStageLabel }> = [
+      { module: "server/energy-pipeline.ts", minStage: "reduced-order" },
+    ];
+    if (grRequested) {
+      entries.push({
+        module: "server/gr-evolve-brick.ts",
+        minStage: "diagnostic",
+      });
+    }
+    return entries;
+  }, [grRequested]);
+
+  const mathGate = useMemo(() => {
+    const reasons: string[] = [];
+    const modules: Array<{ module: string; stage: MathStageLabel }> = [];
+    const pending = mathGraphQuery.isLoading || mathGraphQuery.isFetching;
+    const hasGraph = Boolean(mathGraph?.root);
+
+    if (!hasGraph) {
+      reasons.push(pending ? "math maturity graph pending" : "math maturity graph unavailable");
+    }
+
+    for (const entry of gateRequirements) {
+      const stage = hasGraph
+        ? mathNodeIndex.get(entry.module)?.stage ?? "unstaged"
+        : "unstaged";
+      modules.push({ module: entry.module, stage });
+      if (hasGraph && !meetsStage(stage, entry.minStage)) {
+        reasons.push(`stage blocked: ${entry.module} (${stage} < ${entry.minStage})`);
+      }
+    }
+
+    if (!grRequested) {
+      reasons.push("GR brick disabled");
+    } else if (!useGrBrickData) {
+      if (grQuery.isError) {
+        reasons.push(`GR brick error: ${grErrorMessage ?? "unknown error"}`);
+      } else if (grQuery.isFetching) {
+        reasons.push("GR brick computing");
+      } else {
+        reasons.push("waiting for GR brick");
+      }
+    } else if (!thetaSample) {
+      reasons.push("missing theta channel");
+    } else if (alphaSource !== "gr-brick") {
+      reasons.push(`proxy alpha source: ${alphaSource}`);
+    }
+
+    return {
+      allowed: reasons.length === 0,
+      pending,
+      reasons,
+      modules,
+    };
+  }, [
+    alphaSource,
+    mathGraph?.root,
+    mathGraphQuery.isFetching,
+    mathGraphQuery.isLoading,
+    mathNodeIndex,
+    grRequested,
+    useGrBrickData,
+    grQuery.isError,
+    grQuery.isFetching,
+    grErrorMessage,
+    thetaSample,
+    gateRequirements,
+  ]);
+
+  const gateProgress = useMemo(() => {
+    const steps: Array<{ label: string; ready: boolean }> = [];
+    const hasGraph = Boolean(mathGraph?.root);
+    steps.push({ label: "math graph", ready: hasGraph });
+    for (const entry of gateRequirements) {
+      const stage = hasGraph
+        ? mathNodeIndex.get(entry.module)?.stage ?? "unstaged"
+        : "unstaged";
+      steps.push({ label: entry.module, ready: hasGraph && meetsStage(stage, entry.minStage) });
+    }
+    steps.push({ label: "gr enabled", ready: grRequested });
+    if (grRequested) {
+      const grReady = useGrBrickData && !grQuery.isFetching && !grQuery.isError;
+      steps.push({ label: "gr brick", ready: grReady });
+      steps.push({ label: "theta channel", ready: Boolean(thetaSample) });
+      steps.push({ label: "alpha source", ready: alphaSource === "gr-brick" });
+    }
+    const total = steps.length;
+    const ready = steps.reduce((sum, step) => sum + (step.ready ? 1 : 0), 0);
+    const ratio = total > 0 ? ready / total : 0;
+    return {
+      ratio,
+      ready,
+      total,
+    };
+  }, [
+    mathGraph?.root,
+    mathNodeIndex,
+    gateRequirements,
+    grRequested,
+    useGrBrickData,
+    grQuery.isFetching,
+    grQuery.isError,
+    thetaSample,
+    alphaSource,
+  ]);
+
+  const renderBlocked = !mathGate.allowed;
 
   const debugStats = useMemo(() => {
     if (!debugEnabled) return null;
@@ -3241,6 +3648,27 @@ export default function TimeDilationLatticePanel({
     grProxy,
     pipelineState,
   ]);
+  const warpProvenance = useMemo(() => {
+    if (!debugEnabled) return null;
+    const warpStrength = debugStats?.warpStrength ?? DEFAULT_VISUALS.warpStrength;
+    const shearStrength = visualTuning.kijEnabled ? SHEAR_STRENGTH * visualTuning.kijScale : 0;
+    return {
+      mode: warpFieldType,
+      geomScale: warpGeometry.geomScale,
+      betaWeight: warpGeometry.betaWeight,
+      betaScale: visualTuning.betaScale,
+      thetaScale,
+      thetaWarpScale: THETA_WARP_SCALE,
+      warpStrength,
+      shearStrength,
+    };
+  }, [debugEnabled, debugStats, warpFieldType, warpGeometry, visualTuning, thetaScale]);
+
+  useEffect(() => {
+    if (!renderBlocked) return;
+    setIsReady(false);
+    readyRef.current = false;
+  }, [renderBlocked]);
 
   const lapseStats = useMemo(() => {
     if (!debugEnabled || !lapseQuery.data) return null;
@@ -3254,10 +3682,15 @@ export default function TimeDilationLatticePanel({
   const grStats = useMemo(() => {
     if (!debugEnabled || !grQuery.data || !grRequested) return null;
     const alpha = grQuery.data.channels.alpha;
+    const theta = getBrickChannel(grQuery.data, "theta");
     return {
       dims: grQuery.data.dims,
       alphaMin: toFiniteNumber(alpha?.min, 0),
       alphaMax: toFiniteNumber(alpha?.max, 0),
+      thetaMin: toFiniteNumber(theta?.min, 0),
+      thetaMax: toFiniteNumber(theta?.max, 0),
+      thetaPeakAbs: toFiniteNumber(grQuery.data.stats?.thetaPeakAbs, 0),
+      thetaGrowthPerStep: toFiniteNumber(grQuery.data.stats?.thetaGrowthPerStep, 0),
       gttMin: grDerived?.gttMin,
       gttMax: grDerived?.gttMax,
       betaMaxAbs: firstFinite(
@@ -3299,6 +3732,37 @@ export default function TimeDilationLatticePanel({
       H_rms,
       M_rms,
       source: grQuery.data ? "gr-brick" : (pipelineState as any)?.gr ? "pipeline-gr" : "missing",
+      proxy: grProxy,
+    };
+  }, [debugEnabled, grQuery.data, pipelineState, grProxy]);
+
+  const thetaDiagnostics = useMemo(() => {
+    if (!debugEnabled) return null;
+    const stressEnergy =
+      grQuery.data?.stats?.stressEnergy ??
+      (pipelineState as any)?.gr?.matter?.stressEnergy;
+    const natario = stressEnergy?.natario;
+    if (!natario) return null;
+    const divPre = firstFinite(natario.divBetaMaxPre, natario.divBetaMax);
+    const divPost = firstFinite(natario.divBetaMaxPost, natario.divBetaMax);
+    const ratio =
+      Number.isFinite(natario.clampScale)
+        ? natario.clampScale
+        : Number.isFinite(divPre) && divPre !== 0
+          ? (divPost as number) / (divPre as number)
+          : Number.NaN;
+    if (!Number.isFinite(divPre) && !Number.isFinite(divPost) && !Number.isFinite(ratio)) {
+      return null;
+    }
+    return {
+      divPre,
+      divPost,
+      ratio,
+      source: grQuery.data?.stats?.stressEnergy
+        ? "gr-brick"
+        : (pipelineState as any)?.gr?.matter?.stressEnergy
+          ? "pipeline-gr"
+          : "missing",
       proxy: grProxy,
     };
   }, [debugEnabled, grQuery.data, pipelineState, grProxy]);
@@ -3446,6 +3910,7 @@ export default function TimeDilationLatticePanel({
   };
 
   useEffect(() => {
+    if (renderBlocked) return;
     const cv = canvasRef.current;
     if (!cv) return;
 
@@ -3480,12 +3945,14 @@ export default function TimeDilationLatticePanel({
         return;
       }
 
-      const lineVbo = gl.createBuffer();
-      const nodeVbo = gl.createBuffer();
-      const lineAlphaVbo = gl.createBuffer();
-      const nodeAlphaVbo = gl.createBuffer();
-      const lineBetaVbo = gl.createBuffer();
-      const nodeBetaVbo = gl.createBuffer();
+        const lineVbo = gl.createBuffer();
+        const nodeVbo = gl.createBuffer();
+        const lineAlphaVbo = gl.createBuffer();
+        const nodeAlphaVbo = gl.createBuffer();
+        const lineThetaVbo = gl.createBuffer();
+        const nodeThetaVbo = gl.createBuffer();
+        const lineBetaVbo = gl.createBuffer();
+        const nodeBetaVbo = gl.createBuffer();
       const lineGammaVbo = gl.createBuffer();
       const nodeGammaVbo = gl.createBuffer();
       const lineShearVbo = gl.createBuffer();
@@ -3501,12 +3968,14 @@ export default function TimeDilationLatticePanel({
       const lineHullDirVbo = gl.createBuffer();
       const nodeHullDirVbo = gl.createBuffer();
       if (
-        !lineVbo ||
-        !nodeVbo ||
-        !lineAlphaVbo ||
-        !nodeAlphaVbo ||
-        !lineBetaVbo ||
-        !nodeBetaVbo ||
+          !lineVbo ||
+          !nodeVbo ||
+          !lineAlphaVbo ||
+          !nodeAlphaVbo ||
+          !lineThetaVbo ||
+          !nodeThetaVbo ||
+          !lineBetaVbo ||
+          !nodeBetaVbo ||
         !lineGammaVbo ||
         !nodeGammaVbo ||
         !lineShearVbo ||
@@ -3526,12 +3995,14 @@ export default function TimeDilationLatticePanel({
         setGlError("WebGL buffer creation failed.");
         return;
       }
-      lineVboRef.current = lineVbo;
-      nodeVboRef.current = nodeVbo;
-      lineAlphaVboRef.current = lineAlphaVbo;
-      nodeAlphaVboRef.current = nodeAlphaVbo;
-      lineBetaVboRef.current = lineBetaVbo;
-      nodeBetaVboRef.current = nodeBetaVbo;
+        lineVboRef.current = lineVbo;
+        nodeVboRef.current = nodeVbo;
+        lineAlphaVboRef.current = lineAlphaVbo;
+        nodeAlphaVboRef.current = nodeAlphaVbo;
+        lineThetaVboRef.current = lineThetaVbo;
+        nodeThetaVboRef.current = nodeThetaVbo;
+        lineBetaVboRef.current = lineBetaVbo;
+        nodeBetaVboRef.current = nodeBetaVbo;
       lineGammaVboRef.current = lineGammaVbo;
       nodeGammaVboRef.current = nodeGammaVbo;
       lineShearVboRef.current = lineShearVbo;
@@ -3551,11 +4022,15 @@ export default function TimeDilationLatticePanel({
       gl.bufferData(gl.ARRAY_BUFFER, lineVerts, gl.STATIC_DRAW);
       gl.bindBuffer(gl.ARRAY_BUFFER, nodeVbo);
       gl.bufferData(gl.ARRAY_BUFFER, nodeVerts, gl.STATIC_DRAW);
-      gl.bindBuffer(gl.ARRAY_BUFFER, lineAlphaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, lineAlphaRef.current ?? defaultLineAlpha, gl.DYNAMIC_DRAW);
-      gl.bindBuffer(gl.ARRAY_BUFFER, nodeAlphaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, nodeAlphaRef.current ?? defaultNodeAlpha, gl.DYNAMIC_DRAW);
-      gl.bindBuffer(gl.ARRAY_BUFFER, lineBetaVbo);
+        gl.bindBuffer(gl.ARRAY_BUFFER, lineAlphaVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, lineAlphaRef.current ?? defaultLineAlpha, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, nodeAlphaVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, nodeAlphaRef.current ?? defaultNodeAlpha, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, lineThetaVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, lineThetaRef.current ?? defaultLineTheta, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, nodeThetaVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, nodeThetaRef.current ?? defaultNodeTheta, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, lineBetaVbo);
       gl.bufferData(gl.ARRAY_BUFFER, lineBetaRef.current ?? defaultLineBeta, gl.DYNAMIC_DRAW);
       gl.bindBuffer(gl.ARRAY_BUFFER, nodeBetaVbo);
       gl.bufferData(gl.ARRAY_BUFFER, nodeBetaRef.current ?? defaultNodeBeta, gl.DYNAMIC_DRAW);
@@ -3613,10 +4088,15 @@ export default function TimeDilationLatticePanel({
         u_bubbleCenter: gl.getUniformLocation(prog, "u_bubbleCenter"),
         u_bubbleR: gl.getUniformLocation(prog, "u_bubbleR"),
         u_sigma: gl.getUniformLocation(prog, "u_sigma"),
-        u_beta: gl.getUniformLocation(prog, "u_beta"),
-        u_phiScale: gl.getUniformLocation(prog, "u_phiScale"),
-        u_alphaMin: gl.getUniformLocation(prog, "u_alphaMin"),
-        u_softening: gl.getUniformLocation(prog, "u_softening"),
+          u_beta: gl.getUniformLocation(prog, "u_beta"),
+          u_betaCenter: gl.getUniformLocation(prog, "u_betaCenter"),
+          u_betaScale: gl.getUniformLocation(prog, "u_betaScale"),
+          u_betaWarpWeight: gl.getUniformLocation(prog, "u_betaWarpWeight"),
+          u_geomWarpScale: gl.getUniformLocation(prog, "u_geomWarpScale"),
+          u_phiScale: gl.getUniformLocation(prog, "u_phiScale"),
+          u_alphaMin: gl.getUniformLocation(prog, "u_alphaMin"),
+          u_thetaScale: gl.getUniformLocation(prog, "u_thetaScale"),
+          u_softening: gl.getUniformLocation(prog, "u_softening"),
         u_warpStrength: gl.getUniformLocation(prog, "u_warpStrength"),
         u_breathAmp: gl.getUniformLocation(prog, "u_breathAmp"),
         u_breathRate: gl.getUniformLocation(prog, "u_breathRate"),
@@ -3720,7 +4200,12 @@ export default function TimeDilationLatticePanel({
         );
         activationRef.current = activation;
         const visual = visualTuningRef.current;
-        const betaEffective = betaFieldRef.current.value * activation * visual.betaScale;
+        const warpGeometry = warpGeometryRef.current;
+        const betaCenter = betaCenterRef.current ?? [0, 0, 0];
+        const geomWarpScale = Math.max(0, warpGeometry?.geomScale ?? 1);
+        const betaWarpWeight = Math.max(0, warpGeometry?.betaWeight ?? 0);
+        const betaScale = Math.max(0, visual.betaScale);
+        const betaEffective = betaFieldRef.current.value * activation * betaScale;
         const lineBrickBlend = smoothExp(
           lineBrickBlendRef.current,
           lineBrickTargetRef.current,
@@ -3767,6 +4252,10 @@ export default function TimeDilationLatticePanel({
         gl.uniform1f(uniforms.u_bubbleR, bubble.R);
         gl.uniform1f(uniforms.u_sigma, bubble.sigma);
         gl.uniform1f(uniforms.u_beta, betaEffective);
+        gl.uniform3f(uniforms.u_betaCenter, betaCenter[0], betaCenter[1], betaCenter[2]);
+        gl.uniform1f(uniforms.u_betaScale, betaScale);
+        gl.uniform1f(uniforms.u_betaWarpWeight, betaWarpWeight);
+        gl.uniform1f(uniforms.u_geomWarpScale, geomWarpScale);
         gl.uniform1f(uniforms.u_phiScale, settings.phiScale);
         gl.uniform1f(uniforms.u_alphaMin, settings.alphaMin);
         gl.uniform1f(uniforms.u_softening, settings.softening);
@@ -3776,6 +4265,7 @@ export default function TimeDilationLatticePanel({
         gl.uniform1f(uniforms.u_pulseRate, settings.pulseRate);
         gl.uniform1f(uniforms.u_pointSize, settings.pointSize);
         gl.uniform1f(uniforms.u_alphaScale, visual.alphaScale);
+        gl.uniform1f(uniforms.u_thetaScale, thetaScaleRef.current);
         gl.uniform1f(
           uniforms.u_metricBlend,
           visual.gammaEnabled ? METRIC_BLEND * visual.gammaScale : 0,
@@ -3871,14 +4361,22 @@ export default function TimeDilationLatticePanel({
           gl.disableVertexAttribArray(8);
           gl.vertexAttrib1f(8, 0);
         }
-        if (lineRegionGridVboRef.current) {
-          gl.bindBuffer(gl.ARRAY_BUFFER, lineRegionGridVboRef.current);
-          gl.enableVertexAttribArray(9);
-          gl.vertexAttribPointer(9, 1, gl.FLOAT, false, 0, 0);
-        } else {
-          gl.disableVertexAttribArray(9);
-          gl.vertexAttrib1f(9, 0);
-        }
+          if (lineRegionGridVboRef.current) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, lineRegionGridVboRef.current);
+            gl.enableVertexAttribArray(9);
+            gl.vertexAttribPointer(9, 1, gl.FLOAT, false, 0, 0);
+          } else {
+            gl.disableVertexAttribArray(9);
+            gl.vertexAttrib1f(9, 0);
+          }
+          if (lineThetaVboRef.current) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, lineThetaVboRef.current);
+            gl.enableVertexAttribArray(10);
+            gl.vertexAttribPointer(10, 1, gl.FLOAT, false, 0, 0);
+          } else {
+            gl.disableVertexAttribArray(10);
+            gl.vertexAttrib1f(10, 0);
+          }
         gl.uniform1f(uniforms.u_brickBlend, lineBrickBlend);
         gl.uniform1f(uniforms.u_hullBlend, lineHullBlend);
         gl.uniform1f(uniforms.u_pointPass, 0.0);
@@ -3950,14 +4448,22 @@ export default function TimeDilationLatticePanel({
           gl.disableVertexAttribArray(8);
           gl.vertexAttrib1f(8, 0);
         }
-        if (nodeRegionGridVboRef.current) {
-          gl.bindBuffer(gl.ARRAY_BUFFER, nodeRegionGridVboRef.current);
-          gl.enableVertexAttribArray(9);
-          gl.vertexAttribPointer(9, 1, gl.FLOAT, false, 0, 0);
-        } else {
-          gl.disableVertexAttribArray(9);
-          gl.vertexAttrib1f(9, 0);
-        }
+          if (nodeRegionGridVboRef.current) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, nodeRegionGridVboRef.current);
+            gl.enableVertexAttribArray(9);
+            gl.vertexAttribPointer(9, 1, gl.FLOAT, false, 0, 0);
+          } else {
+            gl.disableVertexAttribArray(9);
+            gl.vertexAttrib1f(9, 0);
+          }
+          if (nodeThetaVboRef.current) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, nodeThetaVboRef.current);
+            gl.enableVertexAttribArray(10);
+            gl.vertexAttribPointer(10, 1, gl.FLOAT, false, 0, 0);
+          } else {
+            gl.disableVertexAttribArray(10);
+            gl.vertexAttrib1f(10, 0);
+          }
         gl.uniform1f(uniforms.u_brickBlend, nodeBrickBlend);
         gl.uniform1f(uniforms.u_hullBlend, nodeHullBlend);
         gl.uniform1f(uniforms.u_pointPass, 1.0);
@@ -3991,14 +4497,22 @@ export default function TimeDilationLatticePanel({
             gl.deleteBuffer(nodeVboRef.current);
             nodeVboRef.current = null;
           }
-          if (lineAlphaVboRef.current) {
-            gl.deleteBuffer(lineAlphaVboRef.current);
-            lineAlphaVboRef.current = null;
-          }
-          if (nodeAlphaVboRef.current) {
-            gl.deleteBuffer(nodeAlphaVboRef.current);
-            nodeAlphaVboRef.current = null;
-          }
+            if (lineAlphaVboRef.current) {
+              gl.deleteBuffer(lineAlphaVboRef.current);
+              lineAlphaVboRef.current = null;
+            }
+            if (nodeAlphaVboRef.current) {
+              gl.deleteBuffer(nodeAlphaVboRef.current);
+              nodeAlphaVboRef.current = null;
+            }
+            if (lineThetaVboRef.current) {
+              gl.deleteBuffer(lineThetaVboRef.current);
+              lineThetaVboRef.current = null;
+            }
+            if (nodeThetaVboRef.current) {
+              gl.deleteBuffer(nodeThetaVboRef.current);
+              nodeThetaVboRef.current = null;
+            }
           if (lineBetaVboRef.current) {
             gl.deleteBuffer(lineBetaVboRef.current);
             lineBetaVboRef.current = null;
@@ -4076,7 +4590,7 @@ export default function TimeDilationLatticePanel({
       window.clearTimeout(startHandle);
       if (started) cleanup();
     };
-  }, [lineVerts, nodeVerts, lineCount, nodeCount, glEpoch]);
+  }, [lineVerts, nodeVerts, lineCount, nodeCount, glEpoch, renderBlocked]);
 
   if (glStatus === "no-webgl" || glStatus === "compile-fail") {
     return (
@@ -4186,13 +4700,53 @@ export default function TimeDilationLatticePanel({
             </div>
           </div>
         )}
+        {renderBlocked && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/70">
+            <div className="max-w-[340px] rounded-md border border-amber-500/40 bg-black/80 px-3 py-2 text-[11px] text-slate-200">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300">
+                Math maturity gate
+              </div>
+              <div className="mt-1 text-slate-300">
+                Rendering paused until non-proxy, staged data is available.
+              </div>
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  <span>gate progress</span>
+                  <span>{Math.round(gateProgress.ratio * 100)}% ({gateProgress.ready}/{gateProgress.total})</span>
+                </div>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-white/10">
+                  <div
+                    className="h-full rounded bg-amber-400/80 transition-[width] duration-300"
+                    style={{ width: `${Math.round(gateProgress.ratio * 100)}%` }}
+                  />
+                </div>
+              </div>
+              {mathGate.reasons.length > 0 && (
+                <div className="mt-2 space-y-1 text-[10px] text-slate-400">
+                  {mathGate.reasons.map((reason) => (
+                    <div key={reason}>{reason}</div>
+                  ))}
+                </div>
+              )}
+              {mathGate.modules.length > 0 && (
+                <div className="mt-2 space-y-1 text-[10px] text-slate-500">
+                  {mathGate.modules.map((entry) => (
+                    <div key={entry.module}>
+                      {entry.module}: {entry.stage}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {(debugEnabled ||
           geometryControlsEnabled ||
           casimirControlsEnabled ||
           grControlsEnabled ||
           regionControlsEnabled ||
           visualControlsEnabled) && (
-          <div className="absolute left-3 top-3 flex max-w-[360px] flex-col gap-2 text-[11px] text-slate-200">
+          <div className="absolute left-3 top-3 bottom-3 flex w-[calc(100%-24px)] max-w-[360px] flex-col gap-2 overflow-y-auto overflow-x-hidden break-words pr-1 text-[11px] text-slate-200">
             {debugEnabled && debugStats && (
               <div className="rounded-md border border-white/10 bg-black/70 px-3 py-2">
             <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">kappa drive</div>
@@ -4257,6 +4811,68 @@ export default function TimeDilationLatticePanel({
                 <div>source: {solverDiagnostics.source}</div>
               </div>
             )}
+            {thetaDiagnostics && (
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  theta audit
+                </div>
+                <div>
+                  theta_div_pre: {formatSci(thetaDiagnostics.divPre, 2)}
+                </div>
+                <div>
+                  theta_div_post: {formatSci(thetaDiagnostics.divPost, 2)}
+                </div>
+                <div>clamp_ratio: {formatFixed(thetaDiagnostics.ratio, 3)}</div>
+                <div>source: {thetaDiagnostics.source}</div>
+                {thetaDiagnostics.proxy ? <div>proxy: true</div> : null}
+              </div>
+            )}
+            {thetaExpectation && (
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  theta expectation
+                </div>
+                <div>warpFieldType: {thetaExpectation.mode}</div>
+                <div>{thetaExpectation.note}</div>
+                {thetaExpectation.dipole && (
+                  <>
+                    <div>dipole_sign_flip: {thetaExpectation.dipole.status}</div>
+                    <div>
+                      theta_ahead: {formatSci(thetaExpectation.dipole.ahead, 2)}
+                    </div>
+                    <div>
+                      theta_behind: {formatSci(thetaExpectation.dipole.behind, 2)}
+                    </div>
+                    <div>
+                      threshold: {formatSci(thetaExpectation.dipole.threshold, 2)}
+                    </div>
+                    {thetaExpectation.dipole.reason ? (
+                      <div>note: {thetaExpectation.dipole.reason}</div>
+                    ) : null}
+                    {thetaExpectation.dipole.proxy ? <div>proxy: true</div> : null}
+                  </>
+                )}
+              </div>
+            )}
+            {warpProvenance && (
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  warp provenance
+                </div>
+                <div>mode: {warpProvenance.mode}</div>
+                <div>geom_gate: {formatFixed(warpProvenance.geomScale, 2)}x</div>
+                <div>
+                  beta_warp: w={formatFixed(warpProvenance.betaWeight, 2)} scale=
+                  {formatFixed(warpProvenance.betaScale, 2)}x
+                </div>
+                <div>
+                  theta_warp: scale={formatSci(warpProvenance.thetaScale, 2)} w=
+                  {formatFixed(warpProvenance.thetaWarpScale, 2)}
+                </div>
+                <div>warpStrength: {formatFixed(warpProvenance.warpStrength, 2)}</div>
+                <div>shearStrength: {formatFixed(warpProvenance.shearStrength, 2)}</div>
+              </div>
+            )}
             {grPerf && (
               <div className="mt-2 border-t border-white/10 pt-2">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">gr perf</div>
@@ -4278,6 +4894,11 @@ export default function TimeDilationLatticePanel({
                 <div>
                   alpha: [{formatFixed(grStats.alphaMin, 4)}, {formatFixed(grStats.alphaMax, 4)}]
                 </div>
+                <div>
+                  theta_GR: [{formatSci(grStats.thetaMin as number)}, {formatSci(grStats.thetaMax as number)}]
+                </div>
+                <div>theta_peak_abs: {formatSci(grStats.thetaPeakAbs as number, 2)}</div>
+                <div>theta_growth_step: {formatSci(grStats.thetaGrowthPerStep as number, 2)}</div>
                 <div>
                   g_tt (derived): [{formatFixed(grStats.gttMin as number, 4)}, {formatFixed(grStats.gttMax as number, 4)}]
                 </div>
@@ -5142,7 +5763,7 @@ export default function TimeDilationLatticePanel({
                     />
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">alpha scale</span>
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">theta scale</span>
                     <input
                       type="range"
                       min="0.2"
@@ -5248,7 +5869,7 @@ export default function TimeDilationLatticePanel({
             )}
           </div>
         )}
-        {glStatus === "context-lost" && (
+        {glStatus === "context-lost" && !renderBlocked && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 text-slate-200">
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="text-xs uppercase tracking-[0.3em] text-slate-400">WebGL context lost</div>
@@ -5258,7 +5879,7 @@ export default function TimeDilationLatticePanel({
             </div>
           </div>
         )}
-        {!isReady && glStatus !== "context-lost" && (
+        {!isReady && glStatus !== "context-lost" && !renderBlocked && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 text-slate-200">
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Buffering simulation</div>
@@ -5269,15 +5890,14 @@ export default function TimeDilationLatticePanel({
           </div>
         )}
       </div>
-      <div className="text-xs text-slate-400">
-        Color maps clock rate ({clockRateLabel}): cool means faster, warm means slower. When available, alpha is sampled
-        from the GR evolve brick (non-proxy) or the server lapse brick; otherwise we fall back to the analytic bubble
-        lapse. Shift beta from the GR brick can drive warp cues; gamma_ij adds anisotropic scaling, K_ij adds shear/twist
-        cues, and H_constraint highlights iso bands when present.
-        Hull contours use hullDist/hullMask bricks from GLB uploads when present (visual proxy only). phiScale, warp,
-        breath, and softening follow kappa_drive (log-scaled); activation gates warp cues using electrical inputs and
-        guardrails; pulse rate scales with alpha; lattice warp is a visual cue only.
-      </div>
+        <div className="text-xs text-slate-400">
+          Color maps expansion/contraction (theta): cool means contraction, warm means expansion. The lattice warp is driven
+          by GR theta from the evolve brick (non-proxy) and is always applied. Alpha is still sampled for pulse timing
+          ({clockRateLabel}). Gamma_ij adds anisotropic scaling, K_ij adds shear/twist cues, and H_constraint highlights iso
+          bands when present. Hull contours use hullDist/hullMask bricks from GLB uploads when present (visual proxy only).
+          phiScale, warp, breath, and softening follow kappa_drive (log-scaled); activation gates warp cues using electrical
+          inputs and guardrails.
+        </div>
     </div>
   );
 }

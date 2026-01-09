@@ -34,6 +34,7 @@ Constraint pack mode (pack-agnostic)
   "mode": "constraint-pack",
   "pack": {
     "id": "repo-convergence",
+    "autoTelemetry": true,
     "telemetry": {
       "build": { "status": "pass", "durationMs": 420000 },
       "tests": { "failed": 0, "total": 128 },
@@ -58,6 +59,12 @@ Response (example)
     "value": 0.12,
     "limit": "H_rms <= 0.01"
   },
+  "certificate": {
+    "status": "ADMISSIBLE",
+    "certificateHash": "sha256:deadbeef",
+    "certificateId": "cert-001",
+    "integrityOk": true
+  },
   "deltas": [
     { "key": "dutyCycle", "from": 0.004, "to": 0.002, "delta": -0.002, "change": "changed" }
   ],
@@ -74,6 +81,15 @@ Notes
 - `actions[].params` map directly to the GR pipeline parameter overrides.
 - For `mode: "constraint-pack"`, provide `pack.id` and telemetry/metrics; the
   adapter evaluates the pack and emits a training trace.
+- When available, the adapter response includes a `certificate` object with     
+  hash + integrity status (constraint-pack runs auto-issue certificates when    
+  telemetry is provided).
+- If `certificate` is missing or `integrityOk` is false, treat the run as NOT
+  CERTIFIED even if `verdict` is PASS.
+- Auto-ingest for constraint packs supports report paths (`pack.*Path`) and
+  tool log ingestion (`pack.toolLogTraceId`, `pack.toolLogWindowMs`,
+  `pack.toolLogLimit`). When `autoTelemetry` is true, the adapter will also scan
+  `reports/` for junit/vitest/jest/eslint/tsc outputs by default.
 - `pack.ladderTier` can downgrade fidelity for training-only runs; it is clamped to the actual tier.
 - `policyOverride.policy.minLadderTier` can require a minimum tier (evaluation fails below it).
 - `budget` and `policy` are optional; omit them to use defaults.

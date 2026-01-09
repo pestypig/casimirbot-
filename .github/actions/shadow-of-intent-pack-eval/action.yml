@@ -1,0 +1,82 @@
+name: Shadow of Intent Pack Eval
+description: Collect reports artifacts and evaluate a constraint pack in one step.
+inputs:
+  pack:
+    description: Constraint pack id.
+    required: false
+    default: repo-convergence
+  api-base:
+    description: Base URL for the verifier API (adapter run endpoint is derived).
+    required: false
+    default: http://localhost:5173
+  start-server:
+    description: Start the local AGI API before running the pack eval.
+    required: false
+    default: "true"
+  install-deps:
+    description: Run npm ci before starting the server.
+    required: false
+    default: "true"
+  reports-path:
+    description: Directory containing CI reports.
+    required: false
+    default: reports
+  reports-artifact:
+    description: Optional artifact name to download into reports-path.
+    required: false
+    default: ""
+  trace-out:
+    description: Path to write the training-trace JSONL file.
+    required: false
+    default: artifacts/training-trace.jsonl
+  trace-limit:
+    description: Max traces to export.
+    required: false
+    default: "200"
+  token:
+    description: Bearer token for auth (optional).
+    required: false
+    default: ""
+  tenant:
+    description: Tenant id for auth/tenancy (optional).
+    required: false
+    default: ""
+outputs:
+  trace-out:
+    description: Path to the training trace JSONL output.
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      if: ${{ inputs.install-deps == 'true' }}
+      shell: bash
+      run: npm ci
+
+    - name: Download reports artifact
+      if: ${{ inputs.reports-artifact != '' }}
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.reports-artifact }}
+        path: ${{ inputs.reports-path }}
+
+    - name: Start AGI API
+      if: ${{ inputs.start-server == 'true' }}
+      shell: bash
+      run: |
+        export CASIMIR_AUTO_CI_REPORTS=1
+        export CASIMIR_AUTO_CI_REPORTS_DIRS="${{ inputs.reports-path }}"
+        npm run dev:agi:5173 > /tmp/agi.log 2>&1 &
+        node -e "const url='http://localhost:5173/api/agi/constraint-packs'; const timeoutMs=60000; const start=Date.now(); const delay=ms=>new Promise(r=>setTimeout(r,ms)); (async()=>{ while(true){ try { const res=await fetch(url); if(res.ok){ console.log('AGI API is up'); process.exit(0);} } catch {} if(Date.now()-start>timeoutMs){ console.error('Timed out waiting for AGI API'); process.exit(1);} await delay(1000);} })();"
+
+    - name: Run pack evaluation
+      shell: bash
+      run: |
+        mkdir -p "$(dirname "${{ inputs.trace-out }}")"
+        args=(--pack "${{ inputs.pack }}" --auto-telemetry --trace-out "${{ inputs.trace-out }}" --trace-limit "${{ inputs.trace-limit }}")
+        if [ -n "${{ inputs.token }}" ]; then args+=(--token "${{ inputs.token }}"); fi
+        if [ -n "${{ inputs.tenant }}" ]; then args+=(--tenant "${{ inputs.tenant }}"); fi
+        npm run casimir:verify -- --url "${{ inputs.api-base }}" "${args[@]}"
+
+    - id: outputs
+      shell: bash
+      run: echo "trace-out=${{ inputs.trace-out }}" >> "$GITHUB_OUTPUT"

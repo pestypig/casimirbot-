@@ -26,7 +26,10 @@ import { putMemoryRecord, searchMemories } from "../essence/memory-store";
 import { kvAdd, kvBudgetExceeded, kvEvictOldest } from "../llm/kv-budgeter";
 import { getTool } from "../../skills";
 import { metrics, recordTaskOutcome } from "../../metrics";
-import { appendToolLog } from "../observability/tool-log-store";
+import {
+  appendToolLog,
+  type ToolLogPolicyFlags,
+} from "../observability/tool-log-store";
 import { runSpecialistPlan, runVerifierOnly, type SpecialistRunResult } from "../specialists/executor";
 import { mergeKnowledgeBundles } from "../knowledge/merge";
 import { composeKnowledgeAppendix } from "./knowledge-compositor";
@@ -46,6 +49,12 @@ import {
   formatSupplementForPrompt,
   type Supplement,
 } from "./supplements";
+import {
+  isToolAllowedForAgent,
+  loadAgentMap,
+  resolveAgent,
+  type AgentMap,
+} from "./agent-map";
 import type { WarpViabilityCertificate } from "../../../types/warpViability";
 import { loadWarpAgentsConfig, type WarpAgentsConfig } from "../../../modules/physics/warpAgents";
 
@@ -70,6 +79,8 @@ const DEFAULT_DEBATE_ATTACHMENTS = [
     url: "/mnt/data/Quantum Computation in Brain Microtubules The Penrose-Hameroff hameroff-1998.pdf",
   },
 ];
+const LOCAL_SPAWN_TOOL_NAME = "llm.local.spawn.generate";
+const AGENT_MAP_ENABLED = process.env.ENABLE_AGENT_MAP === "1";
 
 const RESULT_SUMMARY_LIMIT = (() => {
   const fallback = 2000;
@@ -79,6 +90,60 @@ const RESULT_SUMMARY_LIMIT = (() => {
   }
   return Math.min(8000, Math.max(500, Math.floor(raw)));
 })();
+
+const formatMemoryCitation = (hit: TMemorySearchHit): string => {
+  if (typeof hit.envelope_id === "string" && hit.envelope_id.trim()) {
+    return `essence:${hit.envelope_id.trim()}`;
+  }
+  return `memory:${hit.id}`;
+};
+
+const normalizeAgentId = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+type AgentContext = {
+  agentId?: string;
+  personaId: string;
+  allowed: boolean;
+  reason?: "agent_not_found" | "agent_tool_forbidden";
+};
+
+const resolveAgentContext = (
+  agentId: string | undefined,
+  toolName: string | undefined,
+  fallbackPersonaId: string,
+): AgentContext => {
+  const personaFallback = fallbackPersonaId || "default";
+  if (!AGENT_MAP_ENABLED || !agentId) {
+    return { agentId, personaId: personaFallback, allowed: true };
+  }
+  const map = loadAgentMap();
+  const agent = resolveAgent(map, agentId);
+  if (!agent) {
+    return { agentId, personaId: personaFallback, allowed: false, reason: "agent_not_found" };
+  }
+  const personaId = agent.personaId ?? personaFallback;
+  if (toolName && !isToolAllowedForAgent(agent, toolName)) {
+    return { agentId: agent.id, personaId, allowed: false, reason: "agent_tool_forbidden" };
+  }
+  return { agentId: agent.id, personaId, allowed: true };
+};
+
+const formatAgentMapForPrompt = (map: AgentMap): string[] => {
+  return map.agents.map((agent) => {
+    const persona = agent.personaId ?? "default";
+    const tools =
+      agent.toolAllowList && agent.toolAllowList.length > 0
+        ? agent.toolAllowList.join(", ")
+        : "all";
+    return `- ${agent.id} -> persona:${persona} tools:${tools}`;
+  });
+};
 
 export type PlanNode =
   | { id: string; kind: "SEARCH"; query: string; topK: number; target: "memory"; note: string }
@@ -1577,6 +1642,20 @@ export function renderChatBPlannerPrompt(args: PlannerPromptArgs): string {
           )
           .join("\n")
       : "- (no tools registered yet)";
+  const hasLocalSpawnTool = args.manifest.some(
+    (tool) => tool.name === LOCAL_SPAWN_TOOL_NAME,
+  );
+  const hasLocalGenerateTool = args.manifest.some(
+    (tool) => tool.name === "llm.local.generate",
+  );
+  const sampleTool = hasLocalSpawnTool
+    ? LOCAL_SPAWN_TOOL_NAME
+    : hasLocalGenerateTool
+      ? "llm.local.generate"
+      : "llm.http.generate";
+  const agentMapLines = AGENT_MAP_ENABLED
+    ? formatAgentMapForPrompt(loadAgentMap())
+    : [];
 
   const lines = [
     `You are Chat B, the planner for persona ${persona}.`,
@@ -1587,8 +1666,16 @@ export function renderChatBPlannerPrompt(args: PlannerPromptArgs): string {
     `Summary focus: ${args.summaryFocus}`,
     "Registered tools:",
     manifestLines,
+    ...(agentMapLines.length > 0
+      ? [
+          "",
+          "Agent map (optional):",
+          ...agentMapLines,
+          'Route a step with CALL(tool,{...,agent:"research"}).',
+        ]
+      : []),
     'Return a single line using "->" between steps, e.g.',
-    'SEARCH("drive status",k=4)->SUMMARIZE(@s1,"Blockers")->CALL(llm.local.generate,{"prompt":"..."})',
+    `SEARCH("drive status",k=4)->SUMMARIZE(@s1,"Blockers")->CALL(${sampleTool},{"prompt":"..."})`,
   ];
 
   const resonanceSection = composeResonancePatchSection({
@@ -1775,11 +1862,15 @@ export function buildCandidatePlansFromResonance(args: {
   }
   const telemetrySummary = args.telemetrySummary ?? summarizeConsoleTelemetry(args.telemetryBundle);
   const hasDebateTool = args.manifest.some((tool) => tool.name === "debate.run");
-  const narrationTool = args.manifest.some((tool) => tool.name === "llm.http.generate")
-    ? "llm.http.generate"
-    : args.manifest.some((tool) => tool.name === "llm.local.generate")
-    ? "llm.local.generate"
-    : "llm.http.generate";
+  const narrationTool = args.manifest.some(
+    (tool) => tool.name === LOCAL_SPAWN_TOOL_NAME,
+  )
+    ? LOCAL_SPAWN_TOOL_NAME
+    : args.manifest.some((tool) => tool.name === "llm.http.generate")
+      ? "llm.http.generate"
+      : args.manifest.some((tool) => tool.name === "llm.local.generate")
+        ? "llm.local.generate"
+        : "llm.http.generate";
   const intentForClamp = args.intent ?? args.basePlan.intent ?? classifyIntent(args.basePlan.goal);
   const ranking = args.resonanceSelection?.ranking ?? [];
   const rankingOrder = ranking.map((entry) => entry.patchId);
@@ -2439,7 +2530,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
       if (step.kind === "memory.search") {
         const hits = await searchMemories(step.query, step.topK);
         output = hits;
-        citations = hits.map((hit) => hit.id);
+          citations = hits.map(formatMemoryCitation);
         if (debugSourcesEnabled && hits.length > 0) {
           const memorySources: GroundingSource[] = hits.map((hit) => ({
             kind: "memory",
@@ -2711,11 +2802,12 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           let toolError: unknown;
           let result: any;
           let essenceId: string | undefined;
+          const debatePersonaId = step.personaId ?? runtime.personaId ?? "default";
           try {
             result = await tool.handler(input, {
               sessionId,
               goal: runtime.goal,
-              personaId: runtime.personaId ?? "default",
+              personaId: debatePersonaId,
             });
             essenceId = extractEssenceId(result);
           } catch (err) {
@@ -2740,6 +2832,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
               durationMs: duration,
               ok,
               error: toolError ? formatToolError(toolError) : undefined,
+              policy: resolveToolPolicyFlags(toolError),
               essenceId,
               stepId: step.id,
               debateId: logDebateId,
@@ -2847,6 +2940,42 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           citationsByStep.set(step.id, citations);
           continue;
         }
+        const agentHint = normalizeAgentId(
+          (step.extra as { agent?: unknown; owner?: unknown; agent_id?: unknown } | undefined)?.agent ??
+            (step.extra as { owner?: unknown } | undefined)?.owner ??
+            (step.extra as { agent_id?: unknown } | undefined)?.agent_id,
+        );
+        const agentContext = resolveAgentContext(
+          agentHint,
+          step.tool,
+          runtime.personaId ?? "default",
+        );
+        if (!agentContext.allowed) {
+          const duration = Date.now() - stepStart;
+          const error: ExecutionError = {
+            message: `Agent "${agentHint ?? "unknown"}" cannot run ${step.tool}`,
+            type: agentContext.reason ?? "agent_tool_forbidden",
+          };
+          metrics.recordTool(step.tool, duration, false);
+          results.push({
+            id: step.id,
+            kind: step.kind,
+            ok: false,
+            output: null,
+            error,
+            citations: [],
+            latency_ms: duration,
+            essence_ids: [],
+          });
+          citationsByStep.set(step.id, []);
+          break;
+        }
+        const toolContext = {
+          sessionId,
+          goal: runtime.goal,
+          personaId: agentContext.personaId,
+          agentId: agentContext.agentId,
+        };
         await ensureToolApprovals(tool, runtime);
         const summary = step.summaryRef ? outputs.get(step.summaryRef) : undefined;
         let summaryText = formatSummaryForPrompt(summary);
@@ -3106,11 +3235,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         let toolError: unknown;
         let essenceId: string | undefined;
         try {
-          output = await tool.handler(input, {
-            sessionId,
-            goal: runtime.goal,
-            personaId: runtime.personaId ?? "default",
-          });
+          output = await tool.handler(input, toolContext);
           essenceId = extractEssenceId(output);
           if (step.tool === "debate.run" && output && typeof output === "object") {
             const verdict = output as {
@@ -3161,6 +3286,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
             promptHash,
             ok,
             error: toolError ? formatToolError(toolError) : undefined,
+            policy: resolveToolPolicyFlags(toolError),
             essenceId,
             stepId: step.id,
             strategy: runtime.strategy ?? runtime.taskTrace?.reasoning_strategy ?? undefined,
@@ -3271,7 +3397,20 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         const summary = step.summaryRef ? outputs.get(step.summaryRef) : undefined;
         const summaryCitations = step.summaryRef ? citationsByStep.get(step.summaryRef) ?? [] : [];
         const problem = buildSpecialistProblem(runtime, step.id, step.summaryRef, summary, summaryCitations);
-        const personaId = runtime.personaId ?? "default";
+        const agentHint = normalizeAgentId(
+          (step.params as { agent?: unknown; owner?: unknown; agent_id?: unknown } | undefined)?.agent ??
+            (step.params as { owner?: unknown } | undefined)?.owner ??
+            (step.params as { agent_id?: unknown } | undefined)?.agent_id,
+        );
+        const agentContext = resolveAgentContext(
+          agentHint,
+          undefined,
+          runtime.personaId ?? "default",
+        );
+        if (!agentContext.allowed) {
+          throw new Error(`Agent "${agentHint ?? "unknown"}" cannot run solver ${step.solver}`);
+        }
+        const personaId = agentContext.personaId;
         const traceId = runtime.taskTrace?.id ?? runtime.sessionId ?? runtime.goal;
         const plan = {
           solver: step.solver,
@@ -3399,16 +3538,31 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
               if (runtime.taskTrace) {
                 runtime.taskTrace.prompt_hash = promptHash;
               }
+              const agentHint = normalizeAgentId(
+                (lastCall.extra as { agent?: unknown; owner?: unknown; agent_id?: unknown } | undefined)?.agent ??
+                  (lastCall.extra as { owner?: unknown } | undefined)?.owner ??
+                  (lastCall.extra as { agent_id?: unknown } | undefined)?.agent_id,
+              );
+              const agentContext = resolveAgentContext(
+                agentHint,
+                lastCall.tool,
+                runtime.personaId ?? "default",
+              );
+              if (!agentContext.allowed) {
+                throw new Error(`Agent "${agentHint ?? "unknown"}" cannot run ${lastCall.tool}`);
+              }
+              const toolContext = {
+                sessionId,
+                goal: runtime.goal,
+                personaId: agentContext.personaId,
+                agentId: agentContext.agentId,
+              };
               const toolStart = Date.now();
               let toolError: unknown;
               let essenceId: string | undefined;
               let output: unknown;
               try {
-                output = await tool.handler(input, {
-                  sessionId,
-                  goal: runtime.goal,
-                  personaId: runtime.personaId ?? "default",
-                });
+                output = await tool.handler(input, toolContext);
                 essenceId = extractEssenceId(output);
               } catch (err) {
                 toolError = err;
@@ -3427,6 +3581,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
                   durationMs: toolDuration,
                   ok,
                   error: toolError ? formatToolError(toolError) : undefined,
+                  policy: resolveToolPolicyFlags(toolError),
                   essenceId,
                   stepId: `${lastCall.id}.citation`,
                 });
@@ -3921,6 +4076,24 @@ const formatToolError = (error: unknown): string => {
   }
 };
 
+const resolveToolPolicyFlags = (
+  error: unknown,
+): ToolLogPolicyFlags | undefined => {
+  if (!error || typeof error !== "object") return undefined;
+  const candidate = error as { type?: string; code?: string };
+  const flags: ToolLogPolicyFlags = {};
+  if (candidate.type === "approval_denied") {
+    flags.approvalMissing = true;
+  }
+  if (candidate.type === "forbidden" || candidate.code === "forbidden") {
+    flags.forbidden = true;
+  }
+  if (candidate.type === "provenance_missing") {
+    flags.provenanceMissing = true;
+  }
+  return Object.keys(flags).length > 0 ? flags : undefined;
+};
+
 async function summarizeEvictedBlocks(
   sessionId: string,
   runtime: ExecutionRuntime,
@@ -4017,10 +4190,10 @@ function summarizeHits(hits: TMemorySearchHit[], focus: string, goal: string): s
     return `No stored memories matched the goal "${goal}".`;
   }
 
-  const bullets = hits.slice(0, 3).map((hit) => {
-    const detail = hit.snippet || hit.keys.join(", ") || "(keys only)";
-    return `- ${detail} [${hit.id}]`;
-  });
+    const bullets = hits.slice(0, 3).map((hit) => {
+      const detail = hit.snippet || hit.keys.join(", ") || "(keys only)";
+      return `- ${detail} [${formatMemoryCitation(hit)}]`;
+    });
 
   return [`Goal: ${goal}`, `Focus: ${focus}`, "Insights:", ...bullets].join("\n");
 }

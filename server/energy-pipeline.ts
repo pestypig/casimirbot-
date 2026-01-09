@@ -1,10 +1,30 @@
 ﻿// HELIX-CORE: Independent Dynamic Casimir Energy Pipeline
 // This module provides centralized energy calculations that all panels can access
 
-// Model mode switch: raw physics or paper-calibrated targets
-// Explicit default: paper-calibrated targets; set HELIX_MODEL_MODE=raw to bypass
+// Model mode switch: raw physics or paper-calibrated power targets.
+// Explicit default: paper-calibrated power targets; set HELIX_MODEL_MODE=raw to bypass.
 const MODEL_MODE: 'calibrated' | 'raw' =
   (process.env.HELIX_MODEL_MODE === 'raw') ? 'raw' : 'calibrated';
+
+export type MassMode =
+  | "MODEL_DERIVED"
+  | "TARGET_CALIBRATED"
+  | "MEASURED_FORCE_INFERRED";
+export type MassSource = "model" | "measured" | "target";
+export type ControlSource = "measured" | "design" | "policy" | "schedule" | "target";
+
+const DEFAULT_MASS_MODE: MassMode = "MODEL_DERIVED";
+
+const resolveMassMode = (value: unknown): MassMode => {
+  if (
+    value === "MODEL_DERIVED" ||
+    value === "TARGET_CALIBRATED" ||
+    value === "MEASURED_FORCE_INFERRED"
+  ) {
+    return value;
+  }
+  return DEFAULT_MASS_MODE;
+};
 
 // G├╢├çG├╢├ç Physics Constants (centralized) G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
 import { HBAR } from "./physics-const.js";
@@ -36,6 +56,10 @@ import {
 } from '../modules/dynamic/dynamic-casimir.js';
 import { assignGateSummaries } from "../modules/dynamic/gates/index.js";
 import { calculateCasimirEnergy, omega0_from_gap } from '../modules/sim_core/static-casimir.js';
+import {
+  inferCasimirForceScale,
+  inferEnergyFromForceSeries,
+} from "../modules/sim_core/casimir-inference.js";
 import {
   toPipelineStressEnergy,
   enhancedAvgEnergyDensity,
@@ -96,6 +120,7 @@ import type {
   HardwareSectorState,
   HardwareQiSample,
   HardwareSpectrumFrame,
+  CasimirForceDataset,
   MaterialModel,
   MaterialProps,
 } from "../shared/schema.js";
@@ -485,11 +510,18 @@ export interface TileParams {
 }
 
 export type AmpFactors = {
+  // Design values (pipeline prefers measured overrides when present).
   gammaGeo?: number;
   gammaVanDenBroeck?: number;
   qSpoilingFactor?: number;
   qMechanical?: number;
   qCavity?: number;
+  // Measured overrides (telemetry or lab calibration).
+  measuredGammaGeo?: number;
+  measuredGammaVanDenBroeck?: number;
+  measuredQSpoilingFactor?: number;
+  measuredQMechanical?: number;
+  measuredCavityQ?: number;
 };
 
 export type TsTelemetry = {
@@ -500,14 +532,39 @@ export type TsTelemetry = {
 };
 
 export type QuantumInterestBook = {
-  neg_Jm3: number;        // Scheduled negative burst (window-normalized)
-  pos_Jm3: number;        // Scheduled positive payback (window-normalized)
-  debt_Jm3: number;       // Required positive overcompensation (with interest)
-  credit_Jm3: number;     // Available positive energy scheduled in window
+  neg_Jm3: number;        // Scheduled negative burst (window-normalized)       
+  pos_Jm3: number;        // Scheduled positive payback (window-normalized)     
+  debt_Jm3: number;       // Required positive overcompensation (with interest) 
+  credit_Jm3: number;     // Available positive energy scheduled in window      
   margin_Jm3: number;     // credit - debt (>=0 means paid)
-  netCycle_Jm3: number;   // pos - neg over a full cycle (without interest)
+  netCycle_Jm3: number;   // pos - neg over a full cycle (without interest)     
   window_ms: number;      // payback window allocated
   rate: number;           // interest fraction applied to debt
+};
+
+export type CasimirForceInference = {
+  datasetId?: string;
+  referenceSeparation_m?: number;
+  energy_J_at_a0?: number;
+  sigmaEnergy_J?: number;
+  kCasimir?: number;
+  sigmaK?: number;
+  sampleCount?: number;
+  fitResiduals?: {
+    rms_N?: number;
+    rms_rel?: number;
+    sampleCount?: number;
+  };
+  forceSign?: {
+    expected?: "negative" | "positive";
+    observed?: "negative" | "positive" | "mixed" | "unknown";
+    positiveFraction?: number;
+    negativeFraction?: number;
+    sampleCount?: number;
+    autoFlipApplied?: boolean;
+    note?: string;
+  };
+  note?: string;
 };
 
 export interface MechanicalFeasibility {
@@ -670,9 +727,13 @@ export interface EnergyPipelineState {
   couplingSupercellTiles?: number;    // tiles in measured supercell
   couplingSupercellEnergy_J?: number; // measured supercell energy
   couplingFrameFill?: number;         // packing/coverage fraction for coupling calc
+  experimental?: {
+    casimirForce?: CasimirForceDataset;
+  };
 
   // Hull geometry
   hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number }; // Paper-authentic stack ~1 m; default auto-tunes to modulation dwell
+  driveDir?: [number, number, number];
   warpFieldType?: WarpFieldType;
   warpGeometry?: WarpGeometrySpec | null;
   warpGeometryKind?: GeometryKind;
@@ -730,6 +791,7 @@ export interface EnergyPipelineState {
   couplingChi?: number;
   couplingMethod?: string;
   couplingNote?: string;
+  casimirForceInference?: CasimirForceInference;
   supercellRatio?: number;
   U_geo: number;            // Geometry-amplified energy
   U_Q: number;              // Q-enhanced energy
@@ -863,6 +925,28 @@ export interface EnergyPipelineState {
 
   // Model mode for client consistency
   modelMode?: 'calibrated' | 'raw';
+  // Mass provenance mode for client consistency
+  massMode?: MassMode;
+  // Mass provenance for downstream modules
+  massSource?: MassSource;
+  massDatasetId?: string;
+  massFitResiduals?: {
+    rms_N?: number;
+    rms_rel?: number;
+    sampleCount?: number;
+  };
+  massSigma_kg?: number;
+  invariantMassSigma_kg?: number;
+  // Experimental control provenance (measured vs design/policy)
+  gammaGeoSource?: ControlSource;
+  gammaVanDenBroeckSource?: ControlSource;
+  qSpoilingFactorSource?: ControlSource;
+  qCavitySource?: ControlSource;
+  modulationFreqSource?: ControlSource;
+  dutyCycleSource?: ControlSource;
+  dutyBurstSource?: ControlSource;
+  sectorCountSource?: ControlSource;
+  sectorDutySource?: ControlSource;
 
   // Environment telemetry (optional; surfaced to /metrics)
   atmDensity_kg_m3?: number | null;
@@ -2082,12 +2166,12 @@ import { firstFundamentalForm } from "../src/metric.js";
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +┬ª_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
-  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405 },
-  taxi:      { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405 },
-  nearzero:  { S_live: 1 as const,     P_target_W: 5e6,      P_cap_W: 5e6,      M_target_kg: 1405 },
-  cruise:    { S_live: 1 as const,     P_target_W: 40e6,     P_cap_W: 40e6,     M_target_kg: 1405 },
-  emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  P_cap_W: 300e6,    M_target_kg: 1405 },
-  standby:   { S_live: 0 as const,     P_target_W: 0,        P_cap_W: 0,        M_target_kg: 0     },
+  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  taxi:      { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  nearzero:  { S_live: 1 as const,     P_target_W: 5e6,      P_cap_W: 5e6,      M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  cruise:    { S_live: 1 as const,     P_target_W: 40e6,     P_cap_W: 40e6,     M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  P_cap_W: 300e6,    M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  standby:   { S_live: 0 as const,     P_target_W: 0,        P_cap_W: 0,        M_target_kg: 0,    massMode: DEFAULT_MASS_MODE },
 } as const;
 
 // Ship HV bus voltage policy (per mode), in kilovolts
@@ -2340,6 +2424,10 @@ export function initializePipelineState(): EnergyPipelineState {
 
     // Mode defaults (hover)
     currentMode: 'hover',
+    massMode: DEFAULT_MASS_MODE,
+    massSource: "model",
+    massDatasetId: undefined,
+    massFitResiduals: undefined,
     dutyCycle: 0.14,
     dutyShip: 0.000025,      // Ship-wide effective duty (will be recalculated)
     sectorCount: 400,        // Total sectors (always 400)
@@ -2488,6 +2576,15 @@ export async function calculateEnergyPipeline(
     state.modelMode === 'raw' || state.modelMode === 'calibrated'
       ? state.modelMode
       : MODEL_MODE;
+  const policyMassMode = MODE_POLICY[state.currentMode]?.massMode;
+  const massMode = resolveMassMode(state.massMode ?? policyMassMode);
+  let casimirScaleApplied = 1;
+  let measuredScaleApplied = false;
+  let measuredScaleValue: number | undefined;
+  let measuredScaleSigma: number | undefined;
+  let measuredScaleRelSigma: number | undefined;
+  let measuredDatasetId: string | undefined;
+  let measuredFitResiduals: CasimirForceInference["fitResiduals"] | undefined;
 
   // Thread warp geometry controls from dynamic config into top-level fields for downstream consumers
   const dynWarpGeom = (state.dynamicConfig as any)?.warpGeometry;
@@ -2698,6 +2795,91 @@ export async function calculateEnergyPipeline(
     state.supercellRatio = chi;
   }
 
+  const forceDataset = state.experimental?.casimirForce;
+  if (massMode === "MEASURED_FORCE_INFERRED" && forceDataset) {
+    try {
+      const energyInference = inferEnergyFromForceSeries(forceDataset);
+      const scaleInference = inferCasimirForceScale(forceDataset);
+      const forceSign = energyInference.forceSign ?? scaleInference?.forceSign;
+      let note: string | undefined;
+      if (
+        scaleInference &&
+        Number.isFinite(scaleInference.kCasimir) &&
+        scaleInference.kCasimir > 0
+      ) {
+        const scale = scaleInference.kCasimir;
+        casimirScaleApplied = scale;
+        measuredScaleApplied = true;
+        measuredScaleValue = scale;
+        measuredScaleSigma = scaleInference.sigmaK;
+        measuredDatasetId = forceDataset.datasetId;
+        measuredFitResiduals = scaleInference.fitResiduals;
+        state.U_static *= scale;
+        if (Number.isFinite(state.U_static_nominal)) {
+          state.U_static_nominal = state.U_static_nominal * scale;
+        }
+        if (Number.isFinite(state.U_static_realistic)) {
+          state.U_static_realistic = state.U_static_realistic * scale;
+        }
+        if (Number.isFinite(state.U_static_uncoupled)) {
+          state.U_static_uncoupled = state.U_static_uncoupled * scale;
+        }
+        if (state.U_static_band) {
+          state.U_static_band = {
+            min: state.U_static_band.min * scale,
+            max: state.U_static_band.max * scale,
+          };
+        } else {
+          state.U_static_band = { min: state.U_static, max: state.U_static };
+        }
+        note = "scale_applied";
+      } else {
+        note = scaleInference ? "invalid_scale" : "scale_unavailable";
+      }
+
+      state.casimirForceInference = {
+        datasetId: forceDataset.datasetId,
+        referenceSeparation_m: energyInference.referenceSeparation_m,
+        energy_J_at_a0: energyInference.energy_J_at_a0,
+        sigmaEnergy_J: energyInference.sigmaEnergy_J,
+        kCasimir: scaleInference?.kCasimir,
+        sigmaK: scaleInference?.sigmaK,
+        sampleCount: scaleInference?.sampleCount ?? energyInference.sampleCount,
+        fitResiduals: scaleInference?.fitResiduals,
+        forceSign,
+        note,
+      };
+    } catch (err) {
+      if (DEBUG_PIPE) console.warn("[PIPELINE] Casimir force inference failed", err);
+      const errCode =
+        err && typeof err === "object" && "code" in err ? (err as any).code : null;
+      const forceSign =
+        err && typeof err === "object" && "forceSign" in err
+          ? (err as any).forceSign
+          : undefined;
+      state.casimirForceInference = {
+        datasetId: forceDataset.datasetId,
+        forceSign,
+        note:
+          errCode === "CASIMIR_FORCE_SIGN_MISMATCH"
+            ? "force_sign_mismatch"
+            : "inference_failed",
+      };
+    }
+  } else {
+    state.casimirForceInference = undefined;
+  }
+  if (
+    measuredScaleApplied &&
+    Number.isFinite(measuredScaleValue) &&
+    (measuredScaleValue as number) > 0 &&
+    Number.isFinite(measuredScaleSigma)
+  ) {
+    measuredScaleRelSigma = Math.abs(
+      (measuredScaleSigma as number) / (measuredScaleValue as number),
+    );
+  }
+
   // Aggregate static energy band with geometry uncertainty propagated through tile census
   const perTileBand = state.U_static_band ?? { min: state.U_static, max: state.U_static };
   const tileBand = state.N_tiles_band ?? { min: state.N_tiles, max: state.N_tiles };
@@ -2722,6 +2904,122 @@ export async function calculateEnergyPipeline(
   const ui = modeConfig ?? MODE_CONFIGS.hover;
   state.dutyCycle = ui.dutyCycle;
   state.qSpoilingFactor = ui.qSpoilingFactor;
+  const ampInputs = (state.ampFactors ?? (state as any).amps ?? {}) as AmpFactors;
+  const dynConfig = (state.dynamicConfig ?? {}) as Record<string, unknown>;
+  const resolveControl = (
+    measured: number | undefined,
+    design: number | undefined,
+    designSource: ControlSource,
+  ): { value: number | undefined; source: ControlSource } => {
+    if (Number.isFinite(measured)) {
+      return { value: Number(measured), source: "measured" };
+    }
+    if (Number.isFinite(design)) {
+      return { value: Number(design), source: designSource };
+    }
+    return { value: undefined, source: designSource };
+  };
+
+  const modulationResolved = resolveControl(
+    firstFinite(
+      (dynConfig as any).measuredModulationFreqGHz,
+      (state as any).measuredModulationFreq_GHz,
+    ),
+    firstFinite((dynConfig as any).modulationFreqGHz, state.modulationFreq_GHz),
+    "design",
+  );
+  if (modulationResolved.value != null) {
+    state.modulationFreq_GHz = modulationResolved.value;
+  }
+  state.modulationFreqSource = modulationResolved.source;
+
+  const cavityResolved = resolveControl(
+    firstFinite(
+      (dynConfig as any).measuredCavityQ,
+      (ampInputs as any).measuredCavityQ,
+      (state as any).measuredCavityQ,
+    ),
+    firstFinite((dynConfig as any).cavityQ, ampInputs.qCavity, state.qCavity),
+    "design",
+  );
+  if (cavityResolved.value != null) {
+    state.qCavity = cavityResolved.value;
+  }
+  state.qCavitySource = cavityResolved.source;
+
+  const gammaGeoResolved = resolveControl(
+    firstFinite((ampInputs as any).measuredGammaGeo, (state as any).measuredGammaGeo),
+    firstFinite(ampInputs.gammaGeo, state.gammaGeo),
+    "design",
+  );
+  if (gammaGeoResolved.value != null) {
+    state.gammaGeo = gammaGeoResolved.value;
+  }
+  state.gammaGeoSource = gammaGeoResolved.source;
+
+  const gammaVdBResolved = resolveControl(
+    firstFinite(
+      (ampInputs as any).measuredGammaVanDenBroeck,
+      (state as any).measuredGammaVanDenBroeck,
+    ),
+    firstFinite(ampInputs.gammaVanDenBroeck, state.gammaVanDenBroeck),
+    "design",
+  );
+  if (gammaVdBResolved.value != null) {
+    state.gammaVanDenBroeck = gammaVdBResolved.value;
+  }
+  state.gammaVanDenBroeckSource = gammaVdBResolved.source;
+
+  const qSpoilMeasured = firstFinite(
+    (ampInputs as any).measuredQSpoilingFactor,
+    (state as any).measuredQSpoilingFactor,
+  );
+  const qSpoilDesign = firstFinite(ampInputs.qSpoilingFactor);
+  const qSpoilResolved = resolveControl(
+    qSpoilMeasured,
+    qSpoilDesign,
+    qSpoilDesign != null ? "design" : "policy",
+  );
+  if (qSpoilResolved.value != null) {
+    state.qSpoilingFactor = qSpoilResolved.value;
+  }
+  state.qSpoilingFactorSource = qSpoilResolved.source;
+
+  const dutyMeasured = firstFinite(
+    (dynConfig as any).measuredDutyCycle,
+    (state as any).measuredDutyCycle,
+  );
+  const dutyDesign = firstFinite((dynConfig as any).dutyCycle);
+  const dutyResolved = resolveControl(
+    dutyMeasured,
+    dutyDesign,
+    dutyDesign != null ? "design" : "policy",
+  );
+  if (dutyResolved.value != null) {
+    state.dutyCycle = clampNumber(dutyResolved.value, 0, 1);
+  }
+  state.dutyCycleSource = dutyResolved.source;
+
+  const dutyLocalOverride =
+    dutyResolved.source === "policy" ? undefined : dutyResolved.value;
+  const dutyShipMeasured = firstFinite(
+    (dynConfig as any).measuredSectorDuty,
+    (state as any).measuredSectorDuty,
+  );
+  const dutyShipDesign = firstFinite((dynConfig as any).sectorDuty);
+  const dutyShipOverride = firstFinite(dutyShipMeasured, dutyShipDesign);
+  const dutyShipSource: ControlSource =
+    Number.isFinite(dutyShipMeasured)
+      ? "measured"
+      : Number.isFinite(dutyShipDesign)
+        ? "design"
+        : "schedule";
+  const sectorCountMeasured = firstFinite(
+    (dynConfig as any).measuredSectorCount,
+    (state as any).measuredSectorCount,
+  );
+  const sectorCountDesign = firstFinite((dynConfig as any).sectorCount, state.sectorCount);
+
   // keep sector policy from resolveSLive just below; don't touch sectorCount here
 
   // 4) Sector scheduling - prefer measured event stream over schedule
@@ -2749,8 +3047,23 @@ export async function calculateEnergyPipeline(
   const scheduledLive = resolveSLive(state.currentMode);
   const sectorTotalResolved = Number.isFinite(measuredTotal) && measuredTotal > 0
     ? measuredTotal
-    : state.sectorCount || PAPER_DUTY.TOTAL_SECTORS;
-  const S_total = Math.max(1, Math.round(sectorTotalResolved));
+    : Number.isFinite(sectorCountMeasured) && (sectorCountMeasured as number) > 0
+      ? sectorCountMeasured
+      : Number.isFinite(sectorCountDesign) && (sectorCountDesign as number) > 0
+        ? sectorCountDesign
+        : state.sectorCount || PAPER_DUTY.TOTAL_SECTORS;
+  const sectorCountSource: ControlSource =
+    Number.isFinite(measuredTotal) && measuredTotal > 0
+      ? "measured"
+      : Number.isFinite(sectorCountMeasured) && (sectorCountMeasured as number) > 0
+        ? "measured"
+        : Number.isFinite(sectorCountDesign) && (sectorCountDesign as number) > 0
+          ? "design"
+          : "design";
+  const S_total = Math.max(
+    1,
+    Math.round(sectorTotalResolved ?? PAPER_DUTY.TOTAL_SECTORS),
+  );
   let S_live = Number.isFinite(measuredLive) && measuredLive >= 0
     ? measuredLive
     : scheduledLive;
@@ -2765,21 +3078,28 @@ export async function calculateEnergyPipeline(
   // if standby, FR duty must be exactly zero for viewers/clients
   const isStandby = String(state.currentMode || '').toLowerCase() === 'standby';
   const dutyLocal = clampNumber(
-    Number.isFinite(state.dutyBurst)
-      ? (state.dutyBurst as number)
-      : Number.isFinite((state as any).localBurstFrac)
-        ? (state as any).localBurstFrac
-        : PAPER_DUTY.BURST_DUTY_LOCAL,
+    Number.isFinite(dutyLocalOverride)
+      ? (dutyLocalOverride as number)
+      : Number.isFinite(state.dutyBurst)
+        ? (state.dutyBurst as number)
+        : Number.isFinite((state as any).localBurstFrac)
+          ? (state as any).localBurstFrac
+          : Number.isFinite(state.dutyCycle)
+            ? state.dutyCycle
+            : PAPER_DUTY.BURST_DUTY_LOCAL,
     0,
     1,
   );
-  const d_eff_fallback = dutyLocal * (S_live / Math.max(1, S_total));
+  const d_eff_fallback = Number.isFinite(dutyShipOverride)
+    ? clampNumber(dutyShipOverride as number, 0, 1)
+    : dutyLocal * (S_live / Math.max(1, S_total));
   const d_eff = isStandby ? 0 : (measuredDutyEffective ?? d_eff_fallback);
 
   state.sectorCount       = S_total;
   state.concurrentSectors = S_live_int;
   state.activeSectors     = S_live_int;
   state.activeFraction    = Math.max(0, Math.min(1, S_total > 0 ? S_live / S_total : 0));
+  state.sectorCountSource = sectorCountSource;
 
   // Normalize per-sector surface areas (override -> ellipsoid -> uniform)
   const normalizeSectorAreas = (areas: number[] | null | undefined, sectors: number): number[] | null => {
@@ -2889,12 +3209,24 @@ export async function calculateEnergyPipeline(
   (state as any).concurrentSectorsSafe = Math.max(1, state.concurrentSectors);
 
   // =┬â├╢┬║ expose both duties explicitly and consistently
+  const dutyEffectiveSource: ControlSource =
+    measuredDutyEffective != null
+      ? "measured"
+      : Number.isFinite(dutyShipOverride)
+        ? dutyShipSource
+        : "schedule";
+  const dutyBurstSource: ControlSource =
+    Number.isFinite(dutyLocalOverride)
+      ? (state.dutyCycleSource ?? "design")
+      : "schedule";
   state.dutyBurst        = dutyLocal;  // keep as *local* ON-window; prefer measured/local override
+  state.dutyBurstSource  = dutyBurstSource;
   state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for +┬ª & audits)
   (state as any).dutyEffectiveFR = d_eff; // legacy/camel alias
   (state as any).dutyMeasuredFR = measuredDutyEffective;
   (state as any).dutyEffectiveFRMeasured = measuredDutyEffective;
-  (state as any).dutyEffectiveFRSource = measuredDutyEffective != null ? "measured" : "schedule";
+  (state as any).dutyEffectiveFRSource = dutyEffectiveSource;
+  state.sectorDutySource = dutyEffectiveSource;
   (state as any).dutyMeasuredWindow_ms = measuredDutyEffective != null
     ? Number((strobeDuty as any)?.windowMs ?? (strobeDuty as any)?.window_ms ?? STROBE_DUTY_WINDOW_MS_DEFAULT)
     : undefined;
@@ -3057,6 +3389,7 @@ export async function calculateEnergyPipeline(
       cavityQ: Q,
       gammaVanDenBroeck: gammaVdBValue,
       qSpoilingFactor: state.qSpoilingFactor,
+      rho0Scale: casimirScaleApplied,
       dutyEff: d_eff,
     });
     const U_inst = rho_inst * tileVolume_m3;
@@ -3070,13 +3403,16 @@ export async function calculateEnergyPipeline(
 
   const M_target = MODE_POLICY[state.currentMode].M_target_kg;
   const userM = state.exoticMassTarget_kg ?? M_target;
+  const allowTargetCalibration = CALIBRATED && massMode === "TARGET_CALIBRATED";
+  let didTargetCalibration = false;
   let targetShortfall = 0;
-  if (CALIBRATED && userM > 0 && massChain.M_tot > 0) {
+  if (allowTargetCalibration && userM > 0 && massChain.M_tot > 0) {
     const scaleM = userM / massChain.M_tot;
     const gammaCandidate = gammaVanDenBroeck * scaleM;
     const gammaClamped = Math.max(0, Math.min(gammaCandidate, vdbGuard.limit));
     gammaVanDenBroeck = gammaClamped;
     massChain = massFromGamma(gammaVanDenBroeck);
+    didTargetCalibration = true;
     if (gammaCandidate > vdbGuard.limit) {
       targetShortfall = massChain.M_tot / Math.max(userM, 1e-9);
     }
@@ -3086,6 +3422,9 @@ export async function calculateEnergyPipeline(
   }
 
   state.gammaVanDenBroeck = gammaVanDenBroeck;
+  if (didTargetCalibration) {
+    state.gammaVanDenBroeckSource = "target";
+  }
   state.M_exotic_raw = massChain.M_tot;
   state.M_exotic     = massChain.M_tot;
 
@@ -3108,6 +3447,44 @@ export async function calculateEnergyPipeline(
     note: "rho_avg = rho0 * gamma_geo^3 * sqrt(Q/1e9) * gamma_VdB * q_spoil * d_eff",
   };
 
+  const massSource: MassSource = didTargetCalibration
+    ? "target"
+    : measuredScaleApplied
+    ? "measured"
+    : "model";
+  state.massSource = massSource;
+  state.massDatasetId = massSource === "measured" ? measuredDatasetId : undefined;
+  state.massFitResiduals = massSource === "measured"
+    ? measuredFitResiduals
+    : undefined;
+  if (!state.massSource) {
+    state.massSource = "model";
+  }
+    if (state.massSource === "measured" && !state.massDatasetId) {
+      (state as any).massSourceNote = "measured_missing_datasetId";
+      if (massMode === "MEASURED_FORCE_INFERRED") {
+        throw new Error(
+          "MEASURED_FORCE_INFERRED requires experimental.casimirForce.datasetId",
+      );
+    }
+    if (DEBUG_PIPE) {
+      console.warn("[PIPELINE] massSource=measured requires datasetId; downgrading to model.");
+    }
+      state.massSource = "model";
+      state.massDatasetId = undefined;
+      state.massFitResiduals = undefined;
+    }
+    if (
+      state.massSource === "measured" &&
+      Number.isFinite(state.M_exotic) &&
+      Number.isFinite(measuredScaleRelSigma)
+    ) {
+      state.massSigma_kg =
+        Math.abs(state.M_exotic) * (measuredScaleRelSigma as number);
+    } else {
+      state.massSigma_kg = undefined;
+    }
+
   const guardForApplied = guardGammaVdB({
     hull: guardInputHull,
     gammaRequested: state.gammaVanDenBroeck,
@@ -3115,12 +3492,12 @@ export async function calculateEnergyPipeline(
   state.gammaVanDenBroeckGuard = {
     ...guardForApplied,
     requested: baseGammaRequest,
-    targetHit: targetShortfall === 0,
-    targetShortfall: targetShortfall || undefined,
+    targetHit: allowTargetCalibration ? targetShortfall === 0 : undefined,
+    targetShortfall: allowTargetCalibration ? (targetShortfall || undefined) : undefined,
   };
   (state as any).gammaVanDenBroeck_guard = state.gammaVanDenBroeckGuard;
   // Split gamma_VdB into visual vs mass knobs to keep calibrator away from renderer
-  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // G├Ñ├ë calibrated value used to hit M_target
+  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // G├Ñ├ë pipeline value (targeted when enabled)
   (state as any).gammaVanDenBroeck_vis  = PAPER_VDB.GAMMA_VDB;                 // G├Ñ├ë fixed "physics/visual" seed for renderer
 
   // Make visual factor mode-invariant (except standby)
@@ -3140,7 +3517,7 @@ export async function calculateEnergyPipeline(
 
   // DEBUG: ++-Scale Field Strength Audit (dual-value: raw vs calibrated)
   const gammaVdB_raw = PAPER_VDB.GAMMA_VDB;  // Raw paper value (1e11)
-  const gammaVdB_cal = _gammaVdB_forTheta;   // Calibrated value (mass-adjusted)
+  const gammaVdB_cal = _gammaVdB_forTheta;   // Pipeline value (target-adjusted when enabled)
 
   const thetaComponents = {
     gammaGeo: state.gammaGeo,
@@ -3177,6 +3554,7 @@ export async function calculateEnergyPipeline(
   (state as any).uniformsExplain.thetaAudit = {
     mode: modelMode,
     eq: "++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff",
+    massMode,
     inputs: {
       gammaGeo: state.gammaGeo,
       q: state.qSpoilingFactor,
@@ -3199,8 +3577,9 @@ export async function calculateEnergyPipeline(
     };
   }
 
-  console.log('=┬â├╢├¼ ++-Scale Field Strength Audit (Raw vs Calibrated):', {
+  console.log('=┬â├╢├¼ ++-Scale Field Strength Audit (Raw vs Pipeline):', {
     mode: modelMode,
+    massMode,
     formula: '++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff',
     components: thetaComponents,
     results: {
@@ -3231,7 +3610,7 @@ export async function calculateEnergyPipeline(
 
   // Physics logging for debugging (before UI field updates)
   if (DEBUG_PIPE) console.log("[PIPELINE]", {
-    mode: state.currentMode, model: modelMode,
+    mode: state.currentMode, model: modelMode, massMode,
     dutyShip: d_eff, dutyUI_before: state.dutyCycle, S_live, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
@@ -3289,6 +3668,7 @@ export async function calculateEnergyPipeline(
       : Number(process.env.STROBE_HZ ?? 1000); // sectors/sec (1ms macro-tick)
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
   state.modelMode           = modelMode; // for client consistency
+  state.massMode            = massMode;  // for client consistency
 
   // Compliance flags (physics-based safety)
   state.natarioConstraint   = true;
@@ -3972,8 +4352,9 @@ export async function calculateEnergyPipeline(
       qSpoilingFactor: state.qSpoilingFactor ?? 1,
       dutyCycle: state.dutyCycle,
       sectorStrobing: state.sectorStrobing,
-      dutyEffectiveFR: state.dutyEffective_FR,     // stress-energy payload
+      dutyEffectiveFR: state.dutyEffective_FR,     // stress-energy payload     
       lightCrossing: (state as any).lightCrossing,
+      rho0Scale: casimirScaleApplied,
       R_geom_m: geomR
     });
 
@@ -3991,12 +4372,18 @@ export async function calculateEnergyPipeline(
     const c_warp = hullGeomWarp.Lz_m / 2;
     const geomR_warp = Math.cbrt(a_warp * b_warp * c_warp); // meters
 
+    const priorAmpInputs = (state.ampFactors ?? (state as any).amps ?? {}) as AmpFactors;
     const ampFactors: AmpFactors = {
       gammaGeo: state.gammaGeo ?? 26,
       gammaVanDenBroeck: state.gammaVanDenBroeck ?? 3.83e1,
       qSpoilingFactor: state.qSpoilingFactor ?? 1,
       qMechanical: state.qMechanical ?? 1,
       qCavity: state.qCavity ?? PAPER_Q.Q_BURST,
+      measuredGammaGeo: priorAmpInputs.measuredGammaGeo,
+      measuredGammaVanDenBroeck: priorAmpInputs.measuredGammaVanDenBroeck,
+      measuredQSpoilingFactor: priorAmpInputs.measuredQSpoilingFactor,
+      measuredQMechanical: priorAmpInputs.measuredQMechanical,
+      measuredCavityQ: priorAmpInputs.measuredCavityQ,
     };
     state.ampFactors = ampFactors;
     (state as any).amps = ampFactors; // back-compat alias
@@ -4008,6 +4395,20 @@ export async function calculateEnergyPipeline(
       (state.dynamicConfig as any)?.warpGeometryKind ??
       state.warpGeometryKind ??
       'ellipsoid';
+    const allowMassOverride = massMode === "TARGET_CALIBRATED";
+    const invariantMass_kg =
+      Number.isFinite(state.gr?.matter?.stressEnergy?.invariantMass_kg)
+        ? Number(state.gr?.matter?.stressEnergy?.invariantMass_kg)
+        : undefined;
+    const invariantMassSigma_kg =
+      Number.isFinite(measuredScaleRelSigma) && Number.isFinite(invariantMass_kg)
+        ? Math.abs(invariantMass_kg) * (measuredScaleRelSigma as number)
+        : undefined;
+    state.invariantMassSigma_kg = invariantMassSigma_kg;
+    const exoticMassTarget_kg =
+      allowMassOverride && Number.isFinite(state.exoticMassTarget_kg)
+        ? Number(state.exoticMassTarget_kg)
+        : undefined;
 
     const warpParams = {
       geometry: 'bowl' as const,
@@ -4018,8 +4419,11 @@ export async function calculateEnergyPipeline(
       temperature: state.temperature_K ?? 20,
       moduleType: 'warp' as const,
       hull: hullGeomWarp,
-      // **CRITICAL FIX**: Pass calibrated pipeline mass to avoid independent calculation
-      exoticMassTarget_kg: state.M_exotic, // Use calibrated mass (1405 kg) from pipeline
+      // Pass target only when explicitly calibrating mass; otherwise derive from energy.
+      exoticMassTarget_kg,
+      invariantMass_kg,
+      massMode,
+      allowMassOverride,
       dynamicConfig: {
         modulationFreqGHz: state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ,
         strokeAmplitudePm: 50,
@@ -5296,7 +5700,7 @@ function arrN(a:any, k:number){ return (Array.isArray(a) && a.length>=k) ? a : u
  * Calls the central pipeline and merges outputs into shared snapshot
  */
 export async function computeEnergySnapshot(sim: any) {
-  const ampFactors = (sim as any)?.ampFactors ?? sim.amps ?? {};
+  const ampFactorsInput = (sim as any)?.ampFactors ?? sim.amps ?? {};
   const resolvePulseCap = (value: unknown, fallback: number): number =>
     Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback;
   // Convert sim to pipeline state format
@@ -5307,11 +5711,12 @@ export async function computeEnergySnapshot(sim: any) {
     temperature_K: sim.temperature ?? 20,
     modulationFreq_GHz: sim.dynamicConfig?.modulationFreqGHz ?? DEFAULT_MODULATION_FREQ_GHZ,
     currentMode: sim.mode ?? 'hover',
-    gammaGeo: ampFactors?.gammaGeo ?? 26,
-    qMechanical: ampFactors?.qMechanical ?? 1,
-    qCavity: sim.dynamicConfig?.cavityQ ?? ampFactors?.qCavity ?? 1e9,
-    gammaVanDenBroeck: ampFactors?.gammaVanDenBroeck ?? 3.83e1,
-    qSpoilingFactor: ampFactors?.qSpoilingFactor ?? 1,
+    massMode: (sim as any)?.massMode ?? sim.massMode,
+    gammaGeo: ampFactorsInput?.gammaGeo ?? 26,
+    qMechanical: ampFactorsInput?.qMechanical ?? 1,
+    qCavity: sim.dynamicConfig?.cavityQ ?? ampFactorsInput?.qCavity ?? 1e9,
+    gammaVanDenBroeck: ampFactorsInput?.gammaVanDenBroeck ?? 3.83e1,
+    qSpoilingFactor: ampFactorsInput?.qSpoilingFactor ?? 1,
     dutyCycle: sim.dynamicConfig?.dutyCycle ?? 0.14,
     sectorCount: sim.dynamicConfig?.sectorCount ?? 400,
     exoticMassTarget_kg: sim.exoticMassTarget_kg ?? 1405,
@@ -5320,6 +5725,7 @@ export async function computeEnergySnapshot(sim: any) {
     warpGeometryKind: (sim as any)?.warpGeometryKind ?? (sim as any)?.warpGeometry?.kind,
     warpGeometryAssetId: (sim as any)?.warpGeometryAssetId ?? (sim as any)?.warpGeometry?.assetId,
     dynamicConfig: sim.dynamicConfig ?? null,
+    experimental: (sim as any)?.experimental ?? sim.experimental,
     iPeakMaxMidi_A: resolvePulseCap(sim.iPeakMaxMidi_A, DEFAULT_PULSED_CURRENT_LIMITS_A.midi),
     iPeakMaxSector_A: resolvePulseCap(sim.iPeakMaxSector_A, DEFAULT_PULSED_CURRENT_LIMITS_A.sector),
     iPeakMaxLauncher_A: resolvePulseCap(sim.iPeakMaxLauncher_A, DEFAULT_PULSED_CURRENT_LIMITS_A.launcher),
@@ -5331,6 +5737,11 @@ export async function computeEnergySnapshot(sim: any) {
     qSpoilingFactor: state.qSpoilingFactor,
     qMechanical: state.qMechanical,
     qCavity: state.qCavity,
+    measuredGammaGeo: ampFactorsInput?.measuredGammaGeo,
+    measuredGammaVanDenBroeck: ampFactorsInput?.measuredGammaVanDenBroeck,
+    measuredQSpoilingFactor: ampFactorsInput?.measuredQSpoilingFactor,
+    measuredQMechanical: ampFactorsInput?.measuredQMechanical,
+    measuredCavityQ: ampFactorsInput?.measuredCavityQ,
   };
   state.ampFactors = ampFactorsSnapshot;
   (state as any).amps = ampFactorsSnapshot; // legacy alias
@@ -5441,17 +5852,29 @@ export async function computeEnergySnapshot(sim: any) {
   };
 
   // PATCH START: uniformsExplain debug metadata for /bridge
+  const gammaGeoSource = (result as any).gammaGeoSource ?? "design";
+  const gammaVdBSource = (result as any).gammaVanDenBroeckSource ?? "design";
+  const qSpoilSource = (result as any).qSpoilingFactorSource ?? "policy";
+  const qCavitySource = (result as any).qCavitySource ?? "design";
+  const modulationSource = (result as any).modulationFreqSource ?? "design";
+  const dutyCycleSource = (result as any).dutyCycleSource ?? "policy";
+  const sectorCountSource = (result as any).sectorCountSource ?? "design";
+  const dutyEffectiveSource =
+    (result as any).sectorDutySource ??
+    (result as any).dutyEffectiveFRSource ??
+    "schedule";
   const uniformsExplain = {
     // Human-readable G├ç┬úwhere did this come from?G├ç┬Ñ pointers
     sources: {
-      gammaGeo:               "server.result.gammaGeo (pipeline state)",
-      qSpoilingFactor:        "server.result.qSpoilingFactor (mode policy / pipeline)",
-      qCavity:                "server.result.qCavity (dynamic cavity Q)",
+      gammaGeo:               `server.result.gammaGeo (${gammaGeoSource})`,
+      qSpoilingFactor:        `server.result.qSpoilingFactor (${qSpoilSource})`,
+      qCavity:                `server.result.qCavity (${qCavitySource})`,
+      modulationFreq_GHz:     `server.result.modulationFreq_GHz (${modulationSource})`,
       gammaVanDenBroeck_vis:  "server.(gammaVanDenBroeck_vis) G├ç├╢ fixed visual seed unless standby",
-      gammaVanDenBroeck_mass: "server.(gammaVanDenBroeck_mass) G├ç├╢ calibrated to hit M_target",
-      dutyEffectiveFR:        "server.derived (burstLocal +├╣ S_live / S_total; FordG├ç├┤Roman window)",
-      dutyCycle:              "server.result.dutyCycle (UI duty from MODE_CONFIGS)",
-      sectorCount:            "server.result.sectorCount (TOTAL sectors; usually 400)",
+      gammaVanDenBroeck_mass: `server.(gammaVanDenBroeck_mass) (${gammaVdBSource})`,
+      dutyEffectiveFR:        `server.derived (${dutyEffectiveSource})`,
+      dutyCycle:              `server.result.dutyCycle (${dutyCycleSource})`,
+      sectorCount:            `server.result.sectorCount (${sectorCountSource})`,
       sectors:                "server.result.concurrentSectors (live concurrent sectors)",
       currentMode:            "server.result.currentMode (authoritative)",
       hull:                   "server.result.hull (Lx,Ly,Lz,wallThickness_m)",
@@ -5473,9 +5896,10 @@ export async function computeEnergySnapshot(sim: any) {
 
     // ++ audit + the inputs used to compute it (for transparency)
     thetaAudit: {
-      note: "++ audit G├ç├╢ raw vs calibrated VdB",
-      equation: "++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff", 
+      note: "++ audit - raw vs pipeline VdB (targeting optional)",
+      equation: "++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff",
       mode: (result as any).modelMode ?? MODEL_MODE, // "raw" | "calibrated"
+      massMode: (result as any).massMode ?? DEFAULT_MASS_MODE,
       inputs: {
         gammaGeo: result.gammaGeo,
         q: result.qSpoilingFactor,
@@ -5553,6 +5977,7 @@ export async function computeEnergySnapshot(sim: any) {
     thetaRaw: (result as any).thetaRaw,
     thetaCal: (result as any).thetaCal,
     modelMode: (result as any).modelMode,
+    massMode: (result as any).massMode,
     qCavity: result.qCavity,
     qSpoilingFactor: result.qSpoilingFactor,
 

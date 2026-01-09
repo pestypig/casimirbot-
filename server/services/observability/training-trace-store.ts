@@ -6,6 +6,7 @@ import {
   type TrainingTraceCertificate,
   type TrainingTraceConstraint,
   type TrainingTraceDelta,
+  type TrainingTraceMetrics,
   type TrainingTraceRecord,
   type TrainingTraceSignal,
   type TrainingTraceSource,
@@ -18,6 +19,7 @@ export type TrainingTraceInput = {
   signal?: TrainingTraceSignal;
   pass: boolean;
   deltas?: TrainingTraceDelta[];
+  metrics?: TrainingTraceMetrics;
   firstFail?: TrainingTraceConstraint;
   certificate?: TrainingTraceCertificate;
   notes?: string[];
@@ -33,12 +35,33 @@ const parseBufferSize = (): number => {
   return Math.min(Math.max(25, Math.floor(requested)), 1000);
 };
 
+const parseRotateMaxBytes = (): number => {
+  const requested = Number(
+    process.env.TRAINING_TRACE_ROTATE_MAX_BYTES ?? 20000000,
+  );
+  if (!Number.isFinite(requested) || requested < 1) {
+    return 20000000;
+  }
+  return Math.min(Math.max(100000, Math.floor(requested)), 200000000);
+};
+
+const parseRotateMaxFiles = (): number => {
+  const requested = Number(process.env.TRAINING_TRACE_ROTATE_MAX_FILES ?? 5);
+  if (!Number.isFinite(requested) || requested < 0) {
+    return 5;
+  }
+  return Math.min(Math.max(0, Math.floor(requested)), 50);
+};
+
 const MAX_BUFFER_SIZE = parseBufferSize();
 const AUDIT_PERSIST_ENABLED = process.env.TRAINING_TRACE_PERSIST !== "0";
 const AUDIT_LOG_PATH = resolveAuditLogPath();
+const ROTATE_MAX_BYTES = parseRotateMaxBytes();
+const ROTATE_MAX_FILES = parseRotateMaxFiles();
 const traceBuffer: TrainingTraceRecord[] = [];
 let traceSequence = 0;
 let persistChain = Promise.resolve();
+let persistedBytes = loadPersistedBytes();
 
 const normalizeTenantId = (value?: string): string | undefined => {
   if (!value) return undefined;
@@ -86,6 +109,7 @@ export function recordTrainingTrace(input: TrainingTraceInput): TrainingTraceRec
     signal: input.signal,
     pass: input.pass,
     deltas: input.deltas ?? [],
+    metrics: input.metrics,
     firstFail: input.firstFail,
     certificate: input.certificate,
     notes: input.notes,
@@ -247,12 +271,75 @@ function persistAuditRecord(record: TrainingTraceRecord): void {
     return;
   }
   const line = JSON.stringify(record);
+  const lineBytes = Buffer.byteLength(`${line}\n`, "utf8");
   persistChain = persistChain
     .then(async () => {
       await fsPromises.mkdir(path.dirname(AUDIT_LOG_PATH), { recursive: true });
+      await maybeRotateAuditLog(lineBytes);
       await fsPromises.appendFile(AUDIT_LOG_PATH, `${line}\n`, "utf8");
+      persistedBytes += lineBytes;
     })
     .catch((error) => {
       console.warn("[training-trace] failed to persist audit log", error);
     });
+}
+
+function loadPersistedBytes(): number {
+  if (!AUDIT_PERSIST_ENABLED) {
+    return 0;
+  }
+  try {
+    const stat = fs.statSync(AUDIT_LOG_PATH);
+    return stat.isFile() ? stat.size : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function maybeRotateAuditLog(nextBytes: number): Promise<void> {
+  if (ROTATE_MAX_BYTES <= 0) return;
+  if (persistedBytes + nextBytes <= ROTATE_MAX_BYTES) return;
+  await rotateAuditLog();
+}
+
+async function rotateAuditLog(): Promise<void> {
+  if (!fs.existsSync(AUDIT_LOG_PATH)) {
+    persistedBytes = 0;
+    return;
+  }
+  const dir = path.dirname(AUDIT_LOG_PATH);
+  const ext = path.extname(AUDIT_LOG_PATH) || ".jsonl";
+  const base = path.basename(AUDIT_LOG_PATH, ext);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "");
+  const rotated = path.join(dir, `${base}.${stamp}${ext}`);
+  await fsPromises.rename(AUDIT_LOG_PATH, rotated);
+  persistedBytes = 0;
+  await pruneAuditRotations(dir, base, ext);
+}
+
+async function pruneAuditRotations(
+  dir: string,
+  base: string,
+  ext: string,
+): Promise<void> {
+  if (ROTATE_MAX_FILES <= 0) return;
+  const entries = await fsPromises.readdir(dir, { withFileTypes: true });
+  const prefix = `${base}.`;
+  const candidates = entries
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.startsWith(prefix) &&
+        entry.name.endsWith(ext),
+    )
+    .map((entry) => entry.name)
+    .sort();
+  const excess = candidates.length - ROTATE_MAX_FILES;
+  if (excess <= 0) return;
+  const toRemove = candidates.slice(0, excess);
+  await Promise.all(
+    toRemove.map((name) =>
+      fsPromises.unlink(path.join(dir, name)).catch(() => undefined),
+    ),
+  );
 }

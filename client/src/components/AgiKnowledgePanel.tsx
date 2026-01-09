@@ -67,6 +67,7 @@ export function AgiKnowledgePanel() {
     saveFiles,
     deleteFile,
     moveFiles,
+    updateFileTags,
     toggleActive,
     activeIds,
     createProject,
@@ -81,6 +82,7 @@ export function AgiKnowledgePanel() {
     saveFiles: state.saveFiles,
     deleteFile: state.deleteFile,
     moveFiles: state.moveFiles,
+    updateFileTags: state.updateFileTags,
     toggleActive: state.toggleActive,
     activeIds: state.activeIds,
     createProject: state.createProject,
@@ -91,6 +93,8 @@ export function AgiKnowledgePanel() {
   const [creating, setCreating] = React.useState(false);
   const [previewMap, setPreviewMap] = React.useState<PreviewState>({});
   const [syncing, setSyncing] = React.useState(false);
+  const [tagEdit, setTagEdit] = React.useState<{ id: string; value: string } | null>(null);
+  const [tagSaving, setTagSaving] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   
 
@@ -246,6 +250,32 @@ export function AgiKnowledgePanel() {
       setPreviewMap((prev) => ({ ...prev, [file.id]: text }));
     },
     [previewMap]
+  );
+
+  const parseTagsInput = React.useCallback((value: string) => {
+    return value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }, []);
+
+  const handleTagSave = React.useCallback(
+    async (file: KnowledgeFileRecord) => {
+      if (!selectedProject || !tagEdit || tagEdit.id !== file.id) return;
+      setTagSaving(true);
+      try {
+        const tags = parseTagsInput(tagEdit.value);
+        await updateFileTags(selectedProject.id, file.id, tags);
+        setStatus(`Updated tags for ${file.name}.`);
+        setTagEdit(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to update tags.";
+        setStatus(message);
+      } finally {
+        setTagSaving(false);
+      }
+    },
+    [parseTagsInput, selectedProject, tagEdit, updateFileTags]
   );
 
   if (!knowledgeEnabled) {
@@ -499,6 +529,63 @@ export function AgiKnowledgePanel() {
                       Preview
                     </button>
                   </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                    <span>Tags:</span>
+                    {file.tags?.length ? (
+                      <span className="text-slate-300">{file.tags.join(", ")}</span>
+                    ) : (
+                      <span className="text-slate-500">none</span>
+                    )}
+                    <button
+                      className="rounded-md border border-white/15 px-2 py-1 text-xs text-slate-200 hover:border-sky-500"
+                      onClick={() =>
+                        setTagEdit({
+                          id: file.id,
+                          value: (file.tags ?? []).join(", "),
+                        })
+                      }
+                    >
+                      Edit tags
+                    </button>
+                  </div>
+                  {tagEdit?.id === file.id ? (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <input
+                        className="min-w-[200px] flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+                        placeholder="tag1, tag2"
+                        value={tagEdit.value}
+                        onChange={(event) =>
+                          setTagEdit((current) =>
+                            current ? { ...current, value: event.target.value } : current,
+                          )
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            void handleTagSave(file);
+                          }
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            setTagEdit(null);
+                          }
+                        }}
+                      />
+                      <button
+                        className="rounded-md bg-sky-500 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-400 disabled:opacity-60"
+                        onClick={() => void handleTagSave(file)}
+                        disabled={tagSaving}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="rounded-md border border-white/15 px-2 py-1 text-xs text-slate-200 hover:border-sky-500"
+                        onClick={() => setTagEdit(null)}
+                        disabled={tagSaving}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : null}
                   {preview && (
                     <pre className="max-h-32 overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2 text-[11px] text-slate-200">
                       {preview}

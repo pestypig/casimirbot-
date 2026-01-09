@@ -56,6 +56,8 @@ export interface GrEvolveBrickStats {
   cfl: number;
   H_rms: number;
   M_rms: number;
+  thetaPeakAbs?: number;
+  thetaGrowthPerStep?: number;
   stressEnergy?: StressEnergyStats;
   perf?: GrEvolveBrickPerfStats;
 }
@@ -198,6 +200,25 @@ const GR_EVOLVE_MATTER_CHANNELS = [
   "S_yz",
 ] as const;
 
+const filterChannelOrder = (
+  order: readonly string[],
+  channels: Record<string, GrEvolveBrickChannel>,
+): string[] => {
+  const filtered: string[] = [];
+  const seen = new Set<string>();
+  for (const key of order) {
+    if (!channels[key]) continue;
+    filtered.push(key);
+    seen.add(key);
+  }
+  for (const key of Object.keys(channels)) {
+    if (seen.has(key)) continue;
+    filtered.push(key);
+    seen.add(key);
+  }
+  return filtered;
+};
+
 const defaultHullBounds = () => {
   const state = getGlobalPipelineState();
   const hull = state?.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
@@ -266,6 +287,14 @@ const maxAbsBeta = (
     if (mag > maxAbs) maxAbs = mag;
   }
   return maxAbs;
+};
+
+const maxAbsFromChannel = (channel: GrEvolveBrickChannel) => {
+  const min = Number(channel.min);
+  const max = Number(channel.max);
+  const absMin = Number.isFinite(min) ? Math.abs(min) : 0;
+  const absMax = Number.isFinite(max) ? Math.abs(max) : 0;
+  return Math.max(absMin, absMax);
 };
 
 const buildConstraintDiagnostics = (
@@ -522,13 +551,16 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     }
   }
 
+  const resolvedChannelOrder = filterChannelOrder(channelOrder, channels);
   const totalVoxels = Math.max(0, dims[0] * dims[1] * dims[2]);
-  const channelCount = Math.max(1, channelOrder.length);
+  const channelCount = Math.max(1, resolvedChannelOrder.length);
   const bytesEstimate = totalVoxels * channelCount * 4;
   const totalMs = nowMs() - perfStart;
   const msPerStep = steps > 0 ? evolveMs / steps : 0;
 
   const time_s_end = evolution.time_s;
+  const thetaPeakAbs = maxAbsFromChannel(K_trace);
+  const thetaGrowthPerStep = steps > 0 ? thetaPeakAbs / steps : 0;
 
   const stats: GrEvolveBrickStats = {
     steps,
@@ -537,6 +569,8 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     cfl: Number.isFinite(cfl) ? cfl : 0,
     H_rms: evolutionBrick.stats?.H_rms ?? rmsFromChannel(H_constraint),
     M_rms: evolutionBrick.stats?.M_rms ?? rmsFromVector(M_constraint_x, M_constraint_y, M_constraint_z),
+    thetaPeakAbs: Number.isFinite(thetaPeakAbs) ? thetaPeakAbs : 0,
+    thetaGrowthPerStep: Number.isFinite(thetaGrowthPerStep) ? thetaGrowthPerStep : 0,
     stressEnergy: evolution.sourceBrick?.stats,
     perf: {
       totalMs: Number.isFinite(totalMs) ? totalMs : 0,
@@ -557,7 +591,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     voxelSize_m,
     time_s: time_s_end,
     dt_s,
-    channelOrder,
+    channelOrder: resolvedChannelOrder,
     channels,
     stats,
   };

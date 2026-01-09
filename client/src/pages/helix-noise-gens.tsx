@@ -35,11 +35,19 @@ import {
 } from "@/components/noise-gens/RecentUploadsRail";
 import { MoodLegend } from "@/components/noise-gens/MoodLegend";
 import NoiseFieldPanel from "@/components/noise-gens/NoiseFieldPanel";
+import AtomLibraryPanel from "@/components/noise-gens/AtomLibraryPanel";
 import { TrainingPlan } from "@/components/noise-gens/TrainingPlan";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
-import ProjectAlbumPanel from "@/components/noise-gen/ProjectAlbumPanel";
+import ProjectAlbumPanel from "@/components/noise-gen/ProjectAlbumPanel";       
 import { decodeLayout } from "@/lib/desktop/shareState";
-import type { JobStatus, MoodPreset, Original, HelixPacket, TempoMeta } from "@/types/noise-gens";
+import type {
+  CoverEvidence,
+  JobStatus,
+  MoodPreset,
+  Original,
+  HelixPacket,
+  TempoMeta,
+} from "@/types/noise-gens";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalSession } from "@/hooks/useLocalSession";
 import type { SessionUser } from "@/lib/auth/session";
@@ -77,6 +85,9 @@ const MAX_RECENT_UPLOADS = 5;
 const MAX_RENDER_HISTORY = 5;
 const FALLBACK_DURATION_SECONDS = 180;
 const DEFAULT_BARS_IN_LOOP = 8;
+
+const clamp01 = (value: number): number =>
+  Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 
 const sanitizeTempoMeta = (value: unknown): TempoMeta | undefined => {
   if (!value || typeof value !== "object") return undefined;
@@ -157,6 +168,7 @@ type RenderHistoryEntry = {
   completedAt?: number;
   status: JobStatus | null;
   previewUrl?: string | null;
+  evidence?: CoverEvidence;
 };
 
 const sanitizeRecentUploads = (value: unknown): RecentUploadEntry[] => {
@@ -387,6 +399,7 @@ export default function HelixNoiseGensPage() {
         startedAt: update.startedAt ?? Date.now(),
         status: update.status,
         previewUrl: update.previewUrl ?? null,
+        evidence: update.evidence,
       });
     },
     [],
@@ -404,6 +417,7 @@ export default function HelixNoiseGensPage() {
           completedAt: result.completedAt,
           status: result.status ?? "ready",
           previewUrl: result.previewUrl ?? null,
+          evidence: result.evidence,
         };
         const filtered = previous.filter((item) => item.jobId !== result.jobId);
         return [entry, ...filtered].slice(0, MAX_RENDER_HISTORY);
@@ -726,6 +740,7 @@ export default function HelixNoiseGensPage() {
         <main className="flex-1">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 lg:px-6">
             <ProjectAlbumPanel projectSlug={externalProjectSlug} />
+            <AtomLibraryPanel />
             <TrainingPlan />
             <NoiseFieldPanel />
             {decoratedRecentUploads.length ? (
@@ -845,6 +860,19 @@ function RenderHistoryPanel({ entries }: { entries: RenderHistoryEntry[] }) {
       <div className="space-y-2">
         {entries.map((entry) => {
           const previewReady = isShareablePreview(entry.previewUrl);
+          const idiValue = entry.evidence?.idi;
+          const idiPct =
+            typeof idiValue === "number" && Number.isFinite(idiValue)
+              ? Math.round(clamp01(idiValue) * 100)
+              : null;
+          const idiTone =
+            idiPct == null
+              ? "border-slate-500/40 text-slate-400"
+              : idiPct >= 75
+                ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-300"
+                : idiPct >= 60
+                  ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
+                  : "border-slate-500/40 bg-slate-500/10 text-slate-300";
           return (
             <div
               key={entry.jobId}
@@ -857,20 +885,27 @@ function RenderHistoryPanel({ entries }: { entries: RenderHistoryEntry[] }) {
                   {formatRelativeTime(entry.completedAt ?? entry.startedAt)}
                 </div>
               </div>
-              {previewReady ? (
-                <Button
-                  asChild
-                  variant="secondary"
-                  size="sm"
-                  className="text-xs"
-                >
-                  <a href={entry.previewUrl ?? "#"} target="_blank" rel="noreferrer">
-                    Open preview
-                  </a>
-                </Button>
-              ) : (
-                <span className="text-[11px] text-slate-500">Awaiting preview</span>
-              )}
+              <div className="flex items-center gap-2">
+                {idiPct != null ? (
+                  <span className={`rounded-full border px-2 py-0.5 text-[11px] ${idiTone}`}>
+                    IDI {idiPct}%
+                  </span>
+                ) : null}
+                {previewReady ? (
+                  <Button
+                    asChild
+                    variant="secondary"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    <a href={entry.previewUrl ?? "#"} target="_blank" rel="noreferrer">
+                      Open preview
+                    </a>
+                  </Button>
+                ) : (
+                  <span className="text-[11px] text-slate-500">Awaiting preview</span>
+                )}
+              </div>
             </div>
           );
         })}

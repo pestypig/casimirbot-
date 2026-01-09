@@ -247,7 +247,7 @@ The **contracts** for each are defined below.
 
 The narrator prompt includes structured blocks to enforce physics-first answers:
 
-- `[Warp Evidence]`: status, certificate hash, config fields (bubbleRadius_m, wallThickness_m, targetVelocity_c, tileCount, dutyCycle, gammaGeoOverride), constraints (PASS/FAIL, severity, margin), pipeline snapshot line (TS_ratio, gamma_VdB, T00_min, M_exotic, etc.), and a clipped summary from `warp.ask`.
+- `[Warp Evidence]`: status, certificate hash, config fields (bubbleRadius_m, wallThickness_m, targetVelocity_c, tileCount, dutyCycle, gammaGeoOverride), constraints (PASS/FAIL, severity, margin), pipeline snapshot line (TS_ratio, gamma_VdB, T00_min, M_exotic, massMode, massSource, massDatasetId when measured, invariantMass_kg, massSigma_kg), and a clipped summary from `warp.ask`.
 - `[Warp Viability Guardrails]`: policy rules â€” only claim viability when status=ADMISSIBLE (or MARGINAL if policy allows) and all HARD constraints pass; if missing certificate, say NOT CERTIFIED.
 - `[Warp Certificate Context]`: JSON payload with `question`, `certificate` (status/hash/constraints/snapshot/config), and policy flags, rendered for transparency.
 

@@ -15,7 +15,7 @@ import type {
   GrConstraintGateStatus,
   GrConstraintEntry,
   GrEvaluation,
-  type PolicyLadder,
+  PolicyLadder,
   TrainingTraceConstraint,
   TrainingTraceDelta,
 } from "../../../shared/schema.js";
@@ -341,7 +341,9 @@ const emitTrainingTraces = (record: GrAgentLoopRunRecord): void => {
   });
 };
 
-const normalizeRunRecord = (record: GrAgentLoopRunRecord): GrAgentLoopRunRecord => {
+function normalizeRunRecord(
+  record: GrAgentLoopRunRecord,
+): GrAgentLoopRunRecord {
   const state = record.state ?? (record.accepted ? "accepted" : "rejected");
   const stateHistory = Array.isArray(record.stateHistory)
     ? record.stateHistory
@@ -357,7 +359,7 @@ const normalizeRunRecord = (record: GrAgentLoopRunRecord): GrAgentLoopRunRecord 
     budget,
     patches,
   };
-};
+}
 
 const toTimestampMs = (value?: string): number | null => {
   if (!value) return null;

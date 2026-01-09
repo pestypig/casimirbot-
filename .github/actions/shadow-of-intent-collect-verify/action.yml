@@ -1,0 +1,92 @@
+name: Shadow of Intent Collect + Verify
+description: Collect repo telemetry, run verification, and upload artifacts.
+inputs:
+  pack:
+    description: Constraint pack id.
+    required: false
+    default: repo-convergence
+  api-base:
+    description: Base URL for the verifier API (optional).
+    required: false
+    default: ""
+  install-deps:
+    description: Run npm ci before collecting/verifying.
+    required: false
+    default: "true"
+  reports-path:
+    description: Directory containing CI reports.
+    required: false
+    default: reports
+  trace-out:
+    description: Path to write the training-trace JSONL file.
+    required: false
+    default: artifacts/training-trace.jsonl
+  trace-limit:
+    description: Max traces to export.
+    required: false
+    default: "200"
+  collect-args:
+    description: Extra arguments for shadow-of-intent collect.
+    required: false
+    default: ""
+  token:
+    description: Bearer token for auth (optional).
+    required: false
+    default: ""
+  tenant:
+    description: Tenant id for auth/tenancy (optional).
+    required: false
+    default: ""
+  upload-artifacts:
+    description: Upload reports + trace output as artifacts.
+    required: false
+    default: "true"
+  artifact-name:
+    description: Name for uploaded artifacts.
+    required: false
+    default: shadow-of-intent-artifacts
+outputs:
+  trace-out:
+    description: Path to the training trace JSONL output.
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      if: ${{ inputs.install-deps == 'true' }}
+      shell: bash
+      run: npm ci
+
+    - name: Collect reports
+      shell: bash
+      run: |
+        mkdir -p "${{ inputs.reports-path }}"
+        export CASIMIR_REPORTS_DIR="${{ inputs.reports-path }}"
+        if [ -n "${{ inputs.collect-args }}" ]; then
+          npm run casimir:collect -- --reports-dir "${{ inputs.reports-path }}" ${{ inputs.collect-args }}
+        else
+          npm run casimir:collect -- --reports-dir "${{ inputs.reports-path }}"
+        fi
+
+    - name: Run verification
+      shell: bash
+      run: |
+        mkdir -p "$(dirname "${{ inputs.trace-out }}")"
+        export CASIMIR_REPORTS_DIR="${{ inputs.reports-path }}"
+        args=(--pack "${{ inputs.pack }}" --auto-telemetry --trace-out "${{ inputs.trace-out }}" --trace-limit "${{ inputs.trace-limit }}")
+        if [ -n "${{ inputs.api-base }}" ]; then args+=(--url "${{ inputs.api-base }}"); fi
+        if [ -n "${{ inputs.token }}" ]; then args+=(--token "${{ inputs.token }}"); fi
+        if [ -n "${{ inputs.tenant }}" ]; then args+=(--tenant "${{ inputs.tenant }}"); fi
+        npm run casimir:verify -- "${args[@]}"
+
+    - name: Upload artifacts
+      if: ${{ inputs.upload-artifacts == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          ${{ inputs.reports-path }}
+          ${{ inputs.trace-out }}
+
+    - id: outputs
+      shell: bash
+      run: echo "trace-out=${{ inputs.trace-out }}" >> "$GITHUB_OUTPUT"

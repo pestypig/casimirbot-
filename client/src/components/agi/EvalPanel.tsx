@@ -18,6 +18,7 @@ type EvalReplayPayload = {
   timed_out?: boolean;
   essence_id?: string;
   traceId?: string;
+  essenceId?: string;
 };
 
 export default function EvalPanel() {
@@ -25,7 +26,8 @@ export default function EvalPanel() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<EvalPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [replayTraceId, setReplayTraceId] = useState("");
+  const [replayTarget, setReplayTarget] = useState("");
+  const [replayTargetKind, setReplayTargetKind] = useState<"trace" | "essence">("trace");
   const [replayBusy, setReplayBusy] = useState(false);
   const [replayResult, setReplayResult] = useState<EvalReplayPayload | null>(null);
   const [replayError, setReplayError] = useState<string | null>(null);
@@ -61,9 +63,13 @@ export default function EvalPanel() {
     setReplayNotice(null);
     try {
       const payload: Record<string, string> = {};
-      const trimmed = replayTraceId.trim();
+      const trimmed = replayTarget.trim();
       if (trimmed) {
-        payload.traceId = trimmed;
+        if (replayTargetKind === "essence") {
+          payload.essenceId = trimmed;
+        } else {
+          payload.traceId = trimmed;
+        }
       }
       const response = await fetch("/api/agi/eval/replay", {
         method: "POST",
@@ -134,11 +140,21 @@ export default function EvalPanel() {
       >
         <div className="uppercase tracking-wide opacity-60">Eval Replay</div>
         <div className="flex items-center gap-2">
+          <select
+            className="rounded border border-white/20 bg-transparent px-2 py-1 text-[11px]"
+            value={replayTargetKind}
+            onChange={(event) =>
+              setReplayTargetKind(event.target.value === "essence" ? "essence" : "trace")
+            }
+          >
+            <option value="trace">Trace</option>
+            <option value="essence">Essence</option>
+          </select>
           <input
             className="flex-1 rounded border border-white/20 bg-transparent px-2 py-1 text-[11px] placeholder:opacity-40 focus:outline-none"
-            placeholder="Trace ID (optional)"
-            value={replayTraceId}
-            onChange={(event) => setReplayTraceId(event.target.value)}
+            placeholder={replayTargetKind === "essence" ? "Essence ID (optional)" : "Trace ID (optional)"}
+            value={replayTarget}
+            onChange={(event) => setReplayTarget(event.target.value)}
           />
           <button
             className="border border-white/20 rounded px-2 py-1 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"

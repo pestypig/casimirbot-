@@ -4778,7 +4778,7 @@ useEffect(() => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 bg-slate-950 rounded-lg">
                     <div className="flex items-center gap-2">
-                      <p className="text-xs text-slate-400">Exotic Mass</p>
+                      <p className="text-xs text-slate-400">Exotic Mass</p>     
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
@@ -4797,7 +4797,7 @@ useEffect(() => {
                     <p className="text-lg font-mono text-purple-400">{fmt(pipeline?.M_exotic ?? systemMetrics?.exoticMass, 0, "1405")} kg</p>
                   </div>
                   <div className="p-3 bg-slate-950 rounded-lg">
-                    <p className="text-xs text-slate-400">System Status</p>
+                    <p className="text-xs text-slate-400">System Status</p>     
                     <p className="text-lg font-mono text-green-400">{pipeline?.overallStatus || systemMetrics?.overallStatus || "NOMINAL"}</p>
                   </div>
                 </div>

@@ -5,7 +5,7 @@ The Needle Hull Mainframe is the operator-facing slice of Helix Core. It stitche
 ## System Layers
 
 ### 1. HELIX-CORE console (client)
-- `client/src/pages/helix-core.tsx` renders the dashboard bannered as **“Needle Hull Mainframe System”**. The hero cards expose enrollment state (mode, duty, Ford–Roman guards) while the lower half hosts the log terminal, tile grid, sweep HUDs, and Hull3D renderer.
+- The Helix Core panel (registered in `client/src/pages/helix-core.panels.ts`) renders the dashboard bannered as **“Needle Hull Mainframe System”** for `/desktop` and `/mobile`. The legacy route in `client/src/pages/helix-core.tsx` still exists for archival access but is deprecated for new UI work. The hero cards expose enrollment state (mode, duty, Ford–Roman guards) while the lower half hosts the log terminal, tile grid, sweep HUDs, and Hull3D renderer.
 - The mainframe terminal keeps a dual feed:
   - **AI chat** calls `/api/helix/command` and records every exchange plus any function calls in `chatMessages`.
   - **System logs** append `[FUNCTION]`, `[RESULT]`, `[TILE]`, and `[DATA]` entries into `mainframeLog`, letting operators audit every action the assistant invokes.

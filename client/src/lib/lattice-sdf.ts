@@ -40,6 +40,37 @@ type BuildDistanceGridParams = {
 const clampIndex = (value: number, maxExclusive: number) =>
   Math.min(Math.max(value, 0), Math.max(0, maxExclusive - 1));
 
+const isIdentityMatrix = (m: Float32Array, eps = 1e-6) =>
+  Math.abs(m[0] - 1) < eps &&
+  Math.abs(m[5] - 1) < eps &&
+  Math.abs(m[10] - 1) < eps &&
+  Math.abs(m[15] - 1) < eps &&
+  Math.abs(m[1]) < eps &&
+  Math.abs(m[2]) < eps &&
+  Math.abs(m[3]) < eps &&
+  Math.abs(m[4]) < eps &&
+  Math.abs(m[6]) < eps &&
+  Math.abs(m[7]) < eps &&
+  Math.abs(m[8]) < eps &&
+  Math.abs(m[9]) < eps &&
+  Math.abs(m[11]) < eps &&
+  Math.abs(m[12]) < eps &&
+  Math.abs(m[13]) < eps &&
+  Math.abs(m[14]) < eps;
+
+const transformPositions = (positions: Float32Array, m: Float32Array) => {
+  const out = new Float32Array(positions.length);
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i] ?? 0;
+    const y = positions[i + 1] ?? 0;
+    const z = positions[i + 2] ?? 0;
+    out[i] = m[0] * x + m[4] * y + m[8] * z + m[12];
+    out[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+    out[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+  }
+  return out;
+};
+
 const triangleNormal = (
   ax: number, ay: number, az: number,
   bx: number, by: number, bz: number,
@@ -205,7 +236,10 @@ export async function buildHullDistanceGrid(
     };
   }
 
-  const positions = surface.positions;
+  const positions =
+    frame.worldToLattice && !isIdentityMatrix(frame.worldToLattice)
+      ? transformPositions(surface.positions, frame.worldToLattice)
+      : surface.positions;
   const indices = surface.indices;
   const triCount = Math.max(0, Math.floor(indices.length / 3));
   if (triCount === 0) {

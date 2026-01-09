@@ -9,7 +9,7 @@
       "excerpt": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.",
       "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.\n\nWhen measurements disagree with our story, we revise the story. The vow survives by truth, not by force.",
       "tags": ["stewardship", "compassion"],
-      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols"],
+      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols", "jurisdictional-floor", "two-key-approval", "interbeing-systems", "sangha-architecture", "right-speech-infrastructure", "restorative-harm-repair", "impermanence-by-design", "koan-governance", "three-tenets-loop", "no-bypass-guardrail", "capture-resistance", "scarcity-justice", "data-dignity", "civic-memory-continuity", "skillful-mediation", "external-interface-integrity"],
       "links": [
         { "rel": "see-also", "to": "bodhisattva-craft" },
         { "rel": "see-also", "to": "beginners-mind" },
@@ -21,6 +21,227 @@
       ],
       "actions": [
         { "label": "Read Source Essay", "action": { "kind": "openPanel", "panelId": "mission-ethos-source" } }
+      ]
+    },
+    {
+      "id": "interbeing-systems",
+      "slug": "interbeing-systems",
+      "title": "Interbeing Systems",
+      "excerpt": "Dependent systems make promises real; every public commitment is a dependency graph.",
+      "bodyMD": "Dependent arising is operations realism: nothing stands alone. Fuel depends on ports, hospitals depend on power, contracts depend on courts, and courts depend on legitimacy.\n\nA promise that ignores its dependencies is a false promise. We require cross-sector coherence before we accept a plan as viable.\n\nAnti-pattern: silo virtue, where each ministry is right and the system still collapses.\n\nMinimal artifact: Interbeing Map, a published dependency model with if-this-fails/that-fails links and second-order impacts.\n\nSee [[node:bodhisattva-craft]], [[node:stewardship-ledger]], and [[node:feedback-loop-hygiene]].",
+      "tags": ["systems", "interdependence", "coherence", "dependencies"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "bodhisattva-craft" },
+        { "rel": "see-also", "to": "stewardship-ledger" },
+        { "rel": "see-also", "to": "feedback-loop-hygiene" }
+      ]
+    },
+    {
+      "id": "sangha-architecture",
+      "slug": "sangha-architecture",
+      "title": "Sangha Architecture",
+      "excerpt": "Community is a container for practice; durable civic design makes consent possible.",
+      "bodyMD": "Sangha is not an abstract vibe. It is a structured community that holds practice, truth-telling, and repair.\n\nIn society, integration requires durable civic containers where consent can form, grievances can surface safely, and legitimacy is generated through participation rather than performance.\n\nAnti-pattern: order without consent, where streets are quiet and resentment grows loud.\n\nMinimal artifact: Civic Sangha Charter, rules for inclusive local councils, protected civic space, and conflict-mediation norms.\n\nSee [[node:values-over-images]], [[node:voice-integrity]], and [[node:worldview-integrity]].",
+      "tags": ["community", "consent", "legitimacy", "civic", "participation"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "values-over-images" },
+        { "rel": "see-also", "to": "voice-integrity" },
+        { "rel": "see-also", "to": "worldview-integrity" }
+      ]
+    },
+    {
+      "id": "right-speech-infrastructure",
+      "slug": "right-speech-infrastructure",
+      "title": "Right Speech Infrastructure",
+      "excerpt": "Speech is ethical action; trustworthy channels keep society coherent.",
+      "bodyMD": "Right speech is truth, non-harm, and timeliness expressed in systems. Society integrates through trustworthy channels: reporting, verification, public updates, and rumor-to-fact pipelines that do not default to censorship or propaganda.\n\nInforming is protective. Withholding material information is not neutral; it lets fear author the story. We prefer clear disclosure, stated uncertainty, visible corrections, and public indicators over rumor competition.\n\nAnti-pattern: information predation, where manipulation, extortion, or false certainty dominates the channel.\n\nMinimal artifact: Trusted Channel Protocol, with multi-channel intake, anonymity options, independent follow-up SLAs, and public stats on closure rates.\n\nSee [[node:voice-integrity]], [[node:compromised-channel-response]], and [[node:verification-checklist]].",
+      "tags": ["speech", "communication", "ethics", "verification", "channels"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "voice-integrity" },
+        { "rel": "see-also", "to": "compromised-channel-response" },
+        { "rel": "see-also", "to": "verification-checklist" }
+      ]
+    },
+    {
+      "id": "restorative-harm-repair",
+      "slug": "restorative-harm-repair",
+      "title": "Restorative Harm Repair",
+      "excerpt": "Compassion with accountability: repair reduces harm and reintegrates society.",
+      "bodyMD": "Compassion without accountability becomes impunity; accountability without repair becomes vengeance. We reduce suffering through repair and enforce credible consequences for abuse.\n\nAnti-pattern: cycles of revenge or impunity with paperwork.\n\nMinimal artifact: Harm Repair Ladder, a staged pathway for investigation, protection, restitution options, escalation triggers, and public reporting that preserves dignity.\n\nSee [[node:integrity-protocols]], [[node:stewardship-ledger]], and [[node:verification-checklist]].",
+      "tags": ["repair", "accountability", "justice", "reintegration", "dignity"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "stewardship-ledger" },
+        { "rel": "see-also", "to": "verification-checklist" }
+      ]
+    },
+    {
+      "id": "impermanence-by-design",
+      "slug": "impermanence-by-design",
+      "title": "Impermanence by Design",
+      "excerpt": "Build institutions to adapt without breaking legitimacy; emergency power must expire.",
+      "bodyMD": "Impermanence is reality, so governance must adapt without breaking trust. We design for change: sunset clauses, review cycles, reversible pilots, and clear amendment paths.\n\nThis keeps contracts and mandates durable across political shifts because procedure stays continuous even when leadership changes.\n\nAnti-pattern: brittle governance and forever transitions that turn emergency power into permanent power.\n\nMinimal artifact: Sunset + Review Register, where every exceptional power has an expiry and audit requirement.\n\nSee [[node:provenance-protocol]], [[node:lifetime-trust-ledger]], and [[node:promise-trials]].",
+      "tags": ["impermanence", "governance", "review", "sunset", "adaptation"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "provenance-protocol" },
+        { "rel": "see-also", "to": "lifetime-trust-ledger" },
+        { "rel": "see-also", "to": "promise-trials" }
+      ]
+    },
+    {
+      "id": "koan-governance",
+      "slug": "koan-governance",
+      "title": "Koan Governance",
+      "excerpt": "Hold real paradoxes without collapsing into slogans; accountable tradeoffs are explicit.",
+      "bodyMD": "Koans train the mind to hold paradox without collapse. Governance faces real tradeoffs: security vs liberty, speed vs due process, unity vs pluralism. We name the tensions and decide with accountability instead of pretending they do not exist.\n\nAnti-pattern: ideological rigidity and whiplash policy.\n\nMinimal artifact: Tradeoff Ledger, recording values at stake, risks, mitigations, reversal triggers, and metrics for every major decision.\n\nSee [[node:beginners-mind]], [[node:values-over-images]], and [[node:promise-trials]].",
+      "tags": ["paradox", "tradeoffs", "governance", "accountability", "discernment"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "beginners-mind" },
+        { "rel": "see-also", "to": "values-over-images" },
+        { "rel": "see-also", "to": "promise-trials" }
+      ]
+    },
+    {
+      "id": "three-tenets-loop",
+      "slug": "three-tenets-loop",
+      "title": "Three Tenets Loop",
+      "excerpt": "Not-knowing, bearing witness, taking action: a governance cycle that learns in public.",
+      "bodyMD": "The three tenets loop is a social action cycle: Not-Knowing, Bearing Witness, Taking Action. We encode it as governance discipline.\n\nNot-Knowing: suspend certainty, avoid propaganda certainty, and name assumptions.\n\nBearing Witness: gather ground truth, listen to impacted communities, and publish indicators.\n\nTaking Action: act, then measure, then correct.\n\nAnti-pattern: action first, reality later.\n\nSee [[node:beginners-mind]], [[node:verification-checklist]], [[node:bodhisattva-craft]], and [[node:feedback-loop-hygiene]].",
+      "tags": ["loop", "practice", "governance", "learning", "accountability"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "beginners-mind" },
+        { "rel": "see-also", "to": "verification-checklist" },
+        { "rel": "see-also", "to": "bodhisattva-craft" },
+        { "rel": "see-also", "to": "feedback-loop-hygiene" }
+      ]
+    },
+    {
+      "id": "no-bypass-guardrail",
+      "slug": "no-bypass-guardrail",
+      "title": "No Bypass Guardrail",
+      "excerpt": "Equanimity is not neutrality toward harm; calm language must not delay protection.",
+      "bodyMD": "Zen language can become a dodge. This guardrail prevents calm speech from anesthetizing harm or delaying accountability.\n\nEquanimity is not neutrality toward predation. When credible harm signals appear, the protect and investigate path must start.\n\nSilence in the face of credible harm signals is an action. Withholding information is not neutral; fear fills the gap. Default to timely disclosure with uncertainty markers and correction logs, and document any temporary limits.\n\nAnti-pattern: spiritual bypass, process theater, or staying above it while harm continues.\n\nMinimal artifact: Bypass Checklist. If a credible harm signal appears, start protection and investigation. Silence or delay requires recorded justification and independent review.\n\nSee [[node:values-over-images]], [[node:integrity-protocols]], [[node:restorative-harm-repair]], [[node:voice-integrity]], and [[node:three-tenets-loop]].",
+      "tags": ["accountability", "guardrail", "harm", "integrity", "response"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "values-over-images" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "voice-integrity" },
+        { "rel": "see-also", "to": "three-tenets-loop" }
+      ]
+    },
+    {
+      "id": "capture-resistance",
+      "slug": "capture-resistance",
+      "title": "Capture Resistance",
+      "excerpt": "Design so capture is hard; predation is a systems bug, not a personnel issue.",
+      "bodyMD": "Institutional capture is a systems phenomenon, especially at chokepoints like permits, fuel, ports, procurement, and enforcement. We design for resistance: separation of duties, auditability, recusal norms, and transparency requirements.\n\nAnti-pattern: reform theater, elite recycling, or new faces with the same extraction.\n\nMinimal artifact: Capture Risk Register, a public list of high-leverage chokepoints and the protections that exist.\n\nSee [[node:stewardship-ledger]], [[node:provenance-protocol]], [[node:interbeing-systems]], [[node:feedback-loop-hygiene]], and [[node:verification-checklist]].",
+      "tags": ["capture", "governance", "systems", "auditability", "transparency"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "stewardship-ledger" },
+        { "rel": "see-also", "to": "provenance-protocol" },
+        { "rel": "see-also", "to": "interbeing-systems" },
+        { "rel": "see-also", "to": "feedback-loop-hygiene" },
+        { "rel": "see-also", "to": "verification-checklist" }
+      ]
+    },
+    {
+      "id": "scarcity-justice",
+      "slug": "scarcity-justice",
+      "title": "Scarcity Justice",
+      "excerpt": "Fairness under scarcity is a legitimacy engine when restoration is uneven.",
+      "bodyMD": "Scarcity forces rationing. Legitimacy depends on clear allocation criteria, transparent prioritization, and an appeals path when everything cannot be restored at once.\n\nAnti-pattern: queue-jumping, resource apartheid, or rationing-by-relationship.\n\nMinimal artifact: Scarcity Allocation Charter, with criteria, prioritization logic, appeals, and a publication cadence.\n\nSee [[node:bodhisattva-craft]], [[node:stewardship-ledger]], [[node:values-over-images]], [[node:koan-governance]], and [[node:verification-checklist]].",
+      "tags": ["scarcity", "fairness", "allocation", "legitimacy", "transparency"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "bodhisattva-craft" },
+        { "rel": "see-also", "to": "stewardship-ledger" },
+        { "rel": "see-also", "to": "values-over-images" },
+        { "rel": "see-also", "to": "koan-governance" },
+        { "rel": "see-also", "to": "verification-checklist" }
+      ]
+    },
+    {
+      "id": "data-dignity",
+      "slug": "data-dignity",
+      "title": "Data Dignity",
+      "excerpt": "Measurement must not become coercion; data collection stays minimal and accountable.",
+      "bodyMD": "Reporting and verification create data exhaust. We protect people from metric-powered coercion through data minimization, retention limits, consentful use, and redress.\n\nAnti-pattern: surveillance creep, doxxing-by-process, or we measure you therefore we own you.\n\nMinimal artifact: Civic Data Covenant, stating what data is collected, why, who can access it, how long it is kept, how misuse is appealed, and how audits occur.\n\nSee [[node:right-speech-infrastructure]], [[node:voice-integrity]], [[node:integrity-protocols]], [[node:verification-checklist]], and [[node:compromised-channel-response]].",
+      "tags": ["data", "dignity", "privacy", "consent", "accountability"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "right-speech-infrastructure" },
+        { "rel": "see-also", "to": "voice-integrity" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "verification-checklist" },
+        { "rel": "see-also", "to": "compromised-channel-response" }
+      ]
+    },
+    {
+      "id": "civic-memory-continuity",
+      "slug": "civic-memory-continuity",
+      "title": "Civic Memory Continuity",
+      "excerpt": "Legitimacy survives when decision rationale survives turnover.",
+      "bodyMD": "Societies need continuity of rationale: why a decision was made, what evidence and tradeoffs were used, and what correction triggers exist. This prevents policy from resetting to rumor after each political shift.\n\nAnti-pattern: institutional amnesia or policy by rumor.\n\nMinimal artifact: Decision Rationale Archive, a public record of major commitments with assumptions, evidence, signatories, tradeoffs, review dates, and reversal triggers.\n\nSee [[node:provenance-protocol]], [[node:liveness-or-it-didnt-happen]], [[node:impermanence-by-design]], and [[node:koan-governance]].",
+      "tags": ["memory", "continuity", "rationale", "legitimacy", "record"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "provenance-protocol" },
+        { "rel": "see-also", "to": "liveness-or-it-didnt-happen" },
+        { "rel": "see-also", "to": "impermanence-by-design" },
+        { "rel": "see-also", "to": "koan-governance" }
+      ]
+    },
+    {
+      "id": "skillful-mediation",
+      "slug": "skillful-mediation",
+      "title": "Skillful Mediation",
+      "excerpt": "Nonviolent dispute handling is a designed civic capability, not an afterthought.",
+      "bodyMD": "Daily conflicts over land, labor, utilities, and governance require a civic metabolism. Mediation must be legible and safe so disputes do not default to escalation.\n\nAnti-pattern: every dispute becomes existential.\n\nMinimal artifact: Mediation Ladder, an escalation path from dialogue to facilitated mediation to adjudication or repair, with protections for vulnerable participants.\n\nSee [[node:sangha-architecture]], [[node:right-speech-infrastructure]], [[node:restorative-harm-repair]], and [[node:koan-governance]].",
+      "tags": ["mediation", "conflict", "civic", "nonviolent", "repair"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "sangha-architecture" },
+        { "rel": "see-also", "to": "right-speech-infrastructure" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "koan-governance" }
+      ]
+    },
+    {
+      "id": "external-interface-integrity",
+      "slug": "external-interface-integrity",
+      "title": "External Interface Integrity",
+      "excerpt": "Partner without capture; external ties must stay transparent and bounded.",
+      "bodyMD": "External actors can stabilize or distort everything. We handle donors, NGOs, foreign governments, sanctions systems, and external capital without becoming a proxy battlefield or extraction opportunity.\n\nAnti-pattern: aid capture, dependency loops, opaque side-deals, or proxy governance.\n\nMinimal artifact: External Partnership Register, listing purpose, commitments, reporting expectations, conflict-of-interest handling, and termination or sunset terms.\n\nSee [[node:worldview-integrity]], [[node:values-over-images]], and [[node:reciprocity-contract]].",
+      "tags": ["external", "partnership", "integrity", "transparency", "sovereignty"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "worldview-integrity" },
+        { "rel": "see-also", "to": "values-over-images" },
+        { "rel": "see-also", "to": "reciprocity-contract" }
       ]
     },
     {
@@ -116,16 +337,39 @@
       "excerpt": "Preserve wonder so real partnership — between humans or with spacetime — is possible.",
       "bodyMD": "A child's drive to stay whole mirrors our need to keep the warp bubble coherent.\n\nPresence is an engineering control loop: if you cannot stabilize your own signal, you cannot stabilize spacetime.",
       "tags": ["presence", "psychology"],
-      "children": [],
+      "children": ["dream-integrity"],
       "links": [
-        { "rel": "parent", "to": "beginners-mind" }
+        { "rel": "parent", "to": "beginners-mind" },
+        { "rel": "child", "to": "dream-integrity" }
       ],
       "actions": [
         {
           "label": "Open Zen Mantra Settings",
           "action": { "kind": "openSettings", "tab": "preferences" }
         },
+        { "label": "Explore Dream Integrity", "action": { "kind": "gotoNode", "to": "dream-integrity" } },
         { "label": "Return to Beginner's Mind", "action": { "kind": "gotoNode", "to": "beginners-mind" } }
+      ]
+    },
+    {
+      "id": "dream-integrity",
+      "slug": "dream-integrity",
+      "title": "Dream Integrity",
+      "excerpt": "Protect aspirations from insecurity or oppression; the vow is not indulgence.",
+      "bodyMD": "Dreams are not luxuries; they are bearings. We protect them because they keep the craft aligned with the vow.\n\nWhen insecurity or pressure demands you shrink, name the demand and refuse the trade. Safety bought by abandoning purpose is false safety.\n\nPractice:\n- Keep the aspiration visible.\n- Name what cannot be traded away.\n- Take the next step that keeps the vow intact and verify it.",
+      "tags": ["dreams", "integrity", "vow", "resilience", "aspiration"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "inner-spark" },
+        { "rel": "see-also", "to": "struggle-testament" },
+        { "rel": "see-also", "to": "values-over-images" }
+      ],
+      "actions": [
+        {
+          "label": "Open Zen Mantra Settings",
+          "action": { "kind": "openSettings", "tab": "preferences" }
+        },
+        { "label": "Return to Inner Spark", "action": { "kind": "gotoNode", "to": "inner-spark" } }
       ]
     },
     {
@@ -293,8 +537,11 @@
       "excerpt": "Close loops only with verified signals.",
       "bodyMD": "Feedback loops amplify what they measure. If the measurement is corrupted, the loop becomes a lie generator.\n\nWe keep loops constructive by:\n- Choosing the right window (instant vs averaged).\n- Using guardrails (duty, zeta, TS) to bound harm.\n- Keeping a rollback path when signals go weird.\n\nInnovation lives here: new ideas become safe when they enter a loop with proof and guardrails.\n\nSee [[node:reciprocity-contract]].",
       "tags": ["feedback", "innovation", "guardrails"],
-      "children": [],
-      "links": [{ "rel": "parent", "to": "integrity-protocols" }],
+      "children": ["habit-pressure-break"],
+      "links": [
+        { "rel": "parent", "to": "integrity-protocols" },
+        { "rel": "child", "to": "habit-pressure-break" }
+      ],
       "references": [
         { "kind": "panel", "title": "Helix Core", "panelId": "helix-core" },
         { "kind": "panel", "title": "Vacuum Gap Heatmap", "panelId": "vacuum-gap-heatmap" }
@@ -302,6 +549,27 @@
       "actions": [
         { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
         { "label": "Open Vacuum Gap Heatmap", "action": { "kind": "openPanel", "panelId": "vacuum-gap-heatmap" } }
+      ]
+    },
+    {
+      "id": "habit-pressure-break",
+      "slug": "habit-pressure-break",
+      "title": "Habit Pressure Break",
+      "excerpt": "Refuse inherited dependency loops; choose self-alignment when tradition demands conformity.",
+      "bodyMD": "Habit pressure is legacy gravity. It asks for repetition because it is old, not because it is true.\n\nWe break it by pausing, naming the pressure, and checking what it asks us to trade away. If the loop demands dependence, we label it stale and step out of it.\n\nPractice the break in steps:\n- Pause and name the inherited habit.\n- Check provenance: who set it, when, and for what purpose.\n- Test liveness: is it still serving the present.\n- Choose alignment: keep what protects the vow, drop what narrows it.\n- Re-enter with a new loop and a verification hook.\n\nSee [[node:values-over-images]] and [[node:liveness-or-it-didnt-happen]].",
+      "tags": ["habits", "alignment", "autonomy", "tradition", "discipline"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "feedback-loop-hygiene" },
+        { "rel": "see-also", "to": "values-over-images" },
+        { "rel": "see-also", "to": "liveness-or-it-didnt-happen" }
+      ],
+      "references": [
+        { "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }
+      ],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Return to Feedback Loop Hygiene", "action": { "kind": "gotoNode", "to": "feedback-loop-hygiene" } }
       ]
     },
     {
@@ -355,12 +623,34 @@
       "excerpt": "Step back: choose the right window to see the real signal.",
       "bodyMD": "Solitude in a system is a windowed average.\n\nInstant readings are useful, but easy to manipulate and easy to misread. The cure is to step back to the correct window: instant, \u03c4LC, burst, or one-sector.\n\nInnovation stays constructive when the window matches the claim.\n\nSee [[node:beginners-mind]] and [[node:stewardship-ledger]].",
       "tags": ["averaging", "signal", "discipline"],
-      "children": [],
-      "links": [{ "rel": "parent", "to": "beginners-mind" }],
+      "children": ["solitude-to-signal"],
+      "links": [
+        { "rel": "parent", "to": "beginners-mind" },
+        { "rel": "child", "to": "solitude-to-signal" }
+      ],
       "references": [{ "kind": "panel", "title": "Helix Core", "panelId": "helix-core" }],
       "actions": [
         { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Explore Solitude to Signal", "action": { "kind": "gotoNode", "to": "solitude-to-signal" } },
         { "label": "Return to Beginner's Mind", "action": { "kind": "gotoNode", "to": "beginners-mind" } }
+      ]
+    },
+    {
+      "id": "solitude-to-signal",
+      "slug": "solitude-to-signal",
+      "title": "Solitude to Signal",
+      "excerpt": "Isolation as a deliberate window that clarifies self-guidance and seeds new inspiration.",
+      "bodyMD": "Solitude is not retreat; it is signal processing. The distance lowers noise so guidance can be heard without distortion.\n\nWe use isolation to choose a window that fits the claim: long enough to settle, short enough to stay honest.\n\nPractice:\n- Step out of the loop and name the noise.\n- Hold the window until the signal stabilizes.\n- Write the next move and re-enter with a testable aim.",
+      "tags": ["solitude", "signal", "guidance", "inspiration", "discipline"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "phoenix-averaging" },
+        { "rel": "see-also", "to": "beginners-mind" },
+        { "rel": "see-also", "to": "inner-spark" }
+      ],
+      "actions": [
+        { "label": "Open Helix Core", "action": { "kind": "openPanel", "panelId": "helix-core" } },
+        { "label": "Return to Phoenix Averaging", "action": { "kind": "gotoNode", "to": "phoenix-averaging" } }
       ]
     },
     {
@@ -370,13 +660,65 @@
       "excerpt": "Promises are proven under separation and pressure.",
       "bodyMD": "When a mission splits roles, the vow is tested.\n\nOne side continues the work. Another side becomes exposed to stress, persuasion, or noise. We measure integrity by what happens next:\n- Do we return with proof, or with a story?\n- Do we protect the vulnerable, or use them as evidence?\n\nInnovation depends on this. Without trustworthy promises, teams cannot take coherent risks.",
       "tags": ["trust", "promises", "resilience"],
-      "children": [],
-      "links": [{ "rel": "parent", "to": "struggle-testament" }],
+      "children": ["lifetime-trust-ledger"],
+      "links": [
+        { "rel": "parent", "to": "struggle-testament" },
+        { "rel": "child", "to": "lifetime-trust-ledger" }
+      ],
       "references": [{ "kind": "panel", "title": "AGI Task History", "panelId": "agi-task-history" }],
       "actions": [
         { "label": "Trace Trials in Task History", "action": { "kind": "openPanel", "panelId": "agi-task-history" } },
+        { "label": "Explore Lifetime Trust Ledger", "action": { "kind": "gotoNode", "to": "lifetime-trust-ledger" } },
         { "label": "Return to Struggle as Testament", "action": { "kind": "gotoNode", "to": "struggle-testament" } }
       ]
+    },
+    {
+      "id": "lifetime-trust-ledger",
+      "slug": "lifetime-trust-ledger",
+      "title": "Lifetime Trust Ledger",
+      "excerpt": "Trust is time-tested evidence, not momentary agreement.",
+      "bodyMD": "Trust is an archive, not a feeling. We build it by keeping promises over time and showing work that survives pressure.\n\nAgreement can be easy; evidence is earned. A single moment can inspire, but it cannot certify.\n\nPractice:\n- Record what was promised and what was delivered.\n- Mark the time span and the conditions.\n- Prefer patterns that repeat under stress.",
+      "tags": ["trust", "evidence", "time", "integrity", "promises"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "promise-trials" },
+        { "rel": "see-also", "to": "provenance-protocol" }
+      ],
+      "actions": [
+        { "label": "Trace Trials in Task History", "action": { "kind": "openPanel", "panelId": "agi-task-history" } },
+        { "label": "Return to Promise Trials", "action": { "kind": "gotoNode", "to": "promise-trials" } }
+      ]
+    },
+    {
+      "id": "jurisdictional-floor",
+      "slug": "jurisdictional-floor",
+      "title": "Jurisdictional Floor",
+      "excerpt": "Law is the minimum rights and procedure floor; ethos adds completeness.",
+      "bodyMD": "Binding law is a floor, not a vibe. The ethos tree does not replace it; it adds a completeness layer for non-harm, non-domination, non-attachment, right speech, right livelihood, interbeing, sangha, repair, and integrity loops.\n\nWe model this as versioned ruleset packs per jurisdiction and a crosswalk that maps each norm to ethos nodes.\n\nAnti-pattern: claiming ethical intent to bypass binding rules, or using legal compliance as a shield for predation.\n\nMinimal artifact: Ruleset Pack + Norm-Ethos Crosswalk with versioned notes and invalidators.\n\nSee [[node:two-key-approval]], [[node:integrity-protocols]], and [[node:external-interface-integrity]].",
+      "tags": ["law", "jurisdiction", "governance", "baseline", "compliance"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "two-key-approval" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "external-interface-integrity" }
+      ]
+    },
+    {
+      "id": "two-key-approval",
+      "slug": "two-key-approval",
+      "title": "Two-Key Approval",
+      "excerpt": "Plans are approved only when both legal and ethos gates pass.",
+      "bodyMD": "Two keys must turn before the system mints approval: a legal key and an ethos key.\n\nLegal key: the artifact complies with the selected jurisdiction ruleset. Ethos key: even if legal, it remains non-harm, non-domination, non-attachment, consent-based, reversible, and verifiable, with right speech and right livelihood intact.\n\nAnti-pattern: shipping artifacts that are legal-but-predatory or ethical-but-unlawful.\n\nMinimal artifact: Dual-Key Gate Sheet attached to every plan, contract, public communication, and payout request with pass/fail evidence and invalidators.\n\nSee [[node:jurisdictional-floor]], [[node:verification-checklist]], and [[node:no-bypass-guardrail]].",
+      "tags": ["approval", "gating", "law", "ethos", "verification"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "jurisdictional-floor" },
+        { "rel": "see-also", "to": "verification-checklist" },
+        { "rel": "see-also", "to": "no-bypass-guardrail" }
+      ]
     }
+
   ]
 }

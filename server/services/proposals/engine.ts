@@ -226,7 +226,13 @@ function awardForAction(userId: string, proposal: EssenceProposal, action: Propo
   }
   const base = proposal.rewardTokens || DEFAULT_REWARD;
   const amount = Math.max(10, Math.round(base * 0.2));
-  awardTokens(userId, amount, `proposal:${action}:${proposal.id}`, jobId ?? proposal.jobId ?? undefined);
+  awardTokens(
+    userId,
+    amount,
+    `proposal:${action}:${proposal.id}`,
+    jobId ?? proposal.jobId ?? undefined,
+    { source: "proposal", ref: proposal.id },
+  );
 }
 
 function jobKindForProposal(kind: ProposalKind): Job["kind"] {

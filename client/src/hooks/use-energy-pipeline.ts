@@ -137,6 +137,11 @@ export type AmpFactors = {
   qSpoilingFactor?: number;
   qMechanical?: number;
   qCavity?: number;
+  measuredGammaGeo?: number;
+  measuredGammaVanDenBroeck?: number;
+  measuredQSpoilingFactor?: number;
+  measuredQMechanical?: number;
+  measuredCavityQ?: number;
 };
 
 export type HullBrickChannel = {
@@ -331,6 +336,41 @@ export interface EnergyPipelineState {
   gammaVdB?: number;            // legacy alias
   gamma_vdb?: number;           // legacy alias
   exoticMassTarget_kg: number;
+  massMode?: "MODEL_DERIVED" | "TARGET_CALIBRATED" | "MEASURED_FORCE_INFERRED";
+  massSource?: "model" | "measured" | "target" | "targetOverride";
+  massDatasetId?: string;
+  massFitResiduals?: {
+    rms_N?: number;
+    rms_rel?: number;
+    sampleCount?: number;
+  };
+  massSigma_kg?: number;
+  invariantMassSigma_kg?: number;
+  massSourceNote?: string;
+  casimirForceInference?: {
+    datasetId?: string;
+    referenceSeparation_m?: number;
+    energy_J_at_a0?: number;
+    sigmaEnergy_J?: number;
+    kCasimir?: number;
+    sigmaK?: number;
+    sampleCount?: number;
+    fitResiduals?: {
+      rms_N?: number;
+      rms_rel?: number;
+      sampleCount?: number;
+    };
+    forceSign?: {
+      expected?: "negative" | "positive";
+      observed?: "negative" | "positive" | "mixed" | "unknown";
+      positiveFraction?: number;
+      negativeFraction?: number;
+      sampleCount?: number;
+      autoFlipApplied?: boolean;
+      note?: string;
+    };
+    note?: string;
+  };
   geomCoupling?: number;        // χ coupling factor for parametric sweeps
   pumpEff?: number;             // η pump transduction efficiency (0..1)
   ampFactors?: AmpFactors;      // Amplification factors (gamma, q) from pipeline

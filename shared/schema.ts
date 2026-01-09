@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { InformationBoundary } from "./information-boundary";
 
 export const sweepGeometrySchema = z.enum(["parallel_plate", "cpw"]);
 export type SweepGeometry = z.infer<typeof sweepGeometrySchema>;
@@ -822,11 +823,25 @@ export const hardwareSectorStateSchema = z.object({
   currentSector: z.coerce.number().int().nonnegative().optional(),
   activeSectors: z.coerce.number().int().nonnegative().optional(),
   sectorsConcurrent: z.coerce.number().int().positive().optional(),
+  sectorCount: z.coerce.number().int().positive().optional(),
   load: z.enum(["sector", "midi", "launcher"]).optional(),
   i_peak_A: z.coerce.number().optional(),
   dwell_ms: z.coerce.number().nonnegative().optional(),
   burst_ms: z.coerce.number().nonnegative().optional(),
   strobeHz: z.coerce.number().nonnegative().optional(),
+  // Optional measured controls (telemetry-inferred, override design values).  
+  measuredModulationFreqGHz: z.coerce.number().positive().optional(),
+  measuredPulseFrequencyGHz: z.coerce.number().positive().optional(),
+  measuredBurstLengthUs: z.coerce.number().positive().optional(),
+  measuredCycleLengthUs: z.coerce.number().positive().optional(),
+  measuredDutyCycle: z.coerce.number().min(0).max(1).optional(),
+  measuredSectorDuty: z.coerce.number().min(0).max(1).optional(),
+  measuredSectorCount: z.coerce.number().int().positive().optional(),
+  measuredCavityQ: z.coerce.number().positive().optional(),
+  measuredGammaGeo: z.coerce.number().nonnegative().optional(),
+  measuredGammaVanDenBroeck: z.coerce.number().nonnegative().optional(),
+  measuredQSpoilingFactor: z.coerce.number().nonnegative().optional(),
+  measuredQMechanical: z.coerce.number().nonnegative().optional(),
   phase01: z.coerce.number().optional(),
   phaseCont: z.coerce.number().optional(),
   pumpPhase_deg: z.coerce.number().optional(),
@@ -1013,17 +1028,42 @@ export type VacuumGapSweepConfig = z.infer<typeof vacuumGapSweepConfigSchema>;
 export type DynamicCasimirSweepConfig = VacuumGapSweepConfig;
 
 export const dynamicConfigSchema = z.object({
-  modulationFreqGHz: z.number().positive().min(0.1).max(100).default(15), // GHz (f_m)
+  // Drive modulation frequency (GHz); measurable via synthesizer readback.
+  modulationFreqGHz: z.number().positive().min(0.1).max(100).default(15),
+  // Measured modulation frequency (GHz); overrides modulationFreqGHz.
+  measuredModulationFreqGHz: z.number().positive().min(0.1).max(100).optional(),
   strokeAmplitudePm: z.number().positive().min(0.1).max(1000).default(50), // pm (delta a)
-  burstLengthUs: z.number().positive().min(0.1).max(1000).default(10), // microseconds (t_burst)
-  cycleLengthUs: z.number().positive().min(1).max(10000).default(1000), // microseconds (t_cycle)
-  cavityQ: z.number().positive().min(1e3).max(1e12).default(1e9), // Q factor
+  // Burst on-window length (us); measurable from gate timing.
+  burstLengthUs: z.number().positive().min(0.1).max(1000).default(10),
+  // Measured burst length (us); overrides burstLengthUs.
+  measuredBurstLengthUs: z.number().positive().min(0.1).max(1000).optional(),
+  // Cycle length (us); measurable from sequencer timing.
+  cycleLengthUs: z.number().positive().min(1).max(10000).default(1000),
+  // Measured cycle length (us); overrides cycleLengthUs.
+  measuredCycleLengthUs: z.number().positive().min(1).max(10000).optional(),
+  // Local duty fraction (0..1) during a burst; measurable from gate timing.
+  dutyCycle: z.number().min(0).max(1).optional(),
+  // Measured local duty fraction (0..1); overrides dutyCycle.
+  measuredDutyCycle: z.number().min(0).max(1).optional(),
+  // Cavity quality factor (Q); measurable via ringdown/linewidth.
+  cavityQ: z.number().positive().min(1e3).max(1e12).default(1e9),
+  // Measured cavity Q; overrides cavityQ.
+  measuredCavityQ: z.number().positive().min(1e3).max(1e12).optional(),
   gateSchedule: z.array(gatePulseSchema).optional(),
   gateRouting: z.array(gateRouteSchema).optional(),
   // Needle Hull sector strobing parameters
-  sectorCount: z.number().int().positive().min(1).max(1000).default(400), // Number of sectors
-  sectorDuty: z.number().positive().min(1e-6).max(1).default(2.5e-5), // Ship-wide duty factor
-  pulseFrequencyGHz: z.number().positive().min(0.1).max(100).default(15), // Pulse frequency
+  // Total sectors in the ring; measurable from scheduler telemetry.
+  sectorCount: z.number().int().positive().min(1).max(1000).default(400),
+  // Measured sector count; overrides sectorCount.
+  measuredSectorCount: z.number().int().positive().min(1).max(1000).optional(),
+  // Ship-wide effective duty (FR); measurable from strobe telemetry.
+  sectorDuty: z.number().positive().min(1e-6).max(1).default(2.5e-5),
+  // Measured ship-wide duty; overrides sectorDuty.
+  measuredSectorDuty: z.number().positive().min(1e-6).max(1).optional(),
+  // Pulse frequency (GHz); measurable via synthesizer readback.
+  pulseFrequencyGHz: z.number().positive().min(0.1).max(100).default(15),
+  // Measured pulse frequency (GHz); overrides pulseFrequencyGHz.
+  measuredPulseFrequencyGHz: z.number().positive().min(0.1).max(100).optional(),
   lightCrossingTimeNs: z.number().positive().min(1).max(1000).default(100), // Light crossing time
   // Warp field parameters
   shiftAmplitude: z.number().positive().min(1e-15).max(1e-9).default(50e-12), // m (shift amplitude)
@@ -1454,6 +1494,108 @@ export const grGroundingSchema = z.object({
 });
 export type GrGrounding = z.infer<typeof grGroundingSchema>;
 
+export const grOsStageSchema = ladderTierSchema;
+export type GrOsStage = z.infer<typeof grOsStageSchema>;
+
+export const grOsConstraintStatusSchema = z.enum(["PASS", "FAIL", "WARN"]);
+export type GrOsConstraintStatus = z.infer<typeof grOsConstraintStatusSchema>;
+
+export const grOsGatePolicySchema = z.object({
+  mode: grConstraintPolicySchema.shape.mode,
+  unknownAsFail: grConstraintPolicySchema.shape.unknownAsFail,
+});
+export type GrOsGatePolicy = z.infer<typeof grOsGatePolicySchema>;
+
+export const grOsConstraintSummarySchema = z.object({
+  gate: grOsGatePolicySchema,
+  status: grOsConstraintStatusSchema,
+  metrics: z.lazy(() => grConstraintMetricsSchema.partial()).optional(),
+  hard_fail_ids: z.array(z.string()).default([]),
+});
+export type GrOsConstraintSummary = z.infer<typeof grOsConstraintSummarySchema>;
+
+export const grOsStressEnergySchema = z.object({
+  div_mean: z.number().optional(),
+  div_rms: z.number().optional(),
+  div_max_abs: z.number().optional(),
+  net_flux_norm: z.number().optional(),
+});
+export type GrOsStressEnergy = z.infer<typeof grOsStressEnergySchema>;
+
+export const grOsGaugeSchema = z.object({
+  lapse_min: z.number().optional(),
+  lapse_max: z.number().optional(),
+  shift_rms: z.number().optional(),
+  shift_max_abs: z.number().optional(),
+  K_trace_mean: z.number().optional(),
+});
+export type GrOsGauge = z.infer<typeof grOsGaugeSchema>;
+
+export const grOsStabilitySchema = z.object({
+  cfl: z.number().optional(),
+  step_ms: z.number().optional(),
+  steps: z.number().int().nonnegative().optional(),
+  nan_count: z.number().int().nonnegative().optional(),
+  total_ms: z.number().optional(),
+  voxels: z.number().int().nonnegative().optional(),
+  channel_count: z.number().int().nonnegative().optional(),
+});
+export type GrOsStability = z.infer<typeof grOsStabilitySchema>;
+
+export const grOsViabilityStatusSchema = z.enum([
+  "ADMISSIBLE",
+  "MARGINAL",
+  "INADMISSIBLE",
+  "NOT_CERTIFIED",
+]);
+export type GrOsViabilityStatus = z.infer<typeof grOsViabilityStatusSchema>;
+
+export const grOsViabilitySchema = z.object({
+  status: grOsViabilityStatusSchema,
+  certificate_hash: z.string().nullable().optional(),
+  certificate_id: z.string().nullable().optional(),
+  integrity_ok: z.boolean().optional(),
+});
+export type GrOsViability = z.infer<typeof grOsViabilitySchema>;
+
+export const grOsGridSchema = z.object({
+  nx: z.number().int().positive(),
+  ny: z.number().int().positive(),
+  nz: z.number().int().positive(),
+  dx_m: z.number().positive().optional(),
+  dy_m: z.number().positive().optional(),
+  dz_m: z.number().positive().optional(),
+  voxelSize_m: vec3Schema.optional(),
+});
+export type GrOsGrid = z.infer<typeof grOsGridSchema>;
+
+export const grOsProvenanceSchema = z.object({
+  essence_id: z.string().optional(),
+  information_boundary: InformationBoundary.optional(),
+});
+export type GrOsProvenance = z.infer<typeof grOsProvenanceSchema>;
+
+export const grOsActionSchema = z.object({
+  type: z.enum(["throttle", "halt", "notify"]),
+  reason: z.string(),
+});
+export type GrOsAction = z.infer<typeof grOsActionSchema>;
+
+export const grOsPayloadSchema = z.object({
+  schema_version: z.literal("gr-os/0.1"),
+  stage: grOsStageSchema,
+  timestamp: z.string().datetime(),
+  grid: grOsGridSchema.optional(),
+  constraints: grOsConstraintSummarySchema.optional(),
+  stress_energy: grOsStressEnergySchema.optional(),
+  gauge: grOsGaugeSchema.optional(),
+  stability: grOsStabilitySchema.optional(),
+  viability: grOsViabilitySchema.optional(),
+  provenance: grOsProvenanceSchema.optional(),
+  actions: z.array(grOsActionSchema).default([]),
+});
+export type GrOsPayload = z.infer<typeof grOsPayloadSchema>;
+
 export const grConstraintMetricsSchema = z.object({
   H_rms: z.number().nonnegative(),
   M_rms: z.number().nonnegative(),
@@ -1681,6 +1823,99 @@ export const couplingCorrectionSchema = z.object({
 });
 export type CouplingCorrection = z.infer<typeof couplingCorrectionSchema>;
 
+// --- Amplification controls -------------------------------------------------
+export const amplificationFactorsSchema = z.object({
+  // Geometry amplification from tile layout/curvature; measurable via metrology + fit.
+  gammaGeo: z.number().nonnegative().optional(),
+  // Van den Broeck pocket compression; hypothesis unless experimentally constrained.
+  gammaVanDenBroeck: z.number().nonnegative().optional(),
+  // Off-state Q multiplier; measurable via on/off ringdown.
+  qSpoilingFactor: z.number().nonnegative().optional(),
+  // Mechanical stroke gain (power knob); measurable from actuator calibration.
+  qMechanical: z.number().nonnegative().optional(),
+  // Cavity Q factor; measurable via linewidth or ringdown.
+  qCavity: z.number().nonnegative().optional(),
+  // Measured counterparts override design values when supplied.
+  measuredGammaGeo: z.number().nonnegative().optional(),
+  measuredGammaVanDenBroeck: z.number().nonnegative().optional(),
+  measuredQSpoilingFactor: z.number().nonnegative().optional(),
+  measuredQMechanical: z.number().nonnegative().optional(),
+  measuredCavityQ: z.number().nonnegative().optional(),
+});
+export type AmplificationFactors = z.infer<typeof amplificationFactorsSchema>;
+
+// --- Experimental inputs -------------------------------------------------
+// force_N sign convention: negative values indicate attraction (toward smaller separation).
+export const casimirForceDatasetSchema = z
+  .object({
+    datasetId: z.string().min(1),
+    geometry: z.enum(["parallelPlate", "spherePlane"]),
+    temperature_K: z.number().positive(),
+    separation_m: z.array(z.number().positive()),
+    force_N: z.array(z.number().finite()),
+    // By default, attraction is negative. Use attractionPositive only with explicit sign handling.
+    forceSignConvention: z
+      .enum(["attractionNegative", "attractionPositive"])
+      .optional(),
+    allowForceSignAutoFlip: z.boolean().optional(),
+    sigmaForce_N: z.array(z.number().nonnegative()).optional(),
+    sigmaSep_m: z.array(z.number().nonnegative()).optional(),
+    area_m2: z.number().positive().optional(),
+    radius_m: z.number().positive().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const n = value.separation_m.length;
+    if (n < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "casimirForce requires at least 2 separation samples",
+        path: ["separation_m"],
+      });
+    }
+    if (value.force_N.length !== n) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "force_N must match separation_m length",
+        path: ["force_N"],
+      });
+    }
+    if (value.sigmaForce_N && value.sigmaForce_N.length !== n) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "sigmaForce_N must match separation_m length",
+        path: ["sigmaForce_N"],
+      });
+    }
+    if (value.sigmaSep_m && value.sigmaSep_m.length !== n) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "sigmaSep_m must match separation_m length",
+        path: ["sigmaSep_m"],
+      });
+    }
+    if (value.geometry === "parallelPlate" && !value.area_m2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "area_m2 is required for parallelPlate datasets",
+        path: ["area_m2"],
+      });
+    }
+    if (value.geometry === "spherePlane" && !value.radius_m) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "radius_m is required for spherePlane datasets",
+        path: ["radius_m"],
+      });
+    }
+  });
+export type CasimirForceDataset = z.infer<typeof casimirForceDatasetSchema>;
+
+export const experimentalSchema = z.object({
+  casimirForce: casimirForceDatasetSchema.optional(),
+});
+export type ExperimentalInputs = z.infer<typeof experimentalSchema>;
+
 // Simulation parameter schemas - Extended for modular Casimir-Tile platform
 export const simulationParametersSchema = z.object({
   geometry: z.enum(["sphere", "parallel_plate", "bowl"]),
@@ -1706,9 +1941,15 @@ export const simulationParametersSchema = z.object({
 
   // Dynamic module parameters (based on math-gpt.org formulation)
   dynamicConfig: dynamicConfigSchema.optional(),
+  // Amplification controls (geometry/Q/Van den Broeck factors + measured overrides)
+  ampFactors: amplificationFactorsSchema.optional(),
   warpGeometry: warpGeometrySchema.optional(),
   warpGeometryKind: warpGeometryKindSchema.optional(),
   warpGeometryAssetId: z.string().optional(),
+  massMode: z
+    .enum(["MODEL_DERIVED", "TARGET_CALIBRATED", "MEASURED_FORCE_INFERRED"])
+    .optional(),
+  allowMassOverride: z.boolean().optional(),
 
   // Advanced computational parameters
   advanced: z
@@ -1721,6 +1962,7 @@ export const simulationParametersSchema = z.object({
     })
     .optional(),
   coupling: couplingCorrectionSchema.optional(),
+  experimental: experimentalSchema.optional(),
 });
 
 export const simulationResultSchema = z.object({
@@ -1759,6 +2001,18 @@ export const simulationResultSchema = z.object({
       supercellRatio: z.number().min(0).max(1).optional(),
       tilePitch_m: z.number().nonnegative().optional(),
       U_static_uncoupled: z.number().optional(),
+      adiabaticGuard: z
+        .object({
+          status: z.enum(["PASS", "WARN", "FAIL", "UNKNOWN"]),
+          driveHz: z.number().optional(),
+          materialResponseHz: z.number().optional(),
+          gapResponseHz: z.number().optional(),
+          ratioDriveToMaterial: z.number().optional(),
+          ratioDriveToGap: z.number().optional(),
+          criteria: z.string().optional(),
+          note: z.string().optional(),
+        })
+        .optional(),
 
       // Dynamic Casimir results (when moduleType === 'dynamic')
       strokePeriodPs: z.number().optional(),
@@ -1874,7 +2128,19 @@ export const trainingTraceSignalSchema = z.object({
   proxy: z.boolean().optional(),
   ladder: policyLadderSchema.optional(),
 });
-export type TrainingTraceSignal = z.infer<typeof trainingTraceSignalSchema>;
+export type TrainingTraceSignal = z.infer<typeof trainingTraceSignalSchema>;    
+
+const trainingTraceMetricValueSchema = z.union([
+  z.number(),
+  z.boolean(),
+  z.string(),
+  z.null(),
+]);
+
+export const trainingTraceMetricsSchema = z.record(
+  trainingTraceMetricValueSchema,
+);
+export type TrainingTraceMetrics = z.infer<typeof trainingTraceMetricsSchema>;
 
 export const trainingTraceDeltaSchema = z.object({
   key: z.string(),
@@ -1916,6 +2182,7 @@ export const trainingTraceSchema = z.object({
   signal: trainingTraceSignalSchema.optional(),
   pass: z.boolean(),
   deltas: z.array(trainingTraceDeltaSchema),
+  metrics: trainingTraceMetricsSchema.optional(),
   firstFail: trainingTraceConstraintSchema.optional(),
   certificate: trainingTraceCertificateSchema.optional(),
   notes: z.array(z.string()).optional(),
@@ -1973,6 +2240,13 @@ export const adapterConstraintPackSchema = z.object({
   autoTelemetry: z.boolean().optional(),
   telemetryPath: z.string().optional(),
   junitPath: z.string().optional(),
+  vitestPath: z.string().optional(),
+  jestPath: z.string().optional(),
+  eslintPath: z.string().optional(),
+  tscPath: z.string().optional(),
+  toolLogTraceId: z.string().optional(),
+  toolLogWindowMs: z.number().optional(),
+  toolLogLimit: z.number().optional(),
 });
 export type AdapterConstraintPack = z.infer<typeof adapterConstraintPackSchema>;
 

@@ -22,11 +22,11 @@ This note ties the narration researchers are sharing in reviews to the actual co
    \[
    M=\frac{|U_{\rm static}| \,\gamma_{\rm geo}^{3}\, Q_{\rm burst}\,\gamma_{\rm VdB}\,d_{\rm eff}\,N}{c^2}.
    \]
-   This is the exact formula wired into `server/energy-pipeline.ts`, with I3_VdB acting as the calibrated mass knob while the renderer still shows the raw paper value. Duty clamping comes straight from the quantum-inequality guardrail (Ford–Roman; Fewster & Eveson) and the Van den Broeck gain tracks the compressed geometry that meets a QI. ([arXiv][3])
+   This is the exact formula wired into `server/energy-pipeline.ts`. By default (`massMode=MODEL_DERIVED`) gamma_VdB is treated as a physical hypothesis knob and mass is derived from the chain without retuning. `TARGET_CALIBRATED` rescales gamma_VdB to hit `exoticMassTarget_kg` (legacy behavior), while `MEASURED_FORCE_INFERRED` scales `U_static` with `kCasimir` from `experimental.casimirForce` before amplification and stamps `massSource=measured`. Duty clamping comes straight from the quantum-inequality guardrail (Ford–Roman; Fewster & Eveson) and the Van den Broeck gain tracks the compressed geometry that meets a QI. ([arXiv][3])
 
 5. **GR-valid "time-sliced" proxy.** Operationally, the array is strobed so fast (TS >> 1) that general relativity only sees the cycle-average \(\langle T_{\mu\nu}\rangle\) (tracked as `TS_long`/`TS_ratio` plus the `isHomogenized` badge). The KM-scale warp ledger surfaces the same Isaacson high-frequency logic. ([APS Link][4])
 
-6. **Mass band pipe-through.** Nominal energy feeds the legacy mass proxy while the Lifshitz/Hamaker band feeds `mass.realisticBandKg`; both use the same gamma/Q/duty ladder. UI cards surface the nominal hint alongside the realistic mass band so operators can see material effects without losing the legacy anchor.
+6. **Mass band pipe-through.** Nominal energy feeds the legacy mass proxy while the Lifshitz/Hamaker band feeds `mass.realisticBandKg`; both use the same gamma/Q/duty ladder. Measured normalization applies to both bands, and the pipeline emits `massSigma_kg` when experimental uncertainty is available. UI cards surface the nominal hint alongside the realistic mass band so operators can see material effects without losing the legacy anchor.
 
 ---
 
@@ -99,9 +99,10 @@ Running in the high-frequency regime (TS >> 1; many light-crossings per control 
 
 ## 5) Where to verify this in the running system
 
-* **Pipeline state (`GET /api/helix/pipeline`).** Returns the live ladder seeds (gap, tile area, gamma_geo, d_eff, gamma_VdB) plus derived values like `tiles.count`, `perTileEnergyJ`, `U_static`, `U_geo`, `staticEnergy.realisticBandJ`, and `mass.realisticBandKg`. These populate `useEnergyPipeline` and every dashboard card referencing the Casimir chain.
+* **Pipeline state (`GET /api/helix/pipeline`).** Returns the live ladder seeds (gap, tile area, gamma_geo, d_eff, gamma_VdB) plus derived values like `tiles.count`, `perTileEnergyJ`, `U_static`, `U_geo`, `staticEnergy.realisticBandJ`, and `mass.realisticBandKg`. Provenance fields include `massMode`, `massSource`, `massDatasetId`, `massFitResiduals`, `massSigma_kg`, `invariantMass_kg`, `invariantMassSigma_kg`, and `casimirForceInference` when experimental datasets are used. These populate `useEnergyPipeline` and every dashboard card referencing the Casimir chain.
 * **Warp ledger microsite (`warp-web/km-scale-warp-ledger.html`).** Shows the same bounds (Q_L, gamma_VdB, d_eff) along with falsifiability scalings and the GR badges.
 * **Docs/papers feed (`docs/papers/*.md`).** Source PDFs and annotations for the citations referenced here.
+* **Mass provenance policy.** See `docs/mass-semantics.md` for `massMode` behavior, measured dataset requirements, and certification rules.
 
 ---
 
@@ -127,7 +128,7 @@ Running in the high-frequency regime (TS >> 1; many light-crossings per control 
      \[
      M=\frac{|U_{\rm static}| \gamma_{\rm geo}^{3} Q_L \gamma_{\rm VdB} d_{\rm eff} N}{c^2}
      \]
-     and confirm M ~ 1.4e3 kg. Nominal vs. realistic mass bands only differ by the Lifshitz/Hamaker branch; the ladder stays the same.
+     and confirm M ~ 1.4e3 kg when `massMode=MODEL_DERIVED`. In `TARGET_CALIBRATED`, gamma_VdB may be retuned to hit `exoticMassTarget_kg`; in `MEASURED_FORCE_INFERRED`, the measured `kCasimir` rescales `U_static` before amplification. Nominal vs. realistic mass bands only differ by the Lifshitz/Hamaker branch; the ladder stays the same.
 5. **Literature provenance.**
    * Casimir plates: Klimchitskaya–Mohideen–Mostepanenko Rev. Mod. Phys. 81 (2009). ([APS Link][1])
    * Ellipsoid area via first fundamental form: Poelaert et al., arXiv:1104.5145. ([arXiv][2])
@@ -137,7 +138,7 @@ Running in the high-frequency regime (TS >> 1; many light-crossings per control 
 
 ### Bottom line
 
-* Mechanism: canonical Casimir tiles + ellipsoid area integration + packed tile census + gamma_geo^3 ladder + QI-clamped duty + Q_L + gamma_VdB + E/c^2 mass proxy with nominal and Lifshitz/Hamaker bands.
+* Mechanism: canonical Casimir tiles + ellipsoid area integration + packed tile census + gamma_geo^3 ladder + QI-clamped duty + Q_L + gamma_VdB + E/c^2 mass proxy with nominal and Lifshitz/Hamaker bands, plus `massMode` controls for model-derived, measured, or target-calibrated outputs.
 * Numbers: E_tile ≈ -1.08 mJ; U_static ≈ -2.13 MJ; U_geo ≈ -37.5 GJ; green-zone knobs land at M ≈ 1.4 t.
 * Evidence: every step maps to a function in the repo; `/api/helix/pipeline` and the KM ledger expose the exact values to operators so screenshots and audits land on the same math. ([APS Link][1])
 

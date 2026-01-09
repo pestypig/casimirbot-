@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import fs from "node:fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer, get as httpGet, type Server, type ServerResponse } from "http";
@@ -6,6 +7,11 @@ import os from "os";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
 import { otelMiddleware } from "./services/observability/otel-middleware";
+import {
+  loadIdeologyVerifierPack,
+  validateIdeologyVerifierPackAgainstNodeIds,
+} from "@shared/ideology/ideology-verifiers";
+import { collectIdeologyNodeIdsFromTree } from "../scripts/collect-ideology-node-ids";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -61,6 +67,40 @@ const log = (message: string, source = "express") => {
   console.log(`${formattedTime} [${source}] ${message}`);
 };
 
+const resolveExistingPath = (primary: string, fallback?: string) => {
+  if (fs.existsSync(primary)) return primary;
+  if (fallback && fs.existsSync(fallback)) return fallback;
+  return primary;
+};
+
+const validateIdeologyVerifierPack = () => {
+  const ideologyPath = resolveExistingPath(
+    path.resolve(process.cwd(), "docs", "ethos", "ideology.json"),
+    path.resolve(process.cwd(), "ideology.json"),
+  );
+  const verifiersPath = resolveExistingPath(
+    path.resolve(process.cwd(), "configs", "ideology-verifiers.json"),
+    path.resolve(process.cwd(), "ideology-verifiers.json"),
+  );
+
+  const ideologyTree = JSON.parse(fs.readFileSync(ideologyPath, "utf8"));
+  const nodeIds = collectIdeologyNodeIdsFromTree(ideologyTree);
+  const pack = loadIdeologyVerifierPack(verifiersPath);
+  const result = validateIdeologyVerifierPackAgainstNodeIds(pack, nodeIds);
+
+  if (!result.ok) {
+    const details = result.errors
+      .map((error) => `[${error.kind}] ${error.message}`)
+      .join("; ");
+    throw new Error(`ideology-verifiers validation failed: ${details}`);
+  }
+
+  log(
+    `[ideology-verifiers] validation ok (mappings=${pack.mappings.length} nodes=${nodeIds.size})`,
+    "ideology",
+  );
+};
+
 const healthPayload = () => {
   const ready = appReady || healthReady;
   return {
@@ -70,6 +110,50 @@ const healthPayload = () => {
   };
 };
 
+const resolveServiceName = (): string =>
+  process.env.SERVICE_NAME ??
+  process.env.SERVICE_ID ??
+  process.env.npm_package_name ??
+  "casimirbot";
+
+const resolveServiceVersion = (): string =>
+  process.env.SERVICE_VERSION ?? process.env.npm_package_version ?? "0.0.0";
+
+const resolveGitSha = (): string | null => {
+  const sha =
+    process.env.GIT_SHA ??
+    process.env.COMMIT_SHA ??
+    process.env.GITHUB_SHA ??
+    process.env.REPLIT_GIT_COMMIT;
+  const normalized = sha?.trim();
+  return normalized && normalized.length > 0 ? normalized : null;
+};
+
+const resolveBuildTime = (): string | null => {
+  const explicit =
+    process.env.BUILD_TIME ??
+    process.env.BUILD_TIMESTAMP ??
+    process.env.BUILD_AT;
+  if (explicit && explicit.trim()) {
+    return explicit.trim();
+  }
+  const sourceDateEpoch = process.env.SOURCE_DATE_EPOCH;
+  if (sourceDateEpoch) {
+    const seconds = Number(sourceDateEpoch);
+    if (Number.isFinite(seconds)) {
+      return new Date(seconds * 1000).toISOString();
+    }
+  }
+  return null;
+};
+
+const versionPayload = () => ({
+  service: resolveServiceName(),
+  version: resolveServiceVersion(),
+  gitSha: resolveGitSha(),
+  buildTime: resolveBuildTime(),
+});
+
 app.get("/healthz", (_req, res) => {
   const payload = healthPayload();
   res.status(payload.ready ? 200 : 503).json(payload);
@@ -77,6 +161,15 @@ app.get("/healthz", (_req, res) => {
 app.head("/healthz", (_req, res) => {
   const ready = appReady || healthReady;
   res.status(ready ? 200 : 503).end();
+});
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+app.head("/health", (_req, res) => {
+  res.status(200).end();
+});
+app.get("/version", (_req, res) => {
+  res.status(200).json(versionPayload());
 });
 
 const headerValue = (value: string | string[] | undefined): string => {
@@ -136,7 +229,13 @@ const addProbeHeaders = (res: ServerResponse, handler: string): void => {
 
 const isPublicHealthRoute = (req: Request): boolean => {
   const normalized = normalizeHealthPath(req.path || req.originalUrl);
-  return normalized === "/" || normalized === "/healthz" || normalized === "/__selfcheck";
+  return (
+    normalized === "/" ||
+    normalized === "/health" ||
+    normalized === "/healthz" ||
+    normalized === "/version" ||
+    normalized === "/__selfcheck"
+  );
 };
 
 const isHealthCheckRequest = (req: HealthCheckRequest): boolean => {
@@ -642,7 +741,9 @@ app.use((req, res, next) => {
     const isHealthCheck = isHealthCheckRequest(req);
     const isSelfcheck = pathname === "/__selfcheck";
     const isProbePath =
+      pathname === "/health" ||
       pathname === "/healthz" ||
+      pathname === "/version" ||
       isSelfcheck ||
       (isRootPath && isHealthCheck);
     const shouldStartBootstrap = deferRouteBoot && !bootstrapPromise;
@@ -771,6 +872,8 @@ app.use((req, res, next) => {
   });
 
   const bootstrap = async () => {
+    validateIdeologyVerifierPack();
+
     if (fastBoot) {
       log("FAST_BOOT=1: skipping module init, API routes, and background services");
       appReady = true;

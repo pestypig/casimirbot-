@@ -38,6 +38,13 @@ export type AdapterConstraintPack = {
   autoTelemetry?: boolean;
   telemetryPath?: string;
   junitPath?: string;
+  vitestPath?: string;
+  jestPath?: string;
+  eslintPath?: string;
+  tscPath?: string;
+  toolLogTraceId?: string;
+  toolLogWindowMs?: number;
+  toolLogLimit?: number;
 };
 
 export type AdapterRunRequest = {
@@ -66,6 +73,10 @@ export type TrainingTraceDelta = {
   unit?: string;
   change?: "added" | "removed" | "changed";
 };
+
+export type TrainingTraceMetricValue = number | boolean | string | null;
+
+export type TrainingTraceMetrics = Record<string, TrainingTraceMetricValue>;
 
 export type AdapterArtifactRef = {
   kind: string;
@@ -122,6 +133,7 @@ export type TrainingTraceRecord = {
   signal?: TrainingTraceSignal;
   pass: boolean;
   deltas: TrainingTraceDelta[];
+  metrics?: TrainingTraceMetrics;
   firstFail?: TrainingTraceConstraint;
   certificate?: TrainingTraceCertificate;
   notes?: string[];

@@ -47,6 +47,30 @@
 
 ---
 
+## Build Steps - Local LLM Spawn, Memory/RAG, Multi-Agent Mapping
+This section sequences the three core build tracks so each step lands cleanly before the next.
+
+1. Local LLM spawn (llm.local.spawn.generate)
+   - Step 1: define the spawn contract (inputs, outputs, timeouts) and validate env config in one place.
+   - Step 2: implement the spawn runner with streaming, kill switch, and deterministic seed capture.
+   - Step 3: persist output to Essence + TaskTrace and emit tool-log telemetry.
+   - Step 4: add offline smoke + bench coverage for tok/s and latency.
+   - Evidence: server/skills/llm.local.spawn.ts, server/services/planner/chat-b.ts, server/services/observability/tool-log-store.ts, tests/llm-local-spawn.spec.ts.
+
+2. Memory and RAG
+   - Step 1: complete DAL read/write/search for memory and Essence packets with persistence fallback.
+   - Step 2: implement retrieval that returns citations and knowledge_context with token budget + dedupe.
+   - Step 3: reflection writes (episodic + semantic) after tasks with provenance.
+   - Step 4: add eval fixtures for recall, citation coverage, and RAG ordering.
+   - Evidence: server/services/agi/memory.ts, server/services/knowledge/*, server/routes/agi.memory.ts, tests/agi-memory.spec.ts.
+
+3. Multi-agent plan/execute mapping
+   - Step 1: define an agent map (role -> tools -> budget -> verifier) and expose it to the planner.
+   - Step 2: translate PlanDSL into multi-agent steps with explicit owner + intent tags.
+   - Step 3: consolidate outputs and verifier results into a single TaskTrace with citations.
+   - Step 4: add harness tests for plan -> execute -> verify under debate + agentic runs.
+   - Evidence: server/services/planner/chat-b.ts, server/routes/agi.plan.ts, server/skills/debate.run.ts, tools/agentic/run.ts.
+
 ## Agentic Architecture Integration (phased plan)
 Purpose: pair the `all-agentic-architectures` LangGraph repo with Essence so every pattern (reflection, ReAct, tree-of-thoughts, ensemble, blackboard, meta-controller, PEV, dry-run, self-improve) is runnable, observable, and token-efficient on our stack.
 

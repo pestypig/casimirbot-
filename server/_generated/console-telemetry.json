@@ -1,22 +1,18 @@
 {
   "desktopId": "helix.desktop.main",
-  "capturedAt": "2025-11-21T06:12:34.470Z",
+  "capturedAt": "2026-01-05T04:38:04.183Z",
   "panels": [
     {
       "panelId": "near-zero",
-      "instanceId": "near-zero",
-      "title": "NearZeroWidget",
-      "kind": "widget",
+      "instanceId": "near-zero-1",
+      "title": "Near Zero Widget",
       "metrics": {
-        "guard_trips": 1
-      },
-      "strings": {
-        "mode": "yellow"
+        "mode": 1
       },
       "sourceIds": [
         "client/src/components/NearZeroWidget.tsx"
       ],
-      "lastUpdated": "2025-11-21T06:12:34.470Z"
+      "lastUpdated": "2026-01-05T04:38:04.183Z"
     }
   ]
 }

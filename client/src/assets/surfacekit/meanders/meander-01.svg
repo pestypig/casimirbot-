@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+  <path
+    class="ink"
+    d="M70 140 H930 M70 240 H420 L500 320 H930 M70 360 H260 L340 440 H930 M70 520 H420 L520 620 H930 M70 720 H930"
+    fill="none"
+    stroke-width="2"
+    vector-effect="non-scaling-stroke"
+  />
+  <path
+    class="ink"
+    d="M140 140 V720 M260 240 V520 M420 360 V720 M740 320 V520"
+    fill="none"
+    stroke-width="2"
+    vector-effect="non-scaling-stroke"
+  />
+</svg>

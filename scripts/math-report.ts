@@ -9,6 +9,19 @@ import {
   type MathStageEntry,
   type UnitSignature,
 } from "../shared/math-stage.js";
+import { loadMathConfig, resolveStageFromConfig } from "./math-config.js";
+import { buildAutoEvidenceChecks } from "./math-discovery.js";
+import {
+  loadEvidenceProfiles,
+  mapEvidenceTokenToProfile,
+  type EvidenceProfileName,
+} from "./math-evidence.js";
+import {
+  buildWaiverIndex,
+  hasWaiver,
+  loadMathWaivers,
+  type WaiverKind,
+} from "./math-waivers.js";
 
 type MathGraphEdge = {
   from: string;
@@ -50,12 +63,40 @@ type UnitViolation = {
   severity: "error" | "warning";
 };
 
+type AutoEvidenceSummary = {
+  moduleCount: number;
+  testCount: number;
+  modules: string[];
+};
+
+type EvidenceProfileSummary = {
+  name: EvidenceProfileName;
+  label: string;
+  commands: string[];
+  tests: number;
+};
+
+type AutoGraphSummary = {
+  nodeCount: number;
+  edgeCount: number;
+};
+
 type StageViolation = {
   from: string;
   to: string;
   fromStage: MathStage;
   toStage: MathStage;
   reason: string;
+};
+
+type UnstagedSuggestions = Partial<Record<MathStage, string[]>>;
+
+type WaivedIssue = {
+  kind: WaiverKind;
+  module?: string;
+  from?: string;
+  to?: string;
+  reason?: string;
 };
 
 const REPORT_DIR = process.env.MATH_REPORT_DIR ?? "reports";
@@ -130,9 +171,17 @@ const repoRoot = process.cwd();
 const registryByModule = new Map(
   mathStageRegistry.map((entry) => [entry.module, entry]),
 );
+const waivers = loadMathWaivers();
+const { edgeIndex, moduleIndex } = buildWaiverIndex(waivers);
 
 const fileExists = (relativePath: string) =>
   fs.existsSync(path.resolve(repoRoot, relativePath));
+
+const isModuleWaived = (module: string, kind: WaiverKind) =>
+  hasWaiver(moduleIndex.get(module)?.waive, kind);
+
+const isEdgeWaived = (from: string, to: string, kind: WaiverKind) =>
+  hasWaiver(edgeIndex.get(`${from}::${to}`)?.waive, kind);
 
 const hasAnyType = (checks: MathCheck[], types: Set<MathCheck["type"]>) =>
   checks.some((check) => types.has(check.type));
@@ -140,8 +189,10 @@ const hasAnyType = (checks: MathCheck[], types: Set<MathCheck["type"]>) =>
 const requiresResidualEvidence = (entry: MathStageEntry) =>
   entry.tag.startsWith("GR_");
 
-const resolveEvidenceIssues = (entry: MathStageEntry): EvidenceIssue | null => {
-  const checks = entry.checks ?? [];
+const resolveEvidenceIssues = (
+  entry: MathStageEntry,
+  checks: MathCheck[],
+): EvidenceIssue | null => {
   const missing: string[] = [];
 
   switch (entry.stage) {
@@ -228,10 +279,10 @@ const sameDimensions = (left: UnitVector, right: UnitVector) =>
 const isLengthTimeSwap = (left: UnitVector, right: UnitVector) =>
   left.M === right.M && left.L === right.T && left.T === right.L;
 
-const loadGraph = (): { edges: MathGraphEdge[] } => {
+const loadGraph = (fallbackEdges: MathGraphEdge[] = []): { edges: MathGraphEdge[] } => {
   const graphPath = path.resolve(repoRoot, "MATH_GRAPH.json");
   if (!fs.existsSync(graphPath)) {
-    return { edges: [] };
+    return { edges: fallbackEdges };
   }
   const raw = fs.readFileSync(graphPath, "utf8");
   const parsed = JSON.parse(raw) as { edges?: MathGraphEdge[] };
@@ -459,6 +510,22 @@ const resolveUnstagedModules = async (): Promise<string[]> => {
   return files.filter((file) => !staged.has(file)).sort();
 };
 
+const buildUnstagedSuggestions = (
+  modules: string[],
+  config: ReturnType<typeof loadMathConfig>,
+): UnstagedSuggestions => {
+  if (!config) return {};
+  const suggestions: UnstagedSuggestions = {};
+  for (const modulePath of modules) {
+    const stage = resolveStageFromConfig(modulePath, config);
+    if (!stage) continue;
+    const list = suggestions[stage] ?? [];
+    list.push(modulePath);
+    suggestions[stage] = list;
+  }
+  return suggestions;
+};
+
 const renderList = (items: string[], max = MAX_LIST) => {
   if (items.length === 0) return "none";
   const shown = items.slice(0, max);
@@ -491,39 +558,189 @@ const ensureReportDir = () => {
 };
 
 const main = async () => {
+  const autoEvidence = buildAutoEvidenceChecks(mathStageRegistry);
+  const autoChecksByModule = autoEvidence.autoChecksByModule;
+  const autoModules = Array.from(autoChecksByModule.keys()).sort();
+  const autoTestFiles = new Set<string>();
+  autoChecksByModule.forEach((checks) => {
+    checks.forEach((check) => autoTestFiles.add(check.path));
+  });
+  const autoEvidenceSummary: AutoEvidenceSummary = {
+    moduleCount: autoModules.length,
+    testCount: autoTestFiles.size,
+    modules: autoModules,
+  };
+  const autoGraphEdges: MathGraphEdge[] = autoEvidence.graph.edges.map((edge) => ({
+    from: edge.from,
+    to: edge.to,
+  }));
+  const autoGraphSummary: AutoGraphSummary = {
+    nodeCount: autoEvidence.graph.nodes.size,
+    edgeCount: autoEvidence.graph.edges.length,
+  };
+
+  const mergeChecks = (entry: MathStageEntry) => {
+    const manualChecks = entry.checks ?? [];
+    const autoChecks = autoChecksByModule.get(entry.module) ?? [];
+    if (autoChecks.length === 0) return manualChecks;
+    const merged = new Map<string, MathCheck>();
+    for (const check of manualChecks) {
+      merged.set(`${check.type}:${check.path}`, check);
+    }
+    for (const check of autoChecks) {
+      merged.set(`${check.type}:${check.path}`, check);
+    }
+    return Array.from(merged.values());
+  };
+
   const coverage = buildCoverage();
   const unstaged = await resolveUnstagedModules();
-  const evidenceIssues = mathStageRegistry
-    .map(resolveEvidenceIssues)
+  const mathConfig = loadMathConfig();
+  const unstagedSuggestions = buildUnstagedSuggestions(unstaged, mathConfig);
+  const evidenceProfiles = loadEvidenceProfiles();
+  const rawEvidenceIssues = mathStageRegistry
+    .map((entry) => resolveEvidenceIssues(entry, mergeChecks(entry)))
     .filter((item): item is EvidenceIssue => item !== null);
+  const waivedIssues: WaivedIssue[] = [];
+  const evidenceIssues = rawEvidenceIssues.filter((issue) => {
+    if (isModuleWaived(issue.module, "evidence")) {
+      waivedIssues.push({
+        kind: "evidence",
+        module: issue.module,
+        reason: issue.missing.join(", "),
+      });
+      return false;
+    }
+    return true;
+  });
+  const evidenceByProfile = new Map<EvidenceProfileName, number>();
+  autoChecksByModule.forEach((checks) => {
+    checks.forEach((check) => {
+      if (!check.note?.startsWith("auto:")) return;
+      const name = check.note.replace("auto:", "") as EvidenceProfileName;
+      evidenceByProfile.set(name, (evidenceByProfile.get(name) ?? 0) + 1);
+    });
+  });
+  const missingByProfile = new Map<EvidenceProfileName, number>();
+  evidenceIssues.forEach((issue) => {
+    issue.missing.forEach((token) => {
+      const profile = mapEvidenceTokenToProfile(token);
+      if (!profile) return;
+      missingByProfile.set(profile, (missingByProfile.get(profile) ?? 0) + 1);
+    });
+  });
+  const evidenceProfileSummaries: EvidenceProfileSummary[] = evidenceProfiles.map(
+    (profile) => ({
+      name: profile.name,
+      label: profile.label ?? profile.name,
+      commands: profile.commands ?? [],
+      tests: evidenceByProfile.get(profile.name) ?? 0,
+    }),
+  );
   const evidenceMap = new Map(
     evidenceIssues.map((item) => [item.module, item]),
   );
-  const graph = loadGraph();
+  const graph = loadGraph(autoGraphEdges);
   const { edgeViolations, pipelineViolations } = resolveStageViolations(
     graph.edges,
     evidenceMap,
   );
+  const filteredEdgeViolations = edgeViolations.filter((violation) => {
+    if (isEdgeWaived(violation.from, violation.to, "stage")) {
+      waivedIssues.push({
+        kind: "stage",
+        from: violation.from,
+        to: violation.to,
+        reason: violation.reason,
+      });
+      return false;
+    }
+    return true;
+  });
+  const filteredPipelineViolations = pipelineViolations.filter((violation) => {
+    if (violation.reason === "upstream_missing_evidence") {
+      if (
+        isEdgeWaived(violation.from, violation.to, "evidence") ||
+        isModuleWaived(violation.from, "evidence") ||
+        isModuleWaived(violation.to, "evidence")
+      ) {
+        waivedIssues.push({
+          kind: "evidence",
+          from: violation.from,
+          to: violation.to,
+          reason: violation.reason,
+        });
+        return false;
+      }
+    }
+    if (violation.reason === "upstream_stage_below_minimum") {
+      if (isEdgeWaived(violation.from, violation.to, "stage")) {
+        waivedIssues.push({
+          kind: "stage",
+          from: violation.from,
+          to: violation.to,
+          reason: violation.reason,
+        });
+        return false;
+      }
+    }
+    return true;
+  });
 
   const unitCoverage = resolveUnitCoverage();
   const unitViolations = resolveUnitViolations(graph.edges);
+  const filteredUnitViolations = unitViolations.filter((violation) => {
+    if (
+      isEdgeWaived(violation.from, violation.to, "unit") ||
+      isModuleWaived(violation.from, "unit") ||
+      isModuleWaived(violation.to, "unit")
+    ) {
+      waivedIssues.push({
+        kind: "unit",
+        from: violation.from,
+        to: violation.to,
+        reason: `${violation.key}:${violation.reason}`,
+      });
+      return false;
+    }
+    return true;
+  });
 
   const report = {
     generatedAt: new Date().toISOString(),
     registryCount: mathStageRegistry.length,
     coverage,
-    unstaged: { count: unstaged.length, modules: unstaged },
-    evidenceIssues: { count: evidenceIssues.length, items: evidenceIssues },    
+    unstaged: {
+      count: unstaged.length,
+      modules: unstaged,
+      suggested: unstagedSuggestions,
+      defaultStage: mathConfig?.defaultStage ?? null,
+    },
+    evidenceIssues: { count: evidenceIssues.length, items: evidenceIssues },
     stageViolations: {
-      edge: { count: edgeViolations.length, items: edgeViolations },
-      pipeline: { count: pipelineViolations.length, items: pipelineViolations },
+      edge: { count: filteredEdgeViolations.length, items: filteredEdgeViolations },
+      pipeline: {
+        count: filteredPipelineViolations.length,
+        items: filteredPipelineViolations,
+      },
     },
     unitCoverage,
     unitViolations: {
-      count: unitViolations.length,
-      errors: unitViolations.filter((item) => item.severity === "error"),
-      warnings: unitViolations.filter((item) => item.severity === "warning"),
+      count: filteredUnitViolations.length,
+      errors: filteredUnitViolations.filter((item) => item.severity === "error"),
+      warnings: filteredUnitViolations.filter((item) => item.severity === "warning"),
     },
+    autoEvidence: autoEvidenceSummary,
+    autoGraph: autoGraphSummary,
+    evidenceProfiles: evidenceProfileSummaries,
+    missingEvidenceProfiles: Array.from(missingByProfile.entries()).map(
+      ([profile, count]) => ({ profile, count }),
+    ),
+    waivers: {
+      edgeCount: waivers.edges?.length ?? 0,
+      moduleCount: waivers.modules?.length ?? 0,
+    },
+    waivedIssues,
   };
 
   const dir = ensureReportDir();
@@ -545,14 +762,71 @@ const main = async () => {
   lines.push("## Unstaged Modules");
   lines.push(renderList(unstaged));
   lines.push("");
+  lines.push("## Unstaged Stage Suggestions");
+  if (!mathConfig) {
+    lines.push("math.config.json not found.");
+  } else {
+    const stages = Object.entries(unstagedSuggestions)
+      .filter(([, items]) => items.length > 0)
+      .map(([stage, items]) => `${stage}: ${items.length}`);
+    lines.push(stages.length > 0 ? `- ${stages.join("\n- ")}` : "none");
+    if (mathConfig.defaultStage) {
+      lines.push(`- default: ${mathConfig.defaultStage}`);
+    }
+  }
+  lines.push("");
   lines.push("## Missing Evidence");
   lines.push(renderEvidenceIssues(evidenceIssues));
   lines.push("");
+  lines.push("## Evidence Profiles");
+  evidenceProfileSummaries.forEach((profile) => {
+    lines.push(`- ${profile.name} (${profile.label})`);
+    lines.push(`  - auto tests: ${profile.tests}`);
+    if (profile.commands.length) {
+      lines.push(`  - commands: ${profile.commands.join(", ")}`);
+    }
+  });
+  lines.push("");
+  lines.push("## Missing Evidence Profiles");
+  if (missingByProfile.size === 0) {
+    lines.push("none");
+  } else {
+    const items = Array.from(missingByProfile.entries()).map(
+      ([profile, count]) => `${profile}: ${count}`,
+    );
+    lines.push(renderList(items));
+  }
+  lines.push("");
+  lines.push("## Auto-discovered Evidence");
+  lines.push(`- modules with test coverage: ${autoEvidenceSummary.moduleCount}`);
+  lines.push(`- tests considered: ${autoEvidenceSummary.testCount}`);
+  lines.push("");
+  lines.push("## Auto-discovered Dependencies");
+  lines.push(`- nodes: ${autoGraphSummary.nodeCount}`);
+  lines.push(`- edges: ${autoGraphSummary.edgeCount}`);
+  lines.push("");
   lines.push("## Stage Violations (Edges)");
-  lines.push(renderViolations(edgeViolations));
+  lines.push(renderViolations(filteredEdgeViolations));
   lines.push("");
   lines.push("## Stage Violations (Pipelines)");
-  lines.push(renderViolations(pipelineViolations));
+  lines.push(renderViolations(filteredPipelineViolations));
+  lines.push("");
+  lines.push("## Waivers");
+  lines.push(`- edge waivers: ${waivers.edges?.length ?? 0}`);
+  lines.push(`- module waivers: ${waivers.modules?.length ?? 0}`);
+  lines.push("");
+  lines.push("## Waived Issues");
+  if (waivedIssues.length === 0) {
+    lines.push("none");
+  } else {
+    const formatted = waivedIssues.map((issue) => {
+      if (issue.module) {
+        return `${issue.kind}: ${issue.module}${issue.reason ? ` (${issue.reason})` : ""}`;
+      }
+      return `${issue.kind}: ${issue.from} -> ${issue.to}${issue.reason ? ` (${issue.reason})` : ""}`;
+    });
+    lines.push(renderList(formatted));
+  }
   lines.push("");
   lines.push("## Unit Coverage");
   lines.push(

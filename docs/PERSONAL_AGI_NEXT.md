@@ -36,6 +36,39 @@
 6. **Bench**
    - `scripts/bench.ts` prints `{ tok_s, img_ms, stt_rtf }` for quick laptop checks.
 
+## Build Steps (Phase 2 kickoff)
+Below is the step-by-step build path for the Phase 2 components. Finish each step before moving to the next.
+
+1. Durable storage (DB + DAL)
+   - Step 1: finalize migrations for persona, memory, task_trace, essence_envelope, essence_packet with strict constraints.
+   - Step 2: implement DAL create/read/search with in-memory fallbacks.
+   - Step 3: wire services + tests; confirm persistence across restarts.
+   - Evidence: server/db/*, server/services/essence/store.ts, server/services/agi/memory.ts, tests/*.spec.ts.
+
+2. Blob handling (object storage)
+   - Step 1: route all media output through putBlob/getBlob and persist Essence packet URIs + hashes.
+   - Step 2: enforce content type/size limits; define retention + cleanup hooks.
+   - Step 3: add storage tests for fs and s3 with local fallback.
+   - Evidence: server/storage/index.ts, server/db/essence.ts, server/services/essence/*, tests/storage*.spec.ts.
+
+3. Queues and scheduling
+   - Step 1: confirm BullMQ with REDIS_URL, in-memory queue otherwise.
+   - Step 2: set priorities (LLM > STT > diffusion), GPU slot guards, and CPU fallback for STT.
+   - Step 3: surface queue depth + approvals in /api/hull/status and add alert thresholds.
+   - Evidence: server/queue.ts, server/services/hardware/gpu-scheduler.ts, server/routes/hull.status.ts, tests/queue*.spec.ts.
+
+4. Auth and ACLs
+   - Step 1: env-gated JWT middleware; anonymous access only when ACL allows.
+   - Step 2: per-persona checks on memory, trace, essence fetch, and uploads.
+   - Step 3: record audit trails for access decisions.
+   - Evidence: server/auth/*, server/routes/*, server/services/essence/store.ts, tests/auth*.spec.ts.
+
+5. Metrics and bench
+   - Step 1: counters/histograms for tool calls, queue latency, and storage writes.
+   - Step 2: bench harness outputs tok/s, img_ms, stt_rtf and writes reports.
+   - Step 3: CI gates for regression budgets.
+   - Evidence: server/metrics/index.ts, scripts/bench.ts, reports/*.
+
 ## Acceptance (Phase 2)
 - All existing tests pass; new DAL tests pass against ephemeral DB.
 - `curl /metrics` shows non-zero counters after a run.

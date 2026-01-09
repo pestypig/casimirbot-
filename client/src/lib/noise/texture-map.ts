@@ -1,4 +1,11 @@
 type PeakInput = { f: number; q: number; gain: number };
+type PlanEqPeak = { freq: number; q: number; gainDb: number };
+type PlanFxOverrides = {
+  chorus?: number;
+  sat?: number;
+  reverbSend?: number;
+  comp?: number;
+};
 
 export type Peak = Readonly<{
   f: number;
@@ -21,6 +28,8 @@ export type TextureRecipe = Readonly<{
   irName: string;
   chorus: { rate: number; depth: number };
   sat: { drive: number };
+  reverbSend?: number;
+  comp?: number;
 }>;
 
 export interface TextureBlendOptions {
@@ -28,6 +37,8 @@ export interface TextureBlendOptions {
   styleInfluence: number;
   weirdness: number;
   seed: number;
+  eqPeaks?: PlanEqPeak[];
+  fx?: PlanFxOverrides;
 }
 
 const MAX_PEAKS = 12;
@@ -64,17 +75,28 @@ export function textureFrom(
   const weights = resolveWeights(opts.sampleInfluence, opts.styleInfluence);
   const rng = createDeterministicRng(opts.seed);
   const weird = clamp01(opts.weirdness);
+  const eqOverrides = sanitizePeaks(eqOverridesToPeakInputs(opts.eqPeaks));
 
-  const eqPeaks = blendPeaksInternal(helixPeaks, kbPeaks, weights, weird, rng);
+  const eqPeaks = eqOverrides.length
+    ? applyWeirdnessToPeaks(eqOverrides, weird, rng)
+    : blendPeaksInternal(helixPeaks, kbPeaks, weights, weird, rng);
   const irName = resolveImpulse(kbTexture?.ir, rng);
-  const chorus = resolveChorus(kbTexture?.chorus, weird, rng);
-  const sat = resolveSaturation(kbTexture?.sat, weird, rng);
+  const chorusBase = resolveChorus(kbTexture?.chorus, weird, rng);
+  const satBase = resolveSaturation(kbTexture?.sat, weird, rng);
+  const fxChorus = resolveFxScalar(opts.fx?.chorus);
+  const fxSat = resolveFxScalar(opts.fx?.sat);
+  const chorus = applyChorusOverride(chorusBase, fxChorus);
+  const sat = applySaturationOverride(satBase, fxSat);
+  const reverbSend = resolveFxScalar(opts.fx?.reverbSend);
+  const comp = resolveFxScalar(opts.fx?.comp);
 
   return {
     eqPeaks,
     irName,
     chorus,
     sat,
+    reverbSend,
+    comp,
   };
 }
 
@@ -133,6 +155,18 @@ function blendPeaksInternal(
     .slice(0, MAX_PEAKS);
 
   return limited;
+}
+
+function applyWeirdnessToPeaks(
+  peaks: Peak[],
+  weirdness: number,
+  rng: Xoroshiro128State,
+): Peak[] {
+  if (!peaks.length || weirdness <= 0) return peaks;
+  return peaks
+    .map((peak, index) => addMicroVariations(peak, weirdness, index, rng))
+    .sort((a, b) => a.f - b.f)
+    .slice(0, MAX_PEAKS);
 }
 
 function mergeTwoPeaks(
@@ -207,6 +241,16 @@ function resolveChorus(
   };
 }
 
+function applyChorusOverride(
+  base: { rate: number; depth: number },
+  intensity: number | undefined,
+) {
+  if (intensity == null) return base;
+  const scaledRate = clamp(base.rate * (0.6 + intensity * 0.8), 0.05, 2.5);
+  const scaledDepth = clamp(base.depth * (0.25 + intensity * 1.6), 0.0005, 0.02);
+  return { rate: scaledRate, depth: scaledDepth };
+}
+
 function resolveSaturation(
   input: { drive: number } | undefined,
   weirdness: number,
@@ -218,6 +262,15 @@ function resolveSaturation(
   return {
     drive: clamp(base + 0.25 * weird + jitter, 0.05, 1.4),
   };
+}
+
+function applySaturationOverride(
+  base: { drive: number },
+  intensity: number | undefined,
+) {
+  if (intensity == null) return base;
+  const scaledDrive = clamp(base.drive * (0.35 + intensity * 1.6), 0.05, 1.4);
+  return { drive: scaledDrive };
 }
 
 function findClosestPeak(target: Peak, candidates: Peak[]): Peak | undefined {
@@ -242,6 +295,21 @@ function resolveWeights(sampleInfluence: number, styleInfluence: number) {
   }
 
   return { helixWeight, kbWeight };
+}
+
+function eqOverridesToPeakInputs(peaks: PlanEqPeak[] | undefined) {
+  if (!peaks?.length) return undefined;
+  const inputs: PeakInput[] = [];
+  for (const peak of peaks) {
+    const freq = Number(peak?.freq);
+    const q = Number(peak?.q);
+    const gainDb = Number(peak?.gainDb);
+    if (!Number.isFinite(freq) || !Number.isFinite(q) || !Number.isFinite(gainDb)) {
+      continue;
+    }
+    inputs.push({ f: freq, q, gain: dbToNormalizedGain(gainDb) });
+  }
+  return inputs.length ? inputs : undefined;
 }
 
 function sanitizePeaks(peaks: PeakInput[] | undefined): Peak[] {
@@ -291,6 +359,14 @@ function clamp01(value: number) {
 
 function normalizedGainToDb(normalized: number): number {
   return clamp((normalized - 1) * 12, MIN_GAIN_DB, MAX_GAIN_DB);
+}
+
+function dbToNormalizedGain(db: number): number {
+  return clamp(db / 12 + 1, 0, 2);
+}
+
+function resolveFxScalar(value: number | undefined) {
+  return Number.isFinite(value) ? clamp01(value) : undefined;
 }
 
 export function createDeterministicRng(seed: number): Xoroshiro128State {

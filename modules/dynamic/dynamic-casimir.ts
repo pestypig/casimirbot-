@@ -192,24 +192,30 @@ function resolveFromPipeline(sim: SimulationParameters): Required<PipeLike> {
   const dc: any = sim.dynamicConfig ?? {};
   const p  : any = sim as any;
 
-  const sectors = Math.max(1, Number(p.sectorStrobing ?? dc.sectorCount ?? 1));
-  const dutyLocal = Math.max(0, Math.min(1, Number(p.dutyCycle ?? dc.sectorDuty ?? 0.14)));
+  const sectors = Math.max(1, Number(p.sectorStrobing ?? dc.measuredSectorCount ?? dc.sectorCount ?? 1));
+  const dutyLocal = Math.max(
+    0,
+    Math.min(
+      1,
+      Number(dc.measuredDutyCycle ?? p.dutyCycle ?? dc.dutyCycle ?? dc.sectorDuty ?? 0.14),
+    ),
+  );
 
   // Prefer FR duty if available from light-crossing loop
   const lc = p.lightCrossing;
   const dutyFR = (Number.isFinite(lc?.burst_ms) && Number.isFinite(lc?.dwell_ms) && lc!.dwell_ms! > 0)
     ? Math.max(0, Math.min(1, Number(lc!.burst_ms) / Number(lc!.dwell_ms)))
-    : Number(p.dutyEffectiveFR);
+    : Number(p.dutyEffectiveFR ?? dc.measuredSectorDuty ?? dc.sectorDuty);
 
   return {
     gammaGeo:           Number(p.gammaGeo ?? dc.gammaGeo ?? 26),
     gammaVanDenBroeck:  Number(p.gammaVanDenBroeck ?? dc.gammaVanDenBroeck ?? 2.86e5),
     qSpoilingFactor:    Math.max(1e-6, Number(p.qSpoilingFactor ?? dc.qSpoilingFactor ?? 1)),
-    cavityQ:            Math.max(1, Number(p.cavityQ ?? dc.cavityQ ?? 1e9)),
+    cavityQ:            Math.max(1, Number(dc.measuredCavityQ ?? p.cavityQ ?? dc.cavityQ ?? 1e9)),
     sectorStrobing:     sectors,
     dutyCycle:          dutyLocal,
     dutyEffectiveFR:    Number.isFinite(dutyFR) ? dutyFR : (dutyLocal / sectors),
-    modulationFreq_GHz: Number(p.modulationFreq_GHz ?? dc.modulationFreqGHz ?? 15),
+    modulationFreq_GHz: Number(dc.measuredModulationFreqGHz ?? p.modulationFreq_GHz ?? dc.modulationFreqGHz ?? 15),
     tauLC_ms:           Number(p.tauLC_ms ?? p.lightCrossing?.tauLC_ms ?? (dc.lightCrossingTimeNs ? dc.lightCrossingTimeNs * 1e-6 : 0.1)),
     N_tiles:            Math.max(1, Number(p.N_tiles ?? (sim.arrayConfig?.size ? Math.pow(sim.arrayConfig.size, 2) : 1))),
     tileArea_m2:        Number(p.tileArea_m2 ?? 0.05 * 0.05),

@@ -4,6 +4,9 @@ import {
   type YorkSample,
   type Vec3,
 } from "../client/src/lib/york-time";
+import { theta as alcubierreTheta, extrinsicCurvature } from "../client/src/physics/alcubierre";
+import { buildEvolutionBrick } from "../server/gr/evolution/index.js";
+import { createMinkowskiState, gridFromBounds } from "../modules/gr/bssn-state";
 
 const TWO_PI = Math.PI * 2;
 
@@ -62,5 +65,62 @@ describe("computeSurfaceDivergenceBeta", () => {
     const stats = computeSurfaceDivergenceBeta(samples, axesUnit);
     expect(stats.divMax).toBeLessThan(5e-3);
     expect(stats.divRMS).toBeLessThan(2e-3);
+  });
+});
+
+describe("Alcubierre theta sign convention", () => {
+  it("maps theta to -K and preserves front/back sign flip", () => {
+    const dims: [number, number, number] = [9, 7, 5];
+    const bounds = { min: [-1, -1, -1] as Vec3, max: [1, 1, 1] as Vec3 };
+    const grid = gridFromBounds(dims, bounds);
+    const state = createMinkowskiState(grid);
+    const params = {
+      R: 0.6,
+      sigma: 5.0,
+      v: 0.4,
+      center: [0, 0, 0] as Vec3,
+    };
+
+    const [nx, ny, nz] = dims;
+    const dx = (bounds.max[0] - bounds.min[0]) / nx;
+    const dy = (bounds.max[1] - bounds.min[1]) / ny;
+    const dz = (bounds.max[2] - bounds.min[2]) / nz;
+    let idx = 0;
+    for (let z = 0; z < nz; z += 1) {
+      const pz = bounds.min[2] + (z + 0.5) * dz;
+      for (let y = 0; y < ny; y += 1) {
+        const py = bounds.min[1] + (y + 0.5) * dy;
+        for (let x = 0; x < nx; x += 1) {
+          const px = bounds.min[0] + (x + 0.5) * dx;
+          const { Kxx, Kyy, Kzz } = extrinsicCurvature(px, py, pz, params);
+          state.K[idx] = Kxx + Kyy + Kzz;
+          idx += 1;
+        }
+      }
+    }
+
+    const brick = buildEvolutionBrick({ state, includeConstraints: false });
+    const index = (x: number, y: number, z: number) => z * nx * ny + y * nx + x;
+    const sampleAt = (x: number, y: number, z: number) => {
+      const pos: Vec3 = [
+        bounds.min[0] + (x + 0.5) * dx,
+        bounds.min[1] + (y + 0.5) * dy,
+        bounds.min[2] + (z + 0.5) * dz,
+      ];
+      const thetaExpected = alcubierreTheta(pos[0], pos[1], pos[2], params);
+      const thetaBrick = brick.channels.theta.data[index(x, y, z)];
+      return { thetaExpected, thetaBrick };
+    };
+
+    const midY = Math.floor(ny / 2);
+    const midZ = Math.floor(nz / 2);
+    const ahead = sampleAt(nx - 2, midY, midZ);
+    const behind = sampleAt(1, midY, midZ);
+
+    expect(Math.abs(ahead.thetaExpected)).toBeGreaterThan(1e-4);
+    expect(Math.abs(behind.thetaExpected)).toBeGreaterThan(1e-4);
+    expect(ahead.thetaBrick).toBeCloseTo(ahead.thetaExpected, 6);
+    expect(behind.thetaBrick).toBeCloseTo(behind.thetaExpected, 6);
+    expect(ahead.thetaBrick * behind.thetaBrick).toBeLessThan(0);
   });
 });

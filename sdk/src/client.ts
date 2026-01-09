@@ -32,7 +32,7 @@ export type CasimirClientOptions = {
   fetch?: FetchLike;
 };
 
-const DEFAULT_BASE_URL = "https://casimirbot.com";
+const DEFAULT_BASE_URL = "http://localhost:5173";
 
 const isHttpUrl = (value?: string): boolean =>
   typeof value === "string" && /^https?:\/\//i.test(value);

@@ -77,6 +77,103 @@ export type BarWindow = {
   endBar: number;
 };
 
+export type RenderPlan = {
+  global?: {
+    bpm?: number;
+    key?: string;
+    sections?: Array<{ name: string; startBar: number; bars: number }>;
+    energyCurve?: Array<{ bar: number; energy: number }>;
+  };
+  windows: Array<{
+    startBar: number;
+    bars: number;
+    material?: {
+      audioAtomIds?: string[];
+      midiMotifIds?: string[];
+      grooveTemplateIds?: string[];
+      macroCurveIds?: string[];
+      transposeSemitones?: number;
+      timeStretch?: number;
+    };
+    texture?: {
+      kbTexture?: string | { weights: Record<string, number> };
+      sampleInfluence?: number;
+      styleInfluence?: number;
+      weirdness?: number;
+      eqPeaks?: Array<{ freq: number; q: number; gainDb: number }>;
+      fx?: {
+        chorus?: number;
+        sat?: number;
+        reverbSend?: number;
+        comp?: number;
+      };
+    };
+  }>;
+};
+
+export type MidiNote = {
+  startBeat: number;
+  durationBeats: number;
+  pitch: number;
+  velocity?: number;
+};
+
+export type MidiMotif = {
+  id?: string;
+  name?: string;
+  bars?: number;
+  lengthBeats?: number;
+  bpm?: number;
+  timeSig?: TimeSig;
+  swing?: number;
+  quantize?: string | number;
+  arp?: {
+    mode?: "up" | "down" | "updown";
+    rate?: string | number;
+    gate?: number;
+    octaves?: number;
+  };
+  synth?: {
+    waveform?: "sine" | "triangle" | "square" | "sawtooth";
+    detune?: number;
+    attackMs?: number;
+    decayMs?: number;
+    sustain?: number;
+    releaseMs?: number;
+    gain?: number;
+  };
+  notes: MidiNote[];
+};
+
+export type GrooveTemplate = {
+  id?: string;
+  name?: string;
+  grid?: string | number;
+  offsets?: number[];
+  velocities?: number[];
+  swing?: number;
+};
+
+export type MacroCurveTarget =
+  | "gain"
+  | "detune"
+  | "attackMs"
+  | "decayMs"
+  | "releaseMs"
+  | "sustain";
+
+export type MacroCurvePoint = {
+  beat: number;
+  value: number;
+};
+
+export type MacroCurve = {
+  id?: string;
+  name?: string;
+  target: MacroCurveTarget;
+  points: MacroCurvePoint[];
+};
+
 export type KBTextureId = string;
 
 export type KBTexture = {
@@ -109,6 +206,7 @@ export type CoverJobRequest = {
   styleInfluence?: number;
   weirdness?: number;
   tempo?: TempoMeta;
+  renderPlan?: RenderPlan;
 };
 
 export type CoverJob = {
@@ -120,6 +218,35 @@ export type CoverJob = {
   previewUrl?: string;
   error?: string;
   evidence?: CoverEvidence;
+};
+
+export type KnowledgeAudioSource = {
+  id: string;
+  name: string;
+  mime: string;
+  url: string;
+  projectId?: string;
+};
+
+export type KnowledgeMidiSource = {
+  id: string;
+  name: string;
+  projectId?: string;
+  motif: MidiMotif;
+};
+
+export type KnowledgeGrooveSource = {
+  id: string;
+  name: string;
+  projectId?: string;
+  groove: GrooveTemplate;
+};
+
+export type KnowledgeMacroSource = {
+  id: string;
+  name: string;
+  projectId?: string;
+  curves: MacroCurve[];
 };
 
 export type OriginalUpload = {

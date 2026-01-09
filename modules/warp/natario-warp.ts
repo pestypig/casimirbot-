@@ -11,6 +11,8 @@ import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
 import { casimirEnergyDensity } from '../dynamic/stress-energy-equations.js';
 import type { SimulationParameters, WarpGeometry, WarpGeometryKind } from '../../shared/schema.js';
 
+export type MassMode = "MODEL_DERIVED" | "TARGET_CALIBRATED" | "MEASURED_FORCE_INFERRED";
+
 type Vec3 = [number, number, number];
 
 // Pipeline-driven defaults (configurable, no hard-coded targets)
@@ -67,8 +69,9 @@ export interface NatarioWarpParams {
   stressTangentialFactor?: number;          // replaces hard-coded 0.5
   powerTarget_W?: number;                   // optional compliance target
   powerTolerance?: number;                  // fractional tolerance
-  betaTiltVec?: [number, number, number];   // optional pipeline tilt mapping
+  betaTiltVec?: [number, number, number];   // optional pipeline tilt mapping   
   exoticMassTarget_kg?: number;
+  invariantMass_kg?: number;
   tileArea_m2_override?: number;
   warpFieldType?: 'natario' | 'natario_sdf' | 'alcubierre' | 'irrotational';
   warpGeometry?: WarpGeometry | null;
@@ -77,6 +80,8 @@ export interface NatarioWarpParams {
   warpGridResolution?: number;
   warpDriveDirection?: Vec3;
   hullAxes?: { a: number; b: number; c: number };
+  massMode?: MassMode;
+  allowMassOverride?: boolean;
 }
 
 export interface NatarioWarpResult {
@@ -94,6 +99,10 @@ export interface NatarioWarpResult {
   amplifiedEnergyDensity: number;       // J/mÂ³ (includes d_eff)
   exoticMassPerTile: number;            // kg (time-averaged)
   totalExoticMass: number;              // kg (time-averaged)
+  massSource?: "model" | "measured" | "targetOverride";
+  massModeApplied?: MassMode;
+  massOverrideApplied?: boolean;
+  massOverrideWarning?: string;
 
   // Sector strobing validation
   timeAveragedMass: number;             // kg (same as totalExoticMass; no double-duty)
@@ -301,14 +310,44 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const tileCount = Math.max(1, params.tileCount ?? 1);
   let totalExoticMass = 0;
   let exoticMassPerTile = 0;
-  if (Number.isFinite(params.exoticMassTarget_kg) && params.exoticMassTarget_kg! > 0) {
+  const overrideRequested =
+    Number.isFinite(params.exoticMassTarget_kg) && params.exoticMassTarget_kg! > 0;
+  const invariantMass_kg = Number.isFinite(params.invariantMass_kg)
+    ? Math.max(0, params.invariantMass_kg!)
+    : undefined;
+  const allowMassOverride = params.allowMassOverride === true;
+  const overrideApplied = allowMassOverride && overrideRequested;
+  let massModeApplied: MassMode | undefined = params.massMode;
+  let massSource: NatarioWarpResult["massSource"] | undefined;
+  let massOverrideWarning: string | undefined;
+
+  if (overrideRequested && !allowMassOverride) {
+    massOverrideWarning = "exoticMassTarget_kg ignored: allowMassOverride is false";
+    console.warn("[natario-warp] Mass override rejected without allowMassOverride");
+  }
+
+  if (overrideApplied) {
     totalExoticMass = params.exoticMassTarget_kg!;
     exoticMassPerTile = totalExoticMass / tileCount;
+    massSource = "targetOverride";
+    massModeApplied = "TARGET_CALIBRATED";
+    if (params.massMode && params.massMode !== "TARGET_CALIBRATED") {
+      massOverrideWarning =
+        "mass override forced massModeApplied=TARGET_CALIBRATED (input was different)";
+      console.warn("[natario-warp] Mass override forced TARGET_CALIBRATED mode");
+    } else {
+      console.warn("[natario-warp] Mass override applied via exoticMassTarget_kg");
+    }
+  } else if (invariantMass_kg && invariantMass_kg > 0) {
+    totalExoticMass = invariantMass_kg;
+    exoticMassPerTile = totalExoticMass / tileCount;
+    massSource = params.massMode === "MEASURED_FORCE_INFERRED" ? "measured" : "model";
   } else {
     const totalEnergy = Math.abs(amplifiedEnergyDensity) * tileVolume * tileCount;
     const c2 = 8.9875517923e16;
     totalExoticMass = totalEnergy / c2;
     exoticMassPerTile = totalExoticMass / tileCount;
+    massSource = params.massMode === "MEASURED_FORCE_INFERRED" ? "measured" : "model";
   }
   const powerDraw = Number.isFinite(params.P_avg_W) ? params.P_avg_W! : Math.abs(amplifiedEnergyDensity) * tileVolume * (params.burstDuration / Math.max(1, params.cycleDuration)) * 1.0;
   const quantumValidation = validateQuantumInequality(totalExoticMass, amplifiedEnergyDensity, Math.max(1e-12, (params.burstDuration||1) * 1e-6), a_m, params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg);
@@ -331,6 +370,10 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     amplifiedEnergyDensity,
     exoticMassPerTile,
     totalExoticMass,
+    massSource,
+    massModeApplied: massModeApplied ?? params.massMode,
+    massOverrideApplied: overrideApplied,
+    massOverrideWarning,
     timeAveragedMass: totalExoticMass,
     powerDraw,
     quantumInequalityMargin: quantumValidation.margin,

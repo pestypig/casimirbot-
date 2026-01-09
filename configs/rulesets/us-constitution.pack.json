@@ -1,0 +1,249 @@
+{
+  "id": "us-constitution",
+  "version": 1,
+  "jurisdiction": "US",
+  "source": {
+    "title": "US Constitution (paraphrased baseline)",
+    "edition": "v1"
+  },
+  "norms": [
+    {
+      "id": "USC.Article1.SeparationOfPowers",
+      "text": "Separate lawmaking, execution, and adjudication to prevent unchecked power.",
+      "obligation": "Binding actions must be tied to lawful authority with documented delegation, review, and checks.",
+      "scope": "institutional",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/separation-of-powers-review"] },
+        { "kind": "attestation", "refs": ["attestations/authority-delegation"] }
+      ],
+      "invalidators": [
+        "Material authority exercised without lawful delegation",
+        "No independent review path for binding decisions"
+      ],
+      "tier": "L3",
+      "risk": "systemic"
+    },
+    {
+      "id": "USC.Article1.BillsOfAttainderExPostFacto",
+      "text": "No punishment without trial; no retroactive penalties.",
+      "obligation": "Rules must be prospective and enforced through due process, not targeted punishment.",
+      "scope": "procedural",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/retroactivity-review"] },
+        { "kind": "attestation", "refs": ["attestations/legal-review"] }
+      ],
+      "invalidators": [
+        "Rule applies retroactively to impose penalties",
+        "Legislation targets named parties without trial"
+      ],
+      "tier": "L2",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Article1.Appropriations",
+      "text": "Public spending requires lawful appropriation and disclosure.",
+      "obligation": "Funds and payouts must follow documented authorization with a traceable audit trail.",
+      "scope": "institutional",
+      "strength": "strong",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/appropriations-ledger"] },
+        { "kind": "metric", "refs": ["metrics/appropriation-variance"] }
+      ],
+      "invalidators": [
+        "Payouts executed without appropriation",
+        "Off-budget transfers or undisclosed funding"
+      ],
+      "tier": "L2",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Article3.IndependentJudiciary",
+      "text": "Disputes and rights claims require independent adjudication.",
+      "obligation": "Provide impartial review and enforceable remedies for binding decisions.",
+      "scope": "institutional",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/independent-review-path"] },
+        { "kind": "attestation", "refs": ["attestations/appeals-availability"] }
+      ],
+      "invalidators": [
+        "No independent review path for rights disputes",
+        "Adjudication controlled by the decision owner"
+      ],
+      "tier": "L3",
+      "risk": "systemic"
+    },
+    {
+      "id": "USC.Amendment1.Speech",
+      "text": "Protect lawful speech; restrictions must be narrow and justified.",
+      "obligation": "Do not suppress lawful speech without compelling, narrowly tailored justification and due process.",
+      "scope": "substantive",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/speech-restrictions"] },
+        { "kind": "attestation", "refs": ["attestations/neutrality-review"] }
+      ],
+      "invalidators": [
+        "Content-based suppression without due process",
+        "Retaliation for lawful speech"
+      ],
+      "tier": "L3",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Amendment1.AssemblyPetition",
+      "text": "Protect peaceful assembly and petition.",
+      "obligation": "Enable lawful assembly and petition with clear, content-neutral time/place/manner limits.",
+      "scope": "substantive",
+      "strength": "strong",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/assembly-petition-access"] },
+        { "kind": "attestation", "refs": ["attestations/assembly-policy"] }
+      ],
+      "invalidators": [
+        "Blanket bans on peaceful assembly without safety justification",
+        "Permitting used as viewpoint filter"
+      ],
+      "tier": "L2",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Amendment1.Religion",
+      "text": "No establishment of religion; protect free exercise.",
+      "obligation": "Policies must not privilege or penalize beliefs; provide accommodations where feasible.",
+      "scope": "substantive",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/religion-neutrality"] },
+        { "kind": "attestation", "refs": ["attestations/accommodation-review"] }
+      ],
+      "invalidators": [
+        "State preference for a belief system",
+        "Coerced participation in religious practice"
+      ],
+      "tier": "L2",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Amendment4.SearchSeizure",
+      "text": "No unreasonable searches or seizures; warrants require cause.",
+      "obligation": "Collect data or seize property only with lawful basis, warrant or consent, and scope limits.",
+      "scope": "procedural",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/search-seizure-basis"] },
+        { "kind": "test", "refs": ["tests/warrant-scope-checks"] }
+      ],
+      "invalidators": [
+        "Search or seizure without lawful basis",
+        "Bulk collection beyond approved scope"
+      ],
+      "tier": "L3",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Amendment5.DueProcess",
+      "text": "No deprivation of life, liberty, or property without due process.",
+      "obligation": "Provide notice, hearing, evidence access, and appeal before deprivation.",
+      "scope": "procedural",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/due-process-checks"] },
+        { "kind": "attestation", "refs": ["attestations/appeal-path"] }
+      ],
+      "invalidators": [
+        "Detention or penalty without notice or hearing",
+        "No appeal path for binding decisions"
+      ],
+      "tier": "L3",
+      "risk": "systemic"
+    },
+    {
+      "id": "USC.Amendment5.SelfIncrimination",
+      "text": "No compelled self-incrimination.",
+      "obligation": "Do not coerce self-incriminating testimony; preserve the right to decline.",
+      "scope": "procedural",
+      "strength": "strong",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/self-incrimination-safeguards"] },
+        { "kind": "attestation", "refs": ["attestations/privilege-policy"] }
+      ],
+      "invalidators": [
+        "Compelled testimony tied to penalty",
+        "No option to decline self-incriminating disclosures"
+      ],
+      "tier": "L2",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Amendment6.CounselTrial",
+      "text": "Right to counsel and a speedy, public, impartial trial.",
+      "obligation": "Ensure access to counsel and impartial adjudication with timely review.",
+      "scope": "procedural",
+      "strength": "strong",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/counsel-access"] },
+        { "kind": "metric", "refs": ["metrics/adjudication-sla"] }
+      ],
+      "invalidators": [
+        "No access to counsel",
+        "Indefinite delays without review"
+      ],
+      "tier": "L2",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Amendment8.CruelPunishment",
+      "text": "No cruel or unusual punishment; require proportionality.",
+      "obligation": "Punishments must be proportionate and avoid torture or degrading treatment.",
+      "scope": "substantive",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/punishment-proportionality"] },
+        { "kind": "attestation", "refs": ["attestations/treatment-standards"] }
+      ],
+      "invalidators": [
+        "Disproportionate penalties",
+        "Degrading or torturous conditions"
+      ],
+      "tier": "L3",
+      "risk": "high"
+    },
+    {
+      "id": "USC.Amendment13.InvoluntaryServitude",
+      "text": "No involuntary servitude outside lawful penalties.",
+      "obligation": "Participation must be voluntary and consent-based with meaningful exit options.",
+      "scope": "substantive",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/consent-exit-rights"] },
+        { "kind": "attestation", "refs": ["attestations/voluntary-participation"] }
+      ],
+      "invalidators": [
+        "Coerced labor or participation",
+        "Exit blocked by threats or penalties"
+      ],
+      "tier": "L3",
+      "risk": "systemic"
+    },
+    {
+      "id": "USC.Amendment14.EqualProtection",
+      "text": "Equal protection and consistent application of the law.",
+      "obligation": "Apply rules consistently; no discrimination on protected status without compelling basis.",
+      "scope": "substantive",
+      "strength": "strict",
+      "evidence": [
+        { "kind": "audit", "refs": ["audit/equal-protection-review"] },
+        { "kind": "metric", "refs": ["metrics/disparate-impact"] }
+      ],
+      "invalidators": [
+        "Disparate enforcement without justification",
+        "Explicit exclusion based on protected status"
+      ],
+      "tier": "L3",
+      "risk": "systemic"
+    }
+  ]
+}

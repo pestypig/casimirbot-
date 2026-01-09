@@ -1,0 +1,22 @@
+{
+  "defaultStage": "exploratory",
+  "strictStages": [],
+  "pathStages": [
+    { "pattern": "modules/gr/**", "stage": "diagnostic" },
+    { "pattern": "server/gr/**", "stage": "diagnostic" },
+    { "pattern": "server/gr-*.ts", "stage": "diagnostic" },
+    { "pattern": "modules/warp/**", "stage": "reduced-order" },
+    { "pattern": "modules/physics/**", "stage": "reduced-order" },
+    { "pattern": "modules/dynamic/**", "stage": "reduced-order" },
+    { "pattern": "modules/analysis/**", "stage": "exploratory" },
+    { "pattern": "server/energy-pipeline.ts", "stage": "reduced-order" },
+    { "pattern": "server/stress-energy-brick.ts", "stage": "reduced-order" },
+    { "pattern": "server/services/constraint-packs/**", "stage": "reduced-order" },
+    { "pattern": "server/routes/agi*.ts", "stage": "reduced-order" },
+    { "pattern": "server/services/observability/**", "stage": "exploratory" },
+    { "pattern": "tools/warp*.ts", "stage": "diagnostic" },
+    { "pattern": "tools/verifyCertificate.ts", "stage": "certified" },
+    { "pattern": "server/routes/warp-viability.ts", "stage": "certified" },
+    { "pattern": "server/skills/physics.warp.viability.ts", "stage": "certified" }
+  ]
+}

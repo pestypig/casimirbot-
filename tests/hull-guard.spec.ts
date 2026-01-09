@@ -19,5 +19,12 @@ describe("hull guard", () => {
     expect(isHullAllowed("https://alpha.hull")).toBe(true);
     expect(isHullAllowed("https://api.example.com")).toBe(false);
     expect(() => assertHullAllowed("https://api.example.com")).toThrow(/HULL_MODE/);
+    try {
+      assertHullAllowed("https://api.example.com");
+    } catch (error) {
+      const typed = error as { policy?: { reason?: string; capability?: string } };
+      expect(typed.policy?.reason).toMatch(/HULL_MODE/);
+      expect(typed.policy?.capability).toBe("network_access");
+    }
   });
 });

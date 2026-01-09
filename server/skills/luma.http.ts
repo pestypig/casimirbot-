@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { EssenceEnvelope } from "@shared/essence-schema";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
-import { putEnvelope } from "../services/essence/store";
+import { putEnvelopeWithPolicy } from "./provenance";
 import { putBlob } from "../storage";
 import { assertHullAllowed } from "../security/hull-guard";
 
@@ -156,7 +156,7 @@ export const lumaHttpHandler: ToolHandler = async (input: any, ctx: any) => {
       signatures: [],
     },
   });
-  await putEnvelope(env);
+  await putEnvelopeWithPolicy(env);
 
   return {
     essence_id: env.header.id,

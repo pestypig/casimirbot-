@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import { EssenceEnvelope } from "@shared/essence-schema";
 import { putBlob } from "../storage";
-import { putEnvelope } from "../services/essence/store";
+import { putEnvelopeWithPolicy } from "./provenance";
 import { assertHullAllowed } from "../security/hull-guard";
 
 const DEFAULT_VISION_HTTP_RPM = Math.max(1, Number(process.env.VISION_HTTP_RPM ?? 60));
@@ -160,7 +160,7 @@ export const visionHttpHandler: ToolHandler = async (_input: any, ctx: any) => {
         signatures: [],
       },
     });
-    await putEnvelope(env);
+    await putEnvelopeWithPolicy(env);
     essenceId = env.header.id;
   }
 

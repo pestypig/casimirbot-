@@ -60,6 +60,91 @@ const tempoMetaSchema = z
   })
   .strict();
 
+const renderPlanSectionSchema = z
+  .object({
+    name: z.string().min(1),
+    startBar: z.number().int().min(1),
+    bars: z.number().int().min(1),
+  })
+  .passthrough();
+
+const renderPlanEnergySchema = z
+  .object({
+    bar: z.number().int().min(1),
+    energy: z.number().finite(),
+  })
+  .passthrough();
+
+const renderPlanMaterialSchema = z
+  .object({
+    audioAtomIds: z.array(z.string().min(1)).optional(),
+    midiMotifIds: z.array(z.string().min(1)).optional(),
+    grooveTemplateIds: z.array(z.string().min(1)).optional(),
+    macroCurveIds: z.array(z.string().min(1)).optional(),
+    transposeSemitones: z.number().finite().optional(),
+    timeStretch: z.number().finite().optional(),
+  })
+  .passthrough();
+
+const renderPlanTextureBlendSchema = z
+  .object({
+    weights: z.record(z.number().finite()),
+  })
+  .passthrough();
+
+const renderPlanTextureSchema = z
+  .object({
+    kbTexture: z.union([z.string().min(1), renderPlanTextureBlendSchema]).optional(),
+    sampleInfluence: z.number().min(0).max(1).optional(),
+    styleInfluence: z.number().min(0).max(1).optional(),
+    weirdness: z.number().min(0).max(1).optional(),
+    eqPeaks: z
+      .array(
+        z
+          .object({
+            freq: z.number().finite(),
+            q: z.number().finite(),
+            gainDb: z.number().finite(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+    fx: z
+      .object({
+        chorus: z.number().finite().optional(),
+        sat: z.number().finite().optional(),
+        reverbSend: z.number().finite().optional(),
+        comp: z.number().finite().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+const renderPlanWindowSchema = z
+  .object({
+    startBar: z.number().int().min(1),
+    bars: z.number().int().min(1),
+    material: renderPlanMaterialSchema.optional(),
+    texture: renderPlanTextureSchema.optional(),
+  })
+  .passthrough();
+
+const renderPlanSchema = z
+  .object({
+    global: z
+      .object({
+        bpm: z.number().min(1).optional(),
+        key: z.string().optional(),
+        sections: z.array(renderPlanSectionSchema).optional(),
+        energyCurve: z.array(renderPlanEnergySchema).optional(),
+      })
+      .passthrough()
+      .optional(),
+    windows: z.array(renderPlanWindowSchema),
+  })
+  .passthrough();
+
 const coverJobRequestSchema = z
   .object({
     originalId: z.string().min(1),
@@ -73,6 +158,7 @@ const coverJobRequestSchema = z
     weirdness: z.number().min(0).max(1).optional(),
     tempo: tempoMetaSchema.optional(),
     knowledgeFileIds: z.array(z.string().min(1)).optional(), // audio from knowledge store
+    renderPlan: renderPlanSchema.optional(),
   })
   .refine((value) => !value.linkHelix || Boolean(value.helix), {
     message: "helix packet required when linkHelix is true",

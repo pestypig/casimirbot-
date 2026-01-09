@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "rulesetId": "us-constitution",
+  "mappings": [
+    {
+      "normId": "USC.Article1.SeparationOfPowers",
+      "nodeIds": ["capture-resistance", "integrity-protocols", "civic-memory-continuity"],
+      "notes": "Checks and balances map to anti-capture and accountable governance.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Article1.BillsOfAttainderExPostFacto",
+      "nodeIds": ["verification-checklist", "civic-memory-continuity", "integrity-protocols"],
+      "notes": "No retroactive punishment aligns with traceable, falsifiable policy.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Article1.Appropriations",
+      "nodeIds": ["stewardship-ledger", "provenance-protocol", "integrity-protocols"],
+      "notes": "Authorized funds and payout discipline map to stewardship and provenance.",
+      "conflictMode": "escalate"
+    },
+    {
+      "normId": "USC.Article3.IndependentJudiciary",
+      "nodeIds": ["skillful-mediation", "civic-memory-continuity", "no-bypass-guardrail"],
+      "notes": "Independent review and remedies reinforce conflict metabolism.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment1.Speech",
+      "nodeIds": ["right-speech-infrastructure", "voice-integrity", "verification-checklist"],
+      "notes": "Speech protections require truthful channels and correction hooks.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment1.AssemblyPetition",
+      "nodeIds": ["sangha-architecture", "skillful-mediation", "no-bypass-guardrail"],
+      "notes": "Assembly and petition rely on consent containers and dispute paths.",
+      "conflictMode": "allow-with-review"
+    },
+    {
+      "normId": "USC.Amendment1.Religion",
+      "nodeIds": ["worldview-integrity", "values-over-images", "sangha-architecture"],
+      "notes": "Non-establishment aligns with worldview integrity and pluralism.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment4.SearchSeizure",
+      "nodeIds": ["data-dignity", "integrity-protocols", "no-bypass-guardrail"],
+      "notes": "Search limits align with consent, minimization, and anti-bypass guardrails.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment5.DueProcess",
+      "nodeIds": ["integrity-protocols", "verification-checklist", "civic-memory-continuity"],
+      "notes": "Due process requires auditable steps and preserved rationale.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment5.SelfIncrimination",
+      "nodeIds": ["data-dignity", "voice-integrity", "integrity-protocols"],
+      "notes": "Privilege against self-incrimination aligns with dignity and channel integrity.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment6.CounselTrial",
+      "nodeIds": ["skillful-mediation", "restorative-harm-repair", "sangha-architecture"],
+      "notes": "Counsel and impartial review align with repair and mediation.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment8.CruelPunishment",
+      "nodeIds": ["restorative-harm-repair", "no-bypass-guardrail", "integrity-protocols"],
+      "notes": "Proportionality reinforces non-harm and accountable response.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment13.InvoluntaryServitude",
+      "nodeIds": ["capture-resistance", "external-interface-integrity", "stewardship-ledger"],
+      "notes": "Consent-based participation aligns with anti-capture and stewardship.",
+      "conflictMode": "block"
+    },
+    {
+      "normId": "USC.Amendment14.EqualProtection",
+      "nodeIds": ["scarcity-justice", "interbeing-systems", "capture-resistance"],
+      "notes": "Equal protection links to fair allocation and anti-domination systems.",
+      "conflictMode": "block"
+    }
+  ]
+}

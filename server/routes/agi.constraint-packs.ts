@@ -21,14 +21,17 @@ import {
 import {
   buildRepoConvergenceMetrics,
   buildToolUseBudgetMetrics,
+  buildAuditSafetyMetrics,
   evaluateConstraintPackFromMetrics,
   type ConstraintPackMetricMap,
+  type AuditSafetyTelemetry,
   type RepoConvergenceTelemetry,
   type ToolUseBudgetTelemetry,
 } from "../services/observability/constraint-pack-evaluator.js";
 import {
   collectRepoConvergenceTelemetry,
   collectToolUseBudgetTelemetry,
+  collectAuditSafetyTelemetry,
   isAutoTelemetryEnabled,
 } from "../services/observability/constraint-pack-telemetry.js";
 import { recordConstraintPackTrace } from "../services/observability/constraint-pack-normalizer.js";
@@ -312,6 +315,55 @@ const toolUseBudgetTelemetrySchema = z
   })
   .optional();
 
+const auditSafetyTelemetrySchema = z
+  .object({
+    audit: z
+      .object({
+        files: z
+          .object({
+            total: z.number().nonnegative().optional(),
+            tagged: z.number().nonnegative().optional(),
+            untagged: z.number().nonnegative().optional(),
+          })
+          .optional(),
+        tags: z
+          .object({
+            unknown: z.number().nonnegative().optional(),
+          })
+          .optional(),
+        violations: z
+          .object({
+            count: z.number().nonnegative().optional(),
+          })
+          .optional(),
+        risk: z
+          .object({
+            files: z.number().nonnegative().optional(),
+          })
+          .optional(),
+        provenance: z
+          .object({
+            files: z.number().nonnegative().optional(),
+            coverage: z.number().min(0).max(1).optional(),
+          })
+          .optional(),
+        safety: z
+          .object({
+            files: z.number().nonnegative().optional(),
+            coverage: z.number().min(0).max(1).optional(),
+          })
+          .optional(),
+        critical: z
+          .object({
+            files: z.number().nonnegative().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+    metrics: metricsSchema,
+  })
+  .optional();
+
 const evalBaseSchema = z.object({
   traceId: z.string().min(1).optional(),
   customerId: z.string().min(1).optional(),
@@ -321,6 +373,13 @@ const evalBaseSchema = z.object({
   autoTelemetry: z.boolean().optional(),
   telemetryPath: z.string().min(1).optional(),
   junitPath: z.string().min(1).optional(),
+  vitestPath: z.string().min(1).optional(),
+  jestPath: z.string().min(1).optional(),
+  eslintPath: z.string().min(1).optional(),
+  tscPath: z.string().min(1).optional(),
+  toolLogTraceId: z.string().min(1).optional(),
+  toolLogWindowMs: z.coerce.number().int().positive().optional(),
+  toolLogLimit: z.coerce.number().int().positive().optional(),
   ladderTier: policyLadderTierSchema.optional(),
   metrics: metricsSchema,
   certificate: constraintPackCertificateResultSchema.optional(),
@@ -335,6 +394,10 @@ const repoConvergenceEvalSchema = evalBaseSchema.extend({
 
 const toolUseBudgetEvalSchema = evalBaseSchema.extend({
   telemetry: toolUseBudgetTelemetrySchema,
+});
+
+const auditSafetyEvalSchema = evalBaseSchema.extend({
+  telemetry: auditSafetyTelemetrySchema,
 });
 
 const mergeMetricOverrides = (
@@ -370,12 +433,30 @@ const resolveAutoTelemetry = (input: {
   autoTelemetry?: boolean;
   telemetryPath?: string;
   junitPath?: string;
+  vitestPath?: string;
+  jestPath?: string;
+  eslintPath?: string;
+  tscPath?: string;
+  toolLogTraceId?: string;
+  toolLogWindowMs?: number;
+  toolLogLimit?: number;
 }): boolean => {
+  const hasAutoHint = !!(
+    input.telemetryPath ||
+    input.junitPath ||
+    input.vitestPath ||
+    input.jestPath ||
+    input.eslintPath ||
+    input.tscPath ||
+    input.toolLogTraceId ||
+    input.toolLogWindowMs ||
+    input.toolLogLimit
+  );
   if (input.autoTelemetry === true) return true;
   if (input.autoTelemetry === false) {
-    return !!(input.telemetryPath || input.junitPath);
+    return hasAutoHint;
   }
-  if (input.telemetryPath || input.junitPath) return true;
+  if (hasAutoHint) return true;
   return isAutoTelemetryEnabled();
 };
 
@@ -401,7 +482,9 @@ constraintPacksRouter.post(
         ? repoConvergenceEvalSchema
         : pack.id === "tool-use-budget"
           ? toolUseBudgetEvalSchema
-          : null;
+          : pack.id === "provenance-safety"
+            ? auditSafetyEvalSchema
+            : null;
     if (!schema) {
       return res
         .status(400)
@@ -498,25 +581,59 @@ constraintPacksRouter.post(
         policyNotes.push(...resolved.warnings.map((warning) => `policy_${warning}`));
       }
     }
-    const shouldAutoTelemetry = resolveAutoTelemetry({
-      autoTelemetry: parsed.data.autoTelemetry,
-      telemetryPath: parsed.data.telemetryPath,
-      junitPath: parsed.data.junitPath,
-    });
-    let telemetry = parsed.data.telemetry;
+    const shouldAutoTelemetry =
+      pack.id === "provenance-safety"
+        ? parsed.data.autoTelemetry !== false
+        : resolveAutoTelemetry({
+          autoTelemetry: parsed.data.autoTelemetry,
+          telemetryPath: parsed.data.telemetryPath,
+          junitPath: parsed.data.junitPath,
+          vitestPath: parsed.data.vitestPath,
+          jestPath: parsed.data.jestPath,
+          eslintPath: parsed.data.eslintPath,
+          tscPath: parsed.data.tscPath,
+          toolLogTraceId: parsed.data.toolLogTraceId,
+          toolLogWindowMs: parsed.data.toolLogWindowMs,
+          toolLogLimit: parsed.data.toolLogLimit,
+        });
+    let telemetry:
+      | RepoConvergenceTelemetry
+      | ToolUseBudgetTelemetry
+      | AuditSafetyTelemetry
+      | undefined = parsed.data.telemetry as
+      | RepoConvergenceTelemetry
+      | ToolUseBudgetTelemetry
+      | AuditSafetyTelemetry
+      | undefined;
     const autoTelemetryNotes: string[] = [];
     if (shouldAutoTelemetry) {
       if (pack.id === "repo-convergence") {
         const collected = await collectRepoConvergenceTelemetry({
+          autoTelemetry: shouldAutoTelemetry,
           explicit: telemetry as RepoConvergenceTelemetry,
           telemetryPath: parsed.data.telemetryPath,
           junitPath: parsed.data.junitPath,
+          vitestPath: parsed.data.vitestPath,
+          jestPath: parsed.data.jestPath,
+          eslintPath: parsed.data.eslintPath,
+          tscPath: parsed.data.tscPath,
         });
         telemetry = collected.telemetry;
         autoTelemetryNotes.push(...collected.notes);
       } else if (pack.id === "tool-use-budget") {
         const collected = await collectToolUseBudgetTelemetry({
           explicit: telemetry as ToolUseBudgetTelemetry,
+          telemetryPath: parsed.data.telemetryPath,
+          toolLogTraceId: parsed.data.toolLogTraceId,
+          toolLogWindowMs: parsed.data.toolLogWindowMs,
+          toolLogLimit: parsed.data.toolLogLimit,
+        });
+        telemetry = collected.telemetry;
+        autoTelemetryNotes.push(...collected.notes);
+      } else if (pack.id === "provenance-safety") {
+        const collected = await collectAuditSafetyTelemetry({
+          autoTelemetry: shouldAutoTelemetry,
+          explicit: telemetry as AuditSafetyTelemetry,
           telemetryPath: parsed.data.telemetryPath,
         });
         telemetry = collected.telemetry;
@@ -534,7 +651,9 @@ constraintPacksRouter.post(
     const metrics =
       pack.id === "repo-convergence"
         ? buildRepoConvergenceMetrics(telemetry as RepoConvergenceTelemetry)
-        : buildToolUseBudgetMetrics(telemetry as ToolUseBudgetTelemetry);
+        : pack.id === "tool-use-budget"
+          ? buildToolUseBudgetMetrics(telemetry as ToolUseBudgetTelemetry)
+          : buildAuditSafetyMetrics(telemetry as AuditSafetyTelemetry);
     mergeMetricOverrides(metrics, parsed.data.metrics);
 
     const evaluationNotes = [
@@ -564,6 +683,7 @@ constraintPacksRouter.post(
       tenantId: effectiveTenantId,
       pack: resolvedPack,
       evaluation,
+      metrics,
       source,
     });
 

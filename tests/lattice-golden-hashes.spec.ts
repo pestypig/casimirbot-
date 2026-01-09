@@ -86,7 +86,7 @@ describe("lattice golden hashes (CI determinism)", () => {
     });
 
     expect(generationHash).toBe("39d8ab50");
-    expect(determinismHash).toBe("0eb6c680e5503e52");
+    expect(determinismHash).toBe("7d915a432ddf54e0");
   });
 
   it("produces stable cache key + determinism hash for hull SDF band grid", async () => {

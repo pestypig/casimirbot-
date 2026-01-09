@@ -48,8 +48,21 @@ export function assertHullAllowed(target: string): void {
   const message = `HULL_MODE: blocked outbound to ${target}`;
   // eslint-disable-next-line no-console
   console.warn(message);
-  const error = new Error(message);
-  (error as NodeJS.ErrnoException).code = "HULL_BLOCKED";
+  const error = new Error(message) as NodeJS.ErrnoException & {
+    type?: string;
+    policy?: {
+      reason: string;
+      capability?: string;
+      risks?: string[];
+    };
+  };
+  error.code = "HULL_BLOCKED";
+  error.type = "forbidden";
+  error.policy = {
+    reason: message,
+    capability: "network_access",
+    risks: ["network_access"],
+  };
   throw error;
 }
 

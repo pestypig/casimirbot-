@@ -1,4 +1,5 @@
 export { CasimirClient, CasimirError, createCasimirClient } from "./client";
+export { RuntimeTelemetry, createRuntimeTelemetry } from "./runtime";
 export type {
   AdapterAction,
   AdapterArtifactRef,
@@ -35,3 +36,17 @@ export type {
   CasimirRequestOptions,
   FetchLike,
 } from "./client";
+export type {
+  LlmCallOptions,
+  ModelPricing,
+  RuntimeApproval,
+  RuntimeEvent,
+  RuntimeLlmEvent,
+  RuntimePolicyFlags,
+  RuntimeProvenance,
+  RuntimeTelemetryOptions,
+  RuntimeTokenUsage,
+  RuntimeToolEvent,
+  ToolCallOptions,
+  ToolUseBudgetTelemetry,
+} from "./runtime";
