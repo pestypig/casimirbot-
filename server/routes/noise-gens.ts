@@ -482,6 +482,10 @@ type WavFormat = {
   dataSize: number;
 };
 
+const WAVE_FORMAT_EXTENSIBLE = 0xfffe;
+const WAVE_FORMAT_PCM = 1;
+const WAVE_FORMAT_IEEE_FLOAT = 3;
+
 const parseWavFormat = (buffer: Buffer): WavFormat | null => {
   if (buffer.byteLength < 44) return null;
   if (buffer.toString("ascii", 0, 4) !== "RIFF") return null;
@@ -502,6 +506,13 @@ const parseWavFormat = (buffer: Buffer): WavFormat | null => {
       channels = buffer.readUInt16LE(chunkData + 2);
       sampleRate = buffer.readUInt32LE(chunkData + 4);
       bitsPerSample = buffer.readUInt16LE(chunkData + 14);
+      if (audioFormat === WAVE_FORMAT_EXTENSIBLE && chunkSize >= 40) {
+        // SubFormat GUID starts at byte 24; first 4 bytes map to PCM/float.
+        const subFormat = buffer.readUInt32LE(chunkData + 24);
+        if (subFormat === WAVE_FORMAT_PCM || subFormat === WAVE_FORMAT_IEEE_FLOAT) {
+          audioFormat = subFormat;
+        }
+      }
     } else if (chunkId === "data") {
       dataOffset = chunkData;
       dataSize = chunkSize;
@@ -534,7 +545,9 @@ const convertWavToPcm16 = (buffer: Buffer): Buffer | null => {
   const format = parseWavFormat(buffer);
   if (!format) return null;
   if (format.audioFormat === 1 && format.bitsPerSample === 16) return null;
-  if (format.audioFormat !== 1 && format.audioFormat !== 3) return null;
+  if (format.audioFormat !== WAVE_FORMAT_PCM && format.audioFormat !== WAVE_FORMAT_IEEE_FLOAT) {
+    return null;
+  }
   const bytesPerSample = format.bitsPerSample / 8;
   if (!Number.isInteger(bytesPerSample) || bytesPerSample <= 0) return null;
   if (![2, 3, 4].includes(bytesPerSample)) return null;
