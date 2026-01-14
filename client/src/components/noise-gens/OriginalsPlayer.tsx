@@ -324,6 +324,7 @@ export function OriginalsPlayer({
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const detailsCacheRef = useRef<Map<string, OriginalDetails | null>>(new Map());
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const buffersRef = useRef<Record<string, AudioBuffer | null>>({});
@@ -336,6 +337,7 @@ export function OriginalsPlayer({
   const [playableCount, setPlayableCount] = useState(0);
   const [autoPlayPending, setAutoPlayPending] = useState(false);
   const lastAutoPlayRef = useRef<number | null>(null);
+  const useElementPlayback = sources.length === 1;
 
   useEffect(() => {
     let cancelled = false;
@@ -484,6 +486,9 @@ export function OriginalsPlayer({
   }, []);
 
   const stopPlayback = useCallback(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+    }
     activeSourcesRef.current.forEach(({ source }) => {
       try {
         source.stop();
@@ -498,6 +503,12 @@ export function OriginalsPlayer({
   }, [stopRaf]);
 
   const pausePlayback = useCallback(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      setCurrentTime(audioElementRef.current.currentTime);
+      setIsPlaying(false);
+      return;
+    }
     const ctx = audioContextRef.current;
     const startedAt = startAtRef.current;
     const elapsed =
@@ -525,6 +536,16 @@ export function OriginalsPlayer({
       setPlayableCount(0);
       setLoadError(null);
       setIsLoading(false);
+      return;
+    }
+
+    if (useElementPlayback) {
+      stopPlayback();
+      buffersRef.current = {};
+      setDuration(0);
+      setCurrentTime(0);
+      setPlayableCount(0);
+      setLoadError(null);
       return;
     }
 
@@ -583,9 +604,76 @@ export function OriginalsPlayer({
       controller.abort();
       stopPlayback();
     };
-  }, [ensureAudioContext, sources, stopPlayback]);
+  }, [ensureAudioContext, sources, stopPlayback, useElementPlayback]);
 
   useEffect(() => {
+    if (!useElementPlayback || sources.length === 0) {
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.src = "";
+        audioElementRef.current = null;
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.src = sources[0].url;
+    audioElementRef.current = audio;
+
+    setIsLoading(true);
+    setLoadError(null);
+    setPlayableCount(0);
+    setDuration(0);
+    setCurrentTime(0);
+
+    const handleLoaded = () => {
+      if (cancelled) return;
+      setDuration(audio.duration || 0);
+      setPlayableCount(1);
+      setIsLoading(false);
+    };
+    const handleError = () => {
+      if (cancelled) return;
+      setLoadError(`Could not decode ${sources[0]?.label ?? "song"}`);
+      setPlayableCount(0);
+      setIsLoading(false);
+    };
+    const handleTime = () => {
+      if (cancelled) return;
+      setCurrentTime(audio.currentTime);
+    };
+    const handleEnded = () => {
+      if (cancelled) return;
+      setIsPlaying(false);
+      setCurrentTime(audio.duration || 0);
+    };
+
+    audio.addEventListener("loadedmetadata", handleLoaded);
+    audio.addEventListener("timeupdate", handleTime);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+    audio.load();
+
+    return () => {
+      cancelled = true;
+      audio.pause();
+      audio.removeEventListener("loadedmetadata", handleLoaded);
+      audio.removeEventListener("timeupdate", handleTime);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+      if (audioElementRef.current === audio) {
+        audioElementRef.current = null;
+      }
+    };
+  }, [sources, useElementPlayback]);
+
+  useEffect(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.volume = volume;
+      return;
+    }
     const ctx = audioContextRef.current;
     const gain = masterGainRef.current;
     if (!ctx || !gain) return;
@@ -614,9 +702,26 @@ export function OriginalsPlayer({
   const startPlayback = useCallback(
     async (offsetSec = 0) => {
       if (sources.length === 0) return;
+      stopPlayback();
+
+      if (audioElementRef.current) {
+        const audio = audioElementRef.current;
+        try {
+          audio.currentTime = Math.max(0, offsetSec);
+        } catch {
+          /* ignore */
+        }
+        try {
+          await audio.play();
+          setIsPlaying(true);
+        } catch {
+          setLoadError("Unable to start playback.");
+        }
+        return;
+      }
+
       const ctx = await ensureAudioContext();
       if (!ctx) return;
-      stopPlayback();
       let gain = masterGainRef.current;
       if (!gain) {
         gain = ctx.createGain();
@@ -671,6 +776,10 @@ export function OriginalsPlayer({
     (value: number) => {
       const safe = Math.max(0, Math.min(duration || 0, value));
       setCurrentTime(safe);
+      if (audioElementRef.current) {
+        audioElementRef.current.currentTime = safe;
+        return;
+      }
       if (isPlaying) {
         void startPlayback(safe);
       }
