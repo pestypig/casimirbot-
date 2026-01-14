@@ -50,6 +50,34 @@ export type NoisegenTimeSkyMeta = {
   skySignature?: string;
 };
 
+type BundledOriginalManifest = {
+  id: string;
+  title: string;
+  artist: string;
+  folder?: string;
+  listens?: number;
+  duration?: number;
+  tempo?: TempoMeta;
+  notes?: string;
+  offsetMs?: number;
+  timeSky?: NoisegenTimeSkyMeta;
+  uploadedAt?: number;
+  assets?: {
+    instrumental?: string;
+    vocal?: string;
+  };
+  stems?: Array<{
+    file: string;
+    id?: string;
+    name?: string;
+    category?: string;
+  }>;
+};
+
+type BundledManifestFile = {
+  originals?: BundledOriginalManifest[];
+};
+
 export type NoisegenOriginal = {
   id: string;
   title: string;
@@ -163,6 +191,18 @@ const DEFAULT_MOODS: NoisegenMood[] = [
   },
 ];
 
+const BUNDLED_ORIGINALS_MANIFEST = path.join(
+  process.cwd(),
+  "client",
+  "public",
+  "originals",
+  "manifest.json",
+);
+
+let bundledOriginalsCache:
+  | { mtimeMs: number; originals: NoisegenOriginal[] }
+  | null = null;
+
 const emptyStore = (): NoisegenStore => ({
   version: 1,
   originals: [],
@@ -272,6 +312,178 @@ const writeStore = async (store: NoisegenStore): Promise<void> => {
   await fs.rename(tmpPath, storePath);
 };
 
+const readBundledManifest = async (): Promise<BundledOriginalManifest[]> => {
+  try {
+    const raw = await fs.readFile(BUNDLED_ORIGINALS_MANIFEST, "utf8");
+    const parsed = JSON.parse(raw) as
+      | BundledManifestFile
+      | BundledOriginalManifest[];
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.originals)) return parsed.originals;
+    return [];
+  } catch {
+    return [];
+  }
+};
+
+const listBundledStemFiles = async (
+  rootDir: string,
+): Promise<Array<{ file: string }>> => {
+  const stemsDir = path.join(rootDir, "stems");
+  try {
+    const entries = await fs.readdir(stemsDir, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isFile() && isAudioExtension(entry.name))
+      .map((entry) => ({ file: path.join("stems", entry.name) }))
+      .sort((a, b) => a.file.localeCompare(b.file));
+  } catch {
+    return [];
+  }
+};
+
+const resolveBundledOriginal = async (
+  manifest: BundledOriginalManifest,
+): Promise<NoisegenOriginal | null> => {
+  const id = manifest.id?.trim();
+  if (!id) return null;
+  const folder = manifest.folder?.trim() || id;
+  const rootDir = path.join(
+    process.cwd(),
+    "client",
+    "public",
+    "originals",
+    folder,
+  );
+  if (!existsSync(rootDir)) return null;
+
+  const assets: NoisegenOriginal["assets"] = {};
+  const uploadedAtCandidates: number[] = [];
+  const recordUploadedAt = (value?: number) => {
+    if (!Number.isFinite(value)) return;
+    uploadedAtCandidates.push(Number(value));
+  };
+
+  const resolveOriginalFile = async (
+    kind: "instrumental" | "vocal",
+    fileName?: string,
+  ) => {
+    if (!fileName) return;
+    const filePath = path.isAbsolute(fileName)
+      ? fileName
+      : path.join(rootDir, fileName);
+    if (!existsSync(filePath)) return;
+    const stats = await fs.stat(filePath);
+    const asset: NoisegenOriginalAsset = {
+      kind,
+      fileName: path.basename(filePath),
+      path: filePath,
+      mime: mimeFromPath(filePath),
+      bytes: stats.size,
+      uploadedAt: Math.round(stats.mtimeMs),
+    };
+    assets[kind] = asset;
+    recordUploadedAt(asset.uploadedAt);
+  };
+
+  const fallbackInstrumental = path.join(rootDir, "instrumental.wav");
+  const fallbackVocal = path.join(rootDir, "vocal.wav");
+  await resolveOriginalFile(
+    "instrumental",
+    manifest.assets?.instrumental ??
+      (existsSync(fallbackInstrumental) ? "instrumental.wav" : undefined),
+  );
+  await resolveOriginalFile(
+    "vocal",
+    manifest.assets?.vocal ??
+      (existsSync(fallbackVocal) ? "vocal.wav" : undefined),
+  );
+
+  const stemEntries =
+    manifest.stems && manifest.stems.length > 0
+      ? manifest.stems
+      : await listBundledStemFiles(rootDir);
+  if (stemEntries.length > 0) {
+    const usedStemIds = new Set<string>();
+    const stems: NoisegenStemAsset[] = [];
+    for (const entry of stemEntries) {
+      const filePath = path.isAbsolute(entry.file)
+        ? entry.file
+        : path.join(rootDir, entry.file);
+      if (!existsSync(filePath)) continue;
+      const stats = await fs.stat(filePath);
+      const name = entry.name?.trim() || normalizeStemName(entry.file);
+      const idValue = entry.id?.trim() || buildStemId(name, usedStemIds);
+      const category =
+        normalizeStemCategory(entry.category) ?? inferStemCategory(name);
+      const stem: NoisegenStemAsset = {
+        id: idValue,
+        name,
+        category,
+        fileName: path.basename(filePath),
+        path: filePath,
+        mime: mimeFromPath(filePath),
+        bytes: stats.size,
+        uploadedAt: Math.round(stats.mtimeMs),
+      };
+      stems.push(stem);
+      recordUploadedAt(stem.uploadedAt);
+    }
+    if (stems.length > 0) {
+      assets.stems = stems;
+    }
+  }
+
+  const durationSource =
+    assets.instrumental?.path ??
+    assets.vocal?.path ??
+    assets.stems?.[0]?.path;
+  const durationSeconds = Number.isFinite(manifest.duration)
+    ? Number(manifest.duration)
+    : durationSource
+      ? (await estimateWavDurationSeconds(durationSource)).seconds
+      : 0;
+
+  const uploadedAt = Number.isFinite(manifest.uploadedAt)
+    ? Number(manifest.uploadedAt)
+    : uploadedAtCandidates.length > 0
+      ? Math.max(...uploadedAtCandidates)
+      : Date.now();
+  const notes = manifest.notes?.trim();
+
+  return {
+    id,
+    title: manifest.title,
+    artist: manifest.artist,
+    listens: manifest.listens ?? 0,
+    duration: Math.max(1, Math.round(durationSeconds)),
+    tempo: manifest.tempo ?? undefined,
+    notes: notes || undefined,
+    offsetMs: manifest.offsetMs,
+    uploadedAt,
+    timeSky: manifest.timeSky,
+    assets,
+  };
+};
+
+const resolveBundledOriginals = async (): Promise<NoisegenOriginal[]> => {
+  try {
+    const stats = await fs.stat(BUNDLED_ORIGINALS_MANIFEST);
+    const mtimeMs = Math.round(stats.mtimeMs);
+    if (bundledOriginalsCache?.mtimeMs === mtimeMs) {
+      return bundledOriginalsCache.originals;
+    }
+    const manifest = await readBundledManifest();
+    const originals = (
+      await Promise.all(manifest.map((entry) => resolveBundledOriginal(entry)))
+    ).filter(Boolean) as NoisegenOriginal[];
+    bundledOriginalsCache = { mtimeMs, originals };
+    return originals;
+  } catch {
+    bundledOriginalsCache = { mtimeMs: 0, originals: [] };
+    return [];
+  }
+};
+
 const resolveDefaultOriginal = async (): Promise<NoisegenOriginal | null> => {
   const defaultsRoot = path.join(
     process.cwd(),
@@ -320,6 +532,20 @@ const ensureDefaults = async (store: NoisegenStore): Promise<NoisegenStore> => {
     const fallback = await resolveDefaultOriginal();
     if (fallback) {
       next.originals.unshift(fallback);
+      updated = true;
+    }
+  }
+  const bundled = await resolveBundledOriginals();
+  if (bundled.length > 0) {
+    const knownIds = new Set(
+      [...next.originals, ...next.pendingOriginals].map((original) =>
+        original.id.toLowerCase(),
+      ),
+    );
+    for (const original of bundled) {
+      if (knownIds.has(original.id.toLowerCase())) continue;
+      next.originals.push(original);
+      knownIds.add(original.id.toLowerCase());
       updated = true;
     }
   }
@@ -468,6 +694,93 @@ export const findOriginalById = (
     store.originals.find((original) => original.id.toLowerCase() === needle) ??
     store.pendingOriginals.find((original) => original.id.toLowerCase() === needle)
   );
+};
+
+const STEM_CATEGORY_ALLOWLIST = new Set([
+  "drums",
+  "bass",
+  "music",
+  "fx",
+  "other",
+]);
+
+const isAudioExtension = (fileName: string): boolean => {
+  const ext = path.extname(fileName).toLowerCase();
+  return [
+    ".wav",
+    ".wave",
+    ".mp3",
+    ".flac",
+    ".ogg",
+    ".oga",
+    ".aiff",
+    ".aif",
+  ].includes(ext);
+};
+
+const mimeFromPath = (filePath: string): string => {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".wav" || ext === ".wave") return "audio/wav";
+  if (ext === ".mp3") return "audio/mpeg";
+  if (ext === ".flac") return "audio/flac";
+  if (ext === ".ogg" || ext === ".oga") return "audio/ogg";
+  if (ext === ".aiff" || ext === ".aif") return "audio/aiff";
+  return "application/octet-stream";
+};
+
+const normalizeStemName = (value?: string): string => {
+  if (!value) return "stem";
+  const base = path.basename(value, path.extname(value));
+  const cleaned = base.replace(/[_-]+/g, " ").trim();
+  return cleaned || "stem";
+};
+
+const slugifyStem = (value: string): string => {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || "stem";
+};
+
+const buildStemId = (name: string, used: Set<string>): string => {
+  const base = slugifyStem(name);
+  if (!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+  let index = 2;
+  while (used.has(`${base}-${index}`)) {
+    index += 1;
+  }
+  const next = `${base}-${index}`;
+  used.add(next);
+  return next;
+};
+
+const normalizeStemCategory = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return STEM_CATEGORY_ALLOWLIST.has(normalized) ? normalized : undefined;
+};
+
+const inferStemCategory = (name: string): string | undefined => {
+  const lower = name.toLowerCase();
+  if (
+    lower.includes("drum") ||
+    lower.includes("kick") ||
+    lower.includes("snare") ||
+    lower.includes("hat") ||
+    lower.includes("perc")
+  ) {
+    return "drums";
+  }
+  if (lower.includes("bass")) return "bass";
+  if (lower.includes("fx") || lower.includes("sfx") || lower.includes("noise")) {
+    return "fx";
+  }
+  return "music";
 };
 
 const safeExtension = (value?: string): string => {
