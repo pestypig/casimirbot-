@@ -1,6 +1,7 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export type JobStatus = "queued" | "processing" | "ready" | "error";
 export type NoisegenJobType = "cover" | "legacy";
@@ -191,13 +192,20 @@ const DEFAULT_MOODS: NoisegenMood[] = [
   },
 ];
 
-const BUNDLED_ORIGINALS_MANIFEST = path.join(
-  process.cwd(),
-  "client",
-  "public",
-  "originals",
-  "manifest.json",
-);
+export const resolveBundledOriginalsRoot = (): string => {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const candidates = [
+    path.resolve(__dirname, "..", "..", "client", "public", "originals"),
+    path.resolve(__dirname, "..", "..", "dist", "public", "originals"),
+    path.resolve(process.cwd(), "client", "public", "originals"),
+    path.resolve(process.cwd(), "dist", "public", "originals"),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+};
+
+const resolveBundledManifestPath = (): string =>
+  path.join(resolveBundledOriginalsRoot(), "manifest.json");
 
 let bundledOriginalsCache:
   | { mtimeMs: number; originals: NoisegenOriginal[] }
@@ -314,7 +322,7 @@ const writeStore = async (store: NoisegenStore): Promise<void> => {
 
 const readBundledManifest = async (): Promise<BundledOriginalManifest[]> => {
   try {
-    const raw = await fs.readFile(BUNDLED_ORIGINALS_MANIFEST, "utf8");
+    const raw = await fs.readFile(resolveBundledManifestPath(), "utf8");
     const parsed = JSON.parse(raw) as
       | BundledManifestFile
       | BundledOriginalManifest[];
@@ -347,13 +355,7 @@ const resolveBundledOriginal = async (
   const id = manifest.id?.trim();
   if (!id) return null;
   const folder = manifest.folder?.trim() || id;
-  const rootDir = path.join(
-    process.cwd(),
-    "client",
-    "public",
-    "originals",
-    folder,
-  );
+  const rootDir = path.join(resolveBundledOriginalsRoot(), folder);
   if (!existsSync(rootDir)) return null;
 
   const assets: NoisegenOriginal["assets"] = {};
@@ -467,7 +469,7 @@ const resolveBundledOriginal = async (
 
 const resolveBundledOriginals = async (): Promise<NoisegenOriginal[]> => {
   try {
-    const stats = await fs.stat(BUNDLED_ORIGINALS_MANIFEST);
+    const stats = await fs.stat(resolveBundledManifestPath());
     const mtimeMs = Math.round(stats.mtimeMs);
     if (bundledOriginalsCache?.mtimeMs === mtimeMs) {
       return bundledOriginalsCache.originals;
@@ -523,22 +525,42 @@ const resolveDefaultOriginal = async (): Promise<NoisegenOriginal | null> => {
 
 const isBlank = (value?: string): boolean => !value || value.trim().length === 0;
 
+const shouldReplaceAsset = (asset?: NoisegenOriginalAsset): boolean => {
+  if (!asset) return true;
+  try {
+    return !existsSync(resolveOriginalAssetPath(asset));
+  } catch {
+    return true;
+  }
+};
+
+const shouldReplaceStems = (stems?: NoisegenStemAsset[]): boolean => {
+  if (!stems || stems.length === 0) return true;
+  return stems.every((stem) => {
+    try {
+      return !existsSync(resolveStemAssetPath(stem));
+    } catch {
+      return true;
+    }
+  });
+};
+
 const mergeBundledOriginal = (
   existing: NoisegenOriginal,
   bundled: NoisegenOriginal,
 ): { merged: NoisegenOriginal; changed: boolean } => {
   let changed = false;
   const mergedAssets = { ...existing.assets };
-  if (!mergedAssets.instrumental && bundled.assets.instrumental) {
+  if (shouldReplaceAsset(mergedAssets.instrumental) && bundled.assets.instrumental) {
     mergedAssets.instrumental = bundled.assets.instrumental;
     changed = true;
   }
-  if (!mergedAssets.vocal && bundled.assets.vocal) {
+  if (shouldReplaceAsset(mergedAssets.vocal) && bundled.assets.vocal) {
     mergedAssets.vocal = bundled.assets.vocal;
     changed = true;
   }
   if (
-    (!mergedAssets.stems || mergedAssets.stems.length === 0) &&
+    shouldReplaceStems(mergedAssets.stems) &&
     bundled.assets.stems &&
     bundled.assets.stems.length > 0
   ) {
