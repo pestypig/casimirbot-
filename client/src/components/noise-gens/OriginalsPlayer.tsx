@@ -352,20 +352,21 @@ export function OriginalsPlayer({
     const load = async () => {
       setIsLoading(true);
       try {
-        const [instrumental, vocal] = await Promise.all([
-          checkOriginalAsset(original.id, "instrumental", "Mix"),
-          checkOriginalAsset(original.id, "vocal", "Vocal"),
-        ]);
+        const instrumental = await checkOriginalAsset(
+          original.id,
+          "instrumental",
+          "Mix",
+        );
         if (cancelled) return;
 
         if (instrumental) {
-          const mixSources = [instrumental, vocal].filter(
-            (entry): entry is PlayerSource => Boolean(entry),
-          );
-          setSources(mixSources);
-          setSourceMode(mixSources.length > 1 ? "fallback" : "mix");
+          setSources([instrumental]);
+          setSourceMode("mix");
           return;
         }
+
+        const vocal = await checkOriginalAsset(original.id, "vocal", "Vocal");
+        if (cancelled) return;
 
         const stems = await fetchOriginalStems(original.id);
         if (cancelled) return;
