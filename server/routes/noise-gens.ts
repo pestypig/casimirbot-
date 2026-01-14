@@ -10,7 +10,7 @@ import {
   findOriginalById,
   getNoisegenPaths,
   getNoisegenStore,
-  resolveBundledOriginalsRoot,
+  resolveBundledOriginalsRoots,
   resolveOriginalAsset,
   resolveOriginalAssetPath,
   resolveStemAsset,
@@ -643,11 +643,13 @@ const estimateDurationSeconds = (buffer: Buffer, mime?: string): number => {
 
 const { previewsDir } = getNoisegenPaths();
 const kbTexturesDir = path.join(process.cwd(), "client", "public", "kb-textures");
-const staticOriginalsDir = resolveBundledOriginalsRoot();
+const staticOriginalsDirs = resolveBundledOriginalsRoots();
 
 router.use("/kb-textures", express.static(kbTexturesDir));
 router.use("/noisegen/previews", express.static(previewsDir));
-router.use("/originals", express.static(staticOriginalsDir));
+staticOriginalsDirs.forEach((dir) => {
+  router.use("/originals", express.static(dir));
+});
 
 const streamAudioFile = async (
   req: express.Request,

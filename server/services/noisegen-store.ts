@@ -192,20 +192,33 @@ const DEFAULT_MOODS: NoisegenMood[] = [
   },
 ];
 
-export const resolveBundledOriginalsRoot = (): string => {
+export const resolveBundledOriginalsRoots = (): string[] => {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   const candidates = [
-    path.resolve(__dirname, "..", "..", "client", "public", "originals"),
-    path.resolve(__dirname, "..", "..", "dist", "public", "originals"),
     path.resolve(process.cwd(), "client", "public", "originals"),
     path.resolve(process.cwd(), "dist", "public", "originals"),
+    path.resolve(__dirname, "..", "..", "client", "public", "originals"),
+    path.resolve(__dirname, "..", "..", "dist", "public", "originals"),
   ];
-  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+  return candidates.filter(
+    (candidate, index) =>
+      candidates.indexOf(candidate) === index && existsSync(candidate),
+  );
 };
 
-const resolveBundledManifestPath = (): string =>
-  path.join(resolveBundledOriginalsRoot(), "manifest.json");
+export const resolveBundledOriginalsRoot = (): string =>
+  resolveBundledOriginalsRoots()[0] ??
+  path.resolve(process.cwd(), "client", "public", "originals");
+
+const resolveBundledManifestPath = (): string => {
+  const roots = resolveBundledOriginalsRoots();
+  for (const root of roots) {
+    const candidate = path.join(root, "manifest.json");
+    if (existsSync(candidate)) return candidate;
+  }
+  return path.join(resolveBundledOriginalsRoot(), "manifest.json");
+};
 
 let bundledOriginalsCache:
   | { mtimeMs: number; originals: NoisegenOriginal[] }
@@ -355,7 +368,10 @@ const resolveBundledOriginal = async (
   const id = manifest.id?.trim();
   if (!id) return null;
   const folder = manifest.folder?.trim() || id;
-  const rootDir = path.join(resolveBundledOriginalsRoot(), folder);
+  const roots = resolveBundledOriginalsRoots();
+  const rootDir =
+    roots.map((root) => path.join(root, folder)).find((dir) => existsSync(dir)) ??
+    path.join(resolveBundledOriginalsRoot(), folder);
   if (!existsSync(rootDir)) return null;
 
   const assets: NoisegenOriginal["assets"] = {};
