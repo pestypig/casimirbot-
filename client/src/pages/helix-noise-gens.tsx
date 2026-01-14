@@ -20,6 +20,7 @@ import {
   type RenderJobResult,
   type RenderJobUpdate,
 } from "@/components/noise-gens/CoverCreator";
+import { OriginalsPlayer } from "@/components/noise-gens/OriginalsPlayer";
 import {
   UploadOriginalsModal,
   type UploadCompletePayload,
@@ -38,8 +39,9 @@ import NoiseFieldPanel from "@/components/noise-gens/NoiseFieldPanel";
 import AtomLibraryPanel from "@/components/noise-gens/AtomLibraryPanel";
 import { TrainingPlan } from "@/components/noise-gens/TrainingPlan";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
-import ProjectAlbumPanel from "@/components/noise-gen/ProjectAlbumPanel";       
+import ProjectAlbumPanel from "@/components/noise-gen/ProjectAlbumPanel";
 import { decodeLayout } from "@/lib/desktop/shareState";
+import { cn } from "@/lib/utils";
 import type {
   CoverEvidence,
   JobStatus,
@@ -50,7 +52,10 @@ import type {
 } from "@/types/noise-gens";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalSession } from "@/hooks/useLocalSession";
+import { useNoisegenUiMode } from "@/hooks/useNoisegenUiMode";
 import type { SessionUser } from "@/lib/auth/session";
+import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
+import { useKnowledgeProjectsStore, type ProjectWithStats } from "@/store/useKnowledgeProjectsStore";
 import {
   DEMO_PASSWORD,
   DEMO_USERNAME,
@@ -118,6 +123,7 @@ const sanitizeTempoMeta = (value: unknown): TempoMeta | undefined => {
   }
   return tempo;
 };
+
 
 const estimateDurationFromTempo = (tempo?: TempoMeta | null): number | null => {
   if (!tempo) return null;
@@ -230,7 +236,13 @@ export default function HelixNoiseGensPage() {
     }),
   );
   const { toast } = useToast();
+  const { updateProject, projects: knowledgeProjects } = useKnowledgeProjectsStore((state) => ({
+    updateProject: state.updateProject,
+    projects: state.projects,
+  }));
   const [selectedOriginal, setSelectedOriginal] = useState<Original | null>(null);
+  const [availableOriginals, setAvailableOriginals] = useState<Original[]>([]);
+  const [autoPlayToken, setAutoPlayToken] = useState(0);
   const [moodPresets, setMoodPresets] = useState<MoodPreset[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -239,7 +251,6 @@ export default function HelixNoiseGensPage() {
   const recentUploadsRef = useRef<RecentUploadEntry[]>(recentUploads);
   const [activeRenderJob, setActiveRenderJob] = useState<RenderHistoryEntry | null>(null);
   const [renderHistory, setRenderHistory] = useState<RenderHistoryEntry[]>([]);
-  const [hasGenerations, setHasGenerations] = useState(false);
   const [includeHelixPacket, setIncludeHelixPacket] = useState(Boolean(readHelixPacket()));
   const [helixPacket, setHelixPacket] = useState<HelixPacket | null>(() => readHelixPacket());
   const [sessionTempo, setSessionTempo] = useState<TempoMeta | null>(null);
@@ -253,6 +264,15 @@ export default function HelixNoiseGensPage() {
   const { user, signOut, signIn } = useLocalSession();
   const [currentLocation, setLocation] = useLocation();
   const isDesktopContext = currentLocation?.startsWith("/desktop");
+  const { uiMode, setUiMode, modeLabels, modes } = useNoisegenUiMode();
+  const showListener = uiMode === "listener";
+  const showRemix = uiMode === "remix";
+  const showStudio = uiMode === "studio";
+  const showLabs = uiMode === "labs";
+  const isListenerLayout = showListener;
+  const [remixMounted, setRemixMounted] = useState(showRemix);
+  const [studioMounted, setStudioMounted] = useState(showStudio);
+  const [labsMounted, setLabsMounted] = useState(showLabs);
   const originalsByIdRef = useRef<Map<string, Original>>(new Map());
   const pendingOriginalsRef = useRef<Map<string, Original>>(new Map());
 
@@ -260,29 +280,89 @@ export default function HelixNoiseGensPage() {
     (original: Original) => {
       setSelectedOriginal(original);
       setSessionTempo((prev) => original.tempo ?? prev);
+      setAutoPlayToken((prev) => prev + 1);
       toast({
         title: "Track selected",
-        description: `${original.title} is ready for mood blending.`,
+        description: isListenerLayout
+          ? `${original.title} is ready to play.`
+          : `${original.title} is ready for mood blending.`,
       });
     },
-    [toast],
+    [isListenerLayout, toast],
   );
 
   const handleKnowledgeSelection = useCallback(
     ({ project, file }: KnowledgeAudioSelection) => {
       const projectLabel = project.name?.trim() || "My Knowledge";
-      const fileType = file.mime || file.type || "audio/wav";
-      const instrumental = new File([file.data], file.name, { type: fileType });
+      const creator = user?.name?.trim() || projectLabel;
+      const trimmedTitle = file.name.replace(/\.[^/.]+$/, "").trim();
       setUploadPrefill({
-        instrumental,
-        creator: projectLabel,
+        title: trimmedTitle || projectLabel,
+        creator,
         sourceHint: `Loaded from ${projectLabel} - ${file.name}`,
         knowledgeProjectId: project.id,
         knowledgeProjectName: projectLabel,
       });
       setUploadOpen(true);
     },
-    [setUploadPrefill, setUploadOpen],
+    [setUploadPrefill, setUploadOpen, user?.name],
+  );
+
+  const handleProjectImport = useCallback(
+    (project: ProjectWithStats, files: KnowledgeFileRecord[]) => {
+      if (!files.length) {
+        toast({
+          title: "No stems found",
+          description: "This project does not have any audio files to import.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const projectLabel = project.name?.trim() || "My Knowledge";
+      const creator = user?.name?.trim() || projectLabel;
+      const stemCount = files.length;
+      setUploadPrefill({
+        title: projectLabel,
+        creator,
+        sourceHint: `Loaded ${stemCount} stem${stemCount === 1 ? "" : "s"} from ${projectLabel}.`,
+        knowledgeProjectId: project.id,
+        knowledgeProjectName: projectLabel,
+      });
+      setUploadOpen(true);
+    },
+    [toast, user?.name],
+  );
+
+  const handleReviewPublishProject = useCallback(
+    (project: ProjectWithStats) => {
+      const projectLabel = project.name?.trim() || "Noise Album";
+      const creator = user?.name?.trim() || projectLabel;
+      const meta = (project.meta ?? {}) as Record<string, unknown>;
+      const existingOriginalId =
+        typeof (meta as { publish?: { originalId?: unknown } }).publish?.originalId ===
+        "string"
+          ? String((meta as { publish?: { originalId?: unknown } }).publish?.originalId)
+          : undefined;
+      const lyrics =
+        typeof (meta as { lyrics?: unknown }).lyrics === "string"
+          ? String((meta as { lyrics?: unknown }).lyrics)
+          : undefined;
+      const tempoMeta = sanitizeTempoMeta((meta as { tempo?: unknown }).tempo);
+      setUploadPrefill({
+        title: projectLabel,
+        creator,
+        sourceHint: `Review stems from ${projectLabel} before publishing.`,
+        knowledgeProjectId: project.id,
+        knowledgeProjectName: projectLabel,
+        notes: lyrics,
+        existingOriginalId,
+        bpm: tempoMeta?.bpm,
+        offsetMs: tempoMeta?.offsetMs,
+        quantized: tempoMeta?.quantized,
+      });
+      setUploadOpen(true);
+    },
+    [setUploadPrefill, setUploadOpen, user?.name],
   );
 
   const recordRecentUpload = useCallback((payload: UploadCompletePayload) => {
@@ -326,6 +406,7 @@ export default function HelixNoiseGensPage() {
 
   const handleOriginalsHydrated = useCallback(
     (originals: Original[]) => {
+      setAvailableOriginals(originals);
       const nextMap = new Map<string, Original>();
       for (const original of originals) {
         nextMap.set(original.id, original);
@@ -426,6 +507,42 @@ export default function HelixNoiseGensPage() {
     [],
   );
 
+  const markNoiseAlbumPublished = useCallback(
+    async (payload: UploadCompletePayload, title: string, creator: string) => {
+      if (!payload.knowledgeProjectId) return;
+      const project = knowledgeProjects.find((entry) => entry.id === payload.knowledgeProjectId);
+      if (!project || project.type !== "noise-album") return;
+      const meta = (project.meta ?? {}) as Record<string, unknown>;
+      const currentPublish = ((meta as { publish?: Record<string, unknown> }).publish ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const nextPublish = {
+        ...currentPublish,
+        originalId: payload.trackId,
+        title,
+        creator,
+        publishedAt: Date.now(),
+      };
+      const { fileCount: _fileCount, ...projectRecord } = project;
+      try {
+        await updateProject({
+          ...projectRecord,
+          meta: {
+            ...meta,
+            publish: nextPublish,
+          },
+        });
+      } catch {
+        toast({
+          title: "Publish status not saved",
+          description: "Upload completed, but we could not mark the noise album as published.",
+        });
+      }
+    },
+    [knowledgeProjects, toast, updateProject],
+  );
+
   const handleUploadComplete = useCallback(
     (payload: UploadCompletePayload) => {
       const trimmedTitle = payload.title.trim() || payload.title;
@@ -449,12 +566,13 @@ export default function HelixNoiseGensPage() {
       );
       bumpOriginalAvailabilityVersion();
       recordRecentUpload(payload);
+      void markNoiseAlbumPublished(payload, trimmedTitle, trimmedCreator);
       toast({
         title: "Upload received",
         description: "We will surface the new original once it is ranked.",
       });
     },
-    [recordRecentUpload, toast],
+    [markNoiseAlbumPublished, recordRecentUpload, toast],
   );
 
   const handleOpenLibraryRequest = useCallback(() => {
@@ -586,6 +704,18 @@ export default function HelixNoiseGensPage() {
     }
   }, [inlineSignInOpen, user]);
 
+  useEffect(() => {
+    if (showRemix) setRemixMounted(true);
+  }, [showRemix]);
+
+  useEffect(() => {
+    if (showStudio) setStudioMounted(true);
+  }, [showStudio]);
+
+  useEffect(() => {
+    if (showLabs) setLabsMounted(true);
+  }, [showLabs]);
+
   const handleHelixToggle = useCallback((value: boolean) => {
     setIncludeHelixPacket(value);
     if (value) {
@@ -633,6 +763,28 @@ export default function HelixNoiseGensPage() {
     });
   }, [signOut, toast]);
 
+  const handleModeSelect = useCallback(
+    (mode: typeof uiMode) => {
+      setUiMode(mode);
+    },
+    [setUiMode],
+  );
+
+  const handleCreateCover = useCallback(() => {
+    if (!selectedOriginal) {
+      toast({
+        title: "Select a song first",
+        description: "Pick a song in Listener before opening Remix.",
+      });
+      return;
+    }
+    setUiMode("remix");
+  }, [selectedOriginal, setUiMode, toast]);
+
+  const handlePickTrack = useCallback(() => {
+    setUiMode("listener");
+  }, [setUiMode]);
+
   const handleInlineSignInComplete = useCallback(
     (session: SessionUser) => {
       signIn(session);
@@ -645,7 +797,7 @@ export default function HelixNoiseGensPage() {
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="relative flex min-h-screen flex-col bg-gradient-to-b from-slate-950 via-slate-900/60 to-slate-950 text-slate-100">
         <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/80 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 lg:px-6">
+          <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-sky-500/50 to-blue-500/30">
                 <HelixMarkIcon className="h-7 w-7 text-sky-200" strokeWidth={32} aria-label="Helix mark" />
@@ -658,34 +810,30 @@ export default function HelixNoiseGensPage() {
                   Noise Gens
                 </h1>
                 <p className="text-xs text-slate-400">
-                  Originals + Helix generations, side by side.
+                  Songs + Helix generations, side by side.
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1">
-                <Switch
-                  id="helix-packet-toggle"
-                  checked={includeHelixPacket}
-                  onCheckedChange={handleHelixToggle}
-                />
-                <label
-                  htmlFor="helix-packet-toggle"
-                  className="text-xs font-medium text-slate-200"
-                >
-                  Link Helix
-                </label>
-                {includeHelixPacket ? (
-                  <span
-                    className={
-                      helixPacket
-                        ? "text-[11px] text-emerald-300"
-                        : "text-[11px] text-amber-300"
-                    }
-                  >
-                    {helixPacket ? "Ready" : "Load in Helix"}
-                  </span>
-                ) : null}
+            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
+              <div className="flex w-full flex-wrap items-center justify-center gap-1 rounded-full border border-white/15 bg-white/5 p-1 text-[11px] uppercase tracking-[0.2em] text-slate-300 sm:w-auto sm:justify-start">
+                {modes.map((mode) => {
+                  const isActive = uiMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => handleModeSelect(mode)}
+                      className={cn(
+                        "rounded-full px-2.5 py-1 transition",
+                        isActive
+                          ? "bg-sky-500/80 text-white"
+                          : "text-slate-300 hover:bg-white/10",
+                      )}
+                    >
+                      {modeLabels[mode]}
+                    </button>
+                  );
+                })}
               </div>
               <Button variant="secondary" className="gap-2" onClick={handleOpenLibraryRequest}>
                 <FolderOpen className="h-4 w-4" aria-hidden />
@@ -738,52 +886,145 @@ export default function HelixNoiseGensPage() {
         </header>
 
         <main className="flex-1">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 lg:px-6">
-            <ProjectAlbumPanel projectSlug={externalProjectSlug} />
-            <AtomLibraryPanel />
-            <TrainingPlan />
-            <NoiseFieldPanel />
-            {decoratedRecentUploads.length ? (
-              <RecentUploadsRail
-                uploads={decoratedRecentUploads}
-                onSelect={handleRecentSelect}
-                onReveal={handleRecentReveal}
-              />
-            ) : null}
-            <div className="flex flex-col gap-6">
-              {activeRenderJob ? <RenderInProgressCard job={activeRenderJob} /> : null}
-              <CoverCreator
-                includeHelixPacket={includeHelixPacket}
-                helixPacket={helixPacket}
-                selectedOriginal={selectedOriginal}
-                onClearSelection={() => setSelectedOriginal(null)}
-                moodPresets={moodPresets}
-                sessionTempo={sessionTempo}
-                onRenderJobUpdate={handleRenderJobUpdate}
-                onRenderJobComplete={handleRenderJobComplete}
-              />
-              <DualTopLists
-                selectedOriginalId={selectedOriginal?.id}
-                onOriginalSelected={handleOriginalSelect}
-                onGenerationsPresenceChange={setHasGenerations}
-                onMoodPresetsLoaded={setMoodPresets}
-                onOriginalsHydrated={handleOriginalsHydrated}
-                sessionTempo={sessionTempo}
-              />
-            </div>
-            {renderHistory.length ? <RenderHistoryPanel entries={renderHistory} /> : null}
-            <MoodLegend presets={moodPresets} />
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 text-xs text-slate-300 shadow-[0_20px_60px_-40px_rgba(15,118,220,0.45)]">
-              <div className="font-semibold uppercase tracking-widest text-slate-100">
-                Page Checklist
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:py-8 lg:px-6 lg:py-10">
+            <section
+              className={cn("space-y-6", showListener ? "" : "hidden")}
+              aria-hidden={!showListener}
+            >
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,320px),minmax(0,1fr)]">
+                <div className="space-y-6">
+                  <DualTopLists
+                    layout="listener"
+                    selectedOriginalId={selectedOriginal?.id}
+                    onOriginalSelected={handleOriginalSelect}
+                    onMoodPresetsLoaded={setMoodPresets}
+                    onOriginalsHydrated={handleOriginalsHydrated}
+                    sessionTempo={sessionTempo}
+                  />
+                </div>
+                <div className="space-y-6">
+                  <OriginalsPlayer
+                    original={selectedOriginal}
+                    playlist={availableOriginals}
+                    onSelectOriginal={handleOriginalSelect}
+                    autoPlayToken={autoPlayToken}
+                  />
+                  <div className="flex items-center justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCreateCover}
+                      disabled={!selectedOriginal}
+                    >
+                      Create Cover
+                    </Button>
+                  </div>
+                </div>
               </div>
-              <ul className="mt-3 space-y-1">
-                <li>- Lists scroll independently with pinned search results.</li>
-                <li>- Connectors follow viewport updates and respect motion preferences.</li>
-                <li>- Drag any original into Cover Creator or select via keyboard controls.</li>
-                <li>- Mood presets trigger Helix renders{hasGenerations ? " with live generations streaming in." : "."}</li>
-              </ul>
-            </div>
+            </section>
+
+            {remixMounted ? (
+              <section
+                className={cn("space-y-6", showRemix ? "" : "hidden")}
+                aria-hidden={!showRemix}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                      Helix Link
+                    </p>
+                    <p className="text-sm text-slate-200">
+                      Bind cover renders to the latest Helix observables packet.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1">
+                    <Switch
+                      id="helix-packet-toggle"
+                      checked={includeHelixPacket}
+                      onCheckedChange={handleHelixToggle}
+                    />
+                    <label
+                      htmlFor="helix-packet-toggle"
+                      className="text-xs font-medium text-slate-200"
+                    >
+                      Link Helix
+                    </label>
+                    {includeHelixPacket ? (
+                      <span
+                        className={
+                          helixPacket
+                            ? "text-[11px] text-emerald-300"
+                            : "text-[11px] text-amber-300"
+                        }
+                      >
+                        {helixPacket ? "Ready" : "Load in Helix"}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                {!selectedOriginal ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
+                    <p className="text-sm font-semibold text-slate-100">
+                      Pick a song to remix
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Choose a song in Listener to load it into Remix.
+                    </p>
+                    <div className="mt-3">
+                      <Button size="sm" variant="secondary" onClick={handlePickTrack}>
+                        Go to Listener
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+                {activeRenderJob ? <RenderInProgressCard job={activeRenderJob} /> : null}
+                <CoverCreator
+                  includeHelixPacket={includeHelixPacket}
+                  helixPacket={helixPacket}
+                  selectedOriginal={selectedOriginal}
+                  onClearSelection={() => setSelectedOriginal(null)}
+                  moodPresets={moodPresets}
+                  sessionTempo={sessionTempo}
+                  uiMode={uiMode}
+                  onRenderJobUpdate={handleRenderJobUpdate}
+                  onRenderJobComplete={handleRenderJobComplete}
+                />
+                <AtomLibraryPanel />
+                {renderHistory.length ? (
+                  <RenderHistoryPanel entries={renderHistory} />
+                ) : null}
+                <MoodLegend presets={moodPresets} />
+              </section>
+            ) : null}
+
+            {studioMounted ? (
+              <section
+                className={cn("space-y-6", showStudio ? "" : "hidden")}
+                aria-hidden={!showStudio}
+              >
+                <ProjectAlbumPanel
+                  projectSlug={externalProjectSlug}
+                  onReviewPublish={handleReviewPublishProject}
+                />
+                {decoratedRecentUploads.length ? (
+                  <RecentUploadsRail
+                    uploads={decoratedRecentUploads}
+                    onSelect={handleRecentSelect}
+                    onReveal={handleRecentReveal}
+                  />
+                ) : null}
+                <TrainingPlan />
+              </section>
+            ) : null}
+
+            {labsMounted ? (
+              <section
+                className={cn("space-y-6", showLabs ? "" : "hidden")}
+                aria-hidden={!showLabs}
+              >
+                <NoiseFieldPanel />
+              </section>
+            ) : null}
           </div>
         </main>
 
@@ -799,6 +1040,7 @@ export default function HelixNoiseGensPage() {
         open={libraryOpen}
         onOpenChange={handleLibraryOpenChange}
         onSelect={handleKnowledgeSelection}
+        onImportProject={handleProjectImport}
         initialProjectId={libraryInitialProjectId}
       />
 

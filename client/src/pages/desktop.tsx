@@ -21,6 +21,9 @@ import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
 const PENDING_PANEL_KEY = "helix:pending-panel";
+const NOISE_GENS_PANEL_ID = "helix-noise-gens";
+const ESSENCE_CONSOLE_PANEL_ID = "agi-essence-console";
+const NOISE_GENS_AUTO_OPEN_SUPPRESS = new Set([ESSENCE_CONSOLE_PANEL_ID]);
 
 function collectPanelIdsFromStructure(
   input: unknown,
@@ -84,6 +87,7 @@ export default function DesktopPage() {
   }));
   const hashAppliedRef = useRef(false);
   const environmentAppliedRef = useRef(false);
+  const autoOpenSuppressRef = useRef<Set<string> | null>(null);
   const wallpaperRecipe = useMemo(
     () =>
       generateSurfaceRecipe({
@@ -103,6 +107,9 @@ export default function DesktopPage() {
     try {
       const pending = window.localStorage.getItem(PENDING_PANEL_KEY);
       if (pending) {
+        if (pending === NOISE_GENS_PANEL_ID) {
+          autoOpenSuppressRef.current = NOISE_GENS_AUTO_OPEN_SUPPRESS;
+        }
         open(pending);
         window.localStorage.removeItem(PENDING_PANEL_KEY);
       }
@@ -165,6 +172,9 @@ export default function DesktopPage() {
         }
       }
       const panels = resolvePanelIds(layout.panels);
+      if (panels.includes(NOISE_GENS_PANEL_ID)) {
+        autoOpenSuppressRef.current = NOISE_GENS_AUTO_OPEN_SUPPRESS;
+      }
       panels.forEach((id) => open(id));
     },
     [open, projects, selectProjects],
@@ -180,6 +190,9 @@ export default function DesktopPage() {
       collectPanelIdsFromStructure(context.environment.userOverrides?.widgets, panelIds);
       panelIds.forEach((panelId) => {
         if (panelId && getPanelDef(panelId)) {
+          if (autoOpenSuppressRef.current?.has(panelId)) {
+            return;
+          }
           open(panelId);
         }
       });
@@ -233,6 +246,9 @@ export default function DesktopPage() {
         if (pref.key.startsWith("panel:")) {
           const panelId = pref.key.slice("panel:".length);
           if (panelId) {
+            if (autoOpenSuppressRef.current?.has(panelId)) {
+              return;
+            }
             open(panelId);
             seen.add(pref.key);
           }

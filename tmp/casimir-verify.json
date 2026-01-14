@@ -1,0 +1,15 @@
+{
+  "traceId": "local:pre-commit-hook",
+  "actions": [
+    {
+      "id": "pre-commit-hook",
+      "params": {
+        "dutyEffectiveFR": 0.0025
+      }
+    }
+  ],
+  "budget": {
+    "maxIterations": 1,
+    "maxTotalMs": 60000
+  }
+}

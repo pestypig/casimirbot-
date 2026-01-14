@@ -27,6 +27,8 @@ export function useGrRegionStats(options: UseGrRegionStatsOptions = {}) {
     topN,
     maxVoxels,
     requireCertified,
+    shockMode,
+    advectScheme,
     refetchMs = 0,
     enabled = true,
   } = options;
@@ -48,6 +50,8 @@ export function useGrRegionStats(options: UseGrRegionStatsOptions = {}) {
       topN,
       maxVoxels,
       requireCertified,
+      shockMode,
+      advectScheme,
     }),
     [
       quality,
@@ -65,6 +69,8 @@ export function useGrRegionStats(options: UseGrRegionStatsOptions = {}) {
       topN,
       maxVoxels,
       requireCertified,
+      shockMode,
+      advectScheme,
     ],
   );
 

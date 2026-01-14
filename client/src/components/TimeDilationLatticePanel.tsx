@@ -5,16 +5,19 @@ import { createProgram, resizeCanvasAndViewport } from "@/lib/gl/simple-gl";
 import { registerWebGLContext } from "@/lib/webgl/context-pool";
 import { useEnergyPipeline, useUpdatePipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 import { useHullPreviewPayload } from "@/hooks/use-hull-preview-payload";
+import { useGrAssistantReport } from "@/hooks/useGrAssistantReport";
 import { useGrBrick } from "@/hooks/useGrBrick";
 import { useGrRegionStats } from "@/hooks/useGrRegionStats";
 import { useCasimirTileSummary } from "@/hooks/useCasimirTileSummary";
 import { useLapseBrick } from "@/hooks/useLapseBrick";
+import { computeTimeDilationRenderPlan, type TimeDilationRenderUiToggles } from "@/lib/time-dilation-render-policy";
 import type { CurvatureQuality } from "@/lib/curvature-brick";
 import type { GrEvolveBrickChannel, GrEvolveBrickDecoded } from "@/lib/gr-evolve-brick";
 import type { LapseBrickChannel, LapseBrickDecoded } from "@/lib/lapse-brick";
 import { fetchHullAssets, type HullAssetEntry } from "@/lib/hull-assets";
+import { C } from "@/lib/physics-const";
 import { kappaDriveFromPower } from "@/physics/curvature";
-import type { GrRegionStats, HullPreviewPayload } from "@shared/schema";
+import type { GrRegionStats, HullPreviewPayload, TimeDilationRenderPlan } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -124,6 +127,7 @@ const getBrickChannel = (
 };
 
 type ClockRateMode = "eulerian" | "static";
+type ViewerChartMode = "adm" | "mp_like";
 type GeometrySource = "pipeline" | "repo" | "upload";
 
 type GuardrailState = "ok" | "fail" | "proxy";
@@ -148,6 +152,17 @@ type HullDims = {
   Lx_m: number;
   Ly_m: number;
   Lz_m: number;
+};
+
+type WallDiagnostics = {
+  source: "kretschmann" | "ricci4";
+  detected: boolean;
+  p98: number;
+  threshold: number;
+  bandMin: number;
+  bandMax: number;
+  sampleCount: number;
+  sampleFraction: number;
 };
 
 type BubbleParams = {
@@ -208,11 +223,13 @@ const DEFAULT_KAPPA_TUNING: KappaTuning = {
 };
 
 const DEFAULT_HULL_AXES: [number, number, number] = [503.5, 132, 86.5];
+const DEFAULT_HULL_EPS = 1e-3;
 const DEFAULT_BUBBLE_SIGMA = 6;
 const BRICK_BLEND_TAU = 0.3;
 const GR_TARGET_DX_M = 5;
 const GR_DEFAULT_STEPS = 2;
-const GR_DEFAULT_DT_S = 0.002;
+const GR_DEFAULT_CFL = 0.3;
+const GR_DEFAULT_DT_S = (GR_TARGET_DX_M * GR_DEFAULT_CFL) / C;
 const REGION_TARGET_DX_M = 8;
 const REGION_MAX_VOXELS = 2_000_000;
 const REGION_GRID_LINE_WIDTH = 0.08;
@@ -229,10 +246,27 @@ const HULL_CONTOUR_SCALE = 1.2;
 const HULL_CONTOUR_MIN = 0.05;
 const HULL_GLOW_SCALE = 0.6;
 const HULL_WARP_SCALE = 0.55;
-const NATARIO_GEOM_WARP_SCALE = 0.05;
-const METRIC_BLEND = 0.45;
-const SHEAR_STRENGTH = 0.35;
-const THETA_WARP_SCALE = 0.7;
+const BETA_WARP_PERCENTILE = 0.98;
+const THETA_WARP_PERCENTILE = 0.98;
+const GAMMA_WARP_PERCENTILE = 0.98;
+const SHEAR_WARP_PERCENTILE = 0.98;
+const WARP_SCALE_SAMPLE_MAX = 4096;
+const WARP_SAMPLE_MAX_ABS = 1e6;
+const WARP_CLAMP_MULT = 4;
+const WALL_INVARIANT_PERCENTILE = 0.98;
+const WALL_INVARIANT_FRACTION = 0.25;
+const WALL_INVARIANT_BAND_FRACTION = 0.2;
+const BETA_STRAIN_SAMPLE_FACTOR = 1.05;
+const BETA_STRAIN_THRESHOLD_FRACTION = 0.05;
+const SHIFT_STIFF_WARN_RATIO = 1.0;
+const SHIFT_STIFF_SEVERE_RATIO = 1.5;
+const SHIFT_STIFF_GRAD_WARN_RATIO = 3;
+const SHIFT_STIFF_GRAD_SEVERE_RATIO = 6;
+const GAMMA_DEV_CLAMP_MIN = 0.05;
+const GAMMA_DEV_CLAMP_MAX = 4;
+const GAMMA_SCALE_MIN = 0.5;
+const GAMMA_SCALE_MAX = 2;
+const WARP_CAP_THETA_FLOOR = 0.2;
 const CONSTRAINT_ISO_LEVEL = 0.7;
 const CONSTRAINT_ISO_WIDTH = 0.08;
 const DEFAULT_VISUAL_TUNING = {
@@ -283,11 +317,13 @@ uniform float u_sigma;
   uniform float u_betaScale;
   uniform float u_betaWarpWeight;
   uniform float u_geomWarpScale;
+  uniform float u_warpCap;
   uniform float u_phiScale;
   uniform float u_alphaMin;
-  uniform float u_alphaScale;
-  uniform float u_thetaScale;
-  uniform float u_softening;
+uniform float u_alphaScale;
+uniform float u_thetaScale;
+uniform float u_thetaWarpWeight;
+uniform float u_softening;
 uniform float u_warpStrength;
 uniform float u_breathAmp;
 uniform float u_breathRate;
@@ -349,18 +385,29 @@ void main() {
     float thetaWarp = thetaNorm * u_alphaScale * activation;
   vec3 gamma = max(a_gamma, vec3(0.0));
   vec3 gammaScale = sqrt(max(gamma, vec3(0.0)));
-  gammaScale = clamp(gammaScale, vec3(0.6), vec3(1.6));
-    float metricBlend = max(0.0, u_metricBlend);
-    gammaScale = vec3(1.0) + (gammaScale - vec3(1.0)) * metricBlend;
+  float metricBlend = max(0.0, u_metricBlend);
+  gammaScale = vec3(1.0) + (gammaScale - vec3(1.0)) * metricBlend;
+  gammaScale = clamp(
+    gammaScale,
+    vec3(${GAMMA_SCALE_MIN.toFixed(2)}),
+    vec3(${GAMMA_SCALE_MAX.toFixed(2)})
+  );
     vec3 shear = a_shear * u_shearStrength * activation;
     vec3 twist = cross(dir, shear);
     vec3 betaRel = (a_beta - u_betaCenter) * u_betaScale;
     vec3 betaWarp = betaRel * u_betaWarpWeight * activation * u_warpStrength;
     vec3 radial = safeNormalize(rel);
-    vec3 thetaVec = radial * thetaWarp * u_warpStrength * ${THETA_WARP_SCALE.toFixed(2)};
-    vec3 warp = (betaWarp + thetaVec + hullWarp * u_warpStrength + shear + twist) * u_geomWarpScale;
+  vec3 thetaVec = radial * thetaWarp * u_warpStrength * u_thetaWarpWeight;
+    vec3 warpBase = (betaWarp + thetaVec + hullWarp * u_warpStrength + shear + twist) * u_geomWarpScale;
   float breath = (1.0 - alpha) * u_breathAmp * sin(u_time * u_breathRate) * activation * u_geomWarpScale;
-  vec3 warped = (p + warp + dir * breath) * gammaScale;
+  vec3 warpWithBreath = warpBase + dir * breath;
+  float warpCap = max(
+    1e-6,
+    u_warpCap * (${WARP_CAP_THETA_FLOOR.toFixed(2)} + (1.0 - ${WARP_CAP_THETA_FLOOR.toFixed(2)}) * abs(thetaNorm))
+  );
+  float warpLen = length(warpWithBreath);
+  vec3 warp = warpLen > warpCap ? warpWithBreath * (warpCap / warpLen) : warpWithBreath;
+  vec3 warped = (p + warp) * gammaScale;
 
   float localRate = mix(0.3, 1.0, alpha);
     v_pulse = 0.5 + 0.5 * sin(u_time * u_pulseRate * localRate + dot(p, vec3(1.7, 2.3, 1.1)));
@@ -601,6 +648,8 @@ const normalizeVec3 = (v: [number, number, number]) => {
 };
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
 const lerp = (min: number, max: number, t: number) => min + (max - min) * t;
 const toFiniteNumber = (value: unknown, fallback: number) => {
   const num = Number(value);
@@ -630,6 +679,166 @@ const formatBytes = (value: number | null | undefined) => {
 const formatVec3 = (value: [number, number, number] | null | undefined, digits = 2) => {
   if (!value || value.length < 3) return "n/a";
   return `[${value.map((entry) => (Number.isFinite(entry) ? entry.toFixed(digits) : "n/a")).join(", ")}]`;
+};
+const truncateText = (value: string, max = 80) =>
+  value.length > max ? `${value.slice(0, max - 3)}...` : value;
+const formatInvariantValue = (value: unknown, digits = 2) => {
+  if (typeof value === "number") return formatSci(value, digits);
+  if (typeof value === "string") return truncateText(value);
+  if (value && typeof value === "object") {
+    try {
+      return truncateText(JSON.stringify(value));
+    } catch {
+      return "unserializable";
+    }
+  }
+  return value == null ? "n/a" : String(value);
+};
+const percentileFromSamples = (samples: number[], percentile: number) => {
+  if (!samples.length) return null;
+  samples.sort((a, b) => a - b);
+  const idx = Math.min(
+    samples.length - 1,
+    Math.max(0, Math.floor(percentile * (samples.length - 1))),
+  );
+  return samples[idx];
+};
+const collectAbsSamples = (
+  data: Float32Array | null | undefined,
+  maxSamples: number,
+  maxAbs: number = Number.POSITIVE_INFINITY,
+) => {
+  if (!data || maxSamples <= 0) return [];
+  const len = data.length;
+  if (len === 0) return [];
+  const step = Math.max(1, Math.floor(len / maxSamples));
+  const samples: number[] = [];
+  for (let i = 0; i < len; i += step) {
+    const value = Math.min(Math.abs(data[i]), maxAbs);
+    if (Number.isFinite(value)) samples.push(value);
+  }
+  return samples;
+};
+const collectVec3MagnitudeSamples = (
+  data: Float32Array | null | undefined,
+  maxSamples: number,
+  maxAbs: number = Number.POSITIVE_INFINITY,
+) => {
+  if (!data || data.length < 3 || maxSamples <= 0) return [];
+  const count = Math.floor(data.length / 3);
+  if (count <= 0) return [];
+  const step = Math.max(1, Math.floor(count / maxSamples));
+  const samples: number[] = [];
+  for (let i = 0; i < count; i += step) {
+    const idx = i * 3;
+    const value = Math.min(Math.hypot(data[idx], data[idx + 1], data[idx + 2]), maxAbs);
+    if (Number.isFinite(value)) samples.push(value);
+  }
+  return samples;
+};
+const collectVec3DeviationSamples = (
+  data: Float32Array | null | undefined,
+  maxSamples: number,
+  baseline: number,
+  maxAbs: number = Number.POSITIVE_INFINITY,
+) => {
+  if (!data || data.length < 3 || maxSamples <= 0) return [];
+  const count = Math.floor(data.length / 3);
+  if (count <= 0) return [];
+  const step = Math.max(1, Math.floor(count / maxSamples));
+  const samples: number[] = [];
+  for (let i = 0; i < count; i += step) {
+    const idx = i * 3;
+    const dx = data[idx] - baseline;
+    const dy = data[idx + 1] - baseline;
+    const dz = data[idx + 2] - baseline;
+    const value = Math.min(Math.hypot(dx, dy, dz), maxAbs);
+    if (Number.isFinite(value)) samples.push(value);
+  }
+  return samples;
+};
+const normalizeSignedField = (
+  data: Float32Array | null,
+  p98Abs: number | null | undefined,
+  clampMult: number,
+  fallback = 0,
+) => {
+  if (!data) {
+    return {
+      data: null as Float32Array | null,
+      sanitizedCount: 0,
+      clampMin: null as number | null,
+      clampMax: null as number | null,
+    };
+  }
+  const safeP98 = Number.isFinite(p98Abs as number) && (p98Abs as number) > 0 ? (p98Abs as number) : null;
+  const clampAbs =
+    safeP98 && Number.isFinite(clampMult) && clampMult > 0 ? safeP98 * clampMult : null;
+  const clampMin = clampAbs !== null ? -clampAbs : null;
+  const clampMax = clampAbs !== null ? clampAbs : null;
+  const out = new Float32Array(data.length);
+  let sanitizedCount = 0;
+  for (let i = 0; i < data.length; i += 1) {
+    const value = data[i];
+    if (!Number.isFinite(value)) {
+      out[i] = fallback;
+      sanitizedCount += 1;
+      continue;
+    }
+    if (clampAbs !== null && Math.abs(value) > clampAbs) {
+      out[i] = Math.sign(value) * clampAbs;
+      sanitizedCount += 1;
+      continue;
+    }
+    out[i] = value;
+  }
+  return { data: out, sanitizedCount, clampMin, clampMax };
+};
+const sanitizeVec3Array = (data: Float32Array | null, clampAbs?: number | null) => {
+  if (!data) return null;
+  const out = new Float32Array(data.length);
+  const limit = Number.isFinite(clampAbs as number) && (clampAbs as number) > 0 ? (clampAbs as number) : null;
+  for (let i = 0; i < data.length; i += 3) {
+    const x = data[i];
+    const y = data[i + 1];
+    const z = data[i + 2];
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      out[i] = 0;
+      out[i + 1] = 0;
+      out[i + 2] = 0;
+      continue;
+    }
+    if (limit) {
+      const mag = Math.hypot(x, y, z);
+      if (mag > limit && mag > 0) {
+        const scale = limit / mag;
+        out[i] = x * scale;
+        out[i + 1] = y * scale;
+        out[i + 2] = z * scale;
+        continue;
+      }
+    }
+    out[i] = x;
+    out[i + 1] = y;
+    out[i + 2] = z;
+  }
+  return out;
+};
+const sanitizeGammaArray = (data: Float32Array | null, clampDev?: number | null) => {
+  if (!data) return null;
+  const out = new Float32Array(data.length);
+  const limit = Number.isFinite(clampDev as number) && (clampDev as number) > 0 ? (clampDev as number) : null;
+  const min = limit ? Math.max(0.1, 1 - limit) : 0.1;
+  const max = limit ? 1 + limit : 4;
+  for (let i = 0; i < data.length; i += 1) {
+    const value = data[i];
+    if (!Number.isFinite(value)) {
+      out[i] = 1;
+    } else {
+      out[i] = clampNumber(value, min, max);
+    }
+  }
+  return out;
 };
 const smoothExp = (current: number, target: number, tau: number, dt: number) => {
   if (!Number.isFinite(current) || !Number.isFinite(target)) return target;
@@ -1175,6 +1384,29 @@ function resolveHullAxes(pipeline?: EnergyPipelineState | null): [number, number
     return [(Lx as number) / 2, (Ly as number) / 2, (Lz as number) / 2];
   }
   return DEFAULT_HULL_AXES;
+}
+
+function isDefaultHullAxes(axes: [number, number, number]): boolean {
+  return axes.every((axis, idx) => {
+    const base = DEFAULT_HULL_AXES[idx];
+    const tol = Math.max(1e-6, Math.abs(base) * DEFAULT_HULL_EPS);
+    return Math.abs(axis - base) <= tol;
+  });
+}
+
+function resolveUserHullChoice(pipeline?: EnergyPipelineState | null): boolean {
+  if (!pipeline) return false;
+  const preview = pipeline.geometryPreview;
+  return Boolean(
+    preview?.preview ||
+      preview?.mesh ||
+      preview?.sdf ||
+      preview?.lattice ||
+      pipeline.warpGeometryAssetId ||
+      pipeline.hullBrick ||
+      pipeline.cardRecipe?.geometry?.warpGeometryAssetId ||
+      pipeline.cardRecipe?.geometry?.warpGeometryKind,
+  );
 }
 
 function resolveHullBounds(pipeline?: EnergyPipelineState | null): HullBounds {
@@ -1896,12 +2128,14 @@ function buildClockRateSample(
   brick: any,
   fallbackBounds: HullBounds,
   mode: ClockRateMode,
+  chart: ViewerChartMode,
 ): BrickSample | null {
-  if (mode !== "static") {
+  const preferGtt = chart === "mp_like";
+  if (mode !== "static" && !preferGtt) {
     return buildBrickSample(brick, fallbackBounds, "alpha");
   }
   const staticSample = buildBrickSample(brick, fallbackBounds, "clockRate_static");
-  if (staticSample) return staticSample;
+  if (mode === "static" && staticSample) return staticSample;
   const gttSample = buildBrickSample(brick, fallbackBounds, "g_tt");
   if (!gttSample) return buildBrickSample(brick, fallbackBounds, "alpha");
   const data = new Float32Array(gttSample.data.length);
@@ -2008,6 +2242,15 @@ export default function TimeDilationLatticePanel({
     refetchOnWindowFocus: false,
   });
   const pipelineState = pipeline ?? pipelineSnapshot ?? null;
+  const hullBounds = useMemo(() => resolveHullBounds(pipelineState), [pipelineState]);
+  const hullDims = useMemo(
+    () => ({
+      Lx_m: hullBounds.axes[0] * 2,
+      Ly_m: hullBounds.axes[1] * 2,
+      Lz_m: hullBounds.axes[2] * 2,
+    }),
+    [hullBounds],
+  );
   const updatePipeline = useUpdatePipeline();
   const hullPreviewPayload = useHullPreviewPayload();
   const lapseQuery = useLapseBrick({ quality: "low", refetchMs: 2000 });
@@ -2052,17 +2295,22 @@ export default function TimeDilationLatticePanel({
   const [usePreviewObb, setUsePreviewObb] = useState(true);
   const [geometryError, setGeometryError] = useState<string | null>(null);
   const [clockMode, setClockMode] = useState<ClockRateMode>("eulerian");
-  const [grEnabled, setGrEnabled] = useState(false);
+  const [viewerChart, setViewerChart] = useState<ViewerChartMode>("adm");
+  const [grEnabled, setGrEnabled] = useState(true);
   const [grAutoRefresh, setGrAutoRefresh] = useState(false);
   const [grQuality, setGrQuality] = useState<CurvatureQuality>("high");
   const [grTargetDx, setGrTargetDx] = useState(GR_TARGET_DX_M);
-  const [grSteps, setGrSteps] = useState(1);
-  const [grDt, setGrDt] = useState(0.001);
+  const [grSteps, setGrSteps] = useState(GR_DEFAULT_STEPS);
+  const [grDt, setGrDt] = useState(GR_DEFAULT_DT_S);
   const [grIterations, setGrIterations] = useState(0);
   const [grTolerance, setGrTolerance] = useState(0);
+  const [grShockMode, setGrShockMode] = useState<"off" | "diagnostic" | "stabilize">("off");
+  const [grAdvectScheme, setGrAdvectScheme] = useState<"centered" | "upwind1">("centered");
   const [grIncludeExtra, setGrIncludeExtra] = useState(false);
   const [grIncludeMatter, setGrIncludeMatter] = useState(false);
   const [grIncludeKij, setGrIncludeKij] = useState(true);
+  const [exploratoryOverride, setExploratoryOverride] = useState(false);
+  const [cinematicOverride, setCinematicOverride] = useState(false);
   const [regionEnabled, setRegionEnabled] = useState(false);
   const [regionAutoRefresh, setRegionAutoRefresh] = useState(false);
   const [regionSource, setRegionSource] = useState<"auto" | "gr" | "stress">("auto");
@@ -2415,6 +2663,16 @@ export default function TimeDilationLatticePanel({
     tintScale: regionTintScale,
   });
   const regionStatsRef = useRef({ hasGrid: false, hasTint: false });
+  const grAutoEnableRef = useRef(false);
+
+  useEffect(() => {
+    if (grAutoEnableRef.current) return;
+    if (!pipelineState) return;
+    grAutoEnableRef.current = true;
+    if (pipelineState.grEnabled === false) {
+      updatePipeline.mutate({ grEnabled: true });
+    }
+  }, [pipelineState, updatePipeline]);
 
   const grDims = useMemo(() => {
     const bounds = resolveHullBounds(pipelineState);
@@ -2428,6 +2686,27 @@ export default function TimeDilationLatticePanel({
   const includeKijResolved = grIncludeKij || grIncludeExtra;
   const includeMatterResolved = grIncludeMatter || grIncludeExtra;
   const grRequested = grEnabled || grAutoRefresh;
+  const gateRequirements = useMemo(() => {
+    const entries: Array<{ module: string; minStage: MathStageLabel }> = [
+      { module: "server/energy-pipeline.ts", minStage: "reduced-order" },
+    ];
+    if (grRequested) {
+      entries.push({
+        module: "server/gr-evolve-brick.ts",
+        minStage: "diagnostic",
+      });
+    }
+    return entries;
+  }, [grRequested]);
+  const mathStageOK = useMemo(() => {
+    const hasGraph = Boolean(mathGraph?.root);
+    if (!hasGraph) return false;
+    for (const entry of gateRequirements) {
+      const stage = mathNodeIndex.get(entry.module)?.stage ?? "unstaged";
+      if (!meetsStage(stage, entry.minStage)) return false;
+    }
+    return true;
+  }, [gateRequirements, mathGraph?.root, mathNodeIndex]);
   const grQuery = useGrBrick({
     quality: grQuality,
     dims: grDims,
@@ -2435,6 +2714,8 @@ export default function TimeDilationLatticePanel({
     dt_s: grDt > 0 ? grDt : undefined,
     iterations: grIterations > 0 ? grIterations : undefined,
     tolerance: grTolerance > 0 ? grTolerance : undefined,
+    shockMode: grShockMode,
+    advectScheme: grAdvectScheme,
     includeExtra: grIncludeExtra,
     includeMatter: includeMatterResolved,
     includeKij: includeKijResolved,
@@ -2461,6 +2742,8 @@ export default function TimeDilationLatticePanel({
       radialBins: regionRadialBins > 0 ? regionRadialBins : undefined,
       topN: regionTopN,
       maxVoxels: REGION_MAX_VOXELS,
+      shockMode: grShockMode,
+      advectScheme: grAdvectScheme,
       refetchMs: regionAutoRefresh ? 5000 : 0,
       enabled: regionRequested,
     });
@@ -2494,27 +2777,19 @@ export default function TimeDilationLatticePanel({
   const nodeCount = nodeVerts.length / 3;
 
   const gridScale = 1.2;
+  const grAssistantQuery = useGrAssistantReport({
+    brick: grQuery.data ?? null,
+    pipeline: pipelineState,
+    enabled: grRequested && (grControlsEnabled || debugEnabled),
+    refetchMs: grAutoRefresh ? 5000 : 0,
+    runArtifacts: false,
+    runChecks: true,
+    runInvariants: true,
+    vacuumEpsilon: 1e-8,
+    gridScale,
+    gridDiv: GRID_DIV,
+  });
   const driveDir = useMemo(() => normalizeDir((pipelineState as any)?.driveDir), [pipelineState]);
-  const warpFieldType = useMemo(() => {
-    const raw =
-      (pipelineState as any)?.warpFieldType ??
-      (pipelineState as any)?.dynamicConfig?.warpFieldType;
-    if (typeof raw !== "string" || raw.length === 0) return "natario";
-    return raw.toLowerCase();
-  }, [pipelineState]);
-  const warpGeometry = useMemo(() => {
-    if (warpFieldType === "alcubierre") {
-      return { geomScale: 1, betaWeight: 1 };
-    }
-    if (warpFieldType === "natario" || warpFieldType === "natario_sdf") {
-      return { geomScale: NATARIO_GEOM_WARP_SCALE, betaWeight: 0 };
-    }
-    return { geomScale: 1, betaWeight: 0 };
-  }, [warpFieldType]);
-  const warpGeometryRef = useRef(warpGeometry);
-  useEffect(() => {
-    warpGeometryRef.current = warpGeometry;
-  }, [warpGeometry]);
   const driveDirRef = useRef(driveDir);
   useEffect(() => {
     driveDirRef.current = driveDir;
@@ -2531,16 +2806,6 @@ export default function TimeDilationLatticePanel({
   );
   const showContractionArrow =
     regionArrowEnabled && Boolean(contractionVector) && contractionMagnitude > 0;
-
-  const hullBounds = useMemo(() => resolveHullBounds(pipelineState), [pipelineState]);
-  const hullDims = useMemo(
-    () => ({
-      Lx_m: hullBounds.axes[0] * 2,
-      Ly_m: hullBounds.axes[1] * 2,
-      Lz_m: hullBounds.axes[2] * 2,
-    }),
-    [hullBounds],
-  );
 
   const hullWall = useMemo(() => resolveHullWallThickness(pipelineState), [pipelineState]);
 
@@ -2656,6 +2921,31 @@ export default function TimeDilationLatticePanel({
 
   const grGuardrails = useMemo(() => resolveGrGuardrails(pipelineState), [pipelineState]);
   const grProxy = Boolean(grGuardrails?.proxy);
+  const brickMeta = useMemo(() => {
+    return grQuery.data?.meta ?? (pipelineState as any)?.gr?.meta ?? null;
+  }, [grQuery.data, pipelineState]);
+  const solverHealth = useMemo(() => {
+    return (
+      grQuery.data?.stats?.solverHealth ??
+      (pipelineState as any)?.gr?.solver?.health ??
+      null
+    );
+  }, [grQuery.data, pipelineState]);
+  const solverStatus = useMemo(() => {
+    const healthStatus =
+      solverHealth?.status && typeof solverHealth.status === "string"
+        ? solverHealth.status
+        : "NOT_CERTIFIED";
+    if (healthStatus === "UNSTABLE") return "UNSTABLE";
+    const metaStatus =
+      brickMeta?.status && typeof brickMeta.status === "string"
+        ? brickMeta.status
+        : "NOT_CERTIFIED";
+    if (healthStatus === "CERTIFIED" && metaStatus === "CERTIFIED") {
+      return "CERTIFIED";
+    }
+    return "NOT_CERTIFIED";
+  }, [brickMeta, solverHealth]);
   const grStatus = useMemo(() => {
     if (!grRequested) return "off";
     if (grQuery.isFetching) return "running";
@@ -2678,41 +2968,127 @@ export default function TimeDilationLatticePanel({
     if (!regionQuery.error) return null;
     return regionQuery.error instanceof Error ? regionQuery.error.message : String(regionQuery.error);
   }, [regionQuery.error]);
-  const useGrBrickData = Boolean(grQuery.data && grRequested);
-  const activeBrick = grRequested ? (useGrBrickData ? grQuery.data : null) : lapseQuery.data;
+  const useGrBrickData = Boolean(grQuery.data);
+  const thetaSampleRaw = useMemo(
+    () => (grQuery.data ? buildBrickSample(grQuery.data, latticeBounds, "theta") : null),
+    [grQuery.data, latticeBounds],
+  );
+  const thetaRange = useMemo(() => {
+    if (!useGrBrickData || !grQuery.data) return null;
+    const theta = getBrickChannel(grQuery.data, "theta");
+    if (!theta) return null;
+    const min = toFiniteNumber(theta.min, 0);
+    const max = toFiniteNumber(theta.max, 0);
+    const maxAbs = Math.max(Math.abs(min), Math.abs(max));
+    return { min, max, maxAbs };
+  }, [useGrBrickData, grQuery.data]);
 
-  const clockRateSample = useMemo(() => {
-    if (grRequested && !useGrBrickData) return null;
-    if (!activeBrick) return null;
-    return buildClockRateSample(activeBrick, latticeBounds, clockMode);
-  }, [activeBrick, latticeBounds, clockMode, grRequested, useGrBrickData]);
-  const thetaSample = useMemo(
+  const lineThetaRaw = useMemo(
+    () => (thetaSampleRaw ? sampleBrickForVerts(lineVerts, thetaSampleRaw, gridScale) : null),
+    [lineVerts, thetaSampleRaw, gridScale],
+  );
+  const nodeThetaRaw = useMemo(
+    () => (thetaSampleRaw ? sampleBrickForVerts(nodeVerts, thetaSampleRaw, gridScale) : null),
+    [nodeVerts, thetaSampleRaw, gridScale],
+  );
+  const thetaPercentile = useMemo(() => {
+    const sampleLimit = Math.max(1, Math.floor(WARP_SCALE_SAMPLE_MAX / 2));
+    const samples = [
+      ...collectAbsSamples(lineThetaRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
+      ...collectAbsSamples(nodeThetaRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
+    ];
+    return percentileFromSamples(samples, THETA_WARP_PERCENTILE);
+  }, [lineThetaRaw, nodeThetaRaw]);
+  const thetaNormalization = useMemo(() => {
+    const p98 =
+      Number.isFinite(thetaPercentile as number) && (thetaPercentile as number) > 0
+        ? (thetaPercentile as number)
+        : null;
+    const rangeAbs = thetaRange?.maxAbs ?? null;
+    const normMode: "p98" | "range" | "fallback" = p98 ? "p98" : rangeAbs ? "range" : "fallback";
+    const clampBasis = p98 ?? rangeAbs;
+    const lineNorm = normalizeSignedField(lineThetaRaw, clampBasis, WARP_CLAMP_MULT);
+    const nodeNorm = normalizeSignedField(nodeThetaRaw, clampBasis, WARP_CLAMP_MULT);
+    const clampMin = lineNorm.clampMin ?? nodeNorm.clampMin;
+    const clampMax = lineNorm.clampMax ?? nodeNorm.clampMax;
+    return {
+      line: lineNorm,
+      node: nodeNorm,
+      normMode,
+      p98,
+      clampMin,
+      clampMax,
+      sanitizedCount: lineNorm.sanitizedCount + nodeNorm.sanitizedCount,
+    };
+  }, [lineThetaRaw, nodeThetaRaw, thetaPercentile, thetaRange]);
+  const wallInvariantSample = useMemo(() => {
+    if (!useGrBrickData || !grQuery.data) return null;
+    const kretschmann = buildBrickSample(grQuery.data, latticeBounds, "kretschmann");
+    if (kretschmann) return { sample: kretschmann, source: "kretschmann" as const };
+    const ricci4 = buildBrickSample(grQuery.data, latticeBounds, "ricci4");
+    if (ricci4) return { sample: ricci4, source: "ricci4" as const };
+    return null;
+  }, [useGrBrickData, grQuery.data, latticeBounds]);
+  const lineWallInvariantRaw = useMemo(
     () =>
-      useGrBrickData
-        ? buildBrickSample(activeBrick, latticeBounds, "theta")
+      wallInvariantSample
+        ? sampleBrickForVerts(lineVerts, wallInvariantSample.sample, gridScale)
         : null,
-    [activeBrick, latticeBounds, useGrBrickData],
+    [wallInvariantSample, lineVerts, gridScale],
   );
-
-  const lineAlpha = useMemo(
+  const nodeWallInvariantRaw = useMemo(
     () =>
-      clockRateSample ? sampleBrickForVerts(lineVerts, clockRateSample, gridScale) : null,
-    [clockRateSample, lineVerts, gridScale],
+      wallInvariantSample
+        ? sampleBrickForVerts(nodeVerts, wallInvariantSample.sample, gridScale)
+        : null,
+    [wallInvariantSample, nodeVerts, gridScale],
   );
-  const nodeAlpha = useMemo(
-    () =>
-      clockRateSample ? sampleBrickForVerts(nodeVerts, clockRateSample, gridScale) : null,
-    [clockRateSample, nodeVerts, gridScale],
-  );
-  const lineTheta = useMemo(
-    () => (thetaSample ? sampleBrickForVerts(lineVerts, thetaSample, gridScale) : null),
-    [lineVerts, thetaSample, gridScale],
-  );
-  const nodeTheta = useMemo(
-    () => (thetaSample ? sampleBrickForVerts(nodeVerts, thetaSample, gridScale) : null),
-    [nodeVerts, thetaSample, gridScale],
-  );
-  const betaSamples = useMemo(() => {
+  const wallDiagnostics = useMemo<WallDiagnostics | null>(() => {
+    const regionWall = regionStats?.summary?.wall;
+    if (regionWall) {
+      return {
+        source: regionWall.source,
+        detected: regionWall.detected,
+        p98: regionWall.p98,
+        threshold: regionWall.threshold,
+        bandMin: regionWall.bandMin,
+        bandMax: regionWall.bandMax,
+        sampleCount: regionWall.sampleCount,
+        sampleFraction: regionWall.voxelFraction,
+      };
+    }
+    if (!wallInvariantSample) return null;
+    const sampleLimit = Math.max(1, Math.floor(WARP_SCALE_SAMPLE_MAX / 2));
+    const samples = [
+      ...collectAbsSamples(lineWallInvariantRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
+      ...collectAbsSamples(nodeWallInvariantRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
+    ];
+    const p98 = percentileFromSamples(samples, WALL_INVARIANT_PERCENTILE);
+    const threshold = p98 * WALL_INVARIANT_FRACTION;
+    const bandMin = threshold * (1 - WALL_INVARIANT_BAND_FRACTION);
+    const bandMax = threshold * (1 + WALL_INVARIANT_BAND_FRACTION);
+    let bandCount = 0;
+    for (const value of samples) {
+      if (value >= bandMin && value <= bandMax) bandCount += 1;
+    }
+    const sampleFraction = samples.length > 0 ? bandCount / samples.length : 0;
+    return {
+      source: wallInvariantSample.source,
+      detected: threshold > 0 && bandCount > 0,
+      p98,
+      threshold,
+      bandMin,
+      bandMax,
+      sampleCount: samples.length,
+      sampleFraction,
+    };
+  }, [
+    regionStats,
+    wallInvariantSample,
+    lineWallInvariantRaw,
+    nodeWallInvariantRaw,
+  ]);
+  const betaSamplesRaw = useMemo(() => {
     if (!useGrBrickData || !grQuery.data) return null;
     const sampleX = buildBrickSample(grQuery.data, latticeBounds, "beta_x");
     const sampleY = buildBrickSample(grQuery.data, latticeBounds, "beta_y");
@@ -2720,28 +3096,42 @@ export default function TimeDilationLatticePanel({
     if (!sampleX || !sampleY || !sampleZ) return null;
     return { sampleX, sampleY, sampleZ };
   }, [useGrBrickData, grQuery.data, latticeBounds]);
-  const lineBeta = useMemo(() => {
-    if (!betaSamples) return null;
-    const bx = sampleBrickForVerts(lineVerts, betaSamples.sampleX, gridScale);
-    const by = sampleBrickForVerts(lineVerts, betaSamples.sampleY, gridScale);
-    const bz = sampleBrickForVerts(lineVerts, betaSamples.sampleZ, gridScale);
+  const lineBetaRaw = useMemo(() => {
+    if (!betaSamplesRaw) return null;
+    const bx = sampleBrickForVerts(lineVerts, betaSamplesRaw.sampleX, gridScale);
+    const by = sampleBrickForVerts(lineVerts, betaSamplesRaw.sampleY, gridScale);
+    const bz = sampleBrickForVerts(lineVerts, betaSamplesRaw.sampleZ, gridScale);
     return interleaveVec3(bx, by, bz);
-  }, [betaSamples, lineVerts, gridScale]);
-  const nodeBeta = useMemo(() => {
-    if (!betaSamples) return null;
-    const bx = sampleBrickForVerts(nodeVerts, betaSamples.sampleX, gridScale);  
-    const by = sampleBrickForVerts(nodeVerts, betaSamples.sampleY, gridScale);  
-    const bz = sampleBrickForVerts(nodeVerts, betaSamples.sampleZ, gridScale);  
+  }, [betaSamplesRaw, lineVerts, gridScale]);
+  const nodeBetaRaw = useMemo(() => {
+    if (!betaSamplesRaw) return null;
+    const bx = sampleBrickForVerts(nodeVerts, betaSamplesRaw.sampleX, gridScale);
+    const by = sampleBrickForVerts(nodeVerts, betaSamplesRaw.sampleY, gridScale);
+    const bz = sampleBrickForVerts(nodeVerts, betaSamplesRaw.sampleZ, gridScale);
     return interleaveVec3(bx, by, bz);
-  }, [betaSamples, nodeVerts, gridScale]);
+  }, [betaSamplesRaw, nodeVerts, gridScale]);
+  const betaPercentile = useMemo(() => {
+    const sampleLimit = Math.max(1, Math.floor(WARP_SCALE_SAMPLE_MAX / 2));
+    const samples = [
+      ...collectVec3MagnitudeSamples(lineBetaRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
+      ...collectVec3MagnitudeSamples(nodeBetaRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
+    ];
+    return percentileFromSamples(samples, BETA_WARP_PERCENTILE);
+  }, [lineBetaRaw, nodeBetaRaw]);
+  const betaClampAbs = useMemo(() => {
+    if (!Number.isFinite(betaPercentile as number) || (betaPercentile as number) <= 0) {
+      return null;
+    }
+    return Math.min(WARP_SAMPLE_MAX_ABS, (betaPercentile as number) * WARP_CLAMP_MULT);
+  }, [betaPercentile]);
   const betaCenter = useMemo<[number, number, number]>(() => {
-    if (!betaSamples) return [0, 0, 0];
+    if (!betaSamplesRaw) return [0, 0, 0];
     const center = bubbleParams.center;
-    const bx = sampleBrickScalar(betaSamples.sampleX, center, 0);
-    const by = sampleBrickScalar(betaSamples.sampleY, center, 0);
-    const bz = sampleBrickScalar(betaSamples.sampleZ, center, 0);
+    const bx = sampleBrickScalar(betaSamplesRaw.sampleX, center, 0);
+    const by = sampleBrickScalar(betaSamplesRaw.sampleY, center, 0);
+    const bz = sampleBrickScalar(betaSamplesRaw.sampleZ, center, 0);
     return [toFiniteNumber(bx, 0), toFiniteNumber(by, 0), toFiniteNumber(bz, 0)];
-  }, [betaSamples, bubbleParams.center]);
+  }, [betaSamplesRaw, bubbleParams.center]);
   const betaCenterRef = useRef(betaCenter);
   useEffect(() => {
     betaCenterRef.current = betaCenter;
@@ -2778,7 +3168,23 @@ export default function TimeDilationLatticePanel({
   const defaultNodeRegion = useMemo(() => new Float32Array(nodeCount), [nodeCount]);
   const defaultLineRegionGrid = useMemo(() => new Float32Array(lineCount), [lineCount]);
   const defaultNodeRegionGrid = useMemo(() => new Float32Array(nodeCount), [nodeCount]);
-  const gammaSamples = useMemo(() => {
+  const lineTheta = useMemo(
+    () => thetaNormalization.line.data ?? defaultLineTheta,
+    [thetaNormalization, defaultLineTheta],
+  );
+  const nodeTheta = useMemo(
+    () => thetaNormalization.node.data ?? defaultNodeTheta,
+    [thetaNormalization, defaultNodeTheta],
+  );
+  const lineBeta = useMemo(
+    () => sanitizeVec3Array(lineBetaRaw, betaClampAbs) ?? defaultLineBeta,
+    [lineBetaRaw, betaClampAbs, defaultLineBeta],
+  );
+  const nodeBeta = useMemo(
+    () => sanitizeVec3Array(nodeBetaRaw, betaClampAbs) ?? defaultNodeBeta,
+    [nodeBetaRaw, betaClampAbs, defaultNodeBeta],
+  );
+  const gammaSamplesRaw = useMemo(() => {
     if (!useGrBrickData || !grQuery.data) return null;
     const sampleX = buildBrickSample(grQuery.data, latticeBounds, "gamma_xx");
     const sampleY = buildBrickSample(grQuery.data, latticeBounds, "gamma_yy");
@@ -2786,20 +3192,46 @@ export default function TimeDilationLatticePanel({
     if (!sampleX || !sampleY || !sampleZ) return null;
     return { sampleX, sampleY, sampleZ };
   }, [useGrBrickData, grQuery.data, latticeBounds]);
-  const lineGamma = useMemo(() => {
-    if (!gammaSamples) return defaultLineGamma;
-    const gx = sampleBrickForVerts(lineVerts, gammaSamples.sampleX, gridScale);
-    const gy = sampleBrickForVerts(lineVerts, gammaSamples.sampleY, gridScale);
-    const gz = sampleBrickForVerts(lineVerts, gammaSamples.sampleZ, gridScale);
-    return interleaveVec3(gx, gy, gz) ?? defaultLineGamma;
-  }, [gammaSamples, lineVerts, gridScale, defaultLineGamma]);
-  const nodeGamma = useMemo(() => {
-    if (!gammaSamples) return defaultNodeGamma;
-    const gx = sampleBrickForVerts(nodeVerts, gammaSamples.sampleX, gridScale);
-    const gy = sampleBrickForVerts(nodeVerts, gammaSamples.sampleY, gridScale);
-    const gz = sampleBrickForVerts(nodeVerts, gammaSamples.sampleZ, gridScale);
-    return interleaveVec3(gx, gy, gz) ?? defaultNodeGamma;
-  }, [gammaSamples, nodeVerts, gridScale, defaultNodeGamma]);
+  const lineGammaRaw = useMemo(() => {
+    if (!gammaSamplesRaw) return null;
+    const gx = sampleBrickForVerts(lineVerts, gammaSamplesRaw.sampleX, gridScale);
+    const gy = sampleBrickForVerts(lineVerts, gammaSamplesRaw.sampleY, gridScale);
+    const gz = sampleBrickForVerts(lineVerts, gammaSamplesRaw.sampleZ, gridScale);
+    return interleaveVec3(gx, gy, gz);
+  }, [gammaSamplesRaw, lineVerts, gridScale]);
+  const nodeGammaRaw = useMemo(() => {
+    if (!gammaSamplesRaw) return null;
+    const gx = sampleBrickForVerts(nodeVerts, gammaSamplesRaw.sampleX, gridScale);
+    const gy = sampleBrickForVerts(nodeVerts, gammaSamplesRaw.sampleY, gridScale);
+    const gz = sampleBrickForVerts(nodeVerts, gammaSamplesRaw.sampleZ, gridScale);
+    return interleaveVec3(gx, gy, gz);
+  }, [gammaSamplesRaw, nodeVerts, gridScale]);
+  const gammaPercentile = useMemo(() => {
+    const sampleLimit = Math.max(1, Math.floor(WARP_SCALE_SAMPLE_MAX / 2));
+    const samples = [
+      ...collectVec3DeviationSamples(lineGammaRaw, sampleLimit, 1, WARP_SAMPLE_MAX_ABS),
+      ...collectVec3DeviationSamples(nodeGammaRaw, sampleLimit, 1, WARP_SAMPLE_MAX_ABS),
+    ];
+    return percentileFromSamples(samples, GAMMA_WARP_PERCENTILE);
+  }, [lineGammaRaw, nodeGammaRaw]);
+  const gammaClampDev = useMemo(() => {
+    if (!Number.isFinite(gammaPercentile as number) || (gammaPercentile as number) <= 0) {
+      return GAMMA_DEV_CLAMP_MAX;
+    }
+    return clampNumber(
+      (gammaPercentile as number) * WARP_CLAMP_MULT,
+      GAMMA_DEV_CLAMP_MIN,
+      GAMMA_DEV_CLAMP_MAX,
+    );
+  }, [gammaPercentile]);
+  const lineGamma = useMemo(
+    () => sanitizeGammaArray(lineGammaRaw, gammaClampDev) ?? defaultLineGamma,
+    [lineGammaRaw, gammaClampDev, defaultLineGamma],
+  );
+  const nodeGamma = useMemo(
+    () => sanitizeGammaArray(nodeGammaRaw, gammaClampDev) ?? defaultNodeGamma,
+    [nodeGammaRaw, gammaClampDev, defaultNodeGamma],
+  );
   const kijSamples = useMemo<KijSamples | null>(() => {
     if (!useGrBrickData || !grQuery.data) return null;
     const K_xx = buildBrickSample(grQuery.data, latticeBounds, "K_xx");
@@ -2811,13 +3243,35 @@ export default function TimeDilationLatticePanel({
     if (!K_xx || !K_yy || !K_zz || !K_xy || !K_xz || !K_yz) return null;
     return { K_xx, K_yy, K_zz, K_xy, K_xz, K_yz };
   }, [useGrBrickData, grQuery.data, latticeBounds]);
+  const lineShearRaw = useMemo(
+    () => (kijSamples ? buildShearForVerts(lineVerts, kijSamples, gridScale) : null),
+    [kijSamples, lineVerts, gridScale],
+  );
+  const nodeShearRaw = useMemo(
+    () => (kijSamples ? buildShearForVerts(nodeVerts, kijSamples, gridScale) : null),
+    [kijSamples, nodeVerts, gridScale],
+  );
+  const shearPercentile = useMemo(() => {
+    const sampleLimit = Math.max(1, Math.floor(WARP_SCALE_SAMPLE_MAX / 2));
+    const samples = [
+      ...collectVec3MagnitudeSamples(lineShearRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
+      ...collectVec3MagnitudeSamples(nodeShearRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
+    ];
+    return percentileFromSamples(samples, SHEAR_WARP_PERCENTILE);
+  }, [lineShearRaw, nodeShearRaw]);
+  const shearClampAbs = useMemo(() => {
+    if (!Number.isFinite(shearPercentile as number) || (shearPercentile as number) <= 0) {
+      return null;
+    }
+    return Math.min(WARP_SAMPLE_MAX_ABS, (shearPercentile as number) * WARP_CLAMP_MULT);
+  }, [shearPercentile]);
   const lineShear = useMemo(
-    () => (kijSamples ? buildShearForVerts(lineVerts, kijSamples, gridScale) : defaultLineShear),
-    [kijSamples, lineVerts, gridScale, defaultLineShear],
+    () => sanitizeVec3Array(lineShearRaw, shearClampAbs) ?? defaultLineShear,
+    [lineShearRaw, shearClampAbs, defaultLineShear],
   );
   const nodeShear = useMemo(
-    () => (kijSamples ? buildShearForVerts(nodeVerts, kijSamples, gridScale) : defaultNodeShear),
-    [kijSamples, nodeVerts, gridScale, defaultNodeShear],
+    () => sanitizeVec3Array(nodeShearRaw, shearClampAbs) ?? defaultNodeShear,
+    [nodeShearRaw, shearClampAbs, defaultNodeShear],
   );
   const constraintSample = useMemo(() => {
     if (!useGrBrickData || !grQuery.data) return null;
@@ -2876,133 +3330,10 @@ export default function TimeDilationLatticePanel({
       const maxAbs = Math.max(Math.abs(min), Math.abs(max));
       return maxAbs > 0 ? 1 / maxAbs : 0;
     }, [useGrBrickData, grQuery.data]);
-    const thetaRange = useMemo(() => {
-      const theta = getBrickChannel(activeBrick, "theta");
-      if (!theta) return null;
-      const min = toFiniteNumber(theta.min, 0);
-      const max = toFiniteNumber(theta.max, 0);
-      const maxAbs = Math.max(Math.abs(min), Math.abs(max));
-      return { min, max, maxAbs };
-    }, [activeBrick]);
-    const thetaScale = useMemo(() => {
-      if (!thetaRange || !Number.isFinite(thetaRange.maxAbs)) return 0;
-      return thetaRange.maxAbs > 0 ? 1 / thetaRange.maxAbs : 0;
-    }, [thetaRange]);
     const constraintScaleRef = useRef(constraintScale);
-    const thetaScaleRef = useRef(thetaScale);
     useEffect(() => {
       constraintScaleRef.current = constraintScale;
     }, [constraintScale]);
-    useEffect(() => {
-      thetaScaleRef.current = thetaScale;
-    }, [thetaScale]);
-  const thetaDipoleCheck = useMemo(() => {
-    if (warpFieldType !== "alcubierre") return null;
-    if (!thetaSample) {
-      return {
-        status: "pending",
-        reason: "missing theta channel",
-        ahead: null,
-        behind: null,
-        threshold: null,
-        proxy: grProxy,
-      };
-    }
-    const radius = Number(bubbleParams.R);
-    if (!Number.isFinite(radius) || radius <= 0) {
-      return {
-        status: "pending",
-        reason: "missing bubble radius",
-        ahead: null,
-        behind: null,
-        threshold: null,
-        proxy: grProxy,
-      };
-    }
-    const dirLen = Math.hypot(driveDir[0], driveDir[1], driveDir[2]);
-    if (!(dirLen > 1e-6)) {
-      return {
-        status: "pending",
-        reason: "missing drive direction",
-        ahead: null,
-        behind: null,
-        threshold: null,
-        proxy: grProxy,
-      };
-    }
-    const dist = Math.max(1e-6, radius);
-    const center = bubbleParams.center;
-    const aheadPos: [number, number, number] = [
-      center[0] + driveDir[0] * dist,
-      center[1] + driveDir[1] * dist,
-      center[2] + driveDir[2] * dist,
-    ];
-    const behindPos: [number, number, number] = [
-      center[0] - driveDir[0] * dist,
-      center[1] - driveDir[1] * dist,
-      center[2] - driveDir[2] * dist,
-    ];
-    const ahead = sampleBrickScalar(thetaSample, aheadPos, Number.NaN);
-    const behind = sampleBrickScalar(thetaSample, behindPos, Number.NaN);
-    if (!Number.isFinite(ahead) || !Number.isFinite(behind)) {
-      return {
-        status: "pending",
-        reason: "sample out of bounds",
-        ahead: Number.isFinite(ahead) ? ahead : null,
-        behind: Number.isFinite(behind) ? behind : null,
-        threshold: null,
-        proxy: grProxy,
-      };
-    }
-    const maxAbs = thetaRange?.maxAbs ?? Math.max(Math.abs(ahead), Math.abs(behind));
-    const threshold = Math.max(1e-12, maxAbs * 0.05);
-    const aheadStrong = Math.abs(ahead) >= threshold;
-    const behindStrong = Math.abs(behind) >= threshold;
-    if (!aheadStrong || !behindStrong) {
-      return {
-        status: "weak",
-        reason: "signal below threshold",
-        ahead,
-        behind,
-        threshold,
-        proxy: grProxy,
-      };
-    }
-    return {
-      status: ahead * behind < 0 ? "pass" : "fail",
-      reason: ahead * behind < 0 ? undefined : "no sign flip",
-      ahead,
-      behind,
-      threshold,
-      proxy: grProxy,
-    };
-  }, [
-    warpFieldType,
-    thetaSample,
-    bubbleParams,
-    driveDir,
-    thetaRange,
-    grProxy,
-  ]);
-  const thetaExpectation = useMemo(() => {
-    if (warpFieldType === "alcubierre") {
-      return {
-        mode: warpFieldType,
-        note: "θ dipole sign-flip check",
-        dipole: thetaDipoleCheck,
-      };
-    }
-    if (warpFieldType === "natario" || warpFieldType === "natario_sdf") {
-      return {
-        mode: warpFieldType,
-        note: "θ expected near 0",
-      };
-    }
-    return {
-      mode: warpFieldType,
-      note: "θ expectation: n/a",
-    };
-  }, [warpFieldType, thetaDipoleCheck]);
   const grDerived = useMemo(
     () => (grRequested && grQuery.data ? deriveGrMetrics(grQuery.data, debugEnabled) : null),
     [grRequested, grQuery.data, debugEnabled],
@@ -3026,6 +3357,403 @@ export default function TimeDilationLatticePanel({
   useEffect(() => {
     betaFieldRef.current = betaField;
   }, [betaField]);
+
+  const renderPlanRef = useRef<TimeDilationRenderPlan | null>(null);
+  const [renderPlanVersion, setRenderPlanVersion] = useState(0);
+
+  const activationState = useMemo(() => {
+    const power = resolvePowerW(pipelineState);
+    const duty = resolveDutyEffective(pipelineState);
+    const gammaGeo = resolveGammaGeo(pipelineState);
+    const gammaVdB = resolveGammaVdB(pipelineState);
+    const qSpoil = resolveQSpoiling(pipelineState);
+    const tsRatio = resolveTSRatio(pipelineState);
+    const thetaCal = resolveThetaCal(pipelineState, { gammaGeo, qSpoil, gammaVdB, duty });
+    const gammaGeoCubed = Math.pow(gammaGeo.value, 3);
+
+    const powerNorm = normalizeLog(power.value, 1e6, 1e12);
+    const thetaNorm = normalizeLog(thetaCal.value, 1e8, 1e12);
+    const tsNorm = normalizeLog(tsRatio.value, TS_RATIO_MIN, TS_RATIO_MIN * 1e4);
+    const activationBase = averageFinite(powerNorm, thetaNorm, tsNorm);
+
+    const guardrails = resolveGuardrails(pipelineState, tsRatio.value, gammaVdB.value);
+    const activation = clamp01(activationBase * guardrails.multiplier);
+    const activationProxy =
+      power.proxy ||
+      duty.proxy ||
+      gammaGeo.proxy ||
+      gammaVdB.proxy ||
+      qSpoil.proxy ||
+      tsRatio.proxy ||
+      thetaCal.proxy ||
+      guardrails.proxy;
+
+    return {
+      power,
+      duty,
+      gammaGeo,
+      gammaGeoCubed,
+      gammaVdB,
+      qSpoil,
+      tsRatio,
+      thetaCal,
+      activation,
+      activationBase,
+      activationProxy,
+      guardrails,
+    };
+  }, [pipelineState]);
+
+  useEffect(() => {
+    activationTargetRef.current = activationState.activation;
+  }, [activationState.activation]);
+
+  const pipelineProofs = useMemo(() => {
+    return {
+      t00Min: resolveT00Min(pipelineState),
+      mExotic: resolveMExotic(pipelineState),
+    };
+  }, [pipelineState]);
+
+  const hasHull = useMemo(() => {
+    const nonDefault = !isDefaultHullAxes(hullBounds.axes);
+    const userChosen = resolveUserHullChoice(pipelineState);
+    const hasGeometry = Boolean(
+      pipelineState?.hull ||
+        pipelineState?.warpGeometry ||
+        pipelineState?.warpGeometryKind ||
+        pipelineState?.warpGeometryAssetId ||
+        pipelineState?.geometryPreview ||
+        pipelineState?.hullBrick,
+    );
+    return hasGeometry && (nonDefault || userChosen);
+  }, [pipelineState, hullBounds]);
+  const wallDetectionAvailable = Boolean(wallDiagnostics);
+  const wallDetected = wallDiagnostics?.detected ?? null;
+  const wallSource = wallDiagnostics?.source;
+  const grCertified = Boolean(
+    grGuardrails &&
+      grGuardrails.proxy === false &&
+      grGuardrails.source === "pipeline-gr" &&
+      brickMeta?.status === "CERTIFIED",
+  );
+  const anyProxy =
+    activationState.activationProxy ||
+    pipelineProofs.t00Min.proxy ||
+    pipelineProofs.mExotic.proxy ||
+    grProxy;
+  const cellSize = useMemo(() => (gridScale * 2) / GRID_DIV, [gridScale]);
+  const renderPlan = useMemo(
+    () =>
+      computeTimeDilationRenderPlan(pipelineState, grQuery.data ?? null, lapseQuery.data ?? null, {
+        hasHull,
+        wallDetectionAvailable,
+        wallDetected,
+        wallSource,
+        grRequested,
+        grCertified,
+        anyProxy,
+        mathStageOK,
+        cellSize,
+        solverStatus,
+        exploratoryOverride,
+        cinematicOverride,
+        visualTuning,
+        betaPercentile,
+        thetaPercentile,
+        gammaPercentile,
+        shearPercentile,
+      }),
+    [
+      pipelineState,
+      grQuery.data,
+      lapseQuery.data,
+      hasHull,
+      wallDetectionAvailable,
+      wallDetected,
+      wallSource,
+      grRequested,
+      grCertified,
+      anyProxy,
+      mathStageOK,
+      cellSize,
+      solverStatus,
+      exploratoryOverride,
+      cinematicOverride,
+      visualTuning,
+      betaPercentile,
+      thetaPercentile,
+      gammaPercentile,
+      shearPercentile,
+    ],
+  );
+  renderPlanRef.current = renderPlan;
+  useEffect(() => {
+    renderPlanRef.current = renderPlan;
+    setRenderPlanVersion((prev) => prev + 1);
+  }, [renderPlan]);
+
+  const warpFieldType = renderPlan.mode;
+  const alphaBrick = useMemo(() => {
+    if (renderPlan.sourceForAlpha === "gr-brick") return grQuery.data ?? null;
+    if (renderPlan.sourceForAlpha === "lapse-brick") return lapseQuery.data ?? null;
+    return null;
+  }, [renderPlan.sourceForAlpha, grQuery.data, lapseQuery.data]);
+  const clockRateBrick = useMemo(() => {
+    if (renderPlan.sourceForClockRate === "gr-brick") return grQuery.data ?? null;
+    if (renderPlan.sourceForClockRate === "lapse-brick") return lapseQuery.data ?? null;
+    return null;
+  }, [renderPlan.sourceForClockRate, grQuery.data, lapseQuery.data]);
+  const clockRateSample = useMemo(() => {
+    if (!clockRateBrick) return null;
+    return buildClockRateSample(clockRateBrick, latticeBounds, clockMode, viewerChart);
+  }, [clockRateBrick, latticeBounds, clockMode, viewerChart]);
+  const lineAlpha = useMemo(
+    () => (clockRateSample ? sampleBrickForVerts(lineVerts, clockRateSample, gridScale) : null),
+    [clockRateSample, lineVerts, gridScale],
+  );
+  const nodeAlpha = useMemo(
+    () => (clockRateSample ? sampleBrickForVerts(nodeVerts, clockRateSample, gridScale) : null),
+    [clockRateSample, nodeVerts, gridScale],
+  );
+  const thetaSample = useMemo(
+    () => (renderPlan.sourceForTheta === "gr-brick" ? thetaSampleRaw : null),
+    [renderPlan.sourceForTheta, thetaSampleRaw],
+  );
+  const thetaDipoleCheck = useMemo(() => {
+    if (warpFieldType !== "alcubierre") return null;
+    if (!renderPlan.flags.hasHull) {
+      return {
+        status: "pending",
+        reason: "no hull applied",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    if (!thetaSample) {
+      return {
+        status: "pending",
+        reason: "missing theta channel",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    const radius = Number(bubbleParams.R);
+    if (!Number.isFinite(radius) || radius <= 0) {
+      return {
+        status: "pending",
+        reason: "missing bubble radius",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    const dirLen = Math.hypot(driveDir[0], driveDir[1], driveDir[2]);
+    if (!(dirLen > 1e-6)) {
+      return {
+        status: "pending",
+        reason: "missing drive direction",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    const dist = Math.max(1e-6, radius);
+    const center = bubbleParams.center;
+    const aheadPos: [number, number, number] = [
+      center[0] + driveDir[0] * dist,
+      center[1] + driveDir[1] * dist,
+      center[2] + driveDir[2] * dist,
+    ];
+    const behindPos: [number, number, number] = [
+      center[0] - driveDir[0] * dist,
+      center[1] - driveDir[1] * dist,
+      center[2] - driveDir[2] * dist,
+    ];
+    const ahead = sampleBrickScalar(thetaSample, aheadPos, Number.NaN);
+    const behind = sampleBrickScalar(thetaSample, behindPos, Number.NaN);
+    if (!Number.isFinite(ahead) || !Number.isFinite(behind)) {
+      return {
+        status: "pending",
+        reason: "sample out of bounds",
+        ahead: Number.isFinite(ahead) ? ahead : null,
+        behind: Number.isFinite(behind) ? behind : null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    const maxAbs = thetaRange?.maxAbs ?? Math.max(Math.abs(ahead), Math.abs(behind));
+    const threshold = Math.max(1e-12, maxAbs * 0.05);
+    const aheadStrong = Math.abs(ahead) >= threshold;
+    const behindStrong = Math.abs(behind) >= threshold;
+    if (!aheadStrong || !behindStrong) {
+      return {
+        status: "weak",
+        reason: "signal below threshold",
+        ahead,
+        behind,
+        threshold,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    return {
+      status: ahead * behind < 0 ? "pass" : "fail",
+      reason: ahead * behind < 0 ? undefined : "no sign flip",
+      ahead,
+      behind,
+      threshold,
+      proxy: renderPlan.flags.anyProxy,
+    };
+  }, [
+    warpFieldType,
+    thetaSample,
+    bubbleParams,
+    driveDir,
+    thetaRange,
+    renderPlan.flags.anyProxy,
+    renderPlan.flags.hasHull,
+  ]);
+  const betaStrainCheck = useMemo(() => {
+    if (warpFieldType !== "alcubierre") return null;
+    if (!renderPlan.flags.hasHull) {
+      return {
+        status: "pending",
+        reason: "no hull applied",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    if (!betaSamplesRaw) {
+      return {
+        status: "pending",
+        reason: "missing beta channel",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    const unit = normalizeVec3(driveDir);
+    const unitLen = Math.hypot(unit[0], unit[1], unit[2]);
+    if (!(unitLen > 1e-6)) {
+      return {
+        status: "pending",
+        reason: "missing drive direction",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    const radius = Number(bubbleParams.R);
+    if (!Number.isFinite(radius) || radius <= 0) {
+      return {
+        status: "pending",
+        reason: "missing bubble radius",
+        ahead: null,
+        behind: null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    const dist = Math.max(1e-6, radius * BETA_STRAIN_SAMPLE_FACTOR);
+    const center = bubbleParams.center;
+    const sampleBeta = (pos: [number, number, number]) => {
+      const bx = sampleBrickScalar(betaSamplesRaw.sampleX, pos, Number.NaN);
+      const by = sampleBrickScalar(betaSamplesRaw.sampleY, pos, Number.NaN);
+      const bz = sampleBrickScalar(betaSamplesRaw.sampleZ, pos, Number.NaN);
+      if (!Number.isFinite(bx) || !Number.isFinite(by) || !Number.isFinite(bz)) {
+        return null;
+      }
+      return (bx as number) * unit[0] + (by as number) * unit[1] + (bz as number) * unit[2];
+    };
+    const aheadPos: [number, number, number] = [
+      center[0] + unit[0] * dist,
+      center[1] + unit[1] * dist,
+      center[2] + unit[2] * dist,
+    ];
+    const behindPos: [number, number, number] = [
+      center[0] - unit[0] * dist,
+      center[1] - unit[1] * dist,
+      center[2] - unit[2] * dist,
+    ];
+    const b0 = sampleBeta(center);
+    const bAhead = sampleBeta(aheadPos);
+    const bBehind = sampleBeta(behindPos);
+    if (b0 === null || bAhead === null || bBehind === null) {
+      return {
+        status: "pending",
+        reason: "sample out of bounds",
+        ahead: Number.isFinite(bAhead as number) ? (bAhead as number) : null,
+        behind: Number.isFinite(bBehind as number) ? (bBehind as number) : null,
+        threshold: null,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    const ahead = (bAhead - b0) / dist;
+    const behind = (b0 - bBehind) / dist;
+    const scaleCandidate =
+      Number.isFinite(betaPercentile as number) && (betaPercentile as number) > 0
+        ? (betaPercentile as number)
+        : Math.max(Math.abs(b0), Math.abs(bAhead), Math.abs(bBehind));
+    const scale = Number.isFinite(scaleCandidate) ? scaleCandidate : 0;
+    const threshold = Math.max(1e-12, (scale * BETA_STRAIN_THRESHOLD_FRACTION) / dist);
+    const aheadStrong = Math.abs(ahead) >= threshold;
+    const behindStrong = Math.abs(behind) >= threshold;
+    if (!aheadStrong || !behindStrong) {
+      return {
+        status: "weak",
+        reason: "signal below threshold",
+        ahead,
+        behind,
+        threshold,
+        proxy: renderPlan.flags.anyProxy,
+      };
+    }
+    return {
+      status: ahead * behind < 0 ? "pass" : "fail",
+      reason: ahead * behind < 0 ? undefined : "no sign flip",
+      ahead,
+      behind,
+      threshold,
+      proxy: renderPlan.flags.anyProxy,
+    };
+  }, [
+    warpFieldType,
+    betaSamplesRaw,
+    bubbleParams,
+    driveDir,
+    betaPercentile,
+    renderPlan.flags.anyProxy,
+    renderPlan.flags.hasHull,
+  ]);
+  const thetaExpectation = useMemo(() => {
+    if (warpFieldType === "alcubierre") {
+      return {
+        mode: warpFieldType,
+        note: "Î¸ dipole sign-flip check",
+        dipole: thetaDipoleCheck,
+      };
+    }
+    if (warpFieldType === "natario") {
+      return {
+        mode: warpFieldType,
+        note: "Î¸ expected near 0",
+      };
+    }
+    return {
+      mode: warpFieldType,
+      note: "Î¸ expectation: n/a",
+    };
+  }, [warpFieldType, thetaDipoleCheck]);
 
   const lineHull = useMemo(
     () => (hullField ? sampleHullFieldForVerts(lineVerts, hullField, gridScale) : null),
@@ -3074,55 +3802,51 @@ export default function TimeDilationLatticePanel({
   const lineRegionGridRef = useRef<Float32Array | null>(lineRegionGrid);
   const nodeRegionGridRef = useRef<Float32Array | null>(nodeRegionGrid);
   useEffect(() => {
-    if (lineAlpha) {
-      lineAlphaRef.current = lineAlpha;
-    }
-  }, [lineAlpha]);
+    lineAlphaRef.current = lineAlpha ?? defaultLineAlpha;
+  }, [lineAlpha, defaultLineAlpha]);
   useEffect(() => {
-    if (lineTheta) {
-      lineThetaRef.current = lineTheta;
-    }
-  }, [lineTheta]);
+    const plan = renderPlanRef.current;
+    const useTheta = plan?.sourceForTheta === "gr-brick";
+    lineThetaRef.current = useTheta && lineTheta ? lineTheta : defaultLineTheta;
+  }, [lineTheta, defaultLineTheta, renderPlanVersion]);
   useEffect(() => {
-    if (nodeAlpha) {
-      nodeAlphaRef.current = nodeAlpha;
-    }
-  }, [nodeAlpha]);
+    nodeAlphaRef.current = nodeAlpha ?? defaultNodeAlpha;
+  }, [nodeAlpha, defaultNodeAlpha]);
   useEffect(() => {
-    if (nodeTheta) {
-      nodeThetaRef.current = nodeTheta;
-    }
-  }, [nodeTheta]);
+    const plan = renderPlanRef.current;
+    const useTheta = plan?.sourceForTheta === "gr-brick";
+    nodeThetaRef.current = useTheta && nodeTheta ? nodeTheta : defaultNodeTheta;
+  }, [nodeTheta, defaultNodeTheta, renderPlanVersion]);
   useEffect(() => {
-    if (lineBeta) {
-      lineBetaRef.current = lineBeta;
-    }
-  }, [lineBeta]);
+    const plan = renderPlanRef.current;
+    const useBeta = plan?.sourceForBeta === "gr-brick";
+    lineBetaRef.current = useBeta && lineBeta ? lineBeta : defaultLineBeta;
+  }, [lineBeta, defaultLineBeta, renderPlanVersion]);
   useEffect(() => {
-    if (nodeBeta) {
-      nodeBetaRef.current = nodeBeta;
-    }
-  }, [nodeBeta]);
+    const plan = renderPlanRef.current;
+    const useBeta = plan?.sourceForBeta === "gr-brick";
+    nodeBetaRef.current = useBeta && nodeBeta ? nodeBeta : defaultNodeBeta;
+  }, [nodeBeta, defaultNodeBeta, renderPlanVersion]);
   useEffect(() => {
-    if (lineGamma) {
-      lineGammaRef.current = lineGamma;
-    }
-  }, [lineGamma]);
+    const plan = renderPlanRef.current;
+    const useGamma = Boolean(plan?.enableGeometryWarp);
+    lineGammaRef.current = useGamma && lineGamma ? lineGamma : defaultLineGamma;
+  }, [lineGamma, defaultLineGamma, renderPlanVersion]);
   useEffect(() => {
-    if (nodeGamma) {
-      nodeGammaRef.current = nodeGamma;
-    }
-  }, [nodeGamma]);
+    const plan = renderPlanRef.current;
+    const useGamma = Boolean(plan?.enableGeometryWarp);
+    nodeGammaRef.current = useGamma && nodeGamma ? nodeGamma : defaultNodeGamma;
+  }, [nodeGamma, defaultNodeGamma, renderPlanVersion]);
   useEffect(() => {
-    if (lineShear) {
-      lineShearRef.current = lineShear;
-    }
-  }, [lineShear]);
+    const plan = renderPlanRef.current;
+    const useShear = Boolean(plan?.enableGeometryWarp);
+    lineShearRef.current = useShear && lineShear ? lineShear : defaultLineShear;
+  }, [lineShear, defaultLineShear, renderPlanVersion]);
   useEffect(() => {
-    if (nodeShear) {
-      nodeShearRef.current = nodeShear;
-    }
-  }, [nodeShear]);
+    const plan = renderPlanRef.current;
+    const useShear = Boolean(plan?.enableGeometryWarp);
+    nodeShearRef.current = useShear && nodeShear ? nodeShear : defaultNodeShear;
+  }, [nodeShear, defaultNodeShear, renderPlanVersion]);
   useEffect(() => {
     if (lineConstraint) {
       lineConstraintRef.current = lineConstraint;
@@ -3203,30 +3927,22 @@ export default function TimeDilationLatticePanel({
     const lineAlphaVbo = lineAlphaVboRef.current;
     const nodeAlphaVbo = nodeAlphaVboRef.current;
     if (!lineAlphaVbo || !nodeAlphaVbo) return;
-    if (lineAlpha) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, lineAlphaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, lineAlpha, gl.DYNAMIC_DRAW);
-    }
-    if (nodeAlpha) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, nodeAlphaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, nodeAlpha, gl.DYNAMIC_DRAW);
-    }
-  }, [lineAlpha, nodeAlpha]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineAlphaVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, lineAlphaRef.current ?? defaultLineAlpha, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, nodeAlphaVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, nodeAlphaRef.current ?? defaultNodeAlpha, gl.DYNAMIC_DRAW);
+  }, [lineAlpha, nodeAlpha, defaultLineAlpha, defaultNodeAlpha]);
   useEffect(() => {
     const gl = glRef.current;
     if (!gl) return;
     const lineThetaVbo = lineThetaVboRef.current;
     const nodeThetaVbo = nodeThetaVboRef.current;
     if (!lineThetaVbo || !nodeThetaVbo) return;
-    if (lineTheta) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, lineThetaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, lineTheta, gl.DYNAMIC_DRAW);
-    }
-    if (nodeTheta) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, nodeThetaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, nodeTheta, gl.DYNAMIC_DRAW);
-    }
-  }, [lineTheta, nodeTheta]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineThetaVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, lineThetaRef.current ?? defaultLineTheta, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, nodeThetaVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, nodeThetaRef.current ?? defaultNodeTheta, gl.DYNAMIC_DRAW);
+  }, [lineTheta, nodeTheta, defaultLineTheta, defaultNodeTheta, renderPlanVersion]);
 
   useEffect(() => {
     const gl = glRef.current;
@@ -3234,15 +3950,11 @@ export default function TimeDilationLatticePanel({
     const lineBetaVbo = lineBetaVboRef.current;
     const nodeBetaVbo = nodeBetaVboRef.current;
     if (!lineBetaVbo || !nodeBetaVbo) return;
-    if (lineBeta) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, lineBetaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, lineBeta, gl.DYNAMIC_DRAW);
-    }
-    if (nodeBeta) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, nodeBetaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, nodeBeta, gl.DYNAMIC_DRAW);
-    }
-  }, [lineBeta, nodeBeta]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineBetaVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, lineBetaRef.current ?? defaultLineBeta, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, nodeBetaVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, nodeBetaRef.current ?? defaultNodeBeta, gl.DYNAMIC_DRAW);
+  }, [lineBeta, nodeBeta, defaultLineBeta, defaultNodeBeta, renderPlanVersion]);
 
   useEffect(() => {
     const gl = glRef.current;
@@ -3250,15 +3962,11 @@ export default function TimeDilationLatticePanel({
     const lineGammaVbo = lineGammaVboRef.current;
     const nodeGammaVbo = nodeGammaVboRef.current;
     if (!lineGammaVbo || !nodeGammaVbo) return;
-    if (lineGamma) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, lineGammaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, lineGamma, gl.DYNAMIC_DRAW);
-    }
-    if (nodeGamma) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, nodeGammaVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, nodeGamma, gl.DYNAMIC_DRAW);
-    }
-  }, [lineGamma, nodeGamma]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineGammaVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, lineGammaRef.current ?? defaultLineGamma, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, nodeGammaVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, nodeGammaRef.current ?? defaultNodeGamma, gl.DYNAMIC_DRAW);
+  }, [lineGamma, nodeGamma, defaultLineGamma, defaultNodeGamma, renderPlanVersion]);
 
   useEffect(() => {
     const gl = glRef.current;
@@ -3266,15 +3974,11 @@ export default function TimeDilationLatticePanel({
     const lineShearVbo = lineShearVboRef.current;
     const nodeShearVbo = nodeShearVboRef.current;
     if (!lineShearVbo || !nodeShearVbo) return;
-    if (lineShear) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, lineShearVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, lineShear, gl.DYNAMIC_DRAW);
-    }
-    if (nodeShear) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, nodeShearVbo);
-      gl.bufferData(gl.ARRAY_BUFFER, nodeShear, gl.DYNAMIC_DRAW);
-    }
-  }, [lineShear, nodeShear]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineShearVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, lineShearRef.current ?? defaultLineShear, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, nodeShearVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, nodeShearRef.current ?? defaultNodeShear, gl.DYNAMIC_DRAW);
+  }, [lineShear, nodeShear, defaultLineShear, defaultNodeShear, renderPlanVersion]);
 
   useEffect(() => {
     const gl = glRef.current;
@@ -3361,99 +4065,49 @@ export default function TimeDilationLatticePanel({
     defaultBlendRef.current = defaultBlend;
   }, [defaultBlend]);
 
-  const activationState = useMemo(() => {
-    const power = resolvePowerW(pipelineState);
-    const duty = resolveDutyEffective(pipelineState);
-    const gammaGeo = resolveGammaGeo(pipelineState);
-    const gammaVdB = resolveGammaVdB(pipelineState);
-    const qSpoil = resolveQSpoiling(pipelineState);
-    const tsRatio = resolveTSRatio(pipelineState);
-    const thetaCal = resolveThetaCal(pipelineState, { gammaGeo, qSpoil, gammaVdB, duty });
-    const gammaGeoCubed = Math.pow(gammaGeo.value, 3);
-
-    const powerNorm = normalizeLog(power.value, 1e6, 1e12);
-    const thetaNorm = normalizeLog(thetaCal.value, 1e8, 1e12);
-    const tsNorm = normalizeLog(tsRatio.value, TS_RATIO_MIN, TS_RATIO_MIN * 1e4);
-    const activationBase = averageFinite(powerNorm, thetaNorm, tsNorm);
-
-    const guardrails = resolveGuardrails(pipelineState, tsRatio.value, gammaVdB.value);
-    const activation = clamp01(activationBase * guardrails.multiplier);
-    const activationProxy =
-      power.proxy ||
-      duty.proxy ||
-      gammaGeo.proxy ||
-      gammaVdB.proxy ||
-      qSpoil.proxy ||
-      tsRatio.proxy ||
-      thetaCal.proxy ||
-      guardrails.proxy;
-
-    return {
-      power,
-      duty,
-      gammaGeo,
-      gammaGeoCubed,
-      gammaVdB,
-      qSpoil,
-      tsRatio,
-      thetaCal,
-      activation,
-      activationBase,
-      activationProxy,
-      guardrails,
-    };
-  }, [pipelineState]);
-
-  useEffect(() => {
-    activationTargetRef.current = activationState.activation;
-  }, [activationState.activation]);
-
-  const pipelineProofs = useMemo(() => {
-    return {
-      t00Min: resolveT00Min(pipelineState),
-      mExotic: resolveMExotic(pipelineState),
-    };
-  }, [pipelineState]);
-
   const alphaSource = useMemo(() => {
-    if (grRequested && !useGrBrickData) return "gr-pending";
-    if (useGrBrickData && lineBrickReady && nodeBrickReady) return "gr-brick";
-    if (useGrBrickData && (lineBrickReady || nodeBrickReady)) return "gr-mixed";
-    if (!grRequested && lineBrickReady && nodeBrickReady) return "lapse-brick";
-    if (!grRequested && (lineBrickReady || nodeBrickReady)) return "mixed";
-    return "analytic";
-  }, [grRequested, useGrBrickData, lineBrickReady, nodeBrickReady]);
+    switch (renderPlan.sourceForAlpha) {
+      case "gr-brick":
+        return "gr-brick";
+      case "lapse-brick":
+        return "lapse-brick";
+      case "analytic-proxy":
+        return "analytic";
+      default:
+        return "analytic";
+    }
+  }, [renderPlan.sourceForAlpha]);
 
   const clockRateSource = useMemo(() => {
-    if (clockMode !== "static") return "alpha";
-    const hasStatic = Boolean(getBrickChannel(activeBrick, "clockRate_static"));
-    if (hasStatic) return "clockRate_static";
-    const hasGtt = Boolean(getBrickChannel(activeBrick, "g_tt"));
+    if (!clockRateBrick) return "none";
+    if (clockMode !== "static" && viewerChart !== "mp_like") return "alpha";
+    const hasStatic = Boolean(getBrickChannel(clockRateBrick, "clockRate_static"));
+    if (clockMode === "static" && hasStatic) return "clockRate_static";
+    const hasGtt = Boolean(getBrickChannel(clockRateBrick, "g_tt"));
     return hasGtt ? "sqrt(-g_tt)" : "alpha";
-  }, [activeBrick, clockMode]);
+  }, [clockRateBrick, clockMode, viewerChart]);
 
   const clockRateLabel = useMemo(() => {
-    if (clockMode !== "static") return "eulerian (alpha)";
+    if (clockMode !== "static") {
+      return viewerChart === "mp_like"
+        ? `mp_like (${clockRateSource})`
+        : "eulerian (alpha)";
+    }
     return clockRateSource === "clockRate_static"
       ? "static (clockRate_static)"
       : clockRateSource === "sqrt(-g_tt)"
         ? "static (sqrt(-g_tt))"
         : "eulerian (alpha)";
-  }, [clockMode, clockRateSource]);
-  const gateRequirements = useMemo(() => {
-    const entries: Array<{ module: string; minStage: MathStageLabel }> = [
-      { module: "server/energy-pipeline.ts", minStage: "reduced-order" },
-    ];
-    if (grRequested) {
-      entries.push({
-        module: "server/gr-evolve-brick.ts",
-        minStage: "diagnostic",
-      });
-    }
-    return entries;
-  }, [grRequested]);
-
+  }, [clockMode, clockRateSource, viewerChart]);
   const mathGate = useMemo(() => {
+    if (!renderPlan.flags.hasHull) {
+      return {
+        allowed: true,
+        pending: false,
+        reasons: [],
+        modules: [],
+      };
+    }
     const reasons: string[] = [];
     const modules: Array<{ module: string; stage: MathStageLabel }> = [];
     const pending = mathGraphQuery.isLoading || mathGraphQuery.isFetching;
@@ -3483,10 +4137,16 @@ export default function TimeDilationLatticePanel({
       } else {
         reasons.push("waiting for GR brick");
       }
-    } else if (!thetaSample) {
-      reasons.push("missing theta channel");
-    } else if (alphaSource !== "gr-brick") {
-      reasons.push(`proxy alpha source: ${alphaSource}`);
+    } else {
+      if (renderPlan.sourceForTheta === "gr-brick" && !thetaSample) {
+        reasons.push("missing theta channel");
+      }
+      if (grProxy) {
+        reasons.push("GR guardrails proxy");
+      }
+      if (alphaSource !== "gr-brick") {
+        reasons.push(`proxy alpha source: ${alphaSource}`);
+      }
     }
 
     return {
@@ -3503,11 +4163,14 @@ export default function TimeDilationLatticePanel({
     mathNodeIndex,
     grRequested,
     useGrBrickData,
+    grProxy,
     grQuery.isError,
     grQuery.isFetching,
     grErrorMessage,
     thetaSample,
+    renderPlan.sourceForTheta,
     gateRequirements,
+    renderPlan.flags.hasHull,
   ]);
 
   const gateProgress = useMemo(() => {
@@ -3524,7 +4187,10 @@ export default function TimeDilationLatticePanel({
     if (grRequested) {
       const grReady = useGrBrickData && !grQuery.isFetching && !grQuery.isError;
       steps.push({ label: "gr brick", ready: grReady });
-      steps.push({ label: "theta channel", ready: Boolean(thetaSample) });
+      steps.push({ label: "guardrails", ready: !grProxy });
+      if (renderPlan.sourceForTheta === "gr-brick") {
+        steps.push({ label: "theta channel", ready: Boolean(thetaSample) });
+      }
       steps.push({ label: "alpha source", ready: alphaSource === "gr-brick" });
     }
     const total = steps.length;
@@ -3543,11 +4209,37 @@ export default function TimeDilationLatticePanel({
     useGrBrickData,
     grQuery.isFetching,
     grQuery.isError,
+    grProxy,
     thetaSample,
     alphaSource,
+    renderPlan.sourceForTheta,
   ]);
 
   const renderBlocked = !mathGate.allowed;
+  const renderBanner = useMemo(() => {
+    if (renderPlan.banner === "CERTIFIED") return null;
+    let title = renderPlan.banner === "NO_HULL" ? "NO_HULL / MINKOWSKI" : renderPlan.banner;
+    if (renderPlan.banner === "UNSTABLE" && renderPlan.flags.exploratoryOverride) {
+      title = "UNSTABLE / EXPLORATORY";
+    }
+    const missing: string[] = [];
+    if (!renderPlan.flags.hasHull) missing.push("hull geometry");
+    if (grRequested && !renderPlan.flags.hasGrBrick) missing.push("GR brick");
+    if (grRequested && renderPlan.flags.hasGrBrick && !renderPlan.flags.grCertified) {
+      missing.push("certified GR");
+    }
+    if (renderPlan.flags.solverStatus !== "CERTIFIED" && !renderPlan.flags.exploratoryOverride) {
+      missing.push("solver stability");
+    }
+    if (!renderPlan.flags.mathStageOK) missing.push("math stage");
+    if (renderPlan.flags.anyProxy) missing.push("non-proxy inputs");
+    if (!grRequested) missing.push("GR enabled");
+    return {
+      title,
+      reasons: renderPlan.reasons,
+      missing,
+    };
+  }, [renderPlan, grRequested]);
 
   const debugStats = useMemo(() => {
     if (!debugEnabled) return null;
@@ -3603,6 +4295,7 @@ export default function TimeDilationLatticePanel({
       viabilityStatus: resolveViabilityLabel(pipelineState, activationState.guardrails.hardPass),
       alphaSource,
       clockMode: clockRateLabel,
+      viewerChart,
       hullField: hullField?.source ?? "none",
       hullFieldMode: hullField?.mode ?? "none",
       hullThickness,
@@ -3645,24 +4338,20 @@ export default function TimeDilationLatticePanel({
     hullThickness,
     hullWall,
     clockRateLabel,
+    viewerChart,
     grProxy,
     pipelineState,
   ]);
   const warpProvenance = useMemo(() => {
     if (!debugEnabled) return null;
     const warpStrength = debugStats?.warpStrength ?? DEFAULT_VISUALS.warpStrength;
-    const shearStrength = visualTuning.kijEnabled ? SHEAR_STRENGTH * visualTuning.kijScale : 0;
     return {
-      mode: warpFieldType,
-      geomScale: warpGeometry.geomScale,
-      betaWeight: warpGeometry.betaWeight,
-      betaScale: visualTuning.betaScale,
-      thetaScale,
-      thetaWarpScale: THETA_WARP_SCALE,
+      plan: renderPlan,
       warpStrength,
-      shearStrength,
+      warpCap: renderPlan.warpCap,
+      thetaNormalization,
     };
-  }, [debugEnabled, debugStats, warpFieldType, warpGeometry, visualTuning, thetaScale]);
+  }, [debugEnabled, debugStats, renderPlan, thetaNormalization, viewerChart]);
 
   useEffect(() => {
     if (!renderBlocked) return;
@@ -3717,6 +4406,35 @@ export default function TimeDilationLatticePanel({
     };
   }, [debugEnabled, grQuery.data, pipelineState, grRequested]);
 
+  const grAssistantReport = grAssistantQuery.data ?? null;
+  const grAssistantSummary = useMemo(() => {
+    if (!grAssistantReport) return null;
+    const report = grAssistantReport.report;
+    const gate = grAssistantReport.gate;
+    const gateFail = gate?.constraints?.find((entry) => entry.status === "fail");
+    const firstFail = report.failed_checks[0]?.check_name ?? gateFail?.id ?? null;
+    const overallPass = report.passed && (gate?.pass ?? true);
+    return {
+      report,
+      gate,
+      overallPass,
+      firstFail,
+      invariants: Object.entries(report.invariants ?? {}),
+      brickInvariants: Object.entries(report.brick_invariants ?? {}),
+    };
+  }, [grAssistantReport]);
+  const grAssistantStatus = useMemo(() => {
+    if (grAssistantQuery.isFetching) return "checking";
+    if (!grAssistantSummary) return "idle";
+    return grAssistantSummary.overallPass ? "pass" : "fail";
+  }, [grAssistantQuery.isFetching, grAssistantSummary]);
+  const grAssistantBadgeClass =
+    grAssistantStatus === "pass"
+      ? "bg-emerald-500/20 text-emerald-200"
+      : grAssistantStatus === "fail"
+        ? "bg-rose-500/20 text-rose-200"
+        : "bg-slate-500/20 text-slate-200";
+
   const solverDiagnostics = useMemo(() => {
     if (!debugEnabled) return null;
     const H_rms = firstFinite(
@@ -3736,6 +4454,87 @@ export default function TimeDilationLatticePanel({
     };
   }, [debugEnabled, grQuery.data, pipelineState, grProxy]);
 
+  const solverHealthDiagnostics = useMemo(() => {
+    if (!debugEnabled) return null;
+    const health =
+      grQuery.data?.stats?.solverHealth ?? (pipelineState as any)?.gr?.solver?.health;
+    const fixups =
+      grQuery.data?.stats?.fixups ?? (pipelineState as any)?.gr?.solver?.fixups;
+    const meta = grQuery.data?.meta ?? (pipelineState as any)?.gr?.meta;
+    if (!health && !fixups && !meta) return null;
+    return {
+      health,
+      fixups,
+      meta,
+      source: grQuery.data?.stats?.solverHealth ? "gr-brick" : (pipelineState as any)?.gr ? "pipeline-gr" : "missing",
+    };
+  }, [debugEnabled, grQuery.data, pipelineState]);
+
+  const shiftStiffnessDiagnostics = useMemo(() => {
+    if (!debugEnabled) return null;
+    const stiffness =
+      grQuery.data?.stats?.stiffness ?? (pipelineState as any)?.gr?.stiffness;
+    if (!stiffness) return null;
+    const advectScheme = grQuery.data?.stats?.advectScheme;
+    const dt_s = firstFinite(grQuery.data?.dt_s, (pipelineState as any)?.gr?.grid?.dt_s);
+    const voxelSize = grQuery.data?.voxelSize_m ?? (pipelineState as any)?.gr?.grid?.voxelSize_m;
+    let minSpacing = Number.NaN;
+    if (Array.isArray(voxelSize) && voxelSize.length === 3) {
+      const sx = Number(voxelSize[0]);
+      const sy = Number(voxelSize[1]);
+      const sz = Number(voxelSize[2]);
+      if (Number.isFinite(sx) && Number.isFinite(sy) && Number.isFinite(sz)) {
+        minSpacing = Math.min(sx, sy, sz);
+      }
+    }
+    const dtGeom = Number.isFinite(dt_s) ? (dt_s as number) * C : Number.NaN;
+    const charSuggested = Number(stiffness.charCflSuggested ?? Number.NaN);
+    const ratio =
+      Number.isFinite(dtGeom) && Number.isFinite(charSuggested) && charSuggested > 0
+        ? (dtGeom as number) / charSuggested
+        : Number.NaN;
+    const gradRatio =
+      Number.isFinite(stiffness.gradBetaMaxAbs) && Number.isFinite(stiffness.gradBetaP98Abs) && stiffness.gradBetaP98Abs > 0
+        ? stiffness.gradBetaMaxAbs / stiffness.gradBetaP98Abs
+        : Number.NaN;
+    let status: "ok" | "warning" | "severe" = "ok";
+    let note: string | null = null;
+    const shockSeverity = stiffness.shockSeverity;
+    const hasShockSeverity =
+      shockSeverity === "ok" || shockSeverity === "warn" || shockSeverity === "severe";
+    if (hasShockSeverity) {
+      status =
+        shockSeverity === "severe"
+          ? "severe"
+          : shockSeverity === "warn"
+            ? "warning"
+            : "ok";
+    } else if (
+      (Number.isFinite(ratio) && ratio >= SHIFT_STIFF_SEVERE_RATIO) ||
+      (Number.isFinite(gradRatio) && gradRatio >= SHIFT_STIFF_GRAD_SEVERE_RATIO)
+    ) {
+      status = "severe";
+    } else if (
+      (Number.isFinite(ratio) && ratio >= SHIFT_STIFF_WARN_RATIO) ||
+      (Number.isFinite(gradRatio) && gradRatio >= SHIFT_STIFF_GRAD_WARN_RATIO)
+    ) {
+      status = "warning";
+    } else if (!Number.isFinite(ratio) && !Number.isFinite(gradRatio)) {
+      note = "insufficient dt or gradient data";
+    }
+    return {
+      stiffness,
+      advectScheme,
+      minSpacing,
+      dtGeom,
+      ratio,
+      gradRatio,
+      status,
+      note,
+      source: grQuery.data?.stats?.stiffness ? "gr-brick" : (pipelineState as any)?.gr ? "pipeline-gr" : "missing",
+    };
+  }, [debugEnabled, grQuery.data, pipelineState]);
+
   const thetaDiagnostics = useMemo(() => {
     if (!debugEnabled) return null;
     const stressEnergy =
@@ -3751,6 +4550,12 @@ export default function TimeDilationLatticePanel({
         : Number.isFinite(divPre) && divPre !== 0
           ? (divPost as number) / (divPre as number)
           : Number.NaN;
+    const clampRate =
+      Number.isFinite(natario.clampActivationRate) && natario.clampActivationRate !== undefined
+        ? natario.clampActivationRate
+        : Number.isFinite(natario.clampScale)
+          ? 1 - (natario.clampScale as number)
+          : Number.NaN;
     if (!Number.isFinite(divPre) && !Number.isFinite(divPost) && !Number.isFinite(ratio)) {
       return null;
     }
@@ -3758,6 +4563,11 @@ export default function TimeDilationLatticePanel({
       divPre,
       divPost,
       ratio,
+      clampRate,
+      clampScale: natario.clampScale,
+      clampMode: natario.clampMode,
+      gateLimit: natario.gateLimit,
+      divRms: natario.divBetaRmsPost ?? natario.divBetaRms,
       source: grQuery.data?.stats?.stressEnergy
         ? "gr-brick"
         : (pipelineState as any)?.gr?.matter?.stressEnergy
@@ -3766,6 +4576,26 @@ export default function TimeDilationLatticePanel({
       proxy: grProxy,
     };
   }, [debugEnabled, grQuery.data, pipelineState, grProxy]);
+
+  const modeSemantics = useMemo(() => {
+    if (!debugEnabled) return null;
+    if (warpFieldType === "natario") {
+      return {
+        mode: "natario" as const,
+        note: "theta expected near 0",
+        diagnostics: thetaDiagnostics,
+      };
+    }
+    if (warpFieldType === "alcubierre") {
+      return {
+        mode: "alcubierre" as const,
+        note: "dipole sign-flip required",
+        dipole: thetaDipoleCheck,
+        diagnostics: thetaDiagnostics,
+      };
+    }
+    return null;
+  }, [debugEnabled, warpFieldType, thetaDiagnostics, thetaDipoleCheck]);
 
   const diagnostics = useMemo(() => {
     if (!debugEnabled || !debugStats) return null;
@@ -4091,11 +4921,13 @@ export default function TimeDilationLatticePanel({
           u_beta: gl.getUniformLocation(prog, "u_beta"),
           u_betaCenter: gl.getUniformLocation(prog, "u_betaCenter"),
           u_betaScale: gl.getUniformLocation(prog, "u_betaScale"),
-          u_betaWarpWeight: gl.getUniformLocation(prog, "u_betaWarpWeight"),
-          u_geomWarpScale: gl.getUniformLocation(prog, "u_geomWarpScale"),
+          u_betaWarpWeight: gl.getUniformLocation(prog, "u_betaWarpWeight"),    
+          u_geomWarpScale: gl.getUniformLocation(prog, "u_geomWarpScale"),      
+          u_warpCap: gl.getUniformLocation(prog, "u_warpCap"),
           u_phiScale: gl.getUniformLocation(prog, "u_phiScale"),
           u_alphaMin: gl.getUniformLocation(prog, "u_alphaMin"),
           u_thetaScale: gl.getUniformLocation(prog, "u_thetaScale"),
+          u_thetaWarpWeight: gl.getUniformLocation(prog, "u_thetaWarpWeight"),
           u_softening: gl.getUniformLocation(prog, "u_softening"),
         u_warpStrength: gl.getUniformLocation(prog, "u_warpStrength"),
         u_breathAmp: gl.getUniformLocation(prog, "u_breathAmp"),
@@ -4200,12 +5032,19 @@ export default function TimeDilationLatticePanel({
         );
         activationRef.current = activation;
         const visual = visualTuningRef.current;
-        const warpGeometry = warpGeometryRef.current;
+        const plan = renderPlanRef.current ?? renderPlan;
         const betaCenter = betaCenterRef.current ?? [0, 0, 0];
-        const geomWarpScale = Math.max(0, warpGeometry?.geomScale ?? 1);
-        const betaWarpWeight = Math.max(0, warpGeometry?.betaWeight ?? 0);
-        const betaScale = Math.max(0, visual.betaScale);
-        const betaEffective = betaFieldRef.current.value * activation * betaScale;
+        const geomWarpScale = Math.max(0, plan.geomWarpScale);
+        const betaWarpWeight = Math.max(0, plan.betaWarpWeight);
+        const thetaWarpWeight = Math.max(0, plan.thetaWarpWeight);
+        const betaScaleBase = Math.max(0, visual.betaScale);
+        const betaWarpScale = Math.max(0, plan.normalization.beta.scale);
+        const betaFieldValue =
+          plan.sourceForBeta === "gr-brick" ? betaFieldRef.current.value : bubble.beta;
+        const betaEffective = betaFieldValue * activation * betaScaleBase;
+        const metricBlend = Math.max(0, plan.metricBlend);
+        const shearStrength = Math.max(0, plan.shearWeight);
+        const warpCap = Math.max(1e-6, plan.warpCap);
         const lineBrickBlend = smoothExp(
           lineBrickBlendRef.current,
           lineBrickTargetRef.current,
@@ -4253,9 +5092,10 @@ export default function TimeDilationLatticePanel({
         gl.uniform1f(uniforms.u_sigma, bubble.sigma);
         gl.uniform1f(uniforms.u_beta, betaEffective);
         gl.uniform3f(uniforms.u_betaCenter, betaCenter[0], betaCenter[1], betaCenter[2]);
-        gl.uniform1f(uniforms.u_betaScale, betaScale);
+        gl.uniform1f(uniforms.u_betaScale, betaWarpScale);
         gl.uniform1f(uniforms.u_betaWarpWeight, betaWarpWeight);
         gl.uniform1f(uniforms.u_geomWarpScale, geomWarpScale);
+        gl.uniform1f(uniforms.u_warpCap, warpCap);
         gl.uniform1f(uniforms.u_phiScale, settings.phiScale);
         gl.uniform1f(uniforms.u_alphaMin, settings.alphaMin);
         gl.uniform1f(uniforms.u_softening, settings.softening);
@@ -4265,15 +5105,10 @@ export default function TimeDilationLatticePanel({
         gl.uniform1f(uniforms.u_pulseRate, settings.pulseRate);
         gl.uniform1f(uniforms.u_pointSize, settings.pointSize);
         gl.uniform1f(uniforms.u_alphaScale, visual.alphaScale);
-        gl.uniform1f(uniforms.u_thetaScale, thetaScaleRef.current);
-        gl.uniform1f(
-          uniforms.u_metricBlend,
-          visual.gammaEnabled ? METRIC_BLEND * visual.gammaScale : 0,
-        );
-        gl.uniform1f(
-          uniforms.u_shearStrength,
-          visual.kijEnabled ? SHEAR_STRENGTH * visual.kijScale : 0,
-        );
+        gl.uniform1f(uniforms.u_thetaScale, Math.max(0, plan.normalization.theta.scale));
+        gl.uniform1f(uniforms.u_thetaWarpWeight, thetaWarpWeight);
+        gl.uniform1f(uniforms.u_metricBlend, metricBlend);
+        gl.uniform1f(uniforms.u_shearStrength, shearStrength);
         gl.uniform1f(
           uniforms.u_constraintScale,
           visual.constraintEnabled ? constraintScaleRef.current * visual.constraintScale : 0,
@@ -4631,6 +5466,16 @@ export default function TimeDilationLatticePanel({
             >
               Static (sqrt(-g_tt))
             </DropdownMenuCheckboxItem>
+            <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+              Viewer chart
+            </DropdownMenuLabel>
+            <DropdownMenuCheckboxItem
+              checked={viewerChart === "mp_like"}
+              onCheckedChange={(value) => setViewerChart(value ? "mp_like" : "adm")}
+              className="text-xs text-slate-200"
+            >
+              MP-like (prefer g_tt)
+            </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator className="bg-white/10" />
             <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
               Overlays
@@ -4700,6 +5545,27 @@ export default function TimeDilationLatticePanel({
             </div>
           </div>
         )}
+        {renderBanner && (
+          <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center">
+            <div className="max-w-[360px] rounded-md border border-amber-500/40 bg-black/80 px-3 py-2 text-[11px] text-slate-200">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300">
+                {renderBanner.title}
+              </div>
+              {renderBanner.missing.length > 0 && (
+                <div className="mt-1 text-slate-300">
+                  missing: {renderBanner.missing.join(", ")}
+                </div>
+              )}
+              {renderBanner.reasons.length > 0 && (
+                <div className="mt-2 space-y-1 text-[10px] text-slate-400">
+                  {renderBanner.reasons.map((reason) => (
+                    <div key={reason}>{reason}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {renderBlocked && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/70">
             <div className="max-w-[340px] rounded-md border border-amber-500/40 bg-black/80 px-3 py-2 text-[11px] text-slate-200">
@@ -4746,7 +5612,7 @@ export default function TimeDilationLatticePanel({
           grControlsEnabled ||
           regionControlsEnabled ||
           visualControlsEnabled) && (
-          <div className="absolute left-3 top-3 bottom-3 flex w-[calc(100%-24px)] max-w-[360px] flex-col gap-2 overflow-y-auto overflow-x-hidden break-words pr-1 text-[11px] text-slate-200">
+          <div className="absolute left-3 top-3 bottom-3 flex w-[calc(100%-24px)] max-w-[360px] flex-col gap-2 overflow-y-auto overflow-x-hidden break-words pb-16 pr-1 text-[11px] text-slate-200">
             {debugEnabled && debugStats && (
               <div className="rounded-md border border-white/10 bg-black/70 px-3 py-2">
             <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">kappa drive</div>
@@ -4775,6 +5641,7 @@ export default function TimeDilationLatticePanel({
             <div>hullThickness: {formatFixed(debugStats.hullThickness, 2)} m</div>
             <div>alphaSource: {debugStats.alphaSource}</div>
             <div>clockRate: {debugStats.clockMode}</div>
+            <div>viewerChart: {debugStats.viewerChart}</div>
             <div>
               guardrails: FR={debugStats.guardrails.fordRoman}, TH={debugStats.guardrails.thetaAudit}, TS={debugStats.guardrails.tsRatio}, VdB={debugStats.guardrails.vdbBand}
             </div>
@@ -4809,6 +5676,150 @@ export default function TimeDilationLatticePanel({
                   {solverDiagnostics.proxy ? " (proxy)" : ""}
                 </div>
                 <div>source: {solverDiagnostics.source}</div>
+              </div>
+            )}
+            {grAssistantSummary && (
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                    gr correctness
+                  </div>
+                  <div
+                    className={`rounded-full px-2 py-[1px] text-[9px] uppercase tracking-[0.2em] ${grAssistantBadgeClass}`}
+                  >
+                    {grAssistantStatus}
+                  </div>
+                </div>
+                <div>
+                  checks: {grAssistantSummary.report.checks.length} | failed: {grAssistantSummary.report.failed_checks.length}
+                </div>
+                {grAssistantSummary.firstFail ? (
+                  <div>first_fail: {grAssistantSummary.firstFail}</div>
+                ) : null}
+                {grAssistantSummary.gate ? (
+                  <div>
+                    gate: {grAssistantSummary.gate.pass ? "pass" : "fail"} | cert: {grAssistantSummary.gate.certificate?.certificateHash ?? "n/a"}
+                  </div>
+                ) : null}
+                <div>signature: {grAssistantSummary.report.assumptions.signature}</div>
+                <div>units: {grAssistantSummary.report.assumptions.units_internal}</div>
+                <div>coords: {grAssistantSummary.report.assumptions.coords.join(", ")}</div>
+                {grAssistantSummary.invariants.length > 0 && (
+                  <div className="mt-1">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                      invariants (cas)
+                    </div>
+                    {grAssistantSummary.invariants.map(([key, value]) => (
+                      <div key={`inv-${key}`}>
+                        {key}: {formatInvariantValue(value)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {grAssistantSummary.brickInvariants.length > 0 && (
+                  <div className="mt-1">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                      invariants (brick)
+                    </div>
+                    {grAssistantSummary.brickInvariants.map(([key, value]) => (
+                      <div key={`inv-brick-${key}`}>
+                        {key}: {formatInvariantValue(value)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {solverHealthDiagnostics && (
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  solver health
+                </div>
+                <div>status: {solverHealthDiagnostics.health?.status ?? "n/a"}</div>
+                <div>brick_meta: {solverHealthDiagnostics.meta?.status ?? "n/a"}</div>
+                <div>
+                  alpha_clamp_fraction: {formatSci(solverHealthDiagnostics.health?.alphaClampFraction, 2)}
+                </div>
+                <div>
+                  k_clamp_fraction: {formatSci(solverHealthDiagnostics.health?.kClampFraction, 2)}
+                </div>
+                <div>
+                  total_clamp_fraction: {formatSci(solverHealthDiagnostics.health?.totalClampFraction, 2)}
+                </div>
+                <div>
+                  max_alpha_before: {formatSci(solverHealthDiagnostics.health?.maxAlphaBeforeClamp, 2)}
+                </div>
+                <div>
+                  max_k_before: {formatSci(solverHealthDiagnostics.health?.maxKBeforeClamp, 2)}
+                </div>
+                <div>
+                  alpha_clamp_count: {formatCount(solverHealthDiagnostics.fixups?.alphaClampCount ?? null)}
+                </div>
+                <div>
+                  k_clamp_count: {formatCount(solverHealthDiagnostics.fixups?.kClampCount ?? null)}
+                </div>
+                <div>
+                  det_fix_count: {formatCount(solverHealthDiagnostics.fixups?.detFixCount ?? null)}
+                </div>
+                <div>
+                  trace_fix_count: {formatCount(solverHealthDiagnostics.fixups?.traceFixCount ?? null)}
+                </div>
+                {solverHealthDiagnostics.health?.reasons?.length ? (
+                  <div>reasons: {solverHealthDiagnostics.health.reasons.join("; ")}</div>
+                ) : null}
+                {solverHealthDiagnostics.meta?.reasons?.length ? (
+                  <div>meta_reasons: {solverHealthDiagnostics.meta.reasons.join("; ")}</div>
+                ) : null}
+                <div>source: {solverHealthDiagnostics.source}</div>
+                {solverHealthDiagnostics.health?.status === "UNSTABLE" ? (
+                  <div className="mt-1 inline-flex items-center rounded-full bg-rose-500/20 px-2 py-[1px] text-[9px] uppercase tracking-[0.2em] text-rose-200">
+                    unstable fixups
+                  </div>
+                ) : null}
+                {exploratoryOverride && solverStatus !== "CERTIFIED" ? (
+                  <div className="mt-1 inline-flex items-center rounded-full bg-amber-500/20 px-2 py-[1px] text-[9px] uppercase tracking-[0.2em] text-amber-200">
+                    exploratory override
+                  </div>
+                ) : null}
+              </div>
+            )}
+            {shiftStiffnessDiagnostics && (
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  stiffness
+                </div>
+                <div>shift-stiff: {shiftStiffnessDiagnostics.status}</div>
+                {shiftStiffnessDiagnostics.note ? (
+                  <div>note: {shiftStiffnessDiagnostics.note}</div>
+                ) : null}
+                <div>beta_max_abs: {formatSci(shiftStiffnessDiagnostics.stiffness.betaMaxAbs, 2)}</div>
+                <div>beta_p98_abs: {formatSci(shiftStiffnessDiagnostics.stiffness.betaP98Abs, 2)}</div>
+                <div>grad_beta_max: {formatSci(shiftStiffnessDiagnostics.stiffness.gradBetaMaxAbs, 2)}</div>
+                <div>grad_beta_p98: {formatSci(shiftStiffnessDiagnostics.stiffness.gradBetaP98Abs, 2)}</div>
+                <div>shock_index: {formatFixed(shiftStiffnessDiagnostics.stiffness.shockIndex, 2)}</div>
+                <div>
+                  shock_severity: {shiftStiffnessDiagnostics.stiffness.shockSeverity ?? "n/a"}
+                </div>
+                {shiftStiffnessDiagnostics.stiffness.shockMode ? (
+                  <div>shock_mode: {shiftStiffnessDiagnostics.stiffness.shockMode}</div>
+                ) : null}
+                {shiftStiffnessDiagnostics.advectScheme ? (
+                  <div>advect_scheme: {shiftStiffnessDiagnostics.advectScheme}</div>
+                ) : null}
+                {shiftStiffnessDiagnostics.stiffness.stabilizersApplied?.length ? (
+                  <div>
+                    stabilizers: {shiftStiffnessDiagnostics.stiffness.stabilizersApplied.join(", ")}
+                  </div>
+                ) : null}
+                <div>
+                  advective_cfl_suggest: {formatSci(shiftStiffnessDiagnostics.stiffness.advectiveCflSuggested, 2)}
+                </div>
+                <div>char_speed_suggest: {formatSci(shiftStiffnessDiagnostics.stiffness.charSpeedSuggested, 2)}</div>
+                <div>char_cfl_suggest: {formatSci(shiftStiffnessDiagnostics.stiffness.charCflSuggested, 2)}</div>
+                <div>dt_geom: {formatSci(shiftStiffnessDiagnostics.dtGeom, 2)}</div>
+                <div>dt/char_cfl: {formatFixed(shiftStiffnessDiagnostics.ratio, 2)}</div>
+                <div>grad_ratio: {formatFixed(shiftStiffnessDiagnostics.gradRatio, 2)}</div>
+                <div>source: {shiftStiffnessDiagnostics.source}</div>
               </div>
             )}
             {thetaDiagnostics && (
@@ -4852,6 +5863,62 @@ export default function TimeDilationLatticePanel({
                     {thetaExpectation.dipole.proxy ? <div>proxy: true</div> : null}
                   </>
                 )}
+                {betaStrainCheck && (
+                  <>
+                    <div>beta_strain_sign_flip: {betaStrainCheck.status}</div>
+                    <div>
+                      beta_strain_ahead: {formatSci(betaStrainCheck.ahead, 2)}
+                    </div>
+                    <div>
+                      beta_strain_behind: {formatSci(betaStrainCheck.behind, 2)}
+                    </div>
+                    <div>
+                      threshold: {formatSci(betaStrainCheck.threshold, 2)}
+                    </div>
+                    {betaStrainCheck.reason ? (
+                      <div>note: {betaStrainCheck.reason}</div>
+                    ) : null}
+                    {betaStrainCheck.proxy ? <div>proxy: true</div> : null}
+                  </>
+                )}
+              </div>
+            )}
+            {modeSemantics && (
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  mode semantics
+                </div>
+                <div>warpFieldType: {modeSemantics.mode}</div>
+                <div>{modeSemantics.note}</div>
+                {modeSemantics.mode === "natario" ? (
+                  <>
+                    <div>
+                      theta_div_pre: {formatSci(modeSemantics.diagnostics?.divPre, 2)}
+                    </div>
+                    <div>
+                      theta_div_post: {formatSci(modeSemantics.diagnostics?.divPost, 2)}
+                    </div>
+                    <div>
+                      clamp_ratio: {formatFixed(modeSemantics.diagnostics?.ratio, 3)}
+                    </div>
+                    <div>clamp_mode: {modeSemantics.diagnostics?.clampMode ?? "n/a"}</div>
+                    <div>
+                      clamp_rate: {formatFixed(modeSemantics.diagnostics?.clampRate, 3)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      dipole_sign_flip: {modeSemantics.dipole?.status ?? "n/a"}
+                    </div>
+                    {modeSemantics.dipole?.reason ? (
+                      <div>note: {modeSemantics.dipole.reason}</div>
+                    ) : null}
+                    <div>
+                      beta_strain_rms: {formatSci(modeSemantics.diagnostics?.divRms, 2)}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             {warpProvenance && (
@@ -4859,18 +5926,111 @@ export default function TimeDilationLatticePanel({
                 <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
                   warp provenance
                 </div>
-                <div>mode: {warpProvenance.mode}</div>
-                <div>geom_gate: {formatFixed(warpProvenance.geomScale, 2)}x</div>
+                <div>banner: {warpProvenance.plan.banner}</div>
+                <div>mode: {warpProvenance.plan.mode}</div>
+                <div>viewer_chart: {viewerChart}</div>
+                <div>geom_gate: {formatFixed(warpProvenance.plan.geomWarpScale, 2)}x</div>
+                <div>geom_enable: {warpProvenance.plan.enableGeometryWarp ? "on" : "off"}</div>
                 <div>
-                  beta_warp: w={formatFixed(warpProvenance.betaWeight, 2)} scale=
-                  {formatFixed(warpProvenance.betaScale, 2)}x
+                  flags: hull={warpProvenance.plan.flags.hasHull ? "yes" : "no"},{" "}
+                  wall=
+                  {warpProvenance.plan.flags.wallDetected === undefined
+                    ? "n/a"
+                    : warpProvenance.plan.flags.wallDetected
+                      ? "yes"
+                      : "no"}
+                  {warpProvenance.plan.flags.wallSource
+                    ? ` (${warpProvenance.plan.flags.wallSource})`
+                    : ""},{" "}
+                  gr={warpProvenance.plan.flags.hasGrBrick ? "yes" : "no"},{" "}
+                  certified={warpProvenance.plan.flags.grCertified ? "yes" : "no"},{" "}
+                  proxy={warpProvenance.plan.flags.anyProxy ? "yes" : "no"},{" "}
+                  stage={warpProvenance.plan.flags.mathStageOK ? "ok" : "blocked"},{" "}
+                  solver={warpProvenance.plan.flags.solverStatus ?? "n/a"},{" "}
+                  override={warpProvenance.plan.flags.exploratoryOverride ? "on" : "off"},{" "}
+                  cinematic={warpProvenance.plan.flags.cinematicOverride ? "on" : "off"}
                 </div>
                 <div>
-                  theta_warp: scale={formatSci(warpProvenance.thetaScale, 2)} w=
-                  {formatFixed(warpProvenance.thetaWarpScale, 2)}
+                  sources: α={warpProvenance.plan.sourceForAlpha}, β={warpProvenance.plan.sourceForBeta},{" "}
+                  θ={warpProvenance.plan.sourceForTheta}, clock={warpProvenance.plan.sourceForClockRate}
+                </div>
+                <div>
+                  beta_warp: w={formatFixed(warpProvenance.plan.betaWarpWeight, 2)} scale=
+                  {formatFixed(warpProvenance.plan.normalization.beta.scale, 2)}x
+                </div>
+                <div>
+                  beta_norm: {warpProvenance.plan.normalization.beta.mode}
+                  {warpProvenance.plan.normalization.beta.percentile != null
+                    ? ` p98=${formatSci(warpProvenance.plan.normalization.beta.percentile, 2)}`
+                    : ""}
+                  {` base=${formatFixed(warpProvenance.plan.normalization.beta.baseScale, 2)}`}
+                </div>
+                <div>
+                  theta_warp: scale={formatSci(warpProvenance.plan.normalization.theta.scale, 2)} w=
+                  {formatFixed(warpProvenance.plan.thetaWarpWeight, 2)}
+                </div>
+                <div>
+                  theta_norm: {warpProvenance.plan.normalization.theta.mode}
+                  {warpProvenance.plan.normalization.theta.percentile != null
+                    ? ` p98=${formatSci(warpProvenance.plan.normalization.theta.percentile, 2)}`
+                    : ""}
+                  {` base=${formatSci(warpProvenance.plan.normalization.theta.baseScale, 2)}`}
+                </div>
+                <div>
+                  theta_norm_mode: {warpProvenance.thetaNormalization?.normMode ?? "n/a"}
+                </div>
+                <div>
+                  theta_norm_p98: {formatSci(warpProvenance.thetaNormalization?.p98, 2)}
+                </div>
+                <div>
+                  theta_clamp: [{formatSci(warpProvenance.thetaNormalization?.clampMin, 2)}, {formatSci(warpProvenance.thetaNormalization?.clampMax, 2)}]
+                </div>
+                <div>
+                  theta_sanitized: {formatCount(warpProvenance.thetaNormalization?.sanitizedCount ?? null)}
+                </div>
+                {warpProvenance.thetaNormalization?.sanitizedCount ? (
+                  <div className="mt-1 inline-flex items-center rounded-full bg-amber-500/20 px-2 py-[1px] text-[9px] uppercase tracking-[0.2em] text-amber-200">
+                    theta sanitized
+                  </div>
+                ) : null}
+                <div>
+                  gamma_norm: {warpProvenance.plan.normalization.gamma.mode}
+                  {warpProvenance.plan.normalization.gamma.percentile != null
+                    ? ` p98=${formatSci(warpProvenance.plan.normalization.gamma.percentile, 2)}`
+                    : ""}
+                  {` base=${formatFixed(warpProvenance.plan.normalization.gamma.baseScale, 2)}`}
+                </div>
+                <div>
+                  shear_norm: {warpProvenance.plan.normalization.shear.mode}
+                  {warpProvenance.plan.normalization.shear.percentile != null
+                    ? ` p98=${formatSci(warpProvenance.plan.normalization.shear.percentile, 2)}`
+                    : ""}
+                  {` base=${formatFixed(warpProvenance.plan.normalization.shear.baseScale, 2)}`}
                 </div>
                 <div>warpStrength: {formatFixed(warpProvenance.warpStrength, 2)}</div>
-                <div>shearStrength: {formatFixed(warpProvenance.shearStrength, 2)}</div>
+                <div>metricBlend: {formatFixed(warpProvenance.plan.metricBlend, 2)}</div>
+                <div>shearStrength: {formatFixed(warpProvenance.plan.shearWeight, 2)}</div>
+                <div>warp_cap: {formatSci(warpProvenance.warpCap, 2)}</div>
+                <div>
+                  reasons: {warpProvenance.plan.reasons.length ? warpProvenance.plan.reasons.join("; ") : "none"}
+                </div>
+              </div>
+            )}
+            {wallDiagnostics && (
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  wall diagnostics
+                </div>
+                <div>source: {wallDiagnostics.source}</div>
+                <div>detected: {wallDiagnostics.detected ? "yes" : "no"}</div>
+                <div>p98: {formatSci(wallDiagnostics.p98, 2)}</div>
+                <div>threshold: {formatSci(wallDiagnostics.threshold, 2)}</div>
+                <div>
+                  band: [{formatSci(wallDiagnostics.bandMin, 2)}, {formatSci(wallDiagnostics.bandMax, 2)}]
+                </div>
+                <div>
+                  sample_frac: {formatFixed(wallDiagnostics.sampleFraction * 100, 1)}%
+                </div>
               </div>
             )}
             {grPerf && (
@@ -5375,7 +6535,7 @@ export default function TimeDilationLatticePanel({
                     <input
                       type="number"
                       min="0"
-                      step="0.0001"
+                      step="1e-9"
                       value={grDt}
                       onChange={(event) => {
                         const value = Number(event.target.value);
@@ -5412,6 +6572,36 @@ export default function TimeDilationLatticePanel({
                     />
                   </div>
                   <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">shock mode</span>
+                    <select
+                      className="h-7 w-28 rounded border border-white/10 bg-black/40 px-2 text-[11px] text-slate-100"
+                      value={grShockMode}
+                      onChange={(event) =>
+                        setGrShockMode(event.target.value as "off" | "diagnostic" | "stabilize")
+                      }
+                    >
+                      <option value="off">off</option>
+                      <option value="diagnostic">diagnostic</option>
+                      <option value="stabilize">stabilize</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">advection scheme</span>
+                    <select
+                      className="h-7 w-28 rounded border border-white/10 bg-black/40 px-2 text-[11px] text-slate-100"
+                      value={grAdvectScheme}
+                      onChange={(event) =>
+                        setGrAdvectScheme(event.target.value as "centered" | "upwind1")
+                      }
+                    >
+                      <option value="centered">centered</option>
+                      <option value="upwind1">upwind1</option>
+                    </select>
+                  </div>
+                  <div className="text-[10px] text-amber-300">
+                    Experimental: upwind1 is more stable, more diffusive.
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">include extra</span>
                     <input
                       type="checkbox"
@@ -5437,6 +6627,18 @@ export default function TimeDilationLatticePanel({
                       onChange={(event) => setGrIncludeKij(event.target.checked)}
                       className="h-3 w-3"
                     />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-amber-300">exploratory override</span>
+                    <input
+                      type="checkbox"
+                      checked={exploratoryOverride}
+                      onChange={(event) => setExploratoryOverride(event.target.checked)}
+                      className="h-3 w-3"
+                    />
+                  </div>
+                  <div className="text-[10px] text-amber-300">
+                    Allows geometry warp from UNSTABLE GR bricks (debug only).
                   </div>
                   <div className="text-[10px] text-slate-400">
                     include extra forces Kij + matter on the server.
@@ -5705,6 +6907,28 @@ export default function TimeDilationLatticePanel({
                     <div>
                       contraction mag: {formatFixed(regionStats.summary.contractionMagnitude * 100, 1)}%
                     </div>
+                    {regionStats.summary.wall && (
+                      <>
+                        <div>
+                          wall: {regionStats.summary.wall.detected ? "detected" : "none"} ({regionStats.summary.wall.source})
+                        </div>
+                        <div>
+                          wall p98: {formatSci(regionStats.summary.wall.p98, 2)} | threshold:{" "}
+                          {formatSci(regionStats.summary.wall.threshold, 2)}
+                        </div>
+                        <div>
+                          wall band: [{formatSci(regionStats.summary.wall.bandMin, 2)}, {formatSci(regionStats.summary.wall.bandMax, 2)}]
+                        </div>
+                        <div>
+                          wall center: {formatVec3(regionStats.summary.wall.center ?? null, 2)}
+                        </div>
+                        <div>
+                          wall radius: {formatFixed(regionStats.summary.wall.radiusMin ?? 0, 2)} -{" "}
+                          {formatFixed(regionStats.summary.wall.radiusMax ?? 0, 2)} (thickness{" "}
+                          {formatFixed(regionStats.summary.wall.thickness ?? 0, 2)})
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
                 {regionStats && regionStats.topRegions.length > 0 && (
@@ -5763,6 +6987,18 @@ export default function TimeDilationLatticePanel({
                     />
                   </div>
                   <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-amber-300">cinematic override</span>
+                    <input
+                      type="checkbox"
+                      checked={cinematicOverride}
+                      onChange={(event) => setCinematicOverride(event.target.checked)}
+                      className="h-3 w-3"
+                    />
+                  </div>
+                  <div className="text-[10px] text-amber-300">
+                    Allows geometry warp in Natario mode (debug only).
+                  </div>
+                  <div className="flex items-center justify-between gap-2">     
                       <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">theta scale</span>
                     <input
                       type="range"
@@ -5891,12 +7127,12 @@ export default function TimeDilationLatticePanel({
         )}
       </div>
         <div className="text-xs text-slate-400">
-          Color maps expansion/contraction (theta): cool means contraction, warm means expansion. The lattice warp is driven
-          by GR theta from the evolve brick (non-proxy) and is always applied. Alpha is still sampled for pulse timing
-          ({clockRateLabel}). Gamma_ij adds anisotropic scaling, K_ij adds shear/twist cues, and H_constraint highlights iso
-          bands when present. Hull contours use hullDist/hullMask bricks from GLB uploads when present (visual proxy only).
-          phiScale, warp, breath, and softening follow kappa_drive (log-scaled); activation gates warp cues using electrical
-          inputs and guardrails.
+          Color maps expansion/contraction (theta): cool means contraction, warm means expansion. Geometry warp follows the
+          RenderPlan: Alcubierre uses beta-advection + theta when certified; Natario keeps geometry warp off by default.
+          Clock rate is sampled for pulse timing ({clockRateLabel}). Gamma_ij adds anisotropic scaling, K_ij adds
+          shear/twist cues, and H_constraint highlights iso bands when present. Hull contours use hullDist/hullMask bricks
+          from GLB uploads when present (visual proxy only). phiScale, warp, breath, and softening follow kappa_drive
+          (log-scaled); activation gates warp cues using electrical inputs and guardrails.
         </div>
     </div>
   );

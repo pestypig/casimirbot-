@@ -60,14 +60,16 @@ const DEFAULT_PROFILES: EvidenceProfile[] = [
   {
     name: "certificate",
     label: "Certificate / policy checks",
-    checkType: "test",
+    checkType: "certificate",
     testGlobs: [
       "**/*certificate*.spec.ts",
       "**/*certificate*.test.ts",
       "**/*viability*.spec.ts",
       "**/*viability*.test.ts",
     ],
-    commands: ["npm run casimir:verify"],
+    commands: [
+      "npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl",
+    ],
   },
   {
     name: "regression",
@@ -125,6 +127,7 @@ export const mapEvidenceTokenToProfile = (
     case "residual_check":
       return "residual_check";
     case "policy_check":
+    case "certificate_check":
       return "certificate";
     default:
       return null;

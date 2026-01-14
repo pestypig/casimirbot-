@@ -18,6 +18,13 @@ export interface GrRegionStatsRequest {
   topN?: number;
   maxVoxels?: number;
   requireCertified?: boolean;
+  shockMode?: "off" | "diagnostic" | "stabilize";
+  advectScheme?: "centered" | "upwind1";
+  wallMetrics?: boolean;
+  wallInvariant?: "kretschmann" | "ricci4";
+  wallFraction?: number;
+  wallBandFraction?: number;
+  wallSampleMax?: number;
 }
 
 const buildQuery = (request: GrRegionStatsRequest) => {
@@ -54,6 +61,31 @@ const buildQuery = (request: GrRegionStatsRequest) => {
   }
   if (typeof request.requireCertified === "boolean") {
     params.set("requireCertified", request.requireCertified ? "1" : "0");
+  }
+  if (
+    request.shockMode === "off" ||
+    request.shockMode === "diagnostic" ||
+    request.shockMode === "stabilize"
+  ) {
+    params.set("shockMode", request.shockMode);
+  }
+  if (request.advectScheme === "centered" || request.advectScheme === "upwind1") {
+    params.set("advectScheme", request.advectScheme);
+  }
+  if (typeof request.wallMetrics === "boolean") {
+    params.set("wallMetrics", request.wallMetrics ? "1" : "0");
+  }
+  if (request.wallInvariant === "kretschmann" || request.wallInvariant === "ricci4") {
+    params.set("wallInvariant", request.wallInvariant);
+  }
+  if (Number.isFinite(request.wallFraction ?? NaN)) {
+    params.set("wallFraction", String(request.wallFraction));
+  }
+  if (Number.isFinite(request.wallBandFraction ?? NaN)) {
+    params.set("wallBandFraction", String(request.wallBandFraction));
+  }
+  if (Number.isFinite(request.wallSampleMax ?? NaN)) {
+    params.set("wallSampleMax", String(request.wallSampleMax));
   }
   return params.toString();
 };

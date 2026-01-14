@@ -27,7 +27,11 @@ import {
 type CoverRenderRequest = {
   t: "render";
   jobId: string;
-  original: { instrumentalUrl: string; vocalUrl?: string };
+  original: {
+    instrumentalUrl?: string;
+    vocalUrl?: string;
+    instrumentalStems?: Array<{ url: string; name?: string }>;
+  };
   tempo: TempoMeta;
   barWindows: BarWindow[];
   helix?: HelixPacket;
@@ -96,8 +100,11 @@ async function handleRender(request: CoverRenderRequest) {
       throw new Error("No valid bar windows provided");
     }
 
-    postProgress(0.1, "Fetching stems");
-    const instrumental = await fetchAudioBuffer(request.original.instrumentalUrl);
+    postProgress(
+      0.1,
+      request.original.instrumentalUrl ? "Fetching mix" : "Mixing stems",
+    );
+    const instrumental = await resolveInstrumentalBuffer(request.original);
     checkAborted(jobId);
 
     const vocal = request.original.vocalUrl ? await fetchAudioBuffer(request.original.vocalUrl) : null;
@@ -313,6 +320,48 @@ async function fetchAudioBuffer(url: string): Promise<AudioBuffer> {
   const audioBuffer = await context.decodeAudioData(buffer);
   await closeOfflineContext(context);
   return audioBuffer;
+}
+
+async function mixBuffers(buffers: AudioBuffer[]): Promise<AudioBuffer> {
+  if (!buffers.length) {
+    throw new Error("No stem buffers available to mix.");
+  }
+  if (buffers.length === 1) {
+    return buffers[0];
+  }
+  const sampleRate = buffers[0].sampleRate || 44100;
+  const maxDuration = Math.max(
+    ...buffers.map((buffer) => buffer.length / buffer.sampleRate),
+  );
+  const frameCount = Math.max(1, Math.ceil(maxDuration * sampleRate));
+  const context = new OfflineAudioContext(2, frameCount, sampleRate);
+  const gainValue = 1 / Math.max(1, buffers.length);
+  for (const buffer of buffers) {
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    const gain = context.createGain();
+    gain.gain.value = gainValue;
+    source.connect(gain);
+    gain.connect(context.destination);
+    source.start(0);
+  }
+  const mixed = await context.startRendering();
+  await closeOfflineContext(context);
+  return mixed;
+}
+
+async function resolveInstrumentalBuffer(
+  original: CoverRenderRequest["original"],
+): Promise<AudioBuffer> {
+  if (original.instrumentalUrl) {
+    return fetchAudioBuffer(original.instrumentalUrl);
+  }
+  const stems = original.instrumentalStems ?? [];
+  if (!stems.length) {
+    throw new Error("No instrumental source available for rendering.");
+  }
+  const buffers = await Promise.all(stems.map((stem) => fetchAudioBuffer(stem.url)));
+  return mixBuffers(buffers);
 }
 
 async function loadAudioAtomBank(

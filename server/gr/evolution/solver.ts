@@ -7,12 +7,16 @@ import {
 import {
   computeBssnConstraints,
   evolveBssn,
+  applyBssnDetTraceFixups,
+  initFixupStats,
   type BoundaryParams,
   type FixupParams,
+  type FixupStats,
   type GaugeParams,
   type StencilParams,
   type ConstraintFields,
 } from "../../../modules/gr/bssn-evolve.js";
+import { computeShiftStiffnessMetrics } from "../../../modules/gr/gr-diagnostics.js";
 import type { StressEnergyFieldSet } from "../../../modules/gr/stress-energy.js";
 import type { StressEnergyBrick } from "../../stress-energy-brick";
 import type { StressEnergyBrickParams } from "../../stress-energy-brick";
@@ -43,6 +47,10 @@ export interface GrEvolutionRunParams {
   stencils?: StencilParams;
   boundary?: BoundaryParams;
   fixups?: FixupParams;
+  koEps?: number;
+  koTargets?: "gauge" | "all";
+  advectScheme?: "centered" | "upwind1";
+  shockMode?: "off" | "diagnostic" | "stabilize";
   matter?: StressEnergyFieldSet | null;
   usePipelineMatter?: boolean;
   sourceParams?: Partial<StressEnergyBrickParams>;
@@ -56,8 +64,14 @@ export interface GrEvolutionRunResult {
   matter?: StressEnergyFieldSet | null;
   sourceBrick?: StressEnergyBrick;
   constraints: ConstraintFields;
+  fixups?: FixupStats;
   time_s: number;
   dt: number;
+  koEpsUsed?: number;
+  koTargetsUsed?: "gauge" | "all";
+  advectSchemeUsed?: "centered" | "upwind1";
+  shockMode?: "off" | "diagnostic" | "stabilize";
+  stabilizersApplied?: string[];
 }
 
 export const runBssnEvolution = ({
@@ -72,12 +86,20 @@ export const runBssnEvolution = ({
   stencils,
   boundary,
   fixups,
+  koEps,
+  koTargets,
+  advectScheme,
+  shockMode: shockModeInput,
   matter,
   usePipelineMatter = true,
   sourceParams,
   sourceOptions,
   time_s = 0,
 }: GrEvolutionRunParams): GrEvolutionRunResult => {
+  const shockMode =
+    shockModeInput === "diagnostic" || shockModeInput === "stabilize"
+      ? shockModeInput
+      : "off";
   const dims = inputDims ?? [128, 128, 128];
   const vec3Equal = (left: Vec3, right: Vec3) =>
     left[0] === right[0] && left[1] === right[1] && left[2] === right[2];
@@ -103,6 +125,11 @@ export const runBssnEvolution = ({
   const dt_s = Math.max(0, dt);
   const dt_geom = unitSystem === "SI" ? toGeometricTime(dt_s) : dt_s;
   const state = initialState ?? createMinkowskiState(resolvedGrid);
+  const fixupStats = initFixupStats(state.alpha.length, steps, fixups);
+  let koEpsUsed = Number.isFinite(koEps as number) ? Math.max(0, koEps as number) : 0;
+  const koTargetsUsed = koTargets === "all" ? "all" : "gauge";
+  const advectSchemeUsed = advectScheme === "upwind1" ? "upwind1" : "centered";
+  const stabilizersApplied: string[] = [];
   let matterFields = matter ?? null;
   let sourceBrick: StressEnergyBrick | undefined;
 
@@ -116,15 +143,31 @@ export const runBssnEvolution = ({
     sourceBrick = source.brick;
   }
 
+  if (shockMode === "stabilize") {
+    const stiffnessPre = computeShiftStiffnessMetrics(state, stencils, {
+      cflTarget: 0.5,
+    });
+    if (stiffnessPre.shockSeverity === "severe" && !(koEpsUsed > 0)) {
+      koEpsUsed = 0.1;
+      stabilizersApplied.push("ko");
+    }
+  }
+
   if (steps > 0 && dt_geom > 0) {
     evolveBssn(state, dt_geom, steps, {
       gauge,
       stencils,
       boundary,
       fixups,
+      fixupStats,
+      koEps: koEpsUsed,
+      koTargets: koTargetsUsed,
+      advectScheme: advectSchemeUsed,
       matter: matterFields ?? null,
     });
   }
+
+  applyBssnDetTraceFixups(state, fixups, fixupStats);
 
   const constraints = computeBssnConstraints(state, {
     stencils,
@@ -137,7 +180,13 @@ export const runBssnEvolution = ({
     matter: matterFields ?? undefined,
     sourceBrick,
     constraints,
+    fixups: fixupStats,
     time_s: time_s + (dt_s > 0 ? steps * dt_s : 0),
     dt: dt_s,
+    koEpsUsed,
+    koTargetsUsed,
+    advectSchemeUsed,
+    shockMode,
+    stabilizersApplied: stabilizersApplied.length ? stabilizersApplied : undefined,
   };
 };

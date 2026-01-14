@@ -1017,6 +1017,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     getGrRegionStats,
     getGrConstraintNetwork4d,
     getGrConstraintContract,
+    getGrAssistantReport,
     getGrEvaluation,
     postCurvatureBrickDebugStamp,
     postCurvatureBrickDebugClear,
@@ -1260,10 +1261,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post("/api/helix/gr-evolve-brick", getGrEvolveBrick);
   app.get("/api/helix/gr-region-stats", getGrRegionStats);
   app.post("/api/helix/gr-region-stats", getGrRegionStats);
-  app.get("/api/helix/gr-constraint-network-4d", getGrConstraintNetwork4d);     
-  app.post("/api/helix/gr-constraint-network-4d", getGrConstraintNetwork4d);    
-  app.get("/api/helix/gr-constraint-contract", getGrConstraintContract);        
-  app.post("/api/helix/gr-constraint-contract", getGrConstraintContract);       
+  app.get("/api/helix/gr-constraint-network-4d", getGrConstraintNetwork4d);
+  app.post("/api/helix/gr-constraint-network-4d", getGrConstraintNetwork4d);
+  app.get("/api/helix/gr-constraint-contract", getGrConstraintContract);
+  app.post("/api/helix/gr-constraint-contract", getGrConstraintContract);
+  app.get("/api/helix/gr-assistant-report", getGrAssistantReport);
+  app.post("/api/helix/gr-assistant-report", getGrAssistantReport);
   app.get("/api/helix/gr-evaluation", getGrEvaluation);
   app.post("/api/helix/gr-evaluation", getGrEvaluation);
   app.post("/api/helix/curvature-brick/debug-stamp", postCurvatureBrickDebugStamp);

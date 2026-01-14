@@ -16,6 +16,10 @@ export interface UseGrBrickOptions {
   steps?: number;
   iterations?: number;
   tolerance?: number;
+  koEps?: number;
+  koTargets?: "gauge" | "all";
+  shockMode?: "off" | "diagnostic" | "stabilize";
+  advectScheme?: "centered" | "upwind1";
   lapseKappa?: number;
   shiftEta?: number;
   shiftGamma?: number;
@@ -39,6 +43,10 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
     steps,
     iterations,
     tolerance,
+    koEps,
+    koTargets,
+    shockMode,
+    advectScheme,
     lapseKappa,
     shiftEta,
     shiftGamma,
@@ -64,6 +72,10 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
       steps,
       iterations,
       tolerance,
+      koEps,
+      koTargets,
+      shockMode,
+      advectScheme,
       lapseKappa,
       shiftEta,
       shiftGamma,
@@ -83,6 +95,10 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
       steps,
       iterations,
       tolerance,
+      koEps,
+      koTargets,
+      shockMode,
+      advectScheme,
       lapseKappa,
       shiftEta,
       shiftGamma,

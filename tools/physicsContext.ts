@@ -72,6 +72,8 @@ const ANCHORS: AnchorConfig[] = [
   { path: "modules/warp/warp-module.ts", tag: "warp" },
   { path: "server/stress-energy-brick.ts", tag: "stress-energy" },
   { path: "warp-web/js/physics-core.js", tag: "web-api" },
+  { path: "tools/gr_assistant/README.md", tag: "validation", weight: 1.2 },
+  { path: "server/skills/physics.gr.assistant.ts", tag: "validation", weight: 1.1 },
 
   { path: "tests/stress-energy-brick.spec.ts", tag: "tests" },
   { path: "tests/york-time.spec.ts", tag: "tests" },

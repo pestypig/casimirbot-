@@ -8,6 +8,7 @@ export const ATOM_TAG = "atom";
 
 const DEFAULT_SAMPLE_SECONDS = 20;
 const MAX_SAMPLE_POINTS = 32_000;
+const WAVEFORM_SAMPLE_COUNT = 180;
 
 const clamp01 = (value: number) =>
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
@@ -137,6 +138,33 @@ const classifyDuration = (durationSec: number) => {
   return "duration:long";
 };
 
+const buildWaveformPeaks = (buffer: AudioBuffer): number[] => {
+  const totalSamples = buffer.length;
+  if (!Number.isFinite(totalSamples) || totalSamples <= 0) return [];
+  const channelCount = buffer.numberOfChannels;
+  const left = buffer.getChannelData(0);
+  const right = channelCount > 1 ? buffer.getChannelData(1) : null;
+  const blockSize = Math.max(1, Math.floor(totalSamples / WAVEFORM_SAMPLE_COUNT));
+  const peaks: number[] = new Array(WAVEFORM_SAMPLE_COUNT).fill(0);
+  for (let i = 0; i < WAVEFORM_SAMPLE_COUNT; i += 1) {
+    const start = i * blockSize;
+    if (start >= totalSamples) {
+      peaks[i] = 0;
+      continue;
+    }
+    const end = Math.min(totalSamples, start + blockSize);
+    let peak = 0;
+    for (let j = start; j < end; j += 1) {
+      const leftSample = Math.abs(left[j] ?? 0);
+      const rightSample = right ? Math.abs(right[j] ?? 0) : 0;
+      const value = leftSample > rightSample ? leftSample : rightSample;
+      if (value > peak) peak = value;
+    }
+    peaks[i] = clamp01(peak);
+  }
+  return peaks;
+};
+
 export type AtomAnalysisResult = {
   analysis: KnowledgeFileAnalysis;
   autoTags: string[];
@@ -188,6 +216,7 @@ export async function analyzeKnowledgeAudio(
     const zcrRate = count > 1 ? zcr / count : 0;
     const brightness = clamp01((zcrRate - 0.02) / 0.23);
     const durationSec = audioBuffer.duration;
+    const waveformPeaks = buildWaveformPeaks(audioBuffer);
 
     const analysis: KnowledgeFileAnalysis = {
       durationSec,
@@ -195,6 +224,7 @@ export async function analyzeKnowledgeAudio(
       peak,
       zcr: zcrRate,
       brightness,
+      waveformPeaks,
     };
 
     const autoTags = uniqueTags([

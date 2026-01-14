@@ -128,7 +128,8 @@ const BASE_PANELS: PanelDefinition[] = [
     title: "Helix Noise Gens",
     loader: load(() => import("@/pages/helix-noise-gens")),
     defaultSize: { w: 1100, h: 720 },
-    defaultPosition: { x: 180, y: 140 }
+    defaultPosition: { x: 180, y: 140 },
+    pinned: true,
   },
   {
     id: "helix-observables",

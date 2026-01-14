@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Clock3, Home, PanelsTopLeft, X, XCircle } from "lucide-react";
+import { AlertTriangle, Clock3, Home, PanelsTopLeft, Pin, X, XCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { HELIX_PANELS } from "@/pages/helix-core.panels";
 import { useMobileAppStore } from "@/store/useMobileAppStore";
@@ -21,7 +21,30 @@ export default function MobileStartPage() {
     [stack, activeId]
   );
 
-  const gridPanels = useMemo(() => HELIX_PANELS, []);
+  const panelOrder = useMemo(
+    () => new Map(HELIX_PANELS.map((panel, index) => [panel.id, index])),
+    []
+  );
+  const pinnedPanels = useMemo(() => {
+    const pinned = HELIX_PANELS.filter(
+      (panel) => panel.pinned || panel.id === "helix-noise-gens"
+    );
+    const unique = new Map<string, (typeof HELIX_PANELS)[number]>();
+    pinned.forEach((panel) => unique.set(panel.id, panel));
+    return Array.from(unique.values()).sort((a, b) => {
+      if (a.id === "helix-noise-gens") return -1;
+      if (b.id === "helix-noise-gens") return 1;
+      return (panelOrder.get(a.id) ?? 0) - (panelOrder.get(b.id) ?? 0);
+    });
+  }, [panelOrder]);
+  const pinnedIds = useMemo(
+    () => new Set(pinnedPanels.map((panel) => panel.id)),
+    [pinnedPanels]
+  );
+  const gridPanels = useMemo(
+    () => HELIX_PANELS.filter((panel) => !pinnedIds.has(panel.id)),
+    [pinnedIds]
+  );
 
   const recents = useMemo(
     () => [...stack].sort((a, b) => b.openedAt - a.openedAt),
@@ -72,6 +95,11 @@ export default function MobileStartPage() {
     return cancelLongPress;
   }, []);
 
+  useEffect(() => {
+    goHome();
+    setShowSwitcher(false);
+  }, [goHome]);
+
   return (
     <div
       className="relative min-h-screen bg-slate-950 text-slate-100"
@@ -119,6 +147,45 @@ export default function MobileStartPage() {
             />
           ) : (
             <div className="space-y-6 px-5 pb-8">
+              {pinnedPanels.length ? (
+                <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-sky-900/30">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
+                    <Pin className="h-4 w-4 text-sky-300" />
+                    Pinned
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                    {pinnedPanels.map((panel) => {
+                      const Icon = panel.icon ?? PanelsTopLeft;
+                      return (
+                        <button
+                          key={panel.id}
+                          className="group flex h-28 flex-col justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:-translate-y-0.5 hover:border-sky-400/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                          onClick={() => handleTilePress(panel.id)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-200 shadow-inner shadow-sky-900/50">
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200">
+                              Pin
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-white line-clamp-2">
+                              {panel.title}
+                            </p>
+                            {panel.keywords && panel.keywords.length > 0 && (
+                              <p className="text-[11px] text-slate-400 line-clamp-1">
+                                {panel.keywords.slice(0, 2).join(" / ")}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
               <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-sky-900/30">
                 <div className="flex items-center justify-between gap-3">
                   <div>

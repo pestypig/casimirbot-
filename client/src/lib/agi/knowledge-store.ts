@@ -24,6 +24,7 @@ export type KnowledgeFileAnalysis = {
   peak?: number;
   zcr?: number;
   brightness?: number;
+  waveformPeaks?: number[];
 };
 
 export type KnowledgeFileRecord = {

@@ -22,6 +22,8 @@ Stage 3 (Certified / Policy-gated)
 - Allowed claims: "pass/fail" under named policy, certificate-backed.
 - Checks: hard constraints + certificate integrity + required tests (see
   `WARP_AGENTS.md`).
+- Narrative: `motivation` + `conceptualWaypoints` (3-7 waypoints) required for
+  certified modules.
 
 ## Core GR/Warp Modules (Tagged)
 
@@ -128,7 +130,8 @@ Stage 3 (Certified / Policy-gated)
 - Evidence profiles: `math.evidence.json` (default evidence types + commands).
 - Starter templates: `templates/math/` (copy `MATH_STATUS.md`, `math.config.json`,
   and `math.evidence.json` into a new repo).
-- Waivers: `math.waivers.json` (local exceptions for stage/evidence/unit).
+- Narrative fields: `motivation` and `conceptualWaypoints` in `shared/math-stage.ts`.
+- Waivers: `math.waivers.json` (local exceptions for stage/evidence/unit/narrative).
 - Strictness: `math.config.json` `strictStages` (default warn-only). Override
   with `MATH_STRICT=1` or `MATH_STRICT_STAGES=diagnostic,certified`.
 - Report: `npm run math:report` (writes `reports/math-report.json` and `.md`).

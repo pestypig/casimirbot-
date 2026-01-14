@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "source": "docs/ethos/ideology.json",
+  "artifacts": [
+    {
+      "artifactId": "pillar-01-dignity",
+      "title": "Protect civilian dignity and prevent predation",
+      "templatePath": "docs/zen-society/templates/pillar-01-dignity.md",
+      "nodeRefs": [
+        "jurisdictional-floor",
+        "right-speech-infrastructure",
+        "restorative-harm-repair",
+        "capture-resistance",
+        "no-bypass-guardrail"
+      ],
+      "requiredChecks": [
+        "reports_ack_48h",
+        "independent_stats_monthly",
+        "predation_prohibitions_explicit"
+      ]
+    },
+    {
+      "artifactId": "pillar-02-services",
+      "title": "Stabilize essential services",
+      "templatePath": "docs/zen-society/templates/pillar-02-services.md",
+      "nodeRefs": [
+        "interbeing-systems",
+        "stewardship-ledger",
+        "capability-ambition-gradient",
+        "right-speech-infrastructure"
+      ],
+      "requiredChecks": [
+        "lifeline_backup_plans",
+        "restoration_schedule_weekly",
+        "spof_risks_owned"
+      ]
+    },
+    {
+      "artifactId": "pillar-03-contracts",
+      "title": "Establish legible, durable authority for contracts",
+      "templatePath": "docs/zen-society/templates/pillar-03-contracts.md",
+      "nodeRefs": [
+        "jurisdictional-floor",
+        "two-key-approval",
+        "provenance-protocol",
+        "civic-memory-continuity",
+        "impermanence-by-design"
+      ],
+      "requiredChecks": [
+        "contract_basis_and_registry",
+        "dispute_sla_visible",
+        "amendment_procedure_followed"
+      ]
+    },
+    {
+      "artifactId": "pillar-04-finance",
+      "title": "Reopen lawful finance and insurance rails",
+      "templatePath": "docs/zen-society/templates/pillar-04-finance.md",
+      "nodeRefs": [
+        "jurisdictional-floor",
+        "external-interface-integrity",
+        "capture-resistance",
+        "provenance-protocol"
+      ],
+      "requiredChecks": [
+        "rail_audit_retention",
+        "sar_path_defined",
+        "compliance_guidance_versioned"
+      ]
+    },
+    {
+      "artifactId": "pillar-05-consent",
+      "title": "Earn local buy-in for a legitimate transition",
+      "templatePath": "docs/zen-society/templates/pillar-05-consent.md",
+      "nodeRefs": [
+        "sangha-architecture",
+        "voice-integrity",
+        "values-over-images",
+        "skillful-mediation",
+        "impermanence-by-design"
+      ],
+      "requiredChecks": [
+        "councils_minutes_published",
+        "civic_access_requirements",
+        "timeline_updates_rationale"
+      ]
+    },
+    {
+      "artifactId": "pillar-06-verification",
+      "title": "Keep verification and accountability loops active",
+      "templatePath": "docs/zen-society/templates/pillar-06-verification.md",
+      "nodeRefs": [
+        "verification-checklist",
+        "feedback-loop-hygiene",
+        "integrity-protocols",
+        "liveness-or-it-didnt-happen",
+        "restorative-harm-repair"
+      ],
+      "requiredChecks": [
+        "indicators_updated_monthly",
+        "investigations_sla_met",
+        "corrections_published"
+      ]
+    },
+    {
+      "artifactId": "artifact-charter",
+      "title": "Charter template",
+      "templatePath": "docs/zen-society/templates/artifacts/charter.md",
+      "nodeRefs": [
+        "values-over-images",
+        "jurisdictional-floor"
+      ],
+      "requiredChecks": [
+        "charter_public",
+        "charter_versioned"
+      ]
+    },
+    {
+      "artifactId": "artifact-protocol",
+      "title": "Protocol template",
+      "templatePath": "docs/zen-society/templates/artifacts/protocol.md",
+      "nodeRefs": [
+        "right-speech-infrastructure",
+        "verification-checklist"
+      ],
+      "requiredChecks": [
+        "protocol_sla_defined",
+        "protocol_revision_logged"
+      ]
+    },
+    {
+      "artifactId": "artifact-ledger",
+      "title": "Ledger template",
+      "templatePath": "docs/zen-society/templates/artifacts/ledger.md",
+      "nodeRefs": [
+        "stewardship-ledger",
+        "provenance-protocol"
+      ],
+      "requiredChecks": [
+        "ledger_auditable",
+        "ledger_update_cadence"
+      ]
+    },
+    {
+      "artifactId": "artifact-dashboard",
+      "title": "Dashboard template",
+      "templatePath": "docs/zen-society/templates/artifacts/dashboard.md",
+      "nodeRefs": [
+        "feedback-loop-hygiene",
+        "liveness-or-it-didnt-happen"
+      ],
+      "requiredChecks": [
+        "dashboard_public",
+        "dashboard_change_log"
+      ]
+    },
+    {
+      "artifactId": "signatory-registry",
+      "title": "Signatory registry template",
+      "templatePath": "docs/zen-society/templates/signatory-registry.md",
+      "nodeRefs": [
+        "provenance-protocol",
+        "civic-memory-continuity",
+        "jurisdictional-floor"
+      ],
+      "requiredChecks": [
+        "registry_versioned",
+        "contacts_current"
+      ]
+    },
+    {
+      "artifactId": "decision-log",
+      "title": "Decision log template",
+      "templatePath": "docs/zen-society/templates/decision-log.md",
+      "nodeRefs": [
+        "civic-memory-continuity",
+        "provenance-protocol",
+        "impermanence-by-design"
+      ],
+      "requiredChecks": [
+        "decisions_timestamped",
+        "amendments_linked"
+      ]
+    }
+  ]
+}

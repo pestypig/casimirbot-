@@ -160,6 +160,12 @@ const invertSymmetric = (m: SymMetric) => {
 };
 
 const SIXTEEN_PI = 16 * Math.PI;
+const ALPHA_MIN = 1e-6;
+const ALPHA_MAX = 10;
+const PHI_ABS_MAX = 10;
+
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
 
 type Axis = 0 | 1 | 2;
 
@@ -260,26 +266,62 @@ const buildDerivedFields = (state: BssnState) => {
   const clockRate_static = new Float32Array(total);
   const theta = new Float32Array(total);
   const det_gamma = new Float32Array(total);
+  let alphaMax = 0;
+  let betaMax = 0;
+  let gttMin = Number.POSITIVE_INFINITY;
+  let gttMax = Number.NEGATIVE_INFINITY;
+  const clampAlpha = (raw: number) => {
+    if (!Number.isFinite(raw)) return ALPHA_MIN;
+    const alphaAbs = Math.abs(raw);
+    return clampNumber(alphaAbs, ALPHA_MIN, ALPHA_MAX);
+  };
   for (let i = 0; i < total; i += 1) {
-    const alpha = state.alpha[i];
-    const phi = state.phi[i];
+    const alpha = clampAlpha(state.alpha[i]);
+    if (alpha > alphaMax) alphaMax = alpha;
+    const phiRaw = state.phi[i];
+    const phi = Number.isFinite(phiRaw) ? clampNumber(phiRaw, -PHI_ABS_MAX, PHI_ABS_MAX) : 0;
     const exp4Phi = Number.isFinite(phi) ? Math.exp(4 * phi) : 1;
-    const gxx = exp4Phi * state.gamma_xx[i];
-    const gyy = exp4Phi * state.gamma_yy[i];
-    const gzz = exp4Phi * state.gamma_zz[i];
-    const gxy = exp4Phi * state.gamma_xy[i];
-    const gxz = exp4Phi * state.gamma_xz[i];
-    const gyz = exp4Phi * state.gamma_yz[i];
-    const bx = state.beta_x[i];
-    const by = state.beta_y[i];
-    const bz = state.beta_z[i];
-    const shiftTerm =
+    let gxx = exp4Phi * state.gamma_xx[i];
+    let gyy = exp4Phi * state.gamma_yy[i];
+    let gzz = exp4Phi * state.gamma_zz[i];
+    let gxy = exp4Phi * state.gamma_xy[i];
+    let gxz = exp4Phi * state.gamma_xz[i];
+    let gyz = exp4Phi * state.gamma_yz[i];
+    if (
+      !Number.isFinite(gxx) ||
+      !Number.isFinite(gyy) ||
+      !Number.isFinite(gzz) ||
+      !Number.isFinite(gxy) ||
+      !Number.isFinite(gxz) ||
+      !Number.isFinite(gyz)
+    ) {
+      gxx = 1;
+      gyy = 1;
+      gzz = 1;
+      gxy = 0;
+      gxz = 0;
+      gyz = 0;
+    }
+    const bxRaw = state.beta_x[i];
+    const byRaw = state.beta_y[i];
+    const bzRaw = state.beta_z[i];
+    const bx = Number.isFinite(bxRaw) ? bxRaw : 0;
+    const by = Number.isFinite(byRaw) ? byRaw : 0;
+    const bz = Number.isFinite(bzRaw) ? bzRaw : 0;
+    const betaMag = Math.hypot(bx, by, bz);
+    if (betaMag > betaMax) betaMax = betaMag;
+    let shiftTerm =
       gxx * bx * bx +
       gyy * by * by +
       gzz * bz * bz +
       2 * (gxy * bx * by + gxz * bx * bz + gyz * by * bz);
+    if (!Number.isFinite(shiftTerm)) shiftTerm = 0;
     const gttVal = -alpha * alpha + shiftTerm;
     g_tt[i] = Number.isFinite(gttVal) ? gttVal : 0;
+    if (Number.isFinite(gttVal)) {
+      if (gttVal < gttMin) gttMin = gttVal;
+      if (gttVal > gttMax) gttMax = gttVal;
+    }
     const clockVal = Math.sqrt(Math.max(0, -g_tt[i]));
     clockRate_static[i] = Number.isFinite(clockVal) ? clockVal : 0;
     const detVal =
@@ -289,6 +331,20 @@ const buildDerivedFields = (state: BssnState) => {
     det_gamma[i] = Number.isFinite(detVal) ? detVal : 0;
     const thetaVal = -state.K[i];
     theta[i] = Number.isFinite(thetaVal) ? thetaVal : 0;
+  }
+  const gttAbsMax = Math.max(Math.abs(gttMin), Math.abs(gttMax));
+  if (
+    alphaMax > 1e-3 &&
+    betaMax < 1e-3 &&
+    (!Number.isFinite(gttAbsMax) || gttAbsMax < alphaMax * alphaMax * 0.1)
+  ) {
+    for (let i = 0; i < total; i += 1) {
+      const alpha = clampAlpha(state.alpha[i]);
+      const gttVal = -alpha * alpha;
+      g_tt[i] = Number.isFinite(gttVal) ? gttVal : 0;
+      const clockVal = Math.sqrt(Math.max(0, -g_tt[i]));
+      clockRate_static[i] = Number.isFinite(clockVal) ? clockVal : 0;
+    }
   }
   return { g_tt, clockRate_static, theta, det_gamma };
 };

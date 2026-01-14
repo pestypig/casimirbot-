@@ -259,6 +259,57 @@ export type WarpGeometry = z.infer<typeof warpGeometrySchema>;
 export const warpFieldTypeSchema = z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]);
 export type WarpFieldType = z.infer<typeof warpFieldTypeSchema>;
 
+export type TimeDilationRenderMode = "alcubierre" | "natario";
+export type TimeDilationDataSource = "gr-brick" | "lapse-brick" | "analytic-proxy" | "none";
+export type TimeDilationBannerState =
+  | "CERTIFIED"
+  | "FALLBACK"
+  | "PROXY"
+  | "NO_HULL"
+  | "WAITING_GR"
+  | "UNSTABLE";
+export type TimeDilationNormalizationMode = "percentile" | "range" | "proxy" | "off" | "missing";
+export type TimeDilationNormalization = {
+  mode: TimeDilationNormalizationMode;
+  scale: number;
+  percentile?: number | null;
+  baseScale?: number | null;
+};
+export type TimeDilationRenderPlan = {
+  mode: TimeDilationRenderMode;
+  flags: {
+    hasHull: boolean;
+    hasGrBrick: boolean;
+    grCertified: boolean;
+    anyProxy: boolean;
+    mathStageOK: boolean;
+    solverStatus?: "CERTIFIED" | "UNSTABLE" | "NOT_CERTIFIED";
+    exploratoryOverride?: boolean;
+    cinematicOverride?: boolean;
+    wallDetected?: boolean;
+    wallSource?: "kretschmann" | "ricci4";
+  };
+  sourceForAlpha: TimeDilationDataSource;
+  sourceForBeta: TimeDilationDataSource;
+  sourceForTheta: TimeDilationDataSource;
+  sourceForClockRate: TimeDilationDataSource;
+  enableGeometryWarp: boolean;
+  geomWarpScale: number;
+  betaWarpWeight: number;
+  thetaWarpWeight: number;
+  shearWeight: number;
+  metricBlend: number;
+  warpCap: number;
+  normalization: {
+    beta: TimeDilationNormalization;
+    theta: TimeDilationNormalization;
+    gamma: TimeDilationNormalization;
+    shear: TimeDilationNormalization;
+  };
+  banner: TimeDilationBannerState;
+  reasons: string[];
+};
+
 const cardGateSourceSchema = z.enum(["schedule", "blanket", "combined"]);
 const cardVolumeVizSchema = z.enum([
   "theta_drive",
@@ -1384,6 +1435,39 @@ export const grGuardrailSchema = z.object({
   vdbBand: grGuardrailStatusSchema,
 });
 export type GrGuardrails = z.infer<typeof grGuardrailSchema>;
+const grFixupStepStatsSchema = z.object({
+  alphaClampCount: z.number().nonnegative(),
+  kClampCount: z.number().nonnegative(),
+  detFixCount: z.number().nonnegative(),
+  traceFixCount: z.number().nonnegative(),
+  maxAlphaBeforeClamp: z.number().nonnegative(),
+  maxKBeforeClamp: z.number().nonnegative(),
+});
+const grFixupStatsSchema = grFixupStepStatsSchema.extend({
+  totalCells: z.number().int().nonnegative(),
+  alphaClampByStep: z.array(z.number().nonnegative()),
+  kClampByStep: z.array(z.number().nonnegative()),
+  detFixByStep: z.array(z.number().nonnegative()),
+  traceFixByStep: z.array(z.number().nonnegative()),
+  alphaClampMin: z.number(),
+  alphaClampMax: z.number(),
+  kClampMaxAbs: z.number(),
+  clampFraction: z.number().nonnegative().optional(),
+  postStep: grFixupStepStatsSchema.optional(),
+});
+const grSolverHealthSchema = z.object({
+  status: z.enum(["CERTIFIED", "UNSTABLE", "NOT_CERTIFIED"]),
+  reasons: z.array(z.string()),
+  alphaClampFraction: z.number().nonnegative(),
+  kClampFraction: z.number().nonnegative(),
+  totalClampFraction: z.number().nonnegative(),
+  maxAlphaBeforeClamp: z.number().nonnegative(),
+  maxKBeforeClamp: z.number().nonnegative(),
+});
+const grBrickMetaSchema = z.object({
+  status: z.enum(["CERTIFIED", "NOT_CERTIFIED"]),
+  reasons: z.array(z.string()),
+});
 
 export const grConstraintContractSchema = z.object({
   kind: z.literal("gr-constraint-contract"),
@@ -1417,6 +1501,9 @@ export const grConstraintContractSchema = z.object({
       lapseMin: z.number().optional(),
       lapseMax: z.number().optional(),
       betaMaxAbs: z.number().optional(),
+      fixups: grFixupStatsSchema.optional(),
+      solverHealth: grSolverHealthSchema.optional(),
+      brickMeta: grBrickMetaSchema.optional(),
     })
     .optional(),
   perf: z
@@ -1493,6 +1580,95 @@ export const grGroundingSchema = z.object({
   proxy: z.boolean().optional(),
 });
 export type GrGrounding = z.infer<typeof grGroundingSchema>;
+
+const grAssistantCheckSchema = z
+  .object({
+    check_name: z.string(),
+    passed: z.boolean(),
+    residual: z.string().nullable().optional(),
+    notes: z.string().optional(),
+  })
+  .passthrough();
+export type GrAssistantCheck = z.infer<typeof grAssistantCheckSchema>;
+
+export const grAssistantReportPayloadSchema = z.object({
+  source: z.string(),
+  assumptions: z.object({
+    coords: z.array(z.string()),
+    signature: z.string(),
+    units_internal: z.string(),
+  }),
+  metric: z.record(z.any()).optional(),
+  artifacts: z.array(z.string()),
+  checks: z.array(grAssistantCheckSchema),
+  failed_checks: z.array(grAssistantCheckSchema),
+  invariants: z.record(z.any()).optional(),
+  brick_invariants: z.record(z.any()).optional(),
+  sample: z
+    .object({
+      ix: z.number(),
+      iy: z.number(),
+      iz: z.number(),
+      x_m: z.number(),
+      y_m: z.number(),
+      z_m: z.number(),
+      t_s: z.number(),
+    })
+    .optional(),
+  passed: z.boolean(),
+  notes: z.array(z.string()).optional(),
+});
+export type GrAssistantReportPayload = z.infer<typeof grAssistantReportPayloadSchema>;
+
+export const grAssistantReportSchema = z.object({
+  kind: z.literal("gr-assistant-report"),
+  updatedAt: z.number(),
+  report: grAssistantReportPayloadSchema,
+  gate: grGroundingSchema.optional(),
+  citations: z.array(z.string()).optional(),
+  trace_id: z.string().optional(),
+  training_trace_id: z.string().optional(),
+});
+export type GrAssistantReport = z.infer<typeof grAssistantReportSchema>;
+
+const grAssistantUnitCheckSchema = z.object({
+  expression: z.string().min(1),
+  unit_system: z.string().optional(),
+  symbol_units: z.record(z.string()).optional(),
+  unit_tags: z.array(z.string()).optional(),
+  unit_modules: z.array(z.string()).optional(),
+});
+
+export const grAssistantReportRequestSchema = z
+  .object({
+    brick: z.record(z.any()).optional(),
+    metric: z.record(z.any()).optional(),
+    sample: z
+      .object({
+        ix: z.number().int().min(0).optional(),
+        iy: z.number().int().min(0).optional(),
+        iz: z.number().int().min(0).optional(),
+        x_m: z.number().optional(),
+        y_m: z.number().optional(),
+        z_m: z.number().optional(),
+      })
+      .optional(),
+    vacuum_sample_points: z.array(z.record(z.number())).optional(),
+    vacuum_epsilon: z.number().optional(),
+    run_invariants: z.boolean().optional(),
+    run_checks: z.boolean().optional(),
+    run_artifacts: z.boolean().optional(),
+    unit_check: grAssistantUnitCheckSchema.optional(),
+    tool_base_url: z.string().optional(),
+    warpConfig: z.record(z.any()).optional(),
+    config: z.record(z.any()).optional(),
+    thresholds: grConstraintThresholdSchema.partial().optional(),
+    policy: grConstraintPolicySchema.partial().optional(),
+    useLiveSnapshot: z.boolean().optional(),
+    traceId: z.string().optional(),
+  })
+  .passthrough();
+export type GrAssistantReportRequest = z.infer<typeof grAssistantReportRequestSchema>;
 
 export const grOsStageSchema = ladderTierSchema;
 export type GrOsStage = z.infer<typeof grOsStageSchema>;
@@ -1698,6 +1874,25 @@ export const grRegionStatsEntrySchema = z.object({
 });
 export type GrRegionStatsEntry = z.infer<typeof grRegionStatsEntrySchema>;
 
+const grRegionWallSchema = z.object({
+  source: z.enum(["kretschmann", "ricci4"]),
+  detected: z.boolean(),
+  p98: z.number().nonnegative(),
+  threshold: z.number().nonnegative(),
+  bandMin: z.number().nonnegative(),
+  bandMax: z.number().nonnegative(),
+  sampleCount: z.number().int().nonnegative(),
+  voxelCount: z.number().int().nonnegative(),
+  voxelFraction: z.number().nonnegative(),
+  center: vec3Schema.nullable().optional(),
+  radiusMin: z.number().nonnegative().optional(),
+  radiusMax: z.number().nonnegative().optional(),
+  radiusMean: z.number().nonnegative().optional(),
+  thickness: z.number().nonnegative().optional(),
+  wallFraction: z.number().nonnegative(),
+  bandFraction: z.number().nonnegative(),
+});
+
 export const grRegionStatsSchema = z.object({
   kind: z.literal("gr-region-stats"),
   updatedAt: z.number(),
@@ -1739,6 +1934,7 @@ export const grRegionStatsSchema = z.object({
     negFraction: z.number().nonnegative(),
     contractionVector: vec3Schema.nullable().optional(),
     contractionMagnitude: z.number().nonnegative(),
+    wall: grRegionWallSchema.optional(),
   }),
   topRegions: z.array(grRegionStatsEntrySchema),
 });

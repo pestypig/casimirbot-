@@ -33,6 +33,10 @@ type OriginalsLibraryModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (selection: KnowledgeAudioSelection) => void;
+  onImportProject?: (
+    project: ProjectWithStats,
+    files: KnowledgeFileRecord[],
+  ) => void;
   initialProjectId?: string;
 };
 
@@ -40,6 +44,7 @@ export function OriginalsLibraryModal({
   open,
   onOpenChange,
   onSelect,
+  onImportProject,
   initialProjectId,
 }: OriginalsLibraryModalProps) {
   const {
@@ -95,20 +100,24 @@ export function OriginalsLibraryModal({
     : undefined;
   const files = selectedProjectId ? projectFiles[selectedProjectId] ?? [] : [];
 
-  const audioFiles = useMemo(() => {
+  const allAudioFiles = useMemo(() => {
     if (!files.length) return [];
-    const trimmedSearch = search.trim().toLowerCase();
     return files
       .filter(isAudioKnowledgeFile)
-      .filter((file) => {
-        if (!trimmedSearch) return true;
-        return (
-          file.name.toLowerCase().includes(trimmedSearch) ||
-          collectTags(file).some((tag) => tag.toLowerCase().includes(trimmedSearch))
-        );
-      })
       .sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [files, search]);
+  }, [files]);
+
+  const audioFiles = useMemo(() => {
+    if (!allAudioFiles.length) return [];
+    const trimmedSearch = search.trim().toLowerCase();
+    if (!trimmedSearch) return allAudioFiles;
+    return allAudioFiles.filter((file) => {
+      return (
+        file.name.toLowerCase().includes(trimmedSearch) ||
+        collectTags(file).some((tag) => tag.toLowerCase().includes(trimmedSearch))
+      );
+    });
+  }, [allAudioFiles, search]);
 
   const handleRefreshProject = async () => {
     if (!selectedProjectId) return;
@@ -123,6 +132,15 @@ export function OriginalsLibraryModal({
   const handleSelect = (file: KnowledgeFileRecord) => {
     if (!selectedProject) return;
     onSelect({ project: selectedProject, file });
+    onOpenChange(false);
+  };
+
+  const canImportProject =
+    Boolean(selectedProject) && allAudioFiles.length > 0 && Boolean(onImportProject);
+
+  const handleImportProject = () => {
+    if (!selectedProject || !onImportProject || allAudioFiles.length === 0) return;
+    onImportProject(selectedProject, allAudioFiles);
     onOpenChange(false);
   };
 
@@ -144,11 +162,18 @@ export function OriginalsLibraryModal({
         </div>
       );
     }
-    if (!audioFiles.length) {
+    if (!allAudioFiles.length) {
       return (
         <div className="rounded-lg border border-dashed border-white/15 bg-white/5 p-6 text-center text-sm text-muted-foreground">
           <p>No audio found in {selectedProject.name}.</p>
           <p className="mt-2">Drop WAV, MP3, AIFF, or FLAC files into this project to see them here.</p>
+        </div>
+      );
+    }
+    if (!audioFiles.length) {
+      return (
+        <div className="rounded-lg border border-dashed border-white/15 bg-white/5 p-6 text-center text-sm text-muted-foreground">
+          No matches for that search.
         </div>
       );
     }
@@ -205,6 +230,18 @@ export function OriginalsLibraryModal({
                 {isRefreshing ? "Refreshing..." : "Refresh"}
               </Button>
             </div>
+            {onImportProject ? (
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleImportProject}
+                  disabled={!canImportProject}
+                >
+                  Import project stems
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           {emptyState ? (

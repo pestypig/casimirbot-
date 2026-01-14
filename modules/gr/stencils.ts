@@ -70,6 +70,32 @@ export const diff1 = (
   return (f1p - f1m) / (2 * dx);
 };
 
+export const diff1Upwind = (
+  field: Float32Array,
+  i: number,
+  j: number,
+  k: number,
+  axis: Axis,
+  grid: GridSpec,
+  flow: number,
+  options: StencilOptions = {},
+): number => {
+  const boundary = options.boundary ?? "clamp";
+  const dx = axisStep(axis, grid.spacing);
+  if (dx === 0) return 0;
+  if (!Number.isFinite(flow) || flow === 0) return 0;
+  const di = axis === 0 ? 1 : 0;
+  const dj = axis === 1 ? 1 : 0;
+  const dk = axis === 2 ? 1 : 0;
+  const f0 = sample(field, i, j, k, grid.dims, boundary);
+  if (flow > 0) {
+    const f1m = sample(field, i - di, j - dj, k - dk, grid.dims, boundary);
+    return (f0 - f1m) / dx;
+  }
+  const f1p = sample(field, i + di, j + dj, k + dk, grid.dims, boundary);
+  return (f1p - f0) / dx;
+};
+
 export const diff2 = (
   field: Float32Array,
   i: number,
@@ -154,4 +180,64 @@ export const computeLaplacian = (
     }
   }
   return out;
+};
+
+export const koDissipationAt = (
+  field: Float32Array,
+  i: number,
+  j: number,
+  k: number,
+  grid: GridSpec,
+  options: StencilOptions = {},
+): number => {
+  const order = options.order ?? 2;
+  const boundary = options.boundary ?? "clamp";
+  const di = 1;
+  const dj = 1;
+  const dk = 1;
+  const f0 = sample(field, i, j, k, grid.dims, boundary);
+  const koAxis = (axis: Axis) => {
+    if (order >= 4) {
+      const s2m =
+        axis === 0
+          ? sample(field, i - 2 * di, j, k, grid.dims, boundary)
+          : axis === 1
+            ? sample(field, i, j - 2 * dj, k, grid.dims, boundary)
+            : sample(field, i, j, k - 2 * dk, grid.dims, boundary);
+      const s1m =
+        axis === 0
+          ? sample(field, i - di, j, k, grid.dims, boundary)
+          : axis === 1
+            ? sample(field, i, j - dj, k, grid.dims, boundary)
+            : sample(field, i, j, k - dk, grid.dims, boundary);
+      const s1p =
+        axis === 0
+          ? sample(field, i + di, j, k, grid.dims, boundary)
+          : axis === 1
+            ? sample(field, i, j + dj, k, grid.dims, boundary)
+            : sample(field, i, j, k + dk, grid.dims, boundary);
+      const s2p =
+        axis === 0
+          ? sample(field, i + 2 * di, j, k, grid.dims, boundary)
+          : axis === 1
+            ? sample(field, i, j + 2 * dj, k, grid.dims, boundary)
+            : sample(field, i, j, k + 2 * dk, grid.dims, boundary);
+      return s2m - 4 * s1m + 6 * f0 - 4 * s1p + s2p;
+    }
+    const s1m =
+      axis === 0
+        ? sample(field, i - di, j, k, grid.dims, boundary)
+        : axis === 1
+          ? sample(field, i, j - dj, k, grid.dims, boundary)
+          : sample(field, i, j, k - dk, grid.dims, boundary);
+    const s1p =
+      axis === 0
+        ? sample(field, i + di, j, k, grid.dims, boundary)
+        : axis === 1
+          ? sample(field, i, j + dj, k, grid.dims, boundary)
+          : sample(field, i, j, k + dk, grid.dims, boundary);
+    return s1m - 2 * f0 + s1p;
+  };
+  const scale = order >= 4 ? 1 / 16 : 1 / 4;
+  return scale * (koAxis(0) + koAxis(1) + koAxis(2));
 };

@@ -5,6 +5,32 @@ export type Original = {
   listens: number;
   duration: number;
   tempo?: TempoMeta;
+  stemCount?: number;
+  uploadedAt?: number;
+  status?: "pending" | "ranked";
+};
+
+export type TimeSkyMeta = {
+  publishedAt?: number;
+  composedStart?: number;
+  composedEnd?: number;
+  place?: string;
+  skySignature?: string;
+};
+
+export type OriginalDetails = Original & {
+  lyrics?: string;
+  timeSky?: TimeSkyMeta;
+};
+
+export type OriginalStem = {
+  id: string;
+  name: string;
+  category?: string;
+  mime: string;
+  size: number;
+  uploadedAt: number;
+  url: string;
 };
 
 export type Generation = {
@@ -13,6 +39,17 @@ export type Generation = {
   title: string;
   mood: string;
   listens: number;
+};
+
+export type NoisegenRecipe = {
+  id: string;
+  name: string;
+  originalId: string;
+  createdAt: number;
+  updatedAt: number;
+  seed?: string | number;
+  coverRequest: CoverJobRequest;
+  notes?: string;
 };
 
 export type MoodPreset = {
@@ -252,8 +289,9 @@ export type KnowledgeMacroSource = {
 export type OriginalUpload = {
   title: string;
   creator: string;
-  instrumental: File;
+  instrumental?: File;
   vocal?: File;
+  stems?: File[];
   notes?: string;
   tempo?: TempoMeta;
 };

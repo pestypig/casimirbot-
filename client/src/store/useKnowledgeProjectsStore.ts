@@ -17,6 +17,8 @@ import {
   type KnowledgeFileRecord,
   type KnowledgeProjectRecord,
 } from "@/lib/agi/knowledge-store";
+import { isAudioKnowledgeFile } from "@/lib/knowledge/audio";
+import { analyzeKnowledgeAudio } from "@/lib/knowledge/atom-curation";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import { KNOWLEDGE_DEFAULT_CONTEXT_LIMIT } from "@shared/knowledge";
 import { sha256Hex } from "@/utils/sha";
@@ -157,6 +159,22 @@ export const useKnowledgeProjectsStore = createWithEqualityFn<KnowledgeProjectsS
             ),
           };
         });
+        void (async () => {
+          for (const file of saved) {
+            if (!isAudioKnowledgeFile(file)) continue;
+            if (file.analysis?.waveformPeaks?.length) continue;
+            const result = await analyzeKnowledgeAudio(file);
+            if (!result) continue;
+            const nextAnalysis = { ...(file.analysis ?? {}), ...result.analysis };
+            const nextAutoTags = Array.from(
+              new Set([...(file.autoTags ?? []), ...result.autoTags]),
+            );
+            await get().updateFileAnalysis(projectId, file.id, {
+              analysis: nextAnalysis,
+              autoTags: nextAutoTags,
+            });
+          }
+        })();
       },
 
       deleteFile: async (projectId: string, fileId: string) => {

@@ -4,6 +4,9 @@ import type {
   Generation,
   MoodPreset,
   Original,
+  OriginalDetails,
+  OriginalStem,
+  NoisegenRecipe,
   JobStatus,
   HelixPacket,
   CoverJobRequest,
@@ -16,10 +19,18 @@ const BASE = "/api/noise-gens";
 
 const endpoints = {
   originals: `${BASE}/originals`,
+  pendingOriginals: `${BASE}/originals/pending`,
+  originalDetails: (originalId: string) =>
+    `${BASE}/originals/${encodeURIComponent(originalId)}`,
+  originalStems: (originalId: string) =>
+    `${BASE}/originals/${encodeURIComponent(originalId)}/stems`,
   generations: `${BASE}/generations`,
   moods: `${BASE}/moods`,
+  recipes: `${BASE}/recipes`,
+  recipe: (recipeId: string) => `${BASE}/recipes/${encodeURIComponent(recipeId)}`,
   generate: `${BASE}/generate`,
   upload: `${BASE}/upload`,
+  previews: `${BASE}/previews`,
   jobStatus: (jobId: string) => `${BASE}/jobs/${encodeURIComponent(jobId)}`,
   noiseField: `${BASE}/noise-field`,
 } as const;
@@ -61,6 +72,50 @@ export async function fetchTopOriginals(
   return parseJson<Original[]>(res);
 }
 
+export async function fetchOriginalDetails(
+  originalId: string,
+  signal?: AbortSignal,
+): Promise<OriginalDetails> {
+  const res = await apiRequest("GET", endpoints.originalDetails(originalId), undefined, signal);
+  return parseJson<OriginalDetails>(res);
+}
+
+export async function fetchPendingOriginals(
+  search?: string,
+  signal?: AbortSignal,
+): Promise<Original[]> {
+  try {
+    const res = await apiRequest(
+      "GET",
+      withSearch(endpoints.pendingOriginals, search),
+      undefined,
+      signal,
+    );
+    return parseJson<Original[]>(res);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const statusMatch = message.match(/^(\d{3})\s*:/);
+    if (statusMatch && (statusMatch[1] === "404" || statusMatch[1] === "501")) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+export async function fetchOriginalStems(
+  originalId: string,
+  signal?: AbortSignal,
+): Promise<OriginalStem[]> {
+  const res = await apiRequest(
+    "GET",
+    endpoints.originalStems(originalId),
+    undefined,
+    signal,
+  );
+  const payload = await parseJson<{ stems: OriginalStem[] }>(res);
+  return payload?.stems ?? [];
+}
+
 export async function fetchTopGenerations(
   search?: string,
   signal?: AbortSignal,
@@ -79,6 +134,58 @@ export async function fetchMoodPresets(
 ): Promise<MoodPreset[]> {
   const res = await apiRequest("GET", endpoints.moods, undefined, signal);
   return parseJson<MoodPreset[]>(res);
+}
+
+export async function fetchRecipes(
+  search?: string,
+  signal?: AbortSignal,
+): Promise<NoisegenRecipe[]> {
+  const res = await apiRequest(
+    "GET",
+    withSearch(endpoints.recipes, search),
+    undefined,
+    signal,
+  );
+  return parseJson<NoisegenRecipe[]>(res);
+}
+
+export async function fetchRecipe(
+  recipeId: string,
+  signal?: AbortSignal,
+): Promise<NoisegenRecipe> {
+  const res = await apiRequest(
+    "GET",
+    endpoints.recipe(recipeId),
+    undefined,
+    signal,
+  );
+  return parseJson<NoisegenRecipe>(res);
+}
+
+export async function saveRecipe(
+  payload: {
+    name: string;
+    coverRequest: CoverJobRequest;
+    seed?: string | number;
+    notes?: string;
+  },
+  signal?: AbortSignal,
+): Promise<NoisegenRecipe> {
+  const res = await apiRequest("POST", endpoints.recipes, payload, signal);
+  return parseJson<NoisegenRecipe>(res);
+}
+
+export async function deleteRecipe(
+  recipeId: string,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean }> {
+  const res = await apiRequest(
+    "DELETE",
+    endpoints.recipe(recipeId),
+    undefined,
+    signal,
+  );
+  return parseJson<{ ok: boolean }>(res);
 }
 
 export async function requestGeneration(payload: {
@@ -139,6 +246,31 @@ export async function uploadOriginal(
   }
 
   return parseJson<{ trackId: string }>(res);
+}
+
+export async function uploadCoverPreview(
+  jobId: string,
+  blob: Blob,
+  signal?: AbortSignal,
+): Promise<{ previewUrl: string }> {
+  const payload = new FormData();
+  payload.append("jobId", jobId);
+  payload.append("preview", blob, "preview.wav");
+  const res = await fetch(endpoints.previews, {
+    method: "POST",
+    body: payload,
+    credentials: "include",
+    signal,
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(
+      errorBody || `Preview upload failed with status ${res.status ?? "unknown"}`,
+    );
+  }
+
+  return parseJson<{ previewUrl: string }>(res);
 }
 
 export async function fetchJobStatus(

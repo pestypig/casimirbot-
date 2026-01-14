@@ -19,6 +19,8 @@ Stage 2 (Diagnostic / High-fidelity)
 Stage 3 (Certified / Policy-gated)
 - Allowed claims: pass/fail under named policy, certificate-backed.
 - Checks: hard constraints + certificate integrity + required tests.
+- Narrative: `motivation` + `conceptualWaypoints` (3-7 waypoints) required for
+  certified modules.
 
 ## Modules (Example)
 
@@ -36,3 +38,4 @@ Stage 3 (Certified / Policy-gated)
 - Default stage policy: `math.config.json`
 - Evidence profiles: `math.evidence.json`
 - Inline overrides: `// math-stage: diagnostic` in the first few lines of a file.
+- Narrative fields: `motivation` and `conceptualWaypoints` in `shared/math-stage.ts`.

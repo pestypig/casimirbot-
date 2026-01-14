@@ -665,6 +665,7 @@ export type GrMomentumConstraintDiagnostics = {
 export type GrPipelineDiagnostics = {
   updatedAt: number;
   source: "gr-evolve-brick";
+  meta?: import("./gr-evolve-brick").GrBrickMeta;
   grid: {
     dims: [number, number, number];
     bounds: { min: Vec3; max: Vec3 };
@@ -677,12 +678,15 @@ export type GrPipelineDiagnostics = {
     iterations: number;
     tolerance: number;
     cfl: number;
+    fixups?: import("./gr-evolve-brick").GrEvolveBrickStats["fixups"];
+    health?: import("./gr-evolve-brick").GrEvolveBrickStats["solverHealth"];
   };
   gauge?: {
     lapseMin: number;
     lapseMax: number;
     betaMaxAbs: number;
   };
+  stiffness?: import("./gr-evolve-brick").GrEvolveBrickStats["stiffness"];
   constraints: {
     H_constraint: GrConstraintDiagnostics;
     M_constraint: GrMomentumConstraintDiagnostics;

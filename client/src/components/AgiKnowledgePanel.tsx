@@ -1,14 +1,42 @@
 import * as React from "react";
 import { isFlagEnabled } from "@/lib/envFlags";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   useKnowledgeProjectsStore,
   type ProjectWithStats
 } from "@/store/useKnowledgeProjectsStore";
-import { extractKnowledgePdfText, type KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
+import {
+  DEFAULT_PROJECT_ID,
+  extractKnowledgePdfText,
+  type KnowledgeFileRecord,
+} from "@/lib/agi/knowledge-store";
 import { decodeLayout } from "@/lib/desktop/shareState";
 
 const ACCEPTED_FILE_TYPES = [".txt", ".md", ".pdf", ".json", ".mp3", ".wav", ".m4a"].join(",");
 const PREVIEW_LIMIT = 4096;
+const PROJECT_NAME_PLACEHOLDERS = [
+  "Stewardship Ledger",
+  "Interbeing Systems",
+  "Sangha Architecture",
+  "Right Speech Infrastructure",
+  "Restorative Harm Repair",
+  "Impermanence by Design",
+  "Koan Governance",
+  "Three Tenets Loop",
+  "Provenance Protocol",
+  "Feedback Loop Hygiene",
+  "Verification Checklist",
+  "Civic Memory Continuity",
+];
 
 const formatBytes = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -66,6 +94,7 @@ export function AgiKnowledgePanel() {
     refreshFiles,
     saveFiles,
     deleteFile,
+    deleteProject,
     moveFiles,
     updateFileTags,
     toggleActive,
@@ -81,6 +110,7 @@ export function AgiKnowledgePanel() {
     refreshFiles: state.refreshFiles,
     saveFiles: state.saveFiles,
     deleteFile: state.deleteFile,
+    deleteProject: state.deleteProject,
     moveFiles: state.moveFiles,
     updateFileTags: state.updateFileTags,
     toggleActive: state.toggleActive,
@@ -95,6 +125,13 @@ export function AgiKnowledgePanel() {
   const [syncing, setSyncing] = React.useState(false);
   const [tagEdit, setTagEdit] = React.useState<{ id: string; value: string } | null>(null);
   const [tagSaving, setTagSaving] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<ProjectWithStats | null>(null);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const projectNamePlaceholder = React.useMemo(() => {
+    if (!PROJECT_NAME_PLACEHOLDERS.length) return "New Project";
+    const index = Math.floor(Math.random() * PROJECT_NAME_PLACEHOLDERS.length);
+    return PROJECT_NAME_PLACEHOLDERS[index];
+  }, []);
   const inputRef = React.useRef<HTMLInputElement>(null);
   
 
@@ -111,6 +148,7 @@ export function AgiKnowledgePanel() {
     }
     return projects[0];
   }, [projects, selectedProjectId]);
+  const isDefaultProject = selectedProject?.id === DEFAULT_PROJECT_ID;
 
   React.useEffect(() => {
     if (!selectedProject?.id) return;
@@ -259,6 +297,23 @@ export function AgiKnowledgePanel() {
       .filter((entry) => entry.length > 0);
   }, []);
 
+  const handleDeleteProject = React.useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setStatus(null);
+    try {
+      await deleteProject(deleteTarget.id);
+      setStatus(`Deleted ${deleteTarget.name}.`);
+      setDeleteTarget(null);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to delete project.";
+      setStatus(message);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [deleteProject, deleteTarget]);
+
   const handleTagSave = React.useCallback(
     async (file: KnowledgeFileRecord) => {
       if (!selectedProject || !tagEdit || tagEdit.id !== file.id) return;
@@ -313,7 +368,7 @@ export function AgiKnowledgePanel() {
                   name="name"
                   required
                   className="mt-1 w-full rounded-md border border-white/10 bg-black/20 px-3 py-1 text-sm text-white focus:border-sky-500 focus:outline-none"
-                  placeholder="Album Aurora"
+                  placeholder={projectNamePlaceholder}
                 />
               </div>
               <div>
@@ -407,6 +462,15 @@ export function AgiKnowledgePanel() {
                     {syncing ? "Syncing..." : "Sync to Essence"}
                   </button>
                 )}
+                {!isDefaultProject ? (
+                  <button
+                    className="rounded-md border border-rose-500/40 px-3 py-1 text-xs font-semibold text-rose-200 hover:border-rose-400 hover:text-rose-100 disabled:opacity-50"
+                    onClick={() => setDeleteTarget(selectedProject)}
+                    disabled={deleteBusy}
+                  >
+                    Delete Project
+                  </button>
+                ) : null}
               </div>
               {selectedProject.type === "noise-album" && (
                 <p className="text-xs text-slate-400">
@@ -467,6 +531,35 @@ export function AgiKnowledgePanel() {
           {status}
         </div>
       )}
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="border border-white/10 bg-slate-950 text-slate-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete "{deleteTarget?.name}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteTarget?.name}"? Files will move to "My Knowledge".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border border-white/10 bg-transparent text-slate-200 hover:bg-white/5">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 text-white hover:bg-rose-400"
+              onClick={() => void handleDeleteProject()}
+              disabled={deleteBusy}
+            >
+              {deleteBusy ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="rounded-xl border border-white/10 bg-white/5">
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 text-xs uppercase tracking-wide text-slate-300">

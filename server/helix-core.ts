@@ -108,6 +108,8 @@ import {
   hullPreviewPayloadSchema,
   cardMeshMetadataSchema,
   cardLatticeMetadataSchema,
+  grAssistantReportRequestSchema,
+  grAssistantReportSchema,
   grConstraintPolicySchema,
   grConstraintThresholdSchema,
   grConstraintContractSchema,
@@ -136,6 +138,7 @@ import type {
   GrRegionStats,
 } from "../shared/schema.js";
 import type { WarpConfig } from "../types/warpViability";
+import { grAssistantHandler } from "./skills/physics.gr.assistant.js";
 import {
   applyHullBasisToDims,
   applyHullBasisToPositions,
@@ -6134,6 +6137,148 @@ const computeRegionStats = (input: {
   };
 };
 
+type InvariantWallMetrics = {
+  source: "kretschmann" | "ricci4";
+  detected: boolean;
+  p98: number;
+  threshold: number;
+  bandMin: number;
+  bandMax: number;
+  sampleCount: number;
+  voxelCount: number;
+  voxelFraction: number;
+  center: Vec3 | null;
+  radiusMin?: number;
+  radiusMax?: number;
+  radiusMean?: number;
+  thickness?: number;
+  wallFraction: number;
+  bandFraction: number;
+};
+
+const percentileSamples = (values: number[], p: number) => {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const q = clamp01(p);
+  const index = Math.floor((sorted.length - 1) * q);
+  return sorted[index] ?? 0;
+};
+
+const computeInvariantWallMetrics = (input: {
+  dims: [number, number, number];
+  bounds: { min: Vec3; max: Vec3 };
+  values: Float32Array;
+  source: "kretschmann" | "ricci4";
+  useAbs: boolean;
+  wallFraction: number;
+  bandFraction: number;
+  sampleMax: number;
+  maxVoxels: number;
+}): InvariantWallMetrics => {
+  const [nx, ny, nz] = input.dims;
+  const total = Math.max(0, nx * ny * nz);
+  const sampleMax = Math.max(1, Math.floor(input.sampleMax));
+  const sampleStride = Math.max(1, Math.floor(total / sampleMax));
+  const wallFraction = clamp01(input.wallFraction);
+  const bandFraction = Math.max(0, clamp01(input.bandFraction));
+  const samples: number[] = [];
+  for (let i = 0; i < total; i += sampleStride) {
+    const raw = input.values[i];
+    if (!Number.isFinite(raw)) continue;
+    samples.push(input.useAbs ? Math.abs(raw) : raw);
+  }
+  const p98 = percentileSamples(samples, 0.98);
+  const threshold = p98 * wallFraction;
+  const bandMin = threshold > 0 ? threshold * (1 - bandFraction) : 0;
+  const bandMax = threshold > 0 ? threshold * (1 + bandFraction) : 0;
+
+  const dx = (input.bounds.max[0] - input.bounds.min[0]) / Math.max(1, nx);
+  const dy = (input.bounds.max[1] - input.bounds.min[1]) / Math.max(1, ny);
+  const dz = (input.bounds.max[2] - input.bounds.min[2]) / Math.max(1, nz);
+  const stride =
+    total > input.maxVoxels
+      ? Math.max(1, Math.floor(Math.cbrt(total / input.maxVoxels)))
+      : 1;
+  let sampled = 0;
+  let count = 0;
+  let sumX = 0;
+  let sumY = 0;
+  let sumZ = 0;
+
+  let idx = 0;
+  for (let z = 0; z < nz; z += stride) {
+    const pz = input.bounds.min[2] + (z + 0.5) * dz;
+    for (let y = 0; y < ny; y += stride) {
+      const py = input.bounds.min[1] + (y + 0.5) * dy;
+      for (let x = 0; x < nx; x += stride) {
+        idx = x + nx * (y + ny * z);
+        sampled += 1;
+        const raw = input.values[idx];
+        if (!Number.isFinite(raw)) continue;
+        const value = input.useAbs ? Math.abs(raw) : raw;
+        if (value < bandMin || value > bandMax) continue;
+        count += 1;
+        const px = input.bounds.min[0] + (x + 0.5) * dx;
+        const py = input.bounds.min[1] + (y + 0.5) * dy;
+        sumX += px;
+        sumY += py;
+        sumZ += pz;
+      }
+    }
+  }
+
+  const center: Vec3 | null =
+    count > 0 ? ([sumX / count, sumY / count, sumZ / count] as Vec3) : null;
+  let radiusMin = Number.POSITIVE_INFINITY;
+  let radiusMax = 0;
+  let radiusSum = 0;
+  if (center) {
+    for (let z = 0; z < nz; z += stride) {
+      const pz = input.bounds.min[2] + (z + 0.5) * dz;
+      for (let y = 0; y < ny; y += stride) {
+        const py = input.bounds.min[1] + (y + 0.5) * dy;
+        for (let x = 0; x < nx; x += stride) {
+          idx = x + nx * (y + ny * z);
+          const raw = input.values[idx];
+          if (!Number.isFinite(raw)) continue;
+          const value = input.useAbs ? Math.abs(raw) : raw;
+          if (value < bandMin || value > bandMax) continue;
+          const px = input.bounds.min[0] + (x + 0.5) * dx;
+          const r = Math.hypot(px - center[0], py - center[1], pz - center[2]);
+          if (r < radiusMin) radiusMin = r;
+          if (r > radiusMax) radiusMax = r;
+          radiusSum += r;
+        }
+      }
+    }
+  }
+
+  const radiusMean = count > 0 ? radiusSum / count : 0;
+  const thickness =
+    Number.isFinite(radiusMin) && Number.isFinite(radiusMax) && radiusMax >= radiusMin
+      ? radiusMax - radiusMin
+      : 0;
+
+  return {
+    source: input.source,
+    detected: count > 0 && threshold > 0,
+    p98: Number.isFinite(p98) ? p98 : 0,
+    threshold: Number.isFinite(threshold) ? threshold : 0,
+    bandMin: Number.isFinite(bandMin) ? bandMin : 0,
+    bandMax: Number.isFinite(bandMax) ? bandMax : 0,
+    sampleCount: samples.length,
+    voxelCount: count,
+    voxelFraction: sampled > 0 ? count / sampled : 0,
+    center,
+    radiusMin: Number.isFinite(radiusMin) ? radiusMin : 0,
+    radiusMax: Number.isFinite(radiusMax) ? radiusMax : 0,
+    radiusMean: Number.isFinite(radiusMean) ? radiusMean : 0,
+    thickness: Number.isFinite(thickness) ? thickness : 0,
+    wallFraction,
+    bandFraction,
+  };
+};
+
 export function getCurvatureBrick(req: Request, res: Response) {
   if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
   setCors(res);
@@ -6836,10 +6981,53 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       0,
       parseNumberParam(query.shiftGamma, 0.75),
     );
+    const koEps = Math.max(
+      0,
+      parseNumberParam(query.koEps, parseNumberParam(query.ko_eps, 0)),
+    );
+    const koTargetsRaw =
+      typeof query.koTargets === "string"
+        ? query.koTargets
+        : typeof query.ko_targets === "string"
+          ? query.ko_targets
+          : undefined;
+    const koTargets = koTargetsRaw === "all" ? "all" : "gauge";
+    const shockModeRaw =
+      typeof query.shockMode === "string"
+        ? query.shockMode
+        : typeof query.shock_mode === "string"
+          ? query.shock_mode
+          : undefined;
+    const shockMode =
+      shockModeRaw === "diagnostic" || shockModeRaw === "stabilize"
+        ? shockModeRaw
+        : shockModeRaw === "off"
+          ? "off"
+          : "off";
+    const advectSchemeRaw =
+      typeof query.advectScheme === "string"
+        ? query.advectScheme
+        : typeof query.advect_scheme === "string"
+          ? query.advect_scheme
+          : undefined;
+    const advectScheme = advectSchemeRaw === "upwind1" ? "upwind1" : "centered";
     const advect = parseBooleanParam(query.advect, true);
     const includeExtra = parseBooleanParam(query.includeExtra, false);
     const includeMatter = parseBooleanParam(query.includeMatter, includeExtra);
     const includeKij = parseBooleanParam(query.includeKij, includeExtra);
+    const invariantWallFraction = clamp01(
+      parseNumberParam(query.invariantWallFraction, 0.25),
+    );
+    const invariantBandFraction = clamp01(
+      parseNumberParam(query.invariantBandFraction, 0.2),
+    );
+    const invariantSampleMax = Math.max(
+      1,
+      Math.floor(parseNumberParam(query.invariantSampleMax, 50_000)),
+    );
+    const invariantPercentile = clamp01(
+      parseNumberParam(query.invariantPercentile, 0.98),
+    );
     const overrideDriveDir = parseVec3ParamOptional(query.driveDir);
     const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
     const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
@@ -6899,6 +7087,10 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       steps,
       iterations,
       tolerance,
+      koEps,
+      koTargets,
+      shockMode,
+      advectScheme,
       useInitialData: true,
       initialIterations,
       initialTolerance,
@@ -6915,6 +7107,10 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       includeExtra,
       includeMatter,
       includeKij,
+      invariantWallFraction,
+      invariantBandFraction,
+      invariantSampleMax,
+      invariantPercentile,
       sourceParams,
       sourceOptions,
     };
@@ -6927,6 +7123,10 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       steps,
       iterations,
       tolerance,
+      koEps,
+      koTargets,
+      shockMode,
+      advectScheme,
       useInitialData: true,
       initialIterations,
       initialTolerance,
@@ -6943,6 +7143,10 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       includeExtra,
       includeMatter,
       includeKij,
+      invariantWallFraction,
+      invariantBandFraction,
+      invariantSampleMax,
+      invariantPercentile,
       grEnabled: state.grEnabled === true,
       source: sourceCacheKey,
       geometry: geometrySig,
@@ -7076,8 +7280,20 @@ export async function getGrRegionStats(req: Request, res: Response) {
     const sourceRaw = typeof (query as any).source === "string" ? (query as any).source : "auto";
     const source = sourceRaw === "gr" || sourceRaw === "stress" ? sourceRaw : "auto";
     const requireCertified = parseBooleanParam((query as any).requireCertified, false);
+    const wallMetricsEnabled = parseBooleanParam((query as any).wallMetrics, true);
+    const wallInvariantRaw =
+      typeof (query as any).wallInvariant === "string" ? (query as any).wallInvariant : undefined;
+    const wallInvariant =
+      wallInvariantRaw === "ricci4" ? "ricci4" : "kretschmann";
+    const wallFraction = clamp01(parseNumberParam((query as any).wallFraction, 0.25));
+    const wallBandFraction = clamp01(parseNumberParam((query as any).wallBandFraction, 0.2));
+    const wallSampleMax = Math.max(
+      1,
+      Math.floor(parseNumberParam((query as any).wallSampleMax, 50_000)),
+    );
 
     let rho: Float32Array | null = null;
+    let wallMetrics: InvariantWallMetrics | null = null;
     let detGamma: Float32Array | null = null;
     let sourceBrick: "gr-evolve-brick" | "stress-energy-brick" | "missing" = "missing";
     let proxy = true;
@@ -7115,6 +7331,36 @@ export async function getGrRegionStats(req: Request, res: Response) {
           parseNumberParam((query as any).eta, parseNumberParam((query as any).shiftEta, 1)),
         );
         const shiftGamma = Math.max(0, parseNumberParam((query as any).shiftGamma, 0.75));
+        const koEps = Math.max(
+          0,
+          parseNumberParam((query as any).koEps, parseNumberParam((query as any).ko_eps, 0)),
+        );
+        const koTargetsRaw =
+          typeof (query as any).koTargets === "string"
+            ? (query as any).koTargets
+            : typeof (query as any).ko_targets === "string"
+              ? (query as any).ko_targets
+              : undefined;
+        const koTargets = koTargetsRaw === "all" ? "all" : "gauge";
+        const shockModeRaw =
+          typeof (query as any).shockMode === "string"
+            ? (query as any).shockMode
+            : typeof (query as any).shock_mode === "string"
+              ? (query as any).shock_mode
+              : undefined;
+        const shockMode =
+          shockModeRaw === "diagnostic" || shockModeRaw === "stabilize"
+            ? shockModeRaw
+            : shockModeRaw === "off"
+              ? "off"
+              : "off";
+        const advectSchemeRaw =
+          typeof (query as any).advectScheme === "string"
+            ? (query as any).advectScheme
+            : typeof (query as any).advect_scheme === "string"
+              ? (query as any).advect_scheme
+              : undefined;
+        const advectScheme = advectSchemeRaw === "upwind1" ? "upwind1" : "centered";
         const advect = parseBooleanParam((query as any).advect, true);
         const orderRaw = Math.max(2, Math.floor(parseNumberParam((query as any).order, 2)));
         const order = orderRaw >= 4 ? 4 : 2;
@@ -7169,6 +7415,10 @@ export async function getGrRegionStats(req: Request, res: Response) {
           steps,
           iterations,
           tolerance,
+          koEps,
+          koTargets,
+          shockMode,
+          advectScheme,
           useInitialData: true,
           initialIterations,
           initialTolerance,
@@ -7182,9 +7432,13 @@ export async function getGrRegionStats(req: Request, res: Response) {
             order,
             boundary,
           },
-          includeExtra: false,
+          includeExtra: wallMetricsEnabled,
           includeMatter: true,
           includeKij: false,
+          invariantWallFraction: wallFraction,
+          invariantBandFraction: wallBandFraction,
+          invariantSampleMax: wallSampleMax,
+          invariantPercentile: 0.98,
           sourceParams,
           sourceOptions,
         };
@@ -7197,6 +7451,10 @@ export async function getGrRegionStats(req: Request, res: Response) {
           steps,
           iterations,
           tolerance,
+          koEps,
+          koTargets,
+          shockMode,
+          advectScheme,
           useInitialData: true,
           initialIterations,
           initialTolerance,
@@ -7210,9 +7468,13 @@ export async function getGrRegionStats(req: Request, res: Response) {
             order,
             boundary,
           },
-          includeExtra: false,
+          includeExtra: wallMetricsEnabled,
           includeMatter: true,
           includeKij: false,
+          invariantWallFraction: wallFraction,
+          invariantBandFraction: wallBandFraction,
+          invariantSampleMax: wallSampleMax,
+          invariantPercentile: 0.98,
           grEnabled: state.grEnabled === true,
           source: sourceCacheKey,
           geometry: geometrySig,
@@ -7244,6 +7506,26 @@ export async function getGrRegionStats(req: Request, res: Response) {
         }
         rho = rhoChannel.data;
         detGamma = brick.channels.det_gamma?.data ?? null;
+        if (wallMetricsEnabled) {
+          const wallChannel =
+            wallInvariant === "ricci4"
+              ? brick.channels.ricci4 ?? brick.channels.kretschmann
+              : brick.channels.kretschmann ?? brick.channels.ricci4;
+          if (wallChannel) {
+            const source = wallChannel === brick.channels.ricci4 ? "ricci4" : "kretschmann";
+            wallMetrics = computeInvariantWallMetrics({
+              dims,
+              bounds,
+              values: wallChannel.data,
+              source,
+              useAbs: source === "ricci4",
+              wallFraction,
+              bandFraction: wallBandFraction,
+              sampleMax: wallSampleMax,
+              maxVoxels,
+            });
+          }
+        }
         sourceBrick = "gr-evolve-brick";
         proxy = false;
         certified = true;
@@ -7344,7 +7626,10 @@ export async function getGrRegionStats(req: Request, res: Response) {
         voxelCount: stats.voxelCount,
         ...(stats.stride > 1 ? { stride: stats.stride } : {}),
       },
-      summary: stats.summary,
+      summary: {
+        ...stats.summary,
+        ...(wallMetrics ? { wall: wallMetrics } : {}),
+      },
       topRegions: stats.topRegions.slice(0, topN),
     };
 
@@ -7664,6 +7949,9 @@ export async function getGrConstraintContract(req: Request, res: Response) {
     if (guardrails.vdbBand === "proxy") {
       notes.push("VdB band uses gamma_VdB proxy; band not configured.");
     }
+    if (gr?.solver?.health?.status === "UNSTABLE") {
+      notes.push("GR solver fixups unstable; treat brick as NOT_CERTIFIED.");
+    }
 
     const grid = gr?.grid && gr?.grid?.bounds
       ? {
@@ -7683,9 +7971,12 @@ export async function getGrConstraintContract(req: Request, res: Response) {
           M_rms: gr.constraints.M_constraint?.rms,
           lapseMin: gr.gauge?.lapseMin,
           lapseMax: gr.gauge?.lapseMax,
-          betaMaxAbs: gr.gauge?.betaMaxAbs,
-        }
-      : undefined;
+        betaMaxAbs: gr.gauge?.betaMaxAbs,
+        fixups: gr.solver?.fixups,
+        solverHealth: gr.solver?.health,
+        brickMeta: gr.meta,
+      }
+    : undefined;
     const perf = gr?.perf
       ? {
           totalMs: gr.perf.totalMs,
@@ -7737,6 +8028,48 @@ export async function getGrConstraintContract(req: Request, res: Response) {
     console.error("[helix-core] gr constraint contract error:", err);
     const message = err instanceof Error ? err.message : "Failed to build gr constraint contract";
     res.status(500).json({ error: "gr-constraint-contract-failed", message });
+  }
+}
+
+export async function getGrAssistantReport(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const query = req.method === "GET"
+      ? req.query
+      : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const body =
+      query && typeof query === "object" ? (query as Record<string, unknown>) : {};
+    const parsed = grAssistantReportRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "invalid-gr-assistant-report",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+    if (!parsed.data.metric && !parsed.data.brick) {
+      res.status(400).json({ error: "gr-assistant-missing-input" });
+      return;
+    }
+
+    const result = await grAssistantHandler(parsed.data);
+    const payload = grAssistantReportSchema.parse({
+      kind: "gr-assistant-report",
+      updatedAt: Date.now(),
+      report: result.report,
+      gate: result.gate,
+      citations: result.citations,
+      trace_id: result.trace_id,
+      training_trace_id: result.training_trace_id,
+    });
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] gr assistant report error:", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to build gr assistant report";
+    res.status(500).json({ error: "gr-assistant-report-failed", message });
   }
 }
 

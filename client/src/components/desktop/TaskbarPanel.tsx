@@ -55,13 +55,16 @@ export function TaskbarShelf({ variant = "panel", onOpenFloatingTaskbar }: Taskb
       .sort((a, b) => b.z - a.z)[0]?.id;
   }, [windows]);
 
-  const pinnedEntries = useMemo(
-    () =>
-      panelRegistry.filter(
-        (panel) => !panel.skipTaskbar && Boolean(pinned[panel.id] ?? panel.pinned)
-      ),
-    [pinned]
-  );
+  const pinnedEntries = useMemo(() => {
+    const entries = panelRegistry.filter(
+      (panel) => !panel.skipTaskbar && Boolean(pinned[panel.id] ?? panel.pinned)
+    );
+    return [...entries].sort((a, b) => {
+      if (a.id === "helix-noise-gens") return -1;
+      if (b.id === "helix-noise-gens") return 1;
+      return panelRegistry.indexOf(a) - panelRegistry.indexOf(b);
+    });
+  }, [pinned]);
 
   const runningEntries = useMemo(
     () =>

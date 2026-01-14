@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export type WaiverKind = "stage" | "evidence" | "unit";
+export type WaiverKind = "stage" | "evidence" | "unit" | "narrative";
 
 export type EdgeWaiver = {
   from: string;

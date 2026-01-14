@@ -5,6 +5,12 @@ server/public
 vite.config.ts.*
 *.tar.gz
 data/
+!data/noisegen/
+data/noisegen/*
+!data/noisegen/store.json
+!data/noisegen/originals/
+data/noisegen/originals/*
+!data/noisegen/originals/1b014c10-2e86-4951-ae10-d5245578d930/**
 !client/src/data/
 !client/src/data/**
 # Simulation output artifacts (large, reproducible)

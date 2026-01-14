@@ -37,6 +37,12 @@ type EvidenceIssue = {
   missing: string[];
 };
 
+type NarrativeIssue = {
+  module: string;
+  stage: MathStage;
+  missing: string[];
+};
+
 type UnitVector = {
   M: number;
   L: number;
@@ -106,12 +112,15 @@ const MAX_LIST = Number(process.env.MATH_REPORT_MAX_LIST ?? 50);
 
 const TEST_LIKE_TYPES = new Set<MathCheck["type"]>([
   "test",
+  "certificate",
   "snapshot",
   "stability",
   "residual",
 ]);
 const STABILITY_TYPES = new Set<MathCheck["type"]>(["stability", "snapshot"]);
 const RESIDUAL_TYPES = new Set<MathCheck["type"]>(["residual"]);
+const NARRATIVE_MIN_WAYPOINTS = 3;
+const NARRATIVE_MAX_WAYPOINTS = 7;
 const UNIT_KEY_ALIASES: Record<string, string> = {
   T00_avg: "T00",
   T11_avg: "T11",
@@ -188,6 +197,10 @@ const hasAnyType = (checks: MathCheck[], types: Set<MathCheck["type"]>) =>
 
 const requiresResidualEvidence = (entry: MathStageEntry) =>
   entry.tag.startsWith("GR_");
+const requiresNarrative = (entry: MathStageEntry) => entry.stage === "certified";
+
+const normalizeWaypoints = (waypoints?: string[]) =>
+  (waypoints ?? []).map((value) => value.trim()).filter(Boolean);
 
 const resolveEvidenceIssues = (
   entry: MathStageEntry,
@@ -227,6 +240,31 @@ const resolveEvidenceIssues = (
   for (const check of checks) {
     if (!fileExists(check.path)) {
       missing.push(`missing_${check.type}_file:${check.path}`);
+    }
+  }
+
+  return missing.length > 0
+    ? { module: entry.module, stage: entry.stage, missing }
+    : null;
+};
+
+const resolveNarrativeIssues = (entry: MathStageEntry): NarrativeIssue | null => {
+  if (!requiresNarrative(entry)) return null;
+  const missing: string[] = [];
+  const motivation = entry.motivation?.trim();
+  const waypoints = normalizeWaypoints(entry.conceptualWaypoints);
+
+  if (!motivation) {
+    missing.push("motivation");
+  }
+  if (waypoints.length === 0) {
+    missing.push("conceptual_waypoints");
+  } else {
+    if (waypoints.length < NARRATIVE_MIN_WAYPOINTS) {
+      missing.push(`conceptual_waypoints_min:${NARRATIVE_MIN_WAYPOINTS}`);
+    }
+    if (waypoints.length > NARRATIVE_MAX_WAYPOINTS) {
+      missing.push(`conceptual_waypoints_max:${NARRATIVE_MAX_WAYPOINTS}`);
     }
   }
 
@@ -551,6 +589,15 @@ const renderEvidenceIssues = (items: EvidenceIssue[], max = MAX_LIST) => {
   return `- ${shown.join("\n- ")}${tail}`;
 };
 
+const renderNarrativeIssues = (items: NarrativeIssue[], max = MAX_LIST) => {
+  if (items.length === 0) return "none";
+  const shown = items.slice(0, max).map((item) => {
+    return `${item.module} (${item.stage}): ${item.missing.join(", ")}`;
+  });
+  const tail = items.length > max ? `\n- ... (${items.length - max} more)` : "";
+  return `- ${shown.join("\n- ")}${tail}`;
+};
+
 const ensureReportDir = () => {
   const dir = path.resolve(repoRoot, REPORT_DIR);
   fs.mkdirSync(dir, { recursive: true });
@@ -601,11 +648,25 @@ const main = async () => {
   const rawEvidenceIssues = mathStageRegistry
     .map((entry) => resolveEvidenceIssues(entry, mergeChecks(entry)))
     .filter((item): item is EvidenceIssue => item !== null);
+  const rawNarrativeIssues = mathStageRegistry
+    .map((entry) => resolveNarrativeIssues(entry))
+    .filter((item): item is NarrativeIssue => item !== null);
   const waivedIssues: WaivedIssue[] = [];
   const evidenceIssues = rawEvidenceIssues.filter((issue) => {
     if (isModuleWaived(issue.module, "evidence")) {
       waivedIssues.push({
         kind: "evidence",
+        module: issue.module,
+        reason: issue.missing.join(", "),
+      });
+      return false;
+    }
+    return true;
+  });
+  const narrativeIssues = rawNarrativeIssues.filter((issue) => {
+    if (isModuleWaived(issue.module, "narrative")) {
+      waivedIssues.push({
+        kind: "narrative",
         module: issue.module,
         reason: issue.missing.join(", "),
       });
@@ -716,7 +777,11 @@ const main = async () => {
       suggested: unstagedSuggestions,
       defaultStage: mathConfig?.defaultStage ?? null,
     },
-    evidenceIssues: { count: evidenceIssues.length, items: evidenceIssues },
+    evidenceIssues: { count: evidenceIssues.length, items: evidenceIssues },    
+    narrativeIssues: {
+      count: narrativeIssues.length,
+      items: narrativeIssues,
+    },
     stageViolations: {
       edge: { count: filteredEdgeViolations.length, items: filteredEdgeViolations },
       pipeline: {
@@ -777,6 +842,9 @@ const main = async () => {
   lines.push("");
   lines.push("## Missing Evidence");
   lines.push(renderEvidenceIssues(evidenceIssues));
+  lines.push("");
+  lines.push("## Missing Narrative");
+  lines.push(renderNarrativeIssues(narrativeIssues));
   lines.push("");
   lines.push("## Evidence Profiles");
   evidenceProfileSummaries.forEach((profile) => {

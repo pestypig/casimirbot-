@@ -20,6 +20,10 @@ export interface GrEvolveBrickRequest {
   steps?: number;
   iterations?: number;
   tolerance?: number;
+  koEps?: number;
+  koTargets?: "gauge" | "all";
+  shockMode?: "off" | "diagnostic" | "stabilize";
+  advectScheme?: "centered" | "upwind1";
   lapseKappa?: number;
   shiftEta?: number;
   shiftGamma?: number;
@@ -29,6 +33,10 @@ export interface GrEvolveBrickRequest {
   includeExtra?: boolean;
   includeMatter?: boolean;
   includeKij?: boolean;
+  invariantWallFraction?: number;
+  invariantBandFraction?: number;
+  invariantSampleMax?: number;
+  invariantPercentile?: number;
   driveDir?: [number, number, number] | null;
 }
 
@@ -36,6 +44,66 @@ export interface GrEvolveBrickChannel {
   data: Float32Array;
   min: number;
   max: number;
+}
+
+export interface FixupStepStats {
+  alphaClampCount: number;
+  kClampCount: number;
+  detFixCount: number;
+  traceFixCount: number;
+  maxAlphaBeforeClamp: number;
+  maxKBeforeClamp: number;
+}
+
+export interface FixupStats extends FixupStepStats {
+  totalCells: number;
+  alphaClampByStep: number[];
+  kClampByStep: number[];
+  detFixByStep: number[];
+  traceFixByStep: number[];
+  alphaClampMin: number;
+  alphaClampMax: number;
+  kClampMaxAbs: number;
+  postStep?: FixupStepStats;
+  clampFraction?: number;
+}
+
+export type GrSolverHealthStatus = "CERTIFIED" | "UNSTABLE" | "NOT_CERTIFIED";
+
+export interface GrSolverHealth {
+  status: GrSolverHealthStatus;
+  reasons: string[];
+  alphaClampFraction: number;
+  kClampFraction: number;
+  totalClampFraction: number;
+  maxAlphaBeforeClamp: number;
+  maxKBeforeClamp: number;
+}
+
+export type GrBrickMetaStatus = "CERTIFIED" | "NOT_CERTIFIED";
+
+export interface GrBrickMeta {
+  status: GrBrickMetaStatus;
+  reasons: string[];
+}
+
+export interface GrShiftStiffnessMetrics {
+  betaMaxAbs: number;
+  betaP98Abs: number;
+  gradBetaMaxAbs: number;
+  gradBetaP98Abs: number;
+  advectiveCflSuggested: number;
+  charSpeedSuggested: number;
+  charCflSuggested: number;
+  shockIndex: number;
+  shockSeverity?: "ok" | "warn" | "severe";
+  shockMode?: "off" | "diagnostic" | "stabilize";
+  stabilizersApplied?: string[];
+}
+
+export interface GrDissipationStats {
+  koEpsUsed: number;
+  koTargets: "gauge" | "all";
 }
 
 export interface GrEvolveBrickStats {
@@ -47,6 +115,12 @@ export interface GrEvolveBrickStats {
   M_rms: number;
   thetaPeakAbs?: number;
   thetaGrowthPerStep?: number;
+  invariants?: GrInvariantStatsSet;
+  dissipation?: GrDissipationStats;
+  advectScheme?: "centered" | "upwind1";
+  stiffness?: GrShiftStiffnessMetrics;
+  fixups?: FixupStats;
+  solverHealth?: GrSolverHealth;
   stressEnergy?: StressEnergyBrickStats;
   perf?: GrEvolveBrickPerfStats;
 }
@@ -59,6 +133,25 @@ export interface GrEvolveBrickPerfStats {
   channelCount: number;
   bytesEstimate: number;
   msPerStep: number;
+}
+
+export interface GrInvariantStats {
+  min: number;
+  max: number;
+  mean: number;
+  p98: number;
+  sampleCount: number;
+  abs: boolean;
+  wallFraction: number;
+  bandFraction: number;
+  threshold: number;
+  bandMin: number;
+  bandMax: number;
+}
+
+export interface GrInvariantStatsSet {
+  kretschmann?: GrInvariantStats;
+  ricci4?: GrInvariantStats;
 }
 
 export interface GrEvolveBrickDecoded {
@@ -86,6 +179,7 @@ export interface GrEvolveBrickDecoded {
   };
   extraChannels?: Record<string, GrEvolveBrickChannel>;
   stats: GrEvolveBrickStats;
+  meta?: GrBrickMeta;
 }
 
 const BRICK_FORMAT = "raw";
@@ -173,6 +267,156 @@ const normalizePerfStats = (raw: any): GrEvolveBrickPerfStats | undefined => {
   };
 };
 
+const normalizeFixupStepStats = (raw: any): FixupStepStats => ({
+  alphaClampCount: Number(raw?.alphaClampCount ?? 0),
+  kClampCount: Number(raw?.kClampCount ?? 0),
+  detFixCount: Number(raw?.detFixCount ?? 0),
+  traceFixCount: Number(raw?.traceFixCount ?? 0),
+  maxAlphaBeforeClamp: Number(raw?.maxAlphaBeforeClamp ?? 0),
+  maxKBeforeClamp: Number(raw?.maxKBeforeClamp ?? 0),
+});
+
+const normalizeFixupStats = (raw: any): FixupStats | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const step = normalizeFixupStepStats(raw);
+  return {
+    ...step,
+    totalCells: Number(raw.totalCells ?? 0),
+    alphaClampByStep: Array.isArray(raw.alphaClampByStep)
+      ? raw.alphaClampByStep.map((value) => Number(value))
+      : [],
+    kClampByStep: Array.isArray(raw.kClampByStep)
+      ? raw.kClampByStep.map((value) => Number(value))
+      : [],
+    detFixByStep: Array.isArray(raw.detFixByStep)
+      ? raw.detFixByStep.map((value) => Number(value))
+      : [],
+    traceFixByStep: Array.isArray(raw.traceFixByStep)
+      ? raw.traceFixByStep.map((value) => Number(value))
+      : [],
+    alphaClampMin: Number(raw.alphaClampMin ?? 0),
+    alphaClampMax: Number(raw.alphaClampMax ?? 0),
+    kClampMaxAbs: Number(raw.kClampMaxAbs ?? 0),
+    clampFraction: Number(raw.clampFraction ?? 0),
+    postStep: raw.postStep ? normalizeFixupStepStats(raw.postStep) : undefined,
+  };
+};
+
+const normalizeStiffness = (raw: any): GrShiftStiffnessMetrics | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const betaMaxAbs = Number(raw.betaMaxAbs);
+  const betaP98Abs = Number(raw.betaP98Abs);
+  const gradBetaMaxAbs = Number(raw.gradBetaMaxAbs);
+  const gradBetaP98Abs = Number(raw.gradBetaP98Abs);
+  const advectiveCflSuggested = Number(raw.advectiveCflSuggested);
+  const charSpeedSuggested = Number(raw.charSpeedSuggested);
+  const charCflSuggested = Number(raw.charCflSuggested);
+  const shockIndex = Number(raw.shockIndex);
+  const shockSeverityRaw =
+    typeof raw.shockSeverity === "string" ? raw.shockSeverity.toLowerCase() : "";
+  const shockSeverity =
+    shockSeverityRaw === "severe" || shockSeverityRaw === "warn" || shockSeverityRaw === "ok"
+      ? (shockSeverityRaw as "ok" | "warn" | "severe")
+      : undefined;
+  const shockModeRaw =
+    typeof raw.shockMode === "string" ? raw.shockMode.toLowerCase() : "";
+  const shockMode =
+    shockModeRaw === "diagnostic" || shockModeRaw === "stabilize" || shockModeRaw === "off"
+      ? (shockModeRaw as "off" | "diagnostic" | "stabilize")
+      : undefined;
+  const stabilizersApplied = Array.isArray(raw.stabilizersApplied)
+    ? raw.stabilizersApplied.map((value: any) => String(value))
+    : undefined;
+  if (
+    !Number.isFinite(betaMaxAbs) &&
+    !Number.isFinite(betaP98Abs) &&
+    !Number.isFinite(gradBetaMaxAbs) &&
+    !Number.isFinite(gradBetaP98Abs) &&
+    !Number.isFinite(advectiveCflSuggested) &&
+    !Number.isFinite(charSpeedSuggested) &&
+    !Number.isFinite(charCflSuggested) &&
+    !Number.isFinite(shockIndex) &&
+    !shockSeverity
+  ) {
+    return undefined;
+  }
+  return {
+    betaMaxAbs: Number.isFinite(betaMaxAbs) ? betaMaxAbs : 0,
+    betaP98Abs: Number.isFinite(betaP98Abs) ? betaP98Abs : 0,
+    gradBetaMaxAbs: Number.isFinite(gradBetaMaxAbs) ? gradBetaMaxAbs : 0,
+    gradBetaP98Abs: Number.isFinite(gradBetaP98Abs) ? gradBetaP98Abs : 0,
+    advectiveCflSuggested: Number.isFinite(advectiveCflSuggested) ? advectiveCflSuggested : 0,
+    charSpeedSuggested: Number.isFinite(charSpeedSuggested) ? charSpeedSuggested : 0,
+    charCflSuggested: Number.isFinite(charCflSuggested) ? charCflSuggested : 0,
+    shockIndex: Number.isFinite(shockIndex) ? shockIndex : 0,
+    ...(shockSeverity ? { shockSeverity } : {}),
+    ...(shockMode ? { shockMode } : {}),
+    ...(stabilizersApplied ? { stabilizersApplied } : {}),
+  };
+};
+
+const normalizeDissipation = (raw: any): GrDissipationStats | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const koEps = Number(raw.koEpsUsed ?? raw.koEps);
+  const koTargets = raw.koTargets === "all" ? "all" : "gauge";
+  if (!Number.isFinite(koEps) && koTargets === "gauge") return undefined;
+  return {
+    koEpsUsed: Number.isFinite(koEps) ? koEps : 0,
+    koTargets,
+  };
+};
+
+const normalizeSolverHealth = (raw: any): GrSolverHealth | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const status = String(raw.status ?? "").toUpperCase();
+  return {
+    status: status === "CERTIFIED" || status === "UNSTABLE" ? status : "NOT_CERTIFIED",
+    reasons: Array.isArray(raw.reasons) ? raw.reasons.map((value) => String(value)) : [],
+    alphaClampFraction: Number(raw.alphaClampFraction ?? 0),
+    kClampFraction: Number(raw.kClampFraction ?? 0),
+    totalClampFraction: Number(raw.totalClampFraction ?? 0),
+    maxAlphaBeforeClamp: Number(raw.maxAlphaBeforeClamp ?? 0),
+    maxKBeforeClamp: Number(raw.maxKBeforeClamp ?? 0),
+  };
+};
+
+const normalizeBrickMeta = (raw: any): GrBrickMeta | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const status = String(raw.status ?? "").toUpperCase();
+  return {
+    status: status === "CERTIFIED" ? "CERTIFIED" : "NOT_CERTIFIED",
+    reasons: Array.isArray(raw.reasons) ? raw.reasons.map((value) => String(value)) : [],
+  };
+};
+
+const normalizeInvariantStats = (raw: any): GrInvariantStats | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  return {
+    min: Number(raw.min ?? 0),
+    max: Number(raw.max ?? 0),
+    mean: Number(raw.mean ?? 0),
+    p98: Number(raw.p98 ?? 0),
+    sampleCount: Number(raw.sampleCount ?? 0),
+    abs: Boolean(raw.abs),
+    wallFraction: Number(raw.wallFraction ?? 0),
+    bandFraction: Number(raw.bandFraction ?? 0),
+    threshold: Number(raw.threshold ?? 0),
+    bandMin: Number(raw.bandMin ?? 0),
+    bandMax: Number(raw.bandMax ?? 0),
+  };
+};
+
+const normalizeInvariantStatsSet = (raw: any): GrInvariantStatsSet | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const kretschmann = normalizeInvariantStats(raw.kretschmann);
+  const ricci4 = normalizeInvariantStats(raw.ricci4);
+  if (!kretschmann && !ricci4) return undefined;
+  return {
+    ...(kretschmann ? { kretschmann } : {}),
+    ...(ricci4 ? { ricci4 } : {}),
+  };
+};
+
 const normalizeStats = (raw: any): GrEvolveBrickStats => ({
   steps: Number(raw?.steps ?? 0),
   iterations: Number(raw?.iterations ?? 0),
@@ -182,6 +426,17 @@ const normalizeStats = (raw: any): GrEvolveBrickStats => ({
   M_rms: Number(raw?.M_rms ?? 0),
   thetaPeakAbs: Number(raw?.thetaPeakAbs ?? 0),
   thetaGrowthPerStep: Number(raw?.thetaGrowthPerStep ?? 0),
+  invariants: normalizeInvariantStatsSet(raw?.invariants),
+  dissipation: normalizeDissipation(raw?.dissipation),
+  advectScheme:
+    raw?.advectScheme === "upwind1"
+      ? "upwind1"
+      : raw?.advectScheme === "centered"
+        ? "centered"
+        : undefined,
+  stiffness: normalizeStiffness(raw?.stiffness),
+  fixups: normalizeFixupStats(raw?.fixups),
+  solverHealth: normalizeSolverHealth(raw?.solverHealth),
   stressEnergy: normalizeStressEnergyStats(raw?.stressEnergy),
   perf: normalizePerfStats(raw?.perf),
 });
@@ -286,6 +541,7 @@ const decodeGrEvolveBrickBinary = (buffer: ArrayBuffer): GrEvolveBrickDecoded | 
     },
     extraChannels: Object.keys(extraChannels).length ? extraChannels : undefined,
     stats: normalizeStats(header.stats),
+    meta: normalizeBrickMeta(header.meta),
   };
 };
 
@@ -327,6 +583,22 @@ const buildQuery = (request: GrEvolveBrickRequest) => {
   if (Number.isFinite(request.steps ?? NaN)) params.set("steps", String(Math.max(0, Math.floor(request.steps as number))));
   if (Number.isFinite(request.iterations ?? NaN)) params.set("iterations", String(Math.max(0, Math.floor(request.iterations as number))));
   if (Number.isFinite(request.tolerance ?? NaN)) params.set("tolerance", String(Math.max(0, request.tolerance as number)));
+  if (Number.isFinite(request.koEps ?? NaN)) {
+    params.set("koEps", String(Math.max(0, request.koEps as number)));
+  }
+  if (request.koTargets === "all" || request.koTargets === "gauge") {
+    params.set("koTargets", request.koTargets);
+  }
+  if (
+    request.shockMode === "off" ||
+    request.shockMode === "diagnostic" ||
+    request.shockMode === "stabilize"
+  ) {
+    params.set("shockMode", request.shockMode);
+  }
+  if (request.advectScheme === "upwind1" || request.advectScheme === "centered") {
+    params.set("advectScheme", request.advectScheme);
+  }
   if (Number.isFinite(request.lapseKappa ?? NaN)) params.set("kappa", String(request.lapseKappa));
   if (Number.isFinite(request.shiftEta ?? NaN)) params.set("eta", String(request.shiftEta));
   if (Number.isFinite(request.shiftGamma ?? NaN)) params.set("shiftGamma", String(request.shiftGamma));
@@ -339,6 +611,18 @@ const buildQuery = (request: GrEvolveBrickRequest) => {
   }
   if (typeof request.includeKij === "boolean") {
     params.set("includeKij", request.includeKij ? "1" : "0");
+  }
+  if (Number.isFinite(request.invariantWallFraction ?? NaN)) {
+    params.set("invariantWallFraction", String(request.invariantWallFraction));
+  }
+  if (Number.isFinite(request.invariantBandFraction ?? NaN)) {
+    params.set("invariantBandFraction", String(request.invariantBandFraction));
+  }
+  if (Number.isFinite(request.invariantSampleMax ?? NaN)) {
+    params.set("invariantSampleMax", String(request.invariantSampleMax));
+  }
+  if (Number.isFinite(request.invariantPercentile ?? NaN)) {
+    params.set("invariantPercentile", String(request.invariantPercentile));
   }
   if (request.order === 4 || request.order === 2) params.set("order", String(request.order));
   if (request.boundary === "periodic" || request.boundary === "clamp") {
@@ -420,5 +704,6 @@ export async function fetchGrEvolveBrick(
     },
     extraChannels: Object.keys(extraChannels).length ? extraChannels : undefined,
     stats: normalizeStats(json.stats),
+    meta: normalizeBrickMeta(json.meta),
   };
 }

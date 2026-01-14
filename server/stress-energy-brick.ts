@@ -55,6 +55,9 @@ export interface NatarioDiagnostics {
   divBetaMaxPost?: number;
   divBetaRmsPost?: number;
   clampScale?: number;
+  clampApplied?: boolean;
+  clampActivationRate?: number;
+  clampMode?: "natario" | "stability";
   gateLimit: number;
   gNatario: number;
 }
@@ -108,6 +111,7 @@ export interface StressEnergyBrick {
 const EPS = 1e-9;
 const TWO_PI = Math.PI * 2;
 const NATARIO_K_TOL = 1e-6;
+const ALCUBIERRE_K_TOL = 1e-4;
 const STRESS_ENERGY_CHANNEL_ORDER = ["t00", "Sx", "Sy", "Sz", "divS"] as const;
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
@@ -322,18 +326,19 @@ const clampNatarioShift = (
   dy: number,
   dz: number,
   preStats?: BetaDivergenceStats,
+  limit: number = NATARIO_K_TOL,
 ) => {
   const stats =
     preStats ?? computeBetaDivergenceStats(betaX, betaY, betaZ, nx, ny, nz, dx, dy, dz);
-  if (stats.divBetaMaxAbs > NATARIO_K_TOL && stats.divBetaMaxAbs > 0) {
-    const scale = NATARIO_K_TOL / stats.divBetaMaxAbs;
+  if (stats.divBetaMaxAbs > limit && stats.divBetaMaxAbs > 0) {
+    const scale = limit / stats.divBetaMaxAbs;
     for (let i = 0; i < betaX.length; i += 1) {
       betaX[i] *= scale;
       betaY[i] *= scale;
       betaZ[i] *= scale;
     }
     return {
-      divBetaMaxAbs: NATARIO_K_TOL,
+      divBetaMaxAbs: limit,
       divBetaRms: stats.divBetaRms * scale,
       scaled: true,
       scale,
@@ -493,6 +498,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     dy,
     dz,
   );
+  const warpFieldType = state?.warpFieldType ?? "natario";
+  const isNatarioField = warpFieldType === "natario" || warpFieldType === "natario_sdf";
+  const clampLimit = isNatarioField ? NATARIO_K_TOL : ALCUBIERRE_K_TOL;
+  const clampMode = isNatarioField ? "natario" : "stability";
   const natarioClamp = clampNatarioShift(
     betaX,
     betaY,
@@ -504,14 +513,24 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     dy,
     dz,
     natarioPre,
+    clampLimit,
   );
+  const clampActivationRate = natarioClamp.scaled ? 1 - natarioClamp.scale : 0;
   if (natarioClamp.scaled) {
-    console.warn("[Natario] Divergence exceeds gate; scaling shift field", {
-      divMax: natarioClamp.divBetaMaxAbs,
-      gate: NATARIO_K_TOL,
-      dutyFR,
-      phase01,
-    });
+    console.warn(
+      isNatarioField
+        ? "[Natario] Divergence exceeds gate; scaling shift field"
+        : "[ShiftClamp] Divergence exceeds stability gate; scaling shift field",
+      {
+        divMax: natarioClamp.divBetaMaxAbs,
+        gate: clampLimit,
+        clampMode,
+        clampActivationRate,
+        dutyFR,
+        phase01,
+        warpFieldType,
+      },
+    );
   }
   const natarioDiagnostics: NatarioDiagnostics = {
     divBetaMax: natarioClamp.divBetaMaxAbs,
@@ -521,8 +540,11 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     divBetaMaxPost: natarioClamp.divBetaMaxAbs,
     divBetaRmsPost: natarioClamp.divBetaRms,
     clampScale: natarioClamp.scale,
-    gateLimit: NATARIO_K_TOL,
-    gNatario: Math.max(0, 1 - natarioClamp.divBetaMaxAbs / NATARIO_K_TOL),
+    clampApplied: natarioClamp.scaled,
+    clampActivationRate,
+    clampMode,
+    gateLimit: clampLimit,
+    gNatario: Math.max(0, 1 - natarioClamp.divBetaMaxAbs / clampLimit),
   };
 
   const Sx = new Float32Array(totalVoxels);

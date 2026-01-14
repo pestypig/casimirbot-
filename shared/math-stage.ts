@@ -10,6 +10,7 @@ export type MathStage = keyof typeof MATH_STAGE_LEVELS;
 export type MathCheckType =
   | "test"
   | "policy"
+  | "certificate"
   | "snapshot"
   | "doc"
   | "residual"
@@ -28,6 +29,8 @@ export type MathStageEntry = {
   module: string;
   stage: MathStage;
   notes?: string;
+  motivation?: string;
+  conceptualWaypoints?: string[];
   checks?: MathCheck[];
   units?: UnitSignature;
   residualsRequired?: boolean;
@@ -276,6 +279,13 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "server/gr/constraint-evaluator.ts",
     stage: "certified",
     notes: "GR gate evaluation from diagnostics.",
+    motivation:
+      "Turn GR constraint diagnostics into policy-gated pass/fail so downstream layers do not over-claim viability.",
+    conceptualWaypoints: [
+      "Summarize BSSN constraint fields into RMS and max-abs metrics.",
+      "Apply policy thresholds with unknown-as-fail semantics.",
+      "Emit constraint entries plus gate status for downstream evaluation.",
+    ],
     checks: [
       { type: "test", path: "tests/gr-constraint-gate.spec.ts" },
       { type: "policy", path: "WARP_AGENTS.md" },
@@ -347,6 +357,14 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "server/gr/gr-evaluation.ts",
     stage: "certified",
     notes: "Gate + certificate checks (policy).",
+    motivation:
+      "Combine GR gate results with warp certificate status to decide if an attempt is policy-admissible.",
+    conceptualWaypoints: [
+      "Load threshold and certificate policy from warp agent config.",
+      "Evaluate the GR constraint gate from diagnostics.",
+      "Issue a warp viability certificate and verify integrity/status.",
+      "Pass only when gate, certificate presence, and status requirements are satisfied.",
+    ],
     checks: [
       { type: "test", path: "tests/gr-agent-loop.spec.ts" },
       { type: "policy", path: "WARP_AGENTS.md" },
@@ -366,6 +384,13 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "server/gr/gr-agent-loop.ts",
     stage: "certified",
     notes: "Orchestration + acceptance gate.",
+    motivation:
+      "Iterate the GR pipeline under budget until a gate- and certificate-clean attempt is found (or exhaustion is reported).",
+    conceptualWaypoints: [
+      "Generate proposals and run initial/evolve steps within timing budgets.",
+      "Compute diagnostics and evaluate gate + certificate each attempt.",
+      "Accept and commit the first passing attempt; otherwise record failures.",
+    ],
     checks: [
       { type: "test", path: "tests/gr-agent-loop.spec.ts" },
       { type: "test", path: "tests/gr-agent-loop-baseline.spec.ts" },
@@ -745,6 +770,13 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "tools/warpViabilityCertificate.ts",
     stage: "certified",
     notes: "Certificate issuance (policy-gated).",
+    motivation:
+      "Produce a deterministic, checkable certificate for warp viability based on the current pipeline evaluation.",
+    conceptualWaypoints: [
+      "Evaluate warp viability against constraints and capture snapshot data.",
+      "Build canonical payload and header for reproducible hashing.",
+      "Hash payload and certificate to provide integrity metadata.",
+    ],
     checks: [
       { type: "test", path: "tests/theory-checks.spec.ts" },
       { type: "policy", path: "WARP_AGENTS.md" },
@@ -761,6 +793,13 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "tools/verifyCertificate.ts",
     stage: "certified",
     notes: "Certificate integrity verification.",
+    motivation:
+      "Recompute hashes to confirm certificate integrity and detect tampering.",
+    conceptualWaypoints: [
+      "Recreate the payload hash from canonical JSON.",
+      "Rebuild the certificate hash and compare to the stored hash.",
+      "Optionally re-evaluate and diff constraints/snapshot for drift checks.",
+    ],
     checks: [
       { type: "test", path: "tests/theory-checks.spec.ts" },
       { type: "policy", path: "WARP_AGENTS.md" },
@@ -775,6 +814,13 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "server/skills/physics.warp.viability.ts",
     stage: "certified",
     notes: "Public viability tool endpoint.",
+    motivation:
+      "Expose warp viability evaluation to agents while enforcing policy gating and trace emission.",
+    conceptualWaypoints: [
+      "Validate tool input and build the warp config payload.",
+      "Issue the certificate, verify integrity, and assemble response fields.",
+      "Record training trace with constraint failures and certificate metadata.",
+    ],
     checks: [
       { type: "test", path: "tests/theory-checks.spec.ts" },
       { type: "policy", path: "WARP_AGENTS.md" },
@@ -790,6 +836,13 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "server/routes/warp-viability.ts",
     stage: "certified",
     notes: "HTTP route for viability + trace emission.",
+    motivation:
+      "Provide an HTTP endpoint that issues warp viability certificates and emits traces for external consumers.",
+    conceptualWaypoints: [
+      "Parse the request into a warp config and issue a certificate.",
+      "Verify integrity and store results in the pipeline state.",
+      "Emit a training trace with pass/fail and certificate status.",
+    ],
     checks: [
       { type: "test", path: "tests/theory-checks.spec.ts" },
       { type: "policy", path: "WARP_AGENTS.md" },

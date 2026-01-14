@@ -12,13 +12,14 @@ import { useDraggable } from "@dnd-kit/core";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { fetchMoodPresets, fetchTopGenerations, fetchTopOriginals } from "@/lib/api/noiseGens";
+import {
+  fetchMoodPresets,
+  fetchPendingOriginals,
+  fetchTopGenerations,
+  fetchTopOriginals,
+} from "@/lib/api/noiseGens";
 import type { Generation, MoodPreset, Original, TempoMeta } from "@/types/noise-gens";
 import { cn } from "@/lib/utils";
-import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
-import { isFlagEnabled } from "@/lib/envFlags";
-import { deriveKnowledgeTitle, isAudioKnowledgeFile, pseudoListenCount } from "@/lib/knowledge/audio";
 
 type DualTopListsProps = {
   selectedOriginalId?: string | null;
@@ -27,6 +28,7 @@ type DualTopListsProps = {
   onMoodPresetsLoaded?: (presets: MoodPreset[]) => void;
   onOriginalsHydrated?: (originals: Original[]) => void;
   sessionTempo?: TempoMeta | null;
+  layout?: "default" | "listener";
 };
 
 type RankedOriginal = Original & { rank: number };
@@ -39,26 +41,6 @@ type ConnectorPath = {
 
 const SEARCH_DEBOUNCE_MS = 250;
 const TEMPO_BOOST_WEIGHT = 0.15;
-const MIN_DURATION_SECONDS = 45;
-const MAX_DURATION_SECONDS = 600;
-const FALLBACK_DURATION_SECONDS = 180;
-
-const clampDuration = (seconds: number): number => {
-  if (!Number.isFinite(seconds)) return FALLBACK_DURATION_SECONDS;
-  if (seconds < MIN_DURATION_SECONDS) return MIN_DURATION_SECONDS;
-  if (seconds > MAX_DURATION_SECONDS) return MAX_DURATION_SECONDS;
-  return seconds;
-};
-
-const estimateDurationFromSize = (bytes?: number): number => {
-  if (!Number.isFinite(bytes) || !bytes || bytes <= 0) {
-    return FALLBACK_DURATION_SECONDS;
-  }
-  // Assume moderately compressed audio (~16 KB/sec) for an order-of-magnitude estimate.
-  const approxSeconds = Math.round(bytes / 16_000);
-  return clampDuration(approxSeconds);
-};
-
 function tempoBadge(tempo?: TempoMeta) {
   if (!tempo?.bpm) return null;
   const bpmLabel = Math.round(tempo.bpm);
@@ -200,10 +182,18 @@ type OriginalRowProps = {
   onSelect: (value: Original) => void;
   setRef: (node: HTMLDivElement | null) => void;
   sessionTempo?: TempoMeta | null;
+  layout?: "default" | "listener";
 };
 
 const OriginalRow = memo(
-  ({ original, selected, onSelect, setRef, sessionTempo }: OriginalRowProps) => {
+  ({
+    original,
+    selected,
+    onSelect,
+    setRef,
+    sessionTempo,
+    layout = "default",
+  }: OriginalRowProps) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
       id: `original-${original.id}`,
       data: { type: "original", original },
@@ -227,6 +217,7 @@ const OriginalRow = memo(
     );
     const badge = tempoBadge(original.tempo);
     const tempoMatch = tempoBoost(original.tempo?.bpm, sessionTempo?.bpm);
+    const isListenerLayout = layout === "listener";
 
     return (
       <div
@@ -239,10 +230,11 @@ const OriginalRow = memo(
       onClick={() => onSelect(original)}
       onKeyDown={handleKeyDown}
       className={cn(
-        "group relative flex cursor-pointer items-center gap-3 rounded-2xl border border-transparent px-3 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-        selected
-          ? "border-primary/80 bg-primary/10 text-primary-foreground"
-          : "bg-background/40 hover:bg-primary/5",
+        "group relative flex cursor-pointer items-center gap-3 border px-3 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        isListenerLayout
+          ? "rounded-lg border-white/10 bg-slate-950/40 hover:border-primary/40 hover:bg-primary/5"
+          : "rounded-2xl border-transparent bg-background/40 hover:bg-primary/5",
+        selected ? "border-primary/80 bg-primary/10 text-primary-foreground" : undefined,
         isDragging && "z-20 border-primary bg-primary/20",
       )}
       style={{
@@ -273,23 +265,93 @@ const OriginalRow = memo(
         <div className="text-xs font-medium text-muted-foreground tabular-nums">
           {original.listens.toLocaleString()} plays
         </div>
-        <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="ml-2 hidden whitespace-nowrap text-xs group-focus-visible:inline-flex group-hover:inline-flex lg:hidden"
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect(original);
-        }}
-      >
-        Use in Cover Creator
-      </Button>
     </div>
     );
   },
 );
 OriginalRow.displayName = "OriginalRow";
+
+type PendingOriginalRowProps = {
+  original: Original;
+  selected: boolean;
+  onSelect: (value: Original) => void;
+  sessionTempo?: TempoMeta | null;
+  layout?: "default" | "listener";
+};
+
+const PendingOriginalRow = memo(
+  ({
+    original,
+    selected,
+    onSelect,
+    sessionTempo,
+    layout = "default",
+  }: PendingOriginalRowProps) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+      id: `original-${original.id}`,
+      data: { type: "original", original },
+    });
+    const { role: _dragRole, tabIndex: _dragTabIndex, ...draggableAttributes } = attributes;
+    const handleKeyDown = useCallback(
+      (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(original);
+        }
+      },
+      [onSelect, original],
+    );
+    const badge = tempoBadge(original.tempo);
+    const tempoMatch = tempoBoost(original.tempo?.bpm, sessionTempo?.bpm);
+    const isListenerLayout = layout === "listener";
+
+    return (
+      <div
+        ref={setNodeRef}
+        {...draggableAttributes}
+        {...listeners}
+        role="option"
+        aria-selected={selected}
+        tabIndex={0}
+        onClick={() => onSelect(original)}
+        onKeyDown={handleKeyDown}
+        className={cn(
+          "group relative flex cursor-pointer items-center gap-3 border px-3 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70",
+          isListenerLayout
+            ? "rounded-lg border-amber-400/20 bg-slate-950/40 hover:border-amber-300/60 hover:bg-amber-400/10"
+            : "rounded-2xl border-transparent bg-background/40 hover:bg-amber-400/5",
+          selected ? "border-amber-400/80 bg-amber-400/10 text-amber-100" : undefined,
+          isDragging && "z-20 border-amber-400/80 bg-amber-400/20",
+        )}
+        style={{
+          transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        }}
+      >
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+          Pending
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">{original.title}</div>
+          <div className="text-xs text-muted-foreground">{original.artist}</div>
+          {badge ? (
+            <div className="mt-1">
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full bg-slate-800/60 px-2 py-0.5 text-[11px] text-slate-300",
+                  tempoMatch >= 0.85 && "bg-amber-400/20 text-amber-100",
+                )}
+              >
+                {badge}
+              </span>
+            </div>
+          ) : null}
+        </div>
+        <div className="text-xs font-medium text-amber-200/80">Awaiting rank</div>
+      </div>
+    );
+  },
+);
+PendingOriginalRow.displayName = "PendingOriginalRow";
 
 type GenerationRowProps = {
   generation: RankedGeneration;
@@ -322,6 +384,7 @@ export function DualTopLists({
   onMoodPresetsLoaded,
   onOriginalsHydrated,
   sessionTempo,
+  layout = "default",
 }: DualTopListsProps) {
   const [searchOriginals, setSearchOriginals] = useState("");
   const [searchGenerations, setSearchGenerations] = useState("");
@@ -329,15 +392,8 @@ export function DualTopLists({
   const debouncedGenerations = useDebouncedValue(searchGenerations, SEARCH_DEBOUNCE_MS);
   const prefersReducedMotion = usePrefersReducedMotion();
   const isLargeScreen = useIsLargeScreen();
-  const showConnectors = isLargeScreen && !prefersReducedMotion;
-  const knowledgeEnabled = isFlagEnabled("ENABLE_KNOWLEDGE_PROJECTS", true);
-  const isBrowser = typeof window !== "undefined";
-  const shouldHydrateKnowledge = knowledgeEnabled && isBrowser;
-  const knowledgeProjects = useKnowledgeProjectsStore((state) => state.projects);
-  const knowledgeProjectFiles = useKnowledgeProjectsStore((state) => state.projectFiles);
-  const refreshKnowledgeProjects = useKnowledgeProjectsStore((state) => state.refresh);
-  const refreshKnowledgeFiles = useKnowledgeProjectsStore((state) => state.refreshFiles);
-  const knowledgeRefreshRequestedRef = useRef(false);
+  const showGenerations = layout !== "listener";
+  const showConnectors = showGenerations && isLargeScreen && !prefersReducedMotion;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const originalRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const generationRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -365,43 +421,20 @@ export function DualTopLists({
     };
   }, []);
 
-  useEffect(() => {
-    if (!shouldHydrateKnowledge || knowledgeRefreshRequestedRef.current) return;
-    knowledgeRefreshRequestedRef.current = true;
-    void refreshKnowledgeProjects();
-  }, [refreshKnowledgeProjects, shouldHydrateKnowledge]);
-
-  const missingKnowledgeProjectIds = useMemo(() => {
-    if (!shouldHydrateKnowledge) return [];
-    return knowledgeProjects
-      .filter((project) => !knowledgeProjectFiles[project.id])
-      .map((project) => project.id);
-  }, [knowledgeProjects, knowledgeProjectFiles, shouldHydrateKnowledge]);
-
-  useEffect(() => {
-    if (!shouldHydrateKnowledge || missingKnowledgeProjectIds.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      for (const projectId of missingKnowledgeProjectIds) {
-        if (cancelled) return;
-        try {
-          await refreshKnowledgeFiles(projectId);
-        } catch (error) {
-          if (import.meta.env?.DEV) {
-            console.warn(`[DualTopLists] Failed to load files for project ${projectId}`, error);
-          }
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [missingKnowledgeProjectIds, refreshKnowledgeFiles, shouldHydrateKnowledge]);
-
   const { data: originalsData, isLoading: originalsLoading, isError: originalsError } = useQuery({
     queryKey: ["noise-gens", "originals", debouncedOriginals],
     queryFn: ({ signal }) => fetchTopOriginals(debouncedOriginals, signal),
     staleTime: 60_000,
+  });
+
+  const {
+    data: pendingOriginalsData,
+    isLoading: pendingOriginalsLoading,
+    isError: pendingOriginalsError,
+  } = useQuery({
+    queryKey: ["noise-gens", "originals", "pending", debouncedOriginals],
+    queryFn: ({ signal }) => fetchPendingOriginals(debouncedOriginals, signal),
+    staleTime: 20_000,
   });
 
   const { data: generationsData, isLoading: generationsLoading, isError: generationsError } =
@@ -409,6 +442,7 @@ export function DualTopLists({
       queryKey: ["noise-gens", "generations", debouncedGenerations],
       queryFn: ({ signal }) => fetchTopGenerations(debouncedGenerations, signal),
       staleTime: 60_000,
+      enabled: showGenerations,
     });
 
   const { data: moodPresets } = useQuery({
@@ -424,48 +458,17 @@ export function DualTopLists({
   }, [moodPresets, onMoodPresetsLoaded]);
 
   useEffect(() => {
-    onGenerationsPresenceChange?.((generationsData ?? []).length > 0);
-  }, [generationsData, onGenerationsPresenceChange]);
-
-  const userOriginals = useMemo<Original[]>(() => {
-    if (!shouldHydrateKnowledge) return [];
-    const aggregated: Original[] = [];
-    for (const project of knowledgeProjects) {
-      const files = knowledgeProjectFiles[project.id];
-      if (!files?.length) continue;
-      for (const file of files) {
-        if (!isAudioKnowledgeFile(file)) continue;
-        aggregated.push({
-          id: `knowledge:${file.id}`,
-          title: deriveKnowledgeTitle(file),
-          artist: project.name || "My Knowledge",
-          listens: pseudoListenCount(file),
-          duration: estimateDurationFromSize(file.size),
-        });
-      }
+    if (!onGenerationsPresenceChange) return;
+    if (!showGenerations) {
+      onGenerationsPresenceChange(false);
+      return;
     }
-    return aggregated;
-  }, [knowledgeProjectFiles, knowledgeProjects, shouldHydrateKnowledge]);
-
-  const combinedOriginalSource = useMemo<Original[]>(() => {
-    const merged: Original[] = [];
-    const seen = new Set<string>();
-    const append = (list?: Original[]) => {
-      if (!list) return;
-      for (const entry of list) {
-        if (seen.has(entry.id)) continue;
-        seen.add(entry.id);
-        merged.push(entry);
-      }
-    };
-    append(originalsData);
-    append(userOriginals);
-    return merged;
-  }, [originalsData, userOriginals]);
+    onGenerationsPresenceChange((generationsData ?? []).length > 0);
+  }, [generationsData, onGenerationsPresenceChange, showGenerations]);
 
   const originals = useMemo<RankedOriginal[]>(() => {
     return buildRankedList(
-      combinedOriginalSource,
+      originalsData ?? [],
       debouncedOriginals,
       (item) => [item.title, item.artist],
       {
@@ -473,7 +476,14 @@ export function DualTopLists({
         sessionTempoBpm: sessionTempo?.bpm,
       },
     );
-  }, [combinedOriginalSource, debouncedOriginals, sessionTempo?.bpm]);
+  }, [originalsData, debouncedOriginals, sessionTempo?.bpm]);
+
+  const pendingOriginals = useMemo(() => {
+    const rankedIds = new Set(originals.map((original) => original.id));
+    return (pendingOriginalsData ?? [])
+      .filter((original) => !rankedIds.has(original.id))
+      .map((original) => ({ ...original, status: "pending" as const }));
+  }, [originals, pendingOriginalsData]);
 
   useEffect(() => {
     if (!onOriginalsHydrated) return;
@@ -481,12 +491,13 @@ export function DualTopLists({
   }, [onOriginalsHydrated, originals]);
 
   const generations = useMemo<RankedGeneration[]>(() => {
+    if (!showGenerations) return [];
     return buildRankedList(
       generationsData ?? [],
       debouncedGenerations,
       (item) => [item.title, item.mood],
     );
-  }, [generationsData, debouncedGenerations]);
+  }, [debouncedGenerations, generationsData, showGenerations]);
 
   const generationByOriginal = useMemo(() => {
     const lookup = new Map<string, RankedGeneration>();
@@ -567,14 +578,29 @@ export function DualTopLists({
     scheduleUpdate();
   }, [scheduleUpdate, originals, generations, showConnectors]);
 
+  const originalsHeading = showGenerations ? "Top Songs" : "Songs";
+  const originalsSubtitle = showGenerations
+    ? "Drag a song into the Cover Creator to start a mood blend."
+    : "Select a song to load it into the player on the right.";
+  const containerLabel = showGenerations
+    ? "Top songs and top generations"
+    : "Available songs";
+
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-y-auto rounded-3xl border border-border bg-secondary/10 p-4 lg:p-6"
+      className="relative h-full w-full overflow-y-auto rounded-3xl border border-border bg-secondary/10 p-4 sm:p-5 lg:p-6"
       role="group"
-      aria-label="Top originals and top generations"
+      aria-label={containerLabel}
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),140px,minmax(0,1fr)] lg:items-start">
+      <div
+        className={cn(
+          "grid gap-4 lg:items-start",
+          showGenerations
+            ? "lg:grid-cols-[minmax(0,1fr),140px,minmax(0,1fr)]"
+            : "lg:grid-cols-[minmax(0,1fr)]",
+        )}
+      >
         <section aria-labelledby="noise-originals-heading" className="space-y-3">
           <header className="flex items-center gap-3">
             <div className="rounded-full bg-primary/10 p-2 text-primary">
@@ -582,126 +608,161 @@ export function DualTopLists({
             </div>
             <div>
               <h2 id="noise-originals-heading" className="text-lg font-semibold">
-                Top Originals
+                {originalsHeading}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Drag an original into the Cover Creator to start a mood blend.
+                {originalsSubtitle}
               </p>
             </div>
           </header>
           <div className="space-y-3">
             <Input
-              placeholder="Search originals"
+              placeholder="Search songs"
               value={searchOriginals}
               role="searchbox"
               onChange={(event) => setSearchOriginals(event.target.value)}
             />
-            <div className="space-y-2" role="listbox" aria-label="Top originals list">
+            <div className="space-y-2" role="listbox" aria-label="Pending songs list">
+              <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
+                <span>Pending Songs</span>
+                <span>{pendingOriginals.length} queued</span>
+              </div>
+              {pendingOriginalsLoading ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={`pending-${index}`} className="h-12 rounded-2xl" />
+                ))
+              ) : pendingOriginalsError ? (
+                <div className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-200">
+                  We couldn&rsquo;t load pending songs. Try again soon.
+                </div>
+              ) : pendingOriginals.length ? (
+                pendingOriginals.map((original) => (
+                  <PendingOriginalRow
+                    key={original.id}
+                    original={original}
+                    selected={selectedOriginalId === original.id}
+                    onSelect={onOriginalSelected}
+                    sessionTempo={sessionTempo}
+                    layout={layout}
+                  />
+                ))
+              ) : (
+                <div className="rounded-2xl bg-muted/30 p-3 text-xs text-muted-foreground">
+                  No pending songs right now.
+                </div>
+              )}
+            </div>
+            <div className="space-y-2" role="listbox" aria-label="Top songs list">
               {originalsLoading ? (
                 Array.from({ length: 6 }).map((_, index) => (
                   <Skeleton key={index} className="h-14 rounded-2xl" />
                 ))
               ) : originalsError ? (
                 <div className="rounded-2xl bg-destructive/10 p-4 text-sm text-destructive">
-                  We couldn&rsquo;t load originals. Try again in a moment.
+                  We couldn&rsquo;t load songs. Try again in a moment.
                 </div>
               ) : originals.length ? (
                 originals.map((original) => (
-                <OriginalRow
+                  <OriginalRow
                   key={original.id}
                   original={original}
                   selected={selectedOriginalId === original.id}
                   onSelect={onOriginalSelected}
                   setRef={setOriginalRef(original.id)}
                   sessionTempo={sessionTempo}
+                  layout={layout}
                 />
                 ))
               ) : (
                 <div className="rounded-2xl bg-muted/40 p-4 text-sm text-muted-foreground">
-                  No originals match that search yet.
+                  No songs match that search yet.
                 </div>
               )}
             </div>
           </div>
         </section>
 
-        <div className="relative hidden justify-center lg:flex">
-          {showConnectors && paths.length > 0 ? (
-            <svg
-              className="pointer-events-none"
-              width="140"
-              height={svgHeight || 400}
-              viewBox={`0 0 140 ${svgHeight || 400}`}
-            >
-              <defs>
-                <linearGradient id="noise-connector" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="rgba(148, 163, 184, 0.2)" />
-                  <stop offset="100%" stopColor="rgba(59, 130, 246, 0.5)" />
-                </linearGradient>
-              </defs>
-              {paths.map((connector) => (
-                <path
-                  key={connector.id}
-                  d={connector.path}
-                  fill="none"
-                  stroke="url(#noise-connector)"
-                  strokeWidth={1.5}
-                />
-              ))}
-            </svg>
-          ) : null}
-        </div>
-
-        <section aria-labelledby="noise-generations-heading" className="space-y-3">
-          <header className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/10 p-2 text-primary">
-              <Search className="h-4 w-4" aria-hidden />
-            </div>
-            <div>
-              <h2 id="noise-generations-heading" className="text-lg font-semibold">
-                Top Generations
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Each generation inherits its original&rsquo;s energy with a Helix mood imprint.
-              </p>
-            </div>
-          </header>
-          <div className="space-y-3">
-            <Input
-              placeholder="Search generations"
-              value={searchGenerations}
-              role="searchbox"
-              onChange={(event) => setSearchGenerations(event.target.value)}
-            />
-            <div className="space-y-2" role="listbox" aria-label="Top generations list">
-              {generationsLoading ? (
-                Array.from({ length: 6 }).map((_, index) => (
-                  <Skeleton key={index} className="h-14 rounded-2xl" />
-                ))
-              ) : generationsError ? (
-                <div className="rounded-2xl bg-destructive/10 p-4 text-sm text-destructive">
-                  We couldn&rsquo;t load generations. Try again soon.
-                </div>
-              ) : generations.length ? (
-                generations.map((generation) => {
-                  const isPrimary =
-                    generationByOriginal.get(generation.originalId)?.id === generation.id;
-                  return (
-                    <GenerationRow
-                      key={generation.id}
-                      generation={generation}
-                      setRef={isPrimary ? setGenerationRef(generation.originalId) : undefined}
+        {showGenerations ? (
+          <>
+            <div className="relative hidden justify-center lg:flex">
+              {showConnectors && paths.length > 0 ? (
+                <svg
+                  className="pointer-events-none"
+                  width="140"
+                  height={svgHeight || 400}
+                  viewBox={`0 0 140 ${svgHeight || 400}`}
+                >
+                  <defs>
+                    <linearGradient id="noise-connector" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(148, 163, 184, 0.2)" />
+                      <stop offset="100%" stopColor="rgba(59, 130, 246, 0.5)" />
+                    </linearGradient>
+                  </defs>
+                  {paths.map((connector) => (
+                    <path
+                      key={connector.id}
+                      d={connector.path}
+                      fill="none"
+                      stroke="url(#noise-connector)"
+                      strokeWidth={1.5}
                     />
-                  );
-                })
-              ) : (
-                <div className="rounded-2xl bg-muted/40 p-4 text-sm text-muted-foreground">
-                  No generations match that search yet.
-                </div>
-              )}
+                  ))}
+                </svg>
+              ) : null}
             </div>
-          </div>
-        </section>
+
+            <section aria-labelledby="noise-generations-heading" className="space-y-3">
+              <header className="flex items-center gap-3">
+                <div className="rounded-full bg-primary/10 p-2 text-primary">
+                  <Search className="h-4 w-4" aria-hidden />
+                </div>
+                <div>
+                  <h2 id="noise-generations-heading" className="text-lg font-semibold">
+                    Top Generations
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Each generation inherits its original&rsquo;s energy with a Helix mood imprint.
+                  </p>
+                </div>
+              </header>
+              <div className="space-y-3">
+                <Input
+                  placeholder="Search generations"
+                  value={searchGenerations}
+                  role="searchbox"
+                  onChange={(event) => setSearchGenerations(event.target.value)}
+                />
+                <div className="space-y-2" role="listbox" aria-label="Top generations list">
+                  {generationsLoading ? (
+                    Array.from({ length: 6 }).map((_, index) => (
+                      <Skeleton key={index} className="h-14 rounded-2xl" />
+                    ))
+                  ) : generationsError ? (
+                    <div className="rounded-2xl bg-destructive/10 p-4 text-sm text-destructive">
+                      We couldn&rsquo;t load generations. Try again soon.
+                    </div>
+                  ) : generations.length ? (
+                    generations.map((generation) => {
+                      const isPrimary =
+                        generationByOriginal.get(generation.originalId)?.id === generation.id;
+                      return (
+                        <GenerationRow
+                          key={generation.id}
+                          generation={generation}
+                          setRef={isPrimary ? setGenerationRef(generation.originalId) : undefined}
+                        />
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-2xl bg-muted/40 p-4 text-sm text-muted-foreground">
+                      No generations match that search yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          </>
+        ) : null}
       </div>
     </div>
   );

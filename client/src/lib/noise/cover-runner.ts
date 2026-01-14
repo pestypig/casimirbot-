@@ -7,9 +7,11 @@ import type {
   KnowledgeMacroSource,
   KnowledgeMidiSource,
   MidiMotif,
+  BarWindow,
   RenderPlan,
   TempoMeta,
   CoverJobRequest,
+  OriginalStem,
 } from "@/types/noise-gens";
 import { listKnowledgeFiles } from "@/lib/agi/knowledge-store";
 import { isAudioKnowledgeFile } from "@/lib/knowledge/audio";
@@ -19,6 +21,7 @@ import {
   normalizeMacroCurvePayload,
 } from "@/lib/noise/symbolic-templates";
 import { apiRequest } from "@/lib/queryClient";
+import { fetchOriginalStems } from "@/lib/api/noiseGens";
 
 const WORKER_URL = new URL("../../workers/cover-worker.ts", import.meta.url);
 const TEMPO_STORAGE_KEY = "noisegen:tempo";
@@ -30,6 +33,13 @@ type CoverWorkerError = { t: "error"; error: string };
 type CoverWorkerEvent = CoverWorkerProgress | CoverWorkerReady | CoverWorkerError;
 
 type UploadPreviewFn = (blob: Blob) => Promise<string>;
+
+type InstrumentalStemSource = { url: string; name?: string };
+type ResolvedOriginalAudio = {
+  instrumentalUrl?: string;
+  vocalUrl?: string;
+  instrumentalStems?: InstrumentalStemSource[];
+};
 
 export interface FulfillOptions {
   onProgress?: (pct: number, stage: string) => void;
@@ -49,6 +59,71 @@ export type RenderPlanScore = {
   idiConfidence: number;
   immersion: ImmersionScores;
   duration: number;
+};
+
+const SCORE_CACHE_LIMIT = 24;
+const scoreCache = new Map<string, RenderPlanScore>();
+const STEM_EXCLUDE_TOKENS = [
+  "vocal",
+  "vox",
+  "drum",
+  "drums",
+  "kick",
+  "snare",
+  "hat",
+  "perc",
+  "percussion",
+];
+const STEM_EXCLUDE_CATEGORIES = new Set(["vocal", "drums"]);
+
+const normalizeIdList = (list?: string[]) => {
+  if (!Array.isArray(list)) return [];
+  return Array.from(
+    new Set(list.map((entry) => (typeof entry === "string" ? entry.trim() : ""))),
+  )
+    .filter(Boolean)
+    .sort();
+};
+
+const buildScoreCacheKey = (
+  request: CoverJobRequest,
+  renderPlan: RenderPlan,
+  barWindows: BarWindow[],
+) =>
+  JSON.stringify({
+    originalId: request.originalId,
+    tempo: request.tempo ?? null,
+    barWindows,
+    kbTexture: request.kbTexture ?? null,
+    sampleInfluence: request.sampleInfluence ?? 0.7,
+    styleInfluence: request.styleInfluence ?? 0.3,
+    weirdness: request.weirdness ?? 0.2,
+    knowledgeFileIds: normalizeIdList(request.knowledgeFileIds),
+    renderPlan,
+  });
+
+const shouldExcludeStemName = (value?: string) => {
+  if (!value) return false;
+  const normalized = value.toLowerCase();
+  return STEM_EXCLUDE_TOKENS.some((token) => normalized.includes(token));
+};
+
+const selectInstrumentalStems = (
+  stems: OriginalStem[],
+): InstrumentalStemSource[] => {
+  if (!stems.length) return [];
+  const isExcluded = (stem: OriginalStem) => {
+    const category = stem.category?.toLowerCase();
+    if (category && STEM_EXCLUDE_CATEGORIES.has(category)) return true;
+    return (
+      shouldExcludeStemName(stem.name) || shouldExcludeStemName(stem.id)
+    );
+  };
+  const filtered = stems.filter(
+    (stem) => !isExcluded(stem),
+  );
+  const selected = filtered.length ? filtered : stems;
+  return selected.map((stem) => ({ url: stem.url, name: stem.name }));
 };
 
 export function canFulfillLocally(): boolean {
@@ -79,13 +154,21 @@ export async function fulfillCoverJob(job: CoverJob, options: FulfillOptions = {
     job.request.knowledgeFileIds,
     materialIds,
   );
-  const [knowledgeAudio, midiMotifs, grooveTemplates, macroCurves] =
+  const needsStemAudio = materialIds.some(
+    (id) => typeof id === "string" && id.trim().toLowerCase().startsWith("stem:"),
+  );
+  const [knowledgeAudio, serverStems, midiMotifs, grooveTemplates, macroCurves] =
     await Promise.all([
       resolveKnowledgeAudio(mergedKnowledgeIds),
+      needsStemAudio ? resolveServerStemAudio(job.request.originalId) : [],
       resolveKnowledgeMotifs(mergedKnowledgeIds),
       resolveKnowledgeGrooves(mergedKnowledgeIds),
       resolveKnowledgeMacros(mergedKnowledgeIds),
     ]);
+  const mergedKnowledgeAudio = [
+    ...knowledgeAudio.sources,
+    ...serverStems,
+  ];
   const payload = {
     t: "render" as const,
     jobId: job.id,
@@ -98,7 +181,7 @@ export async function fulfillCoverJob(job: CoverJob, options: FulfillOptions = {
     styleInfluence: job.request.styleInfluence ?? 0.3,
     weirdness: job.request.weirdness ?? 0.2,
     renderPlan: job.request.renderPlan,
-    knowledgeAudio: knowledgeAudio.sources,
+    knowledgeAudio: mergedKnowledgeAudio,
     midiMotifs,
     grooveTemplates,
     macroCurves,
@@ -162,10 +245,17 @@ export async function fulfillCoverJob(job: CoverJob, options: FulfillOptions = {
 export async function scoreRenderPlan(
   request: CoverJobRequest,
   renderPlan: RenderPlan,
-  options: FulfillOptions & { barWindows?: RenderPlan["windows"] } = {},
+  options: FulfillOptions & { barWindows?: BarWindow[] } = {},
 ): Promise<RenderPlanScore> {
   if (!canFulfillLocally()) {
     throw new Error("Offline rendering is not supported in this browser");
+  }
+
+  const renderWindows = options.barWindows ?? request.barWindows;
+  const cacheKey = buildScoreCacheKey(request, renderPlan, renderWindows);
+  const cached = scoreCache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   const worker = new Worker(WORKER_URL, { type: "module", name: `cover-score:${request.originalId}` });
@@ -186,27 +276,35 @@ export async function scoreRenderPlan(
     request.knowledgeFileIds,
     materialIds,
   );
-  const [knowledgeAudio, midiMotifs, grooveTemplates, macroCurves] =
+  const needsStemAudio = materialIds.some(
+    (id) => typeof id === "string" && id.trim().toLowerCase().startsWith("stem:"),
+  );
+  const [knowledgeAudio, serverStems, midiMotifs, grooveTemplates, macroCurves] =
     await Promise.all([
       resolveKnowledgeAudio(mergedKnowledgeIds),
+      needsStemAudio ? resolveServerStemAudio(request.originalId) : [],
       resolveKnowledgeMotifs(mergedKnowledgeIds),
       resolveKnowledgeGrooves(mergedKnowledgeIds),
       resolveKnowledgeMacros(mergedKnowledgeIds),
     ]);
+  const mergedKnowledgeAudio = [
+    ...knowledgeAudio.sources,
+    ...serverStems,
+  ];
   const jobId = `plan-score:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`;
   const payload = {
     t: "render" as const,
     jobId,
     original,
     tempo,
-    barWindows: request.barWindows,
+    barWindows: renderWindows,
     helix: request.helix,
     kbTexture: request.kbTexture ?? null,
     sampleInfluence: request.sampleInfluence ?? 0.7,
     styleInfluence: request.styleInfluence ?? 0.3,
     weirdness: request.weirdness ?? 0.2,
     renderPlan,
-    knowledgeAudio: knowledgeAudio.sources,
+    knowledgeAudio: mergedKnowledgeAudio,
     midiMotifs,
     grooveTemplates,
     macroCurves,
@@ -258,7 +356,15 @@ export async function scoreRenderPlan(
   worker.postMessage(payload);
 
   try {
-    return await ready;
+    const result = await ready;
+    scoreCache.set(cacheKey, result);
+    if (scoreCache.size > SCORE_CACHE_LIMIT) {
+      const oldestKey = scoreCache.keys().next().value;
+      if (oldestKey) {
+        scoreCache.delete(oldestKey);
+      }
+    }
+    return result;
   } finally {
     knowledgeAudio.revoke();
     options.signal?.removeEventListener?.("abort", abortListener);
@@ -278,7 +384,9 @@ async function handleReady(message: CoverWorkerReady, _job: CoverJob, uploadPrev
   return { previewUrl, blob, duration, evidence };
 }
 
-async function resolveOriginalAudio(originalId: string): Promise<{ instrumentalUrl: string; vocalUrl?: string }> {
+async function resolveOriginalAudio(
+  originalId: string,
+): Promise<ResolvedOriginalAudio> {
   const slug = encodeURIComponent(originalId.toLowerCase());
   const rootCandidates = [`/originals/${slug}`, `/audio/originals/${slug}`];
   for (const root of rootCandidates) {
@@ -288,6 +396,20 @@ async function resolveOriginalAudio(originalId: string): Promise<{ instrumentalU
       const vocalUrl = (await resourceExists(`${root}/vocal.wav`)) ? `${root}/vocal.wav` : undefined;
       return { instrumentalUrl, vocalUrl };
     }
+  }
+  try {
+    const stems = await fetchOriginalStems(originalId);
+    const instrumentalStems = selectInstrumentalStems(stems);
+    if (instrumentalStems.length > 0) {
+      const vocalUrl = (await resourceExists(`/originals/${slug}/vocal.wav`))
+        ? `/originals/${slug}/vocal.wav`
+        : (await resourceExists(`/audio/originals/${slug}/vocal.wav`))
+          ? `/audio/originals/${slug}/vocal.wav`
+          : undefined;
+      return { instrumentalStems, vocalUrl };
+    }
+  } catch {
+    // fall through to default
   }
   return {
     instrumentalUrl: "/originals/default/instrumental.wav",
@@ -346,6 +468,31 @@ async function resolveKnowledgeAudio(
   } catch {
     return { sources: [], revoke: () => {} };
   }
+}
+
+const stemAudioCache = new Map<string, Promise<KnowledgeAudioSource[]>>();
+
+async function resolveServerStemAudio(
+  originalId: string,
+): Promise<KnowledgeAudioSource[]> {
+  const key = typeof originalId === "string" ? originalId.trim() : "";
+  if (!key) return [];
+  let cached = stemAudioCache.get(key);
+  if (!cached) {
+    cached = fetchOriginalStems(key)
+      .then((stems) =>
+        stems.map((stem) => ({
+          id: `stem:${stem.id}`,
+          name: `stem:${stem.id}`,
+          mime: stem.mime,
+          url: stem.url,
+          projectId: `original:${key}`,
+        })),
+      )
+      .catch(() => []);
+    stemAudioCache.set(key, cached);
+  }
+  return cached;
 }
 
 const normalizeMotifKey = (value: unknown) =>

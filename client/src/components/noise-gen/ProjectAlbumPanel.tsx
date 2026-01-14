@@ -5,13 +5,14 @@ import StemDaw, { type DawTrack, type StemClip, type StemVariant } from "@/compo
 import type { KnowledgeFileRecord, KnowledgeProjectRecord } from "@/lib/agi/knowledge-store";
 import { writeCoverFlowPayload, type CoverFlowPayload } from "@/lib/noise/cover-flow";
 import { cn } from "@/lib/utils";
-import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
+import { useKnowledgeProjectsStore, type ProjectWithStats } from "@/store/useKnowledgeProjectsStore";
 import { useToast } from "@/hooks/use-toast";
 import type { TempoMeta } from "@/types/noise-gens";
 import { useState, useCallback } from "react";
 
 type Props = {
   projectSlug?: string;
+  onReviewPublish?: (project: ProjectWithStats) => void;
 };
 
 type AlbumStemMeta = {
@@ -34,6 +35,13 @@ type AlbumTrackMeta = {
 
 type AlbumMeta = KnowledgeProjectRecord["meta"] & {
   tracks?: AlbumTrackMeta[];
+  tempo?: AlbumTrackMeta["tempo"];
+  publish?: {
+    originalId?: string;
+    title?: string;
+    creator?: string;
+    publishedAt?: number;
+  };
   kbTexture?: string | null;
   textureId?: string | null;
   texture?: string | null;
@@ -88,6 +96,44 @@ const resolveAlbumTextureId = (meta?: AlbumMeta): string | undefined => {
   return undefined;
 };
 
+const formatPublishedDate = (timestamp?: number): string | null => {
+  if (!timestamp) return null;
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const buildProjectTrackId = (albumId: string) => `${albumId}-song`;
+
+const stemsFromProjectFiles = (
+  files: KnowledgeFileRecord[],
+  urlMap: Record<string, string>,
+): StemClip[] =>
+  files
+    .filter((file) => file.mime.startsWith("audio/"))
+    .map((file, index) => {
+      const url = urlMap[file.id];
+      if (!url) return null;
+      const analysis = file.analysis;
+      const waveformDurationMs =
+        typeof analysis?.durationSec === "number"
+          ? analysis.durationSec * 1000
+          : undefined;
+      return {
+        id: `stem-${file.id}`,
+        label: humanizeStemLabel(file.name, `Stem ${index + 1}`),
+        url,
+        knowledgeFileId: file.id,
+        waveformPeaks: analysis?.waveformPeaks,
+        waveformDurationMs,
+      } satisfies StemClip;
+    })
+    .filter(Boolean) as StemClip[];
+
 const stemsFromTrackMeta = (
   track: AlbumTrackMeta,
   files: KnowledgeFileRecord[],
@@ -116,9 +162,23 @@ const stemsFromTrackMeta = (
     return variants.length ? variants : undefined;
   };
   const pushStem = (id: string, label: string, fileId?: string, directUrl?: string, variants?: StemVariant[]) => {
+    const fileMatch = fileId ? files.find((file) => file.id === fileId) : undefined;
+    const analysis = fileMatch?.analysis;
+    const waveformDurationMs =
+      typeof analysis?.durationSec === "number"
+        ? analysis.durationSec * 1000
+        : undefined;
     const url = directUrl ?? (fileId ? urlMap[fileId] : undefined);
     if (url || (variants && variants.length)) {
-      stems.push({ id, label, url, variants, knowledgeFileId: fileId });
+      stems.push({
+        id,
+        label,
+        url,
+        variants,
+        knowledgeFileId: fileId,
+        waveformPeaks: analysis?.waveformPeaks,
+        waveformDurationMs,
+      });
     }
   };
 
@@ -156,7 +216,7 @@ const stemsFromTrackMeta = (
   return stems;
 };
 
-export function ProjectAlbumPanel({ projectSlug }: Props) {
+export function ProjectAlbumPanel({ projectSlug, onReviewPublish }: Props) {
   const {
     refreshProjects,
     refreshFiles,
@@ -231,10 +291,22 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
   }, [files]);
 
   const selectedProject = noiseAlbums.find((album) => album.id === selectedId);
+  const publishInfo = React.useMemo(() => {
+    if (!selectedProject) return null;
+    const meta = (selectedProject.meta ?? {}) as AlbumMeta;
+    return meta.publish ?? null;
+  }, [selectedProject]);
+  const publishedDate = formatPublishedDate(publishInfo?.publishedAt);
+  const isPublished = Boolean(publishInfo?.originalId);
   const albumTextureId = React.useMemo(
     () => resolveAlbumTextureId((selectedProject?.meta ?? {}) as AlbumMeta),
     [selectedProject],
   );
+  const hasTrackMeta = React.useMemo(() => {
+    if (!selectedProject) return false;
+    const meta = (selectedProject.meta ?? {}) as AlbumMeta;
+    return Array.isArray(meta.tracks) && meta.tracks.length > 0;
+  }, [selectedProject]);
   const tracks = React.useMemo<DawTrack[]>(() => {
     if (!selectedProject) return [];
     const meta = (selectedProject.meta ?? {}) as AlbumMeta;
@@ -250,15 +322,18 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
         };
       });
     }
-    return files
-      .filter((file) => file.mime.startsWith("audio/"))
-      .map((file, index) => ({
-        id: file.id,
-        name: file.name || `Track ${index + 1}`,
-        stems: [{ id: `${file.id}-mix`, label: "Mixdown", url: urlMap[file.id] }],
-        tempo: undefined,
+    const stems = stemsFromProjectFiles(files, urlMap);
+    if (stems.length === 0) return [];
+    const albumTempo = normalizeTempoMeta(meta.tempo);
+    return [
+      {
+        id: buildProjectTrackId(selectedProject.id),
+        name: selectedProject.name || "Song",
+        stems,
+        tempo: albumTempo,
         durationSeconds: undefined,
-      }));
+      },
+    ];
   }, [files, selectedProject, urlMap]);
 
   const resolveAlbumTrackList = React.useCallback(
@@ -278,6 +353,14 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
           id: track.id ?? `${album.id}-track-${index}`,
           name: track.name ?? `Track ${index + 1}`,
         }));
+      }
+      if (album.fileCount && album.fileCount > 0) {
+        return [
+          {
+            id: buildProjectTrackId(album.id),
+            name: album.name ?? "Song",
+          },
+        ];
       }
       return [];
     },
@@ -414,6 +497,12 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
     return Array.from(ids);
   }, [selectedTrack]);
 
+  const hasAudioFiles = React.useMemo(
+    () => files.some((file) => file.mime?.startsWith("audio/")),
+    [files],
+  );
+  const canReviewPublish = Boolean(onReviewPublish && selectedProject && hasAudioFiles);
+
   const coverPayload = React.useMemo<CoverFlowPayload | null>(() => {
     if (!selectedTrack || selectedTrackKnowledgeFileIds.length === 0) return null;
     return {
@@ -465,6 +554,10 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
         .filter(Boolean)
         .join(" → ")
     : "Add tracks to preview transitions.";
+  const trackListLabel = hasTrackMeta ? "Tracklist -> DAW" : "Song -> DAW";
+  const trackPanelTitle = hasTrackMeta
+    ? `Tracks (${tracks.length})`
+    : `Song (${selectedTrack?.stems.length ?? 0} stems)`;
 
   if (noiseAlbums.length === 0) {
     return (
@@ -496,8 +589,26 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
         <div>
           <p className="text-sm font-semibold text-white">Noise Album</p>
           <p className="text-xs text-slate-400">
-            Pulls audio directly from local Knowledge Projects. Nothing leaves this device.
+            Pulls audio directly from local Knowledge Projects. Review & publish to send it to the public player.
           </p>
+          {selectedProject ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
+              <Badge
+                variant="outline"
+                className={
+                  isPublished
+                    ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-100"
+                    : "border-white/20 bg-white/5 text-slate-200"
+                }
+              >
+                {isPublished ? "Published" : "Local only"}
+              </Badge>
+              {publishInfo?.title ? (
+                <span className="text-slate-400">Original: {publishInfo.title}</span>
+              ) : null}
+              {publishedDate ? <span className="text-slate-500">{publishedDate}</span> : null}
+            </div>
+          ) : null}
         </div>
         <select
           className="rounded-lg border border-white/15 bg-black/20 px-3 py-1 text-sm text-white focus:border-sky-500 focus:outline-none"
@@ -599,7 +710,7 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
               })}
             </div>
           </div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">Tracklist -&gt; DAW</p>
+          <p className="text-xs uppercase tracking-wide text-slate-400">{trackListLabel}</p>
           {tracks.length === 0 ? (
             <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-4 text-sm text-slate-400">
               Drop WAV or MP3 stems into this project to start playback.
@@ -609,7 +720,7 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
               <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                    Tracks ({tracks.length})
+                    {trackPanelTitle}
                   </p>
                   <Badge variant="outline" className="border-cyan-400/50 bg-cyan-400/10 text-[11px] text-cyan-100">
                     Click to open in DAW
@@ -632,7 +743,9 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <p className="text-sm font-semibold text-white">{track.name}</p>
-                            <p className="text-[11px] text-slate-400">Track {index + 1}</p>
+                            <p className="text-[11px] text-slate-400">
+                              {hasTrackMeta ? `Track ${index + 1}` : "Project stems"}
+                            </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge
@@ -661,6 +774,17 @@ export function ProjectAlbumPanel({ projectSlug }: Props) {
                   Stems are read directly from your project files. Keep lengths matched for perfect alignment.
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
+                  {onReviewPublish ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="text-xs"
+                      onClick={() => selectedProject && onReviewPublish(selectedProject)}
+                      disabled={!canReviewPublish}
+                    >
+                      {isPublished ? "Review & Update" : "Review & Publish"}
+                    </Button>
+                  ) : null}
                   <Button
                     size="sm"
                     variant="secondary"

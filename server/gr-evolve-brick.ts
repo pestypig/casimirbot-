@@ -6,15 +6,18 @@ import {
   buildEvolutionBrick,
   runInitialDataSolve,
   runBssnEvolution,
+  computeShiftStiffnessMetrics,
   type BoundaryParams,
   type FixupParams,
+  type FixupStats,
   type GaugeParams,
+  type ShiftStiffnessMetrics,
   type StencilParams,
   type BssnState,
   type StressEnergyFieldSet,
   type StressEnergyBuildOptions,
 } from "./gr/evolution/index.js";
-import { toGeometricTime, type GrUnitSystem } from "../shared/gr-units.js";
+import { toGeometricTime, toSiTime, type GrUnitSystem } from "../shared/gr-units.js";
 import type { GrPipelineDiagnostics } from "./energy-pipeline";
 import type { StressEnergyBrickParams, StressEnergyStats } from "./stress-energy-brick";
 
@@ -26,6 +29,10 @@ export interface GrEvolveBrickParams {
   steps?: number;
   iterations?: number;
   tolerance?: number;
+  koEps?: number;
+  koTargets?: "gauge" | "all";
+  shockMode?: "off" | "diagnostic" | "stabilize";
+  advectScheme?: "centered" | "upwind1";
   useInitialData?: boolean;
   initialIterations?: number;
   initialTolerance?: number;
@@ -37,6 +44,10 @@ export interface GrEvolveBrickParams {
   includeExtra?: boolean;
   includeMatter?: boolean;
   includeKij?: boolean;
+  invariantWallFraction?: number;
+  invariantBandFraction?: number;
+  invariantSampleMax?: number;
+  invariantPercentile?: number;
   initialState?: BssnState;
   matter?: StressEnergyFieldSet | null;
   sourceParams?: Partial<StressEnergyBrickParams>;
@@ -58,8 +69,36 @@ export interface GrEvolveBrickStats {
   M_rms: number;
   thetaPeakAbs?: number;
   thetaGrowthPerStep?: number;
+  invariants?: GrInvariantStatsSet;
+  dissipation?: {
+    koEpsUsed: number;
+    koTargets: "gauge" | "all";
+  };
+  advectScheme?: "centered" | "upwind1";
+  stiffness?: ShiftStiffnessMetrics;
+  fixups?: FixupStats;
+  solverHealth?: GrSolverHealth;
   stressEnergy?: StressEnergyStats;
   perf?: GrEvolveBrickPerfStats;
+}
+
+export type GrSolverHealthStatus = "CERTIFIED" | "UNSTABLE" | "NOT_CERTIFIED";
+
+export interface GrSolverHealth {
+  status: GrSolverHealthStatus;
+  reasons: string[];
+  alphaClampFraction: number;
+  kClampFraction: number;
+  totalClampFraction: number;
+  maxAlphaBeforeClamp: number;
+  maxKBeforeClamp: number;
+}
+
+export type GrBrickMetaStatus = "CERTIFIED" | "NOT_CERTIFIED";
+
+export interface GrBrickMeta {
+  status: GrBrickMetaStatus;
+  reasons: string[];
 }
 
 export interface GrEvolveBrickPerfStats {
@@ -70,6 +109,25 @@ export interface GrEvolveBrickPerfStats {
   channelCount: number;
   bytesEstimate: number;
   msPerStep: number;
+}
+
+export interface GrInvariantStats {
+  min: number;
+  max: number;
+  mean: number;
+  p98: number;
+  sampleCount: number;
+  abs: boolean;
+  wallFraction: number;
+  bandFraction: number;
+  threshold: number;
+  bandMin: number;
+  bandMax: number;
+}
+
+export interface GrInvariantStatsSet {
+  kretschmann?: GrInvariantStats;
+  ricci4?: GrInvariantStats;
 }
 
 export interface GrEvolveBrick {
@@ -97,6 +155,7 @@ export interface GrEvolveBrick {
     [key: string]: GrEvolveBrickChannel;
   };
   stats: GrEvolveBrickStats;
+  meta?: GrBrickMeta;
 }
 
 export interface GrEvolveBrickResponseChannel {
@@ -131,6 +190,7 @@ export interface GrEvolveBrickResponse {
     [key: string]: GrEvolveBrickResponseChannel;
   };
   stats: GrEvolveBrickStats;
+  meta?: GrBrickMeta;
 }
 
 export interface GrEvolveBrickBinaryHeader {
@@ -146,6 +206,7 @@ export interface GrEvolveBrickBinaryHeader {
   channelOrder: readonly string[];
   channels: Record<string, { min: number; max: number; bytes: number }>;
   stats: GrEvolveBrickStats;
+  meta?: GrBrickMeta;
 }
 
 export type GrEvolveBrickBinaryPayload = {
@@ -200,6 +261,16 @@ const GR_EVOLVE_MATTER_CHANNELS = [
   "S_yz",
 ] as const;
 
+const FIXUP_CLAMP_FRACTION_MAX = 0.01;
+const FIXUP_MAX_ALPHA_MULT = 2;
+const FIXUP_MAX_K_MULT = 2;
+const GR_CFL_MAX = 0.5;
+const GR_CFL_MIN = 1e-6;
+const INVARIANT_SAMPLE_MAX = 50_000;
+const INVARIANT_P98 = 0.98;
+const INVARIANT_WALL_FRACTION = 0.25;
+const INVARIANT_BAND_FRACTION = 0.2;
+
 const filterChannelOrder = (
   order: readonly string[],
   channels: Record<string, GrEvolveBrickChannel>,
@@ -225,6 +296,39 @@ const defaultHullBounds = () => {
   const min: Vec3 = [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2];
   const max: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];
   return { min, max };
+};
+
+const resolveVoxelSize = (
+  dims: [number, number, number],
+  bounds: { min: Vec3; max: Vec3 },
+): Vec3 => [
+  (bounds.max[0] - bounds.min[0]) / Math.max(1, dims[0]),
+  (bounds.max[1] - bounds.min[1]) / Math.max(1, dims[1]),
+  (bounds.max[2] - bounds.min[2]) / Math.max(1, dims[2]),
+];
+
+const clampDtForCfl = (
+  dt_s: number,
+  dims: [number, number, number],
+  bounds: { min: Vec3; max: Vec3 },
+  unitSystem: GrUnitSystem,
+) => {
+  if (!(dt_s > 0)) {
+    return { dt_s: Math.max(0, dt_s), clamped: false };
+  }
+  const spacing = resolveVoxelSize(dims, bounds);
+  const minSpacing = Math.max(1e-12, Math.min(spacing[0], spacing[1], spacing[2]));
+  const dtGeom = unitSystem === "SI" ? toGeometricTime(dt_s) : dt_s;
+  const dtGeomMax = minSpacing * GR_CFL_MAX;
+  if (!(dtGeom > 0) || !(dtGeomMax > 0)) {
+    return { dt_s, clamped: false };
+  }
+  if (dtGeom <= dtGeomMax) {
+    return { dt_s, clamped: false };
+  }
+  const dtGeomClamped = dtGeomMax;
+  const dtClamped = unitSystem === "SI" ? toSiTime(dtGeomClamped) : dtGeomClamped;
+  return { dt_s: dtClamped, clamped: true };
 };
 
 const buildConstantChannel = (total: number, value: number): GrEvolveBrickChannel => {
@@ -297,6 +401,77 @@ const maxAbsFromChannel = (channel: GrEvolveBrickChannel) => {
   return Math.max(absMin, absMax);
 };
 
+const percentileFromSamples = (samples: number[], p: number) => {
+  if (!samples.length) return 0;
+  const sorted = [...samples].sort((a, b) => a - b);
+  const q = clampNumber(p, 0, 1);
+  const index = Math.floor((sorted.length - 1) * q);
+  return sorted[index] ?? 0;
+};
+
+const buildInvariantStats = (
+  channel: GrEvolveBrickChannel | undefined,
+  options: {
+    wallFraction: number;
+    bandFraction: number;
+    sampleMax: number;
+    percentile: number;
+    useAbs: boolean;
+  },
+): GrInvariantStats | null => {
+  if (!channel) return null;
+  const data = channel.data;
+  const total = Math.max(0, data.length);
+  if (!total) {
+    return {
+      min: 0,
+      max: 0,
+      mean: 0,
+      p98: 0,
+      sampleCount: 0,
+      abs: options.useAbs,
+      wallFraction: options.wallFraction,
+      bandFraction: options.bandFraction,
+      threshold: 0,
+      bandMin: 0,
+      bandMax: 0,
+    };
+  }
+  const sampleMax = Math.max(1, Math.floor(options.sampleMax));
+  const stride = Math.max(1, Math.floor(total / sampleMax));
+  const samples: number[] = [];
+  let sum = 0;
+  let count = 0;
+  for (let i = 0; i < total; i += stride) {
+    const raw = data[i];
+    if (!Number.isFinite(raw)) continue;
+    const value = options.useAbs ? Math.abs(raw) : raw;
+    samples.push(value);
+    sum += value;
+    count += 1;
+  }
+  const p98 = percentileFromSamples(samples, options.percentile);
+  const mean = count > 0 ? sum / count : 0;
+  const wallFraction = Math.min(1, Math.max(0, options.wallFraction));
+  const bandFraction = Math.min(1, Math.max(0, options.bandFraction));
+  const threshold = p98 * wallFraction;
+  const bandMin = threshold > 0 ? threshold * (1 - bandFraction) : 0;
+  const bandMax = threshold > 0 ? threshold * (1 + bandFraction) : 0;
+  return {
+    min: Number.isFinite(channel.min) ? channel.min : 0,
+    max: Number.isFinite(channel.max) ? channel.max : 0,
+    mean: Number.isFinite(mean) ? mean : 0,
+    p98: Number.isFinite(p98) ? p98 : 0,
+    sampleCount: count,
+    abs: options.useAbs,
+    wallFraction,
+    bandFraction,
+    threshold: Number.isFinite(threshold) ? threshold : 0,
+    bandMin: Number.isFinite(bandMin) ? bandMin : 0,
+    bandMax: Number.isFinite(bandMax) ? bandMax : 0,
+  };
+};
+
 const buildConstraintDiagnostics = (
   channel: GrEvolveBrickChannel,
   rms?: number,
@@ -310,6 +485,127 @@ const buildConstraintDiagnostics = (
     maxAbs,
     ...(Number.isFinite(rms) ? { rms: rms as number } : {}),
   };
+};
+
+const buildSolverHealth = (
+  fixups: FixupStats | undefined,
+  steps: number,
+): GrSolverHealth | undefined => {
+  if (!fixups) {
+    return {
+      status: "NOT_CERTIFIED",
+      reasons: ["missing fixup stats"],
+      alphaClampFraction: 0,
+      kClampFraction: 0,
+      totalClampFraction: 0,
+      maxAlphaBeforeClamp: 0,
+      maxKBeforeClamp: 0,
+    };
+  }
+  const totalCells = Math.max(0, fixups.totalCells);
+  const totalPasses = Math.max(1, steps + (fixups.postStep ? 1 : 0));
+  const denom = totalCells * totalPasses;
+  const alphaClampFraction =
+    denom > 0 ? fixups.alphaClampCount / denom : 0;
+  const kClampFraction =
+    denom > 0 ? fixups.kClampCount / denom : 0;
+  const totalClampFraction =
+    denom > 0 ? (fixups.alphaClampCount + fixups.kClampCount) / denom : 0;
+  const maxAlphaBeforeClamp = fixups.maxAlphaBeforeClamp;
+  const maxKBeforeClamp = fixups.maxKBeforeClamp;
+  const reasons: string[] = [];
+  let status: GrSolverHealthStatus = "CERTIFIED";
+
+  if (!(denom > 0)) {
+    status = "NOT_CERTIFIED";
+    reasons.push("missing clamp denominator");
+  }
+  if (alphaClampFraction > FIXUP_CLAMP_FRACTION_MAX) {
+    status = "UNSTABLE";
+    reasons.push("alpha clamp fraction high");
+  }
+  if (kClampFraction > FIXUP_CLAMP_FRACTION_MAX) {
+    status = "UNSTABLE";
+    reasons.push("K clamp fraction high");
+  }
+  if (
+    Number.isFinite(fixups.alphaClampMax) &&
+    fixups.alphaClampMax > 0 &&
+    maxAlphaBeforeClamp > fixups.alphaClampMax * FIXUP_MAX_ALPHA_MULT
+  ) {
+    status = "UNSTABLE";
+    reasons.push("alpha overshoot beyond clamp limit");
+  }
+  if (
+    Number.isFinite(fixups.kClampMaxAbs) &&
+    fixups.kClampMaxAbs > 0 &&
+    maxKBeforeClamp > fixups.kClampMaxAbs * FIXUP_MAX_K_MULT
+  ) {
+    status = "UNSTABLE";
+    reasons.push("K overshoot beyond clamp limit");
+  }
+
+  return {
+    status,
+    reasons,
+    alphaClampFraction,
+    kClampFraction,
+    totalClampFraction,
+    maxAlphaBeforeClamp,
+    maxKBeforeClamp,
+  };
+};
+
+const computeClampFraction = (
+  fixups: FixupStats | undefined,
+  steps: number,
+): number => {
+  if (!fixups) return 0;
+  const totalCells = Math.max(0, fixups.totalCells);
+  const totalPasses = Math.max(1, steps + (fixups.postStep ? 1 : 0));
+  const denom = totalCells * totalPasses;
+  if (!(denom > 0)) return 0;
+  const totalClamps = fixups.alphaClampCount + fixups.kClampCount;
+  return totalClamps / denom;
+};
+
+const buildBrickMeta = (params: {
+  fixups: FixupStats | undefined;
+  solverHealth: GrSolverHealth | undefined;
+  stiffness: ShiftStiffnessMetrics | undefined;
+  steps: number;
+  dtGeom: number;
+  minSpacing: number;
+}): GrBrickMeta => {
+  const reasons: string[] = [];
+  let status: GrBrickMetaStatus = "CERTIFIED";
+  const clampFraction = computeClampFraction(params.fixups, params.steps);
+  const shockMode = params.stiffness?.shockMode ?? "off";
+  const shockSevere = params.stiffness?.shockSeverity === "severe";
+  const dtMin = params.minSpacing * GR_CFL_MIN;
+
+  if (!params.fixups) {
+    status = "NOT_CERTIFIED";
+    reasons.push("missing fixup stats");
+  }
+  if (clampFraction > FIXUP_CLAMP_FRACTION_MAX) {
+    status = "NOT_CERTIFIED";
+    reasons.push("clamp fraction high");
+  }
+  if (params.solverHealth?.status === "UNSTABLE") {
+    status = "NOT_CERTIFIED";
+    reasons.push("solver health unstable");
+  }
+  if (shockSevere && shockMode !== "off") {
+    status = "NOT_CERTIFIED";
+    reasons.push("severe shift shock");
+  }
+  if (params.dtGeom > 0 && params.dtGeom < dtMin) {
+    status = "NOT_CERTIFIED";
+    reasons.push("dt below minimum threshold");
+  }
+
+  return { status, reasons };
 };
 
 const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -328,6 +624,7 @@ export const buildGrDiagnostics = (
   const alpha = brick.channels.alpha;
   const lapseMin = Number.isFinite(alpha?.min) ? alpha.min : 0;
   const lapseMax = Number.isFinite(alpha?.max) ? alpha.max : 0;
+  const stiffness = brick.stats.stiffness;
   const betaMaxAbs = maxAbsBeta(
     brick.channels.beta_x,
     brick.channels.beta_y,
@@ -337,6 +634,7 @@ export const buildGrDiagnostics = (
   return {
     updatedAt: Date.now(),
     source: "gr-evolve-brick",
+    ...(brick.meta ? { meta: brick.meta } : {}),
     grid: {
       dims: brick.dims,
       bounds: brick.bounds,
@@ -349,12 +647,15 @@ export const buildGrDiagnostics = (
       iterations: brick.stats.iterations,
       tolerance: brick.stats.tolerance,
       cfl: brick.stats.cfl,
+      ...(brick.stats.fixups ? { fixups: brick.stats.fixups } : {}),
+      ...(brick.stats.solverHealth ? { health: brick.stats.solverHealth } : {}),
     },
     gauge: {
       lapseMin,
       lapseMax,
       betaMaxAbs: Number.isFinite(betaMaxAbs) ? betaMaxAbs : 0,
     },
+    ...(stiffness ? { stiffness } : {}),
     constraints: {
       H_constraint,
       M_constraint: {
@@ -381,13 +682,20 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const dims: [number, number, number] = input.dims ?? [128, 128, 128];
   const bounds = input.bounds ?? defaultHullBounds();
   const time_s = Math.max(0, clampNumber(input.time_s, 0));
-  const dt_s = Math.max(0, clampNumber(input.dt_s, 0));
+  const dt_s_input = Math.max(0, clampNumber(input.dt_s, 0));
   const steps = Math.max(0, Math.floor(clampNumber(input.steps, 0)));
   const evolveIterations = Math.max(
     0,
     Math.floor(clampNumber(input.iterations, 0)),
   );
   const evolveTolerance = Math.max(0, clampNumber(input.tolerance, 0));
+  const koEps = Math.max(0, clampNumber(input.koEps, 0));
+  const koTargets = input.koTargets === "all" ? "all" : "gauge";
+  const shockMode =
+    input.shockMode === "diagnostic" || input.shockMode === "stabilize"
+      ? input.shockMode
+      : "off";
+  const advectScheme = input.advectScheme === "upwind1" ? "upwind1" : "centered";
   const useInitialData = input.useInitialData ?? false;
   const initialIterations = Math.max(
     0,
@@ -403,7 +711,38 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const includeMatter = input.includeMatter ?? includeExtra;
   const includeKij = input.includeKij ?? includeExtra;
   const includeInvariants = includeExtra;
+  const invariantWallFraction = Math.min(
+    1,
+    Math.max(
+      0,
+      clampNumber(input.invariantWallFraction, INVARIANT_WALL_FRACTION),
+    ),
+  );
+  const invariantBandFraction = Math.min(
+    1,
+    Math.max(
+      0,
+      clampNumber(input.invariantBandFraction, INVARIANT_BAND_FRACTION),
+    ),
+  );
+  const invariantSampleMax = Math.max(
+    1,
+    Math.floor(clampNumber(input.invariantSampleMax, INVARIANT_SAMPLE_MAX)),
+  );
+  const invariantPercentile = Math.min(
+    1,
+    Math.max(0, clampNumber(input.invariantPercentile, INVARIANT_P98)),
+  );
   const unitSystem = input.unitSystem ?? "SI";
+  const dtClamp = clampDtForCfl(dt_s_input, dims, bounds, unitSystem);
+  const dt_s = dtClamp.dt_s;
+  if (dtClamp.clamped && dt_s_input > 0) {
+    console.warn("[gr-evolve-brick] dt_s clamped for CFL stability", {
+      dt_s_input,
+      dt_s,
+      cfl_max: GR_CFL_MAX,
+    });
+  }
   let initialState = input.initialState;
   let matter = input.matter ?? null;
 
@@ -442,6 +781,10 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     stencils: input.stencils,
     boundary: input.boundary,
     fixups: input.fixups,
+    koEps,
+    koTargets,
+    shockMode,
+    advectScheme,
     initialState,
     matter,
     usePipelineMatter: true,
@@ -458,6 +801,13 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const minSpacing = Math.max(1e-12, Math.min(...voxelSize_m));
   const dt_geom = unitSystem === "SI" ? toGeometricTime(dt_s) : dt_s;
   const cfl = dt_geom > 0 ? dt_geom / minSpacing : 0;
+  const stiffness = computeShiftStiffnessMetrics(evolution.state, input.stencils, {
+    cflTarget: GR_CFL_MAX,
+  });
+  stiffness.shockMode = evolution.shockMode;
+  if (evolution.stabilizersApplied?.length) {
+    stiffness.stabilizersApplied = evolution.stabilizersApplied;
+  }
 
   const includeMatterChannels = includeMatter && !!evolution.matter;
   const brickStart = nowMs();
@@ -561,6 +911,44 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const time_s_end = evolution.time_s;
   const thetaPeakAbs = maxAbsFromChannel(K_trace);
   const thetaGrowthPerStep = steps > 0 ? thetaPeakAbs / steps : 0;
+  const solverHealth = buildSolverHealth(evolution.fixups, steps);
+  const clampFraction = computeClampFraction(evolution.fixups, steps);
+  if (evolution.fixups) {
+    evolution.fixups.clampFraction = clampFraction;
+  }
+  const brickMeta = buildBrickMeta({
+    fixups: evolution.fixups,
+    solverHealth,
+    stiffness,
+    steps,
+    dtGeom: dt_geom,
+    minSpacing,
+  });
+  const kretschmannStats = includeInvariants
+    ? buildInvariantStats(kretschmann, {
+        wallFraction: invariantWallFraction,
+        bandFraction: invariantBandFraction,
+        sampleMax: invariantSampleMax,
+        percentile: invariantPercentile,
+        useAbs: false,
+      })
+    : null;
+  const ricci4Stats = includeInvariants
+    ? buildInvariantStats(ricci4, {
+        wallFraction: invariantWallFraction,
+        bandFraction: invariantBandFraction,
+        sampleMax: invariantSampleMax,
+        percentile: invariantPercentile,
+        useAbs: true,
+      })
+    : null;
+  const invariantStats: GrInvariantStatsSet | undefined =
+    kretschmannStats || ricci4Stats
+      ? {
+          ...(kretschmannStats ? { kretschmann: kretschmannStats } : {}),
+          ...(ricci4Stats ? { ricci4: ricci4Stats } : {}),
+        }
+      : undefined;
 
   const stats: GrEvolveBrickStats = {
     steps,
@@ -571,6 +959,15 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     M_rms: evolutionBrick.stats?.M_rms ?? rmsFromVector(M_constraint_x, M_constraint_y, M_constraint_z),
     thetaPeakAbs: Number.isFinite(thetaPeakAbs) ? thetaPeakAbs : 0,
     thetaGrowthPerStep: Number.isFinite(thetaGrowthPerStep) ? thetaGrowthPerStep : 0,
+    dissipation: {
+      koEpsUsed: evolution.koEpsUsed ?? koEps,
+      koTargets: evolution.koTargetsUsed ?? koTargets,
+    },
+    advectScheme: evolution.advectSchemeUsed ?? advectScheme,
+    stiffness,
+    fixups: evolution.fixups,
+    solverHealth,
+    ...(invariantStats ? { invariants: invariantStats } : {}),
     stressEnergy: evolution.sourceBrick?.stats,
     perf: {
       totalMs: Number.isFinite(totalMs) ? totalMs : 0,
@@ -594,6 +991,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     channelOrder: resolvedChannelOrder,
     channels,
     stats,
+    meta: brickMeta,
   };
 
   const pipelineState = getGlobalPipelineState();
@@ -632,6 +1030,7 @@ export const serializeGrEvolveBrick = (brick: GrEvolveBrick): GrEvolveBrickRespo
     channelOrder,
     channels: channels as GrEvolveBrickResponse["channels"],
     stats: brick.stats,
+    ...(brick.meta ? { meta: brick.meta } : {}),
   };
 };
 
@@ -666,6 +1065,7 @@ export const serializeGrEvolveBrickBinary = (brick: GrEvolveBrick): GrEvolveBric
       channelOrder,
       channels: headerChannels,
       stats: brick.stats,
+      ...(brick.meta ? { meta: brick.meta } : {}),
     },
     buffers,
   };

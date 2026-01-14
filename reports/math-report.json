@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-01-09T00:07:23.752Z",
+  "generatedAt": "2026-01-12T04:57:46.102Z",
   "registryCount": 65,
   "coverage": {
     "exploratory": {
@@ -89,8 +89,10 @@
     }
   },
   "unstaged": {
-    "count": 4,
+    "count": 6,
     "modules": [
+      "modules/gr/gr-diagnostics.ts",
+      "server/gr/gr-assistant-adapter.ts",
       "server/gr/gr-os-payload.ts",
       "server/routes/agi.contributions.ts",
       "server/services/observability/gr-os-payload-store.ts",
@@ -98,6 +100,8 @@
     ],
     "suggested": {
       "diagnostic": [
+        "modules/gr/gr-diagnostics.ts",
+        "server/gr/gr-assistant-adapter.ts",
         "server/gr/gr-os-payload.ts"
       ],
       "reduced-order": [
@@ -111,6 +115,10 @@
     "defaultStage": "exploratory"
   },
   "evidenceIssues": {
+    "count": 0,
+    "items": []
+  },
+  "narrativeIssues": {
     "count": 0,
     "items": []
   },
@@ -161,8 +169,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 465,
-    "edgeCount": 957
+    "nodeCount": 470,
+    "edgeCount": 975
   },
   "evidenceProfiles": [
     {
@@ -187,7 +195,7 @@
       "name": "certificate",
       "label": "Certificate / policy checks",
       "commands": [
-        "npm run casimir:verify"
+        "npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl"
       ],
       "tests": 0
     },

@@ -1,6 +1,6 @@
 # Math Report
 
-Generated: 2026-01-09T00:07:23.752Z
+Generated: 2026-01-12T04:57:46.102Z
 Registry entries: 65
 
 ## Coverage by Stage
@@ -10,18 +10,23 @@ Registry entries: 65
 - certified: 7
 
 ## Unstaged Modules
+- modules/gr/gr-diagnostics.ts
+- server/gr/gr-assistant-adapter.ts
 - server/gr/gr-os-payload.ts
 - server/routes/agi.contributions.ts
 - server/services/observability/gr-os-payload-store.ts
 - server/services/observability/tool-event-adapters.ts
 
 ## Unstaged Stage Suggestions
-- diagnostic: 1
+- diagnostic: 3
 - reduced-order: 1
 - exploratory: 2
 - default: exploratory
 
 ## Missing Evidence
+none
+
+## Missing Narrative
 none
 
 ## Evidence Profiles
@@ -33,7 +38,7 @@ none
   - commands: npm run math:validate, npm test -- --run '*constraint*'
 - certificate (Certificate / policy checks)
   - auto tests: 0
-  - commands: npm run casimir:verify
+  - commands: npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl
 - regression (Regression tests)
   - auto tests: 0
   - commands: npm test
@@ -46,8 +51,8 @@ none
 - tests considered: 0
 
 ## Auto-discovered Dependencies
-- nodes: 465
-- edges: 957
+- nodes: 470
+- edges: 975
 
 ## Stage Violations (Edges)
 none

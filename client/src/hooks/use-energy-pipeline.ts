@@ -33,6 +33,7 @@ import type {
   QiGuardrail,
 } from "@/types/pipeline";
 import type { StressEnergyBrickStats } from "@/lib/stress-energy-brick";
+import type { FixupStats, GrBrickMeta, GrSolverHealth } from "@/lib/gr-evolve-brick";
 
 /**
  * TheoryRefs:
@@ -188,9 +189,24 @@ export type GrMomentumConstraintDiagnostics = {
   };
 };
 
+export type GrShiftStiffnessMetrics = {
+  betaMaxAbs: number;
+  betaP98Abs: number;
+  gradBetaMaxAbs: number;
+  gradBetaP98Abs: number;
+  advectiveCflSuggested: number;
+  charSpeedSuggested: number;
+  charCflSuggested: number;
+  shockIndex?: number;
+  shockSeverity?: "ok" | "warn" | "severe";
+  shockMode?: "off" | "diagnostic" | "stabilize";
+  stabilizersApplied?: string[];
+};
+
 export type GrPipelineDiagnostics = {
   updatedAt: number;
   source: "gr-evolve-brick";
+  meta?: GrBrickMeta;
   grid: {
     dims: [number, number, number];
     bounds: { min: [number, number, number]; max: [number, number, number] };
@@ -203,12 +219,15 @@ export type GrPipelineDiagnostics = {
     iterations: number;
     tolerance: number;
     cfl: number;
+    fixups?: FixupStats;
+    health?: GrSolverHealth;
   };
   gauge?: {
     lapseMin: number;
     lapseMax: number;
     betaMaxAbs: number;
   };
+  stiffness?: GrShiftStiffnessMetrics;
   constraints: {
     H_constraint: GrConstraintDiagnostics;
     M_constraint: GrMomentumConstraintDiagnostics;

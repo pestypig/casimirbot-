@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { releaseAudioFocus, requestAudioFocus } from "@/lib/audio-focus";
 
 type MiniPlayerProps = {
   instrumental?: File | Blob | string | null;
@@ -54,6 +55,9 @@ export function MiniPlayer({
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const meterRafRef = useRef<number | null>(null);
+  const playerIdRef = useRef(
+    `noisegen-mini-${Math.random().toString(36).slice(2, 10)}`,
+  );
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [instrumentalLevel, setInstrumentalLevel] = useState(0);
@@ -246,8 +250,16 @@ export function MiniPlayer({
     }
   }, [offsetMs]);
 
+  const handlePause = useCallback(() => {
+    instrumentalRef.current?.pause();
+    vocalRef.current?.pause();
+    setIsPlaying(false);
+    stopRaf();
+  }, [stopRaf]);
+
   const handlePlay = useCallback(async () => {
     if (!isReady || !instrumentalRef.current || !vocalRef.current) return;
+    requestAudioFocus({ id: playerIdRef.current, stop: handlePause });
     await ensureAudioGraph();
     syncCurrentTime();
     try {
@@ -259,14 +271,7 @@ export function MiniPlayer({
       // eslint-disable-next-line no-console
       console.error("MiniPlayer: failed to play", error);
     }
-  }, [isReady, ensureAudioGraph, syncCurrentTime, updateMeters, updateProgress]);
-
-  const handlePause = useCallback(() => {
-    instrumentalRef.current?.pause();
-    vocalRef.current?.pause();
-    setIsPlaying(false);
-    stopRaf();
-  }, [stopRaf]);
+  }, [ensureAudioGraph, handlePause, isReady, syncCurrentTime, updateMeters, updateProgress]);
 
   const snapToGrid = useCallback(
     (value: number) => {
@@ -327,6 +332,7 @@ export function MiniPlayer({
     return () => {
       stopRaf();
       audioContextRef.current?.close().catch(() => null);
+      releaseAudioFocus(playerIdRef.current);
     };
   }, [stopRaf]);
 

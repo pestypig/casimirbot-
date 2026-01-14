@@ -17,13 +17,21 @@ export {
   buildBssnRhs,
   computeBssnConstraints,
   evolveBssn,
+  applyBssnDetTraceFixups,
+  initFixupStats,
   type BoundaryParams,
   type ConstraintDampingParams,
   type ExcisionParams,
   type FixupParams,
+  type FixupStats,
+  type FixupStepStats,
   type GaugeParams,
   type StencilParams,
 } from "../../../modules/gr/bssn-evolve.js";
+export {
+  computeShiftStiffnessMetrics,
+  type ShiftStiffnessMetrics,
+} from "../../../modules/gr/gr-diagnostics.js";
 export {
   buildStressEnergyFieldSetFromBrick,
   buildStressEnergyFieldSetFromPipeline,

@@ -1,5 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
+import {
+  buildPlanFromModel,
+  type PlanAnalysis as ModelPlanAnalysis,
+} from "../services/noisegen-planner-model";
 
 const aiPlanRouter = Router();
 
@@ -99,6 +103,17 @@ const planAnalysisSchema = z
   .object({
     windows: z.array(planWindowAnalysisSchema).optional(),
     energyByBar: z.array(z.number().min(0).max(1)).optional(),
+    densityByBar: z.array(z.number().min(0).max(1)).optional(),
+    onsetDensityByBar: z.array(z.number().min(0).max(1)).optional(),
+    brightnessByBar: z.array(z.number().min(0).max(1)).optional(),
+    centroidByBar: z.array(z.number().min(0).max(1)).optional(),
+    rolloffByBar: z.array(z.number().min(0).max(1)).optional(),
+    dynamicRangeByBar: z.array(z.number().min(0).max(1)).optional(),
+    crestFactorByBar: z.array(z.number().min(0).max(1)).optional(),
+    tempoByBar: z.array(z.number().finite()).optional(),
+    silenceByBar: z.array(z.number().min(0).max(1)).optional(),
+    chromaByBar: z.array(z.array(z.number().min(0).max(1))).optional(),
+    keyConfidence: z.number().min(0).max(1).optional(),
     sections: z.array(planSectionSchema).optional(),
     energyCurve: z.array(planEnergySchema).optional(),
   })
@@ -229,22 +244,36 @@ const resolveWindowEnergy = (
 
 const resolveWindowDensity = (
   analysisWindow: PlanWindowAnalysis | undefined,
+  densityByBar: number[] | undefined,
+  startBar: number,
+  bars: number,
   energy: number,
   rng: () => number,
 ) => {
   if (typeof analysisWindow?.density === "number") {
     return clamp01(analysisWindow.density);
   }
+  const seriesAvg = averageBarSeries(densityByBar, startBar, bars);
+  if (typeof seriesAvg === "number") {
+    return clamp01(seriesAvg);
+  }
   return clamp01(0.35 + energy * 0.45 + (rng() - 0.5) * 0.2);
 };
 
 const resolveWindowBrightness = (
   analysisWindow: PlanWindowAnalysis | undefined,
+  brightnessByBar: number[] | undefined,
+  startBar: number,
+  bars: number,
   energy: number,
   rng: () => number,
 ) => {
   if (typeof analysisWindow?.brightness === "number") {
     return clamp01(analysisWindow.brightness);
+  }
+  const seriesAvg = averageBarSeries(brightnessByBar, startBar, bars);
+  if (typeof seriesAvg === "number") {
+    return clamp01(seriesAvg);
   }
   return clamp01(0.4 + energy * 0.35 + (rng() - 0.5) * 0.18);
 };
@@ -405,7 +434,7 @@ const resolveSections = (windows: Array<{ startBar: number; endBar: number }>) =
   return result;
 };
 
-aiPlanRouter.post("/plan", (req, res) => {
+aiPlanRouter.post("/plan", async (req, res) => {
   const parsed = planRequestSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     return res.status(400).json({ error: "invalid_request", issues: parsed.error.issues });
@@ -430,6 +459,18 @@ aiPlanRouter.post("/plan", (req, res) => {
   const baseStyle = clamp01(base?.styleInfluence ?? 0.3);
   const baseWeird = clamp01(base?.weirdness ?? 0.2);
   const analysisWindowMap = buildAnalysisWindowMap(analysis);
+  const densitySeries =
+    analysis?.onsetDensityByBar?.length
+      ? analysis.onsetDensityByBar
+      : analysis?.densityByBar;
+  const brightnessSeries =
+    analysis?.brightnessByBar?.length
+      ? analysis.brightnessByBar
+      : analysis?.centroidByBar?.length
+        ? analysis.centroidByBar
+        : analysis?.rolloffByBar?.length
+          ? analysis.rolloffByBar
+          : undefined;
   const includeFx = Boolean(
     analysis?.windows?.length || analysis?.energyByBar?.length,
   );
@@ -449,8 +490,22 @@ aiPlanRouter.post("/plan", (req, res) => {
       rng,
       phase,
     );
-    const density = resolveWindowDensity(analysisWindow, energy, rng);
-    const brightness = resolveWindowBrightness(analysisWindow, energy, rng);
+    const density = resolveWindowDensity(
+      analysisWindow,
+      densitySeries,
+      window.startBar,
+      bars,
+      energy,
+      rng,
+    );
+    const brightness = resolveWindowBrightness(
+      analysisWindow,
+      brightnessSeries,
+      window.startBar,
+      bars,
+      energy,
+      rng,
+    );
     energyByWindow.set(windowKey, energy);
     const texture = buildTexturePlan({
       analysisWindow,
@@ -472,6 +527,41 @@ aiPlanRouter.post("/plan", (req, res) => {
     };
   });
 
+  const modelPlan = await buildPlanFromModel({
+    analysis: (analysis ?? undefined) as ModelPlanAnalysis | undefined,
+    tempoBpm: tempo?.bpm,
+    windows,
+    kbTexture: kbTexture ?? undefined,
+  });
+  const modelThreshold = 0.45;
+  const useModel = Boolean(modelPlan && modelPlan.confidence >= modelThreshold);
+  const modelWindowMap = useModel
+    ? new Map(
+        modelPlan!.windows.map((window) => [
+          planWindowKey(window.startBar, window.bars),
+          window,
+        ]),
+      )
+    : null;
+  const mergedWindowPlans = useModel
+    ? windowPlans.map((window) => {
+        const modelWindow = modelWindowMap?.get(
+          planWindowKey(window.startBar, window.bars),
+        );
+        if (!modelWindow) return window;
+        const mergedFx = {
+          ...(window.texture?.fx ?? {}),
+          ...(modelWindow.texture.fx ?? {}),
+        };
+        const mergedTexture = {
+          ...(window.texture ?? {}),
+          ...(modelWindow.texture ?? {}),
+          ...(Object.keys(mergedFx).length ? { fx: mergedFx } : {}),
+        };
+        return { ...window, texture: mergedTexture };
+      })
+    : windowPlans;
+
   const energyCurve =
     analysis?.energyCurve?.length
       ? analysis.energyCurve
@@ -488,7 +578,7 @@ aiPlanRouter.post("/plan", (req, res) => {
         sections,
         energyCurve,
       },
-      windows: windowPlans,
+      windows: mergedWindowPlans,
     },
     meta: {
       seed: seedValue,
@@ -496,8 +586,24 @@ aiPlanRouter.post("/plan", (req, res) => {
       sources: {
         analysis: Boolean(analysis),
         energyByBar: Boolean(analysis?.energyByBar?.length),
+        densityByBar: Boolean(analysis?.densityByBar?.length),
+        onsetDensityByBar: Boolean(analysis?.onsetDensityByBar?.length),
+        brightnessByBar: Boolean(analysis?.brightnessByBar?.length),
+        centroidByBar: Boolean(analysis?.centroidByBar?.length),
+        rolloffByBar: Boolean(analysis?.rolloffByBar?.length),
+        dynamicRangeByBar: Boolean(analysis?.dynamicRangeByBar?.length),
+        crestFactorByBar: Boolean(analysis?.crestFactorByBar?.length),
+        tempoByBar: Boolean(analysis?.tempoByBar?.length),
+        silenceByBar: Boolean(analysis?.silenceByBar?.length),
+        chromaByBar: Boolean(analysis?.chromaByBar?.length),
         windows: Boolean(analysis?.windows?.length),
       },
+      plannerVersion: useModel
+        ? `model:v${modelPlan?.modelVersion ?? "unknown"}`
+        : "heuristic:v1",
+      modelConfidence: modelPlan?.confidence ?? 0,
+      featureSourcesUsed: modelPlan?.featureSourcesUsed ?? [],
+      modelTargetsUsed: modelPlan?.modelTargetsUsed ?? [],
     },
   });
 });

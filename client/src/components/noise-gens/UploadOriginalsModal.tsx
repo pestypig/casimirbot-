@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Filter } from "bad-words";
 import {
   Dialog,
@@ -8,14 +8,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { uploadOriginal } from "@/lib/api/noiseGens";
-import { MiniPlayer } from "./MiniPlayer";
-import type { TempoMeta } from "@/types/noise-gens";
+import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
+import type { TempoMeta, TimeSkyMeta } from "@/types/noise-gens";
 
 type UploadOriginalsModalProps = {
   open: boolean;
@@ -28,14 +30,17 @@ type UploadOriginalsModalProps = {
 
 const MAX_TITLE = 120;
 const MAX_CREATOR = 60;
+const DEFAULT_TIME_SIG: TempoMeta["timeSig"] = "4/4";
 const clampBpm = (value: number) => Math.max(40, Math.min(250, value));
 const sanitizeBpmInput = (value: string): number | null => {
-  const numeric = Number(value);
+  const normalized = value.trim().replace(",", ".");
+  const numeric = Number(normalized);
   if (!Number.isFinite(numeric)) {
     return null;
   }
   return clampBpm(numeric);
 };
+const isBpmInputValue = (value: string): boolean => /^[0-9.,\s]*$/.test(value);
 
 const extractFileMetadata = (file: File): { title?: string; bpm?: number } => {
   const base = file.name.replace(/\.[^/.]+$/, "");
@@ -55,36 +60,163 @@ const extractFileMetadata = (file: File): { title?: string; bpm?: number } => {
   };
 };
 
-const ACCEPTED_TYPES = [
-  "audio/wav",
-  "audio/x-wav",
-  "audio/mpeg",
-  "audio/x-mpeg",
-  "audio/flac",
-  "audio/ogg",
-  "audio/x-aiff",
-  "audio/aiff",
-].join(",");
-
 type FieldState = {
   value: string;
   error: string | null;
+};
+
+type StemCategory =
+  | "mix"
+  | "vocal"
+  | "drums"
+  | "bass"
+  | "music"
+  | "fx"
+  | "other"
+  | "ignore";
+
+type StemEntry = {
+  id: string;
+  name: string;
+  file: File;
+  category: StemCategory;
+  inferred: StemCategory;
+};
+
+const STEM_CATEGORY_LABELS: Record<StemCategory, string> = {
+  mix: "Mix",
+  vocal: "Vocal",
+  drums: "Drums",
+  bass: "Bass",
+  music: "Music",
+  fx: "FX",
+  other: "Other",
+  ignore: "Ignore",
+};
+
+const STEM_CATEGORY_ORDER: StemCategory[] = [
+  "mix",
+  "vocal",
+  "drums",
+  "bass",
+  "music",
+  "fx",
+  "other",
+  "ignore",
+];
+
+const STEM_CATEGORY_STYLES: Record<StemCategory, string> = {
+  mix: "border-sky-500/50 bg-sky-500/10 text-sky-100",
+  vocal: "border-rose-500/50 bg-rose-500/10 text-rose-100",
+  drums: "border-amber-500/50 bg-amber-500/10 text-amber-100",
+  bass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-100",
+  music: "border-cyan-500/50 bg-cyan-500/10 text-cyan-100",
+  fx: "border-slate-400/40 bg-slate-500/10 text-slate-200",
+  other: "border-slate-400/40 bg-slate-500/10 text-slate-200",
+  ignore: "border-slate-600/30 bg-slate-800/20 text-slate-400",
+};
+
+const STEM_CATEGORY_RULES: Array<{
+  category: StemCategory;
+  tokens: string[];
+}> = [
+  { category: "mix", tokens: ["mix", "instrumental", "mixdown", "master"] },
+  { category: "vocal", tokens: ["vocal", "vox", "acap", "chorus"] },
+  {
+    category: "drums",
+    tokens: ["drum", "drums", "kick", "snare", "hat", "perc", "percussion", "clap"],
+  },
+  { category: "bass", tokens: ["bass", "sub"] },
+  {
+    category: "fx",
+    tokens: ["fx", "sfx", "riser", "impact", "sweep", "whoosh", "noise"],
+  },
+  {
+    category: "music",
+    tokens: ["synth", "pad", "keys", "piano", "guitar", "string", "strings", "brass", "lead", "arp", "chord"],
+  },
+];
+
+const inferStemCategory = (name: string): StemCategory => {
+  const normalized = name.toLowerCase();
+  for (const rule of STEM_CATEGORY_RULES) {
+    if (rule.tokens.some((token) => normalized.includes(token))) {
+      return rule.category;
+    }
+  }
+  return "music";
+};
+
+const normalizeTimestamp = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) return numeric;
+    const parsed = Date.parse(trimmed);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+};
+
+const normalizeTimeSkyMeta = (value: unknown): TimeSkyMeta | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const next: TimeSkyMeta = {};
+  const publishedAt = normalizeTimestamp(record.publishedAt);
+  if (publishedAt != null) next.publishedAt = publishedAt;
+  const composedStart = normalizeTimestamp(record.composedStart);
+  if (composedStart != null) next.composedStart = composedStart;
+  const composedEnd = normalizeTimestamp(record.composedEnd);
+  if (composedEnd != null) next.composedEnd = composedEnd;
+  if (typeof record.place === "string" && record.place.trim().length > 0) {
+    next.place = record.place.trim();
+  }
+  if (typeof record.skySignature === "string" && record.skySignature.trim().length > 0) {
+    next.skySignature = record.skySignature.trim();
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+};
+
+const readTimeSkyMeta = (meta?: Record<string, unknown>): TimeSkyMeta | undefined => {
+  if (!meta || typeof meta !== "object") return undefined;
+  const candidate = (meta as { timeSky?: unknown }).timeSky;
+  return normalizeTimeSkyMeta(candidate);
+};
+
+const buildStemEntry = (file: File, category?: StemCategory): StemEntry => {
+  const inferred = inferStemCategory(file.name);
+  const resolvedCategory = category ?? inferred;
+  return {
+    id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
+    name: file.name,
+    file,
+    category: resolvedCategory,
+    inferred,
+  };
+};
+
+const isAudioFile = (record: KnowledgeFileRecord): boolean =>
+  record.kind === "audio" || record.mime?.toLowerCase().startsWith("audio/");
+
+const buildFileFromKnowledge = (record: KnowledgeFileRecord): File => {
+  const mime = record.mime || record.type || "audio/wav";
+  const name = record.name || "stem.wav";
+  return new File([record.data], name, { type: mime });
 };
 
 export type UploadOriginalPrefill = {
   title?: string;
   creator?: string;
   notes?: string;
-  instrumental?: File | null;
-  vocal?: File | null;
   bpm?: number;
-  timeSig?: "4/4" | "3/4" | "6/8";
-  barsInLoop?: number;
   quantized?: boolean;
   offsetMs?: number;
   sourceHint?: string;
   knowledgeProjectId?: string;
   knowledgeProjectName?: string;
+  existingOriginalId?: string;
 };
 
 export type UploadCompletePayload = {
@@ -118,16 +250,40 @@ export function UploadOriginalsModal({
   prefill,
 }: UploadOriginalsModalProps) {
   const { toast } = useToast();
+  const { projects, projectFiles, refresh, refreshFiles, updateProject } = useKnowledgeProjectsStore(
+    (state) => ({
+      projects: state.projects,
+      projectFiles: state.projectFiles,
+      refresh: state.refresh,
+      refreshFiles: state.refreshFiles,
+      updateProject: state.updateProject,
+    }),
+  );
   const filter = useMemo(() => new Filter({ placeHolder: "*" }), []);
+  const validateField = useCallback(
+    (label: string, value: string, maxLength: number) => {
+      const trimmed = value.trim();
+      if (!trimmed) return `${label} is required`;
+      if (trimmed.length > maxLength) {
+        return `${label} must be under ${maxLength} characters`;
+      }
+      if (filter.isProfane(trimmed)) {
+        return `Please remove profanity from the ${label.toLowerCase()}.`;
+      }
+      return null;
+    },
+    [filter],
+  );
   const [title, setTitle] = useState<FieldState>({ value: "", error: null });
   const [creator, setCreator] = useState<FieldState>({ value: "", error: null });
-  const [notes, setNotes] = useState("");
-  const [instrumentalFile, setInstrumentalFile] = useState<File | null>(null);
-  const [vocalFile, setVocalFile] = useState<File | null>(null);
+  const [lyrics, setLyrics] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(
+    undefined,
+  );
+  const [stemEntries, setStemEntries] = useState<StemEntry[]>([]);
+  const stemSourceRef = useRef<string>("");
   const [offsetMs, setOffsetMs] = useState(0);
   const [bpm, setBpm] = useState<string>("");
-  const [timeSig, setTimeSig] = useState<"4/4" | "3/4" | "6/8">("4/4");
-  const [barsInLoop, setBarsInLoop] = useState<number>(8);
   const [quantized, setQuantized] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -135,13 +291,12 @@ export function UploadOriginalsModal({
     if (!open) {
       setTitle({ value: "", error: null });
       setCreator({ value: "", error: null });
-      setNotes("");
-      setInstrumentalFile(null);
-      setVocalFile(null);
+      setLyrics("");
+      setSelectedProjectId(undefined);
+      setStemEntries([]);
+      stemSourceRef.current = "";
       setOffsetMs(0);
       setBpm("");
-      setTimeSig("4/4");
-      setBarsInLoop(8);
       setQuantized(true);
       setIsSubmitting(false);
     }
@@ -149,49 +304,168 @@ export function UploadOriginalsModal({
 
   useEffect(() => {
     if (!open || !prefill) return;
-    const metadata = prefill.instrumental ? extractFileMetadata(prefill.instrumental) : undefined;
-    const derivedTitle = prefill.title ?? metadata?.title ?? "";
+    const derivedTitle = prefill.title ?? prefill.knowledgeProjectName ?? "";
     const derivedCreator = prefill.creator ?? "";
-    setTitle({ value: derivedTitle, error: null });
-    setCreator({ value: derivedCreator, error: null });
-    setNotes(prefill.notes ?? "");
-    setInstrumentalFile(prefill.instrumental ?? null);
-    setVocalFile(prefill.vocal ?? null);
+    setTitle({
+      value: derivedTitle,
+      error: derivedTitle ? validateField("Title", derivedTitle, MAX_TITLE) : null,
+    });
+    setCreator({
+      value: derivedCreator,
+      error: derivedCreator
+        ? validateField("Creator", derivedCreator, MAX_CREATOR)
+        : null,
+    });
+    setLyrics(prefill.notes ?? "");
+    if (prefill.knowledgeProjectId) {
+      setSelectedProjectId(prefill.knowledgeProjectId);
+    }
     if (typeof prefill.offsetMs === "number" && Number.isFinite(prefill.offsetMs)) {
       setOffsetMs(Math.round(prefill.offsetMs));
     } else {
       setOffsetMs(0);
     }
     const resolvedBpm =
-      typeof prefill.bpm === "number" && Number.isFinite(prefill.bpm) ? clampBpm(prefill.bpm) : metadata?.bpm;
+      typeof prefill.bpm === "number" && Number.isFinite(prefill.bpm)
+        ? clampBpm(prefill.bpm)
+        : undefined;
     setBpm(resolvedBpm ? resolvedBpm.toFixed(2) : "");
-    const allowedTimeSig = prefill.timeSig === "3/4" || prefill.timeSig === "6/8" ? prefill.timeSig : "4/4";
-    setTimeSig(allowedTimeSig);
-    if (typeof prefill.barsInLoop === "number" && Number.isFinite(prefill.barsInLoop)) {
-      const clamped = Math.max(1, Math.min(256, Math.round(prefill.barsInLoop)));
-      setBarsInLoop(clamped);
-    } else {
-      setBarsInLoop(8);
-    }
     setQuantized(prefill.quantized ?? true);
-  }, [open, prefill]);
+  }, [open, prefill, validateField]);
 
-  const validateField = (label: string, value: string, maxLength: number) => {
-    const trimmed = value.trim();
-    if (!trimmed) return `${label} is required`;
-    if (trimmed.length > maxLength) return `${label} must be under ${maxLength} characters`;
-    if (filter.isProfane(trimmed)) return `Please remove profanity from the ${label.toLowerCase()}.`;
-    return null;
-  };
+  const noiseProjects = useMemo(
+    () => projects.filter((project) => project.type === "noise-album"),
+    [projects],
+  );
+  const selectedProject = useMemo(
+    () => noiseProjects.find((project) => project.id === selectedProjectId),
+    [noiseProjects, selectedProjectId],
+  );
+  useEffect(() => {
+    if (!open || !selectedProject) return;
+    const projectName = selectedProject.name?.trim();
+    if (!projectName) return;
+    if (!title.value.trim()) {
+      setTitle({
+        value: projectName,
+        error: validateField("Title", projectName, MAX_TITLE),
+      });
+    }
+    if (!creator.value.trim()) {
+      setCreator({
+        value: projectName,
+        error: validateField("Creator", projectName, MAX_CREATOR),
+      });
+    }
+  }, [creator.value, open, selectedProject, title.value, validateField]);
+  const projectFilesList = useMemo<KnowledgeFileRecord[]>(() => {
+    if (!selectedProjectId) return [];
+    return projectFiles[selectedProjectId] ?? [];
+  }, [projectFiles, selectedProjectId]);
+  const audioProjectFiles = useMemo(
+    () => projectFilesList.filter(isAudioFile),
+    [projectFilesList],
+  );
 
+  useEffect(() => {
+    if (!open) return;
+    void refresh();
+  }, [open, refresh]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!selectedProjectId) return;
+    void refreshFiles(selectedProjectId);
+  }, [open, refreshFiles, selectedProjectId]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (selectedProjectId) return;
+    if (prefill?.knowledgeProjectId) {
+      setSelectedProjectId(prefill.knowledgeProjectId);
+      return;
+    }
+    if (noiseProjects.length > 0) {
+      setSelectedProjectId(noiseProjects[0]?.id);
+    }
+  }, [noiseProjects, open, prefill?.knowledgeProjectId, selectedProjectId]);
+
+  useEffect(() => {
+    if (!open || !selectedProjectId) return;
+    if (audioProjectFiles.length === 0) {
+      if (stemEntries.length) {
+        setStemEntries([]);
+      }
+      stemSourceRef.current = "";
+      return;
+    }
+    const sourceKey = `project:${selectedProjectId}:${audioProjectFiles
+      .map((file) => file.id)
+      .join(",")}`;
+    if (stemSourceRef.current === sourceKey) return;
+    setStemEntries(
+      audioProjectFiles.map((record) =>
+        buildStemEntry(buildFileFromKnowledge(record)),
+      ),
+    );
+    stemSourceRef.current = sourceKey;
+  }, [audioProjectFiles, open, selectedProjectId, stemEntries.length]);
+
+  useEffect(() => {
+    if (!open || stemEntries.length === 0) return;
+    const metadata = extractFileMetadata(stemEntries[0].file);
+    if (metadata?.title && !title.value.trim()) {
+      const clipped = metadata.title.slice(0, MAX_TITLE);
+      setTitle({
+        value: clipped,
+        error: validateField("Title", clipped, MAX_TITLE),
+      });
+    }
+    if (metadata?.bpm && !bpm) {
+      setBpm(metadata.bpm.toFixed(2));
+    }
+  }, [bpm, open, stemEntries, title.value, validateField]);
+
+  const stemSummary = useMemo(() => {
+    const mixEntries = stemEntries.filter((entry) => entry.category === "mix");
+    const vocalEntries = stemEntries.filter((entry) => entry.category === "vocal");
+    const stemUploads = stemEntries.filter(
+      (entry) =>
+        entry.category !== "mix" &&
+        entry.category !== "vocal" &&
+        entry.category !== "ignore",
+    );
+    const ignoredCount = stemEntries.filter((entry) => entry.category === "ignore").length;
+    const errors: string[] = [];
+    if (mixEntries.length > 1) {
+      errors.push("Only one mix/instrumental stem can be selected.");
+    }
+    if (vocalEntries.length > 1) {
+      errors.push("Only one vocal stem can be selected.");
+    }
+    if (stemEntries.length > 0 && mixEntries.length === 0 && stemUploads.length === 0) {
+      errors.push("Select a mix or at least one stem.");
+    }
+    return {
+      mixEntry: mixEntries[0],
+      vocalEntry: vocalEntries[0],
+      stemUploads,
+      ignoredCount,
+      errors,
+    };
+  }, [stemEntries]);
+
+  const hasAudio =
+    Boolean(stemSummary.mixEntry) || stemSummary.stemUploads.length > 0;
   const hasRequiredFields =
-    instrumentalFile != null &&
+    hasAudio &&
     !title.error &&
     !creator.error &&
     title.value.trim().length > 0 &&
     creator.value.trim().length > 0;
 
-  const canSubmit = !isSubmitting && hasRequiredFields;
+  const canSubmit =
+    !isSubmitting && hasRequiredFields && stemSummary.errors.length === 0;
   const requiresAuth = !isAuthenticated;
   const submitButtonLabel = requiresAuth
     ? "Sign in to upload"
@@ -206,40 +480,91 @@ export function UploadOriginalsModal({
     if (bpmNumeric == null) return null;
     return {
       bpm: Number(bpmNumeric.toFixed(2)),
-      timeSig,
+      timeSig: DEFAULT_TIME_SIG,
       quantized,
     };
-  }, [bpmNumeric, timeSig, quantized]);
+  }, [bpmNumeric, quantized]);
 
-  const autoFillFromFile = useCallback(
-    (file: File | null) => {
-      if (!file) return;
-      const metadata = extractFileMetadata(file);
-      if (metadata.title && !title.value.trim()) {
-        const clipped = metadata.title.slice(0, MAX_TITLE);
-        setTitle({ value: clipped, error: null });
-      }
-      if (metadata.bpm && !bpm) {
-        setBpm(metadata.bpm.toFixed(2));
-      }
+  const handleProjectChange = useCallback((value: string) => {
+    const nextId = value || undefined;
+    setSelectedProjectId(nextId);
+    setStemEntries([]);
+    stemSourceRef.current = "";
+  }, []);
+
+  const handleStemCategoryChange = useCallback(
+    (stemId: string, category: StemCategory) => {
+      setStemEntries((previous) =>
+        previous.map((entry) =>
+          entry.id === stemId ? { ...entry, category } : entry,
+        ),
+      );
     },
-    [bpm, title.value],
+    [],
   );
 
-  const handleInstrumentalSelect = useCallback(
-    (file: File | null) => {
-      setInstrumentalFile(file);
-      autoFillFromFile(file);
-    },
-    [autoFillFromFile],
-  );
+  const persistProjectMeta = useCallback(
+    async (tempoMeta?: TempoMeta, lyricsText?: string) => {
+      if (!selectedProject) return;
+      try {
+        const currentMeta = (selectedProject.meta ?? {}) as Record<string, unknown>;
+        const existingTempo =
+          (currentMeta as { tempo?: Partial<TempoMeta> }).tempo ?? undefined;
+        let nextTempo: Partial<TempoMeta> | undefined;
+        let tempoChanged = false;
+        if (tempoMeta) {
+          nextTempo = {
+            ...(typeof existingTempo === "object" && existingTempo ? existingTempo : {}),
+            bpm: tempoMeta.bpm,
+            timeSig: tempoMeta.timeSig,
+            offsetMs: tempoMeta.offsetMs,
+            quantized: tempoMeta.quantized,
+          };
+          const isSame =
+            existingTempo &&
+            existingTempo.bpm === nextTempo.bpm &&
+            existingTempo.timeSig === nextTempo.timeSig &&
+            (existingTempo.offsetMs ?? 0) === (nextTempo.offsetMs ?? 0) &&
+            (existingTempo.quantized ?? true) === (nextTempo.quantized ?? true);
+          tempoChanged = !isSame;
+        }
 
-  const handleVocalSelect = useCallback(
-    (file: File | null) => {
-      setVocalFile(file);
-      autoFillFromFile(file);
+        const existingLyrics =
+          typeof (currentMeta as { lyrics?: unknown }).lyrics === "string"
+            ? String((currentMeta as { lyrics?: unknown }).lyrics)
+            : "";
+        const nextLyrics = lyricsText?.trim() ?? "";
+        const lyricsChanged =
+          (nextLyrics || existingLyrics) && nextLyrics !== existingLyrics;
+
+        if (!tempoChanged && !lyricsChanged) return;
+
+        const nextMeta = { ...currentMeta };
+        if (tempoChanged && nextTempo) {
+          nextMeta.tempo = nextTempo;
+        }
+        if (lyricsChanged) {
+          if (nextLyrics) {
+            nextMeta.lyrics = nextLyrics;
+          } else {
+            delete (nextMeta as { lyrics?: unknown }).lyrics;
+          }
+        }
+
+        const { fileCount: _fileCount, ...projectRecord } = selectedProject;
+        await updateProject({
+          ...projectRecord,
+          meta: nextMeta,
+        });
+      } catch {
+        toast({
+          title: "Metadata not saved",
+          description:
+            "We could not store the BPM or lyrics on this noise album. You can set the BPM in the DAW.",
+        });
+      }
     },
-    [autoFillFromFile],
+    [selectedProject, toast, updateProject],
   );
 
   const handleSubmit = async () => {
@@ -249,21 +574,39 @@ export function UploadOriginalsModal({
       const payload = new FormData();
       payload.append("title", title.value.trim());
       payload.append("creator", creator.value.trim());
-      payload.append("instrumental", instrumentalFile as File);
-      if (vocalFile) {
-        payload.append("vocal", vocalFile);
+      const existingOriginalId = prefill?.existingOriginalId?.trim();
+      if (existingOriginalId) {
+        payload.append("existingOriginalId", existingOriginalId);
+      }
+      if (stemSummary.mixEntry) {
+        payload.append("instrumental", stemSummary.mixEntry.file);
+      }
+      if (stemSummary.vocalEntry) {
+        payload.append("vocal", stemSummary.vocalEntry.file);
+      }
+      if (stemSummary.stemUploads.length) {
+        const stemCategories = stemSummary.stemUploads.map((entry) => entry.category);
+        stemSummary.stemUploads.forEach((entry) => {
+          payload.append("stems", entry.file);
+        });
+        payload.append("stemCategories", JSON.stringify(stemCategories));
       }
       payload.append("offsetMs", String(offsetMs));
-      if (notes.trim()) {
-        payload.append("notes", notes.trim());
+      if (lyrics.trim()) {
+        payload.append("notes", lyrics.trim());
+      }
+      const timeSkyMeta = readTimeSkyMeta(
+        (selectedProject?.meta ?? {}) as Record<string, unknown>,
+      );
+      if (timeSkyMeta) {
+        payload.append("timeSky", JSON.stringify(timeSkyMeta));
       }
       let tempoMeta: TempoMeta | undefined;
       if (bpmNumeric != null) {
         tempoMeta = {
           bpm: Number(bpmNumeric.toFixed(2)),
-          timeSig,
+          timeSig: DEFAULT_TIME_SIG,
           offsetMs,
-          barsInLoop,
           quantized,
         };
         payload.append("tempo", JSON.stringify(tempoMeta));
@@ -273,12 +616,15 @@ export function UploadOriginalsModal({
         title: "Upload queued",
         description: "We will notify you when mastering finishes.",
       });
+      void persistProjectMeta(tempoMeta, lyrics);
+      const selectedProjectName =
+        selectedProject?.name?.trim() ?? prefill?.knowledgeProjectName;
       onUploaded?.({
         trackId: result.trackId,
         title: title.value.trim(),
         creator: creator.value.trim(),
-        knowledgeProjectId: prefill?.knowledgeProjectId,
-        knowledgeProjectName: prefill?.knowledgeProjectName,
+        knowledgeProjectId: selectedProjectId,
+        knowledgeProjectName: selectedProjectName,
         tempo: tempoMeta,
         durationSeconds: estimateLoopDurationSeconds(tempoMeta ?? undefined),
       });
@@ -301,8 +647,8 @@ export function UploadOriginalsModal({
         <DialogHeader>
           <DialogTitle>Upload Originals</DialogTitle>
           <DialogDescription>
-            Provide your instrumental stem and optionally a vocal. We will align them exactly as
-            uploaded, so please double-check the sync using the preview when both stems are present.
+            Choose a Noise Album project and tag each stem. Mark one mix if you have it, or keep
+            stems-only to auto-build an instrumental from non-vocal, non-drum stems.
           </DialogDescription>
         </DialogHeader>
 
@@ -360,33 +706,104 @@ export function UploadOriginalsModal({
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="noise-upload-instrumental">Instrumental stem</Label>
-              <Input
-                id="noise-upload-instrumental"
-                type="file"
-                accept={ACCEPTED_TYPES}
-                onChange={(event) => handleInstrumentalSelect(event.target.files?.[0] ?? null)}
-              />
-              <p className="text-xs text-muted-foreground">
-                {instrumentalFile ? instrumentalFile.name : "WAV, AIFF, FLAC, MP3, or OGG"}
-              </p>
+          <div className="space-y-2">
+            <Label htmlFor="noise-upload-project">Noise project</Label>
+            {noiseProjects.length ? (
+              <>
+                <select
+                  id="noise-upload-project"
+                  value={selectedProjectId ?? ""}
+                  onChange={(event) => handleProjectChange(event.target.value)}
+                  className="h-10 w-full rounded border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                >
+                  {noiseProjects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                      {project.fileCount ? ` (${project.fileCount})` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Noise Album projects live in My Knowledge. Drop stems there to make them
+                  available here.
+                </p>
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs text-muted-foreground">
+                No Noise Album projects found yet. Create one in My Knowledge to load stems
+                here.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Project stems</Label>
+              <span className="text-xs text-muted-foreground">
+                {stemEntries.length} file{stemEntries.length === 1 ? "" : "s"}
+              </span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="noise-upload-vocal">Vocal stem (optional)</Label>
-              <Input
-                id="noise-upload-vocal"
-                type="file"
-                accept={ACCEPTED_TYPES}
-                onChange={(event) => handleVocalSelect(event.target.files?.[0] ?? null)}
-              />
+            {stemEntries.length ? (
+              <div className="space-y-2">
+                {stemEntries.map((entry) => {
+                  const isManual = entry.category !== entry.inferred;
+                  return (
+                    <div
+                      key={entry.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2"
+                    >
+                      <div className="min-w-[160px] flex-1">
+                        <p className="truncate text-sm text-slate-100">{entry.name}</p>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                          <Badge className={`border ${STEM_CATEGORY_STYLES[entry.category]}`}>
+                            {STEM_CATEGORY_LABELS[entry.category]}
+                          </Badge>
+                          <span>{isManual ? "Manual" : "Auto"}</span>
+                        </div>
+                      </div>
+                      <label className="flex min-w-[140px] flex-col text-xs font-medium text-muted-foreground">
+                        Category
+                        <select
+                          value={entry.category}
+                          onChange={(event) =>
+                            handleStemCategoryChange(
+                              entry.id,
+                              event.target.value as StemCategory,
+                            )
+                          }
+                          className="mt-1 h-9 rounded border border-white/10 bg-slate-900 px-2 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                        >
+                          {STEM_CATEGORY_ORDER.map((category) => (
+                            <option key={category} value={category}>
+                              {STEM_CATEGORY_LABELS[category]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs text-muted-foreground">
+                {selectedProjectId
+                  ? "No audio stems found in this project."
+                  : "Select a Noise Album project to load stems."}
+              </div>
+            )}
+            {stemSummary.errors.length ? (
+              <p className="text-xs text-destructive">{stemSummary.errors[0]}</p>
+            ) : (
               <p className="text-xs text-muted-foreground">
-                {vocalFile
-                  ? vocalFile.name
-                  : "Upload a dry vocal or stacked harmonies when available."}
+                {stemSummary.mixEntry ? "Mix selected" : "No mix"}{" | "}
+                {stemSummary.vocalEntry ? "Vocal attached" : "No vocal"}{" | "}
+                {stemSummary.stemUploads.length} stem
+                {stemSummary.stemUploads.length === 1 ? "" : "s"}
+                {stemSummary.ignoredCount
+                  ? ` | ${stemSummary.ignoredCount} ignored`
+                  : ""}
               </p>
-            </div>
+            )}
           </div>
 
           <div>
@@ -397,11 +814,10 @@ export function UploadOriginalsModal({
                 <Input
                   type="text"
                   inputMode="decimal"
-                  pattern="\\d*(\\.\\d{0,2})?"
                   value={bpm}
                   onChange={(event) => {
                     const raw = event.target.value;
-                    if (raw === "" || /^\\d*(\\.\\d{0,2})?$/.test(raw)) {
+                    if (raw === "" || isBpmInputValue(raw)) {
                       setBpm(raw);
                     }
                   }}
@@ -418,38 +834,6 @@ export function UploadOriginalsModal({
                   placeholder="120.00"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                Time signature
-                <select
-                  value={timeSig}
-                  onChange={(event) => setTimeSig(event.target.value as "4/4" | "3/4" | "6/8")}
-                  className="h-9 rounded border border-border bg-slate-900 px-2 text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <option value="4/4">4/4</option>
-                  <option value="3/4">3/4</option>
-                  <option value="6/8">6/8</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                Bars in loop
-                <Input
-                  type="number"
-                  min={1}
-                  max={256}
-                  inputMode="numeric"
-                  value={String(barsInLoop)}
-                  onChange={(event) => {
-                    const value = Number(event.target.value);
-                    if (Number.isNaN(value)) {
-                      setBarsInLoop(1);
-                      return;
-                    }
-                    const clamped = Math.max(1, Math.min(256, Math.round(value)));
-                    setBarsInLoop(clamped);
-                  }}
-                  className="rounded bg-slate-900 px-2 py-1 text-slate-100"
-                />
-              </label>
               <label className="mt-5 inline-flex items-center gap-2 text-xs text-muted-foreground">
                 <input
                   type="checkbox"
@@ -460,30 +844,21 @@ export function UploadOriginalsModal({
                 Quantize selections to bar grid
               </label>
             </div>
-          </div>
-
-          <div>
-            <Label htmlFor="noise-upload-notes">Mix notes (optional)</Label>
-            <Textarea
-              id="noise-upload-notes"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Call out anything about timing, dynamics, or mood we should preserve."
-              className="min-h-[80px]"
-            />
             <p className="mt-1 text-xs text-muted-foreground">
-              Notes go straight to the Helix mix engineers reviewing the upload.
+              Time signature is locked to 4/4 for Noise Gens.
             </p>
           </div>
 
-          <MiniPlayer
-            instrumental={instrumentalFile}
-            vocal={vocalFile}
-            offsetMs={offsetMs}
-            onOffsetChange={setOffsetMs}
-            disabled={!instrumentalFile || !vocalFile}
-            tempo={tempoPreview ?? undefined}
-          />
+          <div>
+            <Label htmlFor="noise-upload-lyrics">Lyrics (optional)</Label>
+            <Textarea
+              id="noise-upload-lyrics"
+              value={lyrics}
+              onChange={(event) => setLyrics(event.target.value)}
+              placeholder="Paste lyrics for the listener panels and ideology parallels."
+              className="min-h-[80px]"
+            />
+          </div>
         </div>
 
         <DialogFooter className="gap-2">

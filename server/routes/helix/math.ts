@@ -24,6 +24,7 @@ type MathGraphEdge = {
 
 type NodeIssues = {
   evidence?: string[];
+  narrative?: string[];
   stage?: string[];
   unitErrors?: string[];
   unitWarnings?: string[];
@@ -56,6 +57,10 @@ type MathReport = {
   generatedAt?: string;
   unstaged?: { count?: number; modules?: string[] };
   evidenceIssues?: { count?: number; items?: Array<{ module: string; missing: string[] }> };
+  narrativeIssues?: {
+    count?: number;
+    items?: Array<{ module: string; missing: string[] }>;
+  };
   stageViolations?: {
     edge?: { count?: number; items?: Array<{ from: string; to: string; reason: string }> };
     pipeline?: { count?: number; items?: Array<{ from: string; to: string; reason: string }> };
@@ -111,7 +116,7 @@ const addIssue = (map: Map<string, NodeIssues>, key: string, field: keyof NodeIs
 const deriveStatus = (entry: MathStageEntry | null, issues?: NodeIssues): MathStatus => {
   if (!entry) return "unknown";
   if (issues?.stage?.length || issues?.unitErrors?.length) return "fail";
-  if (issues?.evidence?.length) {
+  if (issues?.evidence?.length || issues?.narrative?.length) {
     return entry.stage === "certified" ? "fail" : "warn";
   }
   if (issues?.unitWarnings?.length) return "warn";
@@ -221,6 +226,12 @@ const buildGraphViewModel = () => {
     );
   });
 
+  report?.narrativeIssues?.items?.forEach((item) => {
+    item.missing.forEach((missing) =>
+      addIssue(issuesByModule, item.module, "narrative", missing),
+    );
+  });
+
   const stageEdgeIssues = [
     ...(report?.stageViolations?.edge?.items ?? []),
     ...(report?.stageViolations?.pipeline?.items ?? []),
@@ -306,6 +317,7 @@ const buildGraphViewModel = () => {
       stages: stageCounts,
       status: statusCounts,
       evidenceIssues: report?.evidenceIssues?.count ?? 0,
+      narrativeIssues: report?.narrativeIssues?.count ?? 0,
       stageViolations: stageEdgeIssues.length,
       unitViolations: {
         errors: report?.unitViolations?.errors?.length ?? 0,

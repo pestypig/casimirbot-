@@ -13,5 +13,6 @@ Notes:
 - Use inline overrides in files when needed:
   `// math-stage: diagnostic`
 - Keep the registry and config aligned with your actual math-critical paths.
+- For certified modules, add `motivation` and `conceptualWaypoints` to the registry.
 - Opt into strict failures when ready:
   `MATH_STRICT=1` or `MATH_STRICT_STAGES=diagnostic,certified`.

@@ -1,11 +1,20 @@
 import {
   BSSN_FIELD_KEYS,
+  type BssnFieldKey,
   type Vec3,
   clearBssnFieldSet,
   type BssnRhs,
   type BssnState,
 } from "./bssn-state";
-import { diff1, diff2, index3D, type BoundaryMode, type StencilOrder } from "./stencils";
+import {
+  diff1,
+  diff1Upwind,
+  diff2,
+  index3D,
+  koDissipationAt,
+  type BoundaryMode,
+  type StencilOrder,
+} from "./stencils";
 import { rk4Step, type Rk4Scratch } from "./rk4";
 import {
   stressEnergyMatchesGrid,
@@ -18,6 +27,8 @@ export interface GaugeParams {
   shiftGamma?: number;
   advect?: boolean;
 }
+
+export type AdvectScheme = "centered" | "upwind1";
 
 export interface StencilParams {
   order?: StencilOrder;
@@ -40,12 +51,42 @@ export interface ConstraintDampingParams {
   strength?: number;
 }
 
+export interface KoDissipationParams {
+  eps?: number;
+  targets?: "gauge" | "all";
+}
+
 export interface FixupParams {
   detGamma?: boolean;
   traceA?: boolean;
   clampAlpha?: boolean;
+  alphaMin?: number;
+  alphaMax?: number;
+  kMaxAbs?: number;
   constraintDamping?: ConstraintDampingParams;
 }
+
+export type FixupStepStats = {
+  alphaClampCount: number;
+  kClampCount: number;
+  detFixCount: number;
+  traceFixCount: number;
+  maxAlphaBeforeClamp: number;
+  maxKBeforeClamp: number;
+};
+
+export type FixupStats = FixupStepStats & {
+  totalCells: number;
+  alphaClampByStep: number[];
+  kClampByStep: number[];
+  detFixByStep: number[];
+  traceFixByStep: number[];
+  alphaClampMin: number;
+  alphaClampMax: number;
+  kClampMaxAbs: number;
+  postStep?: FixupStepStats;
+  clampFraction?: number;
+};
 
 export interface BssnEvolveParams {
   rhs?: (state: BssnState, out: BssnRhs) => void;
@@ -54,6 +95,10 @@ export interface BssnEvolveParams {
   matter?: StressEnergyFieldSet | null;
   boundary?: BoundaryParams;
   fixups?: FixupParams;
+  fixupStats?: FixupStats;
+  koEps?: number;
+  koTargets?: KoDissipationParams["targets"];
+  advectScheme?: AdvectScheme;
 }
 
 type SymMetric = {
@@ -82,15 +127,33 @@ const DEFAULT_CONSTRAINT_DAMPING: Required<ConstraintDampingParams> = {
   enabled: true,
   strength: 0.05,
 };
+const DEFAULT_KO: Required<KoDissipationParams> = {
+  eps: 0,
+  targets: "gauge",
+};
+const DEFAULT_ADVECT_SCHEME: AdvectScheme = "centered";
 const DEFAULT_FIXUPS: Required<FixupParams> = {
   detGamma: true,
   traceA: true,
   clampAlpha: true,
+  alphaMin: 1e-6,
+  alphaMax: 10,
+  kMaxAbs: 1e6,
   constraintDamping: DEFAULT_CONSTRAINT_DAMPING,
 };
 const FOUR_PI = 4 * Math.PI;
 const EIGHT_PI = 8 * Math.PI;
 const SIXTEEN_PI = 16 * Math.PI;
+
+const KO_GAUGE_FIELDS: BssnFieldKey[] = [
+  "alpha",
+  "beta_x",
+  "beta_y",
+  "beta_z",
+  "B_x",
+  "B_y",
+  "B_z",
+];
 
 const clampIndex = (value: number, size: number) =>
   Math.max(0, Math.min(size - 1, value));
@@ -189,11 +252,62 @@ const computeAdvection = (
   beta: [number, number, number],
   state: BssnState,
   options: Required<StencilParams>,
+  advectScheme: AdvectScheme,
 ) => {
-  const dx = diff1(field, i, j, k, 0, state.grid, options);
-  const dy = diff1(field, i, j, k, 1, state.grid, options);
-  const dz = diff1(field, i, j, k, 2, state.grid, options);
+  const dx =
+    advectScheme === "upwind1"
+      ? diff1Upwind(field, i, j, k, 0, state.grid, beta[0], options)
+      : diff1(field, i, j, k, 0, state.grid, options);
+  const dy =
+    advectScheme === "upwind1"
+      ? diff1Upwind(field, i, j, k, 1, state.grid, beta[1], options)
+      : diff1(field, i, j, k, 1, state.grid, options);
+  const dz =
+    advectScheme === "upwind1"
+      ? diff1Upwind(field, i, j, k, 2, state.grid, beta[2], options)
+      : diff1(field, i, j, k, 2, state.grid, options);
   return beta[0] * dx + beta[1] * dy + beta[2] * dz;
+};
+
+const resolveKoParams = (
+  koEps?: number,
+  koTargets?: KoDissipationParams["targets"],
+): Required<KoDissipationParams> => {
+  const eps =
+    Number.isFinite(koEps as number) && (koEps as number) > 0
+      ? (koEps as number)
+      : DEFAULT_KO.eps;
+  const targets = koTargets === "all" ? "all" : DEFAULT_KO.targets;
+  return { eps, targets };
+};
+
+const applyKoDissipation = (
+  state: BssnState,
+  out: BssnRhs,
+  stencils: Required<StencilParams>,
+  params: Required<KoDissipationParams>,
+) => {
+  if (!(params.eps > 0)) return;
+  const fields = params.targets === "all" ? BSSN_FIELD_KEYS : KO_GAUGE_FIELDS;
+  const targets = fields.map((key) => ({
+    field: state[key],
+    rhs: out[key],
+  }));
+  const [nx, ny, nz] = state.grid.dims;
+  let idx = 0;
+  for (let k = 0; k < nz; k += 1) {
+    for (let j = 0; j < ny; j += 1) {
+      for (let i = 0; i < nx; i += 1) {
+        for (const target of targets) {
+          const dissipation = koDissipationAt(target.field, i, j, k, state.grid, stencils);
+          if (Number.isFinite(dissipation)) {
+            target.rhs[idx] += -params.eps * dissipation;
+          }
+        }
+        idx += 1;
+      }
+    }
+  }
 };
 
 const computeBssnRhsWithParams = (
@@ -201,6 +315,8 @@ const computeBssnRhsWithParams = (
   out: BssnRhs,
   gauge: Required<GaugeParams>,
   stencils: Required<StencilParams>,
+  advectScheme: AdvectScheme,
+  dissipation: Required<KoDissipationParams>,
   matter?: StressEnergyFieldSet | null,
 ): void => {
   const { dims, spacing } = state.grid;
@@ -654,7 +770,9 @@ const computeBssnRhsWithParams = (
         const beta = [betaX, betaY, betaZ] as [number, number, number];
         const advectEnabled = gauge.advect;
         const advect = (field: Float32Array) =>
-          advectEnabled ? computeAdvection(field, i, j, k, beta, state, stencils) : 0;
+          advectEnabled
+            ? computeAdvection(field, i, j, k, beta, state, stencils, advectScheme)
+            : 0;
 
         const phiRhs = -alpha * K / 6 + (divBeta / 6) + advect(state.phi);
 
@@ -878,6 +996,7 @@ const computeBssnRhsWithParams = (
               beta,
               state,
               stencils,
+              advectScheme,
             );
           }
           const GammaVal = aa === 0 ? GammaX : aa === 1 ? GammaY : GammaZ;
@@ -928,6 +1047,8 @@ const computeBssnRhsWithParams = (
       }
     }
   }
+
+  applyKoDissipation(state, out, stencils, dissipation);
 };
 
 export interface ConstraintFields {
@@ -1550,18 +1671,86 @@ const applyExcision = (state: BssnState, excision?: ExcisionParams) => {
   }
 };
 
-const resolveFixups = (fixups?: FixupParams): Required<FixupParams> => {
+const resolveFixups = (fixups?: FixupParams): Required<FixupParams> => {        
   if (!fixups) return DEFAULT_FIXUPS;
   const damping = fixups.constraintDamping ?? {};
+  const alphaMin = Number.isFinite(fixups.alphaMin as number)
+    ? (fixups.alphaMin as number)
+    : DEFAULT_FIXUPS.alphaMin;
+  const alphaMax = Number.isFinite(fixups.alphaMax as number)
+    ? (fixups.alphaMax as number)
+    : DEFAULT_FIXUPS.alphaMax;
+  const kMaxAbs = Number.isFinite(fixups.kMaxAbs as number)
+    ? Math.max(0, fixups.kMaxAbs as number)
+    : DEFAULT_FIXUPS.kMaxAbs;
+  const resolvedAlphaMin = Math.max(1e-12, alphaMin);
+  const resolvedAlphaMax = Math.max(resolvedAlphaMin, alphaMax);
   return {
     detGamma: fixups.detGamma ?? DEFAULT_FIXUPS.detGamma,
     traceA: fixups.traceA ?? DEFAULT_FIXUPS.traceA,
     clampAlpha: fixups.clampAlpha ?? DEFAULT_FIXUPS.clampAlpha,
+    alphaMin: resolvedAlphaMin,
+    alphaMax: resolvedAlphaMax,
+    kMaxAbs,
     constraintDamping: {
-      enabled: damping.enabled ?? DEFAULT_FIXUPS.constraintDamping.enabled,
-      strength: damping.strength ?? DEFAULT_FIXUPS.constraintDamping.strength,
+      enabled: damping.enabled ?? DEFAULT_FIXUPS.constraintDamping.enabled,     
+      strength: damping.strength ?? DEFAULT_FIXUPS.constraintDamping.strength,  
     },
   };
+};
+
+export const initFixupStats = (
+  totalCells: number,
+  steps: number,
+  fixups?: FixupParams,
+): FixupStats => {
+  const resolved = resolveFixups(fixups);
+  return {
+    totalCells: Math.max(0, totalCells),
+    alphaClampCount: 0,
+    kClampCount: 0,
+    detFixCount: 0,
+    traceFixCount: 0,
+    maxAlphaBeforeClamp: 0,
+    maxKBeforeClamp: 0,
+    alphaClampByStep: Array.from({ length: Math.max(0, steps) }, () => 0),
+    kClampByStep: Array.from({ length: Math.max(0, steps) }, () => 0),
+    detFixByStep: Array.from({ length: Math.max(0, steps) }, () => 0),
+    traceFixByStep: Array.from({ length: Math.max(0, steps) }, () => 0),
+    alphaClampMin: resolved.alphaMin,
+    alphaClampMax: resolved.alphaMax,
+    kClampMaxAbs: resolved.kMaxAbs,
+    clampFraction: 0,
+  };
+};
+
+const recordFixupStep = (
+  stats: FixupStats | undefined,
+  stepStats: FixupStepStats,
+  stepIndex?: number | null,
+) => {
+  if (!stats) return;
+  stats.alphaClampCount += stepStats.alphaClampCount;
+  stats.kClampCount += stepStats.kClampCount;
+  stats.detFixCount += stepStats.detFixCount;
+  stats.traceFixCount += stepStats.traceFixCount;
+  stats.maxAlphaBeforeClamp = Math.max(
+    stats.maxAlphaBeforeClamp,
+    stepStats.maxAlphaBeforeClamp,
+  );
+  stats.maxKBeforeClamp = Math.max(stats.maxKBeforeClamp, stepStats.maxKBeforeClamp);
+  if (
+    typeof stepIndex === "number" &&
+    stepIndex >= 0 &&
+    stepIndex < stats.alphaClampByStep.length
+  ) {
+    stats.alphaClampByStep[stepIndex] = stepStats.alphaClampCount;
+    stats.kClampByStep[stepIndex] = stepStats.kClampCount;
+    stats.detFixByStep[stepIndex] = stepStats.detFixCount;
+    stats.traceFixByStep[stepIndex] = stepStats.traceFixCount;
+  } else {
+    stats.postStep = stepStats;
+  }
 };
 
 const applyDetTraceFixups = (
@@ -1569,13 +1758,50 @@ const applyDetTraceFixups = (
   detGamma: boolean,
   traceA: boolean,
   clampAlpha: boolean,
-) => {
-  if (!detGamma && !traceA && !clampAlpha) return;
+  alphaMin: number,
+  alphaMax: number,
+  kMaxAbs: number,
+) : FixupStepStats | null => {
+  const clampK = Number.isFinite(kMaxAbs) && kMaxAbs > 0;
+  if (!detGamma && !traceA && !clampAlpha && !clampK) return null;
+  const stepStats: FixupStepStats = {
+    alphaClampCount: 0,
+    kClampCount: 0,
+    detFixCount: 0,
+    traceFixCount: 0,
+    maxAlphaBeforeClamp: 0,
+    maxKBeforeClamp: 0,
+  };
   const total = state.alpha.length;
   for (let idx = 0; idx < total; idx += 1) {
     if (clampAlpha) {
       const alpha = state.alpha[idx];
-      if (!Number.isFinite(alpha) || alpha < 1e-6) state.alpha[idx] = 1e-6;
+      if (Number.isFinite(alpha)) {
+        stepStats.maxAlphaBeforeClamp = Math.max(stepStats.maxAlphaBeforeClamp, Math.abs(alpha));
+      }
+      if (!Number.isFinite(alpha)) {
+        state.alpha[idx] = alphaMin;
+        stepStats.alphaClampCount += 1;
+      } else if (alpha < alphaMin) {
+        state.alpha[idx] = alphaMin;
+        stepStats.alphaClampCount += 1;
+      } else if (alpha > alphaMax) {
+        state.alpha[idx] = alphaMax;
+        stepStats.alphaClampCount += 1;
+      }
+    }
+    if (clampK) {
+      const K = state.K[idx];
+      if (Number.isFinite(K)) {
+        stepStats.maxKBeforeClamp = Math.max(stepStats.maxKBeforeClamp, Math.abs(K));
+      }
+      if (!Number.isFinite(K)) {
+        state.K[idx] = 0;
+        stepStats.kClampCount += 1;
+      } else if (Math.abs(K) > kMaxAbs) {
+        state.K[idx] = Math.sign(K) * kMaxAbs;
+        stepStats.kClampCount += 1;
+      }
     }
     if (!detGamma && !traceA) continue;
 
@@ -1597,6 +1823,9 @@ const applyDetTraceFixups = (
       }).det;
       const detSafe = Math.max(1e-12, Math.abs(det));
       const scale = Math.pow(detSafe, -1 / 3);
+      if (Number.isFinite(scale) && Math.abs(scale - 1) > 1e-6) {
+        stepStats.detFixCount += 1;
+      }
       if (Number.isFinite(scale)) {
         gxx *= scale;
         gyy *= scale;
@@ -1638,6 +1867,9 @@ const applyDetTraceFixups = (
         inv.zz * Azz +
         2 * (inv.xy * Axy + inv.xz * Axz + inv.yz * Ayz);
       const traceScale = trace / 3;
+      if (Number.isFinite(traceScale) && Math.abs(traceScale) > 1e-6) {
+        stepStats.traceFixCount += 1;
+      }
       if (Number.isFinite(traceScale)) {
         state.A_xx[idx] = Axx - gxx * traceScale;
         state.A_yy[idx] = Ayy - gyy * traceScale;
@@ -1648,6 +1880,7 @@ const applyDetTraceFixups = (
       }
     }
   }
+  return stepStats;
 };
 
 const applyConstraintDamping = (
@@ -1677,10 +1910,44 @@ const applyFixups = (
   stencils: StencilParams,
   matter: StressEnergyFieldSet | null,
   dt: number,
+  fixupStats?: FixupStats,
+  stepIndex?: number | null,
 ) => {
   const resolved = resolveFixups(fixups);
-  applyDetTraceFixups(state, resolved.detGamma, resolved.traceA, resolved.clampAlpha);
+  const stepStats = applyDetTraceFixups(
+    state,
+    resolved.detGamma,
+    resolved.traceA,
+    resolved.clampAlpha,
+    resolved.alphaMin,
+    resolved.alphaMax,
+    resolved.kMaxAbs,
+  );
+  if (stepStats) {
+    recordFixupStep(fixupStats, stepStats, stepIndex ?? null);
+  }
   applyConstraintDamping(state, stencils, matter, resolved.constraintDamping, dt);
+};
+
+export const applyBssnDetTraceFixups = (
+  state: BssnState,
+  fixups?: FixupParams,
+  fixupStats?: FixupStats,
+): FixupStepStats | null => {
+  const resolved = resolveFixups(fixups);
+  const stepStats = applyDetTraceFixups(
+    state,
+    resolved.detGamma,
+    resolved.traceA,
+    resolved.clampAlpha,
+    resolved.alphaMin,
+    resolved.alphaMax,
+    resolved.kMaxAbs,
+  );
+  if (stepStats) {
+    recordFixupStep(fixupStats, stepStats, null);
+  }
+  return stepStats;
 };
 
 const applyBoundaryConditions = (
@@ -1700,7 +1967,15 @@ const applyBoundaryConditions = (
 };
 
 export const computeBssnRhs = (state: BssnState, out: BssnRhs): void => {
-  computeBssnRhsWithParams(state, out, DEFAULT_GAUGE, DEFAULT_STENCILS, null);
+  computeBssnRhsWithParams(
+    state,
+    out,
+    DEFAULT_GAUGE,
+    DEFAULT_STENCILS,
+    DEFAULT_ADVECT_SCHEME,
+    DEFAULT_KO,
+    null,
+  );
 };
 
 export const buildBssnRhs = (params: BssnEvolveParams = {}) => {
@@ -1713,8 +1988,19 @@ export const buildBssnRhs = (params: BssnEvolveParams = {}) => {
     boundary: boundaryMode,
   };
   const matter = params.matter ?? null;
+  const advectScheme =
+    params.advectScheme === "upwind1" ? "upwind1" : DEFAULT_ADVECT_SCHEME;
+  const dissipation = resolveKoParams(params.koEps, params.koTargets);
   return (state: BssnState, out: BssnRhs) =>
-    computeBssnRhsWithParams(state, out, gauge, stencils, matter);
+    computeBssnRhsWithParams(
+      state,
+      out,
+      gauge,
+      stencils,
+      advectScheme,
+      dissipation,
+      matter,
+    );
 };
 
 export const evolveBssn = (
@@ -1734,15 +2020,16 @@ export const evolveBssn = (
   };
   const matter = params.matter ?? null;
   const boundaryParams = params.boundary;
+  const fixupStats = params.fixupStats;
   let active = scratch;
   for (let i = 0; i < steps; i += 1) {
     active = rk4Step(state, dt, rhs, active);
-    applyFixups(state, params.fixups, stencils, matter, dt);
+    applyFixups(state, params.fixups, stencils, matter, dt, fixupStats, i);
     applyBoundaryConditions(state, boundaryParams, boundaryMode);
   }
   if (active) return active;
   const fallback = rk4Step(state, dt, rhs);
-  applyFixups(state, params.fixups, stencils, matter, dt);
+  applyFixups(state, params.fixups, stencils, matter, dt, fixupStats, null);
   applyBoundaryConditions(state, boundaryParams, boundaryMode);
   return fallback;
 };

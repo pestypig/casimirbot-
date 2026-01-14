@@ -71,12 +71,15 @@ const fileExists = (relativePath: string) =>
 
 const TEST_LIKE_TYPES = new Set<MathCheck["type"]>([
   "test",
+  "certificate",
   "snapshot",
   "stability",
   "residual",
 ]);
 const STABILITY_TYPES = new Set<MathCheck["type"]>(["stability", "snapshot"]);  
 const RESIDUAL_TYPES = new Set<MathCheck["type"]>(["residual"]);
+const NARRATIVE_MIN_WAYPOINTS = 3;
+const NARRATIVE_MAX_WAYPOINTS = 7;
 const UNIT_KEY_ALIASES: Record<string, string> = {
   T00_avg: "T00",
   T11_avg: "T11",
@@ -112,6 +115,10 @@ const hasAnyType = (checks: MathCheck[], types: Set<MathCheck["type"]>) =>
 
 const requiresResidualEvidence = (entry: MathStageEntry) =>
   entry.tag.startsWith("GR_") && entry.residualsRequired !== false;
+const requiresNarrative = (entry: MathStageEntry) => entry.stage === "certified";
+
+const normalizeWaypoints = (waypoints?: string[]) =>
+  (waypoints ?? []).map((value) => value.trim()).filter(Boolean);
 
 const normalizeUnitKey = (key: string) => UNIT_KEY_ALIASES[key] ?? key;
 
@@ -240,6 +247,7 @@ const validateEntry = (entry: MathStageEntry, checks: MathCheck[]) => {
   const rules = STAGE_RULES[entry.stage];
   const unitKeys = entry.units ? Object.keys(entry.units) : [];
   const evidenceWaived = isModuleWaived(entry.module, "evidence");
+  const narrativeWaived = isModuleWaived(entry.module, "narrative");
 
   if (entry.tag === "PIPELINE" && unitKeys.length === 0) {
     recordError(
@@ -283,12 +291,42 @@ const validateEntry = (entry: MathStageEntry, checks: MathCheck[]) => {
     );
   }
 
-  if (entry.stage === "diagnostic" && requiresResidualEvidence(entry)) {
+  if (entry.stage === "diagnostic" && requiresResidualEvidence(entry)) {        
     if (!hasAnyType(checks, RESIDUAL_TYPES) && !evidenceWaived) {
       recordError(
         entry.module,
         `${entry.module} (${entry.stage}) requires a residual check.`,
       );
+    }
+  }
+
+  if (requiresNarrative(entry) && !narrativeWaived) {
+    const motivation = entry.motivation?.trim();
+    const waypoints = normalizeWaypoints(entry.conceptualWaypoints);
+    if (!motivation) {
+      recordError(
+        entry.module,
+        `${entry.module} (${entry.stage}) requires a motivation statement.`,
+      );
+    }
+    if (waypoints.length === 0) {
+      recordError(
+        entry.module,
+        `${entry.module} (${entry.stage}) requires conceptual waypoints.`,
+      );
+    } else {
+      if (waypoints.length < NARRATIVE_MIN_WAYPOINTS) {
+        recordError(
+          entry.module,
+          `${entry.module} (${entry.stage}) requires at least ${NARRATIVE_MIN_WAYPOINTS} conceptual waypoints.`,
+        );
+      }
+      if (waypoints.length > NARRATIVE_MAX_WAYPOINTS) {
+        recordError(
+          entry.module,
+          `${entry.module} (${entry.stage}) exceeds ${NARRATIVE_MAX_WAYPOINTS} conceptual waypoints.`,
+        );
+      }
     }
   }
 

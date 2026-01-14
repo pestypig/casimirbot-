@@ -71,6 +71,7 @@ import { essenceMixHandler, essenceMixSpec } from "../skills/essence.mix";
 import { warpAskHandler, warpAskSpec } from "../skills/physics.warp.ask";
 import { warpViabilityHandler, warpViabilitySpec } from "../skills/physics.warp.viability";
 import { grGroundingHandler, grGroundingSpec } from "../skills/physics.gr.grounding";
+import { grAssistantHandler, grAssistantSpec } from "../skills/physics.gr.assistant";
 import { debateRunHandler, debateRunSpec } from "../skills/debate.run";
 import { docsEvidenceSearchMdHandler, docsEvidenceSearchMdSpec } from "../skills/docs.evidence.search.md";
 import { docsEvidenceSearchPdfHandler, docsEvidenceSearchPdfSpec } from "../skills/docs.evidence.search.pdf";
@@ -1328,6 +1329,9 @@ async function ensureDefaultTools(): Promise<void> {
   }
   if (!getTool(grGroundingSpec.name)) {
     registerTool({ ...grGroundingSpec, handler: grGroundingHandler });
+  }
+  if (!getTool(grAssistantSpec.name)) {
+    registerTool({ ...grAssistantSpec, handler: grAssistantHandler });
   }
   if (!getTool(essenceMixSpec.name)) {
     registerTool({ ...essenceMixSpec, handler: essenceMixHandler });

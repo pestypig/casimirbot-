@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { releaseAudioFocus, requestAudioFocus } from "@/lib/audio-focus";
 import type { TempoMeta } from "@/types/noise-gens";
 import {
   Activity,
@@ -47,6 +48,8 @@ export type StemClip = {
   color?: string;
   variants?: StemVariant[];
   knowledgeFileId?: string;
+  waveformPeaks?: number[];
+  waveformDurationMs?: number;
 };
 
 export type DawTrack = {
@@ -62,14 +65,73 @@ type SourceHandle = { stemId: string; source: AudioBufferSourceNode; gain: GainN
 
 const STEM_COLORS = ["#38bdf8", "#f97316", "#22c55e", "#f43f5e", "#06b6d4", "#eab308"];
 const BEAT_PX = 52;
+const STEM_ROW_PITCH = 28;
+const STEM_ROW_HEIGHT = 18;
+const STEM_ROW_OFFSET = 10;
+const STEM_LIST_MAX_HEIGHT = 360;
+const TIMELINE_MAX_HEIGHT = 320;
+const WAVEFORM_SAMPLES = 180;
 const STORAGE_KEY_PREFIX = "stemDaw:track:";
 const FAVORITES_KEY = "stemDaw:favorites";
+
+type WaveformCacheEntry = {
+  samples: number[];
+  path: string;
+  durationMs: number;
+};
 
 type PersistedDawState = {
   bpm: number;
   timeSig: TempoMeta["timeSig"];
   barsInLoop?: number;
   updatedAt?: number;
+  userOverride?: boolean;
+};
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const buildWaveformSamples = (buffer: AudioBuffer, sampleCount = WAVEFORM_SAMPLES): number[] => {
+  if (!buffer || buffer.length === 0 || sampleCount <= 0) return [];
+  const samples: number[] = new Array(sampleCount).fill(0);
+  const channelCount = buffer.numberOfChannels;
+  const totalSamples = buffer.length;
+  const blockSize = Math.max(1, Math.floor(totalSamples / sampleCount));
+  const channels = Array.from({ length: channelCount }, (_, index) =>
+    buffer.getChannelData(index),
+  );
+  for (let i = 0; i < sampleCount; i += 1) {
+    const start = i * blockSize;
+    if (start >= totalSamples) {
+      samples[i] = 0;
+      continue;
+    }
+    const end = Math.min(totalSamples, start + blockSize);
+    let peak = 0;
+    for (const data of channels) {
+      for (let j = start; j < end; j += 1) {
+        const value = Math.abs(data[j] ?? 0);
+        if (value > peak) peak = value;
+      }
+    }
+    samples[i] = clamp01(peak);
+  }
+  return samples;
+};
+
+const buildWaveformPath = (samples: number[]): string => {
+  if (!samples.length) return "";
+  const mid = 0.5;
+  const scale = 0.48;
+  const maxIndex = samples.length - 1;
+  let path = `M 0 ${(mid - samples[0] * scale).toFixed(3)}`;
+  for (let i = 1; i <= maxIndex; i += 1) {
+    path += ` L ${i} ${(mid - samples[i] * scale).toFixed(3)}`;
+  }
+  for (let i = maxIndex; i >= 0; i -= 1) {
+    path += ` L ${i} ${(mid + samples[i] * scale).toFixed(3)}`;
+  }
+  path += " Z";
+  return path;
 };
 
 const loadPersistedState = (trackId?: string): PersistedDawState | null => {
@@ -160,6 +222,7 @@ type StemDawProps = {
 export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawProps) {
   const [bpm, setBpm] = useState<number>(() => track?.tempo?.bpm ?? 120);
   const [timeSig, setTimeSig] = useState<TempoMeta["timeSig"]>(() => track?.tempo?.timeSig ?? "4/4");
+  const [userOverride, setUserOverride] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playheadMs, setPlayheadMs] = useState(0);
   const [durationMs, setDurationMs] = useState(() => (track?.durationSeconds ?? 0) * 1000);
@@ -172,10 +235,14 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const buffersRef = useRef<Record<string, AudioBuffer | null>>({});
+  const waveformCacheRef = useRef<Record<string, WaveformCacheEntry>>({});
   const activeSourcesRef = useRef<SourceHandle[]>([]);
   const startAtRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const playerIdRef = useRef(
+    `noisegen-daw-${Math.random().toString(36).slice(2, 10)}`,
+  );
 
   const parsedTimeSig = useMemo(() => parseTimeSig(timeSig), [timeSig]);
   const beatsPerBar = parsedTimeSig.beats;
@@ -207,6 +274,24 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
       variants: normalizeVariantsForStem(stem),
     }));
   }, [track]);
+  const stemWaveforms = useMemo(() => {
+    const map: Record<string, WaveformCacheEntry> = {};
+    stemsWithVariants.forEach((stem) => {
+      if (!stem.waveformPeaks || stem.waveformPeaks.length === 0) return;
+      const durationMs = stem.waveformDurationMs ?? 0;
+      map[stem.id] = {
+        samples: stem.waveformPeaks,
+        path: buildWaveformPath(stem.waveformPeaks),
+        durationMs,
+      };
+    });
+    return map;
+  }, [stemsWithVariants]);
+  const timelineContentHeight = Math.max(
+    120,
+    stemsWithVariants.length * STEM_ROW_PITCH + STEM_ROW_OFFSET * 2,
+  );
+  const timelineViewportHeight = Math.min(TIMELINE_MAX_HEIGHT, timelineContentHeight);
 
   const variantLookup = useMemo(() => {
     const map: Record<string, StemVariant & { stemId: string }> = {};
@@ -248,7 +333,21 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
     setIsPlaying(false);
     setProgress(0);
     setPlayheadMs(0);
-  }, []);
+    releaseAudioFocus(playerIdRef.current);
+  }, [releaseAudioFocus]);
+
+  const pausePlayback = useCallback(() => {
+    const ctx = audioContextRef.current;
+    const startedAt = startAtRef.current;
+    const elapsedMs =
+      ctx && startedAt != null
+        ? Math.max(0, (ctx.currentTime - startedAt) * 1000)
+        : playheadMs;
+    const clamped = durationMs > 0 ? Math.min(elapsedMs, durationMs) : elapsedMs;
+    stopPlayback();
+    setPlayheadMs(clamped);
+    setProgress(durationMs > 0 ? Math.min(1, clamped / durationMs) : 0);
+  }, [durationMs, playheadMs, stopPlayback]);
 
   const updateMeters = useCallback(() => {
     const ctx = audioContextRef.current;
@@ -264,17 +363,32 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
     return () => {
       stopPlayback();
       audioContextRef.current?.close().catch(() => null);
+      releaseAudioFocus(playerIdRef.current);
     };
-  }, [stopPlayback]);
+  }, [releaseAudioFocus, stopPlayback]);
 
   useEffect(() => {
     const persisted = loadPersistedState(track?.id);
-    const initialBpm = persisted?.bpm ?? track?.tempo?.bpm ?? 120;
-    const initialTimeSig = (persisted?.timeSig ?? track?.tempo?.timeSig ?? "4/4") as TempoMeta["timeSig"];
+    const manualOverride = Boolean(persisted?.userOverride);
+    const initialBpm =
+      !manualOverride && typeof track?.tempo?.bpm === "number"
+        ? track.tempo.bpm
+        : persisted?.bpm ?? track?.tempo?.bpm ?? 120;
+    const initialTimeSig = (
+      !manualOverride && track?.tempo?.timeSig
+        ? track.tempo.timeSig
+        : persisted?.timeSig ?? track?.tempo?.timeSig ?? "4/4"
+    ) as TempoMeta["timeSig"];
 
     setBpm(initialBpm);
     setTimeSig(initialTimeSig);
-    setDurationMs((track?.durationSeconds ?? 0) * 1000);
+    setUserOverride(manualOverride);
+    const trackDuration = (track?.durationSeconds ?? 0) * 1000;
+    const analysisDuration = stemsWithVariants.reduce((acc, stem) => {
+      const duration = stem.waveformDurationMs ?? 0;
+      return duration > acc ? duration : acc;
+    }, 0);
+    setDurationMs(Math.max(trackDuration, analysisDuration));
     setStemStates((prev) => {
       const next: Record<string, StemState> = {};
       track?.stems.forEach((stem) => {
@@ -292,6 +406,7 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
       return next;
     });
     buffersRef.current = {};
+    waveformCacheRef.current = {};
     setLoadError(null);
     setLoading(false);
     stopPlayback();
@@ -306,10 +421,11 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
         timeSig,
         barsInLoop: track.tempo?.barsInLoop,
         updatedAt: Date.now(),
+        userOverride,
       });
     }, 250);
     return () => window.clearTimeout(handle);
-  }, [track?.id, track?.tempo?.barsInLoop, bpm, timeSig]);
+  }, [track?.id, track?.tempo?.barsInLoop, bpm, timeSig, userOverride]);
 
   useEffect(() => {
     persistFavoriteVariants(favoriteVariants);
@@ -334,6 +450,7 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
       for (const variant of variantsToLoad) {
         if (!variant.url) {
           loaded[variant.id] = null;
+          delete waveformCacheRef.current[variant.id];
           continue;
         }
         try {
@@ -342,9 +459,25 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
           const buffer = await ctx.decodeAudioData(data);
           loaded[variant.id] = buffer;
           longest = Math.max(longest, buffer.duration * 1000);
+          const variantMeta = variantLookup[variant.id];
+          const precomputed =
+            variantMeta?.isOriginal && variantMeta?.stemId
+              ? stemWaveforms[variantMeta.stemId]
+              : undefined;
+          if (precomputed) {
+            waveformCacheRef.current[variant.id] = { ...precomputed };
+          } else {
+            const samples = buildWaveformSamples(buffer);
+            waveformCacheRef.current[variant.id] = {
+              samples,
+              path: buildWaveformPath(samples),
+              durationMs: buffer.duration * 1000,
+            };
+          }
         } catch (error) {
           if (controller.signal.aborted) return;
           loaded[variant.id] = null;
+          delete waveformCacheRef.current[variant.id];
           const label = variant.label || variant.id;
           setLoadError((prev) => prev ?? `Could not decode ${label}`);
         }
@@ -366,7 +499,7 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
       controller.abort();
       stopPlayback();
     };
-  }, [track, stemsWithVariants, ensureAudioContext, stopPlayback]);
+  }, [ensureAudioContext, stemWaveforms, stemsWithVariants, stopPlayback, track, variantLookup]);
 
   useEffect(() => {
     const ctx = audioContextRef.current;
@@ -440,12 +573,14 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
   );
 
   const handlePlay = useCallback(() => {
-    void startPlayback(0);
-  }, [startPlayback]);
+    const resumeFrom = playheadMs >= durationMs ? 0 : playheadMs;
+    requestAudioFocus({ id: playerIdRef.current, stop: pausePlayback });
+    void startPlayback(resumeFrom);
+  }, [durationMs, pausePlayback, playheadMs, requestAudioFocus, startPlayback]);
 
   const handlePause = useCallback(() => {
-    stopPlayback();
-  }, [stopPlayback]);
+    pausePlayback();
+  }, [pausePlayback]);
 
   const toggleMute = useCallback((stemId: string) => {
     setStemStates((prev) => ({
@@ -594,13 +729,19 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
               min={40}
               max={220}
               step={0.5}
-              onChange={(event) => setBpm(Number(event.target.value) || 0)}
+              onChange={(event) => {
+                setUserOverride(true);
+                setBpm(Number(event.target.value) || 0);
+              }}
               className="h-9 w-24 bg-slate-900/60 text-sm"
             />
             <span className="text-xs text-slate-400">BPM</span>
             <Input
               value={timeSig}
-              onChange={(event) => setTimeSig(event.target.value as TempoMeta["timeSig"])}
+              onChange={(event) => {
+                setUserOverride(true);
+                setTimeSig(event.target.value as TempoMeta["timeSig"]);
+              }}
               className="h-9 w-20 bg-slate-900/60 text-sm"
             />
             <span className="text-xs text-slate-400">Time</span>
@@ -611,7 +752,10 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
               min={60}
               max={180}
               step={1}
-              onValueChange={(values) => setBpm(values[0] ?? bpm)}
+              onValueChange={(values) => {
+                setUserOverride(true);
+                setBpm(values[0] ?? bpm);
+              }}
             />
             <p className="mt-1 text-[11px] text-slate-400">
               Stems start together and follow this grid; change BPM to match your track.
@@ -619,159 +763,161 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
           </div>
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-wide text-slate-400">Stems</p>
-            {stemsWithVariants.map((stem, index) => {
-              const state = stemStates[stem.id] ?? { muted: false, solo: false };
-              const muted = state.muted || (soloIds.size > 0 && !state.solo);
-              const color = resolveStemColor(stem, index);
-              const variants = stem.variants ?? [];
-              const activeVariantId = activeVariants[stem.id] ?? variants[0]?.id;
-              const activeVariant =
-                (activeVariantId ? variantLookup[activeVariantId] : undefined) ||
-                variants.find((variant) => variant.id === activeVariantId);
-              const sortedVariants = [...variants].sort((a, b) => {
-                if (a.isOriginal && !b.isOriginal) return -1;
-                if (b.isOriginal && !a.isOriginal) return 1;
-                const favA = favoriteVariants[a.id] ? 1 : 0;
-                const favB = favoriteVariants[b.id] ? 1 : 0;
-                if (favA !== favB) return favB - favA;
-                return (b.createdAt ?? 0) - (a.createdAt ?? 0);
-              });
-              const isFavorite = activeVariantId ? favoriteVariants[activeVariantId] : false;
-              return (
-                <DropdownMenu key={stem.id}>
-                  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5">
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        className={cn(
-                          "flex flex-1 items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left transition",
-                          muted
-                            ? "border-white/5 bg-slate-950/60"
-                            : "border-cyan-400/40 bg-slate-900/70 shadow-[0_12px_40px_-30px_rgba(56,189,248,0.55)]",
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                          <div>
-                            <div className={cn("text-sm font-semibold", muted ? "text-slate-500 line-through" : "text-white")}>
-                              {stem.label}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-400">
-                              <span className="text-slate-300">
-                                {activeVariant ? `Active: ${activeVariant.label}` : "Pick a take"}
-                              </span>
-                              {activeVariant?.isOriginal ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-amber-400/50 bg-amber-400/10 text-[10px] uppercase tracking-wide text-amber-200"
-                                >
-                                  Original
-                                </Badge>
-                              ) : null}
-                              {isFavorite ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-emerald-400/60 bg-emerald-400/10 text-[10px] uppercase tracking-wide text-emerald-200"
-                                >
-                                  Starred
-                                </Badge>
-                              ) : null}
+            <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1" style={{ maxHeight: STEM_LIST_MAX_HEIGHT }}>
+              {stemsWithVariants.map((stem, index) => {
+                const state = stemStates[stem.id] ?? { muted: false, solo: false };
+                const muted = state.muted || (soloIds.size > 0 && !state.solo);
+                const color = resolveStemColor(stem, index);
+                const variants = stem.variants ?? [];
+                const activeVariantId = activeVariants[stem.id] ?? variants[0]?.id;
+                const activeVariant =
+                  (activeVariantId ? variantLookup[activeVariantId] : undefined) ||
+                  variants.find((variant) => variant.id === activeVariantId);
+                const sortedVariants = [...variants].sort((a, b) => {
+                  if (a.isOriginal && !b.isOriginal) return -1;
+                  if (b.isOriginal && !a.isOriginal) return 1;
+                  const favA = favoriteVariants[a.id] ? 1 : 0;
+                  const favB = favoriteVariants[b.id] ? 1 : 0;
+                  if (favA !== favB) return favB - favA;
+                  return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+                });
+                const isFavorite = activeVariantId ? favoriteVariants[activeVariantId] : false;
+                return (
+                  <DropdownMenu key={stem.id}>
+                    <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5">
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className={cn(
+                            "flex flex-1 items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left transition",
+                            muted
+                              ? "border-white/5 bg-slate-950/60"
+                              : "border-cyan-400/40 bg-slate-900/70 shadow-[0_12px_40px_-30px_rgba(56,189,248,0.55)]",
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                            <div>
+                              <div className={cn("text-sm font-semibold", muted ? "text-slate-500 line-through" : "text-white")}>
+                                {stem.label}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-400">
+                                <span className="text-slate-300">
+                                  {activeVariant ? `Active: ${activeVariant.label}` : "Pick a take"}
+                                </span>
+                                {activeVariant?.isOriginal ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-amber-400/50 bg-amber-400/10 text-[10px] uppercase tracking-wide text-amber-200"
+                                  >
+                                    Original
+                                  </Badge>
+                                ) : null}
+                                {isFavorite ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-emerald-400/60 bg-emerald-400/10 text-[10px] uppercase tracking-wide text-emerald-200"
+                                  >
+                                    Starred
+                                  </Badge>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <ChevronDown className="h-4 w-4 text-slate-300" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant={state.muted ? "secondary" : "ghost"}
-                        className="h-8 px-2 text-xs"
-                        onClick={() => toggleMute(stem.id)}
-                      >
-                        {state.muted ? "Unmute" : "Mute"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={state.solo ? "secondary" : "ghost"}
-                        className="h-8 px-2 text-xs"
-                        onClick={() => toggleSolo(stem.id)}
-                      >
-                        Solo
-                      </Button>
+                          <ChevronDown className="h-4 w-4 text-slate-300" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant={state.muted ? "secondary" : "ghost"}
+                          className="h-8 px-2 text-xs"
+                          onClick={() => toggleMute(stem.id)}
+                        >
+                          {state.muted ? "Unmute" : "Mute"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={state.solo ? "secondary" : "ghost"}
+                          className="h-8 px-2 text-xs"
+                          onClick={() => toggleSolo(stem.id)}
+                        >
+                          Solo
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <DropdownMenuContent
-                    align="end"
-                    className="w-80 border-white/10 bg-slate-900/95 text-slate-100 backdrop-blur"
-                  >
-                    <DropdownMenuLabel className="text-xs uppercase tracking-wide text-slate-300">
-                      Switch takes for {stem.label}
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator className="bg-white/5" />
-                    {sortedVariants.length === 0 ? (
-                      <DropdownMenuItem disabled className="text-xs text-slate-400">
-                        No renders attached to this stem yet.
-                      </DropdownMenuItem>
-                    ) : (
-                      sortedVariants.map((variant) => {
-                        const isActive = variant.id === activeVariantId;
-                        const favorite = favoriteVariants[variant.id];
-                        return (
-                          <DropdownMenuItem
-                            key={variant.id}
-                            className={cn(
-                              "flex items-center justify-between gap-2 rounded-md text-sm text-slate-100 data-[highlighted]:bg-slate-800",
-                              isActive ? "bg-slate-800/80" : "bg-transparent",
-                            )}
-                            onSelect={(event) => {
-                              event.preventDefault();
-                              handleVariantSelect(stem.id, variant.id);
-                            }}
-                          >
-                            <div className="flex flex-col">
-                              <span className="flex items-center gap-2">
-                                <span>{variant.label}</span>
-                                {variant.isOriginal ? (
-                                  <Sparkles className="h-3.5 w-3.5 text-amber-200" />
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-80 border-white/10 bg-slate-900/95 text-slate-100 backdrop-blur"
+                    >
+                      <DropdownMenuLabel className="text-xs uppercase tracking-wide text-slate-300">
+                        Switch takes for {stem.label}
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-white/5" />
+                      {sortedVariants.length === 0 ? (
+                        <DropdownMenuItem disabled className="text-xs text-slate-400">
+                          No renders attached to this stem yet.
+                        </DropdownMenuItem>
+                      ) : (
+                        sortedVariants.map((variant) => {
+                          const isActive = variant.id === activeVariantId;
+                          const favorite = favoriteVariants[variant.id];
+                          return (
+                            <DropdownMenuItem
+                              key={variant.id}
+                              className={cn(
+                                "flex items-center justify-between gap-2 rounded-md text-sm text-slate-100 data-[highlighted]:bg-slate-800",
+                                isActive ? "bg-slate-800/80" : "bg-transparent",
+                              )}
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                handleVariantSelect(stem.id, variant.id);
+                              }}
+                            >
+                              <div className="flex flex-col">
+                                <span className="flex items-center gap-2">
+                                  <span>{variant.label}</span>
+                                  {variant.isOriginal ? (
+                                    <Sparkles className="h-3.5 w-3.5 text-amber-200" />
+                                  ) : null}
+                                  {favorite ? <Star className="h-3.5 w-3.5 fill-emerald-300 text-emerald-300" /> : null}
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                  {variant.isOriginal ? "Original take pinned to album" : "Generated from this stem"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isActive ? (
+                                  <Badge className="h-6 border-emerald-400/40 bg-emerald-400/10 text-[11px] text-emerald-100">
+                                    Live
+                                  </Badge>
                                 ) : null}
-                                {favorite ? <Star className="h-3.5 w-3.5 fill-emerald-300 text-emerald-300" /> : null}
-                              </span>
-                              <span className="text-[11px] text-slate-400">
-                                {variant.isOriginal ? "Original take pinned to album" : "Generated from this stem"}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {isActive ? (
-                                <Badge className="h-6 border-emerald-400/40 bg-emerald-400/10 text-[11px] text-emerald-100">
-                                  Live
-                                </Badge>
-                              ) : null}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-amber-200 hover:text-amber-100"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  toggleFavorite(variant.id);
-                                }}
-                                aria-label={favorite ? "Unstar generation" : "Star generation"}
-                              >
-                                {favorite ? (
-                                  <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
-                                ) : (
-                                  <StarOff className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
-                          </DropdownMenuItem>
-                        );
-                      })
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              );
-            })}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-amber-200 hover:text-amber-100"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    toggleFavorite(variant.id);
+                                  }}
+                                  aria-label={favorite ? "Unstar generation" : "Star generation"}
+                                >
+                                  {favorite ? (
+                                    <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
+                                  ) : (
+                                    <StarOff className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </DropdownMenuItem>
+                          );
+                        })
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -781,11 +927,14 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
               <span>{expectedBars} bars at {parsedTimeSig.label}</span>
               <span>Beat spacing {BEAT_PX}px</span>
             </div>
-            <div className="mt-3 overflow-x-auto">
+            <div
+              className="mt-3 overflow-auto"
+              style={{ height: timelineViewportHeight, maxHeight: timelineViewportHeight }}
+            >
               <div
                 ref={timelineRef}
-                className="relative h-36 min-w-full overflow-hidden rounded-lg border border-white/10"
-                style={{ minWidth: timelineWidth, ...timelineBackground }}
+                className="relative min-w-full overflow-hidden rounded-lg border border-white/10"
+                style={{ minWidth: timelineWidth, height: timelineContentHeight, ...timelineBackground }}
               >
                 {barMarkers.map((bar) => (
                   <div
@@ -796,20 +945,30 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
                 ))}
                 <div className="absolute inset-0">
                   {stemsWithVariants.map((stem, index) => {
-                    const top = index * 28 + 10;
-                    const height = 18;
+                    const top = index * STEM_ROW_PITCH + STEM_ROW_OFFSET;
+                    const height = STEM_ROW_HEIGHT;
                     const color = resolveStemColor(stem, index);
                     const state = stemStates[stem.id] ?? { muted: false, solo: false };
                     const muted = state.muted || (soloIds.size > 0 && !state.solo);
                     const activeVariantId = activeVariants[stem.id];
                     const isFavorite = activeVariantId ? favoriteVariants[activeVariantId] : false;
+                    const waveform =
+                      (activeVariantId ? waveformCacheRef.current[activeVariantId] : undefined) ??
+                      stemWaveforms[stem.id];
+                    const waveformDuration =
+                      waveform && waveform.durationMs > 0 ? waveform.durationMs : durationMs;
+                    const waveformWidth =
+                      waveform && durationMs > 0
+                        ? Math.max(0.02, Math.min(1, waveformDuration / durationMs))
+                        : 1;
+                    const waveformViewBox = waveform ? Math.max(1, waveform.samples.length - 1) : 1;
                     const boxShadow = isFavorite
                       ? `0 0 0 1px ${color}40, 0 0 0 6px rgba(16,185,129,0.25)`
                       : `0 0 0 1px ${color}20`;
                     return (
                       <div
                         key={stem.id}
-                        className="absolute rounded-full bg-white/10"
+                        className="absolute overflow-hidden rounded-full bg-white/10"
                         style={{
                           top,
                           left: 6,
@@ -819,7 +978,23 @@ export function StemDaw({ track, onSendToCover, coverKnowledgeCount }: StemDawPr
                           opacity: muted ? 0.35 : 1,
                           boxShadow,
                         }}
-                      />
+                      >
+                        {waveform?.path ? (
+                          <svg
+                            className="absolute inset-y-0 left-0"
+                            style={{ width: `${(waveformWidth * 100).toFixed(2)}%` }}
+                            viewBox={`0 0 ${waveformViewBox} 1`}
+                            preserveAspectRatio="none"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d={waveform.path}
+                              fill={color}
+                              fillOpacity={muted ? 0.2 : 0.35}
+                            />
+                          </svg>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>

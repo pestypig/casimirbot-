@@ -161,6 +161,18 @@ export default defineConfig({
         target: apiProxyTarget,
         changeOrigin: true,
       },
+      "/originals": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
+      "/audio/originals": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
+      "/noisegen/previews": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
     },
   },
 });
