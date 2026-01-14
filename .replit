@@ -33,6 +33,8 @@ externalPort = 3000
 
 [env]
 REPLIT_KEEP_PACKAGE_DEV_DEPENDENCIES = "1"
+PORT = "5000"
+HOST = "0.0.0.0"
 
 [workflows]
 runButton = "Project"
