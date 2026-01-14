@@ -521,6 +521,89 @@ const resolveDefaultOriginal = async (): Promise<NoisegenOriginal | null> => {
   };
 };
 
+const isBlank = (value?: string): boolean => !value || value.trim().length === 0;
+
+const mergeBundledOriginal = (
+  existing: NoisegenOriginal,
+  bundled: NoisegenOriginal,
+): { merged: NoisegenOriginal; changed: boolean } => {
+  let changed = false;
+  const mergedAssets = { ...existing.assets };
+  if (!mergedAssets.instrumental && bundled.assets.instrumental) {
+    mergedAssets.instrumental = bundled.assets.instrumental;
+    changed = true;
+  }
+  if (!mergedAssets.vocal && bundled.assets.vocal) {
+    mergedAssets.vocal = bundled.assets.vocal;
+    changed = true;
+  }
+  if (
+    (!mergedAssets.stems || mergedAssets.stems.length === 0) &&
+    bundled.assets.stems &&
+    bundled.assets.stems.length > 0
+  ) {
+    mergedAssets.stems = bundled.assets.stems;
+    changed = true;
+  }
+
+  const merged: NoisegenOriginal = {
+    ...existing,
+    assets: mergedAssets,
+  };
+
+  if (isBlank(merged.title) && !isBlank(bundled.title)) {
+    merged.title = bundled.title;
+    changed = true;
+  }
+  if (isBlank(merged.artist) && !isBlank(bundled.artist)) {
+    merged.artist = bundled.artist;
+    changed = true;
+  }
+  if (!Number.isFinite(merged.duration) || merged.duration <= 0) {
+    if (Number.isFinite(bundled.duration) && bundled.duration > 0) {
+      merged.duration = bundled.duration;
+      changed = true;
+    }
+  }
+  if (!merged.tempo && bundled.tempo) {
+    merged.tempo = bundled.tempo;
+    changed = true;
+  }
+  if (!merged.notes && bundled.notes) {
+    merged.notes = bundled.notes;
+    changed = true;
+  }
+  if (merged.offsetMs == null && bundled.offsetMs != null) {
+    merged.offsetMs = bundled.offsetMs;
+    changed = true;
+  }
+  if (!merged.timeSky && bundled.timeSky) {
+    merged.timeSky = bundled.timeSky;
+    changed = true;
+  }
+  if (!Number.isFinite(merged.uploadedAt) && Number.isFinite(bundled.uploadedAt)) {
+    merged.uploadedAt = bundled.uploadedAt;
+    changed = true;
+  }
+
+  return { merged, changed };
+};
+
+const mergeBundledIntoList = (
+  list: NoisegenOriginal[],
+  bundled: NoisegenOriginal,
+): { found: boolean; changed: boolean } => {
+  const index = list.findIndex(
+    (entry) => entry.id.toLowerCase() === bundled.id.toLowerCase(),
+  );
+  if (index < 0) return { found: false, changed: false };
+  const { merged, changed } = mergeBundledOriginal(list[index], bundled);
+  if (changed) {
+    list[index] = merged;
+  }
+  return { found: true, changed };
+};
+
 const ensureDefaults = async (store: NoisegenStore): Promise<NoisegenStore> => {
   let updated = false;
   const next = cloneStore(store);
@@ -537,16 +620,20 @@ const ensureDefaults = async (store: NoisegenStore): Promise<NoisegenStore> => {
   }
   const bundled = await resolveBundledOriginals();
   if (bundled.length > 0) {
-    const knownIds = new Set(
-      [...next.originals, ...next.pendingOriginals].map((original) =>
-        original.id.toLowerCase(),
-      ),
-    );
     for (const original of bundled) {
-      if (knownIds.has(original.id.toLowerCase())) continue;
-      next.originals.push(original);
-      knownIds.add(original.id.toLowerCase());
-      updated = true;
+      const mergedOriginals = mergeBundledIntoList(next.originals, original);
+      const mergedPending = mergedOriginals.found
+        ? { found: true, changed: false }
+        : mergeBundledIntoList(next.pendingOriginals, original);
+
+      if (!mergedOriginals.found && !mergedPending.found) {
+        next.originals.push(original);
+        updated = true;
+        continue;
+      }
+      if (mergedOriginals.changed || mergedPending.changed) {
+        updated = true;
+      }
     }
   }
   return updated ? next : store;

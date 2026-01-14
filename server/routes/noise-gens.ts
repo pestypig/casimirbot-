@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { promises as fs } from "node:fs";
+import { promises as fs, createReadStream } from "node:fs";
 import { z } from "zod";
 import multer from "multer";
 import { listKnowledgeFilesByProjects } from "../db/knowledge";
@@ -621,14 +621,14 @@ const resolveUploadAudio = (
 const normalizeWavFile = async (
   filePath: string,
   mime?: string,
-): Promise<Buffer | null> => {
+): Promise<boolean> => {
   const lower = mime?.toLowerCase() ?? "";
-  if (!lower.includes("wav") && !lower.includes("wave")) return null;
+  if (!lower.includes("wav") && !lower.includes("wave")) return false;
   const buffer = await fs.readFile(filePath);
   const converted = convertWavToPcm16(buffer);
-  if (!converted) return null;
+  if (!converted) return false;
   await fs.writeFile(filePath, converted);
-  return converted;
+  return true;
 };
 
 const estimateDurationSeconds = (buffer: Buffer, mime?: string): number => {
@@ -653,6 +653,55 @@ router.use("/kb-textures", express.static(kbTexturesDir));
 router.use("/noisegen/previews", express.static(previewsDir));
 router.use("/originals", express.static(staticOriginalsDir));
 
+const streamAudioFile = async (
+  req: express.Request,
+  res: express.Response,
+  filePath: string,
+  mime: string,
+) => {
+  const stats = await fs.stat(filePath);
+  const size = stats.size;
+  res.setHeader("Content-Type", mime);
+  res.setHeader("Accept-Ranges", "bytes");
+
+  if (req.method === "HEAD") {
+    res.setHeader("Content-Length", size);
+    res.status(200).end();
+    return;
+  }
+
+  const range = req.headers.range;
+  if (range) {
+    const match = /bytes=(\d*)-(\d*)/.exec(range);
+    if (!match) {
+      res.setHeader("Content-Range", `bytes */${size}`);
+      res.status(416).end();
+      return;
+    }
+    const start = match[1] ? Number(match[1]) : 0;
+    const end = match[2] ? Number(match[2]) : size - 1;
+    if (
+      Number.isNaN(start) ||
+      Number.isNaN(end) ||
+      start > end ||
+      start >= size
+    ) {
+      res.setHeader("Content-Range", `bytes */${size}`);
+      res.status(416).end();
+      return;
+    }
+    const clampedEnd = Math.min(end, size - 1);
+    res.status(206);
+    res.setHeader("Content-Range", `bytes ${start}-${clampedEnd}/${size}`);
+    res.setHeader("Content-Length", clampedEnd - start + 1);
+    createReadStream(filePath, { start, end: clampedEnd }).pipe(res);
+    return;
+  }
+
+  res.setHeader("Content-Length", size);
+  createReadStream(filePath).pipe(res);
+};
+
 const serveOriginalAsset = async (req: any, res: any) => {
   try {
     const store = await getNoisegenStore();
@@ -671,16 +720,15 @@ const serveOriginalAsset = async (req: any, res: any) => {
       return res.status(404).json({ error: "asset_missing" });
     }
     try {
-      const normalized = await normalizeWavFile(assetPath, asset.mime);
-      if (normalized) {
-        res.setHeader("Content-Type", "audio/wav");
-        return res.send(normalized);
+      const shouldNormalize =
+        req.method !== "HEAD" && !path.isAbsolute(asset.path);
+      if (shouldNormalize) {
+        await normalizeWavFile(assetPath, asset.mime);
       }
     } catch {
       // fall through to streaming the original asset
     }
-    res.setHeader("Content-Type", asset.mime);
-    return res.sendFile(assetPath);
+    return await streamAudioFile(req, res, assetPath, asset.mime);
   } catch (error) {
     return res.status(500).json({
       error: "asset_fetch_failed",
@@ -707,16 +755,15 @@ const serveStemAsset = async (req: any, res: any) => {
       return res.status(404).json({ error: "stem_missing" });
     }
     try {
-      const normalized = await normalizeWavFile(stemPath, stem.mime);
-      if (normalized) {
-        res.setHeader("Content-Type", "audio/wav");
-        return res.send(normalized);
+      const shouldNormalize =
+        req.method !== "HEAD" && !path.isAbsolute(stem.path);
+      if (shouldNormalize) {
+        await normalizeWavFile(stemPath, stem.mime);
       }
     } catch {
       // fall through to streaming the original stem
     }
-    res.setHeader("Content-Type", stem.mime);
-    return res.sendFile(stemPath);
+    return await streamAudioFile(req, res, stemPath, stem.mime);
   } catch (error) {
     return res.status(500).json({
       error: "stem_fetch_failed",
