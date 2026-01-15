@@ -1504,7 +1504,12 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
     writeStream.end();
   });
 
-  const mime = chunkFile.mimetype || mimeFromName(fileName);
+  const mime =
+    chunkFile.mimetype &&
+    chunkFile.mimetype !== "application/octet-stream" &&
+    chunkFile.mimetype !== "binary/octet-stream"
+      ? chunkFile.mimetype
+      : mimeFromName(fileName);
   let finalPath = assembledPath;
   try {
     const stats = await fs.stat(assembledPath);
