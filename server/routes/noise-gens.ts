@@ -66,6 +66,7 @@ const MAX_WAV_NORMALIZE_BYTES = 200 * 1024 * 1024;
 const WAVEFORM_BUCKETS = 1024;
 const MAX_WAVEFORM_BYTES = MAX_WAV_NORMALIZE_BYTES;
 const MAX_WAVEFORM_SAMPLES_PER_BUCKET = 2048;
+const MAX_JS_WAV_CONVERT_BYTES = 8 * 1024 * 1024;
 const MIXDOWN_SAMPLE_RATE = 44_100;
 const MIXDOWN_CHANNELS = 2;
 const PLAYBACK_OPUS_BITRATE = "160k";
@@ -833,6 +834,7 @@ const normalizeWavUpload = (
 ): { buffer: Buffer; mime: string } | null => {
   const mime = file.mimetype?.toLowerCase() ?? "";
   if (!mime.includes("wav") && !mime.includes("wave")) return null;
+  if (file.buffer.byteLength > MAX_JS_WAV_CONVERT_BYTES) return null;
   const converted = convertWavToPcm16(file.buffer);
   if (!converted) return null;
   return { buffer: converted, mime: "audio/wav" };
@@ -1786,19 +1788,24 @@ const mixdownAssets = async (
 const ensurePcm16WavBuffer = (
   buffer: Buffer,
   mime: string,
-): { buffer: Buffer; format: ReturnType<typeof parseWavFormat> } | null => {
+): { buffer: Buffer; format: ReturnType<typeof parseWavFormat> } | null => {    
   const lower = mime.toLowerCase();
   if (!lower.includes("wav") && !lower.includes("wave")) return null;
-  let working = buffer;
-  const converted = convertWavToPcm16(buffer);
-  if (converted) {
-    working = converted;
+  const format = parseWavFormat(buffer);
+  if (!format) return null;
+  if (format.audioFormat === 1 && format.bitsPerSample === 16) {
+    return { buffer, format };
   }
-  const format = parseWavFormat(working);
-  if (!format || format.audioFormat !== 1 || format.bitsPerSample !== 16) {
+  if (buffer.byteLength > MAX_JS_WAV_CONVERT_BYTES) {
     return null;
   }
-  return { buffer: working, format };
+  const converted = convertWavToPcm16(buffer);
+  if (!converted) return null;
+  const nextFormat = parseWavFormat(converted);
+  if (!nextFormat || nextFormat.audioFormat !== 1 || nextFormat.bitsPerSample !== 16) {
+    return null;
+  }
+  return { buffer: converted, format: nextFormat };
 };
 
 const buildPcm16WavBuffer = (params: {
