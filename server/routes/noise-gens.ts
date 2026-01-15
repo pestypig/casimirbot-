@@ -12,6 +12,8 @@ import {
   getNoisegenStore,
   downloadReplitObjectStream,
   isReplitStoragePath,
+  type NoisegenOriginal,
+  type NoisegenStemAsset,
   resolveBundledOriginalsRoots,
   resolveOriginalAsset,
   resolveOriginalAssetPath,
@@ -424,6 +426,29 @@ const normalizeStemCategory = (value: unknown): string | undefined => {
   const normalized = value.trim().toLowerCase();
   if (!normalized) return undefined;
   return STEM_CATEGORY_ALLOWLIST.has(normalized) ? normalized : undefined;
+};
+
+const mergeStemAssets = (
+  existing: NoisegenStemAsset[] | undefined,
+  incoming: NoisegenStemAsset[],
+): NoisegenStemAsset[] => {
+  if (!incoming.length) return existing ? [...existing] : [];
+  if (!existing || existing.length === 0) return [...incoming];
+  const merged = [...existing];
+  const indexById = new Map(
+    merged.map((stem, index) => [stem.id.toLowerCase(), index]),
+  );
+  for (const stem of incoming) {
+    const key = stem.id.toLowerCase();
+    const existingIndex = indexById.get(key);
+    if (existingIndex == null) {
+      indexById.set(key, merged.length);
+      merged.push(stem);
+    } else {
+      merged[existingIndex] = stem;
+    }
+  }
+  return merged;
 };
 
 const summarizeNoiseValues = (values: Float32Array) => {
@@ -1099,6 +1124,12 @@ router.post(
     const existingOriginalId = readStringField(req.body?.existingOriginalId);
     const offsetMsRaw = readStringField(req.body?.offsetMs);
     const offsetMs = clampNumber(Number(offsetMsRaw), -2000, 2000, 0);
+    const storeSnapshot = existingOriginalId
+      ? await getNoisegenStore()
+      : null;
+    const existingSnapshot = existingOriginalId
+      ? findOriginalById(storeSnapshot, existingOriginalId)
+      : undefined;
 
     if (!title) {
       return res.status(400).json({ error: "title_required" });
@@ -1203,7 +1234,9 @@ router.post(
     const stemAssets = stems.length
       ? await Promise.all(
           (() => {
-            const used = new Set<string>();
+            const used = new Set<string>(
+              existingSnapshot?.assets.stems?.map((stem) => stem.id) ?? [],
+            );
             return stems.map((stem, index) => {
               const displayName =
                 normalizeStemName(stem.originalname) || `stem-${index + 1}`;
@@ -1229,29 +1262,48 @@ router.post(
       const existingPendingIndex = next.pendingOriginals.findIndex(
         (entry) => entry.id === trackId,
       );
-      const existingEntry =
-        existingOriginalIndex >= 0
-          ? next.originals[existingOriginalIndex]
-          : existingPendingIndex >= 0
-            ? next.pendingOriginals[existingPendingIndex]
-            : undefined;
-      const record = {
-        id: trackId,
-        title,
-        artist: creator,
-        listens: existingEntry?.listens ?? 0,
-        duration: Math.max(1, Math.round(durationSeconds)),
-        tempo,
-        notes: notes || undefined,
-        offsetMs,
-        uploadedAt: now,
-        timeSky: timeSky ?? existingEntry?.timeSky,
-        assets: {
-          ...(instrumentalAsset ? { instrumental: instrumentalAsset } : {}),
-          ...(vocalAsset ? { vocal: vocalAsset } : {}),
-          ...(stemAssets.length ? { stems: stemAssets } : {}),
-        },
-      };
+        const existingEntry =
+          existingOriginalIndex >= 0
+            ? next.originals[existingOriginalIndex]
+            : existingPendingIndex >= 0
+              ? next.pendingOriginals[existingPendingIndex]
+              : undefined;
+        const existingAssets = existingEntry?.assets ?? {};
+        const mergedStems =
+          stemAssets.length > 0
+            ? mergeStemAssets(existingAssets.stems, stemAssets)
+            : existingAssets.stems ?? [];
+        const mergedInstrumental =
+          instrumentalAsset ?? existingAssets.instrumental;
+        const mergedVocal = vocalAsset ?? existingAssets.vocal;
+        const nextAssets: NoisegenOriginal["assets"] = {};
+        if (mergedInstrumental) {
+          nextAssets.instrumental = mergedInstrumental;
+        }
+        if (mergedVocal) {
+          nextAssets.vocal = mergedVocal;
+        }
+        if (mergedStems.length > 0) {
+          nextAssets.stems = mergedStems;
+        }
+        const record = {
+          id: trackId,
+          title,
+          artist: creator,
+          listens: existingEntry?.listens ?? 0,
+          duration:
+            existingEntry?.duration && existingEntry.duration > 0
+              ? existingEntry.duration
+              : Math.max(1, Math.round(durationSeconds)),
+          tempo: tempo ?? existingEntry?.tempo,
+          notes: notes || existingEntry?.notes,
+          offsetMs: Number.isFinite(offsetMs)
+            ? offsetMs
+            : existingEntry?.offsetMs,
+          uploadedAt: existingEntry?.uploadedAt ?? now,
+          timeSky: timeSky ?? existingEntry?.timeSky,
+          assets: nextAssets,
+        };
       if (existingOriginalIndex >= 0) {
         next.originals[existingOriginalIndex] = record;
       } else if (existingPendingIndex >= 0) {

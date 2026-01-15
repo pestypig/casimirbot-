@@ -299,10 +299,16 @@ export async function uploadOriginal(
         }
         return;
       }
-      const errorMessage =
+      const rawMessage =
         xhr.responseText ||
         xhr.statusText ||
         `Upload failed with status ${xhr.status ?? "unknown"}`;
+      const isTooLarge =
+        xhr.status === 413 ||
+        rawMessage.toLowerCase().includes("request entity too large");
+      const errorMessage = isTooLarge
+        ? "Upload too large for the server. Try a smaller file or split the upload."
+        : rawMessage;
       reject(new Error(errorMessage));
     };
 

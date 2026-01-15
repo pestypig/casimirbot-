@@ -592,21 +592,37 @@ export function UploadOriginalsModal({
     if (!canSubmit) return;
     try {
       setIsSubmitting(true);
-      const uploadFiles: UploadFileProgress[] = [
-        ...(stemSummary.mixEntry ? [stemSummary.mixEntry] : []),
-        ...(stemSummary.vocalEntry ? [stemSummary.vocalEntry] : []),
-        ...stemSummary.stemUploads,
-      ].map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        bytes: entry.file.size,
+      const uploadQueue: Array<{
+        entry: StemEntry;
+        field: "instrumental" | "vocal" | "stems";
+        category?: StemCategory;
+      }> = [
+        ...(stemSummary.mixEntry
+          ? [{ entry: stemSummary.mixEntry, field: "instrumental" }]
+          : []),
+        ...(stemSummary.vocalEntry
+          ? [{ entry: stemSummary.vocalEntry, field: "vocal" }]
+          : []),
+        ...stemSummary.stemUploads.map((entry) => ({
+          entry,
+          field: "stems",
+          category: entry.category,
+        })),
+      ];
+      if (uploadQueue.length === 0) {
+        throw new Error("No audio files selected for upload.");
+      }
+      const uploadFiles: UploadFileProgress[] = uploadQueue.map((item) => ({
+        id: item.entry.id,
+        name: item.entry.name,
+        bytes: item.entry.file.size,
         loaded: 0,
         pct: 0,
       }));
       uploadFilesRef.current = uploadFiles;
+      const totalBytes = uploadFiles.reduce((sum, file) => sum + file.bytes, 0);
       if (uploadFiles.length) {
         setUploadProgress(uploadFiles);
-        const totalBytes = uploadFiles.reduce((sum, file) => sum + file.bytes, 0);
         setUploadTotalProgress({
           loaded: 0,
           total: totalBytes > 0 ? totalBytes : undefined,
@@ -617,36 +633,28 @@ export function UploadOriginalsModal({
         setUploadTotalProgress(null);
       }
 
-      const payload = new FormData();
-      payload.append("title", title.value.trim());
-      payload.append("creator", creator.value.trim());
-      const existingOriginalId = prefill?.existingOriginalId?.trim();
-      if (existingOriginalId) {
-        payload.append("existingOriginalId", existingOriginalId);
-      }
-      if (stemSummary.mixEntry) {
-        payload.append("instrumental", stemSummary.mixEntry.file);
-      }
-      if (stemSummary.vocalEntry) {
-        payload.append("vocal", stemSummary.vocalEntry.file);
-      }
-      if (stemSummary.stemUploads.length) {
-        const stemCategories = stemSummary.stemUploads.map((entry) => entry.category);
-        stemSummary.stemUploads.forEach((entry) => {
-          payload.append("stems", entry.file);
+      const updateProgress = (fileId: string, loaded: number) => {
+        const files = uploadFilesRef.current;
+        if (!files.length) return;
+        const next = files.map((file) => {
+          if (file.id !== fileId) return file;
+          const safeLoaded = Math.max(0, Math.min(file.bytes, loaded));
+          const pct = file.bytes > 0 ? safeLoaded / file.bytes : 1;
+          return { ...file, loaded: safeLoaded, pct };
         });
-        payload.append("stemCategories", JSON.stringify(stemCategories));
-      }
-      payload.append("offsetMs", String(offsetMs));
-      if (lyrics.trim()) {
-        payload.append("notes", lyrics.trim());
-      }
+        uploadFilesRef.current = next;
+        setUploadProgress(next);
+        const loadedTotal = next.reduce((sum, file) => sum + file.loaded, 0);
+        setUploadTotalProgress({
+          loaded: loadedTotal,
+          total: totalBytes > 0 ? totalBytes : undefined,
+          pct: totalBytes > 0 ? Math.min(1, loadedTotal / totalBytes) : undefined,
+        });
+      };
+      const existingOriginalId = prefill?.existingOriginalId?.trim();
       const timeSkyMeta = readTimeSkyMeta(
         (selectedProject?.meta ?? {}) as Record<string, unknown>,
       );
-      if (timeSkyMeta) {
-        payload.append("timeSky", JSON.stringify(timeSkyMeta));
-      }
       let tempoMeta: TempoMeta | undefined;
       if (bpmNumeric != null) {
         tempoMeta = {
@@ -655,30 +663,50 @@ export function UploadOriginalsModal({
           offsetMs,
           quantized,
         };
-        payload.append("tempo", JSON.stringify(tempoMeta));
       }
-      const result = await uploadOriginal(payload, {
-        onProgress: (progress) => {
-          const files = uploadFilesRef.current;
-          if (!files.length) return;
-          const totalBytes = files.reduce((sum, file) => sum + file.bytes, 0);
-          const total = progress.total ?? (totalBytes > 0 ? totalBytes : undefined);
-          const loaded = total ? Math.min(progress.loaded, total) : progress.loaded;
-          let remaining = loaded;
-          const next = files.map((file) => {
-            const fileLoaded = Math.max(0, Math.min(file.bytes, remaining));
-            remaining = Math.max(0, remaining - file.bytes);
-            const pct = file.bytes > 0 ? fileLoaded / file.bytes : 1;
-            return { ...file, loaded: fileLoaded, pct };
+      const appendSharedFields = (payload: FormData, trackId?: string) => {
+        payload.append("title", title.value.trim());
+        payload.append("creator", creator.value.trim());
+        if (trackId) {
+          payload.append("existingOriginalId", trackId);
+        }
+        payload.append("offsetMs", String(offsetMs));
+        if (lyrics.trim()) {
+          payload.append("notes", lyrics.trim());
+        }
+        if (timeSkyMeta) {
+          payload.append("timeSky", JSON.stringify(timeSkyMeta));
+        }
+        if (tempoMeta) {
+          payload.append("tempo", JSON.stringify(tempoMeta));
+        }
+      };
+      let currentTrackId = existingOriginalId || undefined;
+      for (const item of uploadQueue) {
+        const payload = new FormData();
+        appendSharedFields(payload, currentTrackId);
+        if (item.field === "stems") {
+          payload.append("stems", item.entry.file);
+          payload.append("stemCategories", JSON.stringify([item.category]));
+        } else {
+          payload.append(item.field, item.entry.file);
+        }
+        try {
+          const result = await uploadOriginal(payload, {
+            onProgress: (progress) =>
+              updateProgress(item.entry.id, progress.loaded),
           });
-          setUploadProgress(next);
-          setUploadTotalProgress({
-            loaded,
-            total,
-            pct: total && total > 0 ? Math.min(1, loaded / total) : undefined,
-          });
-        },
-      });
+          currentTrackId = result.trackId;
+          updateProgress(item.entry.id, item.entry.file.size);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Upload failed";
+          throw new Error(`"${item.entry.name}" failed to upload. ${message}`);
+        }
+      }
+      if (!currentTrackId) {
+        throw new Error("Upload succeeded but response was invalid.");
+      }
       toast({
         title: "Upload queued",
         description: "We will notify you when mastering finishes.",
@@ -687,7 +715,7 @@ export function UploadOriginalsModal({
       const selectedProjectName =
         selectedProject?.name?.trim() ?? prefill?.knowledgeProjectName;
       onUploaded?.({
-        trackId: result.trackId,
+        trackId: currentTrackId,
         title: title.value.trim(),
         creator: creator.value.trim(),
         knowledgeProjectId: selectedProjectId,
