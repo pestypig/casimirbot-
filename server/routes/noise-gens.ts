@@ -829,8 +829,92 @@ const streamReplitAsset = async (
   asset: { path: string; mime: string; bytes?: number },
 ) => {
   res.setHeader("Content-Type", asset.mime);
-  if (asset.bytes) {
-    res.setHeader("Content-Length", asset.bytes);
+  res.setHeader("Accept-Ranges", "bytes");
+  
+  const rangeHeader = req.headers.range;
+  const fileSize = asset.bytes ?? 0;
+  
+  if (rangeHeader && fileSize > 0) {
+    const match = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
+    if (match) {
+      const start = parseInt(match[1], 10);
+      const requestedEnd = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+      
+      if (
+        Number.isNaN(start) ||
+        Number.isNaN(requestedEnd) ||
+        start > requestedEnd ||
+        start >= fileSize
+      ) {
+        res.setHeader("Content-Range", `bytes */${fileSize}`);
+        res.status(416).end();
+        return;
+      }
+      
+      const end = Math.min(requestedEnd, fileSize - 1);
+      const chunkSize = end - start + 1;
+      
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+      res.setHeader("Content-Length", chunkSize);
+      
+      if (req.method === "HEAD") {
+        res.end();
+        return;
+      }
+      
+      const key = resolveReplitStorageKey(asset.path);
+      const stream = await downloadReplitObjectStream(key);
+      let bytesSkipped = 0;
+      let bytesSent = 0;
+      
+      stream.on("data", (chunk: Buffer) => {
+        if (bytesSent >= chunkSize) {
+          stream.destroy();
+          return;
+        }
+        
+        if (bytesSkipped < start) {
+          const remaining = start - bytesSkipped;
+          if (chunk.length <= remaining) {
+            bytesSkipped += chunk.length;
+            return;
+          }
+          chunk = chunk.slice(remaining);
+          bytesSkipped = start;
+        }
+        
+        const remainingToSend = chunkSize - bytesSent;
+        if (chunk.length > remainingToSend) {
+          chunk = chunk.slice(0, remainingToSend);
+        }
+        
+        bytesSent += chunk.length;
+        res.write(chunk);
+        
+        if (bytesSent >= chunkSize) {
+          stream.destroy();
+          res.end();
+        }
+      });
+      
+      stream.on("end", () => {
+        if (!res.writableEnded) res.end();
+      });
+      stream.on("error", (err: Error) => {
+        console.error("Stream error:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "stream_failed" });
+        } else {
+          res.destroy();
+        }
+      });
+      return;
+    }
+  }
+  
+  if (fileSize > 0) {
+    res.setHeader("Content-Length", fileSize);
   }
   if (req.method === "HEAD") {
     res.status(200).end();
@@ -838,6 +922,14 @@ const streamReplitAsset = async (
   }
   const key = resolveReplitStorageKey(asset.path);
   const stream = await downloadReplitObjectStream(key);
+  stream.on("error", (err: Error) => {
+    console.error("Stream error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "stream_failed" });
+    } else {
+      res.destroy();
+    }
+  });
   stream.pipe(res);
 };
 

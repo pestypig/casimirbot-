@@ -200,38 +200,16 @@ const resolveNoisegenStorageBackend = (): NoisegenStorageBackend => {
   return raw === "replit" ? "replit" : "fs";
 };
 
-type ReplitObjectClient = {
-  uploadFromBytes: (key: string, data: Buffer) => Promise<{ ok: boolean; error?: unknown }>;
-  uploadFromFilename?: (
-    key: string,
-    filename: string,
-  ) => Promise<{ ok: boolean; error?: unknown }>;
-  uploadFromStream?: (
-    key: string,
-    stream: Readable,
-  ) => Promise<{ ok: boolean; error?: unknown }>;
-  downloadAsStream: (
-    key: string,
-  ) => Promise<{ ok: boolean; value?: Readable; error?: unknown }>;
-  delete?: (key: string) => Promise<{ ok: boolean; error?: unknown }>;
-};
+import type { Client as ReplitStorageClient } from "@replit/object-storage";
 
-let replitClientPromise: Promise<ReplitObjectClient> | null = null;
+let replitClientInstance: ReplitStorageClient | null = null;
 
-const getReplitClient = async (): Promise<ReplitObjectClient> => {
-  if (!replitClientPromise) {
-    replitClientPromise = import("@replit/object-storage").then((mod) => {
-      const ClientCtor =
-        (mod as { Client?: new () => ReplitObjectClient }).Client ??
-        (mod as { default?: { Client?: new () => ReplitObjectClient } }).default?.Client ??
-        (mod as { default?: new () => ReplitObjectClient }).default;
-      if (!ClientCtor) {
-        throw new Error("Replit object storage Client is unavailable");
-      }
-      return new ClientCtor();
-    });
+const getReplitClient = async (): Promise<ReplitStorageClient> => {
+  if (!replitClientInstance) {
+    const { Client } = await import("@replit/object-storage");
+    replitClientInstance = new Client();
   }
-  return replitClientPromise;
+  return replitClientInstance;
 };
 
 const NOISEGEN_STORAGE_PREFIX = "noisegen/originals";
@@ -256,58 +234,20 @@ const uploadReplitObject = async (
   buffer: Buffer,
 ): Promise<void> => {
   const client = await getReplitClient();
-  const result = await client.uploadFromBytes(key, buffer);
-  if (!result?.ok) {
-    throw new Error(
-      typeof result?.error === "string"
-        ? result.error
-        : "Replit object storage upload failed",
-    );
-  }
+  await client.uploadFromBytes(key, buffer);
 };
 
 const uploadReplitFile = async (key: string, filePath: string): Promise<void> => {
   const client = await getReplitClient();
-  if (typeof client.uploadFromFilename === "function") {
-    const result = await client.uploadFromFilename(key, filePath);
-    if (!result?.ok) {
-      throw new Error(
-        typeof result?.error === "string"
-          ? result.error
-          : "Replit object storage upload failed",
-      );
-    }
-    return;
-  }
-  if (typeof client.uploadFromStream === "function") {
-    const stream = createReadStream(filePath);
-    const result = await client.uploadFromStream(key, stream);
-    if (!result?.ok) {
-      throw new Error(
-        typeof result?.error === "string"
-          ? result.error
-          : "Replit object storage upload failed",
-      );
-    }
-    return;
-  }
-  const buffer = await fs.readFile(filePath);
-  await uploadReplitObject(key, buffer);
+  const stream = createReadStream(filePath);
+  await client.uploadFromStream(key, stream);
 };
 
 export const downloadReplitObjectStream = async (
   key: string,
 ): Promise<Readable> => {
   const client = await getReplitClient();
-  const result = await client.downloadAsStream(key);
-  if (!result?.ok || !result?.value) {
-    throw new Error(
-      typeof result?.error === "string"
-        ? result.error
-        : "Replit object storage download failed",
-    );
-  }
-  return result.value;
+  return client.downloadAsStream(key);
 };
 
 export const resolveBundledOriginalsRoots = (): string[] => {
@@ -852,13 +792,34 @@ export const resolveOriginalAssetPath = (
 ): string => {
   if (isReplitStoragePath(asset.path)) return asset.path;
   const { baseDir } = getNoisegenPaths();
-  return path.isAbsolute(asset.path) ? asset.path : path.join(baseDir, asset.path);
+  
+  if (path.isAbsolute(asset.path)) {
+    if (existsSync(asset.path)) return asset.path;
+    const roots = resolveBundledOriginalsRoots();
+    for (const root of roots) {
+      const candidate = path.join(root, path.basename(path.dirname(asset.path)), asset.fileName);
+      if (existsSync(candidate)) return candidate;
+    }
+    return asset.path;
+  }
+  return path.join(baseDir, asset.path);
 };
 
 export const resolveStemAssetPath = (asset: NoisegenStemAsset): string => {
   if (isReplitStoragePath(asset.path)) return asset.path;
   const { baseDir } = getNoisegenPaths();
-  return path.isAbsolute(asset.path) ? asset.path : path.join(baseDir, asset.path);
+  
+  if (path.isAbsolute(asset.path)) {
+    if (existsSync(asset.path)) return asset.path;
+    const roots = resolveBundledOriginalsRoots();
+    for (const root of roots) {
+      const originalId = path.basename(path.dirname(path.dirname(asset.path)));
+      const candidate = path.join(root, originalId, "stems", asset.fileName);
+      if (existsSync(candidate)) return candidate;
+    }
+    return asset.path;
+  }
+  return path.join(baseDir, asset.path);
 };
 
 export const saveOriginalAsset = async (params: {
