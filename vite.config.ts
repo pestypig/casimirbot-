@@ -90,16 +90,10 @@ export default defineConfig({
     react(),
     runtimeErrorOverlay(),
     viteStaticCopy({
-      targets: [
-        ...treeSitterSources.map((source) => ({
-          src: toClientRelative(source),
-          dest: "treesitter",
-        })),
-        {
-          src: "public/originals/**/*",
-          dest: "originals",
-        },
-      ],
+      targets: treeSitterSources.map((source) => ({
+        src: toClientRelative(source),
+        dest: "treesitter",
+      })),
     }),
     webTreeSitterNodeShim(),
     ...(process.env.NODE_ENV !== "production" &&
