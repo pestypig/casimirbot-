@@ -1,6 +1,7 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { existsSync } from "node:fs";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 export type JobStatus = "queued" | "processing" | "ready" | "error";
@@ -191,6 +192,86 @@ const DEFAULT_MOODS: NoisegenMood[] = [
     description: "Clean pads with light shimmer.",
   },
 ];
+
+type NoisegenStorageBackend = "fs" | "replit";
+
+const resolveNoisegenStorageBackend = (): NoisegenStorageBackend => {
+  const raw = process.env.NOISEGEN_STORAGE_BACKEND?.trim().toLowerCase();
+  return raw === "replit" ? "replit" : "fs";
+};
+
+type ReplitObjectClient = {
+  uploadFromBytes: (key: string, data: Buffer) => Promise<{ ok: boolean; error?: unknown }>;
+  downloadAsStream: (
+    key: string,
+  ) => Promise<{ ok: boolean; value?: Readable; error?: unknown }>;
+  delete?: (key: string) => Promise<{ ok: boolean; error?: unknown }>;
+};
+
+let replitClientPromise: Promise<ReplitObjectClient> | null = null;
+
+const getReplitClient = async (): Promise<ReplitObjectClient> => {
+  if (!replitClientPromise) {
+    replitClientPromise = import("@replit/object-storage").then((mod) => {
+      const ClientCtor =
+        (mod as { Client?: new () => ReplitObjectClient }).Client ??
+        (mod as { default?: { Client?: new () => ReplitObjectClient } }).default?.Client ??
+        (mod as { default?: new () => ReplitObjectClient }).default;
+      if (!ClientCtor) {
+        throw new Error("Replit object storage Client is unavailable");
+      }
+      return new ClientCtor();
+    });
+  }
+  return replitClientPromise;
+};
+
+const NOISEGEN_STORAGE_PREFIX = "noisegen/originals";
+
+const buildNoisegenStorageKey = (originalId: string, relativePath: string) =>
+  path.posix.join(
+    NOISEGEN_STORAGE_PREFIX,
+    originalId,
+    relativePath.replace(/\\/g, "/"),
+  );
+
+export const isReplitStoragePath = (value: string): boolean =>
+  value.startsWith("replit://");
+
+const buildReplitLocator = (key: string): string => `replit://${key}`;
+
+export const resolveReplitStorageKey = (locator: string): string =>
+  locator.replace(/^replit:\/\//, "");
+
+const uploadReplitObject = async (
+  key: string,
+  buffer: Buffer,
+): Promise<void> => {
+  const client = await getReplitClient();
+  const result = await client.uploadFromBytes(key, buffer);
+  if (!result?.ok) {
+    throw new Error(
+      typeof result?.error === "string"
+        ? result.error
+        : "Replit object storage upload failed",
+    );
+  }
+};
+
+export const downloadReplitObjectStream = async (
+  key: string,
+): Promise<Readable> => {
+  const client = await getReplitClient();
+  const result = await client.downloadAsStream(key);
+  if (!result?.ok || !result?.value) {
+    throw new Error(
+      typeof result?.error === "string"
+        ? result.error
+        : "Replit object storage download failed",
+    );
+  }
+  return result.value;
+};
 
 export const resolveBundledOriginalsRoots = (): string[] => {
   const __filename = fileURLToPath(import.meta.url);
@@ -543,6 +624,7 @@ const isBlank = (value?: string): boolean => !value || value.trim().length === 0
 
 const shouldReplaceAsset = (asset?: NoisegenOriginalAsset): boolean => {
   if (!asset) return true;
+  if (isReplitStoragePath(asset.path)) return false;
   try {
     return !existsSync(resolveOriginalAssetPath(asset));
   } catch {
@@ -552,6 +634,7 @@ const shouldReplaceAsset = (asset?: NoisegenOriginalAsset): boolean => {
 
 const shouldReplaceStems = (stems?: NoisegenStemAsset[]): boolean => {
   if (!stems || stems.length === 0) return true;
+  if (stems.some((stem) => isReplitStoragePath(stem.path))) return false;
   return stems.every((stem) => {
     try {
       return !existsSync(resolveStemAssetPath(stem));
@@ -730,11 +813,13 @@ export const resolveStemAsset = (
 export const resolveOriginalAssetPath = (
   asset: NoisegenOriginalAsset,
 ): string => {
+  if (isReplitStoragePath(asset.path)) return asset.path;
   const { baseDir } = getNoisegenPaths();
   return path.isAbsolute(asset.path) ? asset.path : path.join(baseDir, asset.path);
 };
 
 export const resolveStemAssetPath = (asset: NoisegenStemAsset): string => {
+  if (isReplitStoragePath(asset.path)) return asset.path;
   const { baseDir } = getNoisegenPaths();
   return path.isAbsolute(asset.path) ? asset.path : path.join(baseDir, asset.path);
 };
@@ -746,9 +831,23 @@ export const saveOriginalAsset = async (params: {
   mime: string;
   originalName?: string;
 }): Promise<NoisegenOriginalAsset> => {
-  const { originalsDir, baseDir } = getNoisegenPaths();
   const ext = safeExtension(params.originalName);
   const fileName = `${params.kind}${ext}`;
+  const backend = resolveNoisegenStorageBackend();
+  if (backend === "replit") {
+    const key = buildNoisegenStorageKey(params.originalId, fileName);
+    await uploadReplitObject(key, params.buffer);
+    return {
+      kind: params.kind,
+      fileName,
+      path: buildReplitLocator(key),
+      mime: params.mime,
+      bytes: params.buffer.byteLength,
+      uploadedAt: Date.now(),
+    };
+  }
+
+  const { originalsDir, baseDir } = getNoisegenPaths();
   const targetDir = path.join(originalsDir, params.originalId);
   await fs.mkdir(targetDir, { recursive: true });
   const filePath = path.join(targetDir, fileName);
@@ -772,9 +871,28 @@ export const saveStemAsset = async (params: {
   mime: string;
   originalName?: string;
 }): Promise<NoisegenStemAsset> => {
-  const { originalsDir, baseDir } = getNoisegenPaths();
   const ext = safeExtension(params.originalName);
   const fileName = `${params.stemId}${ext}`;
+  const backend = resolveNoisegenStorageBackend();
+  if (backend === "replit") {
+    const key = buildNoisegenStorageKey(
+      params.originalId,
+      path.posix.join("stems", fileName),
+    );
+    await uploadReplitObject(key, params.buffer);
+    return {
+      id: params.stemId,
+      name: params.stemName,
+      category: params.category,
+      fileName,
+      path: buildReplitLocator(key),
+      mime: params.mime,
+      bytes: params.buffer.byteLength,
+      uploadedAt: Date.now(),
+    };
+  }
+
+  const { originalsDir, baseDir } = getNoisegenPaths();
   const targetDir = path.join(originalsDir, params.originalId, "stems");
   await fs.mkdir(targetDir, { recursive: true });
   const filePath = path.join(targetDir, fileName);

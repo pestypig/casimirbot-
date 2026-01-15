@@ -10,9 +10,12 @@ import {
   findOriginalById,
   getNoisegenPaths,
   getNoisegenStore,
+  downloadReplitObjectStream,
+  isReplitStoragePath,
   resolveBundledOriginalsRoots,
   resolveOriginalAsset,
   resolveOriginalAssetPath,
+  resolveReplitStorageKey,
   resolveStemAsset,
   resolveStemAssetPath,
   saveOriginalAsset,
@@ -700,6 +703,24 @@ const streamAudioFile = async (
   createReadStream(filePath).pipe(res);
 };
 
+const streamReplitAsset = async (
+  req: express.Request,
+  res: express.Response,
+  asset: { path: string; mime: string; bytes?: number },
+) => {
+  res.setHeader("Content-Type", asset.mime);
+  if (asset.bytes) {
+    res.setHeader("Content-Length", asset.bytes);
+  }
+  if (req.method === "HEAD") {
+    res.status(200).end();
+    return;
+  }
+  const key = resolveReplitStorageKey(asset.path);
+  const stream = await downloadReplitObjectStream(key);
+  stream.pipe(res);
+};
+
 const serveOriginalAsset = async (req: any, res: any) => {
   try {
     const store = await getNoisegenStore();
@@ -711,6 +732,11 @@ const serveOriginalAsset = async (req: any, res: any) => {
     if (!asset) {
       return res.status(404).json({ error: "asset_not_found" });
     }
+    if (isReplitStoragePath(asset.path)) {
+      await streamReplitAsset(req, res, asset);
+      return;
+    }
+
     const assetPath = resolveOriginalAssetPath(asset);
     try {
       await fs.access(assetPath);
@@ -746,6 +772,11 @@ const serveStemAsset = async (req: any, res: any) => {
     if (!stem) {
       return res.status(404).json({ error: "stem_not_found" });
     }
+    if (isReplitStoragePath(stem.path)) {
+      await streamReplitAsset(req, res, stem);
+      return;
+    }
+
     const stemPath = resolveStemAssetPath(stem);
     try {
       await fs.access(stemPath);
