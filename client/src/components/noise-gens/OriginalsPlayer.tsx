@@ -386,6 +386,36 @@ export function OriginalsPlayer({
     sources.length === 1 ||
     (sourceMode === null && sources.length > 1);
 
+  const stopRaf = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  const stopWebAudioSources = useCallback(() => {
+    activeSourcesRef.current.forEach(({ source }) => {
+      try {
+        source.stop();
+      } catch {
+        /* ignore */
+      }
+    });
+    activeSourcesRef.current = [];
+    startAtRef.current = null;
+    stopRaf();
+  }, [stopRaf]);
+
+  const stopPlayback = useCallback(() => {
+    if (audioElementsRef.current.size) {
+      audioElementsRef.current.forEach((audio) => audio.pause());
+    } else if (audioElementRef.current) {
+      audioElementRef.current.pause();
+    }
+    stopWebAudioSources();
+    setIsPlaying(false);
+  }, [stopWebAudioSources]);
+
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
@@ -506,36 +536,6 @@ export function OriginalsPlayer({
     }
     return ctx;
   }, []);
-
-  const stopRaf = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-  }, []);
-
-  const stopWebAudioSources = useCallback(() => {
-    activeSourcesRef.current.forEach(({ source }) => {
-      try {
-        source.stop();
-      } catch {
-        /* ignore */
-      }
-    });
-    activeSourcesRef.current = [];
-    startAtRef.current = null;
-    stopRaf();
-  }, [stopRaf]);
-
-  const stopPlayback = useCallback(() => {
-    if (audioElementsRef.current.size) {
-      audioElementsRef.current.forEach((audio) => audio.pause());
-    } else if (audioElementRef.current) {
-      audioElementRef.current.pause();
-    }
-    stopWebAudioSources();
-    setIsPlaying(false);
-  }, [stopWebAudioSources]);
 
   const pausePlayback = useCallback(() => {
     if (
