@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { promises as fs, createReadStream, createWriteStream } from "node:fs";
+import { tmpdir } from "node:os";
+import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import multer from "multer";
 import { listKnowledgeFilesByProjects } from "../db/knowledge";
@@ -873,7 +875,7 @@ const ensureFfmpegAvailable = (): boolean => {
   return ffmpegAvailable;
 };
 
-const runFfmpeg = async (args: string[], input: Buffer): Promise<Buffer> =>
+const runFfmpeg = async (args: string[], input: Buffer): Promise<Buffer> =>     
   new Promise((resolve, reject) => {
     const child = spawn(FFMPEG_PATH, args, { stdio: ["pipe", "pipe", "pipe"] });
     const stdout: Buffer[] = [];
@@ -896,6 +898,35 @@ const runFfmpeg = async (args: string[], input: Buffer): Promise<Buffer> =>
     child.stdin.on("error", () => undefined);
     child.stdin.end(input);
   });
+
+const runFfmpegWithFiles = async (args: string[]): Promise<Buffer> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(FFMPEG_PATH, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    child.stdout.on("data", (chunk) => {
+      stdout.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve(Buffer.concat(stdout));
+        return;
+      }
+      const message = Buffer.concat(stderr).toString("utf8").trim();
+      reject(new Error(message || `ffmpeg exited with code ${code ?? 1}`));
+    });
+  });
+
+const writeStreamToFile = async (
+  stream: NodeJS.ReadableStream,
+  filePath: string,
+): Promise<void> => {
+  await pipeline(stream, createWriteStream(filePath));
+};
 
 const extractPcm16Samples = (
   buffer: Buffer,
@@ -1457,32 +1488,23 @@ const buildStemGroupAssetsFromBuffer = async (params: {
   return assets;
 };
 
-const collectStemGroupSources = async (params: {
+const collectStemGroupAssets = (params: {
   original: NoisegenOriginal;
-  groupId: string;
   categories: string[];
   includeVocal: boolean;
-}): Promise<Array<{ label: string; buffer: Buffer; mime: string }>> => {
-  const sources: Array<{ label: string; buffer: Buffer; mime: string }> = [];
+}): MixdownAssetEntry[] => {
+  const entries: MixdownAssetEntry[] = [];
   if (params.includeVocal && params.original.assets.vocal) {
-    sources.push({
-      label: "Vocal",
-      buffer: await loadAssetBuffer(params.original.assets.vocal),
-      mime: params.original.assets.vocal.mime,
-    });
-    return sources;
+    entries.push({ label: "Vocal", asset: params.original.assets.vocal });
+    return entries;
   }
   const stems = params.original.assets.stems ?? [];
   for (const stem of stems) {
     const category = stem.category ?? "music";
     if (!params.categories.includes(category)) continue;
-    sources.push({
-      label: stem.name,
-      buffer: await loadAssetBuffer(stem),
-      mime: stem.mime,
-    });
+    entries.push({ label: stem.name, asset: stem });
   }
-  return sources;
+  return entries;
 };
 
 const buildStemGroupAssets = async (
@@ -1491,14 +1513,13 @@ const buildStemGroupAssets = async (
   if (!original.assets.stems?.length && !original.assets.vocal) return [];
   const grouped: NoisegenStemGroupAsset[] = [];
   for (const group of STEM_GROUP_DEFS) {
-    const sources = await collectStemGroupSources({
+    const mixAssets = collectStemGroupAssets({
       original,
-      groupId: group.id,
       categories: group.categories,
       includeVocal: false,
     });
-    if (!sources.length) continue;
-    const mixdown = await mixdownPcm16WavBuffers({ sources });
+    if (!mixAssets.length) continue;
+    const mixdown = await mixdownAssets(mixAssets);
     if (!mixdown) continue;
     const assets = await buildStemGroupAssetsFromBuffer({
       originalId: original.id,
@@ -1511,14 +1532,13 @@ const buildStemGroupAssets = async (
     grouped.push(...assets);
   }
   if (original.assets.vocal) {
-    const sources = await collectStemGroupSources({
+    const mixAssets = collectStemGroupAssets({
       original,
-      groupId: "vocal",
       categories: [],
       includeVocal: true,
     });
-    if (sources.length) {
-      const mixdown = await mixdownPcm16WavBuffers({ sources });
+    if (mixAssets.length) {
+      const mixdown = await mixdownAssets(mixAssets);
       if (mixdown) {
         const assets = await buildStemGroupAssetsFromBuffer({
           originalId: original.id,
@@ -1678,6 +1698,91 @@ const loadAssetBuffer = async (
   return fs.readFile(assetPath);
 };
 
+const resolveAssetPath = (
+  asset: NoisegenOriginalAsset | NoisegenStemAsset,
+): string =>
+  isOriginalAsset(asset) ? resolveOriginalAssetPath(asset) : resolveStemAssetPath(asset);
+
+const resolveMixdownInputFiles = async (
+  assets: MixdownAssetEntry[],
+): Promise<{ files: string[]; tempDir?: string }> => {
+  const files: string[] = [];
+  let tempDir: string | undefined;
+  for (const entry of assets) {
+    const asset = entry.asset;
+    if (isReplitStoragePath(asset.path)) {
+      if (!tempDir) {
+        tempDir = await fs.mkdtemp(path.join(tmpdir(), "noisegen-mixdown-"));
+      }
+      const ext = path.extname(asset.fileName || "") || ".wav";
+      const filePath = path.join(tempDir, `${randomUUID()}${ext}`);
+      const key = resolveReplitStorageKey(asset.path);
+      const stream = await downloadReplitObjectStream(key);
+      await writeStreamToFile(stream, filePath);
+      files.push(filePath);
+      continue;
+    }
+    files.push(resolveAssetPath(asset));
+  }
+  return { files, tempDir };
+};
+
+const mixdownAssetsWithFfmpeg = async (
+  assets: MixdownAssetEntry[],
+): Promise<{ buffer: Buffer; durationMs: number } | null> => {
+  if (!ensureFfmpegAvailable() || assets.length === 0) return null;
+  const { files, tempDir } = await resolveMixdownInputFiles(assets);
+  try {
+    if (!files.length) return null;
+    const args = [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      ...files.flatMap((file) => ["-i", file]),
+      "-filter_complex",
+      `amix=inputs=${files.length}:normalize=0`,
+      "-ac",
+      String(MIXDOWN_CHANNELS),
+      "-ar",
+      String(MIXDOWN_SAMPLE_RATE),
+      "-c:a",
+      "pcm_s16le",
+      "-f",
+      "wav",
+      "pipe:1",
+    ];
+    const buffer = await runFfmpegWithFiles(args);
+    const durationSeconds = estimateDurationSeconds(buffer, "audio/wav");
+    return {
+      buffer,
+      durationMs: Math.max(0, Math.round(durationSeconds * 1000)),
+    };
+  } catch {
+    return null;
+  } finally {
+    if (tempDir) {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  }
+};
+
+const mixdownAssets = async (
+  assets: MixdownAssetEntry[],
+): Promise<{ buffer: Buffer; durationMs: number; loudnessDb?: number } | null> => {
+  if (assets.length === 0) return null;
+  const ffmpegMix = await mixdownAssetsWithFfmpeg(assets);
+  if (ffmpegMix) return ffmpegMix;
+  const sources: Array<{ label: string; buffer: Buffer; mime: string }> = [];
+  for (const entry of assets) {
+    sources.push({
+      label: entry.label,
+      buffer: await loadAssetBuffer(entry.asset),
+      mime: entry.asset.mime,
+    });
+  }
+  return mixdownPcm16WavBuffers({ sources });
+};
+
 const ensurePcm16WavBuffer = (
   buffer: Buffer,
   mime: string,
@@ -1803,26 +1908,21 @@ const buildPlaybackFromInstrumental = (
   uploadedAt: asset.uploadedAt,
 });
 
-const collectMixdownSources = async (
-  original: NoisegenOriginal,
-): Promise<Array<{ label: string; buffer: Buffer; mime: string }>> => {
-  const sources: Array<{ label: string; buffer: Buffer; mime: string }> = [];
+type MixdownAssetEntry = {
+  label: string;
+  asset: NoisegenOriginalAsset | NoisegenStemAsset;
+};
+
+const collectMixdownAssets = (original: NoisegenOriginal): MixdownAssetEntry[] => {
+  const entries: MixdownAssetEntry[] = [];
   const stems = original.assets.stems ?? [];
   for (const stem of stems) {
-    sources.push({
-      label: stem.name,
-      buffer: await loadAssetBuffer(stem),
-      mime: stem.mime,
-    });
+    entries.push({ label: stem.name, asset: stem });
   }
   if (original.assets.vocal) {
-    sources.push({
-      label: "Vocal",
-      buffer: await loadAssetBuffer(original.assets.vocal),
-      mime: original.assets.vocal.mime,
-    });
+    entries.push({ label: "Vocal", asset: original.assets.vocal });
   }
-  return sources;
+  return entries;
 };
 
 const normalizeWavFile = async (
@@ -3251,8 +3351,8 @@ router.post("/api/noise-gens/upload/complete", async (req, res) => {
   });
 
   try {
-    const sources = await collectMixdownSources(original);
-    const mixdown = await mixdownPcm16WavBuffers({ sources });
+    const mixAssets = collectMixdownAssets(original);
+    const mixdown = await mixdownAssets(mixAssets);
     if (!mixdown) {
       throw new Error(
         `Mixdown requires stems decodable to PCM16 WAV at ${MIXDOWN_SAMPLE_RATE} Hz.`,
