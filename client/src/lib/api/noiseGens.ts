@@ -227,25 +227,97 @@ export async function createCoverJob(
   return parseJson<{ id: string }>(res);
 }
 
+export type UploadProgress = {
+  loaded: number;
+  total?: number;
+  pct?: number;
+};
+
+export type UploadOriginalOptions = {
+  signal?: AbortSignal;
+  onProgress?: (progress: UploadProgress) => void;
+};
+
 export async function uploadOriginal(
   formData: FormData,
-  signal?: AbortSignal,
+  options: UploadOriginalOptions = {},
 ): Promise<{ trackId: string }> {
-  const res = await fetch(endpoints.upload, {
-    method: "POST",
-    body: formData,
-    credentials: "include",
-    signal,
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const abortSignal = options.signal;
+
+    const cleanup = () => {
+      if (abortSignal) {
+        abortSignal.removeEventListener("abort", handleAbort);
+      }
+      xhr.upload.onprogress = null;
+      xhr.onload = null;
+      xhr.onerror = null;
+      xhr.onabort = null;
+    };
+
+    const handleAbort = () => {
+      xhr.abort();
+    };
+
+    if (abortSignal) {
+      if (abortSignal.aborted) {
+        reject(new DOMException("Upload aborted", "AbortError"));
+        return;
+      }
+      abortSignal.addEventListener("abort", handleAbort);
+    }
+
+    xhr.open("POST", endpoints.upload);
+    xhr.withCredentials = true;
+    xhr.responseType = "json";
+
+    xhr.upload.onprogress = (event) => {
+      if (!options.onProgress) return;
+      const total = event.lengthComputable ? event.total : undefined;
+      const pct = total && total > 0 ? event.loaded / total : undefined;
+      options.onProgress({ loaded: event.loaded, total, pct });
+    };
+
+    xhr.onload = () => {
+      cleanup();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const response =
+          typeof xhr.response === "object" && xhr.response
+            ? (xhr.response as { trackId?: string })
+            : (() => {
+                try {
+                  return JSON.parse(xhr.responseText);
+                } catch {
+                  return null;
+                }
+              })();
+        if (response?.trackId) {
+          resolve({ trackId: response.trackId });
+        } else {
+          reject(new Error("Upload succeeded but response was invalid."));
+        }
+        return;
+      }
+      const errorMessage =
+        xhr.responseText ||
+        xhr.statusText ||
+        `Upload failed with status ${xhr.status ?? "unknown"}`;
+      reject(new Error(errorMessage));
+    };
+
+    xhr.onerror = () => {
+      cleanup();
+      reject(new Error("Upload failed due to a network error."));
+    };
+
+    xhr.onabort = () => {
+      cleanup();
+      reject(new DOMException("Upload aborted", "AbortError"));
+    };
+
+    xhr.send(formData);
   });
-
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(
-      errorBody || `Upload failed with status ${res.status ?? "unknown"}`,
-    );
-  }
-
-  return parseJson<{ trackId: string }>(res);
 }
 
 export async function uploadCoverPreview(

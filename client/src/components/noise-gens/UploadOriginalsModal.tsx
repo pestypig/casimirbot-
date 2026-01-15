@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
@@ -81,6 +82,14 @@ type StemEntry = {
   file: File;
   category: StemCategory;
   inferred: StemCategory;
+};
+
+type UploadFileProgress = {
+  id: string;
+  name: string;
+  bytes: number;
+  loaded: number;
+  pct: number;
 };
 
 const STEM_CATEGORY_LABELS: Record<StemCategory, string> = {
@@ -286,6 +295,15 @@ export function UploadOriginalsModal({
   const [bpm, setBpm] = useState<string>("");
   const [quantized, setQuantized] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadFileProgress[] | null>(
+    null,
+  );
+  const [uploadTotalProgress, setUploadTotalProgress] = useState<{
+    loaded: number;
+    total?: number;
+    pct?: number;
+  } | null>(null);
+  const uploadFilesRef = useRef<UploadFileProgress[]>([]);
 
   useEffect(() => {
     if (!open) {
@@ -299,6 +317,9 @@ export function UploadOriginalsModal({
       setBpm("");
       setQuantized(true);
       setIsSubmitting(false);
+      setUploadProgress(null);
+      setUploadTotalProgress(null);
+      uploadFilesRef.current = [];
     }
   }, [open]);
 
@@ -571,6 +592,31 @@ export function UploadOriginalsModal({
     if (!canSubmit) return;
     try {
       setIsSubmitting(true);
+      const uploadFiles: UploadFileProgress[] = [
+        ...(stemSummary.mixEntry ? [stemSummary.mixEntry] : []),
+        ...(stemSummary.vocalEntry ? [stemSummary.vocalEntry] : []),
+        ...stemSummary.stemUploads,
+      ].map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        bytes: entry.file.size,
+        loaded: 0,
+        pct: 0,
+      }));
+      uploadFilesRef.current = uploadFiles;
+      if (uploadFiles.length) {
+        setUploadProgress(uploadFiles);
+        const totalBytes = uploadFiles.reduce((sum, file) => sum + file.bytes, 0);
+        setUploadTotalProgress({
+          loaded: 0,
+          total: totalBytes > 0 ? totalBytes : undefined,
+          pct: totalBytes > 0 ? 0 : undefined,
+        });
+      } else {
+        setUploadProgress(null);
+        setUploadTotalProgress(null);
+      }
+
       const payload = new FormData();
       payload.append("title", title.value.trim());
       payload.append("creator", creator.value.trim());
@@ -611,7 +657,28 @@ export function UploadOriginalsModal({
         };
         payload.append("tempo", JSON.stringify(tempoMeta));
       }
-      const result = await uploadOriginal(payload);
+      const result = await uploadOriginal(payload, {
+        onProgress: (progress) => {
+          const files = uploadFilesRef.current;
+          if (!files.length) return;
+          const totalBytes = files.reduce((sum, file) => sum + file.bytes, 0);
+          const total = progress.total ?? (totalBytes > 0 ? totalBytes : undefined);
+          const loaded = total ? Math.min(progress.loaded, total) : progress.loaded;
+          let remaining = loaded;
+          const next = files.map((file) => {
+            const fileLoaded = Math.max(0, Math.min(file.bytes, remaining));
+            remaining = Math.max(0, remaining - file.bytes);
+            const pct = file.bytes > 0 ? fileLoaded / file.bytes : 1;
+            return { ...file, loaded: fileLoaded, pct };
+          });
+          setUploadProgress(next);
+          setUploadTotalProgress({
+            loaded,
+            total,
+            pct: total && total > 0 ? Math.min(1, loaded / total) : undefined,
+          });
+        },
+      });
       toast({
         title: "Upload queued",
         description: "We will notify you when mastering finishes.",
@@ -860,6 +927,36 @@ export function UploadOriginalsModal({
             />
           </div>
         </div>
+
+        {uploadProgress && uploadProgress.length ? (
+          <div className="rounded-lg border border-white/10 bg-slate-950/60 p-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Uploading {uploadProgress.length} file(s)</span>
+              {uploadTotalProgress?.pct != null ? (
+                <span>{Math.round(uploadTotalProgress.pct * 100)}%</span>
+              ) : null}
+            </div>
+            <Progress
+              value={
+                uploadTotalProgress?.pct != null
+                  ? Math.round(uploadTotalProgress.pct * 100)
+                  : 0
+              }
+              className="mt-2 h-2"
+            />
+            <div className="mt-3 space-y-2">
+              {uploadProgress.map((file) => (
+                <div key={file.id} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="truncate">{file.name}</span>
+                    <span>{Math.round(file.pct * 100)}%</span>
+                  </div>
+                  <Progress value={Math.round(file.pct * 100)} className="h-1.5" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <DialogFooter className="gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
