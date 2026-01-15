@@ -1035,7 +1035,7 @@ const resolveSectionLabel = (
 };
 
 const resolvePlanKbTexture = (
-  input: RenderPlanWindow["texture"]?.["kbTexture"] | undefined,
+  input: NonNullable<RenderPlanWindow["texture"]>["kbTexture"] | undefined,
   manifest: ManifestRecord,
   fallback?: TextureFingerprint,
 ) => {
