@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   DndContext,
@@ -236,6 +237,7 @@ export default function HelixNoiseGensPage() {
     }),
   );
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { updateProject, projects: knowledgeProjects } = useKnowledgeProjectsStore((state) => ({
     updateProject: state.updateProject,
     projects: state.projects,
@@ -567,12 +569,16 @@ export default function HelixNoiseGensPage() {
       bumpOriginalAvailabilityVersion();
       recordRecentUpload(payload);
       void markNoiseAlbumPublished(payload, trimmedTitle, trimmedCreator);
+      void queryClient.invalidateQueries({ queryKey: ["noise-gens", "originals"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["noise-gens", "originals", "pending"],
+      });
       toast({
         title: "Upload received",
         description: "We will surface the new original once it is ranked.",
       });
     },
-    [markNoiseAlbumPublished, recordRecentUpload, toast],
+    [markNoiseAlbumPublished, queryClient, recordRecentUpload, toast],
   );
 
   const handleOpenLibraryRequest = useCallback(() => {

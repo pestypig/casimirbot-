@@ -36,6 +36,7 @@ type PlayerSource = {
   id: string;
   url: string;
   label: string;
+  bytes?: number;
 };
 
 type SourceMode = "mix" | "stems" | "fallback" | null;
@@ -272,6 +273,7 @@ const buildStemSources = (stems: OriginalStem[]): PlayerSource[] =>
     id: stem.id,
     url: stem.url,
     label: stem.category ? stem.category.toUpperCase() : stem.name,
+    bytes: stem.size,
   }));
 
 const checkOriginalAsset = async (
@@ -283,7 +285,14 @@ const checkOriginalAsset = async (
   try {
     const res = await fetch(url, { method: "HEAD" });
     if (!res.ok) return null;
-    return { id: kind, url, label };
+    const lengthHeader = res.headers.get("content-length");
+    const lengthValue = lengthHeader ? Number(lengthHeader) : Number.NaN;
+    return {
+      id: kind,
+      url,
+      label,
+      bytes: Number.isFinite(lengthValue) ? lengthValue : undefined,
+    };
   } catch {
     return null;
   }
@@ -325,6 +334,7 @@ export function OriginalsPlayer({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const detailsCacheRef = useRef<Map<string, OriginalDetails | null>>(new Map());
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const buffersRef = useRef<Record<string, AudioBuffer | null>>({});
@@ -337,7 +347,11 @@ export function OriginalsPlayer({
   const [playableCount, setPlayableCount] = useState(0);
   const [autoPlayPending, setAutoPlayPending] = useState(false);
   const lastAutoPlayRef = useRef<number | null>(null);
-  const useElementPlayback = sources.length === 1;
+  // Stream stems via media elements to avoid decoding large buffers in memory.
+  const useElementPlayback =
+    sources.length === 1 ||
+    sourceMode === "stems" ||
+    (sourceMode === null && sources.length > 1);
 
   useEffect(() => {
     let cancelled = false;
@@ -486,7 +500,9 @@ export function OriginalsPlayer({
   }, []);
 
   const stopPlayback = useCallback(() => {
-    if (audioElementRef.current) {
+    if (audioElementsRef.current.size) {
+      audioElementsRef.current.forEach((audio) => audio.pause());
+    } else if (audioElementRef.current) {
       audioElementRef.current.pause();
     }
     activeSourcesRef.current.forEach(({ source }) => {
@@ -503,9 +519,15 @@ export function OriginalsPlayer({
   }, [stopRaf]);
 
   const pausePlayback = useCallback(() => {
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      setCurrentTime(audioElementRef.current.currentTime);
+    if (audioElementsRef.current.size || audioElementRef.current) {
+      audioElementsRef.current.forEach((audio) => audio.pause());
+      const leader =
+        audioElementRef.current ??
+        audioElementsRef.current.values().next().value ??
+        null;
+      if (leader) {
+        setCurrentTime(leader.currentTime);
+      }
       setIsPlaying(false);
       return;
     }
@@ -568,6 +590,11 @@ export function OriginalsPlayer({
           const response = await fetch(source.url, {
             signal: controller.signal,
           });
+          if (!response.ok) {
+            throw new Error(
+              `Failed to load ${source.label} (${response.status})`,
+            );
+          }
           const data = await response.arrayBuffer();
           const buffer = await ctx.decodeAudioData(data);
           loaded[source.id] = buffer;
@@ -576,7 +603,11 @@ export function OriginalsPlayer({
         } catch (error) {
           if (controller.signal.aborted || cancelled) return;
           loaded[source.id] = null;
-          setLoadError((prev) => prev ?? `Could not decode ${source.label}`);
+          const message =
+            error instanceof Error
+              ? error.message
+              : `Could not decode ${source.label}`;
+          setLoadError((prev) => prev ?? message);
         }
       }
       if (cancelled) return;
@@ -608,6 +639,11 @@ export function OriginalsPlayer({
 
   useEffect(() => {
     if (!useElementPlayback || sources.length === 0) {
+      audioElementsRef.current.forEach((audio) => {
+        audio.pause();
+        audio.src = "";
+      });
+      audioElementsRef.current.clear();
       if (audioElementRef.current) {
         audioElementRef.current.pause();
         audioElementRef.current.src = "";
@@ -617,10 +653,18 @@ export function OriginalsPlayer({
     }
 
     let cancelled = false;
-    const audio = new Audio();
-    audio.preload = "metadata";
-    audio.src = sources[0].url;
-    audioElementRef.current = audio;
+    const elements = new Map<string, HTMLAudioElement>();
+    const handlers = new Map<
+      string,
+      {
+        loaded: () => void;
+        time: () => void;
+        ended: () => void;
+        error: () => void;
+      }
+    >();
+    const loadedIds = new Set<string>();
+    let longest = 0;
 
     setIsLoading(true);
     setLoadError(null);
@@ -628,48 +672,96 @@ export function OriginalsPlayer({
     setDuration(0);
     setCurrentTime(0);
 
-    const handleLoaded = () => {
-      if (cancelled) return;
-      setDuration(audio.duration || 0);
-      setPlayableCount(1);
-      setIsLoading(false);
-    };
-    const handleError = () => {
-      if (cancelled) return;
-      setLoadError(`Could not decode ${sources[0]?.label ?? "song"}`);
-      setPlayableCount(0);
-      setIsLoading(false);
-    };
-    const handleTime = () => {
-      if (cancelled) return;
-      setCurrentTime(audio.currentTime);
-    };
-    const handleEnded = () => {
-      if (cancelled) return;
-      setIsPlaying(false);
-      setCurrentTime(audio.duration || 0);
-    };
+    sources.forEach((source, index) => {
+      const audio = new Audio();
+      audio.preload = "metadata";
+      audio.src = source.url;
+      audio.volume = volume;
 
-    audio.addEventListener("loadedmetadata", handleLoaded);
-    audio.addEventListener("timeupdate", handleTime);
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("error", handleError);
-    audio.load();
+      const handleLoaded = () => {
+        if (cancelled) return;
+        loadedIds.add(source.id);
+        const durationValue = Number.isFinite(audio.duration)
+          ? audio.duration
+          : 0;
+        if (durationValue > longest) {
+          longest = durationValue;
+        }
+        setPlayableCount(loadedIds.size);
+        setDuration(longest);
+        if (loadedIds.size >= sources.length) {
+          setIsLoading(false);
+        }
+      };
+      const handleError = () => {
+        if (cancelled) return;
+        setLoadError((prev) => prev ?? `Could not decode ${source.label}`);
+        setIsLoading(false);
+      };
+      const handleTime = () => {
+        if (cancelled) return;
+        if (index === 0) {
+          setCurrentTime(audio.currentTime);
+        }
+      };
+      const handleEnded = () => {
+        if (cancelled) return;
+        if (index === 0) {
+          setIsPlaying(false);
+          setCurrentTime(audio.duration || 0);
+        }
+      };
+
+      audio.addEventListener("loadedmetadata", handleLoaded);
+      audio.addEventListener("timeupdate", handleTime);
+      audio.addEventListener("ended", handleEnded);
+      audio.addEventListener("error", handleError);
+      audio.load();
+
+      handlers.set(source.id, {
+        loaded: handleLoaded,
+        time: handleTime,
+        ended: handleEnded,
+        error: handleError,
+      });
+      elements.set(source.id, audio);
+    });
+
+    audioElementsRef.current = elements;
+    audioElementRef.current = sources[0]?.id
+      ? elements.get(sources[0].id) ?? null
+      : null;
 
     return () => {
       cancelled = true;
-      audio.pause();
-      audio.removeEventListener("loadedmetadata", handleLoaded);
-      audio.removeEventListener("timeupdate", handleTime);
-      audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("error", handleError);
-      if (audioElementRef.current === audio) {
+      elements.forEach((audio, id) => {
+        const entry = handlers.get(id);
+        if (entry) {
+          audio.removeEventListener("loadedmetadata", entry.loaded);
+          audio.removeEventListener("timeupdate", entry.time);
+          audio.removeEventListener("ended", entry.ended);
+          audio.removeEventListener("error", entry.error);
+        }
+        audio.pause();
+        audio.src = "";
+      });
+      if (
+        audioElementRef.current &&
+        audioElementRef.current === elements.get(sources[0]?.id ?? "")
+      ) {
         audioElementRef.current = null;
       }
+      audioElementsRef.current.clear();
     };
   }, [sources, useElementPlayback]);
 
   useEffect(() => {
+    if (audioElementsRef.current.size) {
+      audioElementsRef.current.forEach((audio) => {
+        audio.volume = volume;
+      });
+      return;
+    }
     if (audioElementRef.current) {
       audioElementRef.current.volume = volume;
       return;
@@ -704,17 +796,25 @@ export function OriginalsPlayer({
       if (sources.length === 0) return;
       stopPlayback();
 
-      if (audioElementRef.current) {
-        const audio = audioElementRef.current;
-        try {
-          audio.currentTime = Math.max(0, offsetSec);
-        } catch {
-          /* ignore */
-        }
-        try {
-          await audio.play();
+      if (audioElementsRef.current.size || audioElementRef.current) {
+        const elements = audioElementsRef.current.size
+          ? Array.from(audioElementsRef.current.values())
+          : audioElementRef.current
+            ? [audioElementRef.current]
+            : [];
+        elements.forEach((audio) => {
+          try {
+            audio.currentTime = Math.max(0, offsetSec);
+          } catch {
+            /* ignore */
+          }
+        });
+        const results = await Promise.allSettled(
+          elements.map((audio) => audio.play()),
+        );
+        if (results.some((result) => result.status === "fulfilled")) {
           setIsPlaying(true);
-        } catch {
+        } else {
           setLoadError("Unable to start playback.");
         }
         return;
@@ -765,17 +865,31 @@ export function OriginalsPlayer({
     pausePlayback();
   }, [pausePlayback]);
 
+  const requiresAllSources = sourceMode === "stems";
+  const hasPlayable =
+    sources.length > 0 &&
+    (requiresAllSources ? playableCount >= sources.length : playableCount > 0);
+
   const handlePlay = useCallback(() => {
-    if (playableCount <= 0 || isLoading) return;
+    if (!hasPlayable || isLoading) return;
     requestAudioFocus({ id: playerIdRef.current, stop: handlePause });
     const resumeFrom = duration > 0 && currentTime >= duration ? 0 : currentTime;
     void startPlayback(resumeFrom);
-  }, [currentTime, duration, handlePause, isLoading, playableCount, startPlayback]);
+  }, [currentTime, duration, handlePause, hasPlayable, isLoading, startPlayback]);
 
   const handleSeek = useCallback(
     (value: number) => {
       const safe = Math.max(0, Math.min(duration || 0, value));
       setCurrentTime(safe);
+      if (audioElementsRef.current.size) {
+        audioElementsRef.current.forEach((audio) => {
+          audio.currentTime = safe;
+          if (isPlaying) {
+            void audio.play().catch(() => null);
+          }
+        });
+        return;
+      }
       if (audioElementRef.current) {
         audioElementRef.current.currentTime = safe;
         return;
@@ -963,7 +1077,6 @@ export function OriginalsPlayer({
   const previewMoods = moodPresets.slice(0, 5);
   const showVaryControls = Boolean(onVary) && previewMoods.length > 0;
   const initials = buildInitials(original?.title, original?.artist);
-  const hasPlayable = playableCount > 0;
   const isReady = hasPlayable && !isLoading;
   const timeSky = details?.timeSky;
   const publishedLabel = formatDate(
