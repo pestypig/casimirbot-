@@ -68,6 +68,7 @@ const MIXDOWN_SAMPLE_RATE = 44_100;
 const MIXDOWN_CHANNELS = 2;
 const PLAYBACK_OPUS_BITRATE = "160k";
 const PLAYBACK_AAC_BITRATE = "192k";
+const PLAYBACK_MP3_BITRATE = "192k";
 const STEM_GROUP_DEFS = [
   { id: "drums", label: "Drums", categories: ["drums"] },
   { id: "bass", label: "Bass", categories: ["bass"] },
@@ -1169,6 +1170,34 @@ const buildPlaybackDerivatives = async (params: {
     ],
   });
   if (aac) assets.push(aac);
+  const mp3 = await transcodePlaybackVariant({
+    originalId: params.originalId,
+    buffer: params.buffer,
+    playbackId: "mix-mp3",
+    label: params.label,
+    codec: "mp3",
+    mime: "audio/mpeg",
+    originalName: "mix.mp3",
+    args: [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-i",
+      "pipe:0",
+      "-c:a",
+      "libmp3lame",
+      "-b:a",
+      PLAYBACK_MP3_BITRATE,
+      "-ac",
+      String(MIXDOWN_CHANNELS),
+      "-ar",
+      String(MIXDOWN_SAMPLE_RATE),
+      "-f",
+      "mp3",
+      "pipe:1",
+    ],
+  });
+  if (mp3) assets.push(mp3);
   return assets;
 };
 
@@ -1372,6 +1401,39 @@ const buildStemGroupAssetsFromBuffer = async (params: {
       ],
     });
     if (aac) assets.push(aac);
+    const mp3 = await transcodeStemGroupVariant({
+      originalId: params.originalId,
+      groupId: params.groupId,
+      label: params.label,
+      category: params.category,
+      assetId: `${params.groupId}-mp3`,
+      codec: "mp3",
+      mime: "audio/mpeg",
+      originalName: `${params.groupId}.mp3`,
+      durationMs: params.durationMs,
+      sampleRate: format.sampleRate,
+      channels: format.channels,
+      buffer: normalized.buffer,
+      args: [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "pipe:0",
+        "-c:a",
+        "libmp3lame",
+        "-b:a",
+        PLAYBACK_MP3_BITRATE,
+        "-ac",
+        String(MIXDOWN_CHANNELS),
+        "-ar",
+        String(MIXDOWN_SAMPLE_RATE),
+        "-f",
+        "mp3",
+        "pipe:1",
+      ],
+    });
+    if (mp3) assets.push(mp3);
   }
 
   if (assets.length === 0) {
@@ -2370,7 +2432,7 @@ router.get("/api/noise-gens/capabilities", (_req, res) => {
   const ffmpeg = ensureFfmpegAvailable();
   const codecs = ["wav"];
   if (ffmpeg) {
-    codecs.push("aac", "opus");
+    codecs.push("aac", "opus", "mp3");
   }
   return res.json({ ffmpeg, codecs });
 });
