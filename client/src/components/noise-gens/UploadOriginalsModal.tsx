@@ -326,6 +326,12 @@ export function UploadOriginalsModal({
     pct?: number;
   } | null>(null);
   const uploadFilesRef = useRef<UploadFileProgress[]>([]);
+  const isUploading =
+    isSubmitting ||
+    (uploadProgress?.some((file) =>
+      ["queued", "uploading", "processing"].includes(file.status),
+    ) ??
+      false);
   const [capabilities, setCapabilities] = useState<NoisegenCapabilities | null>(
     null,
   );
@@ -548,6 +554,19 @@ export function UploadOriginalsModal({
       ? "Uploading..."
       : "Upload";
   const submitButtonDisabled = requiresAuth ? false : !canSubmit;
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && isUploading) {
+        toast({
+          title: "Upload in progress",
+          description: "Keep this window open until the upload finishes.",
+        });
+        return;
+      }
+      onOpenChange(nextOpen);
+    },
+    [isUploading, onOpenChange, toast],
+  );
 
   const bpmNumeric = useMemo(() => sanitizeBpmInput(bpm), [bpm]);
 
@@ -897,8 +916,21 @@ export function UploadOriginalsModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" aria-modal="true">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+        aria-modal="true"
+        onInteractOutside={(event) => {
+          if (isUploading) {
+            event.preventDefault();
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (isUploading) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Upload Originals</DialogTitle>
           <DialogDescription>
@@ -930,6 +962,11 @@ export function UploadOriginalsModal({
             ) : null}
           </div>
         </DialogHeader>
+        {isUploading ? (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+            Upload in progress. Keep this window open until publishing finishes.
+          </div>
+        ) : null}
 
         {prefill?.sourceHint ? (
           <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
@@ -1184,7 +1221,12 @@ export function UploadOriginalsModal({
         ) : null}
 
         <DialogFooter className="gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            disabled={isUploading}
+          >
             Cancel
           </Button>
           <Button

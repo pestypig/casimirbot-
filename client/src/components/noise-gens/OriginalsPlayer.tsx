@@ -271,6 +271,29 @@ const PLAYBACK_PRIORITY: Record<string, number> = {
   wav: 3,
 };
 
+const filterPlayableSources = (sources: PlayerSource[]): PlayerSource[] => {
+  if (typeof window === "undefined" || sources.length === 0) return sources;
+  const probe = document.createElement("audio");
+  const supported = sources.filter((source) => {
+    if (!source.mime) return true;
+    const verdict = probe.canPlayType(source.mime);
+    return verdict === "probably" || verdict === "maybe";
+  });
+  return supported.length > 0 ? supported : sources;
+};
+
+const filterPlayableStemSources = (
+  sources: StemGroupSource[],
+): StemGroupSource[] => {
+  if (typeof window === "undefined" || sources.length === 0) return sources;
+  const probe = document.createElement("audio");
+  const supported = sources.filter((source) => {
+    const verdict = probe.canPlayType(source.mime);
+    return verdict === "probably" || verdict === "maybe";
+  });
+  return supported.length > 0 ? supported : sources;
+};
+
 const buildPlaybackSources = (
   assets?: OriginalDetails["playback"],
 ): PlayerSource[] => {
@@ -280,13 +303,14 @@ const buildPlaybackSources = (
       (PLAYBACK_PRIORITY[a.codec] ?? 99) -
       (PLAYBACK_PRIORITY[b.codec] ?? 99),
   );
-  return sorted.map((asset) => ({
+  const mapped = sorted.map((asset) => ({
     id: asset.id,
     url: asset.url,
     label: asset.label,
     bytes: asset.size,
     mime: asset.mime,
   }));
+  return filterPlayableSources(mapped);
 };
 
 const pickStemGroupSource = (
@@ -298,7 +322,8 @@ const pickStemGroupSource = (
       (PLAYBACK_PRIORITY[a.codec] ?? 99) -
       (PLAYBACK_PRIORITY[b.codec] ?? 99),
   );
-  return sorted[0] ?? null;
+  const filtered = filterPlayableStemSources(sorted);
+  return filtered[0] ?? null;
 };
 
 const checkOriginalAsset = async (
@@ -906,8 +931,30 @@ export function OriginalsPlayer({
     [],
   );
 
+  const resolvePlayError = useCallback(
+    (results: PromiseSettledResult<unknown>[]): string | null => {
+      const rejected = results.filter(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+      const reasons = rejected.map(
+        (result) => result.reason as { name?: string } | undefined,
+      );
+      if (reasons.some((reason) => reason?.name === "AbortError")) {
+        return null;
+      }
+      if (reasons.some((reason) => reason?.name === "NotAllowedError")) {
+        return "Tap play to start audio.";
+      }
+      if (reasons.some((reason) => reason?.name === "NotSupportedError")) {
+        return "This browser cannot play the current audio format.";
+      }
+      return "Unable to start playback.";
+    },
+    [],
+  );
+
   const startPlayback = useCallback(
-    async (offsetSec = 0) => {
+    async (offsetSec = 0, reportError = true) => {
       if (sources.length === 0) return;
       stopPlayback();
 
@@ -929,8 +976,16 @@ export function OriginalsPlayer({
         );
         if (results.some((result) => result.status === "fulfilled")) {
           setIsPlaying(true);
+          if (reportError) {
+            setLoadError(null);
+          }
         } else {
-          setLoadError("Unable to start playback.");
+          if (reportError) {
+            const message = resolvePlayError(results);
+            if (message) {
+              setLoadError(message);
+            }
+          }
         }
         return;
       }
@@ -973,7 +1028,15 @@ export function OriginalsPlayer({
       setIsPlaying(true);
       startRaf();
     },
-    [duration, ensureAudioContext, sources, startRaf, stopPlayback, volume],    
+    [
+      duration,
+      ensureAudioContext,
+      resolvePlayError,
+      sources,
+      startRaf,
+      stopPlayback,
+      volume,
+    ],
   );
 
   const startStemPlayback = useCallback(
@@ -1176,7 +1239,8 @@ export function OriginalsPlayer({
     (requiresAllSources ? playableCount >= sources.length : playableCount > 0);
   const remixPlayable = remixStatus === "ready" || remixStatus === "active";
 
-  const handlePlay = useCallback(() => {
+  const handlePlay = useCallback((options?: { reportError?: boolean }) => {
+    const reportError = options?.reportError ?? true;
     const shouldUseRemix =
       remixStatus === "active" ||
       (remixStatus === "ready" && remixRequestedRef.current);
@@ -1188,9 +1252,12 @@ export function OriginalsPlayer({
       return;
     }
     if (!hasPlayable || isLoading) return;
+    if (reportError) {
+      setLoadError(null);
+    }
     requestAudioFocus({ id: playerIdRef.current, stop: handlePause });
     const resumeFrom = duration > 0 && currentTime >= duration ? 0 : currentTime;
-    void startPlayback(resumeFrom);
+    void startPlayback(resumeFrom, reportError);
   }, [
     currentTime,
     duration,
@@ -1451,7 +1518,7 @@ export function OriginalsPlayer({
   useEffect(() => {
     if (!autoPlayPending) return;
     if (!isReady || isPlaying) return;
-    void handlePlay();
+    void handlePlay({ reportError: false });
     setAutoPlayPending(false);
   }, [autoPlayPending, handlePlay, isPlaying, isReady]);
 
@@ -1506,7 +1573,7 @@ export function OriginalsPlayer({
               size="icon"
               variant="secondary"
               disabled={!isReady}
-              onClick={isPlaying ? handlePause : handlePlay}
+              onClick={isPlaying ? handlePause : () => handlePlay()}
               aria-label={isPlaying ? "Pause song" : "Play song"}
             >
               {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
