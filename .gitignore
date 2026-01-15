@@ -10,7 +10,6 @@ data/noisegen/*
 !data/noisegen/store.json
 !data/noisegen/originals/
 data/noisegen/originals/*
-!data/noisegen/originals/1b014c10-2e86-4951-ae10-d5245578d930/**
 !client/src/data/
 !client/src/data/**
 # Simulation output artifacts (large, reproducible)
@@ -57,6 +56,12 @@ coverage/
 attached_assets/*.png
 client/public/galaxymap.png
 dist/public/galaxymap.png
+
+# Noisegen bundled audio (keep only the tiny default)
+client/public/originals/*
+!client/public/originals/default/
+!client/public/originals/default/**
+!client/public/originals/manifest.json
 
 # Calibration artifacts and local backups
 .cal/
