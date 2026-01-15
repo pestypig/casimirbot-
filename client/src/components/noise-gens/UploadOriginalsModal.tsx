@@ -306,7 +306,9 @@ export function UploadOriginalsModal({
     [filter],
   );
   const [title, setTitle] = useState<FieldState>({ value: "", error: null });
+  const [titleTouched, setTitleTouched] = useState(false);
   const [creator, setCreator] = useState<FieldState>({ value: "", error: null });
+  const [creatorTouched, setCreatorTouched] = useState(false);
   const [lyrics, setLyrics] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(
     undefined,
@@ -315,6 +317,7 @@ export function UploadOriginalsModal({
   const stemSourceRef = useRef<string>("");
   const [offsetMs, setOffsetMs] = useState(0);
   const [bpm, setBpm] = useState<string>("");
+  const [bpmTouched, setBpmTouched] = useState(false);
   const [quantized, setQuantized] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadFileProgress[] | null>(
@@ -341,13 +344,16 @@ export function UploadOriginalsModal({
   useEffect(() => {
     if (!open) {
       setTitle({ value: "", error: null });
+      setTitleTouched(false);
       setCreator({ value: "", error: null });
+      setCreatorTouched(false);
       setLyrics("");
       setSelectedProjectId(undefined);
       setStemEntries([]);
       stemSourceRef.current = "";
       setOffsetMs(0);
       setBpm("");
+      setBpmTouched(false);
       setQuantized(true);
       setIsSubmitting(false);
       setUploadProgress(null);
@@ -402,19 +408,27 @@ export function UploadOriginalsModal({
     if (!open || !selectedProject) return;
     const projectName = selectedProject.name?.trim();
     if (!projectName) return;
-    if (!title.value.trim()) {
+    if (!titleTouched && !title.value.trim()) {
       setTitle({
         value: projectName,
         error: validateField("Title", projectName, MAX_TITLE),
       });
     }
-    if (!creator.value.trim()) {
+    if (!creatorTouched && !creator.value.trim()) {
       setCreator({
         value: projectName,
         error: validateField("Creator", projectName, MAX_CREATOR),
       });
     }
-  }, [creator.value, open, selectedProject, title.value, validateField]);
+  }, [
+    creator.value,
+    creatorTouched,
+    open,
+    selectedProject,
+    title.value,
+    titleTouched,
+    validateField,
+  ]);
   const projectFilesList = useMemo<KnowledgeFileRecord[]>(() => {
     if (!selectedProjectId) return [];
     return projectFiles[selectedProjectId] ?? [];
@@ -495,17 +509,17 @@ export function UploadOriginalsModal({
   useEffect(() => {
     if (!open || stemEntries.length === 0) return;
     const metadata = extractFileMetadata(stemEntries[0].file);
-    if (metadata?.title && !title.value.trim()) {
+    if (metadata?.title && !titleTouched && !title.value.trim()) {
       const clipped = metadata.title.slice(0, MAX_TITLE);
       setTitle({
         value: clipped,
         error: validateField("Title", clipped, MAX_TITLE),
       });
     }
-    if (metadata?.bpm && !bpm) {
+    if (metadata?.bpm && !bpmTouched && !bpm) {
       setBpm(metadata.bpm.toFixed(2));
     }
-  }, [bpm, open, stemEntries, title.value, validateField]);
+  }, [bpm, bpmTouched, open, stemEntries, title.value, titleTouched, validateField]);
 
   const stemSummary = useMemo(() => {
     const mixEntries = stemEntries.filter((entry) => entry.category === "mix");
@@ -983,12 +997,13 @@ export function UploadOriginalsModal({
                 placeholder="Orbiting Signals"
                 maxLength={MAX_TITLE}
                 value={title.value}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setTitleTouched(true);
                   setTitle({
                     value: event.target.value,
                     error: validateField("Title", event.target.value, MAX_TITLE),
-                  })
-                }
+                  });
+                }}
               />
               {title.error ? (
                 <p className="text-xs text-destructive">{title.error}</p>
@@ -1005,12 +1020,13 @@ export function UploadOriginalsModal({
                 placeholder="Helix Lab"
                 maxLength={MAX_CREATOR}
                 value={creator.value}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setCreatorTouched(true);
                   setCreator({
                     value: event.target.value,
                     error: validateField("Creator", event.target.value, MAX_CREATOR),
-                  })
-                }
+                  });
+                }}
               />
               {creator.error ? (
                 <p className="text-xs text-destructive">{creator.error}</p>
@@ -1134,6 +1150,7 @@ export function UploadOriginalsModal({
                   onChange={(event) => {
                     const raw = event.target.value;
                     if (raw === "" || isBpmInputValue(raw)) {
+                      setBpmTouched(true);
                       setBpm(raw);
                     }
                   }}

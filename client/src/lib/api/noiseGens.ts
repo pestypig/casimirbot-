@@ -139,7 +139,16 @@ export async function fetchStemPack(
 export async function fetchNoisegenCapabilities(
   signal?: AbortSignal,
 ): Promise<NoisegenCapabilities> {
-  const res = await apiRequest("GET", endpoints.capabilities, undefined, signal);
+  const cacheBust = `ts=${Date.now()}`;
+  const url = endpoints.capabilities.includes("?")
+    ? `${endpoints.capabilities}&${cacheBust}`
+    : `${endpoints.capabilities}?${cacheBust}`;
+  const res = await apiRequest("GET", url, undefined, signal, {
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
   return parseJson<NoisegenCapabilities>(res);
 }
 

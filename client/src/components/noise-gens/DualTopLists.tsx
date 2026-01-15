@@ -146,6 +146,37 @@ function buildRankedList<T extends { id: string; listens: number }>(
   return scored.map(({ item, rank }) => ({ ...item, rank }));
 }
 
+const normalizeOriginalKey = (item: Original) =>
+  `${item.title?.trim().toLowerCase() ?? ""}::${item.artist
+    ?.trim()
+    .toLowerCase() ?? ""}`;
+
+function pickLatestOriginal<T extends Original>(current: T, next: T): T {
+  const currentStamp = current.uploadedAt ?? 0;
+  const nextStamp = next.uploadedAt ?? 0;
+  if (nextStamp !== currentStamp) {
+    return nextStamp > currentStamp ? next : current;
+  }
+  if (next.listens !== current.listens) {
+    return next.listens > current.listens ? next : current;
+  }
+  if (next.duration !== current.duration) {
+    return next.duration > current.duration ? next : current;
+  }
+  return current;
+}
+
+function dedupeOriginalsByTitle<T extends Original>(items: T[]): T[] {
+  if (!items.length) return [];
+  const map = new Map<string, T>();
+  for (const item of items) {
+    const key = normalizeOriginalKey(item);
+    const existing = map.get(key);
+    map.set(key, existing ? pickLatestOriginal(existing, item) : item);
+  }
+  return Array.from(map.values());
+}
+
 function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -467,8 +498,9 @@ export function DualTopLists({
   }, [generationsData, onGenerationsPresenceChange, showGenerations]);
 
   const originals = useMemo<RankedOriginal[]>(() => {
+    const deduped = dedupeOriginalsByTitle(originalsData ?? []);
     return buildRankedList(
-      originalsData ?? [],
+      deduped,
       debouncedOriginals,
       (item) => [item.title, item.artist],
       {
@@ -480,7 +512,8 @@ export function DualTopLists({
 
   const pendingOriginals = useMemo(() => {
     const rankedIds = new Set(originals.map((original) => original.id));
-    return (pendingOriginalsData ?? [])
+    const deduped = dedupeOriginalsByTitle(pendingOriginalsData ?? []);
+    return deduped
       .filter((original) => !rankedIds.has(original.id))
       .map((original) => ({ ...original, status: "pending" as const }));
   }, [originals, pendingOriginalsData]);

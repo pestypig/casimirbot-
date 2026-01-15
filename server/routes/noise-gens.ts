@@ -2320,6 +2320,7 @@ router.get("/api/noise-gens/originals", async (req, res) => {
       duration: original.duration ?? 0,
       tempo: original.tempo ?? undefined,
       stemCount: original.assets.stems?.length ?? 0,
+      uploadedAt: original.uploadedAt,
     })),
   );
 });
