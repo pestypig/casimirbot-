@@ -31,6 +31,12 @@ export type NoisegenOriginalAsset = {
   mime: string;
   bytes: number;
   uploadedAt: number;
+  waveformPeaks?: number[];
+  waveformDurationMs?: number;
+  loudnessDb?: number;
+  sampleRate?: number;
+  channels?: number;
+  analysisPath?: string;
 };
 
 export type NoisegenStemAsset = {
@@ -42,6 +48,45 @@ export type NoisegenStemAsset = {
   mime: string;
   bytes: number;
   uploadedAt: number;
+  waveformPeaks?: number[];
+  waveformDurationMs?: number;
+  loudnessDb?: number;
+  sampleRate?: number;
+  channels?: number;
+  analysisPath?: string;
+};
+
+export type NoisegenPlaybackAsset = {
+  id: string;
+  label: string;
+  codec: "aac" | "opus" | "mp3" | "wav";
+  fileName: string;
+  path: string;
+  mime: string;
+  bytes: number;
+  uploadedAt: number;
+};
+
+export type NoisegenStemGroupAsset = {
+  id: string;
+  groupId: string;
+  label: string;
+  category: string;
+  codec: "aac" | "opus" | "mp3" | "wav";
+  fileName: string;
+  path: string;
+  mime: string;
+  bytes: number;
+  uploadedAt: number;
+  durationMs?: number;
+  sampleRate?: number;
+  channels?: number;
+};
+
+export type NoisegenProcessingState = {
+  status: JobStatus;
+  detail?: string;
+  updatedAt: number;
 };
 
 export type NoisegenTimeSkyMeta = {
@@ -91,10 +136,13 @@ export type NoisegenOriginal = {
   offsetMs?: number;
   uploadedAt: number;
   timeSky?: NoisegenTimeSkyMeta;
+  processing?: NoisegenProcessingState;
   assets: {
     instrumental?: NoisegenOriginalAsset;
     vocal?: NoisegenOriginalAsset;
     stems?: NoisegenStemAsset[];
+    playback?: NoisegenPlaybackAsset[];
+    stemGroups?: NoisegenStemGroupAsset[];
   };
 };
 
@@ -355,7 +403,11 @@ const promotePendingOriginals = (store: NoisegenStore): NoisegenStore => {
     if (!original?.id) continue;
     if (knownIds.has(original.id)) continue;
     const ageMs = now - (original.uploadedAt ?? now);
-    if (ageMs >= PENDING_RANK_DELAY_MS) {
+    const playbackReady =
+      (original.processing?.status === "ready" &&
+        (original.assets.playback?.length ?? 0) > 0) ||
+      (original.assets.playback?.length ?? 0) > 0;
+    if (ageMs >= PENDING_RANK_DELAY_MS && playbackReady) {
       ready.push(original);
       knownIds.add(original.id);
     } else {
@@ -474,6 +526,10 @@ const resolveBundledOriginal = async (
       (existsSync(fallbackVocal) ? "vocal.wav" : undefined),
   );
 
+  if (!assets.playback && assets.instrumental) {
+    assets.playback = [buildPlaybackFromAsset(assets.instrumental)];
+  }
+
   const stemEntries =
     manifest.stems && manifest.stems.length > 0
       ? manifest.stems
@@ -579,6 +635,7 @@ const resolveDefaultOriginal = async (): Promise<NoisegenOriginal | null> => {
     bytes: duration.bytes,
     uploadedAt: Date.now(),
   };
+  const playback = buildPlaybackFromAsset(asset);
   return {
     id: "default",
     title: "Default Signal",
@@ -593,7 +650,7 @@ const resolveDefaultOriginal = async (): Promise<NoisegenOriginal | null> => {
       quantized: true,
     },
     uploadedAt: Date.now(),
-    assets: { instrumental: asset },
+    assets: { instrumental: asset, playback: [playback] },
   };
 };
 
@@ -621,6 +678,18 @@ const shouldReplaceStems = (stems?: NoisegenStemAsset[]): boolean => {
   });
 };
 
+const shouldReplacePlayback = (playback?: NoisegenPlaybackAsset[]): boolean => {
+  if (!playback || playback.length === 0) return true;
+  if (playback.some((asset) => isReplitStoragePath(asset.path))) return false;
+  return playback.every((asset) => {
+    try {
+      return !existsSync(resolvePlaybackAssetPath(asset));
+    } catch {
+      return true;
+    }
+  });
+};
+
 const mergeBundledOriginal = (
   existing: NoisegenOriginal,
   bundled: NoisegenOriginal,
@@ -641,6 +710,14 @@ const mergeBundledOriginal = (
     bundled.assets.stems.length > 0
   ) {
     mergedAssets.stems = bundled.assets.stems;
+    changed = true;
+  }
+  if (
+    shouldReplacePlayback(mergedAssets.playback) &&
+    bundled.assets.playback &&
+    bundled.assets.playback.length > 0
+  ) {
+    mergedAssets.playback = bundled.assets.playback;
     changed = true;
   }
 
@@ -787,6 +864,26 @@ export const resolveStemAsset = (
   );
 };
 
+export const resolvePlaybackAsset = (
+  original: NoisegenOriginal,
+  playbackId: string,
+): NoisegenPlaybackAsset | undefined => {
+  const needle = playbackId.trim().toLowerCase();
+  return original.assets.playback?.find(
+    (asset) => asset.id.trim().toLowerCase() === needle,
+  );
+};
+
+export const resolveStemGroupAsset = (
+  original: NoisegenOriginal,
+  assetId: string,
+): NoisegenStemGroupAsset | undefined => {
+  const needle = assetId.trim().toLowerCase();
+  return original.assets.stemGroups?.find(
+    (asset) => asset.id.trim().toLowerCase() === needle,
+  );
+};
+
 export const resolveOriginalAssetPath = (
   asset: NoisegenOriginalAsset,
 ): string => {
@@ -815,6 +912,49 @@ export const resolveStemAssetPath = (asset: NoisegenStemAsset): string => {
     for (const root of roots) {
       const originalId = path.basename(path.dirname(path.dirname(asset.path)));
       const candidate = path.join(root, originalId, "stems", asset.fileName);
+      if (existsSync(candidate)) return candidate;
+    }
+    return asset.path;
+  }
+  return path.join(baseDir, asset.path);
+};
+
+export const resolvePlaybackAssetPath = (
+  asset: NoisegenPlaybackAsset,
+): string => {
+  if (isReplitStoragePath(asset.path)) return asset.path;
+  const { baseDir } = getNoisegenPaths();
+
+  if (path.isAbsolute(asset.path)) {
+    if (existsSync(asset.path)) return asset.path;
+    const roots = resolveBundledOriginalsRoots();
+    const originalId = path.basename(path.dirname(path.dirname(asset.path)));
+    for (const root of roots) {
+      const candidate = path.join(root, originalId, "playback", asset.fileName);
+      if (existsSync(candidate)) return candidate;
+    }
+    return asset.path;
+  }
+  return path.join(baseDir, asset.path);
+};
+
+export const resolveStemGroupAssetPath = (
+  asset: NoisegenStemGroupAsset,
+): string => {
+  if (isReplitStoragePath(asset.path)) return asset.path;
+  const { baseDir } = getNoisegenPaths();
+
+  if (path.isAbsolute(asset.path)) {
+    if (existsSync(asset.path)) return asset.path;
+    const roots = resolveBundledOriginalsRoots();
+    const originalId = path.basename(path.dirname(path.dirname(asset.path)));
+    for (const root of roots) {
+      const candidate = path.join(
+        root,
+        originalId,
+        "stem-groups",
+        asset.fileName,
+      );
       if (existsSync(candidate)) return candidate;
     }
     return asset.path;
@@ -856,6 +996,163 @@ export const saveOriginalAsset = async (params: {
     path: path.relative(baseDir, filePath),
     mime: params.mime,
     bytes: params.buffer.byteLength,
+    uploadedAt: Date.now(),
+  };
+};
+
+export const savePlaybackAsset = async (params: {
+  originalId: string;
+  playbackId: string;
+  label: string;
+  codec: NoisegenPlaybackAsset["codec"];
+  buffer: Buffer;
+  mime: string;
+  originalName?: string;
+}): Promise<NoisegenPlaybackAsset> => {
+  const ext = safeExtension(params.originalName);
+  const fileName = `${params.playbackId}${ext}`;
+  const backend = resolveNoisegenStorageBackend();
+  if (backend === "replit") {
+    const key = buildNoisegenStorageKey(
+      params.originalId,
+      path.posix.join("playback", fileName),
+    );
+    await uploadReplitObject(key, params.buffer);
+    return {
+      id: params.playbackId,
+      label: params.label,
+      codec: params.codec,
+      fileName,
+      path: buildReplitLocator(key),
+      mime: params.mime,
+      bytes: params.buffer.byteLength,
+      uploadedAt: Date.now(),
+    };
+  }
+
+  const { originalsDir, baseDir } = getNoisegenPaths();
+  const targetDir = path.join(originalsDir, params.originalId, "playback");
+  await fs.mkdir(targetDir, { recursive: true });
+  const filePath = path.join(targetDir, fileName);
+  await fs.writeFile(filePath, params.buffer);
+  return {
+    id: params.playbackId,
+    label: params.label,
+    codec: params.codec,
+    fileName,
+    path: path.relative(baseDir, filePath),
+    mime: params.mime,
+    bytes: params.buffer.byteLength,
+    uploadedAt: Date.now(),
+  };
+};
+
+export const saveStemGroupAsset = async (params: {
+  originalId: string;
+  assetId: string;
+  groupId: string;
+  label: string;
+  category: string;
+  codec: NoisegenStemGroupAsset["codec"];
+  buffer: Buffer;
+  mime: string;
+  durationMs?: number;
+  sampleRate?: number;
+  channels?: number;
+  originalName?: string;
+}): Promise<NoisegenStemGroupAsset> => {
+  const ext = safeExtension(params.originalName);
+  const fileName = `${params.assetId}${ext}`;
+  const backend = resolveNoisegenStorageBackend();
+  if (backend === "replit") {
+    const key = buildNoisegenStorageKey(
+      params.originalId,
+      path.posix.join("stem-groups", fileName),
+    );
+    await uploadReplitObject(key, params.buffer);
+    return {
+      id: params.assetId,
+      groupId: params.groupId,
+      label: params.label,
+      category: params.category,
+      codec: params.codec,
+      fileName,
+      path: buildReplitLocator(key),
+      mime: params.mime,
+      bytes: params.buffer.byteLength,
+      uploadedAt: Date.now(),
+      durationMs: params.durationMs,
+      sampleRate: params.sampleRate,
+      channels: params.channels,
+    };
+  }
+
+  const { originalsDir, baseDir } = getNoisegenPaths();
+  const targetDir = path.join(originalsDir, params.originalId, "stem-groups");
+  await fs.mkdir(targetDir, { recursive: true });
+  const filePath = path.join(targetDir, fileName);
+  await fs.writeFile(filePath, params.buffer);
+  return {
+    id: params.assetId,
+    groupId: params.groupId,
+    label: params.label,
+    category: params.category,
+    codec: params.codec,
+    fileName,
+    path: path.relative(baseDir, filePath),
+    mime: params.mime,
+    bytes: params.buffer.byteLength,
+    uploadedAt: Date.now(),
+    durationMs: params.durationMs,
+    sampleRate: params.sampleRate,
+    channels: params.channels,
+  };
+};
+
+export const savePlaybackAssetFromFile = async (params: {
+  originalId: string;
+  playbackId: string;
+  label: string;
+  codec: NoisegenPlaybackAsset["codec"];
+  filePath: string;
+  mime: string;
+  originalName?: string;
+}): Promise<NoisegenPlaybackAsset> => {
+  const ext = safeExtension(params.originalName ?? params.filePath);
+  const fileName = `${params.playbackId}${ext}`;
+  const stats = await fs.stat(params.filePath);
+  const backend = resolveNoisegenStorageBackend();
+  if (backend === "replit") {
+    const key = buildNoisegenStorageKey(
+      params.originalId,
+      path.posix.join("playback", fileName),
+    );
+    await uploadReplitFile(key, params.filePath);
+    return {
+      id: params.playbackId,
+      label: params.label,
+      codec: params.codec,
+      fileName,
+      path: buildReplitLocator(key),
+      mime: params.mime,
+      bytes: stats.size,
+      uploadedAt: Date.now(),
+    };
+  }
+
+  const { originalsDir, baseDir } = getNoisegenPaths();
+  const targetDir = path.join(originalsDir, params.originalId, "playback");
+  await fs.mkdir(targetDir, { recursive: true });
+  const filePath = path.join(targetDir, fileName);
+  await fs.copyFile(params.filePath, filePath);
+  return {
+    id: params.playbackId,
+    label: params.label,
+    codec: params.codec,
+    fileName,
+    path: path.relative(baseDir, filePath),
+    mime: params.mime,
+    bytes: stats.size,
     uploadedAt: Date.now(),
   };
 };
@@ -1023,6 +1320,29 @@ export const savePreviewBuffer = async (params: {
   };
 };
 
+export const saveAnalysisArtifact = async (params: {
+  originalId: string;
+  fileName: string;
+  buffer: Buffer;
+}): Promise<string> => {
+  const backend = resolveNoisegenStorageBackend();
+  if (backend === "replit") {
+    const key = buildNoisegenStorageKey(
+      params.originalId,
+      path.posix.join("analysis", params.fileName),
+    );
+    await uploadReplitObject(key, params.buffer);
+    return buildReplitLocator(key);
+  }
+
+  const { originalsDir, baseDir } = getNoisegenPaths();
+  const targetDir = path.join(originalsDir, params.originalId, "analysis");
+  await fs.mkdir(targetDir, { recursive: true });
+  const filePath = path.join(targetDir, params.fileName);
+  await fs.writeFile(filePath, params.buffer);
+  return path.relative(baseDir, filePath);
+};
+
 export const findOriginalById = (
   store: NoisegenStore,
   originalId: string,
@@ -1137,6 +1457,29 @@ const extensionForMime = (mime: string): string => {
   if (lower.includes("aiff")) return ".aiff";
   return ".bin";
 };
+
+const codecFromMime = (mime: string): NoisegenPlaybackAsset["codec"] => {
+  const lower = mime.toLowerCase();
+  if (lower.includes("mpeg") || lower.includes("mp3")) return "mp3";
+  if (lower.includes("ogg") || lower.includes("opus")) return "opus";
+  if (lower.includes("aac") || lower.includes("mp4")) return "aac";
+  return "wav";
+};
+
+const buildPlaybackFromAsset = (
+  asset: NoisegenOriginalAsset,
+  id = "mix",
+  label = "Mix",
+): NoisegenPlaybackAsset => ({
+  id,
+  label,
+  codec: codecFromMime(asset.mime),
+  fileName: asset.fileName,
+  path: asset.path,
+  mime: asset.mime,
+  bytes: asset.bytes,
+  uploadedAt: asset.uploadedAt,
+});
 
 const estimateWavDurationSeconds = async (
   filePath: string,

@@ -6,6 +6,8 @@ import type {
   Original,
   OriginalDetails,
   OriginalStem,
+  NoisegenCapabilities,
+  StemPack,
   NoisegenRecipe,
   JobStatus,
   HelixPacket,
@@ -24,13 +26,17 @@ const endpoints = {
     `${BASE}/originals/${encodeURIComponent(originalId)}`,
   originalStems: (originalId: string) =>
     `${BASE}/originals/${encodeURIComponent(originalId)}/stems`,
+  stemPack: (originalId: string) =>
+    `${BASE}/originals/${encodeURIComponent(originalId)}/stem-pack`,
   generations: `${BASE}/generations`,
   moods: `${BASE}/moods`,
   recipes: `${BASE}/recipes`,
   recipe: (recipeId: string) => `${BASE}/recipes/${encodeURIComponent(recipeId)}`,
   generate: `${BASE}/generate`,
+  capabilities: `${BASE}/capabilities`,
   upload: `${BASE}/upload`,
   uploadChunk: `${BASE}/upload/chunk`,
+  uploadComplete: `${BASE}/upload/complete`,
   previews: `${BASE}/previews`,
   jobStatus: (jobId: string) => `${BASE}/jobs/${encodeURIComponent(jobId)}`,
   noiseField: `${BASE}/noise-field`,
@@ -115,6 +121,26 @@ export async function fetchOriginalStems(
   );
   const payload = await parseJson<{ stems: OriginalStem[] }>(res);
   return payload?.stems ?? [];
+}
+
+export async function fetchStemPack(
+  originalId: string,
+  signal?: AbortSignal,
+): Promise<StemPack> {
+  const res = await apiRequest(
+    "GET",
+    endpoints.stemPack(originalId),
+    undefined,
+    signal,
+  );
+  return parseJson<StemPack>(res);
+}
+
+export async function fetchNoisegenCapabilities(
+  signal?: AbortSignal,
+): Promise<NoisegenCapabilities> {
+  const res = await apiRequest("GET", endpoints.capabilities, undefined, signal);
+  return parseJson<NoisegenCapabilities>(res);
 }
 
 export async function fetchTopGenerations(
@@ -410,6 +436,14 @@ export async function uploadOriginalChunk(
 
     xhr.send(formData);
   });
+}
+
+export async function finalizeOriginalUpload(payload: {
+  trackId: string;
+  autoMixdown?: boolean;
+}): Promise<{ status: string }> {
+  const res = await apiRequest("POST", endpoints.uploadComplete, payload);
+  return parseJson<{ status: string }>(res);
 }
 
 export async function uploadCoverPreview(

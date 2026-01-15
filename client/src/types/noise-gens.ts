@@ -21,6 +21,8 @@ export type TimeSkyMeta = {
 export type OriginalDetails = Original & {
   lyrics?: string;
   timeSky?: TimeSkyMeta;
+  processing?: ProcessingState;
+  playback?: PlaybackAsset[];
 };
 
 export type OriginalStem = {
@@ -30,7 +32,74 @@ export type OriginalStem = {
   mime: string;
   size: number;
   uploadedAt: number;
+  waveformPeaks?: number[];
+  waveformDurationMs?: number;
+  sampleRate?: number;
+  channels?: number;
   url: string;
+};
+
+export type PlaybackAsset = {
+  id: string;
+  label: string;
+  codec: "aac" | "opus" | "mp3" | "wav";
+  mime: string;
+  size: number;
+  uploadedAt: number;
+  url: string;
+};
+
+export type NoisegenCapabilities = {
+  ffmpeg: boolean;
+  codecs: string[];
+};
+
+export type StemGroupSource = {
+  id: string;
+  codec: PlaybackAsset["codec"];
+  mime: string;
+  size: number;
+  uploadedAt: number;
+  url: string;
+};
+
+export type StemGroup = {
+  id: string;
+  label: string;
+  category: string;
+  sources: StemGroupSource[];
+  defaultGain: number;
+  offsetMs: number;
+  durationMs?: number;
+  sampleRate?: number;
+  channels?: number;
+};
+
+export type StemPackStem = {
+  id: string;
+  name: string;
+  category?: string;
+  mime: string;
+  size: number;
+  uploadedAt: number;
+  waveformDurationMs?: number;
+  sampleRate?: number;
+  channels?: number;
+  defaultGain: number;
+  offsetMs: number;
+  url: string;
+};
+
+export type StemPack = {
+  processing?: ProcessingState;
+  groups: StemGroup[];
+  stems: StemPackStem[];
+};
+
+export type ProcessingState = {
+  status: JobStatus;
+  detail?: string;
+  updatedAt: number;
 };
 
 export type Generation = {

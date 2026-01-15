@@ -16,9 +16,18 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
-import { uploadOriginal, uploadOriginalChunk } from "@/lib/api/noiseGens";
+import {
+  finalizeOriginalUpload,
+  fetchNoisegenCapabilities,
+  uploadOriginal,
+  uploadOriginalChunk,
+} from "@/lib/api/noiseGens";
 import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
-import type { TempoMeta, TimeSkyMeta } from "@/types/noise-gens";
+import type {
+  NoisegenCapabilities,
+  TempoMeta,
+  TimeSkyMeta,
+} from "@/types/noise-gens";
 
 type UploadOriginalsModalProps = {
   open: boolean;
@@ -317,6 +326,11 @@ export function UploadOriginalsModal({
     pct?: number;
   } | null>(null);
   const uploadFilesRef = useRef<UploadFileProgress[]>([]);
+  const [capabilities, setCapabilities] = useState<NoisegenCapabilities | null>(
+    null,
+  );
+  const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -333,6 +347,9 @@ export function UploadOriginalsModal({
       setUploadProgress(null);
       setUploadTotalProgress(null);
       uploadFilesRef.current = [];
+      setCapabilities(null);
+      setCapabilitiesError(null);
+      setCapabilitiesLoading(false);
     }
   }, [open]);
 
@@ -405,6 +422,30 @@ export function UploadOriginalsModal({
     if (!open) return;
     void refresh();
   }, [open, refresh]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const controller = new AbortController();
+    setCapabilitiesLoading(true);
+    setCapabilitiesError(null);
+    fetchNoisegenCapabilities(controller.signal)
+      .then((payload) => {
+        setCapabilities(payload);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        const message =
+          error instanceof Error ? error.message : "Unable to read codec status.";
+        setCapabilitiesError(message);
+        setCapabilities(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setCapabilitiesLoading(false);
+        }
+      });
+    return () => controller.abort();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -806,6 +847,26 @@ export function UploadOriginalsModal({
         })(),
       );
       await Promise.all(workers);
+      const shouldAutoMixdown =
+        !stemSummary.mixEntry && stemSummary.stemUploads.length > 0;
+      if (shouldAutoMixdown) {
+        try {
+          await finalizeOriginalUpload({
+            trackId: trackIdForUpload,
+            autoMixdown: true,
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Auto mixdown failed.";
+          toast({
+            title: "Mixdown error",
+            description: message,
+            variant: "destructive",
+          });
+        }
+      } else {
+        await finalizeOriginalUpload({ trackId: trackIdForUpload });
+      }
       toast({
         title: "Upload queued",
         description: "We will notify you when mastering finishes.",
@@ -842,8 +903,32 @@ export function UploadOriginalsModal({
           <DialogTitle>Upload Originals</DialogTitle>
           <DialogDescription>
             Choose a Noise Album project and tag each stem. Mark one mix if you have it, or keep
-            stems-only to auto-build an instrumental from non-vocal, non-drum stems.
+            stems-only to auto-build a playback mixdown from your stems.
           </DialogDescription>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            {capabilitiesLoading ? (
+              <Badge variant="outline" className="border-slate-500/40 text-slate-300">
+                Checking codecs...
+              </Badge>
+            ) : capabilities ? (
+              capabilities.ffmpeg ? (
+                <Badge className="border-emerald-500/40 bg-emerald-500/10 text-emerald-100">
+                  Codec pack ready
+                </Badge>
+              ) : (
+                <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+                  WAV-only playback (ffmpeg missing)
+                </Badge>
+              )
+            ) : (
+              <Badge variant="outline" className="border-slate-500/40 text-slate-300">
+                Codec status unavailable
+              </Badge>
+            )}
+            {capabilitiesError ? (
+              <span className="text-muted-foreground">{capabilitiesError}</span>
+            ) : null}
+          </div>
         </DialogHeader>
 
         {prefill?.sourceHint ? (

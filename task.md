@@ -1050,3 +1050,93 @@ Prompt NG37 (Edition lineage graph) - Status: pending
 - Do: let creators feature or annotate branches.
 - Do not: lose lineage when a recipe is shared or reloaded.
 - Acceptance: the edition graph is navigable and makes provenance/lineage clear.
+
+Prompt NG38 (Upload processing pipeline: normalize + analyze stems) - Status: complete
+- Goal: make uploads slow-but-safe for creators and zero-friction for listeners.
+- Do: on upload/publish, normalize all stem WAVs to PCM16 (44.1k or 48k), verify duration, and compute waveform peaks + loudness + alignment metadata; store analysis artifacts alongside the masters in object storage.
+- Do: expose processing state (queued/processing/ready/error) so creators can wait while jobs run.
+- Do not: rely on client-side decoding for later UI waveforms or stem readiness.
+- Acceptance: once processing finishes, stems and waveforms are ready without re-decoding in the browser.
+
+Prompt NG39 (Playback derivatives: mixdown + browser-safe codecs) - Status: complete
+- Goal: make listener playback universal and instant.
+- Do: generate a mixdown if the creator does not supply one; encode a playback set (arguably Opus + AAC, optional MP3 fallback); upload to object storage with codec metadata.
+- Do: keep masters/stems separate from playback derivatives (masters for studio/render, playback for listener).
+- Do not: stream stems for the listener UI.
+- Acceptance: every published song has at least one browser-safe playback asset.
+
+Prompt NG40 (Manifest + readiness gating) - Status: complete
+- Goal: prevent half-processed originals from appearing as ready.
+- Do: extend the original manifest to include playback assets, master assets, analysis artifacts, and processing status.
+- Do: update API responses to return readiness and playback asset list; keep items in "pending" until playback derivatives exist.
+- Do not: mark an original as "ranked/ready" without playback assets.
+- Acceptance: new uploads surface immediately in pending, then auto-move to ready when processing completes.
+
+Prompt NG41 (Listener playback routing) - Status: complete
+- Goal: ensure the listener always uses the playback lane, not stems.
+- Do: update the listener player to prefer playback assets and provide multiple <source> codecs; only fall back to stems in Studio/Remix contexts.
+- Do: display a clear error when playback assets are missing or inaccessible.
+- Do not: initialize multi-stem decoding in Listener mode.
+- Acceptance: listener playback always streams a single mix via playback assets.
+
+Prompt NG42 (Noise Gen capabilities probe + API) - Status: complete
+- Goal: make codec readiness explicit and reliable.
+- Do: run `ffmpeg -version` at boot, cache the result, and expose `/api/noise-gens/capabilities` with `{ ffmpeg: boolean, codecs: string[] }`.
+- Do: use this flag to gate transcode and UI messaging.
+- Do not: assume ffmpeg exists in production environments.
+- Acceptance: the capabilities endpoint reports ffmpeg availability and supported codec list.
+
+Prompt NG43 (Codec readiness UI badge) - Status: complete
+- Goal: make playback readiness visible during upload/publish.
+- Do: show "Codec pack ready" in Studio/Upload when ffmpeg is available.
+- Do: show "WAV-only playback (ffmpeg missing)" when it is not.
+- Do not: hide missing codec status from creators.
+- Acceptance: creators can see codec readiness without digging in logs.
+
+Prompt NG44 (Fail-safe transcode pipeline) - Status: complete
+- Goal: never block publish on transcode failures.
+- Do: when ffmpeg is missing or transcode fails, keep WAV mix and mark processing detail "playback ready (wav-only)".
+- Do: continue publishing even if derivatives fail.
+- Do not: mark the upload as error when the WAV mix is usable.
+- Acceptance: WAV-only playback still promotes to ready.
+
+Prompt NG45 (Remix prefetch + mix-first playback) - Status: complete
+- Goal: instant playback with optional interactivity.
+- Do: keep listener playback on the single mix; when Remix is tapped, start background fetch of stems or grouped stems.
+- Do not: interrupt playback while stems download.
+- Acceptance: playback starts instantly, stems fetch in the background.
+
+Prompt NG46 (Seamless mix-to-stem upgrade) - Status: complete
+- Goal: upgrade to interactive stems without jarring the listener.
+- Do: when enough stems are decoded, crossfade from mix playback to stem mix at the same playhead time.
+- Do: align all stems to a single audio clock and preserve current bar position.
+- Do not: restart the song or jump time on upgrade.
+- Acceptance: the transition feels like a smooth, inaudible handoff.
+
+Prompt NG47 (Grouped stems derivation) - Status: complete
+- Goal: make Remix mode practical for listeners.
+- Do: derive 4-6 grouped stems (drums, bass, music, textures, fx, optional lead) on upload.
+- Do: encode grouped stems as AAC/Opus for fast streaming.
+- Do not: require 15 separate stems for basic Remix controls.
+- Acceptance: Remix mode can mute or boost groups without heavy loading.
+
+Prompt NG48 (Full stem pack for Studio) - Status: complete
+- Goal: preserve creator-grade control.
+- Do: generate a stem pack manifest with name, offset, duration, sample rate, default gain, channel layout, and URLs.
+- Do: keep WAV masters for analysis/render.
+- Do not: make listener flow depend on full stem packs.
+- Acceptance: Studio mode can load a full stem pack from a manifest.
+
+Prompt NG49 (Stem pack manifest API) - Status: complete
+- Goal: provide a single entrypoint for stem packs.
+- Do: add `/api/noise-gens/originals/:id/stem-pack` returning manifest + grouped stem URLs.
+- Do: include processing state and readiness flags.
+- Do not: expose raw filesystem paths.
+- Acceptance: the API returns a usable manifest for Remix/Studio.
+
+Prompt NG50 (Remix UI controls) - Status: complete
+- Goal: make grouped stems interactive.
+- Do: add per-group mute/level sliders wired to Web Audio GainNodes.
+- Do: keep UI simple and readable for listeners.
+- Do not: expose full DAW controls in Listener mode.
+- Acceptance: listeners can mute/boost grouped stems after upgrade.

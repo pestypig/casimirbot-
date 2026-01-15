@@ -19,15 +19,14 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useIdeology } from "@/hooks/use-ideology";
-import {
-  fetchOriginalDetails,
-  fetchOriginalStems,
-} from "@/lib/api/noiseGens";
+import { fetchOriginalDetails, fetchStemPack } from "@/lib/api/noiseGens";
 import type {
   MoodPreset,
   Original,
   OriginalDetails,
-  OriginalStem,
+  StemGroup,
+  StemGroupSource,
+  StemPack,
 } from "@/types/noise-gens";
 import { cn } from "@/lib/utils";
 import { releaseAudioFocus, requestAudioFocus } from "@/lib/audio-focus";
@@ -37,13 +36,21 @@ type PlayerSource = {
   url: string;
   label: string;
   bytes?: number;
+  mime?: string;
 };
 
-type SourceMode = "mix" | "stems" | "fallback" | null;
+type SourceMode = "playback" | "fallback" | null;
 
 type SourceHandle = {
   id: string;
   source: AudioBufferSourceNode;
+};
+
+type RemixStatus = "idle" | "loading" | "ready" | "active" | "error";
+
+type StemGroupPlayback = StemGroup & {
+  gain: number;
+  source?: StemGroupSource | null;
 };
 
 type MeaningCard = {
@@ -257,24 +264,42 @@ const IDEOLOGY_HINTS: Record<
   },
 };
 
-const isMixStem = (stem: OriginalStem): boolean => {
-  const name = stem.name.toLowerCase();
-  const category = stem.category?.toLowerCase();
-  return (
-    category === "mix" ||
-    category === "instrumental" ||
-    name.includes("mix") ||
-    name.includes("instrumental")
-  );
+const PLAYBACK_PRIORITY: Record<string, number> = {
+  aac: 0,
+  opus: 1,
+  mp3: 2,
+  wav: 3,
 };
 
-const buildStemSources = (stems: OriginalStem[]): PlayerSource[] =>
-  stems.map((stem) => ({
-    id: stem.id,
-    url: stem.url,
-    label: stem.category ? stem.category.toUpperCase() : stem.name,
-    bytes: stem.size,
+const buildPlaybackSources = (
+  assets?: OriginalDetails["playback"],
+): PlayerSource[] => {
+  if (!assets || assets.length === 0) return [];
+  const sorted = [...assets].sort(
+    (a, b) =>
+      (PLAYBACK_PRIORITY[a.codec] ?? 99) -
+      (PLAYBACK_PRIORITY[b.codec] ?? 99),
+  );
+  return sorted.map((asset) => ({
+    id: asset.id,
+    url: asset.url,
+    label: asset.label,
+    bytes: asset.size,
+    mime: asset.mime,
   }));
+};
+
+const pickStemGroupSource = (
+  sources: StemGroupSource[] = [],
+): StemGroupSource | null => {
+  if (sources.length === 0) return null;
+  const sorted = [...sources].sort(
+    (a, b) =>
+      (PLAYBACK_PRIORITY[a.codec] ?? 99) -
+      (PLAYBACK_PRIORITY[b.codec] ?? 99),
+  );
+  return sorted[0] ?? null;
+};
 
 const checkOriginalAsset = async (
   originalId: string,
@@ -320,7 +345,6 @@ export function OriginalsPlayer({
   const { data: ideologyDoc } = useIdeology();
   const [sources, setSources] = useState<PlayerSource[]>([]);
   const [sourceMode, setSourceMode] = useState<SourceMode>(null);
-  const [includesVocal, setIncludesVocal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -347,125 +371,116 @@ export function OriginalsPlayer({
   const [playableCount, setPlayableCount] = useState(0);
   const [autoPlayPending, setAutoPlayPending] = useState(false);
   const lastAutoPlayRef = useRef<number | null>(null);
-  // Stream stems via media elements to avoid decoding large buffers in memory.
+  const [remixStatus, setRemixStatus] = useState<RemixStatus>("idle");
+  const [remixError, setRemixError] = useState<string | null>(null);
+  const [remixGroups, setRemixGroups] = useState<StemGroupPlayback[]>([]);
+  const remixBuffersRef = useRef<Record<string, AudioBuffer | null>>({});
+  const remixGainsRef = useRef<Map<string, GainNode>>(new Map());
+  const remixDurationRef = useRef<number>(0);
+  const remixRequestedRef = useRef(false);
+  const remixControllerRef = useRef<AbortController | null>(null);
+  // Stream playback via media elements to avoid heavy decoding in Listener.    
   const useElementPlayback =
+    sourceMode === "playback" ||
+    sourceMode === "fallback" ||
     sources.length === 1 ||
-    sourceMode === "stems" ||
     (sourceMode === null && sources.length > 1);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     setSources([]);
     setSourceMode(null);
     setLoadError(null);
     setDuration(0);
     setCurrentTime(0);
     setIsPlaying(false);
-    setIncludesVocal(false);
+    remixControllerRef.current?.abort();
+    remixControllerRef.current = null;
+    remixRequestedRef.current = false;
+    remixBuffersRef.current = {};
+    remixGainsRef.current = new Map();
+    remixDurationRef.current = 0;
+    setRemixGroups([]);
+    setRemixStatus("idle");
+    setRemixError(null);
 
-    if (!original) return undefined;
+    if (!original) {
+      setDetails(null);
+      setDetailsError(null);
+      setDetailsLoading(false);
+      setIsLoading(false);
+      return undefined;
+    }
 
     const load = async () => {
       setIsLoading(true);
+      setDetailsLoading(true);
       try {
-        const instrumental = await checkOriginalAsset(
+        const cached = detailsCacheRef.current.get(original.id);
+        const payload =
+          cached ??
+          (await fetchOriginalDetails(original.id, controller.signal));
+        if (cancelled) return;
+        if (cached == null) {
+          detailsCacheRef.current.set(original.id, payload);
+        }
+        setDetails(payload);
+        setDetailsError(null);
+
+        const playbackSources = buildPlaybackSources(payload.playback);
+        if (playbackSources.length > 0) {
+          setSources(playbackSources);
+          setSourceMode("playback");
+          return;
+        }
+
+        if (payload.processing && payload.processing.status !== "ready") {
+          const detail = payload.processing.detail?.trim();
+          const statusLabel =
+            payload.processing.status === "error"
+              ? "Playback failed."
+              : "Playback is still processing.";
+          setLoadError(detail || statusLabel);
+          setIsLoading(false);
+          return;
+        }
+
+        const fallback = await checkOriginalAsset(
           original.id,
           "instrumental",
           "Mix",
         );
         if (cancelled) return;
-
-        if (instrumental) {
-          setSources([instrumental]);
-          setSourceMode("mix");
-          return;
-        }
-
-        const vocal = await checkOriginalAsset(original.id, "vocal", "Vocal");
-        if (cancelled) return;
-
-        const stems = await fetchOriginalStems(original.id);
-        if (cancelled) return;
-        if (stems.length > 0) {
-          const mixStem = stems.find(isMixStem);
-          if (mixStem) {
-            setSources(buildStemSources([mixStem]));
-            setSourceMode("mix");
-          } else {
-            const stemSources = buildStemSources(stems);
-            if (vocal) {
-              setSources([...stemSources, vocal]);
-              setIncludesVocal(true);
-              setSourceMode("stems");
-            } else {
-              setSources(stemSources);
-              setSourceMode("stems");
-            }
-          }
-          return;
-        }
-
-        if (vocal) {
-          setSources([vocal]);
+        if (fallback) {
+          setSources([fallback]);
           setSourceMode("fallback");
           return;
         }
 
-        setLoadError("No audio sources were found for this song.");
+        setLoadError("Playback assets are not ready yet.");
+        setIsLoading(false);
       } catch (error) {
         if (cancelled) return;
-        setLoadError(
-          error instanceof Error ? error.message : "Unable to load song audio.",
-        );
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [original?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!original) {
-      setDetails(null);
-      setDetailsError(null);
-      setDetailsLoading(false);
-      return undefined;
-    }
-    const cached = detailsCacheRef.current.get(original.id);
-    if (cached) {
-      setDetails(cached);
-      setDetailsError(null);
-      setDetailsLoading(false);
-      return undefined;
-    }
-
-    const load = async () => {
-      setDetailsLoading(true);
-      try {
-        const payload = await fetchOriginalDetails(original.id);
-        if (cancelled) return;
-        detailsCacheRef.current.set(original.id, payload);
-        setDetails(payload);
-        setDetailsError(null);
-      } catch (error) {
-        if (cancelled) return;
-        setDetailsError(
-          error instanceof Error ? error.message : "Unable to load lyrics.",
-        );
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to load track details.";
+        setDetailsError(message);
+        setLoadError(message);
+        setIsLoading(false);
       } finally {
         if (!cancelled) setDetailsLoading(false);
       }
     };
+
     void load();
     return () => {
       cancelled = true;
+      controller.abort();
+      stopPlayback();
     };
-  }, [original?.id]);
+  }, [original?.id, stopPlayback]);
 
   useEffect(
     () => () => {
@@ -499,12 +514,7 @@ export function OriginalsPlayer({
     }
   }, []);
 
-  const stopPlayback = useCallback(() => {
-    if (audioElementsRef.current.size) {
-      audioElementsRef.current.forEach((audio) => audio.pause());
-    } else if (audioElementRef.current) {
-      audioElementRef.current.pause();
-    }
+  const stopWebAudioSources = useCallback(() => {
     activeSourcesRef.current.forEach(({ source }) => {
       try {
         source.stop();
@@ -515,11 +525,23 @@ export function OriginalsPlayer({
     activeSourcesRef.current = [];
     startAtRef.current = null;
     stopRaf();
-    setIsPlaying(false);
   }, [stopRaf]);
 
+  const stopPlayback = useCallback(() => {
+    if (audioElementsRef.current.size) {
+      audioElementsRef.current.forEach((audio) => audio.pause());
+    } else if (audioElementRef.current) {
+      audioElementRef.current.pause();
+    }
+    stopWebAudioSources();
+    setIsPlaying(false);
+  }, [stopWebAudioSources]);
+
   const pausePlayback = useCallback(() => {
-    if (audioElementsRef.current.size || audioElementRef.current) {
+    if (
+      remixStatus !== "active" &&
+      (audioElementsRef.current.size || audioElementRef.current)
+    ) {
       audioElementsRef.current.forEach((audio) => audio.pause());
       const leader =
         audioElementRef.current ??
@@ -540,7 +562,7 @@ export function OriginalsPlayer({
     const clamped = duration > 0 ? Math.min(elapsed, duration) : elapsed;
     stopPlayback();
     setCurrentTime(clamped);
-  }, [currentTime, duration, stopPlayback]);
+  }, [currentTime, duration, remixStatus, stopPlayback]);
 
   useEffect(() => {
     return () => {
@@ -672,65 +694,133 @@ export function OriginalsPlayer({
     setDuration(0);
     setCurrentTime(0);
 
-    sources.forEach((source, index) => {
+    if (sourceMode === "playback") {
+      const playbackKey = "playback";
       const audio = new Audio();
       audio.preload = "metadata";
-      audio.src = source.url;
       audio.volume = volume;
+      let currentIndex = 0;
+
+      const setPlaybackSource = (index: number) => {
+        const source = sources[index];
+        if (!source) return;
+        audio.src = source.url;
+        audio.load();
+      };
 
       const handleLoaded = () => {
         if (cancelled) return;
-        loadedIds.add(source.id);
         const durationValue = Number.isFinite(audio.duration)
           ? audio.duration
           : 0;
         if (durationValue > longest) {
           longest = durationValue;
         }
-        setPlayableCount(loadedIds.size);
+        setPlayableCount(1);
         setDuration(longest);
-        if (loadedIds.size >= sources.length) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       };
       const handleError = () => {
         if (cancelled) return;
-        setLoadError((prev) => prev ?? `Could not decode ${source.label}`);
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < sources.length) {
+          currentIndex = nextIndex;
+          setPlaybackSource(currentIndex);
+          return;
+        }
+        setLoadError(
+          (prev) =>
+            prev ?? `Could not decode ${sources[currentIndex]?.label ?? "audio"}`,
+        );
         setIsLoading(false);
       };
       const handleTime = () => {
         if (cancelled) return;
-        if (index === 0) {
-          setCurrentTime(audio.currentTime);
-        }
+        setCurrentTime(audio.currentTime);
       };
       const handleEnded = () => {
         if (cancelled) return;
-        if (index === 0) {
-          setIsPlaying(false);
-          setCurrentTime(audio.duration || 0);
-        }
+        setIsPlaying(false);
+        setCurrentTime(audio.duration || 0);
       };
 
       audio.addEventListener("loadedmetadata", handleLoaded);
       audio.addEventListener("timeupdate", handleTime);
       audio.addEventListener("ended", handleEnded);
       audio.addEventListener("error", handleError);
-      audio.load();
+      setPlaybackSource(currentIndex);
 
-      handlers.set(source.id, {
+      handlers.set(playbackKey, {
         loaded: handleLoaded,
         time: handleTime,
         ended: handleEnded,
         error: handleError,
       });
-      elements.set(source.id, audio);
-    });
+      elements.set(playbackKey, audio);
+    } else {
+      sources.forEach((source, index) => {
+        const audio = new Audio();
+        audio.preload = "metadata";
+        audio.src = source.url;
+        audio.volume = volume;
+
+        const handleLoaded = () => {
+          if (cancelled) return;
+          loadedIds.add(source.id);
+          const durationValue = Number.isFinite(audio.duration)
+            ? audio.duration
+            : 0;
+          if (durationValue > longest) {
+            longest = durationValue;
+          }
+          setPlayableCount(loadedIds.size);
+          setDuration(longest);
+          if (loadedIds.size >= sources.length) {
+            setIsLoading(false);
+          }
+        };
+        const handleError = () => {
+          if (cancelled) return;
+          setLoadError((prev) => prev ?? `Could not decode ${source.label}`);
+          setIsLoading(false);
+        };
+        const handleTime = () => {
+          if (cancelled) return;
+          if (index === 0) {
+            setCurrentTime(audio.currentTime);
+          }
+        };
+        const handleEnded = () => {
+          if (cancelled) return;
+          if (index === 0) {
+            setIsPlaying(false);
+            setCurrentTime(audio.duration || 0);
+          }
+        };
+
+        audio.addEventListener("loadedmetadata", handleLoaded);
+        audio.addEventListener("timeupdate", handleTime);
+        audio.addEventListener("ended", handleEnded);
+        audio.addEventListener("error", handleError);
+        audio.load();
+
+        handlers.set(source.id, {
+          loaded: handleLoaded,
+          time: handleTime,
+          ended: handleEnded,
+          error: handleError,
+        });
+        elements.set(source.id, audio);
+      });
+    }
 
     audioElementsRef.current = elements;
-    audioElementRef.current = sources[0]?.id
-      ? elements.get(sources[0].id) ?? null
-      : null;
+    audioElementRef.current =
+      sourceMode === "playback"
+        ? elements.get("playback") ?? null
+        : sources[0]?.id
+          ? elements.get(sources[0].id) ?? null
+          : null;
 
     return () => {
       cancelled = true;
@@ -753,7 +843,7 @@ export function OriginalsPlayer({
       }
       audioElementsRef.current.clear();
     };
-  }, [sources, useElementPlayback]);
+  }, [sources, sourceMode, useElementPlayback]);
 
   useEffect(() => {
     if (audioElementsRef.current.size) {
@@ -790,6 +880,31 @@ export function OriginalsPlayer({
     };
     rafRef.current = requestAnimationFrame(tick);
   }, [duration, stopPlayback, stopRaf]);
+
+  const fadeElementVolume = useCallback(
+    (audio: HTMLAudioElement, target: number, durationMs: number) =>
+      new Promise<void>((resolve) => {
+        if (durationMs <= 0 || typeof window === "undefined") {
+          audio.volume = target;
+          resolve();
+          return;
+        }
+        const start = audio.volume;
+        const delta = target - start;
+        const startTime = performance.now();
+        const tick = (now: number) => {
+          const progress = Math.min(1, (now - startTime) / durationMs);
+          audio.volume = start + delta * progress;
+          if (progress >= 1) {
+            resolve();
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    [],
+  );
 
   const startPlayback = useCallback(
     async (offsetSec = 0) => {
@@ -858,29 +973,245 @@ export function OriginalsPlayer({
       setIsPlaying(true);
       startRaf();
     },
-    [duration, ensureAudioContext, sources, startRaf, stopPlayback, volume],
+    [duration, ensureAudioContext, sources, startRaf, stopPlayback, volume],    
   );
+
+  const startStemPlayback = useCallback(
+    async (offsetSec = 0, fadeInMs = 0) => {
+      if (remixGroups.length === 0) return;
+      const ctx = await ensureAudioContext();
+      if (!ctx) return;
+      stopWebAudioSources();
+      let master = masterGainRef.current;
+      if (!master) {
+        master = ctx.createGain();
+        master.connect(ctx.destination);
+        masterGainRef.current = master;
+      }
+      master.gain.setValueAtTime(volume, ctx.currentTime);
+      const startAt = ctx.currentTime + 0.02;
+      const handles: SourceHandle[] = [];
+      const gains = new Map<string, GainNode>();
+      let longest = 0;
+
+      remixGroups.forEach((group) => {
+        const buffer = remixBuffersRef.current[group.id];
+        if (!buffer) return;
+        const groupGain = ctx.createGain();
+        const targetGain = Math.max(0, Math.min(1, group.gain));
+        if (fadeInMs > 0) {
+          groupGain.gain.setValueAtTime(0, ctx.currentTime);
+          groupGain.gain.linearRampToValueAtTime(
+            targetGain,
+            ctx.currentTime + fadeInMs / 1000,
+          );
+        } else {
+          groupGain.gain.setValueAtTime(targetGain, ctx.currentTime);
+        }
+        groupGain.connect(master);
+        const node = ctx.createBufferSource();
+        node.buffer = buffer;
+        node.connect(groupGain);
+        const maxStart = Math.max(0, buffer.duration - 0.01);
+        const startOffset = Math.max(0, Math.min(offsetSec, maxStart));
+        node.start(startAt, startOffset);
+        handles.push({ id: group.id, source: node });
+        gains.set(group.id, groupGain);
+        longest = Math.max(longest, buffer.duration);
+      });
+
+      if (!handles.length) return;
+      activeSourcesRef.current = handles;
+      remixGainsRef.current = gains;
+      const effectiveOffset = longest > 0 ? Math.min(offsetSec, longest) : offsetSec;
+      startAtRef.current = startAt - effectiveOffset;
+      setDuration(longest);
+      setCurrentTime(effectiveOffset);
+      setIsPlaying(true);
+      setRemixStatus("active");
+      startRaf();
+    },
+    [ensureAudioContext, remixGroups, startRaf, stopWebAudioSources, volume],
+  );
+
+  const activateRemix = useCallback(async () => {
+    const mixElement =
+      audioElementRef.current ??
+      audioElementsRef.current.values().next().value ??
+      null;
+    const mixTime = mixElement ? mixElement.currentTime : currentTime;
+    const fadeMs = 450;
+    await startStemPlayback(mixTime, fadeMs);
+    if (mixElement) {
+      await fadeElementVolume(mixElement, 0, fadeMs);
+      mixElement.pause();
+      mixElement.currentTime = mixTime;
+      mixElement.volume = volume;
+    }
+  }, [currentTime, fadeElementVolume, startStemPlayback, volume]);
+
+  const loadStemPack = useCallback(async () => {
+    if (!original) return;
+    if (remixStatus === "loading") return;
+    remixRequestedRef.current = true;
+    setRemixStatus("loading");
+    setRemixError(null);
+    const controller = new AbortController();
+    remixControllerRef.current?.abort();
+    remixControllerRef.current = controller;
+    try {
+      const pack: StemPack = await fetchStemPack(original.id, controller.signal);
+      if (controller.signal.aborted) return;
+      if (pack.processing && pack.processing.status !== "ready") {
+        const detail = pack.processing.detail?.trim();
+        throw new Error(detail || "Stem pack is still processing.");
+      }
+      const baseGroups = (pack.groups ?? [])
+        .map((group) => {
+          const source = pickStemGroupSource(group.sources);
+          if (!source) return null;
+          const gain = Number.isFinite(group.defaultGain)
+            ? Math.max(0, Math.min(1, group.defaultGain))
+            : 1;
+          return {
+            ...group,
+            gain,
+            source,
+          };
+        })
+        .filter((group): group is StemGroupPlayback => Boolean(group));
+
+      if (baseGroups.length === 0) {
+        throw new Error("No stem groups are available yet.");
+      }
+
+      const ctx = await ensureAudioContext();
+      if (!ctx) {
+        throw new Error("Audio engine unavailable.");
+      }
+
+      const buffers: Record<string, AudioBuffer | null> = {};
+      let playable = 0;
+      let longest = 0;
+      let decodeIssue: string | null = null;
+      for (const group of baseGroups) {
+        if (!group.source?.url) {
+          buffers[group.id] = null;
+          continue;
+        }
+        try {
+          const response = await fetch(group.source.url, {
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            throw new Error(
+              `Failed to load ${group.label} (${response.status})`,
+            );
+          }
+          const data = await response.arrayBuffer();
+          const buffer = await ctx.decodeAudioData(data);
+          buffers[group.id] = buffer;
+          playable += 1;
+          longest = Math.max(longest, buffer.duration);
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          buffers[group.id] = null;
+          const message =
+            error instanceof Error
+              ? error.message
+              : `Could not decode ${group.label}`;
+          decodeIssue = decodeIssue ?? message;
+          setRemixError((prev) => prev ?? message);
+        }
+      }
+
+      if (playable === 0) {
+        throw new Error(decodeIssue ?? "Stem groups are not ready.");
+      }
+
+      remixBuffersRef.current = buffers;
+      remixDurationRef.current = longest;
+      const readyGroups = baseGroups.filter((group) => buffers[group.id]);
+      setRemixGroups(readyGroups);
+      setRemixStatus("ready");
+      if (remixRequestedRef.current && isPlaying) {
+        await activateRemix();
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      const message =
+        error instanceof Error ? error.message : "Unable to load stem pack.";
+      setRemixError(message);
+      setRemixStatus("error");
+    }
+  }, [
+    activateRemix,
+    ensureAudioContext,
+    isPlaying,
+    original,
+    remixStatus,
+  ]);
 
   const handlePause = useCallback(() => {
     pausePlayback();
   }, [pausePlayback]);
 
-  const requiresAllSources = sourceMode === "stems";
+  const handleRemix = useCallback(() => {
+    if (!original) return;
+    remixRequestedRef.current = true;
+    if (remixStatus === "active") return;
+    if (remixStatus === "ready") {
+      if (isPlaying) {
+        void activateRemix();
+      }
+      return;
+    }
+    if (remixStatus === "loading") return;
+    void loadStemPack();
+  }, [activateRemix, isPlaying, loadStemPack, original, remixStatus]);
+
+  const requiresAllSources = false;
   const hasPlayable =
     sources.length > 0 &&
     (requiresAllSources ? playableCount >= sources.length : playableCount > 0);
+  const remixPlayable = remixStatus === "ready" || remixStatus === "active";
 
   const handlePlay = useCallback(() => {
+    const shouldUseRemix =
+      remixStatus === "active" ||
+      (remixStatus === "ready" && remixRequestedRef.current);
+    if (shouldUseRemix) {
+      requestAudioFocus({ id: playerIdRef.current, stop: handlePause });
+      const resumeFrom =
+        duration > 0 && currentTime >= duration ? 0 : currentTime;
+      void startStemPlayback(resumeFrom);
+      return;
+    }
     if (!hasPlayable || isLoading) return;
     requestAudioFocus({ id: playerIdRef.current, stop: handlePause });
     const resumeFrom = duration > 0 && currentTime >= duration ? 0 : currentTime;
     void startPlayback(resumeFrom);
-  }, [currentTime, duration, handlePause, hasPlayable, isLoading, startPlayback]);
+  }, [
+    currentTime,
+    duration,
+    handlePause,
+    hasPlayable,
+    isLoading,
+    remixStatus,
+    startPlayback,
+    startStemPlayback,
+  ]);
 
   const handleSeek = useCallback(
     (value: number) => {
       const safe = Math.max(0, Math.min(duration || 0, value));
       setCurrentTime(safe);
+      if (remixStatus === "active") {
+        if (isPlaying) {
+          void startStemPlayback(safe);
+        }
+        return;
+      }
       if (audioElementsRef.current.size) {
         audioElementsRef.current.forEach((audio) => {
           audio.currentTime = safe;
@@ -898,22 +1229,28 @@ export function OriginalsPlayer({
         void startPlayback(safe);
       }
     },
-    [duration, isPlaying, startPlayback],
+    [duration, isPlaying, remixStatus, startPlayback, startStemPlayback],
   );
 
+  const handleGroupGainChange = useCallback((groupId: string, gain: number) => {
+    const clamped = Math.max(0, Math.min(1, gain));
+    setRemixGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId ? { ...group, gain: clamped } : group,
+      ),
+    );
+    const ctx = audioContextRef.current;
+    const node = remixGainsRef.current.get(groupId);
+    if (ctx && node) {
+      node.gain.setTargetAtTime(clamped, ctx.currentTime, 0.01);
+    }
+  }, []);
+
   const sourceLabel = useMemo(() => {
-    if (sourceMode === "mix") return sources[0]?.label ?? "Song";
-    if (sourceMode === "stems") {
-      const stemCount = Math.max(0, sources.length - (includesVocal ? 1 : 0));
-      return includesVocal
-        ? `Stems + Vocal (${stemCount})`
-        : `Stems (${stemCount})`;
-    }
-    if (sourceMode === "fallback") {
-      return sources.length > 1 ? "Instrumental + Vocal" : sources[0]?.label ?? "Song";
-    }
+    if (sourceMode === "playback") return sources[0]?.label ?? "Song";
+    if (sourceMode === "fallback") return sources[0]?.label ?? "Song";
     return "";
-  }, [includesVocal, sourceMode, sources]);
+  }, [sourceMode, sources]);
 
   const lyricText = details?.lyrics?.trim() ?? "";
   const lyricLines = useMemo(
@@ -1077,7 +1414,18 @@ export function OriginalsPlayer({
   const previewMoods = moodPresets.slice(0, 5);
   const showVaryControls = Boolean(onVary) && previewMoods.length > 0;
   const initials = buildInitials(original?.title, original?.artist);
-  const isReady = hasPlayable && !isLoading;
+  const stemCount = details?.stemCount ?? original?.stemCount ?? 0;
+  const canRemix = stemCount > 0;
+  const remixLoading = remixStatus === "loading";
+  const remixReady = remixPlayable;
+  const isReady = (hasPlayable && !isLoading) || remixReady;
+  const remixLabel = remixLoading
+    ? "Loading stems"
+    : remixStatus === "active"
+      ? "Remix live"
+      : remixReady
+        ? "Remix ready"
+        : "Remix";
   const timeSky = details?.timeSky;
   const publishedLabel = formatDate(
     timeSky?.publishedAt ?? details?.uploadedAt ?? original?.uploadedAt,
@@ -1223,6 +1571,59 @@ export function OriginalsPlayer({
                 {preset.label}
               </Button>
             ))}
+          </div>
+        ) : null}
+
+        {canRemix ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              variant={remixReady ? "secondary" : "outline"}
+              className="gap-2"
+              disabled={remixLoading || remixStatus === "active"}
+              onClick={handleRemix}
+            >
+              {remixLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {remixLabel}
+            </Button>
+            {remixStatus === "error" && remixError ? (
+              <span className="text-xs text-amber-200">{remixError}</span>
+            ) : null}
+            {remixReady && remixGroups.length > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                Grouped stems ready.
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {remixReady && remixGroups.length > 0 ? (
+          <div className="rounded-xl border border-border/60 bg-slate-950/40 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+              Remix Groups
+            </div>
+            <div className="mt-3 grid gap-3">
+              {remixGroups.map((group) => (
+                <div key={group.id} className="flex items-center gap-3">
+                  <div className="w-24 text-xs font-medium text-slate-200">
+                    {group.label}
+                  </div>
+                  <Slider
+                    value={[group.gain]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={(value) =>
+                      handleGroupGainChange(group.id, value[0] ?? 0)
+                    }
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
 

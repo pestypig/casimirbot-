@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import { randomUUID } from "node:crypto";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { promises as fs, createReadStream, createWriteStream } from "node:fs";
 import { z } from "zod";
@@ -14,15 +15,26 @@ import {
   isReplitStoragePath,
   type NoisegenOriginal,
   type NoisegenOriginalAsset,
+  type NoisegenPlaybackAsset,
+  type NoisegenProcessingState,
+  type NoisegenStemGroupAsset,
   type NoisegenStemAsset,
+  resolvePlaybackAsset,
+  resolvePlaybackAssetPath,
   resolveBundledOriginalsRoots,
   resolveOriginalAsset,
   resolveOriginalAssetPath,
   resolveReplitStorageKey,
   resolveStemAsset,
   resolveStemAssetPath,
+  resolveStemGroupAsset,
+  resolveStemGroupAssetPath,
+  saveAnalysisArtifact,
+  savePlaybackAsset,
+  savePlaybackAssetFromFile,
   saveOriginalAssetFromFile,
   saveOriginalAsset,
+  saveStemGroupAsset,
   saveStemAssetFromFile,
   saveStemAsset,
   savePreviewBuffer,
@@ -49,6 +61,21 @@ const PREVIEW_CHANNELS = 1;
 const PREVIEW_MIN_SECONDS = 6;
 const PREVIEW_MAX_SECONDS = 30;
 const MAX_WAV_NORMALIZE_BYTES = 200 * 1024 * 1024;
+const WAVEFORM_BUCKETS = 1024;
+const MAX_WAVEFORM_BYTES = MAX_WAV_NORMALIZE_BYTES;
+const MAX_WAVEFORM_SAMPLES_PER_BUCKET = 2048;
+const MIXDOWN_SAMPLE_RATE = 44_100;
+const MIXDOWN_CHANNELS = 2;
+const PLAYBACK_OPUS_BITRATE = "160k";
+const PLAYBACK_AAC_BITRATE = "192k";
+const STEM_GROUP_DEFS = [
+  { id: "drums", label: "Drums", categories: ["drums"] },
+  { id: "bass", label: "Bass", categories: ["bass"] },
+  { id: "music", label: "Music", categories: ["music", "other"] },
+  { id: "fx", label: "FX", categories: ["fx"] },
+];
+const FFMPEG_PATH = process.env.FFMPEG_PATH?.trim() || "ffmpeg";
+let ffmpegAvailable: boolean | null = null;
 
 const peakSchema = z.object({
   omega: z.number(),
@@ -339,6 +366,16 @@ const readStringField = (value: unknown): string => {
   return "";
 };
 
+const readBooleanField = (value: unknown): boolean => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes";
+  }
+  return false;
+};
+
 const normalizeSearch = (value: unknown): string =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
 
@@ -473,6 +510,52 @@ const mergeStemAssets = (
   return merged;
 };
 
+const mergePlaybackAssets = (
+  existing: NoisegenPlaybackAsset[] | undefined,
+  incoming: NoisegenPlaybackAsset[] | undefined,
+): NoisegenPlaybackAsset[] => {
+  if (!incoming || incoming.length === 0) return existing ? [...existing] : [];
+  if (!existing || existing.length === 0) return [...incoming];
+  const merged = [...existing];
+  const indexById = new Map(
+    merged.map((asset, index) => [asset.id.toLowerCase(), index]),
+  );
+  for (const asset of incoming) {
+    const key = asset.id.toLowerCase();
+    const existingIndex = indexById.get(key);
+    if (existingIndex == null) {
+      indexById.set(key, merged.length);
+      merged.push(asset);
+    } else {
+      merged[existingIndex] = asset;
+    }
+  }
+  return merged;
+};
+
+const mergeStemGroupAssets = (
+  existing: NoisegenStemGroupAsset[] | undefined,
+  incoming: NoisegenStemGroupAsset[] | undefined,
+): NoisegenStemGroupAsset[] => {
+  if (!incoming || incoming.length === 0) return existing ? [...existing] : [];
+  if (!existing || existing.length === 0) return [...incoming];
+  const merged = [...existing];
+  const indexById = new Map(
+    merged.map((asset, index) => [asset.id.toLowerCase(), index]),
+  );
+  for (const asset of incoming) {
+    const key = asset.id.toLowerCase();
+    const existingIndex = indexById.get(key);
+    if (existingIndex == null) {
+      indexById.set(key, merged.length);
+      merged.push(asset);
+    } else {
+      merged[existingIndex] = asset;
+    }
+  }
+  return merged;
+};
+
 const upsertOriginalRecord = async (params: {
   trackId: string;
   title: string;
@@ -485,6 +568,9 @@ const upsertOriginalRecord = async (params: {
   instrumentalAsset?: NoisegenOriginalAsset;
   vocalAsset?: NoisegenOriginalAsset;
   stemAssets?: NoisegenStemAsset[];
+  playbackAssets?: NoisegenPlaybackAsset[];
+  stemGroupAssets?: NoisegenStemGroupAsset[];
+  processing?: NoisegenProcessingState;
 }): Promise<void> => {
   await updateNoisegenStore((next) => {
     const existingOriginalIndex = next.originals.findIndex(
@@ -504,6 +590,14 @@ const upsertOriginalRecord = async (params: {
       params.stemAssets && params.stemAssets.length > 0
         ? mergeStemAssets(existingAssets.stems, params.stemAssets)
         : existingAssets.stems ?? [];
+    const mergedPlayback =
+      params.playbackAssets && params.playbackAssets.length > 0
+        ? mergePlaybackAssets(existingAssets.playback, params.playbackAssets)
+        : existingAssets.playback ?? [];
+    const mergedStemGroups =
+      params.stemGroupAssets && params.stemGroupAssets.length > 0
+        ? mergeStemGroupAssets(existingAssets.stemGroups, params.stemGroupAssets)
+        : existingAssets.stemGroups ?? [];
     const mergedInstrumental =
       params.instrumentalAsset ?? existingAssets.instrumental;
     const mergedVocal = params.vocalAsset ?? existingAssets.vocal;
@@ -516,6 +610,12 @@ const upsertOriginalRecord = async (params: {
     }
     if (mergedStems.length > 0) {
       nextAssets.stems = mergedStems;
+    }
+    if (mergedPlayback.length > 0) {
+      nextAssets.playback = mergedPlayback;
+    }
+    if (mergedStemGroups.length > 0) {
+      nextAssets.stemGroups = mergedStemGroups;
     }
     const record = {
       id: params.trackId,
@@ -533,6 +633,7 @@ const upsertOriginalRecord = async (params: {
         : existingEntry?.offsetMs,
       uploadedAt: existingEntry?.uploadedAt ?? Date.now(),
       timeSky: params.timeSky ?? existingEntry?.timeSky,
+      processing: params.processing ?? existingEntry?.processing,
       assets: nextAssets,
     };
     if (existingOriginalIndex >= 0) {
@@ -742,6 +843,926 @@ const resolveUploadAudio = (
   return { buffer: file.buffer, mime: file.mimetype };
 };
 
+const resolvePlaybackCodec = (
+  mime: string,
+): NoisegenPlaybackAsset["codec"] => {
+  const lower = mime.toLowerCase();
+  if (lower.includes("mpeg") || lower.includes("mp3")) return "mp3";
+  if (lower.includes("ogg") || lower.includes("opus")) return "opus";
+  if (lower.includes("aac") || lower.includes("mp4")) return "aac";
+  return "wav";
+};
+
+const resolvePlaybackReadyDetail = (
+  playbackAssets: NoisegenPlaybackAsset[] | undefined,
+): string => {
+  if (!playbackAssets || playbackAssets.length === 0) return "playback ready";
+  const hasCompressed = playbackAssets.some((asset) => asset.codec !== "wav");
+  return hasCompressed ? "playback ready" : "playback ready (wav-only)";
+};
+
+const ensureFfmpegAvailable = (): boolean => {
+  if (ffmpegAvailable != null) return ffmpegAvailable;
+  try {
+    const result = spawnSync(FFMPEG_PATH, ["-version"], { stdio: "ignore" });
+    ffmpegAvailable = result.status === 0;
+  } catch {
+    ffmpegAvailable = false;
+  }
+  return ffmpegAvailable;
+};
+
+const runFfmpeg = async (args: string[], input: Buffer): Promise<Buffer> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(FFMPEG_PATH, args, { stdio: ["pipe", "pipe", "pipe"] });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    child.stdout.on("data", (chunk) => {
+      stdout.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve(Buffer.concat(stdout));
+        return;
+      }
+      const message = Buffer.concat(stderr).toString("utf8").trim();
+      reject(new Error(message || `ffmpeg exited with code ${code ?? 1}`));
+    });
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(input);
+  });
+
+const extractPcm16Samples = (
+  buffer: Buffer,
+  format: WavFormat,
+): Int16Array => {
+  const data = buffer.subarray(
+    format.dataOffset,
+    format.dataOffset + format.dataSize,
+  );
+  return new Int16Array(
+    data.buffer,
+    data.byteOffset,
+    Math.floor(data.byteLength / 2),
+  );
+};
+
+const convertPcm16Channels = (
+  samples: Int16Array,
+  fromChannels: number,
+  toChannels: number,
+): Int16Array | null => {
+  if (fromChannels === toChannels) return samples;
+  const frameCount = Math.floor(samples.length / fromChannels);
+  if (frameCount <= 0) return null;
+  if (fromChannels === 1 && toChannels === 2) {
+    const output = new Int16Array(frameCount * 2);
+    for (let i = 0; i < frameCount; i += 1) {
+      const sample = samples[i];
+      const base = i * 2;
+      output[base] = sample;
+      output[base + 1] = sample;
+    }
+    return output;
+  }
+  if (fromChannels === 2 && toChannels === 1) {
+    const output = new Int16Array(frameCount);
+    for (let i = 0; i < frameCount; i += 1) {
+      const base = i * 2;
+      const merged = (samples[base] + samples[base + 1]) / 2;
+      output[i] = Math.max(-32768, Math.min(32767, Math.round(merged)));
+    }
+    return output;
+  }
+  return null;
+};
+
+const resamplePcm16Samples = (
+  samples: Int16Array,
+  channels: number,
+  inputRate: number,
+  outputRate: number,
+): Int16Array => {
+  if (inputRate === outputRate) return samples;
+  const inputFrames = Math.floor(samples.length / channels);
+  if (inputFrames <= 0) return new Int16Array(0);
+  const outputFrames = Math.max(
+    1,
+    Math.round((inputFrames * outputRate) / inputRate),
+  );
+  const output = new Int16Array(outputFrames * channels);
+  const ratio = inputRate / outputRate;
+  for (let frame = 0; frame < outputFrames; frame += 1) {
+    const sourcePos = frame * ratio;
+    const leftIndex = Math.floor(sourcePos);
+    const rightIndex = Math.min(leftIndex + 1, inputFrames - 1);
+    const mix = sourcePos - leftIndex;
+    const leftBase = leftIndex * channels;
+    const rightBase = rightIndex * channels;
+    const outBase = frame * channels;
+    for (let channel = 0; channel < channels; channel += 1) {
+      const leftSample = samples[leftBase + channel];
+      const rightSample = samples[rightBase + channel];
+      const value = leftSample + (rightSample - leftSample) * mix;
+      output[outBase + channel] = Math.max(
+        -32768,
+        Math.min(32767, Math.round(value)),
+      );
+    }
+  }
+  return output;
+};
+
+const rebuildPcm16WavBuffer = (
+  samples: Int16Array,
+  sampleRate: number,
+  channels: number,
+): { buffer: Buffer; format: WavFormat } | null => {
+  const buffer = buildPcm16WavBuffer({ samples, sampleRate, channels });
+  const format = parseWavFormat(buffer);
+  if (!format) return null;
+  return { buffer, format };
+};
+
+const normalizePcm16WavBuffer = async (params: {
+  buffer: Buffer;
+  mime: string;
+}): Promise<{ buffer: Buffer; format: WavFormat } | null> => {
+  const direct = ensurePcm16WavBuffer(params.buffer, params.mime);
+  if (direct) {
+    let format = direct.format!;
+    if (format.channels > MIXDOWN_CHANNELS) {
+      if (!ensureFfmpegAvailable()) return null;
+      try {
+        const wavBuffer = await runFfmpeg(
+          [
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            "pipe:0",
+            "-acodec",
+            "pcm_s16le",
+            "-ac",
+            String(MIXDOWN_CHANNELS),
+            "-ar",
+            String(MIXDOWN_SAMPLE_RATE),
+            "-f",
+            "wav",
+            "pipe:1",
+          ],
+          direct.buffer,
+        );
+        return ensurePcm16WavBuffer(wavBuffer, "audio/wav");
+      } catch {
+        return null;
+      }
+    }
+    let samples = extractPcm16Samples(direct.buffer, format);
+    let updated = false;
+    if (format.channels !== MIXDOWN_CHANNELS) {
+      const converted = convertPcm16Channels(
+        samples,
+        format.channels,
+        MIXDOWN_CHANNELS,
+      );
+      if (!converted) return null;
+      samples = converted;
+      format = { ...format, channels: MIXDOWN_CHANNELS };
+      updated = true;
+    }
+    if (format.sampleRate !== MIXDOWN_SAMPLE_RATE) {
+      samples = resamplePcm16Samples(
+        samples,
+        format.channels,
+        format.sampleRate,
+        MIXDOWN_SAMPLE_RATE,
+      );
+      format = { ...format, sampleRate: MIXDOWN_SAMPLE_RATE };
+      updated = true;
+    }
+    if (!updated) return direct;
+    return rebuildPcm16WavBuffer(samples, format.sampleRate, format.channels);
+  }
+  if (!ensureFfmpegAvailable()) return null;
+  try {
+    const wavBuffer = await runFfmpeg(
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "pipe:0",
+        "-acodec",
+        "pcm_s16le",
+        "-ac",
+        String(MIXDOWN_CHANNELS),
+        "-ar",
+        String(MIXDOWN_SAMPLE_RATE),
+        "-f",
+        "wav",
+        "pipe:1",
+      ],
+      params.buffer,
+    );
+    return ensurePcm16WavBuffer(wavBuffer, "audio/wav");
+  } catch {
+    return null;
+  }
+};
+
+const transcodePlaybackVariant = async (params: {
+  originalId: string;
+  buffer: Buffer;
+  playbackId: string;
+  label: string;
+  codec: NoisegenPlaybackAsset["codec"];
+  mime: string;
+  originalName: string;
+  args: string[];
+}): Promise<NoisegenPlaybackAsset | null> => {
+  if (!ensureFfmpegAvailable()) return null;
+  try {
+    const encoded = await runFfmpeg(params.args, params.buffer);
+    return await savePlaybackAsset({
+      originalId: params.originalId,
+      playbackId: params.playbackId,
+      label: params.label,
+      codec: params.codec,
+      buffer: encoded,
+      mime: params.mime,
+      originalName: params.originalName,
+    });
+  } catch {
+    return null;
+  }
+};
+
+const buildPlaybackDerivatives = async (params: {
+  originalId: string;
+  buffer: Buffer;
+  label: string;
+}): Promise<NoisegenPlaybackAsset[]> => {
+  if (!ensureFfmpegAvailable()) return [];
+  const assets: NoisegenPlaybackAsset[] = [];
+  const opus = await transcodePlaybackVariant({
+    originalId: params.originalId,
+    buffer: params.buffer,
+    playbackId: "mix-opus",
+    label: params.label,
+    codec: "opus",
+    mime: "audio/ogg",
+    originalName: "mix.opus",
+    args: [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-i",
+      "pipe:0",
+      "-c:a",
+      "libopus",
+      "-b:a",
+      PLAYBACK_OPUS_BITRATE,
+      "-vbr",
+      "on",
+      "-ac",
+      String(MIXDOWN_CHANNELS),
+      "-ar",
+      String(MIXDOWN_SAMPLE_RATE),
+      "-f",
+      "ogg",
+      "pipe:1",
+    ],
+  });
+  if (opus) assets.push(opus);
+  const aac = await transcodePlaybackVariant({
+    originalId: params.originalId,
+    buffer: params.buffer,
+    playbackId: "mix-aac",
+    label: params.label,
+    codec: "aac",
+    mime: "audio/mp4",
+    originalName: "mix.m4a",
+    args: [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-i",
+      "pipe:0",
+      "-c:a",
+      "aac",
+      "-b:a",
+      PLAYBACK_AAC_BITRATE,
+      "-movflags",
+      "frag_keyframe+empty_moov",
+      "-ac",
+      String(MIXDOWN_CHANNELS),
+      "-ar",
+      String(MIXDOWN_SAMPLE_RATE),
+      "-f",
+      "mp4",
+      "pipe:1",
+    ],
+  });
+  if (aac) assets.push(aac);
+  return assets;
+};
+
+const buildPlaybackAssetsFromBuffer = async (params: {
+  originalId: string;
+  buffer: Buffer;
+  mime: string;
+  originalName?: string;
+  fallbackAsset?: NoisegenOriginalAsset;
+}): Promise<NoisegenPlaybackAsset[]> => {
+  const label = "Mix";
+  const direct = ensurePcm16WavBuffer(params.buffer, params.mime);
+  const reuseOriginal =
+    !!params.fallbackAsset &&
+    !!direct &&
+    direct.buffer === params.buffer &&
+    direct.format?.sampleRate === MIXDOWN_SAMPLE_RATE &&
+    direct.format?.channels === MIXDOWN_CHANNELS;
+  const normalized = await normalizePcm16WavBuffer({
+    buffer: params.buffer,
+    mime: params.mime,
+  });
+  if (normalized) {
+    const playbackAssets: NoisegenPlaybackAsset[] = [];
+    if (reuseOriginal && params.fallbackAsset) {
+      playbackAssets.push(buildPlaybackFromInstrumental(params.fallbackAsset));
+    } else {
+      const wavAsset = await savePlaybackAsset({
+        originalId: params.originalId,
+        playbackId: "mix",
+        label,
+        codec: "wav",
+        buffer: normalized.buffer,
+        mime: "audio/wav",
+        originalName: "mix.wav",
+      });
+      playbackAssets.push(wavAsset);
+    }
+    const derivatives = await buildPlaybackDerivatives({
+      originalId: params.originalId,
+      buffer: normalized.buffer,
+      label,
+    });
+    playbackAssets.push(...derivatives);
+    return playbackAssets;
+  }
+  if (params.fallbackAsset) {
+    return [buildPlaybackFromInstrumental(params.fallbackAsset)];
+  }
+  const fallback = await savePlaybackAsset({
+    originalId: params.originalId,
+    playbackId: "mix",
+    label,
+    codec: resolvePlaybackCodec(params.mime),
+    buffer: params.buffer,
+    mime: params.mime,
+    originalName: params.originalName,
+  });
+  return [fallback];
+};
+
+const buildPlaybackAssetsFromFile = async (params: {
+  originalId: string;
+  filePath: string;
+  mime: string;
+  originalName?: string;
+  fallbackAsset?: NoisegenOriginalAsset;
+}): Promise<NoisegenPlaybackAsset[]> => {
+  const buffer = await fs.readFile(params.filePath);
+  return buildPlaybackAssetsFromBuffer({
+    originalId: params.originalId,
+    buffer,
+    mime: params.mime,
+    originalName: params.originalName,
+    fallbackAsset: params.fallbackAsset,
+  });
+};
+
+const transcodeStemGroupVariant = async (params: {
+  originalId: string;
+  groupId: string;
+  label: string;
+  category: string;
+  assetId: string;
+  codec: NoisegenStemGroupAsset["codec"];
+  mime: string;
+  originalName: string;
+  durationMs?: number;
+  sampleRate?: number;
+  channels?: number;
+  buffer: Buffer;
+  args: string[];
+}): Promise<NoisegenStemGroupAsset | null> => {
+  if (!ensureFfmpegAvailable()) return null;
+  try {
+    const encoded = await runFfmpeg(params.args, params.buffer);
+    return await saveStemGroupAsset({
+      originalId: params.originalId,
+      assetId: params.assetId,
+      groupId: params.groupId,
+      label: params.label,
+      category: params.category,
+      codec: params.codec,
+      buffer: encoded,
+      mime: params.mime,
+      originalName: params.originalName,
+      durationMs: params.durationMs,
+      sampleRate: params.sampleRate,
+      channels: params.channels,
+    });
+  } catch {
+    return null;
+  }
+};
+
+const buildStemGroupAssetsFromBuffer = async (params: {
+  originalId: string;
+  groupId: string;
+  label: string;
+  category: string;
+  buffer: Buffer;
+  durationMs?: number;
+}): Promise<NoisegenStemGroupAsset[]> => {
+  const normalized = await normalizePcm16WavBuffer({
+    buffer: params.buffer,
+    mime: "audio/wav",
+  });
+  if (!normalized) return [];
+  const format = normalized.format!;
+  const assets: NoisegenStemGroupAsset[] = [];
+
+  if (ensureFfmpegAvailable()) {
+    const opus = await transcodeStemGroupVariant({
+      originalId: params.originalId,
+      groupId: params.groupId,
+      label: params.label,
+      category: params.category,
+      assetId: `${params.groupId}-opus`,
+      codec: "opus",
+      mime: "audio/ogg",
+      originalName: `${params.groupId}.opus`,
+      durationMs: params.durationMs,
+      sampleRate: format.sampleRate,
+      channels: format.channels,
+      buffer: normalized.buffer,
+      args: [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "pipe:0",
+        "-c:a",
+        "libopus",
+        "-b:a",
+        PLAYBACK_OPUS_BITRATE,
+        "-vbr",
+        "on",
+        "-ac",
+        String(MIXDOWN_CHANNELS),
+        "-ar",
+        String(MIXDOWN_SAMPLE_RATE),
+        "-f",
+        "ogg",
+        "pipe:1",
+      ],
+    });
+    if (opus) assets.push(opus);
+
+    const aac = await transcodeStemGroupVariant({
+      originalId: params.originalId,
+      groupId: params.groupId,
+      label: params.label,
+      category: params.category,
+      assetId: `${params.groupId}-aac`,
+      codec: "aac",
+      mime: "audio/mp4",
+      originalName: `${params.groupId}.m4a`,
+      durationMs: params.durationMs,
+      sampleRate: format.sampleRate,
+      channels: format.channels,
+      buffer: normalized.buffer,
+      args: [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "pipe:0",
+        "-c:a",
+        "aac",
+        "-b:a",
+        PLAYBACK_AAC_BITRATE,
+        "-movflags",
+        "frag_keyframe+empty_moov",
+        "-ac",
+        String(MIXDOWN_CHANNELS),
+        "-ar",
+        String(MIXDOWN_SAMPLE_RATE),
+        "-f",
+        "mp4",
+        "pipe:1",
+      ],
+    });
+    if (aac) assets.push(aac);
+  }
+
+  if (assets.length === 0) {
+    const wavAsset = await saveStemGroupAsset({
+      originalId: params.originalId,
+      assetId: `${params.groupId}-wav`,
+      groupId: params.groupId,
+      label: params.label,
+      category: params.category,
+      codec: "wav",
+      buffer: normalized.buffer,
+      mime: "audio/wav",
+      originalName: `${params.groupId}.wav`,
+      durationMs: params.durationMs,
+      sampleRate: format.sampleRate,
+      channels: format.channels,
+    });
+    assets.push(wavAsset);
+  }
+
+  return assets;
+};
+
+const collectStemGroupSources = async (params: {
+  original: NoisegenOriginal;
+  groupId: string;
+  categories: string[];
+  includeVocal: boolean;
+}): Promise<Array<{ label: string; buffer: Buffer; mime: string }>> => {
+  const sources: Array<{ label: string; buffer: Buffer; mime: string }> = [];
+  if (params.includeVocal && params.original.assets.vocal) {
+    sources.push({
+      label: "Vocal",
+      buffer: await loadAssetBuffer(params.original.assets.vocal),
+      mime: params.original.assets.vocal.mime,
+    });
+    return sources;
+  }
+  const stems = params.original.assets.stems ?? [];
+  for (const stem of stems) {
+    const category = stem.category ?? "music";
+    if (!params.categories.includes(category)) continue;
+    sources.push({
+      label: stem.name,
+      buffer: await loadAssetBuffer(stem),
+      mime: stem.mime,
+    });
+  }
+  return sources;
+};
+
+const buildStemGroupAssets = async (
+  original: NoisegenOriginal,
+): Promise<NoisegenStemGroupAsset[]> => {
+  if (!original.assets.stems?.length && !original.assets.vocal) return [];
+  const grouped: NoisegenStemGroupAsset[] = [];
+  for (const group of STEM_GROUP_DEFS) {
+    const sources = await collectStemGroupSources({
+      original,
+      groupId: group.id,
+      categories: group.categories,
+      includeVocal: false,
+    });
+    if (!sources.length) continue;
+    const mixdown = await mixdownPcm16WavBuffers({ sources });
+    if (!mixdown) continue;
+    const assets = await buildStemGroupAssetsFromBuffer({
+      originalId: original.id,
+      groupId: group.id,
+      label: group.label,
+      category: group.id,
+      buffer: mixdown.buffer,
+      durationMs: mixdown.durationMs,
+    });
+    grouped.push(...assets);
+  }
+  if (original.assets.vocal) {
+    const sources = await collectStemGroupSources({
+      original,
+      groupId: "vocal",
+      categories: [],
+      includeVocal: true,
+    });
+    if (sources.length) {
+      const mixdown = await mixdownPcm16WavBuffers({ sources });
+      if (mixdown) {
+        const assets = await buildStemGroupAssetsFromBuffer({
+          originalId: original.id,
+          groupId: "vocal",
+          label: "Vocal",
+          category: "vocal",
+          buffer: mixdown.buffer,
+          durationMs: mixdown.durationMs,
+        });
+        grouped.push(...assets);
+      }
+    }
+  }
+  return grouped;
+};
+
+const buildWaveformSummaryFromBuffer = (
+  buffer: Buffer,
+  mime?: string,
+): {
+  peaks: number[];
+  durationMs: number;
+  loudnessDb?: number;
+  sampleRate?: number;
+  channels?: number;
+} | null => {
+  const lower = mime?.toLowerCase() ?? "";
+  if (!lower.includes("wav") && !lower.includes("wave")) return null;
+  const format = parseWavFormat(buffer);
+  if (!format || format.audioFormat !== 1 || format.bitsPerSample !== 16) {
+    return null;
+  }
+  const bytesPerSample = format.bitsPerSample / 8;
+  const frameSize = bytesPerSample * format.channels;
+  const totalFrames = Math.floor(format.dataSize / frameSize);
+  if (totalFrames <= 0 || format.sampleRate <= 0) return null;
+
+  const bucketCount = Math.min(WAVEFORM_BUCKETS, totalFrames);
+  const framesPerBucket = Math.max(1, Math.floor(totalFrames / bucketCount));
+  const peaks = new Array(bucketCount).fill(0);
+  let sumSquares = 0;
+  let sampleCount = 0;
+
+  for (let i = 0; i < bucketCount; i += 1) {
+    const startFrame = i * framesPerBucket;
+    const endFrame =
+      i === bucketCount - 1
+        ? totalFrames
+        : Math.min(totalFrames, (i + 1) * framesPerBucket);
+    const bucketFrames = endFrame - startFrame;
+    const step = Math.max(
+      1,
+      Math.floor(bucketFrames / MAX_WAVEFORM_SAMPLES_PER_BUCKET),
+    );
+    let peak = 0;
+    for (let frame = startFrame; frame < endFrame; frame += step) {
+      const offset = format.dataOffset + frame * frameSize;
+      if (offset + 2 > buffer.length) break;
+      const sample = buffer.readInt16LE(offset);
+      const normalized = Math.abs(sample) / 32768;
+      if (normalized > peak) peak = normalized;
+      sumSquares += (sample / 32768) ** 2;
+      sampleCount += 1;
+    }
+    peaks[i] = Number(peak.toFixed(4));
+  }
+
+  const rms = sampleCount > 0 ? Math.sqrt(sumSquares / sampleCount) : 0;
+  const loudnessDb =
+    rms > 0 ? Number((20 * Math.log10(rms)).toFixed(2)) : undefined;
+  const durationMs = Math.round((totalFrames / format.sampleRate) * 1000);
+  return {
+    peaks,
+    durationMs,
+    loudnessDb,
+    sampleRate: format.sampleRate,
+    channels: format.channels,
+  };
+};
+
+const buildWaveformSummaryFromFile = async (
+  filePath: string,
+  mime?: string,
+): Promise<{ peaks: number[]; durationMs: number; loudnessDb?: number } | null> => {
+  try {
+    const stats = await fs.stat(filePath);
+    if (stats.size > MAX_WAVEFORM_BYTES) return null;
+    const buffer = await fs.readFile(filePath);
+    return buildWaveformSummaryFromBuffer(buffer, mime);
+  } catch {
+    return null;
+  }
+};
+
+const attachWaveformSummary = async (
+  asset: {
+    waveformPeaks?: number[];
+    waveformDurationMs?: number;
+    loudnessDb?: number;
+    sampleRate?: number;
+    channels?: number;
+    analysisPath?: string;
+  },
+  summary: {
+    peaks: number[];
+    durationMs: number;
+    loudnessDb?: number;
+    sampleRate?: number;
+    channels?: number;
+  } | null,
+  originalId: string,
+  fileName: string,
+): Promise<void> => {
+  if (!summary) return;
+  asset.waveformPeaks = summary.peaks;
+  asset.waveformDurationMs = summary.durationMs;
+  if (summary.loudnessDb != null) asset.loudnessDb = summary.loudnessDb;
+  if (summary.sampleRate != null) asset.sampleRate = summary.sampleRate;
+  if (summary.channels != null) asset.channels = summary.channels;
+  try {
+    const buffer = Buffer.from(JSON.stringify(summary));
+    asset.analysisPath = await saveAnalysisArtifact({
+      originalId,
+      fileName,
+      buffer,
+    });
+  } catch {
+    // Analysis artifacts are best-effort.
+  }
+};
+
+const isOriginalAsset = (
+  asset: NoisegenOriginalAsset | NoisegenStemAsset,
+): asset is NoisegenOriginalAsset => "kind" in asset;
+
+const readStreamToBuffer = async (
+  stream: NodeJS.ReadableStream,
+): Promise<Buffer> => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+};
+
+const loadAssetBuffer = async (
+  asset: NoisegenOriginalAsset | NoisegenStemAsset,
+): Promise<Buffer> => {
+  if (isReplitStoragePath(asset.path)) {
+    const key = resolveReplitStorageKey(asset.path);
+    const stream = await downloadReplitObjectStream(key);
+    return readStreamToBuffer(stream);
+  }
+  const assetPath = isOriginalAsset(asset)
+    ? resolveOriginalAssetPath(asset)
+    : resolveStemAssetPath(asset);
+  return fs.readFile(assetPath);
+};
+
+const ensurePcm16WavBuffer = (
+  buffer: Buffer,
+  mime: string,
+): { buffer: Buffer; format: ReturnType<typeof parseWavFormat> } | null => {
+  const lower = mime.toLowerCase();
+  if (!lower.includes("wav") && !lower.includes("wave")) return null;
+  let working = buffer;
+  const converted = convertWavToPcm16(buffer);
+  if (converted) {
+    working = converted;
+  }
+  const format = parseWavFormat(working);
+  if (!format || format.audioFormat !== 1 || format.bitsPerSample !== 16) {
+    return null;
+  }
+  return { buffer: working, format };
+};
+
+const buildPcm16WavBuffer = (params: {
+  samples: Int16Array;
+  sampleRate: number;
+  channels: number;
+}): Buffer => {
+  const dataSize = params.samples.length * 2;
+  const blockAlign = params.channels * 2;
+  const byteRate = params.sampleRate * blockAlign;
+  const output = Buffer.alloc(44 + dataSize);
+  output.write("RIFF", 0);
+  output.writeUInt32LE(36 + dataSize, 4);
+  output.write("WAVE", 8);
+  output.write("fmt ", 12);
+  output.writeUInt32LE(16, 16);
+  output.writeUInt16LE(1, 20);
+  output.writeUInt16LE(params.channels, 22);
+  output.writeUInt32LE(params.sampleRate, 24);
+  output.writeUInt32LE(byteRate, 28);
+  output.writeUInt16LE(blockAlign, 32);
+  output.writeUInt16LE(16, 34);
+  output.write("data", 36);
+  output.writeUInt32LE(dataSize, 40);
+  Buffer.from(
+    params.samples.buffer,
+    params.samples.byteOffset,
+    params.samples.byteLength,
+  ).copy(output, 44);
+  return output;
+};
+
+const mixdownPcm16WavBuffers = async (params: {
+  sources: Array<{ label: string; buffer: Buffer; mime: string }>;
+}): Promise<{ buffer: Buffer; durationMs: number; loudnessDb?: number } | null> => {
+  if (params.sources.length === 0) return null;
+  const tracks: Int16Array[] = [];
+
+  for (const source of params.sources) {
+    const normalized = await normalizePcm16WavBuffer({
+      buffer: source.buffer,
+      mime: source.mime,
+    });
+    if (!normalized) return null;
+    const format = normalized.format!;
+    const data = normalized.buffer.subarray(
+      format.dataOffset,
+      format.dataOffset + format.dataSize,
+    );
+    tracks.push(
+      new Int16Array(
+        data.buffer,
+        data.byteOffset,
+        Math.floor(data.byteLength / 2),
+      ),
+    );
+  }
+
+  const maxSamples = Math.max(...tracks.map((track) => track.length));
+  const mixed = new Int16Array(maxSamples);
+  const gain = 1 / Math.max(1, tracks.length);
+  let sumSquares = 0;
+  let sampleCount = 0;
+
+  for (let i = 0; i < maxSamples; i += 1) {
+    let sum = 0;
+    for (const track of tracks) {
+      if (i < track.length) {
+        sum += track[i];
+      }
+    }
+    const scaled = sum * gain;
+    const clamped = Math.max(-32768, Math.min(32767, Math.round(scaled)));
+    mixed[i] = clamped;
+    const normalized = clamped / 32768;
+    sumSquares += normalized * normalized;
+    sampleCount += 1;
+  }
+
+  const durationMs = Math.round(
+    (maxSamples / MIXDOWN_CHANNELS / MIXDOWN_SAMPLE_RATE) * 1000,
+  );
+  const rms = sampleCount > 0 ? Math.sqrt(sumSquares / sampleCount) : 0;
+  const loudnessDb =
+    rms > 0 ? Number((20 * Math.log10(rms)).toFixed(2)) : undefined;
+  return {
+    buffer: buildPcm16WavBuffer({
+      samples: mixed,
+      sampleRate: MIXDOWN_SAMPLE_RATE,
+      channels: MIXDOWN_CHANNELS,
+    }),
+    durationMs,
+    loudnessDb,
+  };
+};
+
+const buildPlaybackFromInstrumental = (
+  asset: NoisegenOriginalAsset,
+): NoisegenPlaybackAsset => ({
+  id: "mix",
+  label: "Mix",
+  codec: resolvePlaybackCodec(asset.mime),
+  fileName: asset.fileName,
+  path: asset.path,
+  mime: asset.mime,
+  bytes: asset.bytes,
+  uploadedAt: asset.uploadedAt,
+});
+
+const collectMixdownSources = async (
+  original: NoisegenOriginal,
+): Promise<Array<{ label: string; buffer: Buffer; mime: string }>> => {
+  const sources: Array<{ label: string; buffer: Buffer; mime: string }> = [];
+  const stems = original.assets.stems ?? [];
+  for (const stem of stems) {
+    sources.push({
+      label: stem.name,
+      buffer: await loadAssetBuffer(stem),
+      mime: stem.mime,
+    });
+  }
+  if (original.assets.vocal) {
+    sources.push({
+      label: "Vocal",
+      buffer: await loadAssetBuffer(original.assets.vocal),
+      mime: original.assets.vocal.mime,
+    });
+  }
+  return sources;
+};
+
 const normalizeWavFile = async (
   filePath: string,
   mime?: string,
@@ -767,6 +1788,8 @@ const estimateDurationSeconds = (buffer: Buffer, mime?: string): number => {
 const { previewsDir } = getNoisegenPaths();
 const kbTexturesDir = path.join(process.cwd(), "client", "public", "kb-textures");
 const staticOriginalsDirs = resolveBundledOriginalsRoots();
+
+ensureFfmpegAvailable();
 
 router.use("/kb-textures", express.static(kbTexturesDir));
 router.use("/noisegen/previews", express.static(previewsDir));
@@ -973,6 +1996,46 @@ const serveOriginalAsset = async (req: any, res: any) => {
   }
 };
 
+const servePlaybackAsset = async (req: any, res: any) => {
+  try {
+    const store = await getNoisegenStore();
+    const original = findOriginalById(store, req.params.id);
+    if (!original) {
+      return res.status(404).json({ error: "not_found" });
+    }
+    const asset = resolvePlaybackAsset(original, req.params.playbackId ?? "");
+    if (!asset) {
+      return res.status(404).json({ error: "playback_not_found" });
+    }
+    if (isReplitStoragePath(asset.path)) {
+      await streamReplitAsset(req, res, asset);
+      return;
+    }
+
+    const assetPath = resolvePlaybackAssetPath(asset);
+    try {
+      await fs.access(assetPath);
+    } catch {
+      return res.status(404).json({ error: "playback_missing" });
+    }
+    try {
+      const shouldNormalize =
+        req.method !== "HEAD" && !path.isAbsolute(asset.path);
+      if (shouldNormalize) {
+        await normalizeWavFile(assetPath, asset.mime);
+      }
+    } catch {
+      // fall through to streaming the original asset
+    }
+    return await streamAudioFile(req, res, assetPath, asset.mime);
+  } catch (error) {
+    return res.status(500).json({
+      error: "playback_fetch_failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 const serveStemAsset = async (req: any, res: any) => {
   try {
     const store = await getNoisegenStore();
@@ -1013,14 +2076,62 @@ const serveStemAsset = async (req: any, res: any) => {
   }
 };
 
+const serveStemGroupAsset = async (req: any, res: any) => {
+  try {
+    const store = await getNoisegenStore();
+    const original = findOriginalById(store, req.params.id);
+    if (!original) {
+      return res.status(404).json({ error: "not_found" });
+    }
+    const asset = resolveStemGroupAsset(original, req.params.groupId ?? "");
+    if (!asset) {
+      return res.status(404).json({ error: "stem_group_not_found" });
+    }
+    if (isReplitStoragePath(asset.path)) {
+      await streamReplitAsset(req, res, asset);
+      return;
+    }
+
+    const assetPath = resolveStemGroupAssetPath(asset);
+    try {
+      await fs.access(assetPath);
+    } catch {
+      return res.status(404).json({ error: "stem_group_missing" });
+    }
+    try {
+      const shouldNormalize =
+        req.method !== "HEAD" && !path.isAbsolute(asset.path);
+      if (shouldNormalize) {
+        await normalizeWavFile(assetPath, asset.mime);
+      }
+    } catch {
+      // fall through to streaming the original asset
+    }
+    return await streamAudioFile(req, res, assetPath, asset.mime);
+  } catch (error) {
+    return res.status(500).json({
+      error: "stem_group_fetch_failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 router.get("/originals/:id/:asset", serveOriginalAsset);
 router.head("/originals/:id/:asset", serveOriginalAsset);
 router.get("/audio/originals/:id/:asset", serveOriginalAsset);
 router.head("/audio/originals/:id/:asset", serveOriginalAsset);
+router.get("/originals/:id/playback/:playbackId", servePlaybackAsset);
+router.head("/originals/:id/playback/:playbackId", servePlaybackAsset);
+router.get("/audio/originals/:id/playback/:playbackId", servePlaybackAsset);
+router.head("/audio/originals/:id/playback/:playbackId", servePlaybackAsset);
 router.get("/originals/:id/stems/:stemId", serveStemAsset);
 router.head("/originals/:id/stems/:stemId", serveStemAsset);
 router.get("/audio/originals/:id/stems/:stemId", serveStemAsset);
 router.head("/audio/originals/:id/stems/:stemId", serveStemAsset);
+router.get("/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
+router.head("/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
+router.get("/audio/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
+router.head("/audio/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
 
 router.get("/api/noise-gens/originals", async (req, res) => {
   const search = normalizeSearch(req.query?.search);
@@ -1077,6 +2188,18 @@ router.get("/api/noise-gens/originals/:id", async (req, res) => {
   const isPending = store.pendingOriginals.some(
     (entry) => entry.id.toLowerCase() === original.id.toLowerCase(),
   );
+  const playbackAssets = original.assets.playback ?? [];
+  const playbackFallback = original.assets.instrumental
+    ? {
+        id: "instrumental",
+        label: "Mix",
+        codec: resolvePlaybackCodec(original.assets.instrumental.mime),
+        mime: original.assets.instrumental.mime,
+        size: original.assets.instrumental.bytes,
+        uploadedAt: original.assets.instrumental.uploadedAt,
+        url: `/originals/${encodeURIComponent(original.id)}/instrumental`,
+      }
+    : null;
   return res.json({
     id: original.id,
     title: original.title,
@@ -1084,13 +2207,29 @@ router.get("/api/noise-gens/originals/:id", async (req, res) => {
     listens: original.listens ?? 0,
     duration: original.duration ?? 0,
     tempo: original.tempo ?? undefined,
-      stemCount: original.assets.stems?.length ?? 0,
-      uploadedAt: original.uploadedAt,
-      status: isPending ? "pending" : "ranked",
-      lyrics: original.notes ?? undefined,
-      timeSky: original.timeSky ?? undefined,
-    });
+    stemCount: original.assets.stems?.length ?? 0,
+    uploadedAt: original.uploadedAt,
+    status: isPending ? "pending" : "ranked",
+    lyrics: original.notes ?? undefined,
+    timeSky: original.timeSky ?? undefined,
+    processing: original.processing ?? undefined,
+    playback: playbackAssets.length
+      ? playbackAssets.map((asset) => ({
+          id: asset.id,
+          label: asset.label,
+          codec: asset.codec,
+          mime: asset.mime,
+          size: asset.bytes,
+          uploadedAt: asset.uploadedAt,
+          url: `/originals/${encodeURIComponent(original.id)}/playback/${encodeURIComponent(
+            asset.id,
+          )}`,
+        }))
+      : playbackFallback
+        ? [playbackFallback]
+        : [],
   });
+});
 
 router.get("/api/noise-gens/originals/:id/stems", async (req, res) => {
   const store = await getNoisegenStore();
@@ -1107,6 +2246,96 @@ router.get("/api/noise-gens/originals/:id/stems", async (req, res) => {
       mime: stem.mime,
       size: stem.bytes,
       uploadedAt: stem.uploadedAt,
+      waveformPeaks: stem.waveformPeaks ?? undefined,
+      waveformDurationMs: stem.waveformDurationMs ?? undefined,
+      sampleRate: stem.sampleRate ?? undefined,
+      channels: stem.channels ?? undefined,
+      url: `/originals/${encodeURIComponent(original.id)}/stems/${encodeURIComponent(stem.id)}`,
+    })),
+  });
+});
+
+router.get("/api/noise-gens/originals/:id/stem-pack", async (req, res) => {
+  const store = await getNoisegenStore();
+  const original = findOriginalById(store, req.params.id ?? "");
+  if (!original) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  const groupAssets = original.assets.stemGroups ?? [];
+  const grouped = new Map<
+    string,
+    {
+      id: string;
+      label: string;
+      category: string;
+      durationMs?: number;
+      sampleRate?: number;
+      channels?: number;
+      sources: Array<{
+        id: string;
+        codec: NoisegenStemGroupAsset["codec"];
+        mime: string;
+        size: number;
+        uploadedAt: number;
+        url: string;
+      }>;
+    }
+  >();
+  for (const asset of groupAssets) {
+    const existing = grouped.get(asset.groupId);
+    const entry =
+      existing ??
+      {
+        id: asset.groupId,
+        label: asset.label,
+        category: asset.category,
+        durationMs: asset.durationMs,
+        sampleRate: asset.sampleRate,
+        channels: asset.channels,
+        sources: [],
+      };
+    entry.sources.push({
+      id: asset.id,
+      codec: asset.codec,
+      mime: asset.mime,
+      size: asset.bytes,
+      uploadedAt: asset.uploadedAt,
+      url: `/originals/${encodeURIComponent(original.id)}/stem-groups/${encodeURIComponent(asset.id)}`,
+    });
+    grouped.set(asset.groupId, entry);
+  }
+  const codecPriority: Record<string, number> = {
+    aac: 0,
+    opus: 1,
+    mp3: 2,
+    wav: 3,
+  };
+  const groups = Array.from(grouped.values()).map((group) => ({
+    ...group,
+    defaultGain: 1,
+    offsetMs: 0,
+    sources: group.sources.sort(
+      (a, b) =>
+        (codecPriority[a.codec] ?? 99) - (codecPriority[b.codec] ?? 99),
+    ),
+  }));
+
+  const stems = original.assets.stems ?? [];
+  return res.json({
+    processing: original.processing ?? undefined,
+    groups,
+    stems: stems.map((stem) => ({
+      id: stem.id,
+      name: stem.name,
+      category: stem.category ?? undefined,
+      mime: stem.mime,
+      size: stem.bytes,
+      uploadedAt: stem.uploadedAt,
+      waveformDurationMs: stem.waveformDurationMs ?? undefined,
+      sampleRate: stem.sampleRate ?? undefined,
+      channels: stem.channels ?? undefined,
+      defaultGain: 1,
+      offsetMs: 0,
       url: `/originals/${encodeURIComponent(original.id)}/stems/${encodeURIComponent(stem.id)}`,
     })),
   });
@@ -1135,6 +2364,15 @@ router.get("/api/noise-gens/generations", async (req, res) => {
 router.get("/api/noise-gens/moods", async (_req, res) => {
   const store = await getNoisegenStore();
   return res.json(store.moods ?? []);
+});
+
+router.get("/api/noise-gens/capabilities", (_req, res) => {
+  const ffmpeg = ensureFfmpegAvailable();
+  const codecs = ["wav"];
+  if (ffmpeg) {
+    codecs.push("aac", "opus");
+  }
+  return res.json({ ffmpeg, codecs });
 });
 
 router.get("/api/noise-gens/recipes", async (req, res) => {
@@ -1396,51 +2634,146 @@ router.post(
       timeSky = timeSkyValidation.data;
     }
 
-    const durationSource = instrumental ?? stems[0] ?? vocal;
-    const durationSeconds = durationSource
-      ? estimateDurationSeconds(durationSource.buffer, durationSource.mimetype)
-      : 0;
     const trackId = existingOriginalId || randomUUID();
     const now = Date.now();
-    const instrumentalAsset = instrumental
+    const instrumentalPayload = instrumental
+      ? resolveUploadAudio(instrumental)
+      : null;
+    const vocalPayload = vocal ? resolveUploadAudio(vocal) : null;
+    const stemPayloads = stems.length
+      ? (() => {
+          const used = new Set<string>(
+            existingSnapshot?.assets.stems?.map((stem) => stem.id) ?? [],
+          );
+          return stems.map((stem, index) => {
+            const displayName =
+              normalizeStemName(stem.originalname) || `stem-${index + 1}`;
+            const stemId = buildStemId(displayName, used);
+            const category = normalizeStemCategory(stemCategories[index]);
+            const payload = resolveUploadAudio(stem);
+            return {
+              stem,
+              stemId,
+              displayName,
+              category,
+              payload,
+              summary: buildWaveformSummaryFromBuffer(
+                payload.buffer,
+                payload.mime,
+              ),
+            };
+          });
+        })()
+      : [];
+
+    const instrumentalSummary = instrumentalPayload
+      ? buildWaveformSummaryFromBuffer(
+          instrumentalPayload.buffer,
+          instrumentalPayload.mime,
+        )
+      : null;
+    const vocalSummary = vocalPayload
+      ? buildWaveformSummaryFromBuffer(vocalPayload.buffer, vocalPayload.mime)
+      : null;
+
+    const durationSeconds = (() => {
+      if (instrumentalSummary?.durationMs) {
+        return instrumentalSummary.durationMs / 1000;
+      }
+      if (stemPayloads[0]?.summary?.durationMs) {
+        return stemPayloads[0].summary.durationMs / 1000;
+      }
+      if (vocalSummary?.durationMs) {
+        return vocalSummary.durationMs / 1000;
+      }
+      const durationSource = instrumental ?? stems[0] ?? vocal;
+      return durationSource
+        ? estimateDurationSeconds(durationSource.buffer, durationSource.mimetype)
+        : 0;
+    })();
+
+    const instrumentalAsset = instrumentalPayload
       ? await saveOriginalAsset({
           originalId: trackId,
           kind: "instrumental",
-          ...resolveUploadAudio(instrumental),
-          originalName: instrumental.originalname,
+          ...instrumentalPayload,
+          originalName: instrumental?.originalname,
         })
       : undefined;
-    const vocalAsset = vocal
+    if (instrumentalAsset) {
+      await attachWaveformSummary(
+        instrumentalAsset,
+        instrumentalSummary,
+        trackId,
+        "instrumental-waveform.json",
+      );
+    }
+
+    const vocalAsset = vocalPayload
       ? await saveOriginalAsset({
           originalId: trackId,
           kind: "vocal",
-          ...resolveUploadAudio(vocal),
-          originalName: vocal.originalname,
+          ...vocalPayload,
+          originalName: vocal?.originalname,
         })
       : undefined;
-    const stemAssets = stems.length
+    if (vocalAsset) {
+      await attachWaveformSummary(
+        vocalAsset,
+        vocalSummary,
+        trackId,
+        "vocal-waveform.json",
+      );
+    }
+
+    const stemAssets = stemPayloads.length
       ? await Promise.all(
-          (() => {
-            const used = new Set<string>(
-              existingSnapshot?.assets.stems?.map((stem) => stem.id) ?? [],
-            );
-            return stems.map((stem, index) => {
-              const displayName =
-                normalizeStemName(stem.originalname) || `stem-${index + 1}`;
-              const stemId = buildStemId(displayName, used);
-              const category = normalizeStemCategory(stemCategories[index]);
-              return saveStemAsset({
-                originalId: trackId,
-                stemId,
-                stemName: displayName,
-                category,
-                ...resolveUploadAudio(stem),
-                originalName: stem.originalname,
-              });
+          stemPayloads.map(async (entry) => {
+            const asset = await saveStemAsset({
+              originalId: trackId,
+              stemId: entry.stemId,
+              stemName: entry.displayName,
+              category: entry.category,
+              ...entry.payload,
+              originalName: entry.stem.originalname,
             });
-          })(),
+            await attachWaveformSummary(
+              asset,
+              entry.summary,
+              trackId,
+              `stem-${entry.stemId}-waveform.json`,
+            );
+            return asset;
+          }),
         )
       : [];
+
+    const playbackAssets: NoisegenPlaybackAsset[] = [];
+    if (instrumentalPayload) {
+      const assets = await buildPlaybackAssetsFromBuffer({
+        originalId: trackId,
+        buffer: instrumentalPayload.buffer,
+        mime: instrumentalPayload.mime,
+        originalName: instrumental?.originalname,
+        fallbackAsset: instrumentalAsset,
+      });
+      playbackAssets.push(...assets);
+    }
+
+    const processing: NoisegenProcessingState | undefined =
+      playbackAssets.length > 0
+        ? {
+            status: "ready",
+            detail: resolvePlaybackReadyDetail(playbackAssets),
+            updatedAt: now,
+          }
+        : existingSnapshot?.processing?.status === "ready"
+          ? existingSnapshot.processing
+          : {
+              status: "processing",
+              detail: "awaiting mixdown for playback",
+              updatedAt: now,
+            };
 
     await upsertOriginalRecord({
       trackId,
@@ -1454,6 +2787,8 @@ router.post(
       instrumentalAsset,
       vocalAsset,
       stemAssets,
+      playbackAssets,
+      processing,
     });
 
     return res.json({ trackId });
@@ -1614,6 +2949,7 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
   } catch {
     // Leave as-is if normalization fails.
   }
+  const waveformSummary = await buildWaveformSummaryFromFile(finalPath, mime);
 
   const usedIds = new Set<string>();
   const storeSnapshot = await getNoisegenStore();
@@ -1623,6 +2959,7 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
   let instrumentalAsset: NoisegenOriginalAsset | undefined;
   let vocalAsset: NoisegenOriginalAsset | undefined;
   let stemAssets: NoisegenStemAsset[] | undefined;
+  const playbackAssets: NoisegenPlaybackAsset[] = [];
   if (kind === "instrumental") {
     instrumentalAsset = await saveOriginalAssetFromFile({
       originalId: trackId,
@@ -1631,6 +2968,20 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
       mime,
       originalName: fileName,
     });
+    await attachWaveformSummary(
+      instrumentalAsset,
+      waveformSummary,
+      trackId,
+      "instrumental-waveform.json",
+    );
+    const assets = await buildPlaybackAssetsFromFile({
+      originalId: trackId,
+      filePath: finalPath,
+      mime,
+      originalName: fileName,
+      fallbackAsset: instrumentalAsset,
+    });
+    playbackAssets.push(...assets);
   } else if (kind === "vocal") {
     vocalAsset = await saveOriginalAssetFromFile({
       originalId: trackId,
@@ -1639,6 +2990,12 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
       mime,
       originalName: fileName,
     });
+    await attachWaveformSummary(
+      vocalAsset,
+      waveformSummary,
+      trackId,
+      "vocal-waveform.json",
+    );
   } else {
     const displayName = normalizeStemName(fileName);
     const stemId = buildStemId(displayName, usedIds);
@@ -1653,10 +3010,32 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
         originalName: fileName,
       }),
     ];
+    await attachWaveformSummary(
+      stemAssets[0],
+      waveformSummary,
+      trackId,
+      `stem-${stemId}-waveform.json`,
+    );
   }
 
   const stats = await fs.stat(finalPath);
-  const durationSeconds = fallbackDurationSeconds(stats.size);
+  const durationSeconds = waveformSummary?.durationMs
+    ? waveformSummary.durationMs / 1000
+    : fallbackDurationSeconds(stats.size);
+  const processing: NoisegenProcessingState | undefined =
+    playbackAssets.length > 0
+      ? {
+          status: "ready",
+          detail: resolvePlaybackReadyDetail(playbackAssets),
+          updatedAt: Date.now(),
+        }
+      : existingSnapshot?.processing?.status === "ready"
+        ? existingSnapshot.processing
+        : {
+            status: "processing",
+            detail: "awaiting mixdown for playback",
+            updatedAt: Date.now(),
+          };
   await upsertOriginalRecord({
     trackId,
     title,
@@ -1669,10 +3048,214 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
     instrumentalAsset,
     vocalAsset,
     stemAssets,
+    playbackAssets,
+    processing,
   });
 
   await fs.rm(uploadDir, { recursive: true, force: true });
   return res.json({ trackId, complete: true });
+});
+
+router.post("/api/noise-gens/upload/complete", async (req, res) => {
+  const trackId = readStringField(req.body?.trackId);
+  if (!trackId) {
+    return res.status(400).json({ error: "track_id_required" });
+  }
+  const autoMixdown = readBooleanField(req.body?.autoMixdown);
+  const store = await getNoisegenStore();
+  const original = findOriginalById(store, trackId);
+  if (!original) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  const shouldBuildStemGroups =
+    (!original.assets.stemGroups || original.assets.stemGroups.length === 0) &&
+    ((original.assets.stems?.length ?? 0) > 0 || Boolean(original.assets.vocal));
+  const buildStemGroupsIfNeeded = async () =>
+    shouldBuildStemGroups ? await buildStemGroupAssets(original) : undefined;
+
+  if (original.assets.playback && original.assets.playback.length > 0) {
+    const stemGroupAssets = await buildStemGroupsIfNeeded();
+    await upsertOriginalRecord({
+      trackId,
+      title: original.title,
+      creator: original.artist,
+      durationSeconds: original.duration,
+      offsetMs: original.offsetMs ?? 0,
+      tempo: original.tempo,
+      notes: original.notes,
+      timeSky: original.timeSky,
+      stemGroupAssets,
+      processing: {
+        status: "ready",
+        detail: resolvePlaybackReadyDetail(original.assets.playback),
+        updatedAt: Date.now(),
+      },
+    });
+    return res.json({ status: "ready" });
+  }
+
+  if (original.assets.instrumental) {
+    try {
+      const buffer = await loadAssetBuffer(original.assets.instrumental);
+      const playbackAssets = await buildPlaybackAssetsFromBuffer({
+        originalId: trackId,
+        buffer,
+        mime: original.assets.instrumental.mime,
+        originalName: original.assets.instrumental.fileName,
+        fallbackAsset: original.assets.instrumental,
+      });
+      const stemGroupAssets = await buildStemGroupsIfNeeded();
+      await upsertOriginalRecord({
+        trackId,
+        title: original.title,
+        creator: original.artist,
+        durationSeconds: original.duration,
+        offsetMs: original.offsetMs ?? 0,
+        tempo: original.tempo,
+        notes: original.notes,
+        timeSky: original.timeSky,
+        playbackAssets,
+        stemGroupAssets,
+        processing: {
+          status: "ready",
+          detail: resolvePlaybackReadyDetail(playbackAssets),
+          updatedAt: Date.now(),
+        },
+      });
+      return res.json({ status: "ready" });
+    } catch {
+      const playbackAsset = buildPlaybackFromInstrumental(
+        original.assets.instrumental,
+      );
+      const stemGroupAssets = await buildStemGroupsIfNeeded();
+      await upsertOriginalRecord({
+        trackId,
+        title: original.title,
+        creator: original.artist,
+        durationSeconds: original.duration,
+        offsetMs: original.offsetMs ?? 0,
+        tempo: original.tempo,
+        notes: original.notes,
+        timeSky: original.timeSky,
+        playbackAssets: [playbackAsset],
+        stemGroupAssets,
+        processing: {
+          status: "ready",
+          detail: resolvePlaybackReadyDetail([playbackAsset]),
+          updatedAt: Date.now(),
+        },
+      });
+      return res.json({ status: "ready" });
+    }
+  }
+
+  if (!autoMixdown) {
+    await upsertOriginalRecord({
+      trackId,
+      title: original.title,
+      creator: original.artist,
+      durationSeconds: original.duration,
+      offsetMs: original.offsetMs ?? 0,
+      tempo: original.tempo,
+      notes: original.notes,
+      timeSky: original.timeSky,
+      processing: {
+        status: "processing",
+        detail: "awaiting mixdown for playback",
+        updatedAt: Date.now(),
+      },
+    });
+    return res.json({ status: "processing" });
+  }
+
+  if (!original.assets.stems?.length && !original.assets.vocal) {
+    return res.status(400).json({ error: "stems_required" });
+  }
+
+  await upsertOriginalRecord({
+    trackId,
+    title: original.title,
+    creator: original.artist,
+    durationSeconds: original.duration,
+    offsetMs: original.offsetMs ?? 0,
+    tempo: original.tempo,
+    notes: original.notes,
+    timeSky: original.timeSky,
+    processing: {
+      status: "processing",
+      detail: "building playback mixdown",
+      updatedAt: Date.now(),
+    },
+  });
+
+  try {
+    const sources = await collectMixdownSources(original);
+    const mixdown = await mixdownPcm16WavBuffers({ sources });
+    if (!mixdown) {
+      throw new Error(
+        `Mixdown requires stems decodable to PCM16 WAV at ${MIXDOWN_SAMPLE_RATE} Hz.`,
+      );
+    }
+    const instrumentalAsset = await saveOriginalAsset({
+      originalId: trackId,
+      kind: "instrumental",
+      buffer: mixdown.buffer,
+      mime: "audio/wav",
+      originalName: "instrumental.wav",
+    });
+    await attachWaveformSummary(
+      instrumentalAsset,
+      buildWaveformSummaryFromBuffer(mixdown.buffer, "audio/wav"),
+      trackId,
+      "instrumental-waveform.json",
+    );
+    const playbackAssets = await buildPlaybackAssetsFromBuffer({
+      originalId: trackId,
+      buffer: mixdown.buffer,
+      mime: "audio/wav",
+      originalName: "mix.wav",
+      fallbackAsset: instrumentalAsset,
+    });
+    const stemGroupAssets = await buildStemGroupAssets(original);
+    await upsertOriginalRecord({
+      trackId,
+      title: original.title,
+      creator: original.artist,
+      durationSeconds: mixdown.durationMs / 1000,
+      offsetMs: original.offsetMs ?? 0,
+      tempo: original.tempo,
+      notes: original.notes,
+      timeSky: original.timeSky,
+      instrumentalAsset,
+      playbackAssets,
+      stemGroupAssets,
+      processing: {
+        status: "ready",
+        detail: resolvePlaybackReadyDetail(playbackAssets),
+        updatedAt: Date.now(),
+      },
+    });
+    return res.json({ status: "ready" });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Mixdown failed.";
+    await upsertOriginalRecord({
+      trackId,
+      title: original.title,
+      creator: original.artist,
+      durationSeconds: original.duration,
+      offsetMs: original.offsetMs ?? 0,
+      tempo: original.tempo,
+      notes: original.notes,
+      timeSky: original.timeSky,
+      processing: {
+        status: "error",
+        detail: message,
+        updatedAt: Date.now(),
+      },
+    });
+    return res.status(500).json({ error: "mixdown_failed", message });
+  }
 });
 
 router.post("/api/noise-gens/jobs", async (req, res) => {
