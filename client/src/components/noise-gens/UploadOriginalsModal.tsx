@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
-import { uploadOriginal } from "@/lib/api/noiseGens";
+import { uploadOriginal, uploadOriginalChunk } from "@/lib/api/noiseGens";
 import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
 import type { TempoMeta, TimeSkyMeta } from "@/types/noise-gens";
 
@@ -32,6 +32,8 @@ type UploadOriginalsModalProps = {
 const MAX_TITLE = 120;
 const MAX_CREATOR = 60;
 const DEFAULT_TIME_SIG: TempoMeta["timeSig"] = "4/4";
+const DIRECT_UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
+const CHUNK_SIZE_BYTES = 8 * 1024 * 1024;
 const clampBpm = (value: number) => Math.max(40, Math.min(250, value));
 const sanitizeBpmInput = (value: string): number | null => {
   const normalized = value.trim().replace(",", ".");
@@ -90,6 +92,8 @@ type UploadFileProgress = {
   bytes: number;
   loaded: number;
   pct: number;
+  status: "queued" | "uploading" | "processing" | "done" | "error";
+  error?: string;
 };
 
 const STEM_CATEGORY_LABELS: Record<StemCategory, string> = {
@@ -204,6 +208,15 @@ const buildStemEntry = (file: File, category?: StemCategory): StemEntry => {
     category: resolvedCategory,
     inferred,
   };
+};
+
+const createUploadId = (): string => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `noise-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
 };
 
 const isAudioFile = (record: KnowledgeFileRecord): boolean =>
@@ -618,6 +631,7 @@ export function UploadOriginalsModal({
         bytes: item.entry.file.size,
         loaded: 0,
         pct: 0,
+        status: "queued",
       }));
       uploadFilesRef.current = uploadFiles;
       const totalBytes = uploadFiles.reduce((sum, file) => sum + file.bytes, 0);
@@ -633,14 +647,30 @@ export function UploadOriginalsModal({
         setUploadTotalProgress(null);
       }
 
-      const updateProgress = (fileId: string, loaded: number) => {
+      const updateProgress = (
+        fileId: string,
+        loaded: number,
+        status?: UploadFileProgress["status"],
+        error?: string,
+      ) => {
         const files = uploadFilesRef.current;
         if (!files.length) return;
         const next = files.map((file) => {
           if (file.id !== fileId) return file;
           const safeLoaded = Math.max(0, Math.min(file.bytes, loaded));
           const pct = file.bytes > 0 ? safeLoaded / file.bytes : 1;
-          return { ...file, loaded: safeLoaded, pct };
+          const resolvedStatus = status ?? file.status;
+          const nextStatus =
+            pct >= 1 && resolvedStatus === "uploading"
+              ? "processing"
+              : resolvedStatus;
+          return {
+            ...file,
+            loaded: safeLoaded,
+            pct,
+            status: nextStatus,
+            error,
+          };
         });
         uploadFilesRef.current = next;
         setUploadProgress(next);
@@ -652,6 +682,7 @@ export function UploadOriginalsModal({
         });
       };
       const existingOriginalId = prefill?.existingOriginalId?.trim();
+      const trackIdForUpload = existingOriginalId || createUploadId();
       const timeSkyMeta = readTimeSkyMeta(
         (selectedProject?.meta ?? {}) as Record<string, unknown>,
       );
@@ -681,32 +712,100 @@ export function UploadOriginalsModal({
           payload.append("tempo", JSON.stringify(tempoMeta));
         }
       };
-      let currentTrackId = existingOriginalId || undefined;
-      for (const item of uploadQueue) {
-        const payload = new FormData();
-        appendSharedFields(payload, currentTrackId);
-        if (item.field === "stems") {
-          payload.append("stems", item.entry.file);
-          payload.append("stemCategories", JSON.stringify([item.category]));
-        } else {
-          payload.append(item.field, item.entry.file);
-        }
+      const abortControllers = new Map<string, AbortController>();
+      let abortAll = false;
+      const runUpload = async (item: (typeof uploadQueue)[number]) => {
+        if (abortAll) return;
+        const controller = new AbortController();
+        abortControllers.set(item.entry.id, controller);
+        updateProgress(item.entry.id, 0, "uploading");
+        const totalSize = item.entry.file.size;
+        const shouldChunk = totalSize > DIRECT_UPLOAD_LIMIT_BYTES;
         try {
-          const result = await uploadOriginal(payload, {
-            onProgress: (progress) =>
-              updateProgress(item.entry.id, progress.loaded),
-          });
-          currentTrackId = result.trackId;
-          updateProgress(item.entry.id, item.entry.file.size);
+          if (!shouldChunk) {
+            const payload = new FormData();
+            appendSharedFields(payload, trackIdForUpload);
+            if (item.field === "stems") {
+              payload.append("stems", item.entry.file);
+              payload.append("stemCategories", JSON.stringify([item.category]));
+            } else {
+              payload.append(item.field, item.entry.file);
+            }
+            const result = await uploadOriginal(payload, {
+              signal: controller.signal,
+              onProgress: (progress) => {
+                updateProgress(item.entry.id, progress.loaded, "uploading");
+              },
+            });
+            if (result.trackId && result.trackId !== trackIdForUpload) {
+              throw new Error("Upload returned a mismatched track ID.");
+            }
+            updateProgress(item.entry.id, totalSize, "done");
+          } else {
+            const totalChunks = Math.ceil(totalSize / CHUNK_SIZE_BYTES);
+            for (let index = 0; index < totalChunks; index += 1) {
+              if (abortAll) return;
+              const start = index * CHUNK_SIZE_BYTES;
+              const end = Math.min(totalSize, start + CHUNK_SIZE_BYTES);
+              const chunk = item.entry.file.slice(start, end);
+              const payload = new FormData();
+              appendSharedFields(payload, trackIdForUpload);
+              payload.append("fileId", item.entry.id);
+              payload.append("fileName", item.entry.name);
+              payload.append(
+                "kind",
+                item.field === "stems" ? "stem" : item.field,
+              );
+              if (item.field === "stems" && item.category) {
+                payload.append("stemCategory", item.category);
+              }
+              payload.append("chunkIndex", String(index));
+              payload.append("chunkCount", String(totalChunks));
+              payload.append("chunk", chunk, item.entry.name);
+              const base = index * CHUNK_SIZE_BYTES;
+              const result = await uploadOriginalChunk(payload, {
+                signal: controller.signal,
+                onProgress: (progress) => {
+                  const loaded = Math.min(totalSize, base + progress.loaded);
+                  updateProgress(item.entry.id, loaded, "uploading");
+                },
+              });
+              if (result.trackId && result.trackId !== trackIdForUpload) {
+                throw new Error("Upload returned a mismatched track ID.");
+              }
+              if (index === totalChunks - 1) {
+                updateProgress(item.entry.id, totalSize, "done");
+              }
+            }
+          }
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Upload failed";
+          updateProgress(item.entry.id, 0, "error", message);
+          abortAll = true;
+          abortControllers.forEach((ctrl) => ctrl.abort());
           throw new Error(`"${item.entry.name}" failed to upload. ${message}`);
+        } finally {
+          abortControllers.delete(item.entry.id);
         }
-      }
-      if (!currentTrackId) {
-        throw new Error("Upload succeeded but response was invalid.");
-      }
+      };
+      const hasChunkedUploads = uploadQueue.some(
+        (item) => item.entry.file.size > DIRECT_UPLOAD_LIMIT_BYTES,
+      );
+      const concurrency = hasChunkedUploads
+        ? 1
+        : Math.min(2, uploadQueue.length);
+      let cursor = 0;
+      const workers = Array.from({ length: concurrency }, () =>
+        (async () => {
+          while (!abortAll) {
+            const next = uploadQueue[cursor++];
+            if (!next) return;
+            await runUpload(next);
+          }
+        })(),
+      );
+      await Promise.all(workers);
       toast({
         title: "Upload queued",
         description: "We will notify you when mastering finishes.",
@@ -715,7 +814,7 @@ export function UploadOriginalsModal({
       const selectedProjectName =
         selectedProject?.name?.trim() ?? prefill?.knowledgeProjectName;
       onUploaded?.({
-        trackId: currentTrackId,
+        trackId: trackIdForUpload,
         title: title.value.trim(),
         creator: creator.value.trim(),
         knowledgeProjectId: selectedProjectId,
@@ -977,9 +1076,22 @@ export function UploadOriginalsModal({
                 <div key={file.id} className="space-y-1">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="truncate">{file.name}</span>
-                    <span>{Math.round(file.pct * 100)}%</span>
+                    <span>
+                      {file.status === "processing"
+                        ? "Processing"
+                        : file.status === "done"
+                          ? "Done"
+                          : file.status === "error"
+                            ? "Error"
+                            : file.status === "queued"
+                              ? "Queued"
+                              : `${Math.round(file.pct * 100)}%`}
+                    </span>
                   </div>
                   <Progress value={Math.round(file.pct * 100)} className="h-1.5" />
+                  {file.error ? (
+                    <p className="text-[11px] text-destructive">{file.error}</p>
+                  ) : null}
                 </div>
               ))}
             </div>

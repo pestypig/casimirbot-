@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { promises as fs, createReadStream } from "node:fs";
+import { promises as fs, createReadStream, createWriteStream } from "node:fs";
 import { z } from "zod";
 import multer from "multer";
 import { listKnowledgeFilesByProjects } from "../db/knowledge";
@@ -13,6 +13,7 @@ import {
   downloadReplitObjectStream,
   isReplitStoragePath,
   type NoisegenOriginal,
+  type NoisegenOriginalAsset,
   type NoisegenStemAsset,
   resolveBundledOriginalsRoots,
   resolveOriginalAsset,
@@ -20,7 +21,9 @@ import {
   resolveReplitStorageKey,
   resolveStemAsset,
   resolveStemAssetPath,
+  saveOriginalAssetFromFile,
   saveOriginalAsset,
+  saveStemAssetFromFile,
   saveStemAsset,
   savePreviewBuffer,
   updateNoisegenStore,
@@ -45,6 +48,7 @@ const PREVIEW_SAMPLE_RATE = 44_100;
 const PREVIEW_CHANNELS = 1;
 const PREVIEW_MIN_SECONDS = 6;
 const PREVIEW_MAX_SECONDS = 30;
+const MAX_WAV_NORMALIZE_BYTES = 200 * 1024 * 1024;
 
 const peakSchema = z.object({
   omega: z.number(),
@@ -359,6 +363,17 @@ const isAudioMime = (mime: string | null | undefined): boolean => {
   );
 };
 
+const mimeFromName = (value?: string): string => {
+  if (!value) return "application/octet-stream";
+  const ext = path.extname(value).toLowerCase();
+  if (ext === ".wav" || ext === ".wave") return "audio/wav";
+  if (ext === ".mp3") return "audio/mpeg";
+  if (ext === ".flac") return "audio/flac";
+  if (ext === ".ogg" || ext === ".oga") return "audio/ogg";
+  if (ext === ".aiff" || ext === ".aif") return "audio/aiff";
+  return "application/octet-stream";
+};
+
 const clampNumber = (
   value: number,
   min: number,
@@ -428,6 +443,13 @@ const normalizeStemCategory = (value: unknown): string | undefined => {
   return STEM_CATEGORY_ALLOWLIST.has(normalized) ? normalized : undefined;
 };
 
+const normalizeStemCategoryValue = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return STEM_CATEGORY_ALLOWLIST.has(normalized) ? normalized : undefined;
+};
+
 const mergeStemAssets = (
   existing: NoisegenStemAsset[] | undefined,
   incoming: NoisegenStemAsset[],
@@ -449,6 +471,79 @@ const mergeStemAssets = (
     }
   }
   return merged;
+};
+
+const upsertOriginalRecord = async (params: {
+  trackId: string;
+  title: string;
+  creator: string;
+  durationSeconds: number;
+  offsetMs: number;
+  tempo?: z.infer<typeof tempoMetaSchema>;
+  notes?: string;
+  timeSky?: z.infer<typeof timeSkySchema>;
+  instrumentalAsset?: NoisegenOriginalAsset;
+  vocalAsset?: NoisegenOriginalAsset;
+  stemAssets?: NoisegenStemAsset[];
+}): Promise<void> => {
+  await updateNoisegenStore((next) => {
+    const existingOriginalIndex = next.originals.findIndex(
+      (entry) => entry.id === params.trackId,
+    );
+    const existingPendingIndex = next.pendingOriginals.findIndex(
+      (entry) => entry.id === params.trackId,
+    );
+    const existingEntry =
+      existingOriginalIndex >= 0
+        ? next.originals[existingOriginalIndex]
+        : existingPendingIndex >= 0
+          ? next.pendingOriginals[existingPendingIndex]
+          : undefined;
+    const existingAssets = existingEntry?.assets ?? {};
+    const mergedStems =
+      params.stemAssets && params.stemAssets.length > 0
+        ? mergeStemAssets(existingAssets.stems, params.stemAssets)
+        : existingAssets.stems ?? [];
+    const mergedInstrumental =
+      params.instrumentalAsset ?? existingAssets.instrumental;
+    const mergedVocal = params.vocalAsset ?? existingAssets.vocal;
+    const nextAssets: NoisegenOriginal["assets"] = {};
+    if (mergedInstrumental) {
+      nextAssets.instrumental = mergedInstrumental;
+    }
+    if (mergedVocal) {
+      nextAssets.vocal = mergedVocal;
+    }
+    if (mergedStems.length > 0) {
+      nextAssets.stems = mergedStems;
+    }
+    const record = {
+      id: params.trackId,
+      title: params.title,
+      artist: params.creator,
+      listens: existingEntry?.listens ?? 0,
+      duration:
+        existingEntry?.duration && existingEntry.duration > 0
+          ? existingEntry.duration
+          : Math.max(1, Math.round(params.durationSeconds)),
+      tempo: params.tempo ?? existingEntry?.tempo,
+      notes: params.notes || existingEntry?.notes,
+      offsetMs: Number.isFinite(params.offsetMs)
+        ? params.offsetMs
+        : existingEntry?.offsetMs,
+      uploadedAt: existingEntry?.uploadedAt ?? Date.now(),
+      timeSky: params.timeSky ?? existingEntry?.timeSky,
+      assets: nextAssets,
+    };
+    if (existingOriginalIndex >= 0) {
+      next.originals[existingOriginalIndex] = record;
+    } else if (existingPendingIndex >= 0) {
+      next.pendingOriginals[existingPendingIndex] = record;
+    } else {
+      next.pendingOriginals.push(record);
+    }
+    return next;
+  });
 };
 
 const summarizeNoiseValues = (values: Float32Array) => {
@@ -1255,68 +1350,233 @@ router.post(
         )
       : [];
 
-    await updateNoisegenStore((next) => {
-      const existingOriginalIndex = next.originals.findIndex(
-        (entry) => entry.id === trackId,
-      );
-      const existingPendingIndex = next.pendingOriginals.findIndex(
-        (entry) => entry.id === trackId,
-      );
-        const existingEntry =
-          existingOriginalIndex >= 0
-            ? next.originals[existingOriginalIndex]
-            : existingPendingIndex >= 0
-              ? next.pendingOriginals[existingPendingIndex]
-              : undefined;
-        const existingAssets = existingEntry?.assets ?? {};
-        const mergedStems =
-          stemAssets.length > 0
-            ? mergeStemAssets(existingAssets.stems, stemAssets)
-            : existingAssets.stems ?? [];
-        const mergedInstrumental =
-          instrumentalAsset ?? existingAssets.instrumental;
-        const mergedVocal = vocalAsset ?? existingAssets.vocal;
-        const nextAssets: NoisegenOriginal["assets"] = {};
-        if (mergedInstrumental) {
-          nextAssets.instrumental = mergedInstrumental;
-        }
-        if (mergedVocal) {
-          nextAssets.vocal = mergedVocal;
-        }
-        if (mergedStems.length > 0) {
-          nextAssets.stems = mergedStems;
-        }
-        const record = {
-          id: trackId,
-          title,
-          artist: creator,
-          listens: existingEntry?.listens ?? 0,
-          duration:
-            existingEntry?.duration && existingEntry.duration > 0
-              ? existingEntry.duration
-              : Math.max(1, Math.round(durationSeconds)),
-          tempo: tempo ?? existingEntry?.tempo,
-          notes: notes || existingEntry?.notes,
-          offsetMs: Number.isFinite(offsetMs)
-            ? offsetMs
-            : existingEntry?.offsetMs,
-          uploadedAt: existingEntry?.uploadedAt ?? now,
-          timeSky: timeSky ?? existingEntry?.timeSky,
-          assets: nextAssets,
-        };
-      if (existingOriginalIndex >= 0) {
-        next.originals[existingOriginalIndex] = record;
-      } else if (existingPendingIndex >= 0) {
-        next.pendingOriginals[existingPendingIndex] = record;
-      } else {
-        next.pendingOriginals.push(record);
-      }
-      return next;
+    await upsertOriginalRecord({
+      trackId,
+      title,
+      creator,
+      durationSeconds,
+      offsetMs,
+      tempo,
+      notes: notes || undefined,
+      timeSky,
+      instrumentalAsset,
+      vocalAsset,
+      stemAssets,
     });
 
     return res.json({ trackId });
   },
 );
+
+router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, res) => {
+  const title = readStringField(req.body?.title);
+  const creator = readStringField(req.body?.creator);
+  const existingOriginalId = readStringField(req.body?.existingOriginalId);
+  const trackId = existingOriginalId || readStringField(req.body?.trackId);
+  const offsetMsRaw = readStringField(req.body?.offsetMs);
+  const offsetMs = clampNumber(Number(offsetMsRaw), -2000, 2000, 0);
+
+  if (!title) {
+    return res.status(400).json({ error: "title_required" });
+  }
+  if (!creator) {
+    return res.status(400).json({ error: "creator_required" });
+  }
+  if (!trackId) {
+    return res.status(400).json({ error: "track_id_required" });
+  }
+
+  const chunkFile = req.file;
+  if (!chunkFile) {
+    return res.status(400).json({ error: "chunk_required" });
+  }
+
+  const chunkIndex = Number(readStringField(req.body?.chunkIndex));
+  const chunkCount = Number(readStringField(req.body?.chunkCount));
+  if (!Number.isFinite(chunkIndex) || chunkIndex < 0) {
+    return res.status(400).json({ error: "invalid_chunk_index" });
+  }
+  if (!Number.isFinite(chunkCount) || chunkCount < 1) {
+    return res.status(400).json({ error: "invalid_chunk_count" });
+  }
+  if (chunkIndex >= chunkCount) {
+    return res.status(400).json({ error: "chunk_index_out_of_range" });
+  }
+
+  const fileId = readStringField(req.body?.fileId);
+  if (!fileId) {
+    return res.status(400).json({ error: "file_id_required" });
+  }
+  const fileName = readStringField(req.body?.fileName) || chunkFile.originalname;
+  const kindRaw = readStringField(req.body?.kind).toLowerCase();
+  const kind =
+    kindRaw === "instrumental" || kindRaw === "vocal" || kindRaw === "stem"
+      ? kindRaw
+      : null;
+  if (!kind) {
+    return res.status(400).json({ error: "invalid_kind" });
+  }
+  const stemCategory = normalizeStemCategoryValue(readStringField(req.body?.stemCategory));
+
+  const tempoField = readStringField(req.body?.tempo);
+  let tempo: z.infer<typeof tempoMetaSchema> | undefined;
+  if (tempoField) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(tempoField);
+    } catch {
+      return res.status(400).json({ error: "invalid_tempo_json" });
+    }
+    const tempoValidation = tempoMetaSchema.safeParse(parsed);
+    if (!tempoValidation.success) {
+      return res
+        .status(400)
+        .json({ error: "invalid_tempo", issues: tempoValidation.error.issues });
+    }
+    tempo = tempoValidation.data;
+  }
+
+  const timeSkyField = readStringField(req.body?.timeSky);
+  let timeSky: z.infer<typeof timeSkySchema> | undefined;
+  if (timeSkyField) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(timeSkyField);
+    } catch {
+      return res.status(400).json({ error: "invalid_time_sky_json" });
+    }
+    const timeSkyValidation = timeSkySchema.safeParse(parsed);
+    if (!timeSkyValidation.success) {
+      return res.status(400).json({
+        error: "invalid_time_sky",
+        issues: timeSkyValidation.error.issues,
+      });
+    }
+    timeSky = timeSkyValidation.data;
+  }
+
+  const notes = readStringField(req.body?.notes);
+  const { baseDir } = getNoisegenPaths();
+  const uploadDir = path.join(baseDir, "uploads", trackId, fileId);
+  await fs.mkdir(uploadDir, { recursive: true });
+  const partName = `part-${String(Math.floor(chunkIndex)).padStart(6, "0")}`;
+  const partPath = path.join(uploadDir, partName);
+  await fs.writeFile(partPath, chunkFile.buffer);
+
+  const metaPath = path.join(uploadDir, "meta.json");
+  await fs.writeFile(
+    metaPath,
+    JSON.stringify(
+      {
+        fileName,
+        kind,
+        stemCategory: stemCategory ?? null,
+        chunkCount: Math.floor(chunkCount),
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+
+  const partFiles = (await fs.readdir(uploadDir)).filter((entry) =>
+    entry.startsWith("part-"),
+  );
+  if (partFiles.length < chunkCount) {
+    return res.json({ trackId, complete: false });
+  }
+
+  partFiles.sort();
+  const assembledPath = path.join(uploadDir, "assembled");
+  const writeStream = createWriteStream(assembledPath);
+  for (const part of partFiles) {
+    const sourcePath = path.join(uploadDir, part);
+    await new Promise<void>((resolve, reject) => {
+      const stream = createReadStream(sourcePath);
+      stream.on("error", reject);
+      stream.on("end", resolve);
+      stream.pipe(writeStream, { end: false });
+    });
+  }
+  await new Promise<void>((resolve, reject) => {
+    writeStream.on("error", reject);
+    writeStream.on("finish", resolve);
+    writeStream.end();
+  });
+
+  const mime = chunkFile.mimetype || mimeFromName(fileName);
+  let finalPath = assembledPath;
+  try {
+    const stats = await fs.stat(assembledPath);
+    if (stats.size <= MAX_WAV_NORMALIZE_BYTES) {
+      const normalized = await normalizeWavFile(assembledPath, mime);
+      if (normalized) {
+        finalPath = assembledPath;
+      }
+    }
+  } catch {
+    // Leave as-is if normalization fails.
+  }
+
+  const usedIds = new Set<string>();
+  const storeSnapshot = await getNoisegenStore();
+  const existingSnapshot = findOriginalById(storeSnapshot, trackId);
+  existingSnapshot?.assets.stems?.forEach((stem) => usedIds.add(stem.id));
+
+  let instrumentalAsset: NoisegenOriginalAsset | undefined;
+  let vocalAsset: NoisegenOriginalAsset | undefined;
+  let stemAssets: NoisegenStemAsset[] | undefined;
+  if (kind === "instrumental") {
+    instrumentalAsset = await saveOriginalAssetFromFile({
+      originalId: trackId,
+      kind: "instrumental",
+      filePath: finalPath,
+      mime,
+      originalName: fileName,
+    });
+  } else if (kind === "vocal") {
+    vocalAsset = await saveOriginalAssetFromFile({
+      originalId: trackId,
+      kind: "vocal",
+      filePath: finalPath,
+      mime,
+      originalName: fileName,
+    });
+  } else {
+    const displayName = normalizeStemName(fileName);
+    const stemId = buildStemId(displayName, usedIds);
+    stemAssets = [
+      await saveStemAssetFromFile({
+        originalId: trackId,
+        stemId,
+        stemName: displayName,
+        category: stemCategory,
+        filePath: finalPath,
+        mime,
+        originalName: fileName,
+      }),
+    ];
+  }
+
+  const stats = await fs.stat(finalPath);
+  const durationSeconds = fallbackDurationSeconds(stats.size);
+  await upsertOriginalRecord({
+    trackId,
+    title,
+    creator,
+    durationSeconds,
+    offsetMs,
+    tempo,
+    notes: notes || undefined,
+    timeSky,
+    instrumentalAsset,
+    vocalAsset,
+    stemAssets,
+  });
+
+  await fs.rm(uploadDir, { recursive: true, force: true });
+  return res.json({ trackId, complete: true });
+});
 
 router.post("/api/noise-gens/jobs", async (req, res) => {
   const parsed = coverJobRequestSchema.safeParse(req.body ?? {});

@@ -30,6 +30,7 @@ const endpoints = {
   recipe: (recipeId: string) => `${BASE}/recipes/${encodeURIComponent(recipeId)}`,
   generate: `${BASE}/generate`,
   upload: `${BASE}/upload`,
+  uploadChunk: `${BASE}/upload/chunk`,
   previews: `${BASE}/previews`,
   jobStatus: (jobId: string) => `${BASE}/jobs/${encodeURIComponent(jobId)}`,
   noiseField: `${BASE}/noise-field`,
@@ -238,6 +239,16 @@ export type UploadOriginalOptions = {
   onProgress?: (progress: UploadProgress) => void;
 };
 
+const buildUploadErrorMessage = (status: number, responseText: string, statusText: string) => {
+  const rawMessage =
+    responseText || statusText || `Upload failed with status ${status ?? "unknown"}`;
+  const isTooLarge =
+    status === 413 || rawMessage.toLowerCase().includes("request entity too large");
+  return isTooLarge
+    ? "Upload too large for the server. Try a smaller file or split the upload."
+    : rawMessage;
+};
+
 export async function uploadOriginal(
   formData: FormData,
   options: UploadOriginalOptions = {},
@@ -299,17 +310,92 @@ export async function uploadOriginal(
         }
         return;
       }
-      const rawMessage =
-        xhr.responseText ||
-        xhr.statusText ||
-        `Upload failed with status ${xhr.status ?? "unknown"}`;
-      const isTooLarge =
-        xhr.status === 413 ||
-        rawMessage.toLowerCase().includes("request entity too large");
-      const errorMessage = isTooLarge
-        ? "Upload too large for the server. Try a smaller file or split the upload."
-        : rawMessage;
-      reject(new Error(errorMessage));
+      reject(
+        new Error(buildUploadErrorMessage(xhr.status, xhr.responseText, xhr.statusText)),
+      );
+    };
+
+    xhr.onerror = () => {
+      cleanup();
+      reject(new Error("Upload failed due to a network error."));
+    };
+
+    xhr.onabort = () => {
+      cleanup();
+      reject(new DOMException("Upload aborted", "AbortError"));
+    };
+
+    xhr.send(formData);
+  });
+}
+
+export async function uploadOriginalChunk(
+  formData: FormData,
+  options: UploadOriginalOptions = {},
+): Promise<{ trackId: string; complete: boolean }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const abortSignal = options.signal;
+
+    const cleanup = () => {
+      if (abortSignal) {
+        abortSignal.removeEventListener("abort", handleAbort);
+      }
+      xhr.upload.onprogress = null;
+      xhr.onload = null;
+      xhr.onerror = null;
+      xhr.onabort = null;
+    };
+
+    const handleAbort = () => {
+      xhr.abort();
+    };
+
+    if (abortSignal) {
+      if (abortSignal.aborted) {
+        reject(new DOMException("Upload aborted", "AbortError"));
+        return;
+      }
+      abortSignal.addEventListener("abort", handleAbort);
+    }
+
+    xhr.open("POST", endpoints.uploadChunk);
+    xhr.withCredentials = true;
+    xhr.responseType = "json";
+
+    xhr.upload.onprogress = (event) => {
+      if (!options.onProgress) return;
+      const total = event.lengthComputable ? event.total : undefined;
+      const pct = total && total > 0 ? event.loaded / total : undefined;
+      options.onProgress({ loaded: event.loaded, total, pct });
+    };
+
+    xhr.onload = () => {
+      cleanup();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const response =
+          typeof xhr.response === "object" && xhr.response
+            ? (xhr.response as { trackId?: string; complete?: boolean })
+            : (() => {
+                try {
+                  return JSON.parse(xhr.responseText);
+                } catch {
+                  return null;
+                }
+              })();
+        if (response?.trackId) {
+          resolve({
+            trackId: response.trackId,
+            complete: response.complete !== false,
+          });
+        } else {
+          reject(new Error("Upload succeeded but response was invalid."));
+        }
+        return;
+      }
+      reject(
+        new Error(buildUploadErrorMessage(xhr.status, xhr.responseText, xhr.statusText)),
+      );
     };
 
     xhr.onerror = () => {

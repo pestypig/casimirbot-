@@ -1,6 +1,6 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import { existsSync } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
@@ -202,6 +202,14 @@ const resolveNoisegenStorageBackend = (): NoisegenStorageBackend => {
 
 type ReplitObjectClient = {
   uploadFromBytes: (key: string, data: Buffer) => Promise<{ ok: boolean; error?: unknown }>;
+  uploadFromFilename?: (
+    key: string,
+    filename: string,
+  ) => Promise<{ ok: boolean; error?: unknown }>;
+  uploadFromStream?: (
+    key: string,
+    stream: Readable,
+  ) => Promise<{ ok: boolean; error?: unknown }>;
   downloadAsStream: (
     key: string,
   ) => Promise<{ ok: boolean; value?: Readable; error?: unknown }>;
@@ -256,6 +264,35 @@ const uploadReplitObject = async (
         : "Replit object storage upload failed",
     );
   }
+};
+
+const uploadReplitFile = async (key: string, filePath: string): Promise<void> => {
+  const client = await getReplitClient();
+  if (typeof client.uploadFromFilename === "function") {
+    const result = await client.uploadFromFilename(key, filePath);
+    if (!result?.ok) {
+      throw new Error(
+        typeof result?.error === "string"
+          ? result.error
+          : "Replit object storage upload failed",
+      );
+    }
+    return;
+  }
+  if (typeof client.uploadFromStream === "function") {
+    const stream = createReadStream(filePath);
+    const result = await client.uploadFromStream(key, stream);
+    if (!result?.ok) {
+      throw new Error(
+        typeof result?.error === "string"
+          ? result.error
+          : "Replit object storage upload failed",
+      );
+    }
+    return;
+  }
+  const buffer = await fs.readFile(filePath);
+  await uploadReplitObject(key, buffer);
 };
 
 export const downloadReplitObjectStream = async (
@@ -862,6 +899,50 @@ export const saveOriginalAsset = async (params: {
   };
 };
 
+export const saveOriginalAssetFromFile = async (params: {
+  originalId: string;
+  kind: "instrumental" | "vocal";
+  filePath: string;
+  mime: string;
+  originalName?: string;
+}): Promise<NoisegenOriginalAsset> => {
+  const ext = safeExtension(params.originalName ?? params.filePath);
+  const fileName = `${params.kind}${ext}`;
+  const stats = await fs.stat(params.filePath);
+  const backend = resolveNoisegenStorageBackend();
+  if (backend === "replit") {
+    const key = buildNoisegenStorageKey(params.originalId, fileName);
+    await uploadReplitFile(key, params.filePath);
+    return {
+      kind: params.kind,
+      fileName,
+      path: buildReplitLocator(key),
+      mime: params.mime,
+      bytes: stats.size,
+      uploadedAt: Date.now(),
+    };
+  }
+
+  const { originalsDir, baseDir } = getNoisegenPaths();
+  const targetDir = path.join(originalsDir, params.originalId);
+  await fs.mkdir(targetDir, { recursive: true });
+  const filePath = path.join(targetDir, fileName);
+  try {
+    await fs.rename(params.filePath, filePath);
+  } catch {
+    await fs.copyFile(params.filePath, filePath);
+    await fs.unlink(params.filePath);
+  }
+  return {
+    kind: params.kind,
+    fileName,
+    path: path.relative(baseDir, filePath),
+    mime: params.mime,
+    bytes: stats.size,
+    uploadedAt: Date.now(),
+  };
+};
+
 export const saveStemAsset = async (params: {
   originalId: string;
   stemId: string;
@@ -905,6 +986,59 @@ export const saveStemAsset = async (params: {
     path: path.relative(baseDir, filePath),
     mime: params.mime,
     bytes: params.buffer.byteLength,
+    uploadedAt: Date.now(),
+  };
+};
+
+export const saveStemAssetFromFile = async (params: {
+  originalId: string;
+  stemId: string;
+  stemName: string;
+  category?: string;
+  filePath: string;
+  mime: string;
+  originalName?: string;
+}): Promise<NoisegenStemAsset> => {
+  const ext = safeExtension(params.originalName ?? params.filePath);
+  const fileName = `${params.stemId}${ext}`;
+  const stats = await fs.stat(params.filePath);
+  const backend = resolveNoisegenStorageBackend();
+  if (backend === "replit") {
+    const key = buildNoisegenStorageKey(
+      params.originalId,
+      path.posix.join("stems", fileName),
+    );
+    await uploadReplitFile(key, params.filePath);
+    return {
+      id: params.stemId,
+      name: params.stemName,
+      category: params.category,
+      fileName,
+      path: buildReplitLocator(key),
+      mime: params.mime,
+      bytes: stats.size,
+      uploadedAt: Date.now(),
+    };
+  }
+
+  const { originalsDir, baseDir } = getNoisegenPaths();
+  const targetDir = path.join(originalsDir, params.originalId, "stems");
+  await fs.mkdir(targetDir, { recursive: true });
+  const filePath = path.join(targetDir, fileName);
+  try {
+    await fs.rename(params.filePath, filePath);
+  } catch {
+    await fs.copyFile(params.filePath, filePath);
+    await fs.unlink(params.filePath);
+  }
+  return {
+    id: params.stemId,
+    name: params.stemName,
+    category: params.category,
+    fileName,
+    path: path.relative(baseDir, filePath),
+    mime: params.mime,
+    bytes: stats.size,
     uploadedAt: Date.now(),
   };
 };
