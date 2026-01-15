@@ -29,6 +29,7 @@ type DualTopListsProps = {
   onOriginalsHydrated?: (originals: Original[]) => void;
   sessionTempo?: TempoMeta | null;
   layout?: "default" | "listener";
+  isActive?: boolean;
 };
 
 type RankedOriginal = Original & { rank: number };
@@ -41,6 +42,7 @@ type ConnectorPath = {
 
 const SEARCH_DEBOUNCE_MS = 250;
 const TEMPO_BOOST_WEIGHT = 0.15;
+const LIST_REFRESH_INTERVAL_MS = 12_000;
 function tempoBadge(tempo?: TempoMeta) {
   if (!tempo?.bpm) return null;
   const bpmLabel = Math.round(tempo.bpm);
@@ -416,11 +418,16 @@ export function DualTopLists({
   onOriginalsHydrated,
   sessionTempo,
   layout = "default",
+  isActive = true,
 }: DualTopListsProps) {
   const [searchOriginals, setSearchOriginals] = useState("");
   const [searchGenerations, setSearchGenerations] = useState("");
   const debouncedOriginals = useDebouncedValue(searchOriginals, SEARCH_DEBOUNCE_MS);
   const debouncedGenerations = useDebouncedValue(searchGenerations, SEARCH_DEBOUNCE_MS);
+  const [recentUpdate, setRecentUpdate] = useState(false);
+  const updateTimeoutRef = useRef<number | null>(null);
+  const lastSignatureRef = useRef<string>("");
+  const hasLoadedRef = useRef(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const isLargeScreen = useIsLargeScreen();
   const showGenerations = layout !== "listener";
@@ -455,6 +462,10 @@ export function DualTopLists({
   const { data: originalsData, isLoading: originalsLoading, isError: originalsError } = useQuery({
     queryKey: ["noise-gens", "originals", debouncedOriginals],
     queryFn: ({ signal }) => fetchTopOriginals(debouncedOriginals, signal),
+    enabled: isActive,
+    refetchInterval: isActive ? LIST_REFRESH_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: isActive,
     staleTime: 60_000,
   });
 
@@ -465,6 +476,10 @@ export function DualTopLists({
   } = useQuery({
     queryKey: ["noise-gens", "originals", "pending", debouncedOriginals],
     queryFn: ({ signal }) => fetchPendingOriginals(debouncedOriginals, signal),
+    enabled: isActive,
+    refetchInterval: isActive ? LIST_REFRESH_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: isActive,
     staleTime: 20_000,
   });
 
@@ -473,13 +488,14 @@ export function DualTopLists({
       queryKey: ["noise-gens", "generations", debouncedGenerations],
       queryFn: ({ signal }) => fetchTopGenerations(debouncedGenerations, signal),
       staleTime: 60_000,
-      enabled: showGenerations,
+      enabled: showGenerations && isActive,
     });
 
   const { data: moodPresets } = useQuery({
     queryKey: ["noise-gens", "moods"],
     queryFn: ({ signal }) => fetchMoodPresets(signal),
     staleTime: Infinity,
+    enabled: isActive,
   });
 
   useEffect(() => {
@@ -487,6 +503,41 @@ export function DualTopLists({
       onMoodPresetsLoaded(moodPresets);
     }
   }, [moodPresets, onMoodPresetsLoaded]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const signature = [...(originalsData ?? []), ...(pendingOriginalsData ?? [])]
+      .map((item) => `${item.id}:${item.uploadedAt ?? 0}:${item.listens ?? 0}`)
+      .join("|");
+    if (!signature) return;
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      lastSignatureRef.current = signature;
+      return;
+    }
+    if (signature === lastSignatureRef.current) return;
+    lastSignatureRef.current = signature;
+    setRecentUpdate(true);
+    if (updateTimeoutRef.current) {
+      window.clearTimeout(updateTimeoutRef.current);
+    }
+    updateTimeoutRef.current = window.setTimeout(() => {
+      setRecentUpdate(false);
+    }, 4_000);
+  }, [isActive, originalsData, pendingOriginalsData]);
+
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        window.clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isActive) return;
+    setRecentUpdate(false);
+  }, [isActive]);
 
   useEffect(() => {
     if (!onGenerationsPresenceChange) return;
@@ -647,6 +698,11 @@ export function DualTopLists({
                 {originalsSubtitle}
               </p>
             </div>
+            {recentUpdate ? (
+              <span className="ml-auto text-[11px] uppercase tracking-wide text-emerald-300">
+                Updated just now
+              </span>
+            ) : null}
           </header>
           <div className="space-y-3">
             <Input

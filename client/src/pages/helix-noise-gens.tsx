@@ -906,6 +906,7 @@ export default function HelixNoiseGensPage() {
                     onMoodPresetsLoaded={setMoodPresets}
                     onOriginalsHydrated={handleOriginalsHydrated}
                     sessionTempo={sessionTempo}
+                    isActive={showListener}
                   />
                 </div>
                 <div className="space-y-6">

@@ -2303,6 +2303,7 @@ router.get("/audio/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
 router.head("/audio/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
 
 router.get("/api/noise-gens/originals", async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const search = normalizeSearch(req.query?.search);
   const store = await getNoisegenStore();
   const sorted = [...store.originals].sort(
@@ -2326,6 +2327,7 @@ router.get("/api/noise-gens/originals", async (req, res) => {
 });
 
 router.get("/api/noise-gens/originals/pending", async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const search = normalizeSearch(req.query?.search);
   const store = await getNoisegenStore();
   const sorted = [...store.pendingOriginals].sort(
