@@ -60,3 +60,6 @@ author = "agent"
 task = "shell.exec"
 args = "FAST_BOOT=0 PORT=5000 npm run dev"
 waitForPort = 5000
+
+[objectStorage]
+defaultBucketID = "replit-objstore-4a4dfe42-dfc5-4d45-85ce-df7a39db7dba"
