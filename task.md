@@ -1151,3 +1151,9 @@ Prompt NG51 (Ableton intent import) - Status: pending
 - Do not: claim third-party plugins are recreated; treat them as opaque hints only.
 - Do not: rely on .als for audio media; stems/mix remain required for sound.
 - Acceptance: creators can attach a Live set, see a clean intent summary, and generate plans that inherit the extracted intent while staying bounded by the contract.
+- Plan-1: define an `AbletonIntentSnapshot` schema (versioned JSON) with global tempo/timeSig, locators, tracks, devices, and optional automation summaries; store sanitized values only (no absolute paths).
+- Plan-2: add server import path for `.als` and `.xml` (gzip decompress for `.als`, XML parse, extract fields) and persist snapshot alongside the Original record.
+- Plan-3: add a device mapping layer for Ableton stock devices (Eq8, Glue/Compressor, Reverb, Delay, Chorus, Drum Buss) that emits RenderPlan `eqPeaks` and `fx` defaults plus intent bounds; unrecognized devices become metadata hints.
+- Plan-4: extend Studio upload UI with an optional Ableton file picker and show a one-screen summary (tempo/timeSig/track counts/devices/locators) plus toggles for applying tempo/timeSig, mix intent, and automation.
+- Plan-5: wire snapshot defaults into RenderPlan generation and Intent Contract bounds (clamp overrides, preserve intent).
+- Plan-6: add tests with a small fixture `.als`/`.xml` to validate extraction, sanitization, and device mapping coverage.
