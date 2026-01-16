@@ -18,11 +18,41 @@ export type TimeSkyMeta = {
   skySignature?: string;
 };
 
+export type AbletonIntentSnapshot = {
+  version: 1;
+  source: {
+    kind: "als" | "xml";
+    fileName?: string;
+  };
+  createdAt: number;
+  globals: {
+    bpm?: number;
+    timeSig?: string;
+  };
+  summary: {
+    trackCount: number;
+    audioTrackCount: number;
+    midiTrackCount: number;
+    returnTrackCount: number;
+    groupTrackCount: number;
+    deviceCount: number;
+    locatorCount: number;
+  };
+  devices: Array<{ name: string; count: number }>;
+  tracks: Array<{
+    name?: string;
+    type: "audio" | "midi" | "return" | "group" | "master" | "unknown";
+    devices: string[];
+  }>;
+  locators?: Array<{ name?: string; time?: number }>;
+};
+
 export type OriginalDetails = Original & {
   lyrics?: string;
   timeSky?: TimeSkyMeta;
   processing?: ProcessingState;
   playback?: PlaybackAsset[];
+  intentSnapshot?: AbletonIntentSnapshot;
 };
 
 export type OriginalStem = {

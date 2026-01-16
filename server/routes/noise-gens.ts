@@ -5,11 +5,15 @@ import path from "node:path";
 import { promises as fs, createReadStream, createWriteStream } from "node:fs";
 import { tmpdir } from "node:os";
 import { pipeline } from "node:stream/promises";
+import { gunzip } from "node:zlib";
+import { promisify } from "node:util";
 import { z } from "zod";
 import multer from "multer";
+import { XMLParser } from "fast-xml-parser";
 import { listKnowledgeFilesByProjects } from "../db/knowledge";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop.js";
 import {
+  type AbletonIntentSnapshot,
   findOriginalById,
   getNoisegenPaths,
   getNoisegenStore,
@@ -78,6 +82,21 @@ const STEM_GROUP_DEFS = [
   { id: "music", label: "Music", categories: ["music", "other"] },
   { id: "fx", label: "FX", categories: ["fx"] },
 ];
+const ABLETON_INTENT_VERSION = 1 as const;
+const ABLETON_DEVICE_KEYS = new Set([
+  "Eq8",
+  "GlueCompressor",
+  "Compressor",
+  "Reverb",
+  "Delay",
+  "Chorus",
+  "DrumBuss",
+]);
+const gunzipAsync = promisify(gunzip);
+const ABLETON_XML = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: "",
+});
 const FFMPEG_PATH = process.env.FFMPEG_PATH?.trim() || "ffmpeg";
 let ffmpegAvailable: boolean | null = null;
 
@@ -412,7 +431,253 @@ const mimeFromName = (value?: string): string => {
   if (ext === ".flac") return "audio/flac";
   if (ext === ".ogg" || ext === ".oga") return "audio/ogg";
   if (ext === ".aiff" || ext === ".aif") return "audio/aiff";
+  if (ext === ".xml") return "application/xml";
+  if (ext === ".als") return "application/octet-stream";
   return "application/octet-stream";
+};
+
+const isGzipBuffer = (buffer: Buffer): boolean =>
+  buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b;
+
+const resolveAbletonIntentKind = (
+  fileName: string | undefined,
+  buffer: Buffer,
+): "als" | "xml" | null => {
+  const ext = fileName ? path.extname(fileName).toLowerCase() : "";
+  if (ext === ".als") return "als";
+  if (ext === ".xml") return "xml";
+  if (isGzipBuffer(buffer)) return "als";
+  return null;
+};
+
+const toArray = <T>(value: T | T[] | null | undefined): T[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+const readScalarValue = (value: unknown): string | undefined => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (value && typeof value === "object") {
+    const node = value as Record<string, unknown>;
+    const direct = node.Value ?? node.value ?? node.Name ?? node.name;
+    if (typeof direct === "string" || typeof direct === "number") {
+      return String(direct);
+    }
+  }
+  return undefined;
+};
+
+const readNumericValue = (value: unknown): number | null => {
+  const raw = readScalarValue(value);
+  if (raw == null) return null;
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const collectNodesByKey = (
+  node: unknown,
+  key: string,
+  results: unknown[],
+) => {
+  if (!node) return;
+  if (Array.isArray(node)) {
+    node.forEach((entry) => collectNodesByKey(entry, key, results));
+    return;
+  }
+  if (typeof node !== "object") return;
+  for (const [entryKey, value] of Object.entries(
+    node as Record<string, unknown>,
+  )) {
+    if (entryKey === key) {
+      if (Array.isArray(value)) {
+        results.push(...value);
+      } else {
+        results.push(value);
+      }
+    }
+    if (value && typeof value === "object") {
+      collectNodesByKey(value, key, results);
+    }
+  }
+};
+
+const resolveLiveSetRoot = (parsed: unknown): unknown => {
+  if (!parsed || typeof parsed !== "object") return null;
+  const root = parsed as Record<string, unknown>;
+  const ableton = root.Ableton as Record<string, unknown> | undefined;
+  if (ableton?.LiveSet) return ableton.LiveSet;
+  if (root.LiveSet) return root.LiveSet;
+  return parsed;
+};
+
+const extractTempoFromXml = (root: unknown): number | undefined => {
+  const nodes: unknown[] = [];
+  collectNodesByKey(root, "Tempo", nodes);
+  for (const node of nodes) {
+    const tempo =
+      readNumericValue((node as Record<string, unknown>)?.Manual) ??
+      readNumericValue((node as Record<string, unknown>)?.Value) ??
+      readNumericValue(node);
+    if (tempo && tempo > 0) return tempo;
+  }
+  return undefined;
+};
+
+const extractTimeSigFromXml = (root: unknown): string | undefined => {
+  const nodes: unknown[] = [];
+  collectNodesByKey(root, "TimeSignature", nodes);
+  for (const node of nodes) {
+    const numerator = readNumericValue(
+      (node as Record<string, unknown>)?.Numerator,
+    );
+    const denominator = readNumericValue(
+      (node as Record<string, unknown>)?.Denominator,
+    );
+    if (numerator && denominator) return `${numerator}/${denominator}`;
+  }
+  return undefined;
+};
+
+const extractLocatorsFromXml = (root: unknown) => {
+  const nodes: unknown[] = [];
+  collectNodesByKey(root, "Locator", nodes);
+  const locators = nodes
+    .flatMap((node) => toArray(node))
+    .map((entry) => {
+      const data = entry as Record<string, unknown>;
+      const nameRaw = readScalarValue(data.Name);
+      const time = readNumericValue(data.Time);
+      const name = nameRaw?.trim();
+      if (!name && time == null) return null;
+      return { name: name || undefined, time: time ?? undefined };
+    })
+    .filter((entry): entry is { name?: string; time?: number } => !!entry);
+  return locators;
+};
+
+const collectDeviceNames = (
+  node: unknown,
+  names: string[],
+  counts: Map<string, number>,
+) => {
+  if (!node) return;
+  if (Array.isArray(node)) {
+    node.forEach((entry) => collectDeviceNames(entry, names, counts));
+    return;
+  }
+  if (typeof node !== "object") return;
+  for (const [entryKey, value] of Object.entries(
+    node as Record<string, unknown>,
+  )) {
+    if (ABLETON_DEVICE_KEYS.has(entryKey)) {
+      const entries = toArray(value);
+      const count = entries.length > 0 ? entries.length : 1;
+      for (let i = 0; i < count; i += 1) {
+        names.push(entryKey);
+      }
+      counts.set(entryKey, (counts.get(entryKey) ?? 0) + count);
+    }
+    if (value && typeof value === "object") {
+      collectDeviceNames(value, names, counts);
+    }
+  }
+};
+
+const readTrackName = (node: Record<string, unknown>) => {
+  const nameNode = node.Name as Record<string, unknown> | undefined;
+  const raw =
+    (nameNode?.EffectiveName as Record<string, unknown> | undefined)?.Value ??
+    (nameNode?.UserName as Record<string, unknown> | undefined)?.Value ??
+    nameNode?.Value ??
+    nameNode?.name;
+  const value = typeof raw === "string" ? raw.trim() : undefined;
+  return value || undefined;
+};
+
+const extractTracksFromXml = (root: unknown) => {
+  const trackDefs: Array<{
+    key: string;
+    type: AbletonIntentSnapshot["tracks"][number]["type"];
+  }> = [
+    { key: "AudioTrack", type: "audio" },
+    { key: "MidiTrack", type: "midi" },
+    { key: "ReturnTrack", type: "return" },
+    { key: "GroupTrack", type: "group" },
+    { key: "MasterTrack", type: "master" },
+  ];
+  const tracks: AbletonIntentSnapshot["tracks"] = [];
+  const deviceCounts = new Map<string, number>();
+  for (const def of trackDefs) {
+    const nodes: unknown[] = [];
+    collectNodesByKey(root, def.key, nodes);
+    for (const node of nodes.flatMap((entry) => toArray(entry))) {
+      const trackNode = node as Record<string, unknown>;
+      const deviceNames: string[] = [];
+      collectDeviceNames(trackNode, deviceNames, deviceCounts);
+      tracks.push({
+        name: readTrackName(trackNode),
+        type: def.type,
+        devices: Array.from(new Set(deviceNames)),
+      });
+    }
+  }
+  return { tracks, deviceCounts };
+};
+
+const parseAbletonIntentSnapshot = async (params: {
+  buffer: Buffer;
+  fileName?: string;
+}): Promise<AbletonIntentSnapshot | null> => {
+  const fileName = params.fileName ?? "ableton.als";
+  const kind = resolveAbletonIntentKind(fileName, params.buffer);
+  if (!kind) return null;
+  let xmlBuffer = params.buffer;
+  if (kind === "als") {
+    try {
+      xmlBuffer = await gunzipAsync(params.buffer);
+    } catch {
+      return null;
+    }
+  }
+  const xml = xmlBuffer.toString("utf8");
+  if (!xml.trim()) return null;
+  let parsed: unknown;
+  try {
+    parsed = ABLETON_XML.parse(xml);
+  } catch {
+    return null;
+  }
+  const root = resolveLiveSetRoot(parsed);
+  const tempo = extractTempoFromXml(root);
+  const timeSig = extractTimeSigFromXml(root);
+  const locators = extractLocatorsFromXml(root);
+  const { tracks, deviceCounts } = extractTracksFromXml(root);
+  const devices = Array.from(deviceCounts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const summary = {
+    trackCount: tracks.length,
+    audioTrackCount: tracks.filter((track) => track.type === "audio").length,
+    midiTrackCount: tracks.filter((track) => track.type === "midi").length,
+    returnTrackCount: tracks.filter((track) => track.type === "return").length,
+    groupTrackCount: tracks.filter((track) => track.type === "group").length,
+    deviceCount: devices.reduce((sum, item) => sum + item.count, 0),
+    locatorCount: locators.length,
+  };
+  return {
+    version: ABLETON_INTENT_VERSION,
+    source: { kind, fileName },
+    createdAt: Date.now(),
+    globals: {
+      bpm: tempo,
+      timeSig,
+    },
+    summary,
+    devices,
+    tracks,
+    locators: locators.length ? locators : undefined,
+  };
 };
 
 const clampNumber = (
@@ -569,6 +834,7 @@ const upsertOriginalRecord = async (params: {
   tempo?: z.infer<typeof tempoMetaSchema>;
   notes?: string;
   timeSky?: z.infer<typeof timeSkySchema>;
+  intentSnapshot?: AbletonIntentSnapshot;
   instrumentalAsset?: NoisegenOriginalAsset;
   vocalAsset?: NoisegenOriginalAsset;
   stemAssets?: NoisegenStemAsset[];
@@ -637,6 +903,7 @@ const upsertOriginalRecord = async (params: {
         : existingEntry?.offsetMs,
       uploadedAt: existingEntry?.uploadedAt ?? Date.now(),
       timeSky: params.timeSky ?? existingEntry?.timeSky,
+      intentSnapshot: params.intentSnapshot ?? existingEntry?.intentSnapshot,
       processing: params.processing ?? existingEntry?.processing,
       assets: nextAssets,
     };
@@ -2385,6 +2652,7 @@ router.get("/api/noise-gens/originals/:id", async (req, res) => {
     lyrics: original.notes ?? undefined,
     timeSky: original.timeSky ?? undefined,
     processing: original.processing ?? undefined,
+    intentSnapshot: original.intentSnapshot ?? undefined,
     playback: playbackAssets.length
       ? playbackAssets.map((asset) => ({
           id: asset.id,
@@ -2713,6 +2981,7 @@ router.post(
     { name: "instrumental", maxCount: 1 },
     { name: "vocal", maxCount: 1 },
     { name: "stems", maxCount: 32 },
+    { name: "intent", maxCount: 1 },
   ]),
   async (req, res) => {
     const title = readStringField(req.body?.title);
@@ -2739,6 +3008,7 @@ router.post(
     const instrumental = files?.instrumental?.[0];
     const vocal = files?.vocal?.[0];
     const stems = files?.stems ?? [];
+    const intentFile = files?.intent?.[0];
     if (!instrumental && stems.length === 0) {
       return res.status(400).json({ error: "instrumental_or_stems_required" });
     }
@@ -2812,6 +3082,12 @@ router.post(
       ? resolveUploadAudio(instrumental)
       : null;
     const vocalPayload = vocal ? resolveUploadAudio(vocal) : null;
+    const intentSnapshot = intentFile
+      ? await parseAbletonIntentSnapshot({
+          buffer: Buffer.from(intentFile.buffer),
+          fileName: intentFile.originalname,
+        })
+      : undefined;
     const stemPayloads = stems.length
       ? (() => {
           const used = new Set<string>(
@@ -2956,6 +3232,7 @@ router.post(
       tempo,
       notes: notes || undefined,
       timeSky,
+      intentSnapshot,
       instrumentalAsset,
       vocalAsset,
       stemAssets,
@@ -3009,7 +3286,10 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
   const fileName = readStringField(req.body?.fileName) || chunkFile.originalname;
   const kindRaw = readStringField(req.body?.kind).toLowerCase();
   const kind =
-    kindRaw === "instrumental" || kindRaw === "vocal" || kindRaw === "stem"
+    kindRaw === "instrumental" ||
+    kindRaw === "vocal" ||
+    kindRaw === "stem" ||
+    kindRaw === "intent"
       ? kindRaw
       : null;
   if (!kind) {
@@ -3109,6 +3389,28 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
     chunkFile.mimetype !== "binary/octet-stream"
       ? chunkFile.mimetype
       : mimeFromName(fileName);
+  const storeSnapshot = await getNoisegenStore();
+  const existingSnapshot = findOriginalById(storeSnapshot, trackId);
+  if (kind === "intent") {
+    const buffer = await fs.readFile(finalPath);
+    const intentSnapshot = await parseAbletonIntentSnapshot({
+      buffer,
+      fileName,
+    });
+    await upsertOriginalRecord({
+      trackId,
+      title,
+      creator,
+      durationSeconds: existingSnapshot?.duration ?? 1,
+      offsetMs,
+      tempo,
+      notes: notes || undefined,
+      timeSky,
+      intentSnapshot,
+    });
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    return res.json({ trackId, complete: true });
+  }
   let finalPath = assembledPath;
   try {
     const stats = await fs.stat(assembledPath);
@@ -3124,8 +3426,6 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
   const waveformSummary = await buildWaveformSummaryFromFile(finalPath, mime);
 
   const usedIds = new Set<string>();
-  const storeSnapshot = await getNoisegenStore();
-  const existingSnapshot = findOriginalById(storeSnapshot, trackId);
   existingSnapshot?.assets.stems?.forEach((stem) => usedIds.add(stem.id));
 
   let instrumentalAsset: NoisegenOriginalAsset | undefined;

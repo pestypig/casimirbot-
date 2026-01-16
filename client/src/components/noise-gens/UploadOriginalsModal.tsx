@@ -105,6 +105,14 @@ type UploadFileProgress = {
   error?: string;
 };
 
+type UploadQueueItem = {
+  id: string;
+  name: string;
+  file: File;
+  field: "instrumental" | "vocal" | "stems" | "intent";
+  category?: StemCategory;
+};
+
 const STEM_CATEGORY_LABELS: Record<StemCategory, string> = {
   mix: "Mix",
   vocal: "Vocal",
@@ -126,6 +134,18 @@ const STEM_CATEGORY_ORDER: StemCategory[] = [
   "other",
   "ignore",
 ];
+
+const formatBytes = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+};
 
 const STEM_CATEGORY_STYLES: Record<StemCategory, string> = {
   mix: "border-sky-500/50 bg-sky-500/10 text-sky-100",
@@ -310,6 +330,7 @@ export function UploadOriginalsModal({
   const [creator, setCreator] = useState<FieldState>({ value: "", error: null });
   const [creatorTouched, setCreatorTouched] = useState(false);
   const [lyrics, setLyrics] = useState("");
+  const [intentFile, setIntentFile] = useState<File | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(
     undefined,
   );
@@ -348,6 +369,7 @@ export function UploadOriginalsModal({
       setCreator({ value: "", error: null });
       setCreatorTouched(false);
       setLyrics("");
+      setIntentFile(null);
       setSelectedProjectId(undefined);
       setStemEntries([]);
       stemSourceRef.current = "";
@@ -679,30 +701,52 @@ export function UploadOriginalsModal({
     if (!canSubmit) return;
     try {
       setIsSubmitting(true);
-      const uploadQueue: Array<{
-        entry: StemEntry;
-        field: "instrumental" | "vocal" | "stems";
-        category?: StemCategory;
-      }> = [
+      const uploadQueue: UploadQueueItem[] = [
         ...(stemSummary.mixEntry
-          ? [{ entry: stemSummary.mixEntry, field: "instrumental" }]
+          ? [
+              {
+                id: stemSummary.mixEntry.id,
+                name: stemSummary.mixEntry.name,
+                file: stemSummary.mixEntry.file,
+                field: "instrumental",
+              },
+            ]
           : []),
         ...(stemSummary.vocalEntry
-          ? [{ entry: stemSummary.vocalEntry, field: "vocal" }]
+          ? [
+              {
+                id: stemSummary.vocalEntry.id,
+                name: stemSummary.vocalEntry.name,
+                file: stemSummary.vocalEntry.file,
+                field: "vocal",
+              },
+            ]
           : []),
         ...stemSummary.stemUploads.map((entry) => ({
-          entry,
+          id: entry.id,
+          name: entry.name,
+          file: entry.file,
           field: "stems",
           category: entry.category,
         })),
+        ...(intentFile
+          ? [
+              {
+                id: `intent-${intentFile.name}-${intentFile.size}`,
+                name: intentFile.name,
+                file: intentFile,
+                field: "intent",
+              },
+            ]
+          : []),
       ];
       if (uploadQueue.length === 0) {
         throw new Error("No audio files selected for upload.");
       }
       const uploadFiles: UploadFileProgress[] = uploadQueue.map((item) => ({
-        id: item.entry.id,
-        name: item.entry.name,
-        bytes: item.entry.file.size,
+        id: item.id,
+        name: item.name,
+        bytes: item.file.size,
         loaded: 0,
         pct: 0,
         status: "queued",
@@ -791,41 +835,41 @@ export function UploadOriginalsModal({
       const runUpload = async (item: (typeof uploadQueue)[number]) => {
         if (abortAll) return;
         const controller = new AbortController();
-        abortControllers.set(item.entry.id, controller);
-        updateProgress(item.entry.id, 0, "uploading");
-        const totalSize = item.entry.file.size;
+        abortControllers.set(item.id, controller);
+        updateProgress(item.id, 0, "uploading");
+        const totalSize = item.file.size;
         const shouldChunk = totalSize > DIRECT_UPLOAD_LIMIT_BYTES;
         try {
           if (!shouldChunk) {
             const payload = new FormData();
             appendSharedFields(payload, trackIdForUpload);
             if (item.field === "stems") {
-              payload.append("stems", item.entry.file);
+              payload.append("stems", item.file);
               payload.append("stemCategories", JSON.stringify([item.category]));
             } else {
-              payload.append(item.field, item.entry.file);
+              payload.append(item.field, item.file);
             }
             const result = await uploadOriginal(payload, {
               signal: controller.signal,
               onProgress: (progress) => {
-                updateProgress(item.entry.id, progress.loaded, "uploading");
+                updateProgress(item.id, progress.loaded, "uploading");
               },
             });
             if (result.trackId && result.trackId !== trackIdForUpload) {
               throw new Error("Upload returned a mismatched track ID.");
             }
-            updateProgress(item.entry.id, totalSize, "done");
+            updateProgress(item.id, totalSize, "done");
           } else {
             const totalChunks = Math.ceil(totalSize / CHUNK_SIZE_BYTES);
             for (let index = 0; index < totalChunks; index += 1) {
               if (abortAll) return;
               const start = index * CHUNK_SIZE_BYTES;
               const end = Math.min(totalSize, start + CHUNK_SIZE_BYTES);
-              const chunk = item.entry.file.slice(start, end);
+              const chunk = item.file.slice(start, end);
               const payload = new FormData();
               appendSharedFields(payload, trackIdForUpload);
-              payload.append("fileId", item.entry.id);
-              payload.append("fileName", item.entry.name);
+              payload.append("fileId", item.id);
+              payload.append("fileName", item.name);
               payload.append(
                 "kind",
                 item.field === "stems" ? "stem" : item.field,
@@ -835,36 +879,36 @@ export function UploadOriginalsModal({
               }
               payload.append("chunkIndex", String(index));
               payload.append("chunkCount", String(totalChunks));
-              payload.append("chunk", chunk, item.entry.name);
+              payload.append("chunk", chunk, item.name);
               const base = index * CHUNK_SIZE_BYTES;
               const result = await uploadOriginalChunk(payload, {
                 signal: controller.signal,
                 onProgress: (progress) => {
                   const loaded = Math.min(totalSize, base + progress.loaded);
-                  updateProgress(item.entry.id, loaded, "uploading");
+                  updateProgress(item.id, loaded, "uploading");
                 },
               });
               if (result.trackId && result.trackId !== trackIdForUpload) {
                 throw new Error("Upload returned a mismatched track ID.");
               }
               if (index === totalChunks - 1) {
-                updateProgress(item.entry.id, totalSize, "done");
+                updateProgress(item.id, totalSize, "done");
               }
             }
           }
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Upload failed";
-          updateProgress(item.entry.id, 0, "error", message);
+          updateProgress(item.id, 0, "error", message);
           abortAll = true;
           abortControllers.forEach((ctrl) => ctrl.abort());
-          throw new Error(`"${item.entry.name}" failed to upload. ${message}`);
+          throw new Error(`"${item.name}" failed to upload. ${message}`);
         } finally {
-          abortControllers.delete(item.entry.id);
+          abortControllers.delete(item.id);
         }
       };
       const hasChunkedUploads = uploadQueue.some(
-        (item) => item.entry.file.size > DIRECT_UPLOAD_LIMIT_BYTES,
+        (item) => item.file.size > DIRECT_UPLOAD_LIMIT_BYTES,
       );
       const concurrency = hasChunkedUploads
         ? 1
@@ -1134,6 +1178,38 @@ export function UploadOriginalsModal({
                 {stemSummary.ignoredCount
                   ? ` | ${stemSummary.ignoredCount} ignored`
                   : ""}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="noise-upload-intent">Ableton Set (optional)</Label>
+            <Input
+              id="noise-upload-intent"
+              type="file"
+              accept=".als,.xml,application/xml,text/xml"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                setIntentFile(file);
+              }}
+            />
+            {intentFile ? (
+              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span className="truncate">
+                  {intentFile.name} · {formatBytes(intentFile.size)}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIntentFile(null)}
+                >
+                  Clear
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Attach a Live set to capture tempo, locators, and device intent.
               </p>
             )}
           </div>
