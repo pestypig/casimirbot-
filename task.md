@@ -1140,3 +1140,14 @@ Prompt NG50 (Remix UI controls) - Status: complete
 - Do: keep UI simple and readable for listeners.
 - Do not: expose full DAW controls in Listener mode.
 - Acceptance: listeners can mute/boost grouped stems after upgrade.
+
+Prompt NG51 (Ableton intent import) - Status: pending
+- Goal: treat Ableton Live sets (.als/.xml) as an optional creator intent snapshot that guides RenderPlan defaults and Intent Contract bounds, without attempting full DAW recreation.
+- Do: accept .als or .xml during Studio upload; decompress .als (gzip) server-side; parse XML; extract BPM, time signature, locators/markers (if present), track list with Audio/MIDI types, and device inventory.
+- Do: map a small whitelist of stock devices (Eq8, Glue/Compressor, Reverb, Delay, Chorus, Drum Buss) into RenderPlan textures/FX (eqPeaks, reverbSend, comp, delay intent), leaving unknown devices as metadata hints.
+- Do: optionally extract automation envelopes into macro curves or energy curves (behind a Studio toggle; default off).
+- Do: store a normalized, versioned "intent snapshot" JSON alongside the original, stripping absolute file paths and any user-machine identifiers.
+- Do: show a one-screen summary after import (tempo, time sig, track counts, device counts, locator count) with toggles for which intent layers to apply (tempo/time sig, mix intent, automation).
+- Do not: claim third-party plugins are recreated; treat them as opaque hints only.
+- Do not: rely on .als for audio media; stems/mix remain required for sound.
+- Acceptance: creators can attach a Live set, see a clean intent summary, and generate plans that inherit the extracted intent while staying bounded by the contract.
