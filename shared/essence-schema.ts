@@ -290,6 +290,24 @@ const PhysicsTokamakAddedValueFeature = z.object({
   }),
 });
 
+const PhysicsSolarSpectrumFeature = z.object({
+  kind: z.literal("solar-spectrum"),
+  summary: z.object({
+    dataset: z.string().optional(),
+    version: z.string().optional(),
+    view: z.string().optional(),
+    series_count: z.number().int().nonnegative().optional(),
+    wavelength_min_m: z.number().optional(),
+    wavelength_max_m: z.number().optional(),
+  }),
+  artifacts: z.object({
+    spectrum_url: z.string(),
+    spectrum_cid: z.string().optional(),
+    analysis_url: z.string().optional(),
+    analysis_cid: z.string().optional(),
+  }),
+});
+
 const PhysicsGrOsFeature = z.object({
   kind: z.literal("gr-os"),
   payload: grOsPayloadSchema,
@@ -298,6 +316,7 @@ const PhysicsGrOsFeature = z.object({
 const PhysicsFeature = z.discriminatedUnion("kind", [
   PhysicsCurvatureFeature,
   PhysicsSolarEnergyFieldFeature,
+  PhysicsSolarSpectrumFeature,
   PhysicsTokamakEnergyFieldFeature,
   PhysicsTokamakAddedValueFeature,
   PhysicsGrOsFeature,

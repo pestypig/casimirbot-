@@ -20,6 +20,7 @@ import { migration018 } from "./migrations/018_trace_collapse_strategy";
 import { migration019 } from "./migrations/019_profile_summaries";
 import { migration020 } from "./migrations/020_trace_debate_id";
 import { migration021 } from "./migrations/021_simulations";
+import { migration022 } from "./migrations/022_noisegen_store";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -44,6 +45,7 @@ const MIGRATIONS = [
   migration019,
   migration020,
   migration021,
+  migration022,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

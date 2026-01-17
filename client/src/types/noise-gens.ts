@@ -8,6 +8,7 @@ export type Original = {
   stemCount?: number;
   uploadedAt?: number;
   status?: "pending" | "ranked";
+  processing?: ProcessingState;
 };
 
 export type PulseSource =

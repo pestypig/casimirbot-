@@ -3,6 +3,8 @@ import { promises as fs } from "node:fs";
 import { createReadStream, existsSync } from "node:fs";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { ensureDatabase, getPool } from "../db/client";
+import { putBlob } from "../storage";
 
 export type JobStatus = "queued" | "processing" | "ready" | "error";
 export type NoisegenJobType = "cover" | "legacy";
@@ -388,11 +390,19 @@ const DEFAULT_MOODS: NoisegenMood[] = [
   },
 ];
 
-type NoisegenStorageBackend = "fs" | "replit";
+type NoisegenStorageBackend = "fs" | "replit" | "storage";
+type NoisegenStoreBackend = "fs" | "db";
 
 const resolveNoisegenStorageBackend = (): NoisegenStorageBackend => {
   const raw = process.env.NOISEGEN_STORAGE_BACKEND?.trim().toLowerCase();
-  return raw === "replit" ? "replit" : "fs";
+  if (raw === "replit") return "replit";
+  if (raw === "storage") return "storage";
+  return "fs";
+};
+
+const resolveNoisegenStoreBackend = (): NoisegenStoreBackend => {
+  const raw = process.env.NOISEGEN_STORE_BACKEND?.trim().toLowerCase();
+  return raw === "db" ? "db" : "fs";
 };
 
 import type { Client as ReplitStorageClient } from "@replit/object-storage";
@@ -418,6 +428,9 @@ const buildNoisegenStorageKey = (originalId: string, relativePath: string) =>
 
 export const isReplitStoragePath = (value: string): boolean =>
   value.startsWith("replit://");
+
+export const isStorageLocator = (value: string): boolean =>
+  value.startsWith("storage://") || value.startsWith("cid:");
 
 const buildReplitLocator = (key: string): string => `replit://${key}`;
 
@@ -506,6 +519,8 @@ export const getNoisegenPaths = () => {
   };
 };
 
+const NOISEGEN_STORE_ID = "default";
+
 const ensureDirectories = async () => {
   const { baseDir, originalsDir, previewsDir } = getNoisegenPaths();
   await fs.mkdir(baseDir, { recursive: true });
@@ -578,7 +593,7 @@ const promotePendingOriginals = (store: NoisegenStore): NoisegenStore => {
   return next;
 };
 
-const readStore = async (): Promise<NoisegenStore> => {
+const readStoreFromFs = async (): Promise<NoisegenStore> => {
   await ensureDirectories();
   const { storePath } = getNoisegenPaths();
   try {
@@ -589,12 +604,81 @@ const readStore = async (): Promise<NoisegenStore> => {
   }
 };
 
-const writeStore = async (store: NoisegenStore): Promise<void> => {
+const writeStoreToFs = async (store: NoisegenStore): Promise<void> => {
   await ensureDirectories();
   const { storePath } = getNoisegenPaths();
   const tmpPath = `${storePath}.tmp`;
   await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf8");
   await fs.rename(tmpPath, storePath);
+};
+
+type NoisegenStoreRow = {
+  payload: unknown;
+};
+
+const parseStorePayload = (payload: unknown): NoisegenStore => {
+  if (typeof payload === "string") {
+    try {
+      return normalizeStore(JSON.parse(payload));
+    } catch {
+      return emptyStore();
+    }
+  }
+  return normalizeStore(payload);
+};
+
+const readStoreFromDb = async (): Promise<NoisegenStore | null> => {
+  await ensureDatabase();
+  const pool = getPool();
+  const { rows } = await pool.query<NoisegenStoreRow>(
+    `
+      SELECT payload
+      FROM noisegen_store
+      WHERE id = $1
+      LIMIT 1;
+    `,
+    [NOISEGEN_STORE_ID],
+  );
+  if (!rows[0]) {
+    return null;
+  }
+  return parseStorePayload(rows[0].payload);
+};
+
+const writeStoreToDb = async (store: NoisegenStore): Promise<void> => {
+  await ensureDatabase();
+  const pool = getPool();
+  await pool.query(
+    `
+      INSERT INTO noisegen_store (id, payload, updated_at)
+      VALUES ($1, $2::jsonb, now())
+      ON CONFLICT (id) DO UPDATE
+        SET payload = excluded.payload,
+            updated_at = excluded.updated_at;
+    `,
+    [NOISEGEN_STORE_ID, JSON.stringify(store)],
+  );
+};
+
+const readStore = async (): Promise<NoisegenStore> => {
+  const backend = resolveNoisegenStoreBackend();
+  if (backend === "db") {
+    const dbStore = await readStoreFromDb();
+    if (dbStore) return dbStore;
+    const fallback = await readStoreFromFs();
+    await writeStoreToDb(fallback);
+    return fallback;
+  }
+  return readStoreFromFs();
+};
+
+const writeStore = async (store: NoisegenStore): Promise<void> => {
+  const backend = resolveNoisegenStoreBackend();
+  if (backend === "db") {
+    await writeStoreToDb(store);
+    return;
+  }
+  await writeStoreToFs(store);
 };
 
 const readBundledManifest = async (): Promise<BundledOriginalManifest[]> => {
@@ -813,7 +897,9 @@ const isBlank = (value?: string): boolean => !value || value.trim().length === 0
 
 const shouldReplaceAsset = (asset?: NoisegenOriginalAsset): boolean => {
   if (!asset) return true;
-  if (isReplitStoragePath(asset.path)) return false;
+  if (isReplitStoragePath(asset.path) || isStorageLocator(asset.path)) {
+    return false;
+  }
   try {
     return !existsSync(resolveOriginalAssetPath(asset));
   } catch {
@@ -823,7 +909,14 @@ const shouldReplaceAsset = (asset?: NoisegenOriginalAsset): boolean => {
 
 const shouldReplaceStems = (stems?: NoisegenStemAsset[]): boolean => {
   if (!stems || stems.length === 0) return true;
-  if (stems.some((stem) => isReplitStoragePath(stem.path))) return false;
+  if (
+    stems.some(
+      (stem) =>
+        isReplitStoragePath(stem.path) || isStorageLocator(stem.path),
+    )
+  ) {
+    return false;
+  }
   return stems.every((stem) => {
     try {
       return !existsSync(resolveStemAssetPath(stem));
@@ -835,7 +928,14 @@ const shouldReplaceStems = (stems?: NoisegenStemAsset[]): boolean => {
 
 const shouldReplacePlayback = (playback?: NoisegenPlaybackAsset[]): boolean => {
   if (!playback || playback.length === 0) return true;
-  if (playback.some((asset) => isReplitStoragePath(asset.path))) return false;
+  if (
+    playback.some(
+      (asset) =>
+        isReplitStoragePath(asset.path) || isStorageLocator(asset.path),
+    )
+  ) {
+    return false;
+  }
   return playback.every((asset) => {
     try {
       return !existsSync(resolvePlaybackAssetPath(asset));
@@ -1042,7 +1142,9 @@ export const resolveStemGroupAsset = (
 export const resolveOriginalAssetPath = (
   asset: NoisegenOriginalAsset,
 ): string => {
-  if (isReplitStoragePath(asset.path)) return asset.path;
+  if (isReplitStoragePath(asset.path) || isStorageLocator(asset.path)) {
+    return asset.path;
+  }
   const { baseDir } = getNoisegenPaths();
   
   if (path.isAbsolute(asset.path)) {
@@ -1058,7 +1160,9 @@ export const resolveOriginalAssetPath = (
 };
 
 export const resolveStemAssetPath = (asset: NoisegenStemAsset): string => {
-  if (isReplitStoragePath(asset.path)) return asset.path;
+  if (isReplitStoragePath(asset.path) || isStorageLocator(asset.path)) {
+    return asset.path;
+  }
   const { baseDir } = getNoisegenPaths();
   
   if (path.isAbsolute(asset.path)) {
@@ -1077,7 +1181,9 @@ export const resolveStemAssetPath = (asset: NoisegenStemAsset): string => {
 export const resolvePlaybackAssetPath = (
   asset: NoisegenPlaybackAsset,
 ): string => {
-  if (isReplitStoragePath(asset.path)) return asset.path;
+  if (isReplitStoragePath(asset.path) || isStorageLocator(asset.path)) {
+    return asset.path;
+  }
   const { baseDir } = getNoisegenPaths();
 
   if (path.isAbsolute(asset.path)) {
@@ -1096,7 +1202,9 @@ export const resolvePlaybackAssetPath = (
 export const resolveStemGroupAssetPath = (
   asset: NoisegenStemGroupAsset,
 ): string => {
-  if (isReplitStoragePath(asset.path)) return asset.path;
+  if (isReplitStoragePath(asset.path) || isStorageLocator(asset.path)) {
+    return asset.path;
+  }
   const { baseDir } = getNoisegenPaths();
 
   if (path.isAbsolute(asset.path)) {
@@ -1184,6 +1292,30 @@ export const savePlaybackAsset = async (params: {
       uploadedAt: Date.now(),
     };
   }
+  if (backend === "storage") {
+    const record = await putBlob(params.buffer, { contentType: params.mime });
+    return {
+      id: params.playbackId,
+      label: params.label,
+      codec: params.codec,
+      fileName,
+      path: record.uri,
+      mime: params.mime,
+      bytes: record.bytes,
+      uploadedAt: Date.now(),
+    };
+  }
+  if (backend === "storage") {
+    const record = await putBlob(params.buffer, { contentType: params.mime });
+    return {
+      kind: params.kind,
+      fileName,
+      path: record.uri,
+      mime: params.mime,
+      bytes: record.bytes,
+      uploadedAt: Date.now(),
+    };
+  }
 
   const { originalsDir, baseDir } = getNoisegenPaths();
   const targetDir = path.join(originalsDir, params.originalId, "playback");
@@ -1235,6 +1367,24 @@ export const saveStemGroupAsset = async (params: {
       path: buildReplitLocator(key),
       mime: params.mime,
       bytes: params.buffer.byteLength,
+      uploadedAt: Date.now(),
+      durationMs: params.durationMs,
+      sampleRate: params.sampleRate,
+      channels: params.channels,
+    };
+  }
+  if (backend === "storage") {
+    const record = await putBlob(params.buffer, { contentType: params.mime });
+    return {
+      id: params.assetId,
+      groupId: params.groupId,
+      label: params.label,
+      category: params.category,
+      codec: params.codec,
+      fileName,
+      path: record.uri,
+      mime: params.mime,
+      bytes: record.bytes,
       uploadedAt: Date.now(),
       durationMs: params.durationMs,
       sampleRate: params.sampleRate,
@@ -1294,6 +1444,21 @@ export const savePlaybackAssetFromFile = async (params: {
       uploadedAt: Date.now(),
     };
   }
+  if (backend === "storage") {
+    const record = await putBlob(createReadStream(params.filePath), {
+      contentType: params.mime,
+    });
+    return {
+      id: params.playbackId,
+      label: params.label,
+      codec: params.codec,
+      fileName,
+      path: record.uri,
+      mime: params.mime,
+      bytes: record.bytes,
+      uploadedAt: Date.now(),
+    };
+  }
 
   const { originalsDir, baseDir } = getNoisegenPaths();
   const targetDir = path.join(originalsDir, params.originalId, "playback");
@@ -1332,6 +1497,19 @@ export const saveOriginalAssetFromFile = async (params: {
       path: buildReplitLocator(key),
       mime: params.mime,
       bytes: stats.size,
+      uploadedAt: Date.now(),
+    };
+  }
+  if (backend === "storage") {
+    const record = await putBlob(createReadStream(params.filePath), {
+      contentType: params.mime,
+    });
+    return {
+      kind: params.kind,
+      fileName,
+      path: record.uri,
+      mime: params.mime,
+      bytes: record.bytes,
       uploadedAt: Date.now(),
     };
   }
@@ -1385,6 +1563,19 @@ export const saveStemAsset = async (params: {
       uploadedAt: Date.now(),
     };
   }
+  if (backend === "storage") {
+    const record = await putBlob(params.buffer, { contentType: params.mime });
+    return {
+      id: params.stemId,
+      name: params.stemName,
+      category: params.category,
+      fileName,
+      path: record.uri,
+      mime: params.mime,
+      bytes: record.bytes,
+      uploadedAt: Date.now(),
+    };
+  }
 
   const { originalsDir, baseDir } = getNoisegenPaths();
   const targetDir = path.join(originalsDir, params.originalId, "stems");
@@ -1430,6 +1621,21 @@ export const saveStemAssetFromFile = async (params: {
       path: buildReplitLocator(key),
       mime: params.mime,
       bytes: stats.size,
+      uploadedAt: Date.now(),
+    };
+  }
+  if (backend === "storage") {
+    const record = await putBlob(createReadStream(params.filePath), {
+      contentType: params.mime,
+    });
+    return {
+      id: params.stemId,
+      name: params.stemName,
+      category: params.category,
+      fileName,
+      path: record.uri,
+      mime: params.mime,
+      bytes: record.bytes,
       uploadedAt: Date.now(),
     };
   }
@@ -1488,6 +1694,12 @@ export const saveAnalysisArtifact = async (params: {
     );
     await uploadReplitObject(key, params.buffer);
     return buildReplitLocator(key);
+  }
+  if (backend === "storage") {
+    const record = await putBlob(params.buffer, {
+      contentType: "application/json",
+    });
+    return record.uri;
   }
 
   const { originalsDir, baseDir } = getNoisegenPaths();

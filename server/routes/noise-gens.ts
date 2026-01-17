@@ -19,6 +19,7 @@ import {
   getNoisegenStore,
   downloadReplitObjectStream,
   isReplitStoragePath,
+  isStorageLocator,
   type NoisegenOriginal,
   type NoisegenOriginalAsset,
   type NoisegenPlaybackAsset,
@@ -51,6 +52,7 @@ import {
   savePreviewBuffer,
   updateNoisegenStore,
 } from "../services/noisegen-store";
+import { getBlob } from "../storage";
 import { stableJsonStringify } from "../utils/stable-json";
 import {
   createIntentEnforcementState,
@@ -2531,6 +2533,10 @@ const loadAssetBuffer = async (
     const stream = await downloadReplitObjectStream(key);
     return readStreamToBuffer(stream);
   }
+  if (isStorageLocator(asset.path)) {
+    const stream = await getBlob(asset.path);
+    return readStreamToBuffer(stream);
+  }
   const assetPath = isOriginalAsset(asset)
     ? resolveOriginalAssetPath(asset)
     : resolveStemAssetPath(asset);
@@ -2549,14 +2555,15 @@ const resolveMixdownInputFiles = async (
   let tempDir: string | undefined;
   for (const entry of assets) {
     const asset = entry.asset;
-    if (isReplitStoragePath(asset.path)) {
+    if (isReplitStoragePath(asset.path) || isStorageLocator(asset.path)) {
       if (!tempDir) {
         tempDir = await fs.mkdtemp(path.join(tmpdir(), "noisegen-mixdown-"));
       }
       const ext = path.extname(asset.fileName || "") || ".wav";
       const filePath = path.join(tempDir, `${randomUUID()}${ext}`);
-      const key = resolveReplitStorageKey(asset.path);
-      const stream = await downloadReplitObjectStream(key);
+      const stream = isReplitStoragePath(asset.path)
+        ? await downloadReplitObjectStream(resolveReplitStorageKey(asset.path))
+        : await getBlob(asset.path);
       await writeStreamToFile(stream, filePath);
       files.push(filePath);
       continue;
@@ -2962,6 +2969,79 @@ const streamReplitAsset = async (
   stream.pipe(res);
 };
 
+const streamStorageAsset = async (
+  req: express.Request,
+  res: express.Response,
+  asset: { path: string; mime: string; bytes?: number },
+) => {
+  res.setHeader("Content-Type", asset.mime);
+  res.setHeader("Accept-Ranges", "bytes");
+
+  const rangeHeader = req.headers.range;
+  const fileSize = asset.bytes ?? 0;
+
+  if (rangeHeader && fileSize > 0) {
+    const match = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
+    if (match) {
+      const start = parseInt(match[1], 10);
+      const requestedEnd = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+
+      if (
+        Number.isNaN(start) ||
+        Number.isNaN(requestedEnd) ||
+        start > requestedEnd ||
+        start >= fileSize
+      ) {
+        res.setHeader("Content-Range", `bytes */${fileSize}`);
+        res.status(416).end();
+        return;
+      }
+
+      const end = Math.min(requestedEnd, fileSize - 1);
+      const chunkSize = end - start + 1;
+
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+      res.setHeader("Content-Length", chunkSize);
+
+      if (req.method === "HEAD") {
+        res.end();
+        return;
+      }
+
+      const stream = await getBlob(asset.path, { start, end });
+      stream.on("error", (err: Error) => {
+        console.error("Stream error:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "stream_failed" });
+        } else {
+          res.destroy();
+        }
+      });
+      stream.pipe(res);
+      return;
+    }
+  }
+
+  if (fileSize > 0) {
+    res.setHeader("Content-Length", fileSize);
+  }
+  if (req.method === "HEAD") {
+    res.status(200).end();
+    return;
+  }
+  const stream = await getBlob(asset.path);
+  stream.on("error", (err: Error) => {
+    console.error("Stream error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "stream_failed" });
+    } else {
+      res.destroy();
+    }
+  });
+  stream.pipe(res);
+};
+
 const serveOriginalAsset = async (req: any, res: any) => {
   try {
     const store = await getNoisegenStore();
@@ -2975,6 +3055,10 @@ const serveOriginalAsset = async (req: any, res: any) => {
     }
     if (isReplitStoragePath(asset.path)) {
       await streamReplitAsset(req, res, asset);
+      return;
+    }
+    if (isStorageLocator(asset.path)) {
+      await streamStorageAsset(req, res, asset);
       return;
     }
 
@@ -3023,6 +3107,10 @@ const servePlaybackAsset = async (req: any, res: any) => {
       await streamReplitAsset(req, res, asset);
       return;
     }
+    if (isStorageLocator(asset.path)) {
+      await streamStorageAsset(req, res, asset);
+      return;
+    }
 
     const assetPath = resolvePlaybackAssetPath(asset);
     try {
@@ -3063,6 +3151,10 @@ const serveStemAsset = async (req: any, res: any) => {
       await streamReplitAsset(req, res, stem);
       return;
     }
+    if (isStorageLocator(stem.path)) {
+      await streamStorageAsset(req, res, stem);
+      return;
+    }
 
     const stemPath = resolveStemAssetPath(stem);
     try {
@@ -3101,6 +3193,10 @@ const serveStemGroupAsset = async (req: any, res: any) => {
     }
     if (isReplitStoragePath(asset.path)) {
       await streamReplitAsset(req, res, asset);
+      return;
+    }
+    if (isStorageLocator(asset.path)) {
+      await streamStorageAsset(req, res, asset);
       return;
     }
 
@@ -3199,6 +3295,7 @@ router.get("/api/noise-gens/originals", async (req, res) => {
       tempo: original.tempo ?? undefined,
       stemCount: original.assets.stems?.length ?? 0,
       uploadedAt: original.uploadedAt,
+      processing: original.processing ?? undefined,
     })),
   );
 });
@@ -3224,6 +3321,7 @@ router.get("/api/noise-gens/originals/pending", async (req, res) => {
       stemCount: original.assets.stems?.length ?? 0,
       uploadedAt: original.uploadedAt,
       status: "pending",
+      processing: original.processing ?? undefined,
     })),
   );
 });

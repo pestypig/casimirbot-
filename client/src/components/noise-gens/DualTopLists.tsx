@@ -18,7 +18,13 @@ import {
   fetchTopGenerations,
   fetchTopOriginals,
 } from "@/lib/api/noiseGens";
-import type { Generation, MoodPreset, Original, TempoMeta } from "@/types/noise-gens";
+import type {
+  Generation,
+  MoodPreset,
+  Original,
+  ProcessingState,
+  TempoMeta,
+} from "@/types/noise-gens";
 import { cn } from "@/lib/utils";
 
 type DualTopListsProps = {
@@ -43,6 +49,50 @@ type ConnectorPath = {
 const SEARCH_DEBOUNCE_MS = 250;
 const TEMPO_BOOST_WEIGHT = 0.15;
 const LIST_REFRESH_INTERVAL_MS = 12_000;
+
+type PendingStatusMeta = {
+  label: string;
+  progress: number;
+  tone?: "default" | "error";
+};
+
+const clampPercent = (value: number) =>
+  Math.max(0, Math.min(100, Math.round(value)));
+
+const formatProcessingDetail = (detail?: string) =>
+  detail ? `${detail.charAt(0).toUpperCase()}${detail.slice(1)}` : "";
+
+const resolvePendingStatus = (processing?: ProcessingState): PendingStatusMeta => {
+  if (!processing) {
+    return { label: "Queued for mixdown", progress: 10 };
+  }
+  if (processing.status === "error") {
+    return { label: "Mixdown failed", progress: 100, tone: "error" };
+  }
+  const detail = processing.detail?.toLowerCase() ?? "";
+  if (detail.includes("awaiting mixdown")) {
+    return { label: "Queued for mixdown", progress: 20 };
+  }
+  if (detail.includes("building playback mixdown")) {
+    return { label: "Building playback mixdown", progress: 60 };
+  }
+  if (detail.includes("playback ready")) {
+    return {
+      label: formatProcessingDetail(processing.detail) || "Playback ready",
+      progress: 95,
+    };
+  }
+  if (processing.status === "ready") {
+    return { label: "Playback ready", progress: 95 };
+  }
+  if (processing.status === "processing") {
+    return {
+      label: formatProcessingDetail(processing.detail) || "Processing",
+      progress: 40,
+    };
+  }
+  return { label: "Queued", progress: 10 };
+};
 function tempoBadge(tempo?: TempoMeta) {
   if (!tempo?.bpm) return null;
   const bpmLabel = Math.round(tempo.bpm);
@@ -335,8 +385,10 @@ const PendingOriginalRow = memo(
       [onSelect, original],
     );
     const badge = tempoBadge(original.tempo);
-    const tempoMatch = tempoBoost(original.tempo?.bpm, sessionTempo?.bpm);
+    const tempoMatch = tempoBoost(original.tempo?.bpm, sessionTempo?.bpm);      
     const isListenerLayout = layout === "listener";
+    const pendingStatus = resolvePendingStatus(original.processing);
+    const progressValue = clampPercent(pendingStatus.progress);
 
     return (
       <div
@@ -371,15 +423,43 @@ const PendingOriginalRow = memo(
               <span
                 className={cn(
                   "inline-flex items-center rounded-full bg-slate-800/60 px-2 py-0.5 text-[11px] text-slate-300",
-                  tempoMatch >= 0.85 && "bg-amber-400/20 text-amber-100",
+                  tempoMatch >= 0.85 && "bg-amber-400/20 text-amber-100",       
                 )}
               >
                 {badge}
               </span>
             </div>
           ) : null}
+          <div className="mt-2 space-y-1">
+            <div
+              className={cn(
+                "text-[11px] text-amber-200/80",
+                pendingStatus.tone === "error" && "text-red-300",
+              )}
+            >
+              {pendingStatus.label}
+            </div>
+            <div
+              className={cn(
+                "h-1.5 w-full overflow-hidden rounded-full bg-amber-500/15",
+                pendingStatus.tone === "error" && "bg-red-500/10",
+              )}
+            >
+              <div
+                className={cn(
+                  "h-full bg-amber-400/80 transition-all",
+                  pendingStatus.tone === "error" && "bg-red-400/80",
+                )}
+                style={{ width: `${progressValue}%` }}
+              />
+            </div>
+          </div>
         </div>
-        <div className="text-xs font-medium text-amber-200/80">Awaiting rank</div>
+        {!isListenerLayout ? (
+          <div className="text-xs font-medium text-amber-200/80 tabular-nums">
+            {progressValue}%
+          </div>
+        ) : null}
       </div>
     );
   },

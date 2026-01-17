@@ -1290,3 +1290,126 @@ Prompt NG51 (Ableton intent import) - Status: complete
 - Plan-4: extend Studio upload UI with an optional Ableton file picker and show a one-screen summary (tempo/timeSig/track counts/devices/locators) plus toggles for applying tempo/timeSig, mix intent, and automation.
 - Plan-5: wire snapshot defaults into RenderPlan generation and Intent Contract bounds (clamp overrides, preserve intent).
 - Plan-6: add tests with a small fixture `.als`/`.xml` to validate extraction, sanitization, and device mapping coverage.
+
+---
+
+## Solar Model Track (Spectrum + Surface Coherence)
+
+Solar Ingest Defaults (Normalization + contract) - Status: complete
+- Order: SOLAR-ISS spectrum.dat first (absolute anchor), then Solar-HRS disk-integrated, then disk-center and mu grid.
+- Layout: datasets/solar/spectra/solar-iss/v1.1/spectrum.dat and datasets/solar/spectra/solar-hrs/v1/ (disk-integrated, disk-center, solar-position mu file).
+- SOLAR-ISS columns: lambda_nm, ssi_W_m2_nm, e_ssi_pct (relative uncertainty). Normalize to lambda_m and ssi_W_m2_m (ssi_W_m2_nm * 1e9).
+- Solar-HRS disk-integrated/disk-center columns: lambda_nm, ssi_W_m2_nm (tab-delimited, comment lines start with ';'). Normalize to lambda_m and ssi_W_m2_m.
+- Solar-HRS mu grid: accept wide or long format; explode to series entries with mu in {1.0, 0.9, ... 0.05} and view=intermediate.
+- Canonical series type: { mu: number | null, view: "disk_integrated" | "disk_center" | "intermediate", wavelength_m, ssi_W_m2_m }.
+- Defaults: Omega_sun = pi * (R_sun / AU)^2 for radiance conversion; T0 = 5772 K for eps_eff.
+
+Solar Normals (derived after ingest) - Status: complete
+- Planck baseline: fit T_fit (and optional scale) to continuum-smoothed SSI.
+- ratio(lambda) = SSI / B_lambda(T_fit), log_resid(lambda) = log(SSI) - log(B_lambda(T_fit)).
+- Brightness temperature Tb(lambda) from I_lambda = SSI / Omega_sun.
+- Band integrals for instrument windows (ex: MicroCarb bands).
+
+Solar Phase 0 (Spectrum schema + provenance) - Status: complete
+- Goal: treat solar spectra as deterministic 1D fields with provenance.
+- Do: define a solar_spectrum schema (wavelength grid, SSI or radiance values,
+  uncertainties, geometry: disk_integrated | disk_center | mu, instrument
+  metadata).
+- Do: wrap each ingest in an Essence envelope with deterministic hashing.
+- Do: add a fixture for SOLAR-ISS spectrum.dat (lambda, SSI, e_SSI) and a
+  determinism test (same input -> same hash/artifacts).
+- Do not: allow ambiguous units or geometry metadata.
+- Acceptance: ingest produces stable hash and schema-validated artifacts.
+
+Solar Phase 1 (Brightness temperature + emissivity proxy) - Status: complete    
+- Goal: compute Tb(lambda) and eps_eff(lambda) from spectrum data.
+- Do: convert SSI at 1 AU to radiance via Omega_sun, invert Planck to solve
+  Tb(lambda).
+- Do: compute eps_eff(lambda) relative to T0 (default 5772 K) and optional Tfit
+  from continuum windows.
+- Do: output summary stats (max/min Tb, bands where Tb - T0 is largest,
+  integrated residual power).
+- Do not: claim "super-Planck" without showing Tb(lambda).
+- Acceptance: synthetic blackbody tests yield flat Tb; SOLAR-ISS fixture passes
+  deterministic checks.
+
+Solar Phase 1.5 (Center-to-limb validator) - Status: complete
+- Goal: validate mu dependence and limb darkening across bands.
+- Do: ingest Solar-HRS disk-center and intermediate-mu spectra when available.
+- Do: compute Tb(lambda, mu), eps_eff(lambda, mu), and limb darkening curves
+  I(mu)/I(1) for selected bands.
+- Do not: conflate disk-integrated and disk-center spectra in comparisons.
+- Acceptance: mu curves are reproducible and exportable for model comparison.
+
+Solar Phase 2 (Dual forward models) - Status: pending
+- Goal: compare an atmosphere proxy versus a material emissivity model.
+- Do: implement a baseline opacity-depth proxy that reproduces limb darkening   
+  and continuum slope.
+- Do: implement a parameterized emissivity model (e.g., Drude-like + defect     
+  term) with mu handling.
+- Do: compare fit error, mu stability, and parameter plausibility in a single   
+  report.
+- Do not: promote a model without mu consistency and guardrail checks.
+- Acceptance: both models can be run on the same dataset and compared side by   
+  side.
+- Plan-1: define a SolarModelConfig schema (model family, parameter bounds,
+  continuum windows, fit objective, mu-handling policy).
+- Plan-2: implement the atmosphere proxy forward model (opacity-depth mapping +
+  limb darkening solver) and emit per-band residuals.
+- Plan-3: implement the emissivity forward model (Drude + defect term) with
+  mu-dependent scaling and parameter constraints.
+- Plan-4: add a shared fitter (grid + local refine) with deterministic seeds and
+  metrics (RMSE, AIC/BIC, mu stability).
+- Plan-5: add a dual-model comparison report artifact + Essence envelope.
+- Plan-6: add fixtures/tests that exercise both models on SOLAR-ISS and HRS.
+
+Solar Guardrails (density/pressure constraints) - Status: pending
+- Goal: enforce realism checks alongside emissivity fits.
+- Do: add a guardrail report that flags density/pressure mismatches versus      
+  standard photospheric ranges.
+- Do: require additional checks (limb darkening, scale height, helioseismology  
+  compatibility) when guardrails trip.
+- Do not: allow metallic lattice claims without explicit guardrail reporting.   
+- Acceptance: every model run outputs guardrail status and required follow-ups.
+- Plan-1: define a guardrail schema (density, pressure, scale height, opacity
+  regime) with severity levels and required follow-up actions.
+- Plan-2: encode baseline photospheric ranges + citations in a config file and
+  load them into the guardrail evaluator.
+- Plan-3: integrate guardrail output into the Phase 2 report and block "viable"
+  flags when HARD guardrails trip.
+- Plan-4: add tests that trigger each guardrail and verify required follow-ups
+  are attached to the report.
+
+Solar Surface Coherence Track (u_field + K-metrics) - Status: pending
+- Goal: apply curvature-unit and coherence diagnostics to solar surface proxies.
+- Do: ingest magnetogram/EUV proxies (u_B, intensity, Doppler) into u_field     
+  format.
+- Do: run ridge extraction, K-metrics, ridge hazard, and phase-lock scans       
+  (5-minute band).
+- Do: correlate phase-slip events with flare or sunquake proxies without        
+  over-claiming microphysics.
+- Do not: attribute p-mode oscillations to nuclear core dynamics.
+- Acceptance: produces time-series diagnostics with event annotations and
+  provenance.
+- Plan-1: define a solar_surface_u_field schema (magnetogram, EUV, Doppler
+  channels + normalization manifest) with deterministic hashing.
+- Plan-2: add adapters for HMI/AIA inputs (or cached exports) that map to
+  u_field channels and persist Essence envelopes.
+- Plan-3: run curvature-unit + ridge/K-metrics across windows and store a
+  time-series report with information-boundary audit.
+- Plan-4: add phase-lock scanning in the 5-minute band and emit phase-slip
+  events as annotations.
+- Plan-5: add correlation logic with flare/sunquake proxies (HEK + GOES) and
+  export a combined event timeline.
+- Plan-6: add fixtures/tests for deterministic K-metric outputs and phase-lock
+  stability.
+
+Solar Build Checklist (full pipeline) - Status: pending
+- Do: replace spectrum fixtures with full SOLAR-ISS/SOLAR-HRS datasets under
+  datasets/solar/spectra and record hashes in a dataset manifest.
+- Do: run the spectrum ingest pipeline to persist envelopes for disk-integrated,
+  disk-center, and mu-series outputs.
+- Do: run Phase 2 model fits + guardrails and export comparison reports.
+- Do: run surface coherence ingestion + diagnostics and export event timelines.
+- Acceptance: all solar track outputs have deterministic hashes, envelopes, and
+  PASS Casimir verification gates.

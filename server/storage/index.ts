@@ -23,6 +23,11 @@ export type BlobRecord = {
   bytes: number;
 };
 
+export type BlobRange = {
+  start?: number;
+  end?: number;
+};
+
 type LocatorBackend = "fs" | "s3";
 
 const backend: LocatorBackend = (process.env.STORAGE_BACKEND ?? "fs").toLowerCase() === "s3" ? "s3" : "fs";
@@ -135,8 +140,18 @@ const writeLocalBlob = async (hash: string, buffer: Buffer): Promise<void> => {
   }
 };
 
-const readLocalBlob = (hash: string): Readable => {
+const readLocalBlob = (hash: string, range?: BlobRange): Readable => {
   const filePath = nestedPathFor(hash);
+  if (range && (range.start !== undefined || range.end !== undefined)) {
+    const options: { start?: number; end?: number } = {};
+    if (typeof range.start === "number") {
+      options.start = range.start;
+    }
+    if (typeof range.end === "number") {
+      options.end = range.end;
+    }
+    return createReadStream(filePath, options);
+  }
   return createReadStream(filePath);
 };
 
@@ -167,6 +182,21 @@ const resolveLocator = (locator: string): LocatorInfo => {
     return { backend, hash, key: backend === "s3" ? buildObjectKey(hash) : hash };
   }
   return { backend, hash: locator, key: backend === "s3" ? buildObjectKey(locator) : locator };
+};
+
+const buildRangeHeader = (range?: BlobRange): string | undefined => {
+  if (!range) return undefined;
+  const { start, end } = range;
+  if (typeof start === "number") {
+    if (typeof end === "number") {
+      return `bytes=${start}-${end}`;
+    }
+    return `bytes=${start}-`;
+  }
+  if (typeof end === "number") {
+    return `bytes=-${end}`;
+  }
+  return undefined;
 };
 
 export async function putBlob(data: Buffer | NodeJS.ReadableStream, options: BlobOptions = {}): Promise<BlobRecord> {
@@ -205,14 +235,24 @@ export async function putBlob(data: Buffer | NodeJS.ReadableStream, options: Blo
   };
 }
 
-export async function getBlob(locator: string): Promise<Readable> {
+export async function getBlob(
+  locator: string,
+  range?: BlobRange,
+): Promise<Readable> {
   const info = resolveLocator(locator);
   if (info.backend === "s3") {
     await ensureS3Bucket();
     const cfg = getS3Config();
     const client = getS3Client();
     const bucket = info.bucket ?? cfg.bucket;
-    const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: info.key }));
+    const rangeHeader = buildRangeHeader(range);
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: info.key,
+        ...(rangeHeader ? { Range: rangeHeader } : {}),
+      }),
+    );
     const body = response.Body;
     if (!body) {
       throw new Error(`Object ${info.key} not found in bucket ${bucket}`);
@@ -220,7 +260,7 @@ export async function getBlob(locator: string): Promise<Readable> {
     return normalizeS3Body(body);
   }
 
-  return readLocalBlob(info.hash);
+  return readLocalBlob(info.hash, range);
 }
 
 type S3Body = GetObjectCommandOutput["Body"];
