@@ -1,32 +1,62 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  BookmarkPlus,
+  Copy,
+  Info,
   Loader2,
   MessageCircle,
   Pause,
+  PencilLine,
   Play,
   SkipBack,
   SkipForward,
+  SlidersHorizontal,
   Sparkles,
   Volume2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Textarea } from "@/components/ui/textarea";
 import { useIdeology } from "@/hooks/use-ideology";
-import { fetchOriginalDetails, fetchStemPack } from "@/lib/api/noiseGens";
+import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
+import { useToast } from "@/hooks/use-toast";
+import {
+  fetchOriginalDetails,
+  fetchStemPack,
+  saveRecipe,
+  updateOriginalIntentContract,
+  updateOriginalLyrics,
+} from "@/lib/api/noiseGens";
 import type {
+  CoverJobRequest,
+  IntentContract,
+  ListenerMacros,
+  ListenerMacroLocks,
   MoodPreset,
   Original,
   OriginalDetails,
+  JobStatus,
+  PulseSource,
+  RenderPlan,
   StemGroup,
   StemGroupSource,
   StemPack,
+  TempoMeta,
+  TimeSkyMeta,
 } from "@/types/noise-gens";
 import { cn } from "@/lib/utils";
 import { releaseAudioFocus, requestAudioFocus } from "@/lib/audio-focus";
@@ -60,6 +90,290 @@ type MeaningCard = {
   confidence: "High" | "Medium" | "Low";
   lyricQuote: string;
   parallel: string;
+  why: string;
+  reasonPath: string;
+  lineIndices: number[];
+};
+
+type IntentRangeKey =
+  | "sampleInfluence"
+  | "styleInfluence"
+  | "weirdness"
+  | "reverbSend"
+  | "chorus";
+
+type IntentContractRangeDraft = { min: string; max: string };
+
+type IntentContractDraft = {
+  enabled: boolean;
+  tempoBpm: string;
+  timeSig: string;
+  key: string;
+  grooveTemplateIds: string;
+  motifIds: string;
+  stemLocks: string;
+  arrangementMoves: string;
+  ideologyRootId: string;
+  allowedNodeIds: string;
+  storeTimeSky: boolean;
+  storePulse: boolean;
+  pulseSource: PulseSource;
+  placePrecision: "exact" | "approximate" | "hidden";
+  notes: string;
+  ranges: Record<IntentRangeKey, IntentContractRangeDraft>;
+};
+
+const INTENT_RANGE_FIELDS: Array<{ key: IntentRangeKey; label: string }> = [
+  { key: "sampleInfluence", label: "Sample influence" },
+  { key: "styleInfluence", label: "Style influence" },
+  { key: "weirdness", label: "Weirdness" },
+  { key: "reverbSend", label: "Reverb send" },
+  { key: "chorus", label: "Chorus" },
+];
+
+const clamp01 = (value: number): number =>
+  Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+
+const DEFAULT_INTENT_TIME_SIG = "4/4";
+
+const formatCsvList = (list?: string[]): string =>
+  list && list.length ? list.join(", ") : "";
+
+const parseCsvList = (value: string): string[] | undefined => {
+  const items = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return items.length ? Array.from(new Set(items)) : undefined;
+};
+
+const parseOptionalNumber = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const numeric = Number(trimmed);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const buildRangeDraft = (range?: { min: number; max: number }): IntentContractRangeDraft => ({
+  min: range && Number.isFinite(range.min) ? range.min.toFixed(2) : "",
+  max: range && Number.isFinite(range.max) ? range.max.toFixed(2) : "",
+});
+
+const parseRangeDraft = (
+  range: IntentContractRangeDraft,
+): { min: number; max: number } | undefined => {
+  const minValue = parseOptionalNumber(range.min);
+  const maxValue = parseOptionalNumber(range.max);
+  if (minValue == null && maxValue == null) return undefined;
+  const resolvedMin = clamp01(minValue ?? (maxValue ?? 0));
+  const resolvedMax = clamp01(maxValue ?? (minValue ?? 0));
+  return resolvedMax >= resolvedMin
+    ? { min: resolvedMin, max: resolvedMax }
+    : { min: resolvedMax, max: resolvedMin };
+};
+
+const buildIntentContractDraft = (
+  contract?: IntentContract,
+  tempo?: TempoMeta,
+): IntentContractDraft => ({
+  enabled: Boolean(contract),
+  tempoBpm:
+    contract?.invariants?.tempoBpm != null
+      ? String(contract.invariants.tempoBpm)
+      : tempo?.bpm != null
+        ? String(tempo.bpm)
+        : "",
+  timeSig:
+    contract?.invariants?.timeSig ??
+    tempo?.timeSig ??
+    DEFAULT_INTENT_TIME_SIG,
+  key: contract?.invariants?.key ?? "",
+  grooveTemplateIds: formatCsvList(contract?.invariants?.grooveTemplateIds),
+  motifIds: formatCsvList(contract?.invariants?.motifIds),
+  stemLocks: formatCsvList(contract?.invariants?.stemLocks),
+  arrangementMoves: formatCsvList(contract?.ranges?.arrangementMoves),
+  ideologyRootId: contract?.meaning?.ideologyRootId ?? "",
+  allowedNodeIds: formatCsvList(contract?.meaning?.allowedNodeIds),
+  storeTimeSky: Boolean(contract?.provenancePolicy?.storeTimeSky),
+  storePulse: Boolean(contract?.provenancePolicy?.storePulse),
+  pulseSource: contract?.provenancePolicy?.pulseSource ?? "drand",
+  placePrecision: contract?.provenancePolicy?.placePrecision ?? "approximate",
+  notes: contract?.notes ?? "",
+  ranges: {
+    sampleInfluence: buildRangeDraft(contract?.ranges?.sampleInfluence),
+    styleInfluence: buildRangeDraft(contract?.ranges?.styleInfluence),
+    weirdness: buildRangeDraft(contract?.ranges?.weirdness),
+    reverbSend: buildRangeDraft(contract?.ranges?.reverbSend),
+    chorus: buildRangeDraft(contract?.ranges?.chorus),
+  },
+});
+
+const buildIntentContractFromDraft = (
+  draft: IntentContractDraft,
+  existing?: IntentContract,
+): IntentContract | null => {
+  if (!draft.enabled) return null;
+  const now = Date.now();
+  const invariants: NonNullable<IntentContract["invariants"]> = {};
+  const tempoBpm = parseOptionalNumber(draft.tempoBpm);
+  if (tempoBpm != null) invariants.tempoBpm = tempoBpm;
+  const timeSig = draft.timeSig.trim();
+  if (timeSig) invariants.timeSig = timeSig;
+  const key = draft.key.trim();
+  if (key) invariants.key = key;
+  const grooveTemplateIds = parseCsvList(draft.grooveTemplateIds);
+  if (grooveTemplateIds) invariants.grooveTemplateIds = grooveTemplateIds;
+  const motifIds = parseCsvList(draft.motifIds);
+  if (motifIds) invariants.motifIds = motifIds;
+  const stemLocks = parseCsvList(draft.stemLocks);
+  if (stemLocks) invariants.stemLocks = stemLocks;
+  const resolvedInvariants =
+    Object.keys(invariants).length > 0 ? invariants : undefined;
+
+  const ranges: NonNullable<IntentContract["ranges"]> = {};
+  for (const field of INTENT_RANGE_FIELDS) {
+    const rangeValue = parseRangeDraft(draft.ranges[field.key]);
+    if (rangeValue) {
+      ranges[field.key] = rangeValue;
+    }
+  }
+  const arrangementMoves = parseCsvList(draft.arrangementMoves);
+  if (arrangementMoves) ranges.arrangementMoves = arrangementMoves;
+  const resolvedRanges = Object.keys(ranges).length > 0 ? ranges : undefined;
+
+  const meaning: NonNullable<IntentContract["meaning"]> = {};
+  const ideologyRootId = draft.ideologyRootId.trim();
+  if (ideologyRootId) meaning.ideologyRootId = ideologyRootId;
+  const allowedNodeIds = parseCsvList(draft.allowedNodeIds);
+  if (allowedNodeIds) meaning.allowedNodeIds = allowedNodeIds;
+  const resolvedMeaning = Object.keys(meaning).length > 0 ? meaning : undefined;
+
+  const provenance: NonNullable<IntentContract["provenancePolicy"]> = {};
+  if (draft.storeTimeSky) provenance.storeTimeSky = true;
+  if (draft.storePulse) {
+    provenance.storePulse = true;
+    provenance.pulseSource = draft.pulseSource;
+  }
+  if (draft.placePrecision) {
+    provenance.placePrecision = draft.placePrecision;
+  }
+  const resolvedProvenance =
+    Object.keys(provenance).length > 0 ? provenance : undefined;
+
+  const notes = draft.notes.trim();
+
+  return {
+    version: 1,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    ...(resolvedInvariants ? { invariants: resolvedInvariants } : {}),
+    ...(resolvedRanges ? { ranges: resolvedRanges } : {}),
+    ...(resolvedMeaning ? { meaning: resolvedMeaning } : {}),
+    ...(resolvedProvenance ? { provenancePolicy: resolvedProvenance } : {}),
+    ...(notes ? { notes } : {}),
+  };
+};
+
+const MACROS_STORAGE_KEY = "noisegen:listenerMacros.v1";
+const MEANING_CACHE_PREFIX = "noisegen:meaning:v1";
+const FAIRNESS_BASELINE_IDS = [
+  "worldview-integrity",
+  "integrity-protocols",
+  "verification-checklist",
+  "right-speech-infrastructure",
+  "interbeing-systems",
+  "jurisdictional-floor",
+  "stewardship-ledger",
+];
+
+const hashString = (value: string): string => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `h${(hash >>> 0).toString(16)}`;
+};
+
+const hashSeed = (value: string): number => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const formatPulseSource = (source?: PulseSource): string => {
+  switch (source) {
+    case "drand":
+      return "drand beacon";
+    case "nist-beacon":
+      return "NIST beacon";
+    case "curby":
+      return "CURBy beacon";
+    case "local-sky-photons":
+      return "Local sky photons";
+    default:
+      return "Unspecified";
+  }
+};
+
+const resolveTimeSkyContext = (timeSky?: TimeSkyMeta) => {
+  const context = timeSky?.context;
+  return {
+    publishedAt: context?.publishedAt ?? timeSky?.publishedAt,
+    composedStart: context?.composedStart ?? timeSky?.composedStart,
+    composedEnd: context?.composedEnd ?? timeSky?.composedEnd,
+    timezone: context?.timezone,
+    place: context?.place ?? timeSky?.place,
+    placePrecision: context?.placePrecision ?? "approximate",
+    halobankSpanId: context?.halobankSpanId,
+    skySignature: context?.skySignature ?? timeSky?.skySignature,
+  };
+};
+
+const resolveTimeSkyPulse = (timeSky?: TimeSkyMeta) => {
+  const pulse = timeSky?.pulse;
+  const round = pulse?.round ?? timeSky?.pulseRound;
+  const pulseTime = pulse?.pulseTime;
+  const valueHash = pulse?.valueHash ?? timeSky?.pulseHash;
+  const source =
+    pulse?.source ??
+    (round != null || pulseTime != null || valueHash ? "drand" : undefined);
+  return {
+    source,
+    round,
+    pulseTime,
+    valueHash,
+    seedSalt: pulse?.seedSalt,
+  };
+};
+
+const buildPulseSeed = (options: {
+  originalId?: string;
+  timeSky?: TimeSkyMeta;
+}) => {
+  const originalId = options.originalId;
+  if (!originalId || !options.timeSky) {
+    return {};
+  }
+  const context = resolveTimeSkyContext(options.timeSky);
+  const pulse = resolveTimeSkyPulse(options.timeSky);
+  const pulseKey = pulse.round ?? pulse.pulseTime;
+  if (pulseKey == null || !pulse.valueHash) {
+    return {};
+  }
+  const placeSeed =
+    context.placePrecision === "hidden"
+      ? "hidden"
+      : (context.place ?? "").trim();
+  const publishedAt =
+    context.publishedAt != null ? String(context.publishedAt) : "";
+  const seedMaterial = `${originalId}|${publishedAt}|${placeSeed}|${pulseKey}|${pulse.valueHash}`;
+  const seedSalt = pulse.seedSalt ?? hashString(seedMaterial);
+  const seed = hashSeed(seedMaterial);
+  return { seed, seedSalt, seedMaterial };
 };
 
 const formatTime = (value: number): string => {
@@ -69,25 +383,27 @@ const formatTime = (value: number): string => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
-const formatDateValue = (value?: number): string | null => {
+const formatIsoDate = (value?: number): string | null => {
   if (!value || !Number.isFinite(value)) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return date.toISOString().slice(0, 10);
 };
 
-const formatDate = (value?: number): string =>
-  formatDateValue(value) ?? "Unknown";
+const formatYearMonth = (value?: number): string | null => {
+  if (!value || !Number.isFinite(value)) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getUTCFullYear();
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, "0");
+  return `${year}-${month}`;
+};
 
-const formatDateRange = (start?: number, end?: number): string | null => {
-  const startLabel = formatDateValue(start);
-  const endLabel = formatDateValue(end);
+const formatYearMonthRange = (start?: number, end?: number): string | null => {
+  const startLabel = formatYearMonth(start);
+  const endLabel = formatYearMonth(end);
   if (startLabel && endLabel) {
-    return startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`;
+    return startLabel === endLabel ? startLabel : `${startLabel} -> ${endLabel}`;
   }
   return startLabel ?? endLabel ?? null;
 };
@@ -98,6 +414,50 @@ const buildInitials = (title?: string, artist?: string): string => {
   const parts = base.split(/\s+/).filter(Boolean);
   const letters = parts.slice(0, 2).map((part) => part[0]?.toUpperCase());
   return letters.join("") || "NG";
+};
+
+const DEFAULT_LISTENER_MACROS: ListenerMacros = {
+  energy: 0.6,
+  space: 0.45,
+  texture: 0.5,
+  weirdness: 0.5,
+  drive: 0.3,
+  locks: {},
+};
+
+const normalizeMacroLocks = (
+  locks: ListenerMacroLocks | null | undefined,
+): ListenerMacroLocks => ({
+  groove: Boolean(locks?.groove),
+  harmony: Boolean(locks?.harmony),
+  drums: Boolean(locks?.drums),
+});
+
+const normalizeListenerMacros = (
+  value: Partial<ListenerMacros> | null | undefined,
+): ListenerMacros => ({
+  energy: clamp01(value?.energy ?? DEFAULT_LISTENER_MACROS.energy),
+  space: clamp01(value?.space ?? DEFAULT_LISTENER_MACROS.space),
+  texture: clamp01(value?.texture ?? DEFAULT_LISTENER_MACROS.texture),
+  weirdness:
+    value?.weirdness == null
+      ? DEFAULT_LISTENER_MACROS.weirdness
+      : clamp01(value.weirdness),
+  drive:
+    value?.drive == null ? DEFAULT_LISTENER_MACROS.drive : clamp01(value.drive),
+  locks: normalizeMacroLocks(value?.locks),
+});
+
+const readStoredMacros = (): ListenerMacros => {
+  if (typeof window === "undefined") return DEFAULT_LISTENER_MACROS;
+  try {
+    const raw = window.localStorage.getItem(MACROS_STORAGE_KEY);
+    if (!raw) return DEFAULT_LISTENER_MACROS;
+    const parsed = JSON.parse(raw) as Partial<ListenerMacros>;
+    return normalizeListenerMacros(parsed);
+  } catch {
+    return DEFAULT_LISTENER_MACROS;
+  }
 };
 
 const STOPWORDS = new Set([
@@ -171,6 +531,76 @@ const tokenize = (value: string): string[] =>
     .split(/[^a-z0-9]+/)
     .map((token) => normalizeToken(token.trim()))
     .filter((token) => token.length >= 3 && !STOPWORDS.has(token));
+
+const buildMacroRenderPlan = (
+  macros: ListenerMacros,
+  bars: number,
+): RenderPlan => {
+  const energy = clamp01(macros.energy);
+  const space = clamp01(macros.space);
+  const texture = clamp01(macros.texture);
+  const weirdness = clamp01(macros.weirdness ?? macros.texture);
+  const drive = clamp01(macros.drive ?? 0.3);
+  const midpoint = Math.max(2, Math.round(bars * 0.5));
+
+  const eqPeaks = [
+    { freq: 110, q: 0.9, gainDb: Number((-5 + drive * 3).toFixed(2)) },
+    { freq: 820, q: 1.1, gainDb: Number((-2 + texture * 4).toFixed(2)) },
+    { freq: 5200, q: 0.8, gainDb: Number((-1 + texture * 6).toFixed(2)) },
+  ];
+
+  return {
+    global: {
+      energyCurve: [
+        { bar: 1, energy: clamp01(0.2 + energy * 0.7) },
+        { bar: midpoint, energy: clamp01(0.25 + energy * 0.65) },
+        { bar: bars, energy: clamp01(0.2 + energy * 0.7) },
+      ],
+      locks: normalizeMacroLocks(macros.locks),
+    },
+    windows: [
+      {
+        startBar: 1,
+        bars,
+        texture: {
+          sampleInfluence: clamp01(0.3 + texture * 0.6),
+          styleInfluence: clamp01(0.25 + energy * 0.5 + drive * 0.1),
+          weirdness: clamp01(0.1 + weirdness * 0.6 + space * 0.2),
+          eqPeaks,
+          fx: {
+            reverbSend: clamp01(0.2 + space * 0.6),
+            comp: clamp01(0.25 + drive * 0.5),
+            sat: clamp01(0.15 + drive * 0.6),
+            chorus: clamp01(0.05 + texture * 0.5),
+          },
+        },
+      },
+    ],
+  };
+};
+
+const buildMacroCoverRequest = (params: {
+  originalId: string;
+  macros: ListenerMacros;
+  bars: number;
+  tempo?: OriginalDetails["tempo"];
+}): CoverJobRequest => {
+  const renderPlan = buildMacroRenderPlan(params.macros, params.bars);
+  const texture = renderPlan.windows[0]?.texture;
+  const coverRequest: CoverJobRequest = {
+    originalId: params.originalId,
+    barWindows: [{ startBar: 1, endBar: 1 + params.bars }],
+    linkHelix: false,
+    sampleInfluence: texture?.sampleInfluence,
+    styleInfluence: texture?.styleInfluence,
+    weirdness: texture?.weirdness,
+    renderPlan,
+  };
+  if (params.tempo) {
+    coverRequest.tempo = params.tempo;
+  }
+  return coverRequest;
+};
 
 const buildNodeTokens = (node: {
   title: string;
@@ -326,26 +756,41 @@ const pickStemGroupSource = (
   return filtered[0] ?? null;
 };
 
+const buildOriginalAssetCandidates = (
+  originalId: string,
+  kind: "instrumental" | "vocal",
+) => {
+  const slug = encodeURIComponent(originalId);
+  return [
+    `/api/noise-gens/originals/${slug}/${kind}`,
+    `/originals/${slug}/${kind}`,
+    `/audio/originals/${slug}/${kind}`,
+  ];
+};
+
 const checkOriginalAsset = async (
   originalId: string,
   kind: "instrumental" | "vocal",
   label: string,
 ): Promise<PlayerSource | null> => {
-  const url = `/originals/${encodeURIComponent(originalId)}/${kind}`;
-  try {
-    const res = await fetch(url, { method: "HEAD" });
-    if (!res.ok) return null;
-    const lengthHeader = res.headers.get("content-length");
-    const lengthValue = lengthHeader ? Number(lengthHeader) : Number.NaN;
-    return {
-      id: kind,
-      url,
-      label,
-      bytes: Number.isFinite(lengthValue) ? lengthValue : undefined,
-    };
-  } catch {
-    return null;
+  const candidates = buildOriginalAssetCandidates(originalId, kind);
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { method: "HEAD" });
+      if (!res.ok) continue;
+      const lengthHeader = res.headers.get("content-length");
+      const lengthValue = lengthHeader ? Number(lengthHeader) : Number.NaN;
+      return {
+        id: kind,
+        url,
+        label,
+        bytes: Number.isFinite(lengthValue) ? lengthValue : undefined,
+      };
+    } catch {
+      // try next candidate
+    }
   }
+  return null;
 };
 
 type OriginalsPlayerProps = {
@@ -353,8 +798,15 @@ type OriginalsPlayerProps = {
   playlist?: Original[];
   onSelectOriginal?: (original: Original) => void;
   moodPresets?: MoodPreset[];
-  onVary?: (preset?: MoodPreset) => void;
+  onVary?: (preset?: MoodPreset, macros?: ListenerMacros, seed?: number) => void;
   isVarying?: boolean;
+  varyStatus?: {
+    status: JobStatus;
+    previewUrl?: string | null;
+    detail?: string | null;
+  } | null;
+  canEditLyrics?: boolean;
+  canEditContract?: boolean;
   autoPlayToken?: number;
 };
 
@@ -365,9 +817,32 @@ export function OriginalsPlayer({
   moodPresets = [],
   onVary,
   isVarying = false,
+  varyStatus = null,
+  canEditLyrics = false,
+  canEditContract = false,
   autoPlayToken,
 }: OriginalsPlayerProps) {
   const { data: ideologyDoc } = useIdeology();
+  const { toast } = useToast();
+  const { isMobile } = useIsMobileViewport();
+  const [listenerMacros, setListenerMacros] = useState<ListenerMacros>(() =>
+    readStoredMacros(),
+  );
+  const listenerUndoRef = useRef<ListenerMacros | null>(null);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [recipeOpen, setRecipeOpen] = useState(false);
+  const [recipeName, setRecipeName] = useState("");
+  const [recipeNotes, setRecipeNotes] = useState("");
+  const [recipeSaving, setRecipeSaving] = useState(false);
+  const [lyricsEditorOpen, setLyricsEditorOpen] = useState(false);
+  const [lyricsDraft, setLyricsDraft] = useState("");
+  const [lyricsSaving, setLyricsSaving] = useState(false);
+  const [intentEditorOpen, setIntentEditorOpen] = useState(false);
+  const [intentDraft, setIntentDraft] = useState<IntentContractDraft>(() =>
+    buildIntentContractDraft(),
+  );
+  const [intentSaving, setIntentSaving] = useState(false);
+  const meaningCacheRef = useRef<Map<string, MeaningCard[]>>(new Map());
   const [sources, setSources] = useState<PlayerSource[]>([]);
   const [sourceMode, setSourceMode] = useState<SourceMode>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -377,7 +852,6 @@ export function OriginalsPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(0.9);
   const [lyricsOpen, setLyricsOpen] = useState(false);
-  const [contextOpen, setContextOpen] = useState(false);
   const [details, setDetails] = useState<OriginalDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
@@ -536,6 +1010,18 @@ export function OriginalsPlayer({
       stopPlayback();
     };
   }, [original?.id, stopPlayback]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        MACROS_STORAGE_KEY,
+        JSON.stringify(listenerMacros),
+      );
+    } catch {
+      // best-effort persistence only
+    }
+  }, [listenerMacros]);
 
   useEffect(
     () => () => {
@@ -1313,6 +1799,44 @@ export function OriginalsPlayer({
     }
   }, []);
 
+  const handleListenerMacroChange = useCallback(
+    (key: keyof ListenerMacros, value: number) => {
+      setListenerMacros((prev) => {
+        listenerUndoRef.current = prev;
+        return { ...prev, [key]: clamp01(value) };
+      });
+    },
+    [],
+  );
+
+  const handleListenerLockChange = useCallback(
+    (key: keyof ListenerMacroLocks, value: boolean) => {
+      setListenerMacros((prev) => {
+        listenerUndoRef.current = prev;
+        return {
+          ...prev,
+          locks: {
+            ...prev.locks,
+            [key]: value,
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const handleMacroUndo = useCallback(() => {
+    const snapshot = listenerUndoRef.current;
+    if (!snapshot) return;
+    setListenerMacros(snapshot);
+    listenerUndoRef.current = null;
+  }, []);
+
+  const handleMacroReset = useCallback(() => {
+    setListenerMacros(DEFAULT_LISTENER_MACROS);
+    listenerUndoRef.current = null;
+  }, []);
+
   const sourceLabel = useMemo(() => {
     if (sourceMode === "playback") return sources[0]?.label ?? "Song";
     if (sourceMode === "fallback") return sources[0]?.label ?? "Song";
@@ -1327,9 +1851,35 @@ export function OriginalsPlayer({
         : [],
     [lyricText],
   );
+  const lyricsHash = useMemo(
+    () => (lyricText ? hashString(lyricText) : null),
+    [lyricText],
+  );
 
   const meaningCards = useMemo<MeaningCard[]>(() => {
     if (!ideologyDoc || lyricLines.length === 0) return [];
+    const cacheKey = lyricsHash
+      ? `${MEANING_CACHE_PREFIX}:${ideologyDoc.version}:${lyricsHash}`
+      : null;
+    if (cacheKey) {
+      const cached = meaningCacheRef.current.get(cacheKey);
+      if (cached) return cached;
+      if (typeof window !== "undefined") {
+        try {
+          const raw = window.localStorage.getItem(cacheKey);
+          if (raw) {
+            const parsed = JSON.parse(raw) as MeaningCard[];
+            if (Array.isArray(parsed)) {
+              meaningCacheRef.current.set(cacheKey, parsed);
+              return parsed;
+            }
+          }
+        } catch {
+          // ignore cache read failures
+        }
+      }
+    }
+
     const nodeById = new Map(ideologyDoc.nodes.map((node) => [node.id, node]));
     const parentById = new Map<string, string>();
     ideologyDoc.nodes.forEach((node) => {
@@ -1337,11 +1887,25 @@ export function OriginalsPlayer({
         if (!parentById.has(childId)) parentById.set(childId, node.id);
       });
     });
-    const tokenCache = new Map<string, Set<string>>();
-    const cards: MeaningCard[] = [];
-    const usedNodes = new Set<string>();
-    const segments: { text: string }[] = [];
 
+    const rootId = nodeById.has(ideologyDoc.rootId)
+      ? ideologyDoc.rootId
+      : "mission-ethos";
+    const descendants = new Set<string>();
+    const queue = [rootId];
+    while (queue.length) {
+      const current = queue.shift();
+      if (!current || descendants.has(current)) continue;
+      descendants.add(current);
+      const node = nodeById.get(current);
+      node?.children?.forEach((childId) => queue.push(childId));
+    }
+
+    const reasonPath = FAIRNESS_BASELINE_IDS.map(
+      (id) => nodeById.get(id)?.title ?? id,
+    ).join(" -> ");
+
+    const tokenCache = new Map<string, Set<string>>();
     const getTokens = (nodeId: string) => {
       const cached = tokenCache.get(nodeId);
       if (cached) return cached;
@@ -1368,40 +1932,63 @@ export function OriginalsPlayer({
         titles.unshift(node.title);
         current = parentById.get(current);
       }
-      return titles.join(" → ");
+      return titles.join(" -> ");
     };
 
+    const resolveBranchId = (nodeId: string): string | null => {
+      let current = nodeId;
+      let parent = parentById.get(current);
+      while (parent && parent !== rootId) {
+        current = parent;
+        parent = parentById.get(current);
+      }
+      return parent === rootId ? current : null;
+    };
+
+    const isInBranch = (nodeId: string, branchId: string) => {
+      let current: string | undefined = nodeId;
+      for (let i = 0; i < 8 && current; i += 1) {
+        if (current === branchId) return true;
+        current = parentById.get(current);
+      }
+      return false;
+    };
+
+    const segments: Array<{ text: string; lineIndices: number[] }> = [];
     for (let i = 0; i < lyricLines.length; i += 1) {
       const line = lyricLines[i]?.trim();
       if (!line) continue;
       const next = lyricLines[i + 1]?.trim();
       if (next) {
-        segments.push({ text: `${line} / ${next}` });
+        segments.push({
+          text: `${line} / ${next}`,
+          lineIndices: [i, i + 1],
+        });
         i += 1;
       } else {
-        segments.push({ text: line });
+        segments.push({ text: line, lineIndices: [i] });
       }
     }
 
-    const maxCards = 6;
-    const maxPerSegment = 2;
-    const minScore = 2;
+    const nodeScores = new Map<
+      string,
+      {
+        score: number;
+        bestScore: number;
+        matches: string[];
+        phraseHits: number;
+        segment: { text: string; lineIndices: number[] };
+      }
+    >();
 
+    const minScore = 1.8;
     for (const segment of segments) {
-      if (cards.length >= maxCards) break;
       const lineTokens = new Set(tokenize(segment.text));
       if (lineTokens.size === 0) continue;
       const lineText = segment.text.toLowerCase();
-      const scored: Array<{
-        nodeId: string;
-        score: number;
-        matches: string[];
-        phraseHits: number;
-      }> = [];
-
       for (const node of ideologyDoc.nodes) {
-        if (node.id === ideologyDoc.rootId) continue;
-        if (usedNodes.has(node.id)) continue;
+        if (node.id === rootId) continue;
+        if (!descendants.has(node.id)) continue;
         const tokens = getTokens(node.id);
         if (tokens.size === 0) continue;
         const matches: string[] = [];
@@ -1412,42 +1999,104 @@ export function OriginalsPlayer({
         const phraseHits = hint
           ? hint.phrases.filter((phrase) => lineText.includes(phrase)).length
           : 0;
-        const score = matches.length + phraseHits * 3;
+        const overlapRatio = matches.length / Math.max(1, lineTokens.size);
+        const score = matches.length + phraseHits * 3 + overlapRatio * 2;
         if (score < minScore) continue;
-        scored.push({ nodeId: node.id, score, matches, phraseHits });
-      }
-
-      scored.sort((a, b) => b.score - a.score);
-      for (const entry of scored.slice(0, maxPerSegment)) {
-        if (cards.length >= maxCards) break;
-        if (usedNodes.has(entry.nodeId)) continue;
-        const node = nodeById.get(entry.nodeId);
-        if (!node) continue;
-        const hint = IDEOLOGY_HINTS[entry.nodeId];
-        const focusLabel = hint?.focus ? ` (${hint.focus})` : "";
-        const confidence =
-          entry.score >= 5 ? "High" : entry.score >= 3 ? "Medium" : "Low";
-        const matchLabel = entry.matches.slice(0, 2).join(", ");
-        const parallel =
-          hint?.focus
-            ? `This line aligns with ${node.title}${focusLabel}.`
-            : matchLabel
-              ? `This line aligns with ${node.title} through ${matchLabel}.`
-              : `This line aligns with ${node.title}.`;
-        usedNodes.add(entry.nodeId);
-        cards.push({
-          nodeId: entry.nodeId,
-          nodeTitle: node.title,
-          nodePath: buildPath(entry.nodeId),
-          confidence,
-          lyricQuote: segment.text,
-          parallel,
-        });
+        const existing = nodeScores.get(node.id);
+        if (!existing) {
+          nodeScores.set(node.id, {
+            score,
+            bestScore: score,
+            matches,
+            phraseHits,
+            segment,
+          });
+        } else {
+          existing.score += score;
+          if (score > existing.bestScore) {
+            existing.bestScore = score;
+            existing.matches = matches;
+            existing.phraseHits = phraseHits;
+            existing.segment = segment;
+          }
+        }
       }
     }
 
-    return cards;
-  }, [ideologyDoc, lyricLines]);
+    const branchScores = new Map<string, number>();
+    nodeScores.forEach((entry, nodeId) => {
+      const branchId = resolveBranchId(nodeId);
+      if (!branchId) return;
+      branchScores.set(branchId, (branchScores.get(branchId) ?? 0) + entry.score);
+    });
+
+    let selectedBranch: string | null = null;
+    branchScores.forEach((score, branchId) => {
+      if (!selectedBranch) {
+        selectedBranch = branchId;
+        return;
+      }
+      if (score > (branchScores.get(selectedBranch) ?? 0)) {
+        selectedBranch = branchId;
+      }
+    });
+
+    const scoredNodes = Array.from(nodeScores.entries())
+      .map(([nodeId, entry]) => ({ nodeId, ...entry }))
+      .filter((entry) =>
+        selectedBranch ? isInBranch(entry.nodeId, selectedBranch) : true,
+      )
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+
+    const cards = scoredNodes.map((entry) => {
+      const node = nodeById.get(entry.nodeId);
+      if (!node) return null;
+      const confidence =
+        entry.score >= 6 ? "High" : entry.score >= 3.2 ? "Medium" : "Low";
+      const matchLabel = entry.matches.slice(0, 3).join(", ");
+      const focus = IDEOLOGY_HINTS[entry.nodeId]?.focus;
+      const parallel = matchLabel
+        ? `This line echoes ${node.title} through ${matchLabel}.`
+        : focus
+          ? `This line echoes ${node.title} (${focus}).`
+          : `This line echoes ${node.title}.`;
+      const evidence = matchLabel
+        ? `Evidence: ${matchLabel}.`
+        : "Evidence: thematic overlap within the branch.";
+      return {
+        nodeId: entry.nodeId,
+        nodeTitle: node.title,
+        nodePath: buildPath(entry.nodeId),
+        confidence,
+        lyricQuote: entry.segment.text,
+        parallel,
+        why: evidence,
+        reasonPath,
+        lineIndices: entry.segment.lineIndices,
+      };
+    });
+
+    const resolved = cards.filter(Boolean) as MeaningCard[];
+    if (cacheKey) {
+      meaningCacheRef.current.set(cacheKey, resolved);
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(cacheKey, JSON.stringify(resolved));
+        } catch {
+          // ignore cache write failures
+        }
+      }
+    }
+    return resolved;
+  }, [ideologyDoc, lyricLines, lyricsHash]);
+
+  const currentLyricIndex = useMemo(() => {
+    if (!duration || lyricLines.length === 0) return -1;
+    const progress = clamp01(currentTime / duration);
+    const index = Math.floor(progress * lyricLines.length);
+    return Math.min(lyricLines.length - 1, Math.max(0, index));
+  }, [currentTime, duration, lyricLines.length]);
 
   const currentIndex = useMemo(
     () => playlist.findIndex((entry) => entry.id === original?.id),
@@ -1459,6 +2108,13 @@ export function OriginalsPlayer({
     typeof onSelectOriginal === "function" &&
     currentIndex >= 0 &&
     currentIndex < playlist.length - 1;
+  const timeSky = details?.timeSky;
+  const pulseSeedData = useMemo(
+    () => buildPulseSeed({ originalId: original?.id, timeSky }),
+    [original?.id, timeSky],
+  );
+  const pulseSeed = pulseSeedData.seed;
+  const pulseSeedSalt = pulseSeedData.seedSalt;
 
   const handlePrev = useCallback(() => {
     if (!canSelectPrev || !onSelectOriginal) return;
@@ -1473,13 +2129,201 @@ export function OriginalsPlayer({
   const handleVary = useCallback(
     (preset?: MoodPreset) => {
       if (!onVary || isVarying) return;
-      onVary(preset);
+      onVary(preset, listenerMacros, pulseSeed);
     },
-    [isVarying, onVary],
+    [isVarying, listenerMacros, onVary, pulseSeed],
+  );
+
+  const handleOpenLyricsEditor = useCallback(() => {
+    setLyricsDraft(details?.lyrics ?? "");
+    setLyricsEditorOpen(true);
+  }, [details?.lyrics]);
+
+  const handleOpenIntentEditor = useCallback(() => {
+    const tempo = details?.tempo ?? original?.tempo;
+    setIntentDraft(buildIntentContractDraft(details?.intentContract, tempo));
+    setIntentEditorOpen(true);
+  }, [details?.intentContract, details?.tempo, original?.tempo]);
+
+  const handleIntentRangeChange = useCallback(
+    (key: IntentRangeKey, field: "min" | "max", value: string) => {
+      setIntentDraft((prev) => ({
+        ...prev,
+        ranges: {
+          ...prev.ranges,
+          [key]: { ...prev.ranges[key], [field]: value },
+        },
+      }));
+    },
+    [],
+  );
+
+  const handleSaveLyrics = useCallback(async () => {
+    if (!original) return;
+    const nextLyrics = lyricsDraft.trim();
+    setLyricsSaving(true);
+    try {
+      const payload = await updateOriginalLyrics(original.id, nextLyrics);
+      const nextDetails: OriginalDetails = {
+        ...(details ?? original),
+        lyrics: payload.lyrics || undefined,
+        timeSky: details?.timeSky,
+        playback: details?.playback,
+        processing: details?.processing,
+        intentSnapshot: details?.intentSnapshot,
+        intentContract: details?.intentContract,
+      };
+      setDetails(nextDetails);
+      detailsCacheRef.current.set(original.id, nextDetails);
+      setLyricsEditorOpen(false);
+      toast({
+        title: nextLyrics ? "Lyrics saved" : "Lyrics cleared",
+        description: nextLyrics
+          ? "Lyrics are now attached to this original."
+          : "Lyrics were removed from this original.",
+      });
+    } catch (error) {
+      toast({
+        title: "Lyrics update failed",
+        description:
+          error instanceof Error ? error.message : "Unable to save lyrics.",
+        variant: "destructive",
+      });
+    } finally {
+      setLyricsSaving(false);
+    }
+  }, [details, lyricsDraft, original, toast]);
+
+  const handleSaveIntentContract = useCallback(async () => {
+    if (!original) return;
+    setIntentSaving(true);
+    try {
+      const contractPayload = buildIntentContractFromDraft(
+        intentDraft,
+        details?.intentContract,
+      );
+      const response = await updateOriginalIntentContract(
+        original.id,
+        contractPayload,
+      );
+      const nextDetails: OriginalDetails = {
+        ...(details ?? original),
+        lyrics: details?.lyrics,
+        timeSky: details?.timeSky,
+        playback: details?.playback,
+        processing: details?.processing,
+        intentSnapshot: details?.intentSnapshot,
+        intentContract: response.intentContract ?? undefined,
+      };
+      setDetails(nextDetails);
+      detailsCacheRef.current.set(original.id, nextDetails);
+      setIntentEditorOpen(false);
+      toast({
+        title: response.intentContract ? "Intent contract saved" : "Contract cleared",
+        description: response.intentContract
+          ? "This original now has a creator intent contract."
+          : "Intent contract removed from this original.",
+      });
+    } catch (error) {
+      toast({
+        title: "Intent contract update failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Unable to save the intent contract.",
+        variant: "destructive",
+      });
+    } finally {
+      setIntentSaving(false);
+    }
+  }, [details, intentDraft, original, toast]);
+
+  const handleSaveRecipe = useCallback(async () => {
+    const name = recipeName.trim();
+    if (!name) {
+      toast({
+        title: "Name the recipe",
+        description: "Add a name before saving this recipe.",
+      });
+      return;
+    }
+    if (!original) {
+      toast({
+        title: "Pick a track first",
+        description: "Select a track before saving a recipe.",
+      });
+      return;
+    }
+    const bars = Math.max(
+      4,
+      details?.tempo?.barsInLoop ?? original.tempo?.barsInLoop ?? 8,
+    );
+    const coverRequest = buildMacroCoverRequest({
+      originalId: original.id,
+      macros: listenerMacros,
+      bars,
+      tempo: details?.tempo ?? original.tempo,
+    });
+    setRecipeSaving(true);
+    try {
+      await saveRecipe({
+        name,
+        coverRequest,
+        notes: recipeNotes.trim() || undefined,
+      });
+      setRecipeName("");
+      setRecipeNotes("");
+      setRecipeOpen(false);
+      toast({
+        title: "Recipe saved",
+        description: `Saved ${name} for ${original.title}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Recipe save failed",
+        description:
+          error instanceof Error ? error.message : "Unable to save recipe.",
+        variant: "destructive",
+      });
+    } finally {
+      setRecipeSaving(false);
+    }
+  }, [details?.tempo, listenerMacros, original, recipeName, recipeNotes, toast]);
+
+  const handleCopyText = useCallback(
+    async (value: string, label: string) => {
+      if (!value) return;
+      if (typeof navigator === "undefined" || !navigator.clipboard) {
+        toast({
+          title: `${label} unavailable`,
+          description: "Clipboard access is not available here.",
+        });
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(value);
+        toast({
+          title: `${label} copied`,
+          description: value,
+        });
+      } catch (error) {
+        toast({
+          title: `${label} copy failed`,
+          description:
+            error instanceof Error ? error.message : "Unable to copy.",
+          variant: "destructive",
+        });
+      }
+    },
+    [toast],
   );
 
   const previewMoods = moodPresets.slice(0, 5);
   const showVaryControls = Boolean(onVary) && previewMoods.length > 0;
+  const macroLocks = listenerMacros.locks ?? {};
+  const hasMacroUndo = Boolean(listenerUndoRef.current);
+  const showLyricsPanel = lyricsOpen && !isMobile;
+  const showLyricsDrawer = lyricsOpen && isMobile;
   const initials = buildInitials(original?.title, original?.artist);
   const stemCount = details?.stemCount ?? original?.stemCount ?? 0;
   const canRemix = stemCount > 0;
@@ -1493,16 +2337,464 @@ export function OriginalsPlayer({
       : remixReady
         ? "Remix ready"
         : "Remix";
-  const timeSky = details?.timeSky;
-  const publishedLabel = formatDate(
-    timeSky?.publishedAt ?? details?.uploadedAt ?? original?.uploadedAt,
+  const intentContract = details?.intentContract;
+  const intentSummary = useMemo(() => {
+    if (!intentContract) return null;
+    const sections: Array<{ title: string; rows: Array<{ label: string; value: string }> }> = [];
+    const invariants: Array<{ label: string; value: string }> = [];
+    if (intentContract.invariants?.tempoBpm != null) {
+      invariants.push({
+        label: "Tempo",
+        value: `${intentContract.invariants.tempoBpm} BPM`,
+      });
+    }
+    if (intentContract.invariants?.timeSig) {
+      invariants.push({
+        label: "Time signature",
+        value: intentContract.invariants.timeSig,
+      });
+    }
+    if (intentContract.invariants?.key) {
+      invariants.push({ label: "Key", value: intentContract.invariants.key });
+    }
+    if (intentContract.invariants?.grooveTemplateIds?.length) {
+      invariants.push({
+        label: "Groove IDs",
+        value: intentContract.invariants.grooveTemplateIds.join(", "),
+      });
+    }
+    if (intentContract.invariants?.motifIds?.length) {
+      invariants.push({
+        label: "Motif IDs",
+        value: intentContract.invariants.motifIds.join(", "),
+      });
+    }
+    if (intentContract.invariants?.stemLocks?.length) {
+      invariants.push({
+        label: "Stem locks",
+        value: intentContract.invariants.stemLocks.join(", "),
+      });
+    }
+    if (invariants.length) {
+      sections.push({ title: "Invariants", rows: invariants });
+    }
+
+    const ranges: Array<{ label: string; value: string }> = [];
+    for (const field of INTENT_RANGE_FIELDS) {
+      const rangeValue = intentContract.ranges?.[field.key];
+      if (rangeValue) {
+        ranges.push({
+          label: field.label,
+          value: `${Math.round(rangeValue.min * 100)}-${Math.round(
+            rangeValue.max * 100,
+          )}%`,
+        });
+      }
+    }
+    if (intentContract.ranges?.arrangementMoves?.length) {
+      ranges.push({
+        label: "Moves",
+        value: intentContract.ranges.arrangementMoves.join(", "),
+      });
+    }
+    if (ranges.length) {
+      sections.push({ title: "Ranges", rows: ranges });
+    }
+
+    const meaning: Array<{ label: string; value: string }> = [];
+    if (intentContract.meaning?.ideologyRootId) {
+      meaning.push({
+        label: "Ideology root",
+        value: intentContract.meaning.ideologyRootId,
+      });
+    }
+    if (intentContract.meaning?.allowedNodeIds?.length) {
+      meaning.push({
+        label: "Allowed nodes",
+        value: intentContract.meaning.allowedNodeIds.join(", "),
+      });
+    }
+    if (meaning.length) {
+      sections.push({ title: "Meaning", rows: meaning });
+    }
+
+    const provenance: Array<{ label: string; value: string }> = [];
+    if (intentContract.provenancePolicy?.storeTimeSky != null) {
+      provenance.push({
+        label: "Store Time & Sky",
+        value: intentContract.provenancePolicy.storeTimeSky ? "Yes" : "No",
+      });
+    }
+    if (intentContract.provenancePolicy?.storePulse != null) {
+      provenance.push({
+        label: "Store pulse",
+        value: intentContract.provenancePolicy.storePulse ? "Yes" : "No",
+      });
+    }
+    if (intentContract.provenancePolicy?.pulseSource) {
+      provenance.push({
+        label: "Pulse source",
+        value: formatPulseSource(intentContract.provenancePolicy.pulseSource),
+      });
+    }
+    if (intentContract.provenancePolicy?.placePrecision) {
+      provenance.push({
+        label: "Place precision",
+        value: intentContract.provenancePolicy.placePrecision,
+      });
+    }
+    if (provenance.length) {
+      sections.push({ title: "Provenance", rows: provenance });
+    }
+
+    return {
+      sections,
+      notes: intentContract.notes?.trim() || "",
+    };
+  }, [intentContract]);
+  const context = resolveTimeSkyContext(timeSky);
+  const pulse = resolveTimeSkyPulse(timeSky);
+  const placeValue = context.place?.trim();
+  const placePrecision = context.placePrecision ?? "approximate";
+  const placeLabel =
+    placePrecision === "hidden"
+      ? "Hidden"
+      : placeValue
+        ? placePrecision === "approximate"
+          ? `${placeValue} (approx)`
+          : placeValue
+        : "Not provided";
+  const publishedLabel =
+    formatIsoDate(
+      context.publishedAt ?? details?.uploadedAt ?? original?.uploadedAt,
+    ) ?? "Unknown";
+  const madeLabel = formatYearMonthRange(
+    context.composedStart,
+    context.composedEnd,
   );
-  const madeLabel = formatDateRange(
-    timeSky?.composedStart,
-    timeSky?.composedEnd,
+  const skyLabel = context.skySignature?.trim() || "Unavailable";
+  const pulseRound = pulse.round;
+  const pulseHashLabel = pulse.valueHash ? String(pulse.valueHash) : "";
+  const pulseTimeLabel = pulse.pulseTime
+    ? formatIsoDate(pulse.pulseTime) ?? String(pulse.pulseTime)
+    : null;
+  const pulseLabel =
+    pulseRound != null
+      ? `Round ${pulseRound}`
+      : pulseTimeLabel
+        ? `Time ${pulseTimeLabel}`
+        : "Not seeded";
+  const pulseDisplay = pulseHashLabel
+    ? `${pulseLabel} (${pulseHashLabel.slice(0, 10)}...)`
+    : pulseLabel;
+  const pulseSourceLabel = formatPulseSource(pulse.source);
+  const macroControls = (
+    <div className="space-y-4">
+      {[
+        { key: "energy", label: "Energy", value: listenerMacros.energy },
+        { key: "space", label: "Space", value: listenerMacros.space },
+        { key: "texture", label: "Texture", value: listenerMacros.texture },
+        { key: "weirdness", label: "Weirdness", value: listenerMacros.weirdness ?? 0 },
+        { key: "drive", label: "Drive", value: listenerMacros.drive ?? 0 },
+      ].map((macro) => (
+        <div key={macro.key}>
+          <div className="flex items-center justify-between text-xs text-slate-300">
+            <span>{macro.label}</span>
+            <span>{Math.round(macro.value * 100)}%</span>
+          </div>
+          <Slider
+            value={[macro.value]}
+            min={0}
+            max={1}
+            step={0.01}
+            onValueChange={(value) =>
+              handleListenerMacroChange(
+                macro.key as keyof ListenerMacros,
+                value[0] ?? 0,
+              )
+            }
+            className="mt-2"
+          />
+        </div>
+      ))}
+      <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-200">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+          Locks
+        </div>
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <span>Groove</span>
+            <Switch
+              checked={Boolean(macroLocks.groove)}
+              onCheckedChange={(value) =>
+                handleListenerLockChange("groove", value)
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Harmony</span>
+            <Switch
+              checked={Boolean(macroLocks.harmony)}
+              onCheckedChange={(value) =>
+                handleListenerLockChange("harmony", value)
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Drums</span>
+            <Switch
+              checked={Boolean(macroLocks.drums)}
+              onCheckedChange={(value) =>
+                handleListenerLockChange("drums", value)
+              }
+            />
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-400">
+          Locks keep core motifs anchored while you vary the surface.
+        </p>
+      </div>
+    </div>
   );
-  const placeLabel = timeSky?.place?.trim() || "Not provided";
-  const skyLabel = timeSky?.skySignature?.trim() || "Unavailable";
+  const timeSkyPopover = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="ghost" className="gap-2 text-xs">
+          <Info className="h-4 w-4" />
+          Time & Sky
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 border border-white/10 bg-slate-950 text-slate-100">
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400">Published</span>
+            <span>{publishedLabel}</span>
+          </div>
+          {madeLabel ? (
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Made</span>
+              <span>{madeLabel}</span>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400">Place</span>
+            <span>{placeLabel}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-400">Sky signature</span>
+            <div className="flex items-center gap-2">
+              <span className="max-w-[140px] truncate">{skyLabel}</span>
+              {skyLabel !== "Unavailable" ? (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() => handleCopyText(skyLabel, "Sky signature")}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400">Pulse source</span>
+            <span>{pulseSourceLabel}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-400">Variation pulse</span>
+            <div className="flex items-center gap-2">
+              <span className="max-w-[140px] truncate">{pulseDisplay}</span>
+              {pulseHashLabel ? (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() =>
+                    handleCopyText(pulseHashLabel, "Variation pulse")
+                  }
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          {pulseSeedSalt ? (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400">Seed salt</span>
+              <div className="flex items-center gap-2">
+                <span className="max-w-[140px] truncate">
+                  {pulseSeedSalt.slice(0, 10)}...
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() => handleCopyText(pulseSeedSalt, "Seed salt")}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          <Button asChild variant="outline" size="sm" className="mt-2 w-full text-xs">
+            <a href="/halobank" target="_blank" rel="noreferrer">
+              Explore timeline
+            </a>
+          </Button>
+          <p className="text-[11px] text-slate-500">
+            Provenance note: pulse data is a public salt for replay, not a security key.
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+  const intentContractPopover = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="ghost" className="gap-2 text-xs">
+          <SlidersHorizontal className="h-4 w-4" />
+          Intent Contract
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 border border-white/10 bg-slate-950 text-slate-100">
+        {intentSummary ? (
+          <div className="space-y-3 text-xs">
+            {intentSummary.sections.length ? (
+              intentSummary.sections.map((section) => (
+                <div key={section.title} className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    {section.title}
+                  </div>
+                  {section.rows.map((row) => (
+                    <div
+                      key={`${section.title}-${row.label}`}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-slate-400">{row.label}</span>
+                      <span className="max-w-[160px] truncate">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              ))
+            ) : (
+              <p className="text-slate-400">No explicit constraints recorded.</p>
+            )}
+            {intentSummary.notes ? (
+              <div className="rounded-md border border-white/10 bg-white/5 p-2 text-[11px] text-slate-300">
+                {intentSummary.notes}
+              </div>
+            ) : null}
+            {canEditContract ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-xs"
+                onClick={handleOpenIntentEditor}
+              >
+                {intentContract ? "Edit contract" : "Add contract"}
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="space-y-2 text-xs text-slate-400">
+            <p>No intent contract recorded.</p>
+            {canEditContract ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-xs"
+                onClick={handleOpenIntentEditor}
+              >
+                Add contract
+              </Button>
+            ) : null}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+  const lyricsBody = (
+    <>
+      {detailsLoading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading lyrics
+        </div>
+      ) : detailsError ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          {detailsError}
+        </div>
+      ) : lyricLines.length ? (
+        <div className="mt-3 space-y-2 text-sm leading-relaxed">
+          {lyricLines.map((line, index) => {
+            const isActive = index === currentLyricIndex;
+            return (
+              <p
+                key={`${index}-${line}`}
+                className={cn(
+                  "transition-colors",
+                  !line && "h-3",
+                  isActive && "text-sky-100",
+                )}
+              >
+                {line || "\u00A0"}
+              </p>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-muted-foreground">
+          Lyrics not available for this song.
+        </div>
+      )}
+    </>
+  );
+  const meaningBody = (
+    <div className="space-y-4">
+      {meaningCards.length ? (
+        <div className="space-y-3">
+          {meaningCards.map((card) => {
+            const isActive =
+              currentLyricIndex >= 0 &&
+              card.lineIndices.includes(currentLyricIndex);
+            return (
+              <div
+                key={`${card.nodeId}-${card.lyricQuote}`}
+                className={cn(
+                  "rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-200",
+                  isActive &&
+                    "border-sky-400/60 bg-sky-500/10 shadow-[0_0_20px_rgba(56,189,248,0.35)]",
+                )}
+              >
+                <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
+                  <span>{card.nodeTitle}</span>
+                  <span>{card.confidence}</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-400">
+                  {card.nodePath}
+                </div>
+                <p className="mt-2 text-sm">{card.parallel}</p>
+                <p className="mt-2 text-xs text-slate-400">
+                  &ldquo;{card.lyricQuote}&rdquo;
+                </p>
+                <p className="mt-2 text-[11px] text-slate-400">
+                  Baseline: {card.reasonPath}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-400">{card.why}</p>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
+          Add lyrics to generate ideology parallels.
+        </div>
+      )}
+      <div className="text-xs text-muted-foreground">
+        Interpretation, not author intent.
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     if (!original) {
@@ -1615,30 +2907,86 @@ export function OriginalsPlayer({
         </div>
 
         {showVaryControls ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              className="gap-2"
-              disabled={!isReady || isVarying}
-              onClick={() => handleVary(previewMoods[0])}
-            >
-              <Sparkles className="h-4 w-4" />
-              Vary
-            </Button>
-            {previewMoods.map((preset) => (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
-                key={preset.id}
+                size="sm"
+                variant="secondary"
+                className="gap-2"
+                disabled={!isReady || isVarying}
+                onClick={() => handleVary(previewMoods[0])}
+              >
+                <Sparkles className="h-4 w-4" />
+                Vary
+              </Button>
+              {previewMoods.map((preset) => (
+                <Button
+                  key={preset.id}
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full text-xs"
+                  disabled={!isReady || isVarying}
+                  onClick={() => handleVary(preset)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+              <Button
                 size="sm"
                 variant="outline"
-                className="rounded-full text-xs"
-                disabled={!isReady || isVarying}
-                onClick={() => handleVary(preset)}
+                className="gap-2"
+                disabled={!isReady}
+                onClick={() => setCustomizeOpen(true)}
               >
-                {preset.label}
+                <SlidersHorizontal className="h-4 w-4" />
+                Customize
               </Button>
-            ))}
-          </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                disabled={!original || recipeSaving}
+                onClick={() => setRecipeOpen(true)}
+              >
+                <BookmarkPlus className="h-4 w-4" />
+                Save / Share
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!hasMacroUndo}
+                onClick={handleMacroUndo}
+              >
+                Undo
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleMacroReset}>
+                Reset
+              </Button>
+            </div>
+            {varyStatus ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>
+                  {varyStatus.status === "ready"
+                    ? "Latest variation ready."
+                    : varyStatus.status === "error"
+                      ? "Variation failed."
+                      : "Rendering variation..."}
+                </span>
+                {varyStatus.previewUrl &&
+                !varyStatus.previewUrl.startsWith("blob:") ? (
+                  <Button asChild size="sm" variant="secondary" className="text-xs">
+                    <a
+                      href={varyStatus.previewUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open preview
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </>
         ) : null}
 
         {canRemix ? (
@@ -1709,117 +3057,486 @@ export function OriginalsPlayer({
         ) : null}
       </div>
 
-      {lyricsOpen ? (
+      {showLyricsPanel ? (
         <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-slate-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold">Lyrics &amp; Meaning</h3>
-              <p className="text-xs text-slate-400">
-                Explore words, meaning, and context without leaving playback.
-              </p>
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+            <div className="flex items-center">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                Meaning
+              </span>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => setLyricsOpen(false)}>
-              Close
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {timeSkyPopover}
+              {intentContractPopover}
+              {canEditLyrics ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleOpenLyricsEditor}
+                >
+                  <PencilLine className="h-4 w-4" />
+                  {details?.lyrics ? "Edit lyrics" : "Add lyrics"}
+                </Button>
+              ) : null}
+              <Button size="sm" variant="ghost" onClick={() => setLyricsOpen(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="flex items-center justify-end">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                Lyrics
+              </span>
+            </div>
           </div>
+          <p className="mt-3 text-xs text-slate-400">
+            Playback is a lens for context, values, and provenance.
+          </p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(0,1fr)]">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              {meaningBody}
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              {lyricsBody}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
-          <Tabs defaultValue="lyrics" className="mt-4">
-            <TabsList className="bg-white/5">
-              <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
-              <TabsTrigger value="meaning">Meaning</TabsTrigger>
-            </TabsList>
+      <Drawer open={showLyricsDrawer} onOpenChange={setLyricsOpen}>
+        <DrawerContent className="bg-slate-950 text-slate-100">
+          <DrawerHeader>
+            <DrawerTitle>Lyrics &amp; Meaning</DrawerTitle>
+            <p className="text-xs text-slate-400">
+              Playback is a lens for context, values, and provenance.
+            </p>
+          </DrawerHeader>
+          <div className="px-4 pb-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {timeSkyPopover}
+              {intentContractPopover}
+              {canEditLyrics ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleOpenLyricsEditor}
+                >
+                  <PencilLine className="h-4 w-4" />
+                  {details?.lyrics ? "Edit lyrics" : "Add lyrics"}
+                </Button>
+              ) : null}
+            </div>
+            <Tabs defaultValue="lyrics" className="mt-4">
+              <TabsList className="bg-white/5">
+                <TabsTrigger value="meaning">Meaning</TabsTrigger>
+                <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
+              </TabsList>
+              <TabsContent value="meaning">{meaningBody}</TabsContent>
+              <TabsContent value="lyrics">{lyricsBody}</TabsContent>
+            </Tabs>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
-            <TabsContent value="lyrics">
-              {detailsLoading ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading lyrics
-                </div>
-              ) : detailsError ? (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                  {detailsError}
-                </div>
-              ) : lyricLines.length ? (
-                <div className="mt-3 space-y-2 text-sm leading-relaxed">
-                  {lyricLines.map((line, index) => (
-                    <p key={`${line}-${index}`} className={cn(!line && "h-3")}>
-                      {line || "\u00A0"}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-muted-foreground">
-                  Lyrics not available for this song.
-                </div>
-              )}
-            </TabsContent>
+      <Drawer open={customizeOpen} onOpenChange={setCustomizeOpen}>
+        <DrawerContent className="bg-slate-950 text-slate-100">
+          <DrawerHeader>
+            <DrawerTitle>Customize</DrawerTitle>
+            <p className="text-xs text-slate-400">
+              Macro controls only. No mixing or stems in listener mode.
+            </p>
+          </DrawerHeader>
+          <div className="px-4 pb-6">
+            {macroControls}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!hasMacroUndo}
+                onClick={handleMacroUndo}
+              >
+                Undo
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleMacroReset}>
+                Reset
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
-            <TabsContent value="meaning">
-              <div className="mt-3 space-y-4">
-                {meaningCards.length ? (
-                  <div className="space-y-3">
-                    {meaningCards.map((card) => (
+      <Dialog open={recipeOpen} onOpenChange={setRecipeOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Save / Share recipe</DialogTitle>
+            <DialogDescription>
+              Save your listener macros as a reusable recipe.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Recipe name"
+              value={recipeName}
+              onChange={(event) => setRecipeName(event.target.value)}
+            />
+            <Textarea
+              rows={3}
+              placeholder="Notes or intent (optional)"
+              value={recipeNotes}
+              onChange={(event) => setRecipeNotes(event.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRecipeOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveRecipe} disabled={recipeSaving}>
+              {recipeSaving ? "Saving..." : "Save recipe"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={lyricsEditorOpen} onOpenChange={setLyricsEditorOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {details?.lyrics ? "Edit lyrics" : "Add lyrics"}
+            </DialogTitle>
+            <DialogDescription>
+              Paste or edit the lyrics for this original. Line breaks are preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            rows={8}
+            placeholder="Paste lyrics here..."
+            value={lyricsDraft}
+            onChange={(event) => setLyricsDraft(event.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLyricsEditorOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLyrics} disabled={lyricsSaving}>
+              {lyricsSaving ? "Saving..." : "Save lyrics"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={intentEditorOpen} onOpenChange={setIntentEditorOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Intent contract</DialogTitle>
+            <DialogDescription>
+              Define the invariants and allowable variation for this original.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-200">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Contract enabled
+                </p>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Toggle off to clear the intent contract.
+                </p>
+              </div>
+              <Switch
+                checked={intentDraft.enabled}
+                onCheckedChange={(value) =>
+                  setIntentDraft((prev) => ({ ...prev, enabled: value }))
+                }
+              />
+            </div>
+
+            {intentDraft.enabled ? (
+              <>
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Invariants
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Tempo (BPM)
+                      <Input
+                        value={intentDraft.tempoBpm}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            tempoBpm: event.target.value,
+                          }))
+                        }
+                        placeholder="120"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Time signature
+                      <Input
+                        value={intentDraft.timeSig}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            timeSig: event.target.value,
+                          }))
+                        }
+                        placeholder="4/4"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Key
+                      <Input
+                        value={intentDraft.key}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            key: event.target.value,
+                          }))
+                        }
+                        placeholder="A minor"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Groove template IDs
+                      <Input
+                        value={intentDraft.grooveTemplateIds}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            grooveTemplateIds: event.target.value,
+                          }))
+                        }
+                        placeholder="groove-1, groove-2"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Motif IDs
+                      <Input
+                        value={intentDraft.motifIds}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            motifIds: event.target.value,
+                          }))
+                        }
+                        placeholder="motif-a, motif-b"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Stem locks
+                      <Input
+                        value={intentDraft.stemLocks}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            stemLocks: event.target.value,
+                          }))
+                        }
+                        placeholder="drums, lead"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Variation ranges
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {INTENT_RANGE_FIELDS.map((field) => (
                       <div
-                        key={`${card.nodeId}-${card.lyricQuote}`}
-                        className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-200"
+                        key={field.key}
+                        className="rounded-lg border border-white/10 bg-white/5 p-3"
                       >
-                        <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
-                          <span>{card.nodeTitle}</span>
-                          <span>{card.confidence}</span>
+                        <div className="text-xs font-medium text-slate-200">
+                          {field.label}
                         </div>
-                        <div className="mt-1 text-xs text-slate-400">
-                          {card.nodePath}
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <Input
+                            value={intentDraft.ranges[field.key].min}
+                            onChange={(event) =>
+                              handleIntentRangeChange(
+                                field.key,
+                                "min",
+                                event.target.value,
+                              )
+                            }
+                            placeholder="Min"
+                          />
+                          <Input
+                            value={intentDraft.ranges[field.key].max}
+                            onChange={(event) =>
+                              handleIntentRangeChange(
+                                field.key,
+                                "max",
+                                event.target.value,
+                              )
+                            }
+                            placeholder="Max"
+                          />
                         </div>
-                        <p className="mt-2 text-sm">{card.parallel}</p>
-                        <p className="mt-2 text-xs text-slate-400">
-                          &ldquo;{card.lyricQuote}&rdquo;
-                        </p>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
-                    Add lyrics to generate ideology parallels.
-                  </div>
-                )}
-                <div className="text-xs text-muted-foreground">
-                  Interpretation, not author intent.
+                  <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    Arrangement moves
+                    <Input
+                      value={intentDraft.arrangementMoves}
+                      onChange={(event) =>
+                        setIntentDraft((prev) => ({
+                          ...prev,
+                          arrangementMoves: event.target.value,
+                        }))
+                      }
+                      placeholder="swap-hook, drop-drums"
+                    />
+                  </label>
                 </div>
 
-                <Collapsible open={contextOpen} onOpenChange={setContextOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2">
-                      Time &amp; Sky
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="mt-3 space-y-2 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Published</span>
-                        <span>{publishedLabel}</span>
-                      </div>
-                      {madeLabel ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400">Made</span>
-                          <span>{madeLabel}</span>
-                        </div>
-                      ) : null}
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Place</span>
-                        <span>{placeLabel}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Sky signature</span>
-                        <span>{skyLabel}</span>
-                      </div>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      ) : null}
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Meaning anchors
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Ideology root
+                      <Input
+                        value={intentDraft.ideologyRootId}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            ideologyRootId: event.target.value,
+                          }))
+                        }
+                        placeholder="worldview-integrity"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Allowed nodes
+                      <Input
+                        value={intentDraft.allowedNodeIds}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            allowedNodeIds: event.target.value,
+                          }))
+                        }
+                        placeholder="stewardship-ledger, interbeing-systems"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Provenance policy
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
+                      Store Time &amp; Sky
+                      <Switch
+                        checked={intentDraft.storeTimeSky}
+                        onCheckedChange={(value) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            storeTimeSky: value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
+                      Store pulse
+                      <Switch
+                        checked={intentDraft.storePulse}
+                        onCheckedChange={(value) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            storePulse: value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Pulse source
+                      <select
+                        value={intentDraft.pulseSource}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            pulseSource: event.target.value as PulseSource,
+                          }))
+                        }
+                        disabled={!intentDraft.storePulse}
+                        className="h-10 rounded border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
+                        <option value="drand">drand beacon</option>
+                        <option value="nist-beacon">NIST beacon</option>
+                        <option value="curby">CURBy beacon</option>
+                        <option value="local-sky-photons">Local sky photons</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      Place precision
+                      <select
+                        value={intentDraft.placePrecision}
+                        onChange={(event) =>
+                          setIntentDraft((prev) => ({
+                            ...prev,
+                            placePrecision: event.target.value as
+                              | "exact"
+                              | "approximate"
+                              | "hidden",
+                          }))
+                        }
+                        className="h-10 rounded border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
+                        <option value="exact">Exact</option>
+                        <option value="approximate">Approximate</option>
+                        <option value="hidden">Hidden</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Notes
+                  </div>
+                  <Textarea
+                    rows={3}
+                    value={intentDraft.notes}
+                    onChange={(event) =>
+                      setIntentDraft((prev) => ({
+                        ...prev,
+                        notes: event.target.value,
+                      }))
+                    }
+                    placeholder="Optional notes about the intent contract."
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                The intent contract is disabled for this original.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIntentEditorOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveIntentContract} disabled={intentSaving}>
+              {intentSaving ? "Saving..." : "Save contract"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

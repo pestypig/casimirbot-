@@ -76,9 +76,12 @@ const resolveInstrumentalUrl = async (
   originalId: string,
 ): Promise<string | null> => {
   const slug = encodeURIComponent(originalId.toLowerCase());
-  const roots = [`/originals/${slug}`, `/audio/originals/${slug}`];
-  for (const root of roots) {
-    const url = `${root}/instrumental.wav`;
+  const candidates = [
+    `/api/noise-gens/originals/${slug}/instrumental`,
+    `/originals/${slug}/instrumental.wav`,
+    `/audio/originals/${slug}/instrumental.wav`,
+  ];
+  for (const url of candidates) {
     if (await resourceExists(url)) {
       return url;
     }

@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { promises as fs, createReadStream, createWriteStream } from "node:fs";
@@ -23,6 +23,11 @@ import {
   type NoisegenOriginalAsset,
   type NoisegenPlaybackAsset,
   type NoisegenProcessingState,
+  type IntentSnapshotPreferences,
+  type NoisegenIntentContract,
+  type NoisegenEditionReceipt,
+  type NoisegenTimeSkyMeta,
+  type NoisegenRecipe,
   type NoisegenStemGroupAsset,
   type NoisegenStemAsset,
   resolvePlaybackAsset,
@@ -46,9 +51,19 @@ import {
   savePreviewBuffer,
   updateNoisegenStore,
 } from "../services/noisegen-store";
+import { stableJsonStringify } from "../utils/stable-json";
+import {
+  createIntentEnforcementState,
+  enforceIntentContractOnRequest,
+  enforceIntentContractOnRenderPlan,
+  finalizeIntentMeta,
+} from "../services/noisegen-intent";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+const ORIGINALS_API_PREFIX = "/api/noise-gens/originals";
+const buildOriginalAssetUrl = (originalId: string, assetPath: string) =>
+  `${ORIGINALS_API_PREFIX}/${encodeURIComponent(originalId)}/${assetPath}`;
 const DEFAULT_NOISE_FIELD = {
   width: 32,
   height: 32,
@@ -92,6 +107,66 @@ const ABLETON_DEVICE_KEYS = new Set([
   "Chorus",
   "DrumBuss",
 ]);
+const ABLETON_DEVICE_INTENTS: Record<
+  string,
+  {
+    eqPeaks?: Array<{ freq: number; q: number; gainDb: number }>;
+    fx?: {
+      reverbSend?: number;
+      comp?: number;
+      chorus?: number;
+      delay?: number;
+      sat?: number;
+    };
+    bounds?: {
+      reverbSend?: { min: number; max: number };
+      comp?: { min: number; max: number };
+      chorus?: { min: number; max: number };
+      delay?: { min: number; max: number };
+      sat?: { min: number; max: number };
+    };
+  }
+> = {
+  Eq8: {
+    eqPeaks: [
+      { freq: 120, q: 0.9, gainDb: 2.5 },
+      { freq: 900, q: 1.1, gainDb: 1.6 },
+      { freq: 5200, q: 0.8, gainDb: 2.2 },
+    ],
+  },
+  GlueCompressor: {
+    fx: { comp: 0.6 },
+    bounds: { comp: { min: 0.35, max: 0.85 } },
+  },
+  Compressor: {
+    fx: { comp: 0.5 },
+    bounds: { comp: { min: 0.25, max: 0.75 } },
+  },
+  Reverb: {
+    fx: { reverbSend: 0.45 },
+    bounds: { reverbSend: { min: 0.2, max: 0.75 } },
+  },
+  Delay: {
+    fx: { delay: 0.35 },
+    bounds: { delay: { min: 0.15, max: 0.65 } },
+  },
+  Chorus: {
+    fx: { chorus: 0.25 },
+    bounds: { chorus: { min: 0.1, max: 0.5 } },
+  },
+  DrumBuss: {
+    fx: { sat: 0.4 },
+    bounds: { sat: { min: 0.2, max: 0.7 } },
+  },
+};
+const ABLETON_DEVICE_HINT_RE = /(device|effect|instrument|plugin)/i;
+const ABLETON_DEVICE_HINT_SKIP = new Set([
+  "DeviceChain",
+  "DeviceChainMixer",
+  "InstrumentGroupDevice",
+  "AudioEffectGroupDevice",
+  "MidiEffectGroupDevice",
+]);
 const gunzipAsync = promisify(gunzip);
 const ABLETON_XML = new XMLParser({
   ignoreAttributes: false,
@@ -99,6 +174,10 @@ const ABLETON_XML = new XMLParser({
 });
 const FFMPEG_PATH = process.env.FFMPEG_PATH?.trim() || "ffmpeg";
 let ffmpegAvailable: boolean | null = null;
+const IDEOLOGY_TREE_PATH = path.resolve("docs", "ethos", "ideology.json");
+let ideologyMetaCache:
+  | { mtimeMs: number; rootId?: string; treeVersion?: number }
+  | null = null;
 
 const peakSchema = z.object({
   omega: z.number(),
@@ -138,6 +217,31 @@ const tempoMetaSchema = z
   })
   .strict();
 
+const timeSkyContextSchema = z
+  .object({
+    publishedAt: z.number().int().min(0).optional(),
+    composedStart: z.number().int().min(0).optional(),
+    composedEnd: z.number().int().min(0).optional(),
+    timezone: z.string().min(1).optional(),
+    place: z.string().min(1).optional(),
+    placePrecision: z.enum(["exact", "approximate", "hidden"]).optional(),
+    halobankSpanId: z.string().min(1).optional(),
+    skySignature: z.string().min(1).optional(),
+  })
+  .strict();
+
+const timeSkyPulseSchema = z
+  .object({
+    source: z
+      .enum(["drand", "nist-beacon", "curby", "local-sky-photons"])
+      .optional(),
+    round: z.union([z.string().min(1), z.number().int()]).optional(),
+    pulseTime: z.number().int().min(0).optional(),
+    valueHash: z.string().min(1).optional(),
+    seedSalt: z.string().min(1).optional(),
+  })
+  .strict();
+
 const timeSkySchema = z
   .object({
     publishedAt: z.number().int().min(0).optional(),
@@ -145,17 +249,88 @@ const timeSkySchema = z
     composedEnd: z.number().int().min(0).optional(),
     place: z.string().min(1).optional(),
     skySignature: z.string().min(1).optional(),
+    pulseRound: z.union([z.string().min(1), z.number().int()]).optional(),
+    pulseHash: z.string().min(1).optional(),
+    context: timeSkyContextSchema.optional(),
+    pulse: timeSkyPulseSchema.optional(),
   })
   .strict()
   .refine(
-    ({ composedStart, composedEnd }) =>
-      composedStart == null ||
-      composedEnd == null ||
-      composedEnd >= composedStart,
+    ({ composedStart, composedEnd, context }) => {
+      const start = context?.composedStart ?? composedStart;
+      const end = context?.composedEnd ?? composedEnd;
+      return start == null || end == null || end >= start;
+    },
     {
       message: "composedEnd must be >= composedStart",
     },
   );
+
+const intentRangeSchema = z
+  .object({
+    min: z.number().min(0).max(1),
+    max: z.number().min(0).max(1),
+  })
+  .refine((range) => range.max >= range.min, {
+    message: "range max must be >= min",
+  });
+
+const intentContractSchema = z
+  .object({
+    version: z.literal(1),
+    createdAt: z.number().int().min(0),
+    updatedAt: z.number().int().min(0),
+    invariants: z
+      .object({
+        tempoBpm: z.number().min(1).optional(),
+        timeSig: z.string().regex(/^\d+\/\d+$/).optional(),
+        key: z.string().min(1).optional(),
+        grooveTemplateIds: z.array(z.string().min(1)).optional(),
+        motifIds: z.array(z.string().min(1)).optional(),
+        stemLocks: z.array(z.string().min(1)).optional(),
+      })
+      .strict()
+      .optional(),
+    ranges: z
+      .object({
+        sampleInfluence: intentRangeSchema.optional(),
+        styleInfluence: intentRangeSchema.optional(),
+        weirdness: intentRangeSchema.optional(),
+        reverbSend: intentRangeSchema.optional(),
+        chorus: intentRangeSchema.optional(),
+        arrangementMoves: z.array(z.string().min(1)).optional(),
+      })
+      .strict()
+      .optional(),
+    meaning: z
+      .object({
+        ideologyRootId: z.string().min(1).optional(),
+        allowedNodeIds: z.array(z.string().min(1)).optional(),
+      })
+      .strict()
+      .optional(),
+    provenancePolicy: z
+      .object({
+        storeTimeSky: z.boolean().optional(),
+        storePulse: z.boolean().optional(),
+        pulseSource: z
+          .enum(["drand", "nist-beacon", "curby", "local-sky-photons"])
+          .optional(),
+        placePrecision: z.enum(["exact", "approximate", "hidden"]).optional(),
+      })
+      .strict()
+      .optional(),
+    notes: z.string().max(600).optional(),
+  })
+  .strict();
+
+const intentSnapshotPreferencesSchema = z
+  .object({
+    applyTempo: z.boolean().optional(),
+    applyMix: z.boolean().optional(),
+    applyAutomation: z.boolean().optional(),
+  })
+  .strict();
 
 const renderPlanSectionSchema = z
   .object({
@@ -171,6 +346,18 @@ const renderPlanEnergySchema = z
     energy: z.number().finite(),
   })
   .passthrough();
+
+const renderPlanLocksSchema = z
+  .object({
+    groove: z.boolean().optional(),
+    harmony: z.boolean().optional(),
+    drums: z.boolean().optional(),
+    bass: z.boolean().optional(),
+    music: z.boolean().optional(),
+    textures: z.boolean().optional(),
+    fx: z.boolean().optional(),
+  })
+  .strict();
 
 const renderPlanMaterialSchema = z
   .object({
@@ -212,6 +399,7 @@ const renderPlanTextureSchema = z
         sat: z.number().finite().optional(),
         reverbSend: z.number().finite().optional(),
         comp: z.number().finite().optional(),
+        delay: z.number().finite().optional(),
       })
       .passthrough()
       .optional(),
@@ -235,12 +423,21 @@ const renderPlanSchema = z
         key: z.string().optional(),
         sections: z.array(renderPlanSectionSchema).optional(),
         energyCurve: z.array(renderPlanEnergySchema).optional(),
+        locks: renderPlanLocksSchema.optional(),
       })
       .passthrough()
       .optional(),
     windows: z.array(renderPlanWindowSchema),
   })
   .passthrough();
+
+const planMetaSchema = z
+  .object({
+    plannerVersion: z.string().min(1).optional(),
+    modelVersion: z.union([z.string().min(1), z.number().finite()]).optional(),
+    toolVersions: z.record(z.string().min(1)).optional(),
+  })
+  .strict();
 
 const coverJobRequestSchema = z
   .object({
@@ -256,11 +453,18 @@ const coverJobRequestSchema = z
     tempo: tempoMetaSchema.optional(),
     knowledgeFileIds: z.array(z.string().min(1)).optional(), // audio from knowledge store
     renderPlan: renderPlanSchema.optional(),
+    planMeta: planMetaSchema.optional(),
     forceRemote: z.boolean().optional(),
   })
   .refine((value) => !value.linkHelix || Boolean(value.helix), {
     message: "helix packet required when linkHelix is true",
   });
+
+const recipeMetricsSchema = z
+  .object({
+    idi: z.number().min(0).max(1).optional(),
+  })
+  .strict();
 
 const recipeSchema = z
   .object({
@@ -268,6 +472,30 @@ const recipeSchema = z
     coverRequest: coverJobRequestSchema,
     seed: z.union([z.string().min(1), z.number().finite()]).optional(),
     notes: z.string().optional(),
+    featured: z.boolean().optional(),
+    parentId: z.string().min(1).optional(),
+    metrics: recipeMetricsSchema.optional(),
+  })
+  .strict();
+
+const recipeUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    notes: z.string().optional(),
+    featured: z.boolean().optional(),
+    parentId: z.union([z.string().min(1), z.null()]).optional(),
+    metrics: recipeMetricsSchema.optional(),
+  })
+  .strict();
+
+const listenerMacroSchema = z
+  .object({
+    energy: z.number().min(0).max(1),
+    space: z.number().min(0).max(1),
+    texture: z.number().min(0).max(1),
+    weirdness: z.number().min(0).max(1).optional(),
+    drive: z.number().min(0).max(1).optional(),
+    locks: renderPlanLocksSchema.optional(),
   })
   .strict();
 
@@ -277,6 +505,7 @@ const legacyGenerateSchema = z
     moodId: z.string().min(1),
     seed: z.number().int().optional(),
     helixPacket: helixPacketSchema.optional(),
+    macros: listenerMacroSchema.optional(),
   })
   .strict();
 
@@ -397,6 +626,191 @@ const readBooleanField = (value: unknown): boolean => {
     return normalized === "true" || normalized === "1" || normalized === "yes";
   }
   return false;
+};
+
+const buildIntentSnapshotPreferences = (params: {
+  applyTempo?: boolean;
+  applyMix?: boolean;
+  applyAutomation?: boolean;
+  hasSnapshot: boolean;
+}): IntentSnapshotPreferences | undefined => {
+  const explicit =
+    params.applyTempo != null ||
+    params.applyMix != null ||
+    params.applyAutomation != null;
+  if (!params.hasSnapshot && !explicit) return undefined;
+  return {
+    applyTempo: params.applyTempo ?? true,
+    applyMix: params.applyMix ?? true,
+    applyAutomation: params.applyAutomation ?? false,
+  };
+};
+
+const normalizeNodeIds = (list?: string[]) => {
+  if (!Array.isArray(list)) return [];
+  const unique = new Set(
+    list.map((entry) => (typeof entry === "string" ? entry.trim() : "")),
+  );
+  return Array.from(unique).filter(Boolean).sort();
+};
+
+const loadIdeologyReceiptMeta = async (): Promise<{
+  rootId?: string;
+  treeVersion?: number;
+} | null> => {
+  try {
+    const stats = await fs.stat(IDEOLOGY_TREE_PATH);
+    if (ideologyMetaCache && ideologyMetaCache.mtimeMs === stats.mtimeMs) {
+      return ideologyMetaCache;
+    }
+    const payload = await fs.readFile(IDEOLOGY_TREE_PATH, "utf8");
+    const parsed = JSON.parse(payload) as { rootId?: unknown; version?: unknown };
+    const meta = {
+      mtimeMs: stats.mtimeMs,
+      rootId:
+        typeof parsed.rootId === "string" ? parsed.rootId.trim() : undefined,
+      treeVersion:
+        typeof parsed.version === "number" && Number.isFinite(parsed.version)
+          ? parsed.version
+          : undefined,
+    };
+    ideologyMetaCache = meta;
+    return meta;
+  } catch {
+    return null;
+  }
+};
+
+const buildIdeologyMappingHash = (payload: {
+  rootId?: string;
+  allowedNodeIds?: string[];
+  treeVersion?: number;
+}) => {
+  const stable = stableJsonStringify(payload);
+  return createHash("sha256").update(stable).digest("hex");
+};
+
+const buildIdeologyReceipt = async (
+  contract?: NoisegenIntentContract | null,
+): Promise<NoisegenEditionReceipt["ideology"] | undefined> => {
+  const allowedNodeIds = normalizeNodeIds(contract?.meaning?.allowedNodeIds);
+  const meta = await loadIdeologyReceiptMeta();
+  const rootId = contract?.meaning?.ideologyRootId ?? meta?.rootId;
+  const treeVersion = meta?.treeVersion;
+  if (!rootId && allowedNodeIds.length === 0 && treeVersion == null) {
+    return undefined;
+  }
+  return {
+    rootId: rootId ?? undefined,
+    ...(allowedNodeIds.length ? { allowedNodeIds } : {}),
+    ...(treeVersion != null ? { treeVersion } : {}),
+    mappingHash: buildIdeologyMappingHash({
+      rootId: rootId ?? undefined,
+      allowedNodeIds,
+      treeVersion,
+    }),
+  };
+};
+
+const sanitizeTimeSkyForReceipt = (
+  timeSky: NoisegenTimeSkyMeta,
+  policy: NoisegenIntentContract["provenancePolicy"] | undefined,
+  options: { omitPulse: boolean },
+): NoisegenTimeSkyMeta => {
+  const placePrecision =
+    policy?.placePrecision ?? timeSky.context?.placePrecision;
+  const context = timeSky.context ? { ...timeSky.context } : undefined;
+  if (context && placePrecision) {
+    context.placePrecision = placePrecision;
+    if (placePrecision === "hidden") {
+      delete context.place;
+    }
+  }
+  const sanitized: NoisegenTimeSkyMeta = {
+    ...timeSky,
+    ...(context ? { context } : {}),
+  };
+  if (placePrecision === "hidden") {
+    delete sanitized.place;
+  }
+  if (options.omitPulse) {
+    delete sanitized.pulse;
+    delete sanitized.pulseRound;
+    delete sanitized.pulseHash;
+  }
+  return sanitized;
+};
+
+const resolvePulseReceipt = (
+  timeSky: NoisegenTimeSkyMeta | undefined,
+  policy: NoisegenIntentContract["provenancePolicy"] | undefined,
+) => {
+  if (!timeSky) return undefined;
+  if (policy?.storePulse === false) return undefined;
+  if (timeSky.pulse) {
+    const pulse = { ...timeSky.pulse };
+    if (!pulse.source && policy?.pulseSource) {
+      pulse.source = policy.pulseSource;
+    }
+    return pulse;
+  }
+  if (timeSky.pulseRound != null || timeSky.pulseHash) {
+    return {
+      source: policy?.pulseSource,
+      round: timeSky.pulseRound,
+      valueHash: timeSky.pulseHash,
+    };
+  }
+  return undefined;
+};
+
+const buildProvenanceReceipt = (
+  timeSky: NoisegenTimeSkyMeta | undefined,
+  policy: NoisegenIntentContract["provenancePolicy"] | undefined,
+): NoisegenEditionReceipt["provenance"] | undefined => {
+  if (!timeSky && !policy) return undefined;
+  const storeTimeSky = policy?.storeTimeSky !== false;
+  const placePrecision =
+    policy?.placePrecision ?? timeSky?.context?.placePrecision;
+  const receipt: NoisegenEditionReceipt["provenance"] = {};
+  if (storeTimeSky && timeSky) {
+    receipt.timeSky = sanitizeTimeSkyForReceipt(timeSky, policy, {
+      omitPulse: policy?.storePulse === false,
+    });
+  }
+  const pulse = resolvePulseReceipt(timeSky, policy);
+  if (pulse) {
+    receipt.pulse = pulse;
+  }
+  if (placePrecision) {
+    receipt.placePrecision = placePrecision;
+  }
+  return Object.keys(receipt).length ? receipt : undefined;
+};
+
+const parseIntentContractField = (
+  value: unknown,
+):
+  | { contract?: z.infer<typeof intentContractSchema> }
+  | { error: { error: string; issues?: z.ZodIssue[] } } => {
+  const raw = readStringField(value);
+  if (!raw) return { contract: undefined };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { error: { error: "invalid_intent_contract_json" } };
+  }
+  const validation = intentContractSchema.safeParse(parsed);
+  if (!validation.success) {
+    return {
+      error: {
+        error: "invalid_intent_contract",
+        issues: validation.error.issues,
+      },
+    };
+  }
+  return { contract: validation.data };
 };
 
 const normalizeSearch = (value: unknown): string =>
@@ -570,7 +984,12 @@ const collectDeviceNames = (
   for (const [entryKey, value] of Object.entries(
     node as Record<string, unknown>,
   )) {
-    if (ABLETON_DEVICE_KEYS.has(entryKey)) {
+    const isKnown = ABLETON_DEVICE_KEYS.has(entryKey);
+    const isHint =
+      isKnown ||
+      (ABLETON_DEVICE_HINT_RE.test(entryKey) &&
+        !ABLETON_DEVICE_HINT_SKIP.has(entryKey));
+    if (isHint) {
       const entries = toArray(value);
       const count = entries.length > 0 ? entries.length : 1;
       for (let i = 0; i < count; i += 1) {
@@ -582,6 +1001,144 @@ const collectDeviceNames = (
       collectDeviceNames(value, names, counts);
     }
   }
+};
+
+const mergeIntentFx = (
+  base: NonNullable<AbletonIntentSnapshot["deviceIntent"]>["fx"] | undefined,
+  next: NonNullable<AbletonIntentSnapshot["deviceIntent"]>["fx"] | undefined,
+) => {
+  if (!next) return base;
+  const merged = { ...(base ?? {}) };
+  for (const [key, value] of Object.entries(next)) {
+    if (typeof value !== "number") continue;
+    const prev = merged[key as keyof typeof merged];
+    const resolved =
+      typeof prev === "number" ? Math.max(prev, value) : value;
+    merged[key as keyof typeof merged] = resolved;
+  }
+  return merged;
+};
+
+const mergeIntentBounds = (
+  base: NonNullable<AbletonIntentSnapshot["deviceIntent"]>["bounds"] | undefined,
+  next: NonNullable<AbletonIntentSnapshot["deviceIntent"]>["bounds"] | undefined,
+) => {
+  if (!next) return base;
+  const merged = { ...(base ?? {}) } as NonNullable<
+    AbletonIntentSnapshot["deviceIntent"]
+  >["bounds"];
+  for (const [key, value] of Object.entries(next)) {
+    if (!value || typeof value !== "object") continue;
+    const range = value as { min: number; max: number };
+    const current = merged?.[key as keyof typeof merged];
+    const minValue =
+      current && typeof current.min === "number"
+        ? Math.min(current.min, range.min)
+        : range.min;
+    const maxValue =
+      current && typeof current.max === "number"
+        ? Math.max(current.max, range.max)
+        : range.max;
+    merged[key as keyof typeof merged] = { min: minValue, max: maxValue };
+  }
+  return merged;
+};
+
+const buildDeviceIntent = (deviceCounts: Map<string, number>) => {
+  let eqPeaks: Array<{ freq: number; q: number; gainDb: number }> | undefined;
+  let fx:
+    | NonNullable<AbletonIntentSnapshot["deviceIntent"]>["fx"]
+    | undefined;
+  let bounds:
+    | NonNullable<AbletonIntentSnapshot["deviceIntent"]>["bounds"]
+    | undefined;
+  for (const [name] of deviceCounts.entries()) {
+    const intent = ABLETON_DEVICE_INTENTS[name];
+    if (!intent) continue;
+    if (!eqPeaks && intent.eqPeaks) {
+      eqPeaks = intent.eqPeaks.map((peak) => ({ ...peak }));
+    }
+    fx = mergeIntentFx(fx, intent.fx);
+    bounds = mergeIntentBounds(bounds, intent.bounds);
+  }
+  if (!eqPeaks && !fx && !bounds) return undefined;
+  return {
+    ...(eqPeaks ? { eqPeaks } : {}),
+    ...(fx ? { fx } : {}),
+    ...(bounds ? { bounds } : {}),
+  };
+};
+
+const collectAutomationPoints = (
+  node: unknown,
+  points: Array<{ time: number; value: number }>,
+) => {
+  if (!node) return;
+  if (Array.isArray(node)) {
+    node.forEach((entry) => collectAutomationPoints(entry, points));
+    return;
+  }
+  if (typeof node !== "object") return;
+  const record = node as Record<string, unknown>;
+  const time = readNumericValue(record.Time ?? record.time ?? record.Position);
+  const value = readNumericValue(record.Value ?? record.value);
+  if (time != null && value != null) {
+    points.push({ time, value });
+  }
+  for (const child of Object.values(record)) {
+    if (child && typeof child === "object") {
+      collectAutomationPoints(child, points);
+    }
+  }
+};
+
+const buildAutomationSummary = (
+  root: unknown,
+  timeSig?: string,
+): AbletonIntentSnapshot["automation"] | undefined => {
+  const envelopes: unknown[] = [];
+  collectNodesByKey(root, "AutomationEnvelope", envelopes);
+  if (!envelopes.length) return undefined;
+  const points: Array<{ time: number; value: number }> = [];
+  for (const envelope of envelopes) {
+    collectAutomationPoints(envelope, points);
+  }
+  if (!points.length) {
+    return { envelopeCount: envelopes.length, pointCount: 0 };
+  }
+  let minValue = Number.POSITIVE_INFINITY;
+  let maxValue = Number.NEGATIVE_INFINITY;
+  for (const point of points) {
+    minValue = Math.min(minValue, point.value);
+    maxValue = Math.max(maxValue, point.value);
+  }
+  const range =
+    Number.isFinite(minValue) && Number.isFinite(maxValue) && maxValue > minValue
+      ? maxValue - minValue
+      : 0;
+  const beatsPerBar = (() => {
+    if (!timeSig || !timeSig.includes("/")) return 4;
+    const [numRaw] = timeSig.split("/");
+    const num = Number(numRaw);
+    return Number.isFinite(num) && num > 0 ? Math.floor(num) : 4;
+  })();
+  const barMap = new Map<number, number>();
+  for (const point of points) {
+    const bar = Math.max(1, Math.floor(point.time / beatsPerBar) + 1);
+    const normalized = range
+      ? (point.value - minValue) / range
+      : 0.5;
+    barMap.set(bar, Math.max(0, Math.min(1, normalized)));
+  }
+  const energyCurve = Array.from(barMap.entries())
+    .sort(([a], [b]) => a - b)
+    .slice(0, 256)
+    .map(([bar, energy]) => ({ bar, energy }));
+  return {
+    envelopeCount: envelopes.length,
+    pointCount: points.length,
+    ...(energyCurve.length ? { energyCurve } : {}),
+  };
 };
 
 const readTrackName = (node: Record<string, unknown>) => {
@@ -656,6 +1213,8 @@ const parseAbletonIntentSnapshot = async (params: {
   const devices = Array.from(deviceCounts.entries())
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const deviceIntent = buildDeviceIntent(deviceCounts);
+  const automation = buildAutomationSummary(root, timeSig);
   const summary = {
     trackCount: tracks.length,
     audioTrackCount: tracks.filter((track) => track.type === "audio").length,
@@ -675,6 +1234,8 @@ const parseAbletonIntentSnapshot = async (params: {
     },
     summary,
     devices,
+    deviceIntent,
+    automation,
     tracks,
     locators: locators.length ? locators : undefined,
   };
@@ -835,6 +1396,8 @@ const upsertOriginalRecord = async (params: {
   notes?: string;
   timeSky?: z.infer<typeof timeSkySchema>;
   intentSnapshot?: AbletonIntentSnapshot;
+  intentSnapshotPreferences?: IntentSnapshotPreferences;
+  intentContract?: z.infer<typeof intentContractSchema> | null;
   instrumentalAsset?: NoisegenOriginalAsset;
   vocalAsset?: NoisegenOriginalAsset;
   stemAssets?: NoisegenStemAsset[];
@@ -904,6 +1467,13 @@ const upsertOriginalRecord = async (params: {
       uploadedAt: existingEntry?.uploadedAt ?? Date.now(),
       timeSky: params.timeSky ?? existingEntry?.timeSky,
       intentSnapshot: params.intentSnapshot ?? existingEntry?.intentSnapshot,
+      intentSnapshotPreferences:
+        params.intentSnapshotPreferences ??
+        existingEntry?.intentSnapshotPreferences,
+      intentContract:
+        params.intentContract === null
+          ? undefined
+          : params.intentContract ?? existingEntry?.intentContract,
       processing: params.processing ?? existingEntry?.processing,
       assets: nextAssets,
     };
@@ -2432,6 +3002,12 @@ const serveOriginalAsset = async (req: any, res: any) => {
   }
 };
 
+const serveNamedOriginalAsset =
+  (assetName: string) => async (req: any, res: any) => {
+    req.params = { ...req.params, asset: assetName };
+    return serveOriginalAsset(req, res);
+  };
+
 const servePlaybackAsset = async (req: any, res: any) => {
   try {
     const store = await getNoisegenStore();
@@ -2568,6 +3144,40 @@ router.get("/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
 router.head("/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
 router.get("/audio/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
 router.head("/audio/originals/:id/stem-groups/:groupId", serveStemGroupAsset);
+router.get(
+  "/api/noise-gens/originals/:id/instrumental",
+  serveNamedOriginalAsset("instrumental"),
+);
+router.head(
+  "/api/noise-gens/originals/:id/instrumental",
+  serveNamedOriginalAsset("instrumental"),
+);
+router.get(
+  "/api/noise-gens/originals/:id/vocal",
+  serveNamedOriginalAsset("vocal"),
+);
+router.head(
+  "/api/noise-gens/originals/:id/vocal",
+  serveNamedOriginalAsset("vocal"),
+);
+router.get(
+  "/api/noise-gens/originals/:id/playback/:playbackId",
+  servePlaybackAsset,
+);
+router.head(
+  "/api/noise-gens/originals/:id/playback/:playbackId",
+  servePlaybackAsset,
+);
+router.get("/api/noise-gens/originals/:id/stems/:stemId", serveStemAsset);
+router.head("/api/noise-gens/originals/:id/stems/:stemId", serveStemAsset);
+router.get(
+  "/api/noise-gens/originals/:id/stem-groups/:groupId",
+  serveStemGroupAsset,
+);
+router.head(
+  "/api/noise-gens/originals/:id/stem-groups/:groupId",
+  serveStemGroupAsset,
+);
 
 router.get("/api/noise-gens/originals", async (req, res) => {
   res.set("Cache-Control", "no-store");
@@ -2636,7 +3246,7 @@ router.get("/api/noise-gens/originals/:id", async (req, res) => {
         mime: original.assets.instrumental.mime,
         size: original.assets.instrumental.bytes,
         uploadedAt: original.assets.instrumental.uploadedAt,
-        url: `/originals/${encodeURIComponent(original.id)}/instrumental`,
+        url: buildOriginalAssetUrl(original.id, "instrumental"),
       }
     : null;
   return res.json({
@@ -2653,6 +3263,8 @@ router.get("/api/noise-gens/originals/:id", async (req, res) => {
     timeSky: original.timeSky ?? undefined,
     processing: original.processing ?? undefined,
     intentSnapshot: original.intentSnapshot ?? undefined,
+    intentSnapshotPreferences: original.intentSnapshotPreferences ?? undefined,
+    intentContract: original.intentContract ?? undefined,
     playback: playbackAssets.length
       ? playbackAssets.map((asset) => ({
           id: asset.id,
@@ -2661,13 +3273,157 @@ router.get("/api/noise-gens/originals/:id", async (req, res) => {
           mime: asset.mime,
           size: asset.bytes,
           uploadedAt: asset.uploadedAt,
-          url: `/originals/${encodeURIComponent(original.id)}/playback/${encodeURIComponent(
-            asset.id,
-          )}`,
+          url: buildOriginalAssetUrl(
+            original.id,
+            `playback/${encodeURIComponent(asset.id)}`,
+          ),
         }))
       : playbackFallback
         ? [playbackFallback]
         : [],
+  });
+});
+
+router.put(
+  "/api/noise-gens/originals/:id/intent-snapshot-preferences",
+  async (req, res) => {
+    const store = await getNoisegenStore();
+    const original = findOriginalById(store, req.params.id ?? "");
+    if (!original) {
+      return res.status(404).json({ error: "not_found" });
+    }
+    const payload = req.body?.intentSnapshotPreferences;
+    let intentSnapshotPreferences: IntentSnapshotPreferences | null = null;
+    if (payload == null) {
+      intentSnapshotPreferences = null;
+    } else {
+      const validation = intentSnapshotPreferencesSchema.safeParse(payload);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "invalid_intent_snapshot_preferences",
+          issues: validation.error.issues,
+        });
+      }
+      intentSnapshotPreferences = validation.data;
+    }
+    await upsertOriginalRecord({
+      trackId: original.id,
+      title: original.title,
+      creator: original.artist,
+      durationSeconds: original.duration,
+      offsetMs: original.offsetMs ?? 0,
+      tempo: original.tempo,
+      notes: original.notes,
+      timeSky: original.timeSky,
+      processing: original.processing,
+      intentSnapshot: original.intentSnapshot,
+      intentSnapshotPreferences:
+        intentSnapshotPreferences === null
+          ? undefined
+          : intentSnapshotPreferences,
+      intentContract: original.intentContract ?? null,
+    });
+    return res.json({
+      id: original.id,
+      intentSnapshotPreferences:
+        intentSnapshotPreferences === null
+          ? null
+          : intentSnapshotPreferences,
+    });
+  },
+);
+
+router.get("/api/noise-gens/originals/:id/lyrics", async (req, res) => {
+  const store = await getNoisegenStore();
+  const original = findOriginalById(store, req.params.id ?? "");
+  if (!original) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  return res.json({
+    id: original.id,
+    lyrics: original.notes ?? "",
+  });
+});
+
+router.put("/api/noise-gens/originals/:id/lyrics", async (req, res) => {
+  const lyrics = readStringField(req.body?.lyrics).trim();
+  const store = await getNoisegenStore();
+  const original = findOriginalById(store, req.params.id ?? "");
+  if (!original) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  await upsertOriginalRecord({
+    trackId: original.id,
+    title: original.title,
+    creator: original.artist,
+    durationSeconds: original.duration,
+    offsetMs: original.offsetMs ?? 0,
+    tempo: original.tempo,
+    notes: lyrics || undefined,
+    timeSky: original.timeSky,
+    processing: original.processing,
+    intentSnapshot: original.intentSnapshot,
+  });
+  return res.json({
+    id: original.id,
+    lyrics,
+  });
+});
+
+router.get("/api/noise-gens/originals/:id/intent-contract", async (req, res) => {
+  const store = await getNoisegenStore();
+  const original = findOriginalById(store, req.params.id ?? "");
+  if (!original) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  return res.json({
+    id: original.id,
+    intentContract: original.intentContract ?? null,
+  });
+});
+
+router.put("/api/noise-gens/originals/:id/intent-contract", async (req, res) => {
+  const store = await getNoisegenStore();
+  const original = findOriginalById(store, req.params.id ?? "");
+  if (!original) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  const payload = req.body?.intentContract;
+  let intentContract: z.infer<typeof intentContractSchema> | null = null;
+  if (payload != null) {
+    let parsed: unknown = payload;
+    if (typeof payload === "string") {
+      try {
+        parsed = JSON.parse(payload);
+      } catch {
+        return res.status(400).json({ error: "invalid_intent_contract_json" });
+      }
+    }
+    const validation = intentContractSchema.safeParse(parsed);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "invalid_intent_contract",
+        issues: validation.error.issues,
+      });
+    }
+    intentContract = validation.data;
+  }
+  await upsertOriginalRecord({
+    trackId: original.id,
+    title: original.title,
+    creator: original.artist,
+    durationSeconds: original.duration,
+    offsetMs: original.offsetMs ?? 0,
+    tempo: original.tempo,
+    notes: original.notes,
+    timeSky: original.timeSky,
+    processing: original.processing,
+    intentSnapshot: original.intentSnapshot,
+    intentContract,
+  });
+  return res.json({
+    id: original.id,
+    intentContract: intentContract ?? null,
   });
 });
 
@@ -2690,7 +3446,10 @@ router.get("/api/noise-gens/originals/:id/stems", async (req, res) => {
       waveformDurationMs: stem.waveformDurationMs ?? undefined,
       sampleRate: stem.sampleRate ?? undefined,
       channels: stem.channels ?? undefined,
-      url: `/originals/${encodeURIComponent(original.id)}/stems/${encodeURIComponent(stem.id)}`,
+      url: buildOriginalAssetUrl(
+        original.id,
+        `stems/${encodeURIComponent(stem.id)}`,
+      ),
     })),
   });
 });
@@ -2740,7 +3499,10 @@ router.get("/api/noise-gens/originals/:id/stem-pack", async (req, res) => {
       mime: asset.mime,
       size: asset.bytes,
       uploadedAt: asset.uploadedAt,
-      url: `/originals/${encodeURIComponent(original.id)}/stem-groups/${encodeURIComponent(asset.id)}`,
+      url: buildOriginalAssetUrl(
+        original.id,
+        `stem-groups/${encodeURIComponent(asset.id)}`,
+      ),
     });
     grouped.set(asset.groupId, entry);
   }
@@ -2776,7 +3538,10 @@ router.get("/api/noise-gens/originals/:id/stem-pack", async (req, res) => {
       channels: stem.channels ?? undefined,
       defaultGain: 1,
       offsetMs: 0,
-      url: `/originals/${encodeURIComponent(original.id)}/stems/${encodeURIComponent(stem.id)}`,
+      url: buildOriginalAssetUrl(
+        original.id,
+        `stems/${encodeURIComponent(stem.id)}`,
+      ),
     })),
   });
 });
@@ -2838,6 +3603,56 @@ router.get("/api/noise-gens/recipes/:id", async (req, res) => {
   return res.json(recipe);
 });
 
+router.put("/api/noise-gens/recipes/:id", async (req, res) => {
+  const id = String(req.params.id ?? "").trim();
+  if (!id) return res.status(400).json({ error: "recipe_id_required" });
+  const parsed = recipeUpdateSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_request", issues: parsed.error.issues });
+  }
+  let updated: NoisegenRecipe | null = null;
+  await updateNoisegenStore((next) => {
+    const recipes = next.recipes ?? [];
+    const index = recipes.findIndex((entry) => entry.id === id);
+    if (index === -1) return next;
+    const current = recipes[index];
+    const parentIdRaw = parsed.data.parentId;
+    const parentId =
+      parentIdRaw === null ? undefined : parentIdRaw?.trim() || undefined;
+    if (parentId && parentId === current.id) {
+      return next;
+    }
+    if (parentId && !recipes.some((entry) => entry.id === parentId)) {
+      return next;
+    }
+    const nextRecipe: NoisegenRecipe = {
+      ...current,
+      name: parsed.data.name?.trim() || current.name,
+      notes:
+        typeof parsed.data.notes === "string"
+          ? parsed.data.notes.trim() || undefined
+          : current.notes,
+      featured:
+        typeof parsed.data.featured === "boolean"
+          ? parsed.data.featured
+          : current.featured,
+      parentId: parentId ?? current.parentId,
+      metrics: parsed.data.metrics ?? current.metrics,
+      updatedAt: Date.now(),
+    };
+    recipes[index] = nextRecipe;
+    updated = nextRecipe;
+    next.recipes = recipes;
+    return next;
+  });
+  if (!updated) {
+    return res.status(404).json({ error: "recipe_not_found" });
+  }
+  return res.json(updated);
+});
+
 router.post("/api/noise-gens/recipes", async (req, res) => {
   const parsed = recipeSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
@@ -2846,6 +3661,75 @@ router.post("/api/noise-gens/recipes", async (req, res) => {
       .json({ error: "invalid_request", issues: parsed.error.issues });
   }
   const now = Date.now();
+  const store = await getNoisegenStore();
+  const parentId = parsed.data.parentId?.trim();
+  if (parentId && !store.recipes?.some((entry) => entry.id === parentId)) {
+    return res.status(400).json({ error: "parent_recipe_not_found" });
+  }
+  const original = findOriginalById(store, parsed.data.coverRequest.originalId);
+  const contract = original?.intentContract ?? null;
+  const intentState = createIntentEnforcementState();
+  const enforcedRequest = enforceIntentContractOnRequest(
+    parsed.data.coverRequest,
+    contract,
+    intentState,
+  );
+  if (parsed.data.coverRequest.renderPlan) {
+    enforcedRequest.renderPlan = enforceIntentContractOnRenderPlan(
+      parsed.data.coverRequest.renderPlan,
+      contract,
+      intentState,
+    );
+  }
+  const intentMeta = finalizeIntentMeta(intentState, contract);
+  if (intentMeta.violations.length) {
+    console.warn(
+      "[noise-gens] intent violations on recipe",
+      parsed.data.coverRequest.originalId,
+      intentMeta.violations,
+    );
+  }
+  const ideologyReceipt = await buildIdeologyReceipt(contract);
+  const provenanceReceipt = buildProvenanceReceipt(
+    original?.timeSky,
+    contract?.provenancePolicy,
+  );
+  const planMeta = enforcedRequest.planMeta;
+  const toolsReceipt =
+    planMeta &&
+    (planMeta.plannerVersion ||
+      planMeta.modelVersion != null ||
+      (planMeta.toolVersions && Object.keys(planMeta.toolVersions).length > 0))
+      ? {
+          plannerVersion: planMeta.plannerVersion,
+          modelVersion:
+            planMeta.modelVersion != null
+              ? String(planMeta.modelVersion)
+              : undefined,
+          toolVersions:
+            planMeta.toolVersions && Object.keys(planMeta.toolVersions).length > 0
+              ? planMeta.toolVersions
+              : undefined,
+        }
+      : undefined;
+  const receipt: NoisegenEditionReceipt = {
+    createdAt: now,
+    ...(contract
+      ? {
+          contract: {
+            version: contract.version,
+            hash: intentMeta.contractHash,
+            intentSimilarity: intentMeta.intentSimilarity,
+            ...(intentMeta.violations.length
+              ? { violations: intentMeta.violations }
+              : {}),
+          },
+        }
+      : {}),
+    ...(ideologyReceipt ? { ideology: ideologyReceipt } : {}),
+    ...(provenanceReceipt ? { provenance: provenanceReceipt } : {}),
+    ...(toolsReceipt ? { tools: toolsReceipt } : {}),
+  };
   const recipe = {
     id: randomUUID(),
     name: parsed.data.name.trim(),
@@ -2853,8 +3737,12 @@ router.post("/api/noise-gens/recipes", async (req, res) => {
     createdAt: now,
     updatedAt: now,
     seed: parsed.data.seed,
-    coverRequest: parsed.data.coverRequest,
+    coverRequest: enforcedRequest,
     notes: parsed.data.notes?.trim() || undefined,
+    featured: parsed.data.featured ?? false,
+    parentId: parentId ?? undefined,
+    metrics: parsed.data.metrics,
+    receipt,
   };
   await updateNoisegenStore((next) => {
     next.recipes.push(recipe);
@@ -3075,6 +3963,13 @@ router.post(
       }
       timeSky = timeSkyValidation.data;
     }
+    const intentContractParsed = parseIntentContractField(
+      req.body?.intentContract,
+    );
+    if ("error" in intentContractParsed) {
+      return res.status(400).json(intentContractParsed.error);
+    }
+    const intentContract = intentContractParsed.contract;
 
     const trackId = existingOriginalId || randomUUID();
     const now = Date.now();
@@ -3088,6 +3983,12 @@ router.post(
           fileName: intentFile.originalname,
         })
       : undefined;
+    const intentSnapshotPreferences = buildIntentSnapshotPreferences({
+      applyTempo: readBooleanField(req.body?.intentApplyTempo),
+      applyMix: readBooleanField(req.body?.intentApplyMix),
+      applyAutomation: readBooleanField(req.body?.intentApplyAutomation),
+      hasSnapshot: Boolean(intentSnapshot),
+    });
     const stemPayloads = stems.length
       ? (() => {
           const used = new Set<string>(
@@ -3233,6 +4134,8 @@ router.post(
       notes: notes || undefined,
       timeSky,
       intentSnapshot,
+      intentSnapshotPreferences,
+      intentContract,
       instrumentalAsset,
       vocalAsset,
       stemAssets,
@@ -3333,6 +4236,13 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
     }
     timeSky = timeSkyValidation.data;
   }
+  const intentContractParsed = parseIntentContractField(
+    req.body?.intentContract,
+  );
+  if ("error" in intentContractParsed) {
+    return res.status(400).json(intentContractParsed.error);
+  }
+  const intentContract = intentContractParsed.contract;
 
   const notes = readStringField(req.body?.notes);
   const { baseDir } = getNoisegenPaths();
@@ -3392,10 +4302,16 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
   const storeSnapshot = await getNoisegenStore();
   const existingSnapshot = findOriginalById(storeSnapshot, trackId);
   if (kind === "intent") {
-    const buffer = await fs.readFile(finalPath);
+    const buffer = await fs.readFile(assembledPath);
     const intentSnapshot = await parseAbletonIntentSnapshot({
       buffer,
       fileName,
+    });
+    const intentSnapshotPreferences = buildIntentSnapshotPreferences({
+      applyTempo: readBooleanField(req.body?.intentApplyTempo),
+      applyMix: readBooleanField(req.body?.intentApplyMix),
+      applyAutomation: readBooleanField(req.body?.intentApplyAutomation),
+      hasSnapshot: Boolean(intentSnapshot),
     });
     await upsertOriginalRecord({
       trackId,
@@ -3407,6 +4323,8 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
       notes: notes || undefined,
       timeSky,
       intentSnapshot,
+      intentSnapshotPreferences,
+      intentContract,
     });
     await fs.rm(uploadDir, { recursive: true, force: true });
     return res.json({ trackId, complete: true });
@@ -3508,21 +4426,22 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
             detail: "awaiting mixdown for playback",
             updatedAt: Date.now(),
           };
-  await upsertOriginalRecord({
-    trackId,
-    title,
-    creator,
-    durationSeconds,
-    offsetMs,
-    tempo,
-    notes: notes || undefined,
-    timeSky,
-    instrumentalAsset,
-    vocalAsset,
-    stemAssets,
-    playbackAssets,
-    processing,
-  });
+    await upsertOriginalRecord({
+      trackId,
+      title,
+      creator,
+      durationSeconds,
+      offsetMs,
+      tempo,
+      notes: notes || undefined,
+      timeSky,
+      intentContract,
+      instrumentalAsset,
+      vocalAsset,
+      stemAssets,
+      playbackAssets,
+      processing,
+    });
 
   await fs.rm(uploadDir, { recursive: true, force: true });
   return res.json({ trackId, complete: true });
@@ -3738,13 +4657,38 @@ router.post("/api/noise-gens/jobs", async (req, res) => {
       .json({ error: "invalid_request", issues: parsed.error.issues });
   }
 
+  const store = await getNoisegenStore();
+  const original = findOriginalById(store, parsed.data.originalId);
+  const contract = original?.intentContract ?? null;
+  const intentState = createIntentEnforcementState();
+  const enforcedRequest = enforceIntentContractOnRequest(
+    parsed.data,
+    contract,
+    intentState,
+  );
+  if (parsed.data.renderPlan) {
+    enforcedRequest.renderPlan = enforceIntentContractOnRenderPlan(
+      parsed.data.renderPlan,
+      contract,
+      intentState,
+    );
+  }
+  const intentMeta = finalizeIntentMeta(intentState, contract);
+  if (intentMeta.violations.length) {
+    console.warn(
+      "[noise-gens] intent violations on cover job",
+      parsed.data.originalId,
+      intentMeta.violations,
+    );
+  }
+
   const id = randomUUID();
   const now = Date.now();
   const job: CoverJob = {
     id,
     type: "cover",
     status: "processing",
-    request: parsed.data,
+    request: enforcedRequest,
     createdAt: now,
     updatedAt: now,
   };
@@ -3754,7 +4698,7 @@ router.post("/api/noise-gens/jobs", async (req, res) => {
     return next;
   });
 
-  if (shouldRemoteRender(parsed.data)) {
+  if (shouldRemoteRender(enforcedRequest)) {
     void processCoverJob(id).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       void updateNoisegenStore((next) => {
@@ -3768,7 +4712,7 @@ router.post("/api/noise-gens/jobs", async (req, res) => {
     });
   }
 
-  return res.json({ id });
+  return res.json({ id, request: enforcedRequest, intent: intentMeta });
 });
 
 router.get("/api/noise-gens/jobs/:id", async (req, res) => {
@@ -4075,12 +5019,18 @@ const processLegacyJob = async (jobId: string) => {
   const moodLabel =
     store.moods.find((preset) => preset.id === parsed.data.moodId)?.label ??
     parsed.data.moodId;
+  const macros = parsed.data.macros;
+  const macroEnergy = clamp01(macros?.energy ?? 0.6);
+  const macroTexture = clamp01(macros?.texture ?? 0.5);
+  const macroSpace = clamp01(macros?.space ?? 0.45);
+  const macroWeird = clamp01(macros?.weirdness ?? macroTexture);
+  const macroDrive = clamp01(macros?.drive ?? 0.3);
   const durationSeconds = clampNumber(12, PREVIEW_MIN_SECONDS, PREVIEW_MAX_SECONDS, 12);
   const settings = resolvePreviewSettings({
     seedSource: `${parsed.data.moodId}:${parsed.data.seed ?? jobId}`,
-    styleInfluence: 0.4,
-    sampleInfluence: 0.6,
-    weirdness: 0.3,
+    styleInfluence: clamp01(0.2 + macroTexture * 0.65),
+    sampleInfluence: clamp01(0.35 + macroEnergy * 0.55),
+    weirdness: clamp01(0.1 + macroWeird * 0.6 + macroSpace * 0.15 + macroDrive * 0.1),
   });
   const preview = buildPreviewWav({ durationSeconds, ...settings });
   const storedPreview = await savePreviewBuffer({

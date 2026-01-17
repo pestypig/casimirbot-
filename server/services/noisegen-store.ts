@@ -90,11 +90,95 @@ export type NoisegenProcessingState = {
 };
 
 export type NoisegenTimeSkyMeta = {
+  context?: {
+    publishedAt?: number;
+    composedStart?: number;
+    composedEnd?: number;
+    timezone?: string;
+    place?: string;
+    placePrecision?: "exact" | "approximate" | "hidden";
+    halobankSpanId?: string;
+    skySignature?: string;
+  };
+  pulse?: {
+    source?: "drand" | "nist-beacon" | "curby" | "local-sky-photons";
+    round?: string | number;
+    pulseTime?: number;
+    valueHash?: string;
+    seedSalt?: string;
+  };
   publishedAt?: number;
   composedStart?: number;
   composedEnd?: number;
   place?: string;
   skySignature?: string;
+  pulseRound?: string | number;
+  pulseHash?: string;
+};
+
+export type NoisegenIntentContract = {
+  version: 1;
+  createdAt: number;
+  updatedAt: number;
+  invariants?: {
+    tempoBpm?: number;
+    timeSig?: string;
+    key?: string;
+    grooveTemplateIds?: string[];
+    motifIds?: string[];
+    stemLocks?: string[];
+  };
+  ranges?: {
+    sampleInfluence?: { min: number; max: number };
+    styleInfluence?: { min: number; max: number };
+    weirdness?: { min: number; max: number };
+    reverbSend?: { min: number; max: number };
+    chorus?: { min: number; max: number };
+    arrangementMoves?: string[];
+  };
+  meaning?: {
+    ideologyRootId?: string;
+    allowedNodeIds?: string[];
+  };
+  provenancePolicy?: {
+    storeTimeSky?: boolean;
+    storePulse?: boolean;
+    pulseSource?: "drand" | "nist-beacon" | "curby" | "local-sky-photons";
+    placePrecision?: "exact" | "approximate" | "hidden";
+  };
+  notes?: string;
+};
+
+export type NoisegenEditionReceipt = {
+  createdAt: number;
+  contract?: {
+    version?: number;
+    hash?: string;
+    intentSimilarity?: number;
+    violations?: string[];
+  };
+  ideology?: {
+    rootId?: string;
+    allowedNodeIds?: string[];
+    treeVersion?: number;
+    mappingHash?: string;
+  };
+  provenance?: {
+    timeSky?: NoisegenTimeSkyMeta;
+    pulse?: NoisegenTimeSkyMeta["pulse"];
+    placePrecision?: "exact" | "approximate" | "hidden";
+  };
+  tools?: {
+    plannerVersion?: string;
+    modelVersion?: string;
+    toolVersions?: Record<string, string>;
+  };
+};
+
+export type IntentSnapshotPreferences = {
+  applyTempo?: boolean;
+  applyMix?: boolean;
+  applyAutomation?: boolean;
 };
 
 export type AbletonIntentSnapshot = {
@@ -118,6 +202,28 @@ export type AbletonIntentSnapshot = {
     locatorCount: number;
   };
   devices: Array<{ name: string; count: number }>;
+  deviceIntent?: {
+    eqPeaks?: Array<{ freq: number; q: number; gainDb: number }>;
+    fx?: {
+      reverbSend?: number;
+      comp?: number;
+      chorus?: number;
+      delay?: number;
+      sat?: number;
+    };
+    bounds?: {
+      reverbSend?: { min: number; max: number };
+      comp?: { min: number; max: number };
+      chorus?: { min: number; max: number };
+      delay?: { min: number; max: number };
+      sat?: { min: number; max: number };
+    };
+  };
+  automation?: {
+    envelopeCount: number;
+    pointCount: number;
+    energyCurve?: Array<{ bar: number; energy: number }>;
+  };
   tracks: Array<{
     name?: string;
     type: "audio" | "midi" | "return" | "group" | "master" | "unknown";
@@ -137,6 +243,9 @@ type BundledOriginalManifest = {
   notes?: string;
   offsetMs?: number;
   timeSky?: NoisegenTimeSkyMeta;
+  intentSnapshot?: AbletonIntentSnapshot;
+  intentSnapshotPreferences?: IntentSnapshotPreferences;
+  intentContract?: NoisegenIntentContract;
   uploadedAt?: number;
   assets?: {
     instrumental?: string;
@@ -167,6 +276,8 @@ export type NoisegenOriginal = {
   timeSky?: NoisegenTimeSkyMeta;
   processing?: NoisegenProcessingState;
   intentSnapshot?: AbletonIntentSnapshot;
+  intentSnapshotPreferences?: IntentSnapshotPreferences;
+  intentContract?: NoisegenIntentContract;
   assets: {
     instrumental?: NoisegenOriginalAsset;
     vocal?: NoisegenOriginalAsset;
@@ -195,6 +306,12 @@ export type NoisegenRecipe = {
   seed?: string | number;
   coverRequest: unknown;
   notes?: string;
+  featured?: boolean;
+  parentId?: string;
+  metrics?: {
+    idi?: number;
+  };
+  receipt?: NoisegenEditionReceipt;
 };
 
 export type NoisegenJob = {
@@ -432,7 +549,14 @@ const promotePendingOriginals = (store: NoisegenStore): NoisegenStore => {
   for (const original of store.pendingOriginals) {
     if (!original?.id) continue;
     if (knownIds.has(original.id)) continue;
-    const ageMs = now - (original.uploadedAt ?? now);
+    const processingUpdatedAt = original.processing?.updatedAt;
+    const anchor = Number.isFinite(processingUpdatedAt)
+      ? processingUpdatedAt
+      : Number.isFinite(original.uploadedAt)
+        ? original.uploadedAt
+        : now;
+    const rawAgeMs = now - anchor;
+    const ageMs = rawAgeMs < 0 ? PENDING_RANK_DELAY_MS : rawAgeMs;
     const playbackReady =
       (original.processing?.status === "ready" &&
         (original.assets.playback?.length ?? 0) > 0) ||
@@ -623,6 +747,7 @@ const resolveBundledOriginal = async (
     offsetMs: manifest.offsetMs,
     uploadedAt,
     timeSky: manifest.timeSky,
+    intentContract: manifest.intentContract,
     assets,
   };
 };

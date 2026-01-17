@@ -384,36 +384,63 @@ async function handleReady(message: CoverWorkerReady, _job: CoverJob, uploadPrev
   return { previewUrl, blob, duration, evidence };
 }
 
+async function pickFirstAvailable(
+  candidates: string[],
+): Promise<string | null> {
+  for (const url of candidates) {
+    if (await resourceExists(url)) {
+      return url;
+    }
+  }
+  return null;
+}
+
 async function resolveOriginalAudio(
   originalId: string,
 ): Promise<ResolvedOriginalAudio> {
   const slug = encodeURIComponent(originalId.toLowerCase());
-  const rootCandidates = [`/originals/${slug}`, `/audio/originals/${slug}`];
-  for (const root of rootCandidates) {
-    const instrumentalUrl = `${root}/instrumental.wav`;
-    const exists = await resourceExists(instrumentalUrl);
-    if (exists) {
-      const vocalUrl = (await resourceExists(`${root}/vocal.wav`)) ? `${root}/vocal.wav` : undefined;
-      return { instrumentalUrl, vocalUrl };
-    }
+  const instrumentalUrl = await pickFirstAvailable([
+    `/api/noise-gens/originals/${slug}/instrumental`,
+    `/originals/${slug}/instrumental.wav`,
+    `/audio/originals/${slug}/instrumental.wav`,
+  ]);
+  if (instrumentalUrl) {
+    const vocalUrl =
+      (await pickFirstAvailable([
+        `/api/noise-gens/originals/${slug}/vocal`,
+        `/originals/${slug}/vocal.wav`,
+        `/audio/originals/${slug}/vocal.wav`,
+      ])) ?? undefined;
+    return { instrumentalUrl, vocalUrl };
   }
   try {
     const stems = await fetchOriginalStems(originalId);
     const instrumentalStems = selectInstrumentalStems(stems);
     if (instrumentalStems.length > 0) {
-      const vocalUrl = (await resourceExists(`/originals/${slug}/vocal.wav`))
-        ? `/originals/${slug}/vocal.wav`
-        : (await resourceExists(`/audio/originals/${slug}/vocal.wav`))
-          ? `/audio/originals/${slug}/vocal.wav`
-          : undefined;
+      const vocalUrl =
+        (await pickFirstAvailable([
+          `/api/noise-gens/originals/${slug}/vocal`,
+          `/originals/${slug}/vocal.wav`,
+          `/audio/originals/${slug}/vocal.wav`,
+        ])) ?? undefined;
       return { instrumentalStems, vocalUrl };
     }
   } catch {
     // fall through to default
   }
   return {
-    instrumentalUrl: "/originals/default/instrumental.wav",
-    vocalUrl: (await resourceExists("/originals/default/vocal.wav")) ? "/originals/default/vocal.wav" : undefined,
+    instrumentalUrl:
+      (await pickFirstAvailable([
+        "/api/noise-gens/originals/default/instrumental",
+        "/originals/default/instrumental.wav",
+        "/audio/originals/default/instrumental.wav",
+      ])) ?? "/originals/default/instrumental.wav",
+    vocalUrl:
+      (await pickFirstAvailable([
+        "/api/noise-gens/originals/default/vocal",
+        "/originals/default/vocal.wav",
+        "/audio/originals/default/vocal.wav",
+      ])) ?? undefined,
   };
 }
 
