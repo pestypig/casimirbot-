@@ -22,6 +22,12 @@ const VIRTUAL_NODE_SHIM_PREFIX = "\0node-shim:";
 const defaultApiPort = process.env.PORT ?? "5173";
 const apiProxyTarget =
   process.env.API_PROXY_TARGET ?? `http://localhost:${defaultApiPort}`;
+const buildStamp =
+  process.env.VITE_BUILD_ID ??
+  process.env.BUILD_ID ??
+  process.env.GIT_COMMIT ??
+  process.env.GIT_SHA ??
+  new Date().toISOString();
 
 const toPosix = (value: string) => value.split(path.sep).join(path.posix.sep);
 
@@ -86,6 +92,9 @@ const webTreeSitterNodeShim = (): Plugin => ({
 
 export default defineConfig({
   envPrefix: ["VITE_", "ENABLE_", "KNOWLEDGE_"],
+  define: {
+    __APP_BUILD__: JSON.stringify(buildStamp),
+  },
   plugins: [
     react(),
     runtimeErrorOverlay(),

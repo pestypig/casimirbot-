@@ -1,5 +1,7 @@
 export {};
 
+declare const __APP_BUILD__: string;
+
 declare global {
   interface Window {
     WarpEngine?: any;

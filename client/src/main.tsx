@@ -2,8 +2,14 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+const buildStamp = import.meta.env.DEV
+  ? `dev-${Date.now().toString()}`
+  : typeof __APP_BUILD__ === "string"
+    ? __APP_BUILD__
+    : "prod";
+
 // Stamp build token at app boot
-(window as any).__APP_WARP_BUILD = 'dev-patched-' + Date.now().toString();
+(window as any).__APP_WARP_BUILD = buildStamp;
 
 createRoot(document.getElementById("root")!).render(<App />);
 
@@ -38,7 +44,10 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
   if (isProd && isSecure) {
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("/mobile-sw.js")
+        .register(`/mobile-sw.js?v=${encodeURIComponent(buildStamp)}`, {
+          updateViaCache: "none",
+        })
+        .then((reg) => reg.update())
         .catch(() => {
           // no-op on failure
         });

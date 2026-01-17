@@ -1,4 +1,5 @@
-const CACHE_NAME = "helix-mobile-shell-v1";
+const CACHE_VERSION = new URL(self.location.href).searchParams.get("v") || "v2";
+const CACHE_NAME = `helix-mobile-shell-${CACHE_VERSION}`;
 const CORE_ASSETS = ["/", "/mobile", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -28,6 +29,7 @@ self.addEventListener("fetch", (event) => {
 
   // Only handle same-origin requests
   if (url.origin !== self.location.origin) return;
+  if (req.method !== "GET") return;
 
   // Navigation requests: try network, fall back to cache (app shell)
   if (req.mode === "navigate") {
@@ -37,18 +39,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for static assets we care about
+  // Network-first for static assets to avoid stale bundles
   if (["script", "style", "font"].includes(req.destination)) {
     event.respondWith(
-      caches.match(req).then(
-        (cached) =>
-          cached ||
-          fetch(req).then((resp) => {
-            const copy = resp.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-            return resp;
-          })
-      )
+      fetch(req)
+        .then((resp) => {
+          const copy = resp.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          return resp;
+        })
+        .catch(() => caches.match(req))
     );
     return;
   }
