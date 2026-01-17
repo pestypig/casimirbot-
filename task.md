@@ -428,6 +428,81 @@ Prompt P5 (Contract test) - Status: complete
 
 ---
 
+## Proof Panel Robustness Prompts (pending)
+
+Prompt R1 (Proof pack server endpoint) - Status: complete
+- Goal: make one source of truth for proof metrics used by panels.
+- Do: add a compact `/api/helix/pipeline/proofs` endpoint that returns the
+  derived proof metrics, source tags, proxy flags, and units; reuse pipeline
+  helpers and avoid recomputing heavy bricks.
+- Do not: emit full pipeline state or claim viability.
+- Acceptance: endpoint returns a stable schema that the UI can cache.
+
+Prompt R2 (Panel adoption) - Status: complete
+- Goal: remove client-side drift between proof panels and pipeline math.
+- Do: update `FrontProofsLedger`, `WarpProofPanel`, `DriveGuardsPanel`,
+  `PipelineProofPanel`, `NeedleCavityBubblePanel`, `CardProofOverlay`, and
+  `visual-proof-charts` to consume the proof pack, including proxy flags.
+- Do not: hard-code constants or duty factors when a pipeline value exists.
+- Acceptance: shared metrics match across panels and indicate proxy fallbacks.
+
+Prompt R3 (Math tree coverage for proof math) - Status: complete
+- Goal: stage the shared proof math and constants in the math tree.
+- Do: add `shared/curvature-proxy.ts`, `client/src/physics/curvature.ts`,
+  `client/src/lib/warp-proof-math.ts`, and the proof pack builder to
+  `shared/math-stage.ts` with appropriate stage and evidence pointers.
+- Do not: mark anything certified without tests and evidence coverage.
+- Acceptance: math graph shows these modules staged with no unstaged proof math.
+
+Prompt R4 (Math stage gating in proof UI) - Status: complete
+- Goal: surface math maturity in proof panels and suppress over-claims.
+- Do: reuse `/api/helix/math/graph` to badge stage status and block
+  "non-proxy" claims when required modules are below the minimum stage.
+- Do not: hide values; annotate with stage and proxy status instead.
+- Acceptance: panels show stage badges and degrade to proxy when needed.
+
+Prompt R5 (Proof contract tests + unit checks) - Status: complete
+- Goal: lock the proof pack schema and unit discipline.
+- Do: add tests that compare proof pack outputs to pipeline snapshots on
+  fixtures, including power, area, kappa, and duty conversions.
+- Do not: use random inputs or environment-dependent fixtures.
+- Acceptance: tests fail on schema drift or unit mismatch.
+
+Prompt R6 (Trace + documentation) - Status: complete
+- Goal: make proof logic auditable and searchable.
+- Do: add a short doc explaining the proof pack contract and record proof pack
+  assembly events in training traces with source and proxy fields.
+- Do not: store large arrays or full pipeline payloads in traces.
+- Acceptance: trace export includes proof pack events and doc is linked.
+
+---
+
+## Proof Narrative Contract (policy draft)
+
+Goal: keep proof narratives anchored to solved pipeline outputs and green guardrails,
+with explicit provenance and units so strings never drift.
+
+Rules:
+- Every proof number shown in UI must come from the proof pack or a documented
+  pipeline field; client-side re-derivations must be labeled "proxy".
+- If math stage for a required module is below the minimum, show the value with
+  a "proxy" or "unstaged" badge and suppress non-proxy claims.
+- Each narrative string must carry: source field id, stage label, unit label,
+  and proxy flag (even when proxy=false).
+- Any conversion (MW to W, cm^2 to m^2, etc.) must be recorded with the unit
+  basis used in the proof pack output.
+- If guardrails are not GREEN, narratives must describe the guard state and
+  avoid "viable" or "certified" wording.
+- When values are missing, the UI must display "n/a" and a reason, not fallback
+  to magic constants unless the proof pack flags it as safe proxy data.
+
+Acceptance:
+- No panel shows a proof narrative that cannot be traced to a proof pack field.
+- Stage and proxy badges appear next to all proof strings.
+- Unit checks pass for each proof pack field that reports a unit signature.
+
+---
+
 ## Safety / Robustness Notes
 - Never trust LLM algebra without tool confirmation.
 - Always record conventions and assumptions in artifacts.
@@ -462,9 +537,9 @@ Policy brief: docs/zen-society-alignment.md.
     monitoring, and correction triggers so abuses are investigated.
 
 ### Reusable Artifact Pack (Plan)
-- [x] Treat each pillar as a template and wire templates to ideology node IDs
+- [x] Treat each pillar as a template and wire templates to ideology node IDs   
   so future instances trace back to `docs/ethos/ideology.json`.
-- [x] Build a template set under `docs/zen-society/` with fields for purpose,
+- [x] Build a template set under `docs/zen-society/` with fields for purpose,   
   scope, nodeRefs, minimum checks, evidence links, and review cadence.
 - [x] Add a crosswalk registry (md or json) that maps `artifactId` ->
   `ideology node ids` -> required checks as the canonical ethos index.
@@ -476,6 +551,64 @@ Policy brief: docs/zen-society-alignment.md.
   `civic-memory-continuity`.
 - [x] Package minimal artifacts per node (charter, protocol, ledger, dashboard)
   so each pillar produces the same reusable set across deployments.
+
+### Entrepreneur Ladder + Curiosity Dividend (Zen Ladder Pack)
+- [x] Publish machine-readable pack under `docs/zen-ladder-pack/` (schemas, crosswalk,
+  gates, workflows R0-R6, artifacts, receipts, validator, memo, deck outline).
+- [ ] Add Curiosity Dividend workflow specs (eligibility gate, points policy, payout rules, expiry).
+- [ ] Add program policy registry (ladder versions, deprecation, policy metadata).
+- [ ] Build runtime loader for schemas/crosswalk/gates/workflows/artifacts with strict validation.
+- [ ] Implement scoring engine for demand/capability/integrity/sustainability and rung thresholds.
+- [ ] Add evidence intake + artifact freshness validation (uploads, hashes, metadata).
+- [ ] Implement gate evaluation pipeline (eligibility, two-key approval, public claims).
+- [ ] Implement receipt minting with hashes, versioning, and storage (DB schema + API).
+- [ ] Add revocation/appeal workflow with audit log and decision history.
+- [ ] Add reviewer tooling (queues, checklists, COI prompts, reason codes).
+- [ ] Add applicant tooling (submission wizard, status, missing evidence).
+- [ ] Add utility report generator + API (aggregate metrics, filters, exports).
+- [ ] Add analytics/telemetry for pass rates, evidence freshness, incidents, corrections.
+- [ ] Wire the pack validator into CI and add a smoke test for schema drift.
+- [ ] Add integration tests for scoring, gates, receipts, and API contract.
+- [ ] Pilot R0-R2 flow with real receipts, audit sampling, and a public utility report.
+- [ ] Expand to R3-R6 with two-key gates and anti-capture audits.
+- [ ] Publish public docs, glossary, and reviewer training material.
+
+#### Operating model (draft)
+To "free the American entrepreneur from dead weight," the program should remove ambiguity and delay,
+not structure. The goal is a fast, fair path across the $5k to $100k cliff by replacing opaque
+committees and unwritten rules with clear requirements that anyone can understand and software can
+enforce. That keeps entrepreneurs building and learning instead of decoding bureaucracy, while the
+public gets accountability by default.
+
+The program is published as a ladder of rungs (R0-R6) where each rung is a plain, one-page checklist:
+what to submit, what thresholds apply, what counts as evidence, and what the reviewer can and cannot
+decide. Before anyone is judged on market potential, a pre-rung eligibility gate runs first, covering
+baseline safety, non-predation, conflict-of-interest disclosure, and bounded public claims. If the
+gate fails, the applicant gets a fix list and an appeal path so integrity stays a floor.
+
+Applicants submit evidence through a portal that auto-checks completeness and freshness (missing
+fields, outdated logs, absent disclosures). Eligible submissions go to human reviewers for scoring
+on the same four axes every time: Demand Reality, Capability, Integrity/Safety, and Sustainability.
+Support unlocks automatically based on rung outcomes (early micro-grants and tool credits, later
+guarantees and procurement on-ramps). A Curiosity Dividend runs alongside the ladder to fund verified
+exploration (benchmarks, replications, corrections, datasets) as additive credits, never as a
+substitute for integrity or demand thresholds.
+
+Trust is enforced through lightweight governance: every decision produces a receipt that records what
+was required, what evidence was used, what passed or failed, who reviewed it, and what the next steps
+are. High-impact actions (large disbursements, public endorsements, public-facing claims) require
+two-key approval: one approver and one verifier, both attaching evidence references. The program
+stays honest without getting heavy by using risk-weighted audits, clear revocation triggers for
+fraud or undisclosed conflicts, and automatic sunsets and review cadences so rules do not fossilize.
+
+This depends on a small set of reusable building blocks: a versioned spec registry (WorkflowSpecs,
+GateSpecs, ArtifactSpecs), schema validation for consistent rules, and a deterministic rules engine
+that evaluates gates and thresholds. It needs identity and role management
+(applicant/reviewer/verifier/auditor), an evidence store with provenance (timestamps, hashes,
+redaction support, access controls), an immutable audit log, and a workflow orchestrator for
+submissions, reviews, appeals, audits, and disbursements. Add a metrics pipeline and public dashboard
+for the utility report (pass rates, freshness, cadence, outcomes, incidents/corrections), plus an AI
+assist layer that drafts checklists and flags contradictions but cannot approve, revoke, or punish.
 
 ---
 
@@ -870,87 +1003,87 @@ Prompt NG11 (Latency-safe playback) - Status: pending
 - Do not: block on full offline renders for simple macro tweaks.
 - Acceptance: macro changes feel immediate in listener and explorer modes.
 
-Prompt NG12 (Progressive disclosure UI modes) - Status: pending
+Prompt NG12 (Progressive disclosure UI modes) - Status: complete
 - Goal: implement a layered UI model so the player is simple by default and advanced tools are opt-in.
 - Do: add noisegenUiMode (listener | remix | studio | labs) plus optional showAdvanced; persist via preferences; gate panels in helix-noise-gens.tsx; add a layer router that selects which components render based on mode, device, and whether the user has opened advanced tools.
 - Do not: show DAW or diagnostic panels on first load.
 - Acceptance: each mode shows the intended panel set and can be switched without losing playback state.
 
-Prompt NG13 (Listener player skin) - Status: pending
+Prompt NG13 (Listener player skin) - Status: complete
 - Goal: deliver a simple, complete listener experience.
 - Do: skin CoverCreator as a player surface with play/pause, scrub, next/prev, a single Vary button, 3-7 mood chips, Customize, Save/Share recipe, and Undo/Reset; keep DualTopLists visible and compress MoodLegend into chips.
 - Do not: expose RenderPlan JSON, AtomLibraryPanel, TrainingPlan, StemDaw, or NoiseFieldPanel in listener mode.
 - Acceptance: a listener can pick a track, generate variations, save/share, and reset without seeing creator tooling.
 
-Prompt NG14 (Customize drawer macros) - Status: pending
+Prompt NG14 (Customize drawer macros) - Status: complete
 - Goal: add a curiosity door that exposes only macro controls.
 - Do: implement a drawer/sheet with Energy, Space, and Texture sliders (plus optional Locks: groove, harmony, drums); map macros to RenderPlan overrides (texture.fx, eqPeaks, comp, reverbSend, energy curve).
 - Do not: show stems or atom pickers in this drawer.
 - Acceptance: macro changes visibly alter render output and persist per session.
 
-Prompt NG15 (Remix layer) - Status: pending
+Prompt NG15 (Remix layer) - Status: complete
 - Goal: unlock mid-level control without full DAW complexity.
 - Do: reveal Ingredients (atoms), a lightweight Structure view, and Auto-pick best variation (plan ranking) in Remix mode; allow entry after 3+ renders or explicit toggle.
 - Do not: expose full DAW lanes or training diagnostics here.
 - Acceptance: remix users can pick atoms/motifs, tweak structure, and auto-rank variations.
 
-Prompt NG16 (Studio mode gating) - Status: pending
+Prompt NG16 (Studio mode gating) - Status: complete
 - Goal: make creator tooling explicit and intentional.
 - Do: show ProjectAlbumPanel, StemDaw, UploadOriginalsModal, OriginalsLibraryModal, AtomLibraryPanel, and TrainingPlan only in Studio mode.
 - Do not: auto-open Studio on first visit or when in Listener/Remix.
 - Acceptance: Studio tools are available on demand without leaking into listener flow.
 
-Prompt NG17 (Labs diagnostics) - Status: pending
+Prompt NG17 (Labs diagnostics) - Status: complete
 - Goal: isolate diagnostic panels for builders.
 - Do: place NoiseFieldPanel and other scope-like diagnostics behind a Labs tab or deep link.
 - Do not: show Labs content in Listener/Remix/Studio by default.
 - Acceptance: Labs is accessible but not on the primary path.
 
-Prompt NG18 (Lyrics storage and edit flow) - Status: pending
+Prompt NG18 (Lyrics storage and edit flow) - Status: complete
 - Goal: support manual lyric paste per original.
 - Do: add lyricsText to Original storage; add endpoints to save/get lyrics; expose "Add/Edit lyrics" only in Studio/Creator surfaces.
 - Do not: require DAW uploads or auto-transcription in v1.
 - Acceptance: lyrics can be saved and reloaded for an original.
 
-Prompt NG19 (Lyrics + meaning split view) - Status: pending
+Prompt NG19 (Lyrics + meaning split view) - Status: complete
 - Goal: reveal lyrics and ideology parallels without breaking the player.
 - Do: add a Lyrics button in CoverCreator that opens a split view: lyrics on the right, ideology parallels on the left, player stays centered; on mobile use a bottom sheet with Lyrics and Meaning tabs.
 - Do not: move this into a separate full-page panel.
 - Acceptance: the split view opens and closes smoothly, keeping playback controls visible.
 
-Prompt NG20 (Ideology parallels generation) - Status: pending
+Prompt NG20 (Ideology parallels generation) - Status: complete
 - Goal: generate lay-friendly ideology parallels from lyrics, anchored to the ideology tree.
 - Do: implement a lyrics-to-ideology pipeline anchored at rootId mission-ethos; segment lyrics, score nodes (keywords + semantic similarity), select top nodes from a coherent branch; return nodePath, lyric snippet, parallel text, confidence; cache by lyricsHash + ideology tree version.
 - Do not: claim author intent or output ungrounded conclusions.
 - Acceptance: Meaning cards render with node title/path, lyric quote, and a 1-2 sentence parallel.
 
-Prompt NG21 (Playback-synced lyric highlights) - Status: pending
+Prompt NG21 (Playback-synced lyric highlights) - Status: complete
 - Goal: add a subtle "living liner notes" effect.
 - Do: highlight the current lyric line during playback and softly glow the matching Meaning card.
 - Do not: introduce distracting auto-scroll or flashing UI.
 - Acceptance: highlight sync is present and does not disrupt listening.
 
-Principle NG-P1 (Fairness baseline for expressive truth) - Status: pending
+Principle NG-P1 (Fairness baseline for expressive truth) - Status: complete
 - Goal: ground lyric interpretation in a fairness baseline with checkable reasoning.
 - Do: anchor parallels to mission-ethos; surface a reason path (worldview-integrity, integrity-protocols, verification-checklist, right-speech-infrastructure, interbeing-systems, jurisdictional-floor, stewardship-ledger); show evidence, meaning, and certainty layers for each parallel.
 - Do not: treat vibes as proof or claim author intent.
 - Acceptance: every meaning card includes a lyric snippet, a node path, a short parallel, and a confidence/why field that reflects evidence.
 
-Prompt NG22 (Player-as-a-lens framing) - Status: pending
+Prompt NG22 (Player-as-a-lens framing) - Status: complete
 - Goal: treat playback as a lens that adds context, values, and provenance without turning listening into mixing.
 - Do: build toward a "player-as-a-lens" where playback plus context (lyrics), values (ideology tree), and provenance (time/place/sky) make the track a living artifact with liner notes that can update, branch, and stay grounded.
 - Do: keep the focus on meaningful steering and meaningful reference (not mixing), aligned to the fairness baseline + checkable spine principle.
 - Do not: collapse the player into a DAW surface.
 - Acceptance: listener mode stays simple while still offering context, values, and provenance as opt-in reveals.
 
-Prompt NG23 (Provenance vs security key) - Status: pending
+Prompt NG23 (Provenance vs security key) - Status: complete
 - Goal: clarify the difference between public provenance and secret cryptographic keys for sky/time inputs.
 - Do: document the two goals that sound similar: (1) a public, historical anchor ("This version was generated under these sky conditions, at this time.") that is public and reproducible; (2) a secret, cryptographic key ("Only I can reproduce this value; no one can predict it.").
 - Do: state that the product goal is #1 with a sprinkle of "unpredictability" for artistic freshness, not security.
 - Do not: position telescope/sky data as a secrecy foundation.
 - Acceptance: product copy and technical docs consistently treat this as provenance, not secrecy.
 
-Prompt NG24 (Public randomness beacon pulse) - Status: pending
+Prompt NG24 (Public randomness beacon pulse) - Status: complete
 - Goal: add a fairness-friendly external randomness pulse for provenance/versioning.
 - Do: support public randomness beacons as a "cosmic pulse", including NIST Randomness Beacon (public pulses, time-stamped, designed as a public utility concept) [ref], and drand (distributed randomness beacon, publicly verifiable randomness at fixed intervals; Cloudflare documents a beacon service built on drand) [ref].
 - Do: use the beacon as a public salt, not secrecy; seed = hash(trackId + publishedAt + location + beaconRound + beaconValueHash).
@@ -958,7 +1091,7 @@ Prompt NG24 (Public randomness beacon pulse) - Status: pending
 - Do not: treat beacon output as private or secret.
 - Acceptance: a render can reference the beacon round/value hash and be reproduced later.
 
-Prompt NG25 (Cosmic photon pulse) - Status: pending
+Prompt NG25 (Cosmic photon pulse) - Status: complete
 - Goal: support a studio-only "local sky sensor" ritual mode.
 - Do: add a mode that derives randomness from cosmic photon arrival timing, acknowledging that photon arrivals are fundamentally noisy and not practically predictable at detection level [ref].
 - Do: record the derived seed for reproducibility (store the pulse you used).
@@ -966,7 +1099,7 @@ Prompt NG25 (Cosmic photon pulse) - Status: pending
 - Do not: require this for standard listener workflows.
 - Acceptance: creators can generate a seed from "tonight's sky" and persist it as metadata.
 
-Prompt NG26 (Entanglement-based randomness pulse) - Status: pending
+Prompt NG26 (Entanglement-based randomness pulse) - Status: complete
 - Goal: support a public entanglement-backed pulse when available.
 - Do: include an entanglement-based randomness source such as CURBy (public beacon using quantum entanglement to generate verifiable random numbers) [ref].
 - Do: treat it like drand/NIST as a public salt with strong "checkable spine" vibes.
@@ -974,28 +1107,28 @@ Prompt NG26 (Entanglement-based randomness pulse) - Status: pending
 - Do not: position it as a private key.
 - Acceptance: pulse source can be selected and stored like other beacon inputs.
 
-Prompt NG27 (Deterministic + indeterminacy + accountability layers) - Status: pending
+Prompt NG27 (Deterministic + indeterminacy + accountability layers) - Status: complete
 - Goal: formalize the philosophy into engineering layers.
 - Do: describe and implement the three layers: deterministic layer (track, ideology tree, published/composed timeline, ephemeris-like sky context), indeterminacy layer (external pulse or sensor noise), accountability layer (store inputs so anyone can reproduce the exact RenderPlan).
 - Do: present the framing: context + pulse + replayability.
 - Do not: introduce metaphysical claims beyond these layers.
 - Acceptance: documentation and implementation reflect the three-layer model.
 
-Prompt NG28 (Time & Sky micro-surface in split view) - Status: pending
+Prompt NG28 (Time & Sky micro-surface in split view) - Status: complete
 - Goal: add Time & Sky as a compact, optional sub-surface in the lyrics/meaning split view.
 - Do: in listener view, keep split view header with right tab "Lyrics", left tab "Meaning", and a tiny "Time & Sky" info button.
 - Do: when tapped, show a compact card (not a panel explosion) with: Published (YYYY-MM-DD), Made (YYYY-MM -> YYYY-MM), Place ("City (approx)"), Sky signature (HALO-XXXX... with copy), Variation pulse (beacon round with copy), and an "Explore timeline" deep link to Halobank.
 - Do not: expose a full dashboard from the main player.
 - Acceptance: Time & Sky reads like liner notes and stays optional.
 
-Prompt NG29 (Creator pulse controls + privacy) - Status: pending
+Prompt NG29 (Creator pulse controls + privacy) - Status: complete
 - Goal: let creators opt into cosmic pulse seeding and control place privacy.
 - Do: add a Studio mode toggle "Use cosmic pulse for seeding" with source selection (drand / NIST beacon / local sensor) and record to metadata.
 - Do: allow place privacy settings: exact, approximate, or hidden.
 - Do not: force creators into a public location disclosure.
 - Acceptance: creators can select pulse source and place precision per track.
 
-Prompt NG30 (Context + pulse data model) - Status: pending
+Prompt NG30 (Context + pulse data model) - Status: complete
 - Goal: store reproducible context and pulse metadata separately.
 - Do: implement Context with publishedAt, composedStart, composedEnd, timezone, location (optional/coarse), halobankSpanId or timestamps.
 - Do: implement Pulse with pulseSource ("drand" | "nist-beacon" | "curby" | "local-sky-photons"), pulseTime or round, pulseValueHash, seedSalt (derived salt for reproduction).
@@ -1003,34 +1136,34 @@ Prompt NG30 (Context + pulse data model) - Status: pending
 - Do not: allow pulse to introduce chaotic changes; bounded freshness only.
 - Acceptance: stored context + pulse can reproduce the same RenderPlan output.
 
-Prompt NG31 (Safety note: not encryption) - Status: pending
+Prompt NG31 (Safety note: not encryption) - Status: complete
 - Goal: prevent misclassification of the pulse as security key material.
 - Do: keep language explicitly in the lane of provenance, versioning, fairness anchoring, and artistic ritual.
 - Do not: market this as secure secret key material.
 - Acceptance: UI and docs include a plain safety note that this is verifiable context, not secrecy.
 
-Prompt NG32 (V1 pulse source choice) - Status: pending
+Prompt NG32 (V1 pulse source choice) - Status: complete
 - Goal: pick a practical v1 pulse source and defer hardware rituals.
 - Do: select drand or NIST beacon as the v1 pulse source because it is easy, publicly verifiable, and maps cleanly to the fairness baseline idea [ref].
 - Do: plan a later Studio-only "local sky photons" ritual mode [ref].
 - Do not: block v1 on hardware or entanglement sources.
 - Acceptance: v1 ships with a public beacon pulse and a roadmap note for local sky sensor mode.
 
-Prompt NG33 (Intent Contract v1) - Status: pending
+Prompt NG33 (Intent Contract v1) - Status: complete
 - Goal: add a creator-authored "intent contract" that defines the laws of motion for each track.
 - Do: store invariants (tempo/key/groove/motif identity/stem locks), allowed variation ranges (sampleInfluence/styleInfluence/weirdness/reverb/chorus/arrangement moves), meaning anchors (ideology root + allowed subtrees), and provenance policy (what gets stored, pulse usage, place precision) on the Original.
 - Do: provide a simple Studio UI to capture the contract at upload/edit time.
 - Do not: require a full DAW or complex JSON editing to define the contract.
 - Acceptance: each Original can carry an intent contract that is editable in Studio mode and readable in Listener mode as a summary.
 
-Prompt NG34 (Intent Contract enforcement) - Status: pending
+Prompt NG34 (Intent Contract enforcement) - Status: complete
 - Goal: ensure all plans, renders, and variations stay inside the creator's contract.
 - Do: clamp plan parameters to allowed ranges; reject or repair illegal plans; enforce stem/group locks; prevent disallowed arrangement moves.
 - Do: surface "intent violations" in logs and attach an intentSimilarity score to each edition.
 - Do not: allow ranking or rendering to bypass contract checks.
 - Acceptance: every generated edition is contract-compliant or explicitly rejected with a reason.
 
-Prompt NG35 (Edition receipts in recipes) - Status: pending
+Prompt NG35 (Edition receipts in recipes) - Status: complete
 - Goal: make each render a reproducible, inspectable edition.
 - Do: extend recipes to include contract hash/version, ideology mapping hash + tree version, time/place/sky context reference, pulse metadata, and model/tool versions.
 - Do: expose a "receipts" panel in the edition view so listeners can see why this version exists.
@@ -1141,7 +1274,7 @@ Prompt NG50 (Remix UI controls) - Status: complete
 - Do not: expose full DAW controls in Listener mode.
 - Acceptance: listeners can mute/boost grouped stems after upgrade.
 
-Prompt NG51 (Ableton intent import) - Status: pending
+Prompt NG51 (Ableton intent import) - Status: complete
 - Goal: treat Ableton Live sets (.als/.xml) as an optional creator intent snapshot that guides RenderPlan defaults and Intent Contract bounds, without attempting full DAW recreation.
 - Do: accept .als or .xml during Studio upload; decompress .als (gzip) server-side; parse XML; extract BPM, time signature, locators/markers (if present), track list with Audio/MIDI types, and device inventory.
 - Do: map a small whitelist of stock devices (Eq8, Glue/Compressor, Reverb, Delay, Chorus, Drum Buss) into RenderPlan textures/FX (eqPeaks, reverbSend, comp, delay intent), leaving unknown devices as metadata hints.

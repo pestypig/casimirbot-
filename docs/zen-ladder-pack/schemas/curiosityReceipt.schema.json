@@ -1,0 +1,36 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "curiosityReceipt.schema.json",
+  "title": "CuriosityReceipt",
+  "type": "object",
+  "required": ["id", "contributorId", "category", "publicGood", "evidence", "verifiedBy", "expiresAt"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "contributorId": { "type": "string" },
+    "category": {
+      "type": "string",
+      "enum": ["dataset", "benchmark", "replication", "correction", "negative-result", "method"]
+    },
+    "publicGood": { "type": "string" },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["kind", "uri", "hash", "createdAt"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string" },
+          "uri": { "type": "string" },
+          "hash": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "verifiedBy": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "points": { "type": "integer", "minimum": 0 },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "notes": { "type": "string" }
+  }
+}

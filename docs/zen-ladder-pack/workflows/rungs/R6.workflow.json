@@ -1,0 +1,36 @@
+﻿{
+  "id": "workflow.entrepreneur.rung.R6.v1",
+  "kind": "entrepreneur.rung",
+  "rung": "R6",
+  "riskLevel": "high",
+  "scores": {
+    "demand": { "min": 4 },
+    "capability": { "min": 4 },
+    "integritySafety": { "min": 4 },
+    "sustainability": { "min": 4 }
+  },
+  "requiredChecks": [
+    "check.integrity.receipts-and-audits",
+    "check.rightspeech.sources-linked",
+    "check.impermanence.review-cycle"
+  ],
+  "requiredArtifacts": [
+    "artifact.audited-financials",
+    "artifact.community-impact-report",
+    "artifact.ops-map",
+    "artifact.risk-controls",
+    "artifact.anti-capture-compliance"
+  ],
+  "gates": [
+    "gate.eligibility.zen-handrails.v1",
+    "gate.rung-approval.two-key.v1",
+    "gate.public-claims.two-key.v1"
+  ],
+  "reviewCadenceDays": 365,
+  "valuesRefs": [
+    "impermanence-by-design",
+    "civic-memory-continuity",
+    "integrity-protocols"
+  ],
+  "outcomeMetrics": ["jobs_created", "community_impact_score"]
+}

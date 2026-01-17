@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.supplier-staffing-plan",
+  "name": "Supplier and staffing plan",
+  "requiredFields": ["suppliers", "staffingRoles", "contingencies"],
+  "evidenceKinds": ["doc"],
+  "freshnessDays": 365,
+  "ownerRole": "applicant"
+}

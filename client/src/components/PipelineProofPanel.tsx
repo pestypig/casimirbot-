@@ -3,8 +3,17 @@ import { FrontProofsLedger } from "./FrontProofsLedger";
 import { NeedleCavityBubblePanel } from "./NeedleCavityBubblePanel";
 import TimeDilationLatticePanel from "./TimeDilationLatticePanel";
 import { MODE_CONFIGS, useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { useProofPack } from "@/hooks/useProofPack";
+import { useMathStageGate } from "@/hooks/useMathStageGate";
+import {
+  PROOF_PACK_STAGE_REQUIREMENTS,
+  mergeProofPackIntoPipeline,
+} from "@/lib/proof-pack";
+import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
+import { cn } from "@/lib/utils";
 import { C, G, PI, PLANCK_LUMINOSITY_W } from "@/lib/physics-const";
 import { openDocPanel } from "@/lib/docs/openDocPanel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -815,10 +824,25 @@ export default function PipelineProofPanel() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [planDebug, setPlanDebug] = useState<PlanDebugPayload | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
-  const { data: pipelineSnapshot } = useEnergyPipeline({
+  const { data: pipelineSnapshotRaw } = useEnergyPipeline({
     staleTime: 5000,
     refetchOnWindowFocus: false,
   });
+  const { data: proofPack } = useProofPack({
+    refetchInterval: 5000,
+    staleTime: 10000,
+  });
+  const stageGate = useMathStageGate(PROOF_PACK_STAGE_REQUIREMENTS, {
+    staleTime: 30000,
+  });
+  const stageLabel = stageGate.pending
+    ? "STAGE..."
+    : STAGE_LABELS[stageGate.stage];
+  const stageProxy = !stageGate.ok || !proofPack;
+  const pipelineSnapshot = useMemo(
+    () => mergeProofPackIntoPipeline(proofPack, pipelineSnapshotRaw ?? null),
+    [proofPack, pipelineSnapshotRaw],
+  );
   const mechanical = (pipelineSnapshot as any)?.mechanical ?? {};
   const modeKey = (pipelineSnapshot as any)?.currentMode as keyof typeof MODE_CONFIGS | undefined;
   const modelMode = (pipelineSnapshot as any)?.modelMode as EnergyPipelineState["modelMode"] | undefined;
@@ -901,6 +925,20 @@ export default function PipelineProofPanel() {
           <p className="text-xs text-slate-400">Live pipeline truth + the evidence the planner used.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className={cn(
+              "border px-2 py-0.5 text-[10px]",
+              STAGE_BADGE[stageGate.stage],
+            )}
+          >
+            {stageLabel}
+          </Badge>
+          {stageProxy ? (
+            <Badge className="border px-2 py-0.5 text-[10px] bg-slate-800 text-slate-200">
+              PROXY
+            </Badge>
+          ) : null}
           <button
             type="button"
             onClick={refresh}

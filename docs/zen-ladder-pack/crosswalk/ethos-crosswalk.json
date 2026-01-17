@@ -1,0 +1,125 @@
+﻿{
+  "version": 1,
+  "source": "docs/ethos/ideology.json",
+  "checks": [
+    {
+      "id": "check.nonharm.no-predatory-terms",
+      "title": "No predatory terms or coercive tactics",
+      "nodeRefs": ["jurisdictional-floor", "restorative-harm-repair", "no-bypass-guardrail"]
+    },
+    {
+      "id": "check.safety.baseline-compliance",
+      "title": "Baseline safety and compliance complete",
+      "nodeRefs": ["integrity-protocols", "verification-checklist"]
+    },
+    {
+      "id": "check.data.dignity-minimization",
+      "title": "Data minimization and retention limits",
+      "nodeRefs": ["data-dignity", "right-speech-infrastructure"]
+    },
+    {
+      "id": "check.coi.disclosure",
+      "title": "Conflict of interest disclosed",
+      "nodeRefs": ["capture-resistance", "provenance-protocol"]
+    },
+    {
+      "id": "check.rightspeech.claims-bounded",
+      "title": "Claims are bounded and uncertainty is stated",
+      "nodeRefs": ["right-speech-infrastructure", "verification-checklist"]
+    },
+    {
+      "id": "check.rightspeech.sources-linked",
+      "title": "Sources and evidence linked",
+      "nodeRefs": ["right-speech-infrastructure", "verification-checklist"]
+    },
+    {
+      "id": "check.repair.redress-path",
+      "title": "Redress and correction path exists",
+      "nodeRefs": ["restorative-harm-repair", "feedback-loop-hygiene"]
+    },
+    {
+      "id": "check.non-domination.no-insider-access",
+      "title": "No insider-only access or gatekeeping",
+      "nodeRefs": ["capture-resistance", "no-bypass-guardrail"]
+    },
+    {
+      "id": "check.rightlivelihood.intermediary-transparency",
+      "title": "Intermediaries are transparent and fee-capped",
+      "nodeRefs": ["external-interface-integrity", "capture-resistance"]
+    },
+    {
+      "id": "check.interbeing.dependencies-mapped",
+      "title": "Dependencies and bottlenecks are mapped",
+      "nodeRefs": ["interbeing-systems", "stewardship-ledger"]
+    },
+    {
+      "id": "check.sangha.mentorship-access",
+      "title": "Mentorship and peer learning are accessible",
+      "nodeRefs": ["sangha-architecture", "voice-integrity"]
+    },
+    {
+      "id": "check.integrity.receipts-and-audits",
+      "title": "Receipts, audits, and revocation paths exist",
+      "nodeRefs": ["integrity-protocols", "verification-checklist", "feedback-loop-hygiene"]
+    },
+    {
+      "id": "check.impermanence.review-cycle",
+      "title": "Review cycle and sunset clause defined",
+      "nodeRefs": ["impermanence-by-design"]
+    },
+    {
+      "id": "check.appeals.path-exists",
+      "title": "Appeal path exists",
+      "nodeRefs": ["right-speech-infrastructure", "jurisdictional-floor"]
+    },
+    {
+      "id": "check.public-good.reproducible",
+      "title": "Public good output is reproducible",
+      "nodeRefs": ["verification-checklist", "integrity-protocols"]
+    }
+  ],
+  "artifacts": [
+    {
+      "artifactId": "artifact.interview-log",
+      "title": "Interview log",
+      "templatePath": "docs/zen-ladder-pack/templates/artifacts/interview-log.md",
+      "nodeRefs": ["right-speech-infrastructure", "verification-checklist"],
+      "requiredChecks": ["check.rightspeech.sources-linked"]
+    },
+    {
+      "artifactId": "artifact.pilot-log",
+      "title": "Pilot log",
+      "templatePath": "docs/zen-ladder-pack/templates/artifacts/pilot-log.md",
+      "nodeRefs": ["verification-checklist", "feedback-loop-hygiene"],
+      "requiredChecks": ["check.rightspeech.sources-linked", "check.repair.redress-path"]
+    },
+    {
+      "artifactId": "artifact.unit-econ-sketch",
+      "title": "Unit economics sketch",
+      "templatePath": "docs/zen-ladder-pack/templates/artifacts/unit-econ.md",
+      "nodeRefs": ["stewardship-ledger", "capability-ambition-gradient"],
+      "requiredChecks": ["check.rightspeech.claims-bounded"]
+    },
+    {
+      "artifactId": "artifact.privacy-minimization",
+      "title": "Privacy minimization plan",
+      "templatePath": "docs/zen-ladder-pack/templates/artifacts/privacy-minimization.md",
+      "nodeRefs": ["data-dignity"],
+      "requiredChecks": ["check.data.dignity-minimization"]
+    },
+    {
+      "artifactId": "artifact.coi-disclosure",
+      "title": "Conflict of interest disclosure",
+      "templatePath": "docs/zen-ladder-pack/templates/artifacts/coi-disclosure.md",
+      "nodeRefs": ["capture-resistance", "provenance-protocol"],
+      "requiredChecks": ["check.coi.disclosure"]
+    },
+    {
+      "artifactId": "artifact.safety-precheck",
+      "title": "Safety pre-check",
+      "templatePath": "docs/zen-ladder-pack/templates/artifacts/safety-precheck.md",
+      "nodeRefs": ["integrity-protocols"],
+      "requiredChecks": ["check.safety.baseline-compliance"]
+    }
+  ]
+}

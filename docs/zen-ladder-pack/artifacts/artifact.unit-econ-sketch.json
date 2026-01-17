@@ -1,0 +1,9 @@
+﻿{
+  "id": "artifact.unit-econ-sketch",
+  "name": "Unit economics sketch",
+  "requiredFields": ["revenuePerUnit", "costPerUnit", "grossMargin", "assumptions"],
+  "evidenceKinds": ["spreadsheet", "doc"],
+  "freshnessDays": 180,
+  "ownerRole": "applicant",
+  "templatePath": "docs/zen-ladder-pack/templates/artifacts/unit-econ.md"
+}

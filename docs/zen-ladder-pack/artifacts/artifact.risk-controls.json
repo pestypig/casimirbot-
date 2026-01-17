@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.risk-controls",
+  "name": "Risk controls",
+  "requiredFields": ["incidentPlan", "refundPolicy", "safetyContacts"],
+  "evidenceKinds": ["policy", "runbook"],
+  "freshnessDays": 365,
+  "ownerRole": "applicant"
+}

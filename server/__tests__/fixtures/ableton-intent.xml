@@ -1,0 +1,62 @@
+<Ableton>
+  <LiveSet>
+    <Tempo>
+      <Manual Value="128"/>
+    </Tempo>
+    <TimeSignature>
+      <Numerator>4</Numerator>
+      <Denominator>4</Denominator>
+    </TimeSignature>
+    <Locators>
+      <Locator>
+        <Name>Intro</Name>
+        <Time>0</Time>
+      </Locator>
+      <Locator>
+        <Name>Drop</Name>
+        <Time>32</Time>
+      </Locator>
+    </Locators>
+    <Tracks>
+      <AudioTrack>
+        <Name>
+          <EffectiveName Value="Drums"/>
+        </Name>
+        <DeviceChain>
+          <DeviceChain>
+            <Devices>
+              <Eq8/>
+              <GlueCompressor/>
+              <Reverb/>
+            </Devices>
+          </DeviceChain>
+        </DeviceChain>
+      </AudioTrack>
+      <MidiTrack>
+        <Name>
+          <EffectiveName Value="Bass"/>
+        </Name>
+        <DeviceChain>
+          <DeviceChain>
+            <Devices>
+              <Chorus/>
+              <Delay/>
+            </Devices>
+          </DeviceChain>
+        </DeviceChain>
+      </MidiTrack>
+      <ReturnTrack>
+        <Name>
+          <EffectiveName Value="FX"/>
+        </Name>
+        <DeviceChain>
+          <DeviceChain>
+            <Devices>
+              <DrumBuss/>
+            </Devices>
+          </DeviceChain>
+        </DeviceChain>
+      </ReturnTrack>
+    </Tracks>
+  </LiveSet>
+</Ableton>

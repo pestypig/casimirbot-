@@ -996,6 +996,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     getTileStatus,
     getSystemMetrics,
     getPipelineState,
+    getPipelineProofs,
     getDisplacementField,
     getDisplacementFieldGeometry,
     probeFieldOnHull,
@@ -1048,6 +1049,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.get("/api/helix/tiles/:sectorId", getTileStatus);
   app.get("/api/helix/metrics", getSystemMetrics);
   app.get("/api/helix/pipeline", getPipelineState);
+  app.get("/api/helix/pipeline/proofs", getPipelineProofs);
   // Backwards-compatible alias: some clients (HelixCasimirAmplifier) request /api/helix/state
   app.get("/api/helix/state", getPipelineState);
   app.get("/api/helix/field", getDisplacementField);

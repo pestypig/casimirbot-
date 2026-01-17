@@ -1,0 +1,34 @@
+﻿{
+  "id": "workflow.entrepreneur.rung.R1.v1",
+  "kind": "entrepreneur.rung",
+  "rung": "R1",
+  "riskLevel": "low",
+  "scores": {
+    "demand": { "min": 2 },
+    "capability": { "min": 1 },
+    "integritySafety": { "min": 2 },
+    "sustainability": { "min": 1 }
+  },
+  "requiredChecks": [
+    "check.rightspeech.sources-linked",
+    "check.data.dignity-minimization",
+    "check.repair.redress-path"
+  ],
+  "requiredArtifacts": [
+    "artifact.interview-log",
+    "artifact.business-model-sketch",
+    "artifact.safety-precheck",
+    "artifact.coi-disclosure",
+    "artifact.privacy-minimization"
+  ],
+  "gates": [
+    "gate.eligibility.zen-handrails.v1"
+  ],
+  "reviewCadenceDays": 90,
+  "valuesRefs": [
+    "right-speech-infrastructure",
+    "verification-checklist",
+    "jurisdictional-floor"
+  ],
+  "outcomeMetrics": ["validated_interviews", "alternative_map_complete"]
+}

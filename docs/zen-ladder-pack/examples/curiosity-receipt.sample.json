@@ -1,0 +1,23 @@
+﻿{
+  "id": "curiosity.receipt.2026-01-16T12:00:00Z.001",
+  "contributorId": "applicant.demo.007",
+  "category": "replication",
+  "publicGood": "Replicated benchmark results for invoice extraction and published failures.",
+  "evidence": [
+    {
+      "kind": "repo",
+      "uri": "git:example/replication",
+      "hash": "sha256:abc123",
+      "createdAt": "2026-01-10T09:15:00Z"
+    },
+    {
+      "kind": "report",
+      "uri": "https://example.org/report",
+      "hash": "sha256:def456",
+      "createdAt": "2026-01-10T09:16:00Z"
+    }
+  ],
+  "verifiedBy": ["verifier.19c", "verifier.2aa"],
+  "points": 3,
+  "expiresAt": "2026-04-16T12:00:00Z"
+}

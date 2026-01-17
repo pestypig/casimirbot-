@@ -1,0 +1,30 @@
+﻿{
+  "id": "receipt.rung.R2.2026-01-16.001",
+  "workflowId": "workflow.entrepreneur.rung.R2.v1",
+  "applicantId": "applicant.demo.001",
+  "rung": "R2",
+  "status": "approved",
+  "issuedAt": "2026-01-16T12:00:00Z",
+  "expiresAt": "2026-04-16T12:00:00Z",
+  "scores": {
+    "demand": 2,
+    "capability": 2,
+    "integritySafety": 2,
+    "sustainability": 2
+  },
+  "checks": [
+    { "id": "check.rightspeech.claims-bounded", "status": "pass" },
+    { "id": "check.integrity.receipts-and-audits", "status": "pass" }
+  ],
+  "artifacts": [
+    { "id": "artifact.prototype-proof", "status": "complete", "evidenceRefs": ["evidence:demo-video"] },
+    { "id": "artifact.pilot-log", "status": "complete", "evidenceRefs": ["evidence:pilot-report"] }
+  ],
+  "approvals": [
+    { "role": "reviewer", "approverId": "user.reviewer.01", "approvedAt": "2026-01-16T12:05:00Z" }
+  ],
+  "gates": [
+    { "id": "gate.eligibility.zen-handrails.v1", "status": "pass" }
+  ],
+  "notes": "Approved for R2 with corrective actions on data retention policy."
+}

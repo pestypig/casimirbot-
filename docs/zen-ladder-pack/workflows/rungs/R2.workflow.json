@@ -1,0 +1,35 @@
+﻿{
+  "id": "workflow.entrepreneur.rung.R2.v1",
+  "kind": "entrepreneur.rung",
+  "rung": "R2",
+  "riskLevel": "medium",
+  "scores": {
+    "demand": { "min": 2 },
+    "capability": { "min": 2 },
+    "integritySafety": { "min": 2 },
+    "sustainability": { "min": 2 }
+  },
+  "requiredChecks": [
+    "check.rightspeech.claims-bounded",
+    "check.integrity.receipts-and-audits",
+    "check.repair.redress-path"
+  ],
+  "requiredArtifacts": [
+    "artifact.prototype-proof",
+    "artifact.pilot-log",
+    "artifact.unit-econ-sketch",
+    "artifact.coi-disclosure",
+    "artifact.privacy-minimization",
+    "artifact.safety-precheck"
+  ],
+  "gates": [
+    "gate.eligibility.zen-handrails.v1"
+  ],
+  "reviewCadenceDays": 120,
+  "valuesRefs": [
+    "integrity-protocols",
+    "restorative-harm-repair",
+    "data-dignity"
+  ],
+  "outcomeMetrics": ["pilot_completion_rate", "prototype_uptime"]
+}

@@ -1,13 +1,23 @@
-import React, { useMemo } from "react";
-import { useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { Badge } from "@/components/ui/badge";
+import { useMathStageGate } from "@/hooks/useMathStageGate";
+import { useProofPack } from "@/hooks/useProofPack";
+import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
+import {
+  PROOF_PACK_STAGE_REQUIREMENTS,
+  getProofValue,
+  readProofBoolean,
+  readProofNumber,
+  readProofString,
+} from "@/lib/proof-pack";
+import { cn } from "@/lib/utils";
 
 // Simple sci formatter to match Phoenix/FrontProofs style
 const fmtSci = (v: number | undefined | null, digits = 3): string =>
   v == null || !Number.isFinite(v)
     ? "n/a"
     : Math.abs(v) >= 1e-2 && Math.abs(v) < 1e4
-    ? v.toPrecision(digits)
-    : v.toExponential(digits - 1);
+      ? v.toPrecision(digits)
+      : v.toExponential(digits - 1);
 
 const fmtPct = (v: number | undefined | null, digits = 1): string =>
   v == null || !Number.isFinite(v) ? "n/a" : `${(v * 100).toFixed(digits)}%`;
@@ -22,303 +32,129 @@ const fmtDim = (v: number | undefined | null, digits = 2): string => {
   return n.toExponential(digits);
 };
 
-const finiteNumber = (v: unknown): number | null => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-
-type DerivedLedger = {
-  // cavity (single tile)
-  tileArea_m2: number | null;
-  gap_m: number | null;
-  gap_guard_m: number | null;
-  cavityVolume_m3: number | null;
-  U_static_J: number | null;
-  rho_tile_J_m3: number | null;
-  casimir_Pa: number | null;
-  electrostatic_Pa: number | null;
-  restoring_Pa: number | null;
-  margin_Pa: number | null;
-  maxStroke_pm: number | null;
-
-  // hull / bubble (cloak)
-  Lx_m: number | null;
-  Ly_m: number | null;
-  Lz_m: number | null;
-  R_geom_m: number | null;
-  R_metric_m: number | null;
-  sigma: number | null;
-  beta: number | null;
-
-  hullArea_m2: number | null;
-  N_tiles: number | null;
-  coverage: number | null;
-  coverageRaw: number | null;
-
-  U_static_total_J: number | null;
-  M_exotic_kg: number | null;
-  massCalibration: number | null;
-  rho_static_J_m3: number | null;
-  rho_inst_J_m3: number | null;
-  rho_avg_J_m3: number | null;
-
-  TS_ratio: number | null;
-  zeta: number | null;
-  fordRomanOK: boolean | null;
-  natarioOK: boolean | null;
-
-  gammaGeo: number | null;
-  gammaGeo3: number | null;
-  gammaVdB: number | null;
-  gammaVdB_requested: number | null;
-  qSpoil: number | null;
-  d_eff: number | null;
-  thetaAmplification_raw: number | null;
-  thetaAmplification_clamped: number | null;
-
-  vdbLimit: number | null;
-  pocketRadius_m: number | null;
-  pocketThickness_m: number | null;
-  planckMargin: number | null;
-  vdbReason?: string;
-};
-
-function deriveLedger(p?: EnergyPipelineState | null): DerivedLedger {
-  const tileArea_cm2 = Number(p?.tileArea_cm2);
-  const tileArea_m2 =
-    Number.isFinite(tileArea_cm2) && tileArea_cm2 > 0 ? tileArea_cm2 * 1e-4 : null;
-
-  const gap_nm = Number(p?.gap_nm);
-  const gap_m = Number.isFinite(gap_nm) && gap_nm > 0 ? gap_nm * 1e-9 : null;
-  const gap_guard_nm = Number((p as any)?.mechanical?.constrainedGap_nm ?? (p as any)?.mechanical?.recommendedGap_nm);
-  const gap_guard_m =
-    Number.isFinite(gap_guard_nm) && gap_guard_nm > 0 ? gap_guard_nm * 1e-9 : null;
-
-  const cavityVolume_m3 = tileArea_m2 && gap_m ? tileArea_m2 * gap_m : null;
-
-  const U_static_J = Number.isFinite(p?.U_static) ? (p!.U_static as number) : null;
-  const rho_tile_J_m3 =
-    U_static_J != null && cavityVolume_m3 && cavityVolume_m3 > 0
-      ? U_static_J / cavityVolume_m3
-      : null;
-
-  const mech = p?.mechanical;
-  const casimir_Pa = mech?.casimirPressure_Pa ?? null;
-  const electrostatic_Pa = mech?.electrostaticPressure_Pa ?? null;
-  const restoring_Pa = mech?.restoringPressure_Pa ?? null;
-  const margin_Pa = mech?.margin_Pa ?? null;
-  const maxStroke_pm = mech?.maxStroke_pm ?? null;
-
-  const hull = p?.hull as any | undefined;
-  const Lx_raw = finiteNumber(hull?.Lx_m ?? hull?.a ?? (p as any)?.Lx_m);
-  const Ly_raw = finiteNumber(hull?.Ly_m ?? hull?.b ?? (p as any)?.Ly_m);
-  const Lz_raw = finiteNumber(hull?.Lz_m ?? hull?.c ?? (p as any)?.Lz_m);
-
-  const Lx_m =
-    Lx_raw != null
-      ? hull?.Lx_m == null && hull?.a != null
-        ? Lx_raw * 2
-        : Lx_raw
-      : null;
-  const Ly_m =
-    Ly_raw != null
-      ? hull?.Ly_m == null && hull?.b != null
-        ? Ly_raw * 2
-        : Ly_raw
-      : null;
-  const Lz_m =
-    Lz_raw != null
-      ? hull?.Lz_m == null && hull?.c != null
-        ? Lz_raw * 2
-        : Lz_raw
-      : null;
-
-  const R_geom_m =
-    Number.isFinite(Lx_m) && Number.isFinite(Ly_m) && Number.isFinite(Lz_m)
-      ? Math.cbrt((Lx_m as number) * (Ly_m as number) * (Lz_m as number))
-      : null;
-
-  const massCalibration = finiteNumber((p as any)?.massCalibration);
-
-  const a_m = finiteNumber(hull?.a ?? (p as any)?.a);
-  const b_m = finiteNumber(hull?.b ?? (p as any)?.b);
-  const c_m = finiteNumber(hull?.c ?? (p as any)?.c);
-
-  const bubble = (p as any)?.bubble ?? {};
-  const sigmaRaw = finiteNumber(
-    bubble?.sigma ??
-      (p as any)?.sigma ??
-      (p as any)?.warp?.sigma ??
-      (p as any)?.warp?.bubble?.sigma ??
-      (p as any)?.warpParams?.sigma,
-  );
-  const R_metric_m =
-    finiteNumber(
-      bubble?.R ??
-        bubble?.radius ??
-        (p as any)?.R ??
-        (p as any)?.radius ??
-        (a_m != null && b_m != null && c_m != null ? Math.cbrt(a_m * b_m * c_m) : null),
-    ) ?? R_geom_m;
-  const sigma = sigmaRaw ?? 6; // default to a typical top-hat sharpness to avoid blanks
-  const betaRaw = finiteNumber(
-    bubble?.beta ??
-      (p as any)?.beta_trans ??
-      (p as any)?.beta ??
-      (p as any)?.warp?.beta ??
-      (p as any)?.warp?.bubble?.beta ??
-      (p as any)?.warpParams?.beta,
-  );
-  const beta = betaRaw ?? 0;
-
-  const hullArea_m2 =
-    Number.isFinite(p?.hullArea_m2) && (p!.hullArea_m2 as number) > 0
-      ? (p!.hullArea_m2 as number)
-      : (p as any)?.hullArea?.value ??
-        finiteNumber((p as any)?.tiles?.hullArea_m2) ??
-        null;
-
-  const N_tiles =
-    Number.isFinite(p?.N_tiles) && (p!.N_tiles as number) > 0
-      ? (p!.N_tiles as number)
-      : finiteNumber((p as any)?.tiles?.total) ??
-        finiteNumber((p as any)?.tiles?.active) ??
-        null;
-
-  const packing =
-    finiteNumber((p as any)?.tiles?.packing ?? (p as any)?.PACKING ?? (p as any)?.paperGeo?.PACKING) ??
-    0.88;
-  const radialLayers =
-    finiteNumber(
-      (p as any)?.tiles?.radialLayers ??
-        (p as any)?.RADIAL_LAYERS ??
-        (p as any)?.paperGeo?.RADIAL_LAYERS,
-    ) ?? 10;
-
-  const coverageRaw =
-    N_tiles && hullArea_m2 && tileArea_m2 ? (N_tiles * tileArea_m2) / hullArea_m2 : null;
-  const coverage =
-    N_tiles && hullArea_m2 && tileArea_m2
-      ? Math.min(1, (N_tiles * tileArea_m2) / (hullArea_m2 * packing * radialLayers))
-      : null;
-
-  const U_static_total_J =
-    (p as any)?.U_static_total ??
-    (N_tiles && U_static_J != null ? N_tiles * U_static_J : null);
-
-  const M_exotic_kg = Number.isFinite(p?.M_exotic) ? (p!.M_exotic as number) : null;
-
-  const rho_static_J_m3 = (p as any)?.rho_static ?? null;
-  const rho_inst_J_m3 = (p as any)?.rho_inst ?? null;
-  const rho_avg_J_m3 = (p as any)?.rho_avg ?? null;
-
-  const TS_ratio = (p as any)?.TS_ratio ?? null;
-  const zeta = (p as any)?.zeta ?? (p as any)?.zetaRaw ?? null;
-
-  const fordRomanOK =
-    typeof (p as any)?.fordRomanCompliance === "boolean" ? (p as any)!.fordRomanCompliance : null;
-  const natarioOK =
-    typeof (p as any)?.natarioConstraint === "boolean" ? (p as any)!.natarioConstraint : null;
-
-  const gammaGeo = Number.isFinite(p?.gammaGeo) ? (p!.gammaGeo as number) : null;
-  const gammaGeo3 =
-    (p as any)?.gammaChain?.geo_cubed ??
-    (gammaGeo != null ? gammaGeo * gammaGeo * gammaGeo : null);
-
-  const gammaVdB =
-    Number.isFinite((p as any)?.gammaVanDenBroeck) || Number.isFinite((p as any)?.gammaVdB)
-      ? Number((p as any)?.gammaVanDenBroeck ?? (p as any)?.gammaVdB)
-      : null;
-  const gammaVdB_requested = finiteNumber((p as any)?.gammaVanDenBroeckGuard?.requested);
-
-  const qSpoil =
-    (p as any)?.gammaChain?.qSpoiling ??
-    (Number.isFinite((p as any)?.qSpoilingFactor) ? Number((p as any)?.qSpoilingFactor) : null);
-
-  const d_eff =
-    (p as any)?.gammaChain?.dutyEffective ??
-    (Number.isFinite((p as any)?.dutyEffectiveFR)
-      ? Number((p as any)?.dutyEffectiveFR)
-      : Number.isFinite((p as any)?.dutyEff)
-      ? Number((p as any)?.dutyEff)
-      : null);
-
-  const thetaAmplification_raw =
-    gammaGeo3 && gammaVdB_requested && d_eff
-      ? gammaGeo3 * (qSpoil ?? 1) * gammaVdB_requested * d_eff
-      : null;
-  const thetaAmplification_clamped =
-    gammaGeo3 && gammaVdB && d_eff ? gammaGeo3 * (qSpoil ?? 1) * gammaVdB * d_eff : null;
-
-  const vdbGuard = (p as any)?.gammaVanDenBroeckGuard;
-  const vdbLimit = vdbGuard?.limit ?? null;
-  const pocketRadius_m = vdbGuard?.pocketRadius_m ?? null;
-  const pocketThickness_m = vdbGuard?.pocketThickness_m ?? null;
-  const planckMargin = vdbGuard?.planckMargin ?? null;
-  const vdbReason = vdbGuard?.reason;
-
-  return {
-    tileArea_m2,
-    gap_m,
-    gap_guard_m,
-    cavityVolume_m3,
-    U_static_J,
-    rho_tile_J_m3,
-    casimir_Pa,
-    electrostatic_Pa,
-    restoring_Pa,
-    margin_Pa,
-    maxStroke_pm,
-    Lx_m,
-    Ly_m,
-    Lz_m,
-    R_geom_m,
-    R_metric_m,
-    sigma,
-    beta,
-    hullArea_m2,
-    N_tiles,
-    coverage,
-    coverageRaw,
-    U_static_total_J,
-    M_exotic_kg,
-    massCalibration,
-    rho_static_J_m3,
-    rho_inst_J_m3,
-    rho_avg_J_m3,
-    TS_ratio,
-    zeta,
-    fordRomanOK,
-    natarioOK,
-    gammaGeo,
-    gammaGeo3,
-    gammaVdB,
-    gammaVdB_requested,
-    qSpoil,
-    d_eff,
-    thetaAmplification_raw,
-    thetaAmplification_clamped,
-    vdbLimit,
-    pocketRadius_m,
-    pocketThickness_m,
-    planckMargin,
-    vdbReason,
-  };
-}
+const renderProxyBadge = (proxy: boolean) =>
+  proxy ? (
+    <Badge className="ml-2 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-200">
+      PROXY
+    </Badge>
+  ) : null;
 
 export function NeedleCavityBubblePanel() {
-  const { data: pipeline } = useEnergyPipeline({ refetchInterval: 1000 });
-  const ledger = useMemo(() => deriveLedger(pipeline), [pipeline]);
+  const { data: pack, isLoading, error } = useProofPack({
+    refetchInterval: 1000,
+  });
+  const stageGate = useMathStageGate(PROOF_PACK_STAGE_REQUIREMENTS, {
+    staleTime: 30_000,
+  });
+  const stageLabel = stageGate.pending
+    ? "STAGE..."
+    : STAGE_LABELS[stageGate.stage];
+  const stageProxy = !stageGate.ok || !pack;
+
+  const proofNum = (key: string) => readProofNumber(pack, key);
+  const proofBool = (key: string) => readProofBoolean(pack, key);
+  const proofStr = (key: string) => readProofString(pack, key);
+  const proxyFrom = (keys: string[]) =>
+    stageProxy || keys.some((key) => Boolean(getProofValue(pack, key)?.proxy));
+
+  const tileArea_m2 = proofNum("tile_area_m2");
+  const gap_m = proofNum("gap_m");
+  const gap_guard_m = proofNum("gap_guard_m");
+  const cavityVolume_m3 = proofNum("cavity_volume_m3");
+  const U_static_J = proofNum("U_static_J");
+  const rho_tile_J_m3 = proofNum("rho_tile_J_m3");
+  const casimir_Pa = proofNum("mechanical_casimir_pressure_Pa");
+  const electrostatic_Pa = proofNum("mechanical_electrostatic_pressure_Pa");
+  const restoring_Pa = proofNum("mechanical_restoring_pressure_Pa");
+  const margin_Pa = proofNum("mechanical_margin_Pa");
+  const maxStroke_pm = proofNum("mechanical_max_stroke_pm");
+
+  const Lx_m = proofNum("hull_Lx_m");
+  const Ly_m = proofNum("hull_Ly_m");
+  const Lz_m = proofNum("hull_Lz_m");
+  const R_geom_m = proofNum("R_geom_m");
+  const R_metric_m = proofNum("bubble_R_m");
+  const sigma = proofNum("bubble_sigma");
+  const beta = proofNum("bubble_beta");
+  const hullArea_m2 = proofNum("hull_area_m2");
+  const N_tiles = proofNum("tile_count");
+  const coverage = proofNum("coverage");
+  const U_static_total_J = proofNum("U_static_total_J");
+  const M_exotic_kg = proofNum("M_exotic_kg");
+  const massCalibration = proofNum("mass_calibration");
+  const rho_static_J_m3 = proofNum("rho_static_J_m3");
+  const rho_inst_J_m3 = proofNum("rho_inst_J_m3");
+  const rho_avg_J_m3 = proofNum("rho_avg_J_m3");
+  const TS_ratio = proofNum("ts_ratio");
+  const zeta = proofNum("zeta");
+  const fordRomanOK = proofBool("ford_roman_ok");
+  const natarioOK = proofBool("natario_ok");
+  const thetaRaw = proofNum("theta_raw");
+  const thetaCal = proofNum("theta_cal");
+  const gammaVdB = proofNum("gamma_vdb");
+  const gammaVdB_requested = proofNum("gamma_vdb_requested");
+  const vdbLimit = proofNum("vdb_limit");
+  const pocketRadius_m = proofNum("vdb_pocket_radius_m");
+  const pocketThickness_m = proofNum("vdb_pocket_thickness_m");
+  const planckMargin = proofNum("vdb_planck_margin");
+  const vdbReason = proofStr("vdb_reason");
+
+  const hullDimsValue =
+    Lx_m != null && Ly_m != null && Lz_m != null
+      ? `${fmtDim(Lx_m)} x ${fmtDim(Ly_m)} x ${fmtDim(Lz_m)}`
+      : "n/a";
+
+  const rhoValue =
+    rho_static_J_m3 != null || rho_inst_J_m3 != null || rho_avg_J_m3 != null
+      ? `${fmtSci(rho_static_J_m3)} | ${fmtSci(rho_inst_J_m3)} | ${fmtSci(rho_avg_J_m3)}`
+      : "n/a";
+
+  const thetaValue =
+    thetaRaw != null || thetaCal != null
+      ? `${fmtSci(thetaRaw)} raw / ${fmtSci(thetaCal)} cal`
+      : "n/a";
+
+  const vdbValue =
+    gammaVdB != null && vdbLimit != null
+      ? `${fmtSci(gammaVdB_requested ?? gammaVdB)} req / ${fmtSci(gammaVdB)} cal (limit ${fmtSci(vdbLimit)})`
+      : "n/a";
 
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-[#050915] text-slate-100">
       <header className="border-b border-white/10 bg-black/40 px-4 py-3">
-        <div className="text-sm font-semibold text-white">
-          Needle Hull - Cavity vs. Bubble Ledger
-        </div>
-        <div className="mt-1 text-[11px] text-slate-300/80">
-          Single Casimir cavity (tile) on the left, full needle-hull Casimir cloak and warp-bubble
-          aggregates on the right. All values are live from the energy pipeline snapshot.
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-white">
+              Needle Hull - Cavity vs. Bubble Ledger
+            </div>
+            <div className="mt-1 text-[11px] text-slate-300/80">
+              Single Casimir cavity (tile) on the left, full needle-hull Casimir cloak and warp-bubble aggregates on the right. Values are sourced from the proof pack; PROXY flags indicate fallbacks or stage gating.
+            </div>
+            {isLoading ? (
+              <div className="mt-2 text-[11px] text-slate-400">
+                Loading proof pack...
+              </div>
+            ) : null}
+            {error ? (
+              <div className="mt-2 text-[11px] text-rose-300">
+                Failed to load proof pack. Check /api/helix/pipeline/proofs.
+              </div>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-slate-400">
+            <Badge
+              variant="outline"
+              className={cn("border px-2 py-0.5 text-[10px]", STAGE_BADGE[stageGate.stage])}
+            >
+              {stageLabel}
+            </Badge>
+            {stageProxy ? (
+              <Badge className="border px-2 py-0.5 text-[10px] bg-slate-800 text-slate-200">
+                PROXY
+              </Badge>
+            ) : null}
+            <span>Proof pack</span>
+          </div>
         </div>
       </header>
 
@@ -330,80 +166,90 @@ export function NeedleCavityBubblePanel() {
               Casimir cavity (single tile)
             </div>
             <div className="mt-0.5 text-[11px] text-emerald-100/80">
-              Tile cavity is the atomic negative-energy source; everything else is scaled from
-              this.
+              Tile cavity is the atomic negative-energy source; everything else is scaled from this.
             </div>
           </div>
           <div className="flex-1 space-y-2 px-3 py-3 text-[11px]">
             <LedgerRow
               label="Tile area A_tile"
               formula="A_tile = tileArea_cm2 * 1e-4"
-              value={fmtSci(ledger.tileArea_m2)}
+              value={fmtSci(tileArea_m2)}
               unit="m^2"
+              proxy={proxyFrom(["tile_area_m2"])}
             />
             <LedgerRow
               label="Gap g"
               formula="g = gap_nm * 1e-9"
-              value={fmtSci(ledger.gap_m)}
+              value={fmtSci(gap_m)}
               unit="m"
+              proxy={proxyFrom(["gap_m"])}
             />
-            {ledger.gap_guard_m ? (
+            {gap_guard_m != null ? (
               <LedgerRow
                 label="Guard gap g_guard"
                 formula="g_guard = constrainedGap_nm * 1e-9 (mechanical guard)"
-                value={fmtSci(ledger.gap_guard_m)}
+                value={fmtSci(gap_guard_m)}
                 unit="m"
+                proxy={proxyFrom(["gap_guard_m"])}
               />
             ) : null}
             <LedgerRow
               label="Cavity volume V_cav"
               formula="V_cav = A_tile * g"
-              value={fmtSci(ledger.cavityVolume_m3)}
+              value={fmtSci(cavityVolume_m3)}
               unit="m^3"
+              proxy={proxyFrom(["cavity_volume_m3"])}
             />
             <LedgerRow
               label="Static Casimir energy U_static"
               formula="U_static = -pi^2 hbar c A_tile / (720 g^3)"
-              value={fmtSci(ledger.U_static_J)}
+              value={fmtSci(U_static_J)}
               unit="J"
+              proxy={proxyFrom(["U_static_J"])}
             />
             <LedgerRow
               label="Tile energy density rho_tile"
               formula="rho_tile = U_static / V_cav"
-              value={fmtSci(ledger.rho_tile_J_m3)}
+              value={fmtSci(rho_tile_J_m3)}
               unit="J/m^3"
+              proxy={proxyFrom(["rho_tile_J_m3"])}
             />
             <Divider label="Mechanical guard (per tile)" />
             <LedgerRow
               label="Casimir pressure P_C"
               formula="P_C = pi^2 hbar c / (240 g_guard^4)"
-              value={fmtSci(ledger.casimir_Pa)}
+              value={fmtSci(casimir_Pa)}
               unit="Pa"
+              proxy={proxyFrom(["mechanical_casimir_pressure_Pa"])}
             />
             <LedgerRow
               label="Electrostatic pressure P_ES"
               formula="P_ES = 1/2 eps0 (V_patch / g_guard)^2"
-              value={fmtSci(ledger.electrostatic_Pa)}
+              value={fmtSci(electrostatic_Pa)}
               unit="Pa"
+              proxy={proxyFrom(["mechanical_electrostatic_pressure_Pa"])}
             />
             <LedgerRow
               label="Restoring pressure P_rest"
               formula="P_rest = D * clearance / (k L^4)"
-              value={fmtSci(ledger.restoring_Pa)}
+              value={fmtSci(restoring_Pa)}
               unit="Pa"
+              proxy={proxyFrom(["mechanical_restoring_pressure_Pa"])}
             />
             <LedgerRow
               label="Margin (P_rest - P_load)"
               formula="P_margin = P_rest - (P_C + P_ES)"
-              value={fmtSci(ledger.margin_Pa)}
+              value={fmtSci(margin_Pa)}
               unit="Pa"
-              highlight={ledger.margin_Pa != null && ledger.margin_Pa < 0}
+              highlight={margin_Pa != null && margin_Pa < 0}
+              proxy={proxyFrom(["mechanical_margin_Pa"])}
             />
             <LedgerRow
               label="Max stroke s_max"
               formula="s_max = g_guard - roughness - delta_load"
-              value={fmtSci(ledger.maxStroke_pm)}
+              value={fmtSci(maxStroke_pm)}
               unit="pm"
+              proxy={proxyFrom(["mechanical_max_stroke_pm"])}
             />
           </div>
         </div>
@@ -414,162 +260,157 @@ export function NeedleCavityBubblePanel() {
             <div className="text-xs font-semibold uppercase tracking-wide text-sky-200">
               Warp bubble (needle hull cloak)
             </div>
-          <div className="mt-0.5 text-[11px] text-sky-100/80">
-            Ellipsoidal needle hull with a high-coverage Casimir cloak and Natario/Alcubierre
-            wall profile. The bubble behaves more like a boat, displacing a volume of
-            spacetime, rather than generating lift like a plane.
-          </div>
+            <div className="mt-0.5 text-[11px] text-sky-100/80">
+              Ellipsoidal needle hull with a high-coverage Casimir cloak and Natario/Alcubierre wall profile. The bubble behaves more like a boat, displacing a volume of spacetime, rather than generating lift like a plane.
+            </div>
           </div>
           <div className="flex-1 space-y-2 px-3 py-3 text-[11px]">
             <LedgerRow
               label="Hull dims Lx, Ly, Lz"
               formula="Needle hull box dimensions"
-              value={
-                ledger.Lx_m && ledger.Ly_m && ledger.Lz_m
-                  ? `${fmtDim(ledger.Lx_m)} x ${fmtDim(ledger.Ly_m)} x ${fmtDim(ledger.Lz_m)}`
-                  : "n/a"
-              }
+              value={hullDimsValue}
               unit="m"
+              proxy={proxyFrom(["hull_Lx_m", "hull_Ly_m", "hull_Lz_m"])}
             />
             <LedgerRow
               label="Hull radius R_hull (geom)"
               formula="R_hull = (Lx * Ly * Lz)^(1/3) - display-only, not used by solver"
-              value={fmtSci(ledger.R_geom_m)}
+              value={fmtSci(R_geom_m)}
               unit="m"
+              proxy={proxyFrom(["R_geom_m"])}
             />
             <LedgerRow
               label="Metric bubble radius R_metric"
               formula="R_metric = bubble.R or (a * b * c)^(1/3) (semi-axes) - used by solver"
-              value={fmtSci(ledger.R_metric_m)}
+              value={fmtSci(R_metric_m)}
               unit="m"
+              proxy={proxyFrom(["bubble_R_m"])}
             />
             <LedgerRow
               label="Wall sharpness sigma"
               formula="f(r) = top-hat(sigma, R); df/dr from LUT"
-              value={ledger.sigma != null ? ledger.sigma.toFixed(2) : "n/a"}
+              value={sigma != null ? sigma.toFixed(2) : "n/a"}
+              proxy={proxyFrom(["bubble_sigma"])}
             />
             <LedgerRow
               label="Drive beta"
               formula="beta = v_ship / c (effective)"
-              value={ledger.beta != null ? ledger.beta.toPrecision(3) : "n/a"}
+              value={beta != null ? beta.toPrecision(3) : "n/a"}
+              proxy={proxyFrom(["bubble_beta"])}
             />
             <Divider label="Cloak coverage & energy" />
             <LedgerRow
               label="Hull area A_hull"
               formula="A_hull from ellipsoid surface metric"
-              value={fmtSci(ledger.hullArea_m2)}
+              value={fmtSci(hullArea_m2)}
               unit="m^2"
+              proxy={proxyFrom(["hull_area_m2"])}
             />
             <LedgerRow
               label="Tile census N_tiles"
               formula="N_tiles from A_hull, A_tile, PACKING, RADIAL_LAYERS"
-              value={ledger.N_tiles != null ? fmtSci(ledger.N_tiles, 4) : "n/a"}
+              value={N_tiles != null ? fmtSci(N_tiles, 4) : "n/a"}
               unit="-"
+              proxy={proxyFrom(["tile_count"])}
             />
             <LedgerRow
               label="Coverage fraction f_cov"
               formula="f_cov = N_tiles * A_tile / (A_hull * packing * radialLayers)"
-              value={
-                ledger.coverage != null
-                  ? `${fmtPct(ledger.coverage)} (norm)`
-                  : "n/a"
-              }
+              value={coverage != null ? `${fmtPct(coverage)} (norm)` : "n/a"}
               unit="of hull"
+              proxy={proxyFrom(["coverage"])}
             />
             <LedgerRow
               label="Total Casimir energy U_static,total"
               formula="U_static,total = N_tiles * U_static"
-              value={fmtSci(ledger.U_static_total_J)}
+              value={fmtSci(U_static_total_J)}
               unit="J"
+              proxy={proxyFrom(["U_static_total_J"])}
             />
             <LedgerRow
               label="Exotic mass M_exotic"
               formula="M_exotic = |U_static,total| * gamma_chain / c^2 (massCalibration applied)"
               value={
-                ledger.M_exotic_kg != null
-                  ? `${fmtSci(ledger.M_exotic_kg)} (cal factor ${fmtSci(ledger.massCalibration)})`
+                M_exotic_kg != null
+                  ? `${fmtSci(M_exotic_kg)}${massCalibration != null ? ` (cal factor ${fmtSci(massCalibration)})` : ""}`
                   : "n/a"
               }
               unit="kg"
+              proxy={proxyFrom(["M_exotic_kg", "mass_calibration"])}
             />
             <LedgerRow
               label="rho_static / rho_inst / rho_avg"
               formula="Pipeline energy densities in shell"
-              value={
-                ledger.rho_static_J_m3 != null
-                  ? `${fmtSci(ledger.rho_static_J_m3)} | ${fmtSci(
-                      ledger.rho_inst_J_m3,
-                    )} | ${fmtSci(ledger.rho_avg_J_m3)}`
-                  : "n/a"
-              }
+              value={rhoValue}
               unit="J/m^3"
+              proxy={proxyFrom(["rho_static_J_m3", "rho_inst_J_m3", "rho_avg_J_m3"])}
             />
             <Divider label="GR proxy & guardrails" />
             <LedgerRow
               label="TS ratio"
               formula="TS_ratio = (L_long / c) / (1 / f_mod)"
-              value={fmtSci(ledger.TS_ratio)}
+              value={fmtSci(TS_ratio)}
               unit="-"
+              proxy={proxyFrom(["ts_ratio"])}
             />
             <LedgerRow
               label="Ford-Roman QI zeta"
               formula="zeta = sampledIntegral / bound (zeta <= 1)"
-              value={fmtSci(ledger.zeta)}
-              unit={ledger.fordRomanOK === false ? "violation" : "ok"}
-              highlight={ledger.fordRomanOK === false}
+              value={fmtSci(zeta)}
+              unit={fordRomanOK == null ? "n/a" : fordRomanOK ? "ok" : "violation"}
+              highlight={fordRomanOK === false}
+              proxy={proxyFrom(["zeta", "ford_roman_ok"])}
             />
             <LedgerRow
               label="Natario constraint"
               formula="Enforced in warp module / sampler"
               value={
-                ledger.natarioOK == null ? "n/a" : ledger.natarioOK ? "satisfied" : "violated"
+                natarioOK == null
+                  ? "n/a"
+                  : natarioOK
+                    ? "satisfied"
+                    : "violated"
               }
               unit="-"
-              highlight={ledger.natarioOK === false}
+              highlight={natarioOK === false}
+              proxy={proxyFrom(["natario_ok"])}
             />
             <LedgerRow
               label="FR amplification theta_chain"
               formula="theta_raw = gamma_geo^3 * qSpoil * gamma_VdB(raw) * d_eff; theta_cal uses clamped gamma_VdB"
-              value={
-                ledger.thetaAmplification_raw != null || ledger.thetaAmplification_clamped != null
-                  ? `${fmtSci(ledger.thetaAmplification_raw)} raw / ${fmtSci(
-                      ledger.thetaAmplification_clamped,
-                    )} cal`
-                  : "n/a"
-              }
+              value={thetaValue}
               unit="-"
+              proxy={proxyFrom(["theta_raw", "theta_cal"])}
             />
             <LedgerRow
               label="Van den Broeck limit"
               formula="gamma_VdB <= limit = r_min / pocketFloor"
-              value={
-                ledger.gammaVdB != null && ledger.vdbLimit != null
-                  ? `${fmtSci(ledger.gammaVdB_requested ?? ledger.gammaVdB)} req / ${fmtSci(
-                      ledger.gammaVdB,
-                    )} cal (limit ${fmtSci(ledger.vdbLimit)})`
-                  : "n/a"
-              }
+              value={vdbValue}
               unit="-"
+              proxy={proxyFrom(["gamma_vdb_requested", "gamma_vdb", "vdb_limit"])}
             />
             <LedgerRow
               label="Pocket radius / thickness"
               formula="r_pocket = r_min / gamma_VdB, t_pocket = wall / gamma_VdB"
               value={
-                ledger.pocketRadius_m != null
-                  ? `${fmtSci(ledger.pocketRadius_m)} / ${fmtSci(ledger.pocketThickness_m)}`
+                pocketRadius_m != null && pocketThickness_m != null
+                  ? `${fmtSci(pocketRadius_m)} / ${fmtSci(pocketThickness_m)}`
                   : "n/a"
               }
               unit="m"
+              proxy={proxyFrom(["vdb_pocket_radius_m", "vdb_pocket_thickness_m"])}
             />
             <LedgerRow
               label="Planck margin"
               formula="margin = r_pocket / l_P"
-              value={fmtSci(ledger.planckMargin)}
+              value={fmtSci(planckMargin)}
               unit="x l_P"
+              proxy={proxyFrom(["vdb_planck_margin"])}
             />
-            {ledger.vdbReason ? (
+            {vdbReason ? (
               <div className="mt-1 rounded border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-100">
-                VdB guard reason: {ledger.vdbReason}
+                VdB guard reason: {vdbReason}
+                {renderProxyBadge(proxyFrom(["vdb_reason"]))}
               </div>
             ) : null}
           </div>
@@ -578,10 +419,7 @@ export function NeedleCavityBubblePanel() {
 
       <footer className="border-t border-white/10 bg-black/40 px-4 py-2 text-[11px] text-slate-300/80">
         <div>
-          GR proxy uses theta_GR and rho_GR = (K^2 - K_ij K_ij)/(16 pi) from the warp renderer;
-          theta_drive is theta_GR weighted by the amplification chain and sector gating. This panel
-          only reads the solved pipeline scalars; full field plots still live in the Hull 3D and
-          Phoenix panels.
+          GR proxy uses theta_GR and rho_GR = (K^2 - K_ij K_ij)/(16 pi) from the warp renderer; theta_drive is theta_GR weighted by the amplification chain and sector gating. This panel reads proof-pack scalars; full field plots still live in the Hull 3D and Phoenix panels.
         </div>
       </footer>
     </div>
@@ -594,17 +432,22 @@ function LedgerRow({
   value,
   unit,
   highlight,
+  proxy,
 }: {
   label: string;
   formula: string;
   value: string;
   unit?: string;
   highlight?: boolean;
+  proxy?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-baseline justify-between gap-2">
-        <div className="text-[11px] font-semibold text-white">{label}</div>
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-white">
+          {label}
+          {renderProxyBadge(Boolean(proxy))}
+        </div>
         <div
           className={`text-[11px] font-mono ${
             highlight ? "text-amber-300" : "text-slate-100"

@@ -1,0 +1,23 @@
+﻿{
+  "id": "gate.rung-approval.two-key.v1",
+  "name": "Two-key approval for rung advancement",
+  "appliesTo": {
+    "workflowKinds": ["entrepreneur.rung"],
+    "rungs": ["R3", "R4", "R5", "R6"],
+    "riskLevels": ["medium", "high"]
+  },
+  "requiredChecks": [
+    "check.rightspeech.sources-linked",
+    "check.integrity.receipts-and-audits",
+    "check.repair.redress-path"
+  ],
+  "approvals": {
+    "minApprovers": 2,
+    "roles": ["reviewer", "verifier"],
+    "twoKeyRequired": true
+  },
+  "audit": {
+    "samplingRate": 0.2,
+    "autoRevocationTriggers": ["claim.false", "conflict.undisclosed"]
+  }
+}

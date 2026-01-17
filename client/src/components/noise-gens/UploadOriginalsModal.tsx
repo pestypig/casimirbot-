@@ -18,13 +18,19 @@ import { useToast } from "@/hooks/use-toast";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import {
   finalizeOriginalUpload,
+  fetchOriginalDetails,
   fetchNoisegenCapabilities,
+  updateOriginalIntentSnapshotPreferences,
   uploadOriginal,
   uploadOriginalChunk,
 } from "@/lib/api/noiseGens";
 import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
 import type {
+  AbletonIntentSnapshot,
+  IntentContract,
+  IntentSnapshotPreferences,
   NoisegenCapabilities,
+  PulseSource,
   TempoMeta,
   TimeSkyMeta,
 } from "@/types/noise-gens";
@@ -135,6 +141,29 @@ const STEM_CATEGORY_ORDER: StemCategory[] = [
   "ignore",
 ];
 
+type IntentRangeKey =
+  | "sampleInfluence"
+  | "styleInfluence"
+  | "weirdness"
+  | "reverbSend"
+  | "chorus";
+
+const INTENT_RANGE_FIELDS: Array<{ key: IntentRangeKey; label: string }> = [
+  { key: "sampleInfluence", label: "Sample influence" },
+  { key: "styleInfluence", label: "Style influence" },
+  { key: "weirdness", label: "Weirdness" },
+  { key: "reverbSend", label: "Reverb send" },
+  { key: "chorus", label: "Chorus" },
+];
+
+const DEFAULT_INTENT_RANGES: Record<IntentRangeKey, { min: string; max: string }> = {
+  sampleInfluence: { min: "", max: "" },
+  styleInfluence: { min: "", max: "" },
+  weirdness: { min: "", max: "" },
+  reverbSend: { min: "", max: "" },
+  chorus: { min: "", max: "" },
+};
+
 const formatBytes = (bytes: number): string => {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
@@ -202,21 +231,212 @@ const normalizeTimestamp = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const formatDateInput = (value?: number): string => {
+  if (!value || !Number.isFinite(value)) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
+
+const formatMonthInput = (value?: number): string => {
+  if (!value || !Number.isFinite(value)) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 7);
+};
+
+const formatDateTimeInput = (value?: number): string => {
+  if (!value || !Number.isFinite(value)) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 16);
+};
+
+const parseDateInput = (value: string): number | undefined => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parts = trimmed.split("-");
+  if (parts.length === 3) {
+    const [year, month, day] = parts.map((part) => Number(part));
+    if ([year, month, day].every((part) => Number.isFinite(part))) {
+      return Date.UTC(year, Math.max(0, month - 1), day);
+    }
+  }
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const parseMonthInput = (value: string): number | undefined => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parts = trimmed.split("-");
+  if (parts.length === 2) {
+    const [year, month] = parts.map((part) => Number(part));
+    if ([year, month].every((part) => Number.isFinite(part))) {
+      return Date.UTC(year, Math.max(0, month - 1), 1);
+    }
+  }
+  const parsed = Date.parse(`${trimmed}-01`);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const parseDateTimeInput = (value: string): number | undefined => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const parseCsvList = (value: string): string[] | undefined => {
+  const items = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return items.length ? Array.from(new Set(items)) : undefined;
+};
+
+const parseOptionalNumber = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const numeric = Number(trimmed);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const parseRangeInput = (range: { min: string; max: string }) => {
+  const minValue = parseOptionalNumber(range.min);
+  const maxValue = parseOptionalNumber(range.max);
+  if (minValue == null && maxValue == null) return undefined;
+  const resolvedMin = clamp01(minValue ?? (maxValue ?? 0));
+  const resolvedMax = clamp01(maxValue ?? (minValue ?? 0));
+  return resolvedMax >= resolvedMin
+    ? { min: resolvedMin, max: resolvedMax }
+    : { min: resolvedMax, max: resolvedMin };
+};
+
+const hashSeedSalt = (value: string): string => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `h${(hash >>> 0).toString(16)}`;
+};
+
+const normalizePulseSource = (value: unknown): PulseSource | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  if (
+    normalized === "drand" ||
+    normalized === "nist-beacon" ||
+    normalized === "curby" ||
+    normalized === "local-sky-photons"
+  ) {
+    return normalized;
+  }
+  return undefined;
+};
+
+const normalizePlacePrecision = (
+  value: unknown,
+): "exact" | "approximate" | "hidden" | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  if (normalized === "exact" || normalized === "approximate" || normalized === "hidden") {
+    return normalized as "exact" | "approximate" | "hidden";
+  }
+  return undefined;
+};
+
 const normalizeTimeSkyMeta = (value: unknown): TimeSkyMeta | undefined => {
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
   const next: TimeSkyMeta = {};
-  const publishedAt = normalizeTimestamp(record.publishedAt);
-  if (publishedAt != null) next.publishedAt = publishedAt;
-  const composedStart = normalizeTimestamp(record.composedStart);
-  if (composedStart != null) next.composedStart = composedStart;
-  const composedEnd = normalizeTimestamp(record.composedEnd);
-  if (composedEnd != null) next.composedEnd = composedEnd;
-  if (typeof record.place === "string" && record.place.trim().length > 0) {
-    next.place = record.place.trim();
+  const contextInput =
+    record.context && typeof record.context === "object"
+      ? (record.context as Record<string, unknown>)
+      : record;
+  const context: NonNullable<TimeSkyMeta["context"]> = {};
+  const publishedAt = normalizeTimestamp(contextInput.publishedAt);
+  if (publishedAt != null) {
+    next.publishedAt = publishedAt;
+    context.publishedAt = publishedAt;
   }
-  if (typeof record.skySignature === "string" && record.skySignature.trim().length > 0) {
-    next.skySignature = record.skySignature.trim();
+  const composedStart = normalizeTimestamp(contextInput.composedStart);
+  if (composedStart != null) {
+    next.composedStart = composedStart;
+    context.composedStart = composedStart;
+  }
+  const composedEnd = normalizeTimestamp(contextInput.composedEnd);
+  if (composedEnd != null) {
+    next.composedEnd = composedEnd;
+    context.composedEnd = composedEnd;
+  }
+  if (typeof contextInput.timezone === "string" && contextInput.timezone.trim().length > 0) {
+    context.timezone = contextInput.timezone.trim();
+  }
+  if (typeof contextInput.place === "string" && contextInput.place.trim().length > 0) {
+    const trimmed = contextInput.place.trim();
+    next.place = trimmed;
+    context.place = trimmed;
+  }
+  const placePrecision = normalizePlacePrecision(contextInput.placePrecision);
+  if (placePrecision) {
+    context.placePrecision = placePrecision;
+  }
+  if (
+    typeof contextInput.halobankSpanId === "string" &&
+    contextInput.halobankSpanId.trim().length > 0
+  ) {
+    context.halobankSpanId = contextInput.halobankSpanId.trim();
+  }
+  if (
+    typeof contextInput.skySignature === "string" &&
+    contextInput.skySignature.trim().length > 0
+  ) {
+    const trimmed = contextInput.skySignature.trim();
+    next.skySignature = trimmed;
+    context.skySignature = trimmed;
+  }
+  if (Object.keys(context).length > 0) {
+    next.context = context;
+  }
+
+  const pulseInput =
+    record.pulse && typeof record.pulse === "object"
+      ? (record.pulse as Record<string, unknown>)
+      : record;
+  const pulse: NonNullable<TimeSkyMeta["pulse"]> = {};
+  const source = normalizePulseSource(pulseInput.source);
+  if (source) {
+    pulse.source = source;
+  }
+  const rawRound = pulseInput.round ?? record.pulseRound;
+  if (typeof rawRound === "number" || (typeof rawRound === "string" && rawRound.trim())) {
+    pulse.round = typeof rawRound === "string" ? rawRound.trim() : rawRound;
+    next.pulseRound = pulse.round;
+  }
+  const pulseTime = normalizeTimestamp(pulseInput.pulseTime);
+  if (pulseTime != null) {
+    pulse.pulseTime = pulseTime;
+  }
+  const rawHash = pulseInput.valueHash ?? record.pulseHash;
+  if (typeof rawHash === "string" && rawHash.trim().length > 0) {
+    pulse.valueHash = rawHash.trim();
+    next.pulseHash = pulse.valueHash;
+  }
+  if (typeof pulseInput.seedSalt === "string" && pulseInput.seedSalt.trim().length > 0) {
+    pulse.seedSalt = pulseInput.seedSalt.trim();
+  }
+  if (
+    !pulse.source &&
+    (pulse.round != null || pulse.valueHash || pulse.pulseTime != null)
+  ) {
+    pulse.source = "drand";
+  }
+  if (Object.keys(pulse).length > 0) {
+    next.pulse = pulse;
   }
   return Object.keys(next).length > 0 ? next : undefined;
 };
@@ -225,6 +445,73 @@ const readTimeSkyMeta = (meta?: Record<string, unknown>): TimeSkyMeta | undefine
   if (!meta || typeof meta !== "object") return undefined;
   const candidate = (meta as { timeSky?: unknown }).timeSky;
   return normalizeTimeSkyMeta(candidate);
+};
+
+const mergeTimeSkyContext = (
+  base: TimeSkyMeta["context"],
+  overrides: Partial<NonNullable<TimeSkyMeta["context"]>>,
+  options: {
+    placePrecision?: "exact" | "approximate" | "hidden";
+    placePrecisionTouched: boolean;
+  },
+): TimeSkyMeta["context"] | undefined => {
+  const merged: NonNullable<TimeSkyMeta["context"]> = { ...(base ?? {}) };
+  if (overrides.publishedAt != null) merged.publishedAt = overrides.publishedAt;
+  if (overrides.composedStart != null) {
+    merged.composedStart = overrides.composedStart;
+  }
+  if (overrides.composedEnd != null) merged.composedEnd = overrides.composedEnd;
+  if (overrides.timezone) merged.timezone = overrides.timezone;
+  if (overrides.place) merged.place = overrides.place;
+  if (overrides.halobankSpanId) {
+    merged.halobankSpanId = overrides.halobankSpanId;
+  }
+  if (overrides.skySignature) merged.skySignature = overrides.skySignature;
+  if (options.placePrecisionTouched && options.placePrecision) {
+    merged.placePrecision = options.placePrecision;
+    if (options.placePrecision === "hidden") {
+      delete merged.place;
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+};
+
+const mergeTimeSkyPulse = (
+  base: TimeSkyMeta["pulse"],
+  overrides: Partial<NonNullable<TimeSkyMeta["pulse"]>>,
+  options: { source?: PulseSource; sourceTouched: boolean },
+): TimeSkyMeta["pulse"] | undefined => {
+  const merged: NonNullable<TimeSkyMeta["pulse"]> = { ...(base ?? {}) };
+  if (overrides.round != null) merged.round = overrides.round;
+  if (overrides.pulseTime != null) merged.pulseTime = overrides.pulseTime;
+  if (overrides.valueHash) merged.valueHash = overrides.valueHash;
+  if (overrides.seedSalt) merged.seedSalt = overrides.seedSalt;
+  if (options.sourceTouched && options.source) {
+    merged.source = options.source;
+  }
+  if (!merged.source && options.source) {
+    merged.source = options.source;
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+};
+
+const derivePulseSeedSalt = (options: {
+  trackId: string;
+  context?: TimeSkyMeta["context"];
+  pulse?: TimeSkyMeta["pulse"];
+}): string | undefined => {
+  const { trackId, context, pulse } = options;
+  if (!trackId || !context || !pulse) return undefined;
+  const pulseKey = pulse.round ?? pulse.pulseTime;
+  if (pulseKey == null || !pulse.valueHash) return undefined;
+  const placeSeed =
+    context.placePrecision === "hidden"
+      ? "hidden"
+      : (context.place ?? "").trim();
+  const publishedAt =
+    context.publishedAt != null ? String(context.publishedAt) : "";
+  const seedMaterial = `${trackId}|${publishedAt}|${placeSeed}|${pulseKey}|${pulse.valueHash}`;
+  return hashSeedSalt(seedMaterial);
 };
 
 const buildStemEntry = (file: File, category?: StemCategory): StemEntry => {
@@ -330,7 +617,62 @@ export function UploadOriginalsModal({
   const [creator, setCreator] = useState<FieldState>({ value: "", error: null });
   const [creatorTouched, setCreatorTouched] = useState(false);
   const [lyrics, setLyrics] = useState("");
+  const [timeSkyTouched, setTimeSkyTouched] = useState(false);
+  const [publishedDate, setPublishedDate] = useState("");
+  const [composedStart, setComposedStart] = useState("");
+  const [composedEnd, setComposedEnd] = useState("");
+  const [timezone, setTimezone] = useState("");
+  const [place, setPlace] = useState("");
+  const [placePrecision, setPlacePrecision] = useState<
+    "exact" | "approximate" | "hidden"
+  >("approximate");
+  const [placePrecisionTouched, setPlacePrecisionTouched] = useState(false);
+  const [skySignature, setSkySignature] = useState("");
+  const [pulseEnabled, setPulseEnabled] = useState(false);
+  const [pulseTouched, setPulseTouched] = useState(false);
+  const [pulseSource, setPulseSource] = useState<PulseSource>("drand");
+  const [pulseSourceTouched, setPulseSourceTouched] = useState(false);
+  const [pulseRound, setPulseRound] = useState("");
+  const [pulseTime, setPulseTime] = useState("");
+  const [pulseValueHash, setPulseValueHash] = useState("");
   const [intentFile, setIntentFile] = useState<File | null>(null);
+  const [intentSummaryOpen, setIntentSummaryOpen] = useState(false);
+  const [intentSummaryLoading, setIntentSummaryLoading] = useState(false);
+  const [intentSummaryError, setIntentSummaryError] = useState<string | null>(
+    null,
+  );
+  const [intentSummaryTrackId, setIntentSummaryTrackId] = useState<string | null>(
+    null,
+  );
+  const [intentSnapshot, setIntentSnapshot] = useState<AbletonIntentSnapshot | null>(
+    null,
+  );
+  const [intentSnapshotPreferences, setIntentSnapshotPreferences] =
+    useState<IntentSnapshotPreferences>({
+      applyTempo: true,
+      applyMix: true,
+      applyAutomation: false,
+    });
+  const [intentPrefsSaving, setIntentPrefsSaving] = useState(false);
+  const [intentContractEnabled, setIntentContractEnabled] = useState(false);
+  const [intentKey, setIntentKey] = useState("");
+  const [intentGrooveTemplateIds, setIntentGrooveTemplateIds] = useState("");
+  const [intentMotifIds, setIntentMotifIds] = useState("");
+  const [intentStemLocks, setIntentStemLocks] = useState("");
+  const [intentArrangementMoves, setIntentArrangementMoves] = useState("");
+  const [intentIdeologyRootId, setIntentIdeologyRootId] = useState("");
+  const [intentAllowedNodeIds, setIntentAllowedNodeIds] = useState("");
+  const [intentNotes, setIntentNotes] = useState("");
+  const [intentStoreTimeSky, setIntentStoreTimeSky] = useState(false);
+  const [intentStorePulse, setIntentStorePulse] = useState(false);
+  const [intentPulseSource, setIntentPulseSource] =
+    useState<PulseSource>("drand");
+  const [intentPlacePrecision, setIntentPlacePrecision] = useState<
+    "exact" | "approximate" | "hidden"
+  >("approximate");
+  const [intentRanges, setIntentRanges] = useState(() => ({
+    ...DEFAULT_INTENT_RANGES,
+  }));
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(
     undefined,
   );
@@ -369,7 +711,48 @@ export function UploadOriginalsModal({
       setCreator({ value: "", error: null });
       setCreatorTouched(false);
       setLyrics("");
+      setTimeSkyTouched(false);
+      setPublishedDate("");
+      setComposedStart("");
+      setComposedEnd("");
+      setTimezone("");
+      setPlace("");
+      setPlacePrecision("approximate");
+      setPlacePrecisionTouched(false);
+      setSkySignature("");
+      setPulseEnabled(false);
+      setPulseTouched(false);
+      setPulseSource("drand");
+      setPulseSourceTouched(false);
+      setPulseRound("");
+      setPulseTime("");
+      setPulseValueHash("");
       setIntentFile(null);
+      setIntentSummaryOpen(false);
+      setIntentSummaryLoading(false);
+      setIntentSummaryError(null);
+      setIntentSummaryTrackId(null);
+      setIntentSnapshot(null);
+      setIntentSnapshotPreferences({
+        applyTempo: true,
+        applyMix: true,
+        applyAutomation: false,
+      });
+      setIntentPrefsSaving(false);
+      setIntentContractEnabled(false);
+      setIntentKey("");
+      setIntentGrooveTemplateIds("");
+      setIntentMotifIds("");
+      setIntentStemLocks("");
+      setIntentArrangementMoves("");
+      setIntentIdeologyRootId("");
+      setIntentAllowedNodeIds("");
+      setIntentNotes("");
+      setIntentStoreTimeSky(false);
+      setIntentStorePulse(false);
+      setIntentPulseSource("drand");
+      setIntentPlacePrecision("approximate");
+      setIntentRanges({ ...DEFAULT_INTENT_RANGES });
       setSelectedProjectId(undefined);
       setStemEntries([]);
       stemSourceRef.current = "";
@@ -426,6 +809,76 @@ export function UploadOriginalsModal({
     () => noiseProjects.find((project) => project.id === selectedProjectId),
     [noiseProjects, selectedProjectId],
   );
+  const projectTimeSky = useMemo(
+    () =>
+      readTimeSkyMeta((selectedProject?.meta ?? {}) as Record<string, unknown>),
+    [selectedProject?.meta],
+  );
+
+  useEffect(() => {
+    if (!open || timeSkyTouched) return;
+    const context = projectTimeSky?.context;
+    if (!context) return;
+    if (context.publishedAt && !publishedDate) {
+      setPublishedDate(formatDateInput(context.publishedAt));
+    }
+    if (context.composedStart && !composedStart) {
+      setComposedStart(formatMonthInput(context.composedStart));
+    }
+    if (context.composedEnd && !composedEnd) {
+      setComposedEnd(formatMonthInput(context.composedEnd));
+    }
+    if (context.timezone && !timezone) {
+      setTimezone(context.timezone);
+    }
+    if (context.place && !place) {
+      setPlace(context.place);
+    }
+    if (context.placePrecision && !placePrecisionTouched) {
+      setPlacePrecision(context.placePrecision);
+    }
+    if (context.skySignature && !skySignature) {
+      setSkySignature(context.skySignature);
+    }
+  }, [
+    composedEnd,
+    composedStart,
+    open,
+    place,
+    placePrecisionTouched,
+    projectTimeSky,
+    publishedDate,
+    skySignature,
+    timeSkyTouched,
+    timezone,
+  ]);
+
+  useEffect(() => {
+    if (!open || pulseTouched) return;
+    const pulse = projectTimeSky?.pulse;
+    if (!pulse) return;
+    setPulseEnabled(true);
+    if (pulse.source && !pulseSourceTouched) {
+      setPulseSource(pulse.source);
+    }
+    if (pulse.round != null && !pulseRound) {
+      setPulseRound(String(pulse.round));
+    }
+    if (pulse.pulseTime && !pulseTime) {
+      setPulseTime(formatDateTimeInput(pulse.pulseTime));
+    }
+    if (pulse.valueHash && !pulseValueHash) {
+      setPulseValueHash(pulse.valueHash);
+    }
+  }, [
+    open,
+    projectTimeSky,
+    pulseRound,
+    pulseSourceTouched,
+    pulseTime,
+    pulseTouched,
+    pulseValueHash,
+  ]);
   useEffect(() => {
     if (!open || !selectedProject) return;
     const projectName = selectedProject.name?.trim();
@@ -590,6 +1043,7 @@ export function UploadOriginalsModal({
       ? "Uploading..."
       : "Upload";
   const submitButtonDisabled = requiresAuth ? false : !canSubmit;
+  const showIntentSummary = intentSummaryOpen || intentSummaryLoading;
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen && isUploading) {
@@ -605,6 +1059,30 @@ export function UploadOriginalsModal({
   );
 
   const bpmNumeric = useMemo(() => sanitizeBpmInput(bpm), [bpm]);
+
+  const intentSummaryStats = useMemo(() => {
+    if (!intentSnapshot) return [];
+    const summary = intentSnapshot.summary;
+    return [
+      { label: "Tracks", value: summary.trackCount },
+      { label: "Audio", value: summary.audioTrackCount },
+      { label: "MIDI", value: summary.midiTrackCount },
+      { label: "Returns", value: summary.returnTrackCount },
+      { label: "Groups", value: summary.groupTrackCount },
+      { label: "Devices", value: summary.deviceCount },
+      { label: "Locators", value: summary.locatorCount },
+    ];
+  }, [intentSnapshot]);
+
+  const intentDevicePreview = useMemo(() => {
+    if (!intentSnapshot?.devices?.length) return "";
+    const preview = intentSnapshot.devices
+      .slice(0, 4)
+      .map((device) => `${device.name} (${device.count})`)
+      .join(", ");
+    const remaining = intentSnapshot.devices.length - 4;
+    return remaining > 0 ? `${preview} +${remaining} more` : preview;
+  }, [intentSnapshot]);
 
   const tempoPreview = useMemo(() => {
     if (bpmNumeric == null) return null;
@@ -801,9 +1279,89 @@ export function UploadOriginalsModal({
       };
       const existingOriginalId = prefill?.existingOriginalId?.trim();
       const trackIdForUpload = existingOriginalId || createUploadId();
-      const timeSkyMeta = readTimeSkyMeta(
-        (selectedProject?.meta ?? {}) as Record<string, unknown>,
-      );
+      const timeSkyMeta = (() => {
+        const base = projectTimeSky;
+        const contextOverrides: Partial<
+          NonNullable<TimeSkyMeta["context"]>
+        > = {};
+        const publishedAt = parseDateInput(publishedDate);
+        if (publishedAt != null) contextOverrides.publishedAt = publishedAt;
+        const composedStartTs = parseMonthInput(composedStart);
+        if (composedStartTs != null) {
+          contextOverrides.composedStart = composedStartTs;
+        }
+        const composedEndTs = parseMonthInput(composedEnd);
+        if (composedEndTs != null) {
+          contextOverrides.composedEnd = composedEndTs;
+        }
+        if (timezone.trim()) {
+          contextOverrides.timezone = timezone.trim();
+        }
+        if (place.trim() && placePrecision !== "hidden") {
+          contextOverrides.place = place.trim();
+        }
+        if (skySignature.trim()) {
+          contextOverrides.skySignature = skySignature.trim();
+        }
+
+        const includePulse =
+          pulseEnabled || (!pulseTouched && Boolean(base?.pulse));
+        const pulseOverrides: Partial<NonNullable<TimeSkyMeta["pulse"]>> = {};
+        const trimmedRound = pulseRound.trim();
+        if (trimmedRound) {
+          const numeric = Number(trimmedRound);
+          pulseOverrides.round =
+            Number.isFinite(numeric) && /^\d+$/.test(trimmedRound)
+              ? numeric
+              : trimmedRound;
+        }
+        const pulseTimeTs = parseDateTimeInput(pulseTime);
+        if (pulseTimeTs != null) {
+          pulseOverrides.pulseTime = pulseTimeTs;
+        }
+        if (pulseValueHash.trim()) {
+          pulseOverrides.valueHash = pulseValueHash.trim();
+        }
+
+        const mergedContext = mergeTimeSkyContext(base?.context, contextOverrides, {
+          placePrecision,
+          placePrecisionTouched,
+        });
+        const mergedPulse = includePulse
+          ? mergeTimeSkyPulse(base?.pulse, pulseOverrides, {
+              source: pulseSource,
+              sourceTouched: pulseSourceTouched,
+            })
+          : undefined;
+
+        if (mergedPulse && !mergedPulse.seedSalt) {
+          const seedSalt = derivePulseSeedSalt({
+            trackId: trackIdForUpload,
+            context: mergedContext,
+            pulse: mergedPulse,
+          });
+          if (seedSalt) {
+            mergedPulse.seedSalt = seedSalt;
+          }
+        }
+
+        if (!mergedContext && !mergedPulse) return undefined;
+        const next: TimeSkyMeta = {};
+        if (mergedContext) {
+          next.context = mergedContext;
+          next.publishedAt = mergedContext.publishedAt;
+          next.composedStart = mergedContext.composedStart;
+          next.composedEnd = mergedContext.composedEnd;
+          next.place = mergedContext.place;
+          next.skySignature = mergedContext.skySignature;
+        }
+        if (mergedPulse) {
+          next.pulse = mergedPulse;
+          if (mergedPulse.round != null) next.pulseRound = mergedPulse.round;
+          if (mergedPulse.valueHash) next.pulseHash = mergedPulse.valueHash;
+        }
+        return next;
+      })();
       let tempoMeta: TempoMeta | undefined;
       if (bpmNumeric != null) {
         tempoMeta = {
@@ -813,6 +1371,83 @@ export function UploadOriginalsModal({
           quantized,
         };
       }
+      const intentContract = (() => {
+        if (!intentContractEnabled) return undefined;
+        const now = Date.now();
+        const invariants: NonNullable<IntentContract["invariants"]> = {};
+        if (bpmNumeric != null) {
+          invariants.tempoBpm = Number(bpmNumeric.toFixed(2));
+          invariants.timeSig = DEFAULT_TIME_SIG;
+        }
+        if (intentKey.trim()) {
+          invariants.key = intentKey.trim();
+        }
+        const grooveTemplateIds = parseCsvList(intentGrooveTemplateIds);
+        if (grooveTemplateIds) {
+          invariants.grooveTemplateIds = grooveTemplateIds;
+        }
+        const motifIds = parseCsvList(intentMotifIds);
+        if (motifIds) {
+          invariants.motifIds = motifIds;
+        }
+        const stemLocks = parseCsvList(intentStemLocks);
+        if (stemLocks) {
+          invariants.stemLocks = stemLocks;
+        }
+        const resolvedInvariants =
+          Object.keys(invariants).length > 0 ? invariants : undefined;
+
+        const ranges: NonNullable<IntentContract["ranges"]> = {};
+        for (const field of INTENT_RANGE_FIELDS) {
+          const rangeValue = parseRangeInput(intentRanges[field.key]);
+          if (rangeValue) {
+            ranges[field.key] = rangeValue;
+          }
+        }
+        const arrangementMoves = parseCsvList(intentArrangementMoves);
+        if (arrangementMoves) {
+          ranges.arrangementMoves = arrangementMoves;
+        }
+        const resolvedRanges = Object.keys(ranges).length > 0 ? ranges : undefined;
+
+        const meaning: NonNullable<IntentContract["meaning"]> = {};
+        if (intentIdeologyRootId.trim()) {
+          meaning.ideologyRootId = intentIdeologyRootId.trim();
+        }
+        const allowedNodeIds = parseCsvList(intentAllowedNodeIds);
+        if (allowedNodeIds) {
+          meaning.allowedNodeIds = allowedNodeIds;
+        }
+        const resolvedMeaning =
+          Object.keys(meaning).length > 0 ? meaning : undefined;
+
+        const provenance: NonNullable<IntentContract["provenancePolicy"]> = {};
+        if (intentStoreTimeSky) {
+          provenance.storeTimeSky = true;
+        }
+        if (intentStorePulse) {
+          provenance.storePulse = true;
+          provenance.pulseSource = intentPulseSource;
+        }
+        if (intentPlacePrecision) {
+          provenance.placePrecision = intentPlacePrecision;
+        }
+        const resolvedProvenance =
+          Object.keys(provenance).length > 0 ? provenance : undefined;
+
+        const notes = intentNotes.trim();
+
+        return {
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+          ...(resolvedInvariants ? { invariants: resolvedInvariants } : {}),
+          ...(resolvedRanges ? { ranges: resolvedRanges } : {}),
+          ...(resolvedMeaning ? { meaning: resolvedMeaning } : {}),
+          ...(resolvedProvenance ? { provenancePolicy: resolvedProvenance } : {}),
+          ...(notes ? { notes } : {}),
+        } satisfies IntentContract;
+      })();
       const appendSharedFields = (payload: FormData, trackId?: string) => {
         payload.append("title", title.value.trim());
         payload.append("creator", creator.value.trim());
@@ -828,6 +1463,9 @@ export function UploadOriginalsModal({
         }
         if (tempoMeta) {
           payload.append("tempo", JSON.stringify(tempoMeta));
+        }
+        if (intentContract) {
+          payload.append("intentContract", JSON.stringify(intentContract));
         }
       };
       const abortControllers = new Map<string, AbortController>();
@@ -960,6 +1598,38 @@ export function UploadOriginalsModal({
         tempo: tempoMeta,
         durationSeconds: estimateLoopDurationSeconds(tempoMeta ?? undefined),
       });
+      if (intentFile) {
+        setIntentSummaryLoading(true);
+        setIntentSummaryError(null);
+        try {
+          const details = await fetchOriginalDetails(trackIdForUpload);
+          const snapshot = details.intentSnapshot ?? null;
+          if (snapshot) {
+            const prefs = details.intentSnapshotPreferences ?? {
+              applyTempo: true,
+              applyMix: true,
+              applyAutomation: false,
+            };
+            setIntentSnapshot(snapshot);
+            setIntentSnapshotPreferences({
+              applyTempo: prefs.applyTempo ?? true,
+              applyMix: prefs.applyMix ?? true,
+              applyAutomation: prefs.applyAutomation ?? false,
+            });
+            setIntentSummaryTrackId(trackIdForUpload);
+            setIntentSummaryOpen(true);
+            return;
+          }
+        } catch (error) {
+          setIntentSummaryError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load Ableton summary.",
+          );
+        } finally {
+          setIntentSummaryLoading(false);
+        }
+      }
       onOpenChange(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed";
@@ -970,6 +1640,30 @@ export function UploadOriginalsModal({
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveIntentPreferences = async () => {
+    if (!intentSummaryTrackId) {
+      onOpenChange(false);
+      return;
+    }
+    setIntentPrefsSaving(true);
+    setIntentSummaryError(null);
+    try {
+      await updateOriginalIntentSnapshotPreferences(
+        intentSummaryTrackId,
+        intentSnapshotPreferences,
+      );
+      onOpenChange(false);
+    } catch (error) {
+      setIntentSummaryError(
+        error instanceof Error
+          ? error.message
+          : "Unable to save intent preferences.",
+      );
+    } finally {
+      setIntentPrefsSaving(false);
     }
   };
 
@@ -1032,6 +1726,149 @@ export function UploadOriginalsModal({
           </div>
         ) : null}
 
+        {showIntentSummary ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-white/10 bg-slate-950/60 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <Label>Ableton intent summary</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Review the Live set snapshot and choose which layers to apply.
+                  </p>
+                </div>
+                {intentSummaryLoading ? (
+                  <Badge
+                    variant="outline"
+                    className="border-slate-500/40 text-slate-300"
+                  >
+                    Loading summary...
+                  </Badge>
+                ) : intentSnapshot ? (
+                  <Badge className="border-emerald-500/40 bg-emerald-500/10 text-emerald-100">
+                    Snapshot ready
+                  </Badge>
+                ) : (
+                  <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+                    No snapshot found
+                  </Badge>
+                )}
+              </div>
+
+              {intentSummaryError ? (
+                <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                  {intentSummaryError}
+                </div>
+              ) : null}
+
+              {intentSnapshot ? (
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Tempo
+                      </div>
+                      <div className="mt-1 text-sm text-slate-100">
+                        {intentSnapshot.globals?.bpm != null
+                          ? `${Math.round(intentSnapshot.globals.bpm)} BPM`
+                          : "Unknown BPM"}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Time sig {intentSnapshot.globals?.timeSig ?? "--"}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Tracks and devices
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-slate-300">
+                        {intentSummaryStats.map((item) => (
+                          <div
+                            key={item.label}
+                            className="flex items-center justify-between"
+                          >
+                            <span>{item.label}</span>
+                            <span>{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {intentDevicePreview ? (
+                    <div className="mt-3 text-[11px] text-slate-400">
+                      Devices: {intentDevicePreview}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  No Ableton snapshot was stored for this upload.
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-slate-950/60 p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Apply intent layers
+              </div>
+              <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                <label className="flex items-center justify-between gap-2">
+                  <span>Tempo and time signature</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(intentSnapshotPreferences.applyTempo)}
+                    onChange={(event) =>
+                      setIntentSnapshotPreferences((prev) => ({
+                        ...prev,
+                        applyTempo: event.target.checked,
+                      }))
+                    }
+                    disabled={
+                      !intentSnapshot || intentSummaryLoading || intentPrefsSaving
+                    }
+                    className="h-3.5 w-3.5 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  <span>Mix intent (EQ and FX)</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(intentSnapshotPreferences.applyMix)}
+                    onChange={(event) =>
+                      setIntentSnapshotPreferences((prev) => ({
+                        ...prev,
+                        applyMix: event.target.checked,
+                      }))
+                    }
+                    disabled={
+                      !intentSnapshot || intentSummaryLoading || intentPrefsSaving
+                    }
+                    className="h-3.5 w-3.5 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  <span>Automation energy curve</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(intentSnapshotPreferences.applyAutomation)}
+                    onChange={(event) =>
+                      setIntentSnapshotPreferences((prev) => ({
+                        ...prev,
+                        applyAutomation: event.target.checked,
+                      }))
+                    }
+                    disabled={
+                      !intentSnapshot || intentSummaryLoading || intentPrefsSaving
+                    }
+                    className="h-3.5 w-3.5 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                </label>
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Automation defaults off to keep RenderPlans stable unless you want it.
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -1196,7 +2033,7 @@ export function UploadOriginalsModal({
             {intentFile ? (
               <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                 <span className="truncate">
-                  {intentFile.name} · {formatBytes(intentFile.size)}
+                  {intentFile.name} | {formatBytes(intentFile.size)}
                 </span>
                 <Button
                   type="button"
@@ -1258,6 +2095,421 @@ export function UploadOriginalsModal({
             </p>
           </div>
 
+          <div className="rounded-lg border border-white/10 bg-slate-950/60 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <Label>Time & Sky (optional)</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Provenance metadata for replay. Leave blank to use project defaults.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={pulseEnabled}
+                  onChange={(event) => {
+                    setPulseTouched(true);
+                    setPulseEnabled(event.target.checked);
+                  }}
+                  className="h-3.5 w-3.5 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+                Use cosmic pulse for seeding
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Published date
+                <Input
+                  type="date"
+                  value={publishedDate}
+                  onChange={(event) => {
+                    setTimeSkyTouched(true);
+                    setPublishedDate(event.target.value);
+                  }}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Timezone
+                <Input
+                  value={timezone}
+                  onChange={(event) => {
+                    setTimeSkyTouched(true);
+                    setTimezone(event.target.value);
+                  }}
+                  placeholder="America/Los_Angeles"
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Composed start
+                <Input
+                  type="month"
+                  value={composedStart}
+                  onChange={(event) => {
+                    setTimeSkyTouched(true);
+                    setComposedStart(event.target.value);
+                  }}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Composed end
+                <Input
+                  type="month"
+                  value={composedEnd}
+                  onChange={(event) => {
+                    setTimeSkyTouched(true);
+                    setComposedEnd(event.target.value);
+                  }}
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Place
+                <Input
+                  value={place}
+                  onChange={(event) => {
+                    setTimeSkyTouched(true);
+                    setPlace(event.target.value);
+                  }}
+                  disabled={placePrecision === "hidden"}
+                  placeholder={
+                    placePrecision === "hidden" ? "Hidden" : "City or region"
+                  }
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Place privacy
+                <select
+                  value={placePrecision}
+                  onChange={(event) => {
+                    setTimeSkyTouched(true);
+                    setPlacePrecisionTouched(true);
+                    setPlacePrecision(
+                      event.target.value as "exact" | "approximate" | "hidden",
+                    );
+                  }}
+                  className="h-10 rounded border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                >
+                  <option value="exact">Exact</option>
+                  <option value="approximate">Approximate</option>
+                  <option value="hidden">Hidden</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-3">
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Sky signature
+                <Input
+                  value={skySignature}
+                  onChange={(event) => {
+                    setTimeSkyTouched(true);
+                    setSkySignature(event.target.value);
+                  }}
+                  placeholder="HALO-XXXX..."
+                />
+              </label>
+            </div>
+
+            {pulseEnabled ? (
+              <div className="mt-4 border-t border-white/10 pt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Pulse source
+                    <select
+                      value={pulseSource}
+                      onChange={(event) => {
+                        setPulseTouched(true);
+                        setPulseSourceTouched(true);
+                        setPulseSource(event.target.value as PulseSource);
+                      }}
+                      className="h-10 rounded border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                    >
+                      <option value="drand">drand beacon</option>
+                      <option value="nist-beacon">NIST beacon</option>
+                      <option value="curby">CURBy beacon</option>
+                      <option value="local-sky-photons">Local sky photons</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Pulse round (optional)
+                    <Input
+                      value={pulseRound}
+                      onChange={(event) => {
+                        setPulseTouched(true);
+                        setPulseRound(event.target.value);
+                      }}
+                      placeholder="e.g. 123456"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Pulse time (optional)
+                    <Input
+                      type="datetime-local"
+                      value={pulseTime}
+                      onChange={(event) => {
+                        setPulseTouched(true);
+                        setPulseTime(event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Pulse value hash
+                    <Input
+                      value={pulseValueHash}
+                      onChange={(event) => {
+                        setPulseTouched(true);
+                        setPulseValueHash(event.target.value);
+                      }}
+                      placeholder="hash of the pulse output"
+                    />
+                  </label>
+                </div>
+
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Round or time plus a value hash is required to replay the seed.
+                </p>
+                {pulseSource === "local-sky-photons" ? (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Local sky photons are studio-only; store the derived hash for
+                    reproducibility.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Pulse data is a public salt for replay, not a security key.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-slate-950/60 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <Label>Intent contract (optional)</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Lock invariants and allowable variation for this original.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={intentContractEnabled}
+                  onChange={(event) => setIntentContractEnabled(event.target.checked)}
+                  className="h-3.5 w-3.5 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+                Enable intent contract
+              </label>
+            </div>
+
+            {intentContractEnabled ? (
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Key
+                    <Input
+                      value={intentKey}
+                      onChange={(event) => setIntentKey(event.target.value)}
+                      placeholder="A minor"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Stem locks
+                    <Input
+                      value={intentStemLocks}
+                      onChange={(event) => setIntentStemLocks(event.target.value)}
+                      placeholder="drums, lead"
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Groove template IDs
+                    <Input
+                      value={intentGrooveTemplateIds}
+                      onChange={(event) =>
+                        setIntentGrooveTemplateIds(event.target.value)
+                      }
+                      placeholder="groove-1, groove-2"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Motif IDs
+                    <Input
+                      value={intentMotifIds}
+                      onChange={(event) => setIntentMotifIds(event.target.value)}
+                      placeholder="motif-a, motif-b"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Variation ranges
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {INTENT_RANGE_FIELDS.map((field) => (
+                      <div
+                        key={field.key}
+                        className="rounded-lg border border-white/10 bg-white/5 p-3"
+                      >
+                        <div className="text-xs font-medium text-slate-200">
+                          {field.label}
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <Input
+                            value={intentRanges[field.key].min}
+                            onChange={(event) =>
+                              setIntentRanges((prev) => ({
+                                ...prev,
+                                [field.key]: {
+                                  ...prev[field.key],
+                                  min: event.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="Min"
+                          />
+                          <Input
+                            value={intentRanges[field.key].max}
+                            onChange={(event) =>
+                              setIntentRanges((prev) => ({
+                                ...prev,
+                                [field.key]: {
+                                  ...prev[field.key],
+                                  max: event.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="Max"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Arrangement moves
+                    <Input
+                      value={intentArrangementMoves}
+                      onChange={(event) =>
+                        setIntentArrangementMoves(event.target.value)
+                      }
+                      placeholder="swap-hook, drop-drums"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Ideology root
+                    <Input
+                      value={intentIdeologyRootId}
+                      onChange={(event) =>
+                        setIntentIdeologyRootId(event.target.value)
+                      }
+                      placeholder="worldview-integrity"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Allowed nodes
+                    <Input
+                      value={intentAllowedNodeIds}
+                      onChange={(event) =>
+                        setIntentAllowedNodeIds(event.target.value)
+                      }
+                      placeholder="stewardship-ledger, interbeing-systems"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
+                    Store Time &amp; Sky
+                    <input
+                      type="checkbox"
+                      checked={intentStoreTimeSky}
+                      onChange={(event) =>
+                        setIntentStoreTimeSky(event.target.checked)
+                      }
+                      className="h-3.5 w-3.5 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
+                    Store pulse
+                    <input
+                      type="checkbox"
+                      checked={intentStorePulse}
+                      onChange={(event) =>
+                        setIntentStorePulse(event.target.checked)
+                      }
+                      className="h-3.5 w-3.5 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Pulse source
+                    <select
+                      value={intentPulseSource}
+                      onChange={(event) =>
+                        setIntentPulseSource(event.target.value as PulseSource)
+                      }
+                      disabled={!intentStorePulse}
+                      className="h-10 rounded border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                    >
+                      <option value="drand">drand beacon</option>
+                      <option value="nist-beacon">NIST beacon</option>
+                      <option value="curby">CURBy beacon</option>
+                      <option value="local-sky-photons">Local sky photons</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Place precision
+                    <select
+                      value={intentPlacePrecision}
+                      onChange={(event) =>
+                        setIntentPlacePrecision(
+                          event.target.value as
+                            | "exact"
+                            | "approximate"
+                            | "hidden",
+                        )
+                      }
+                      className="h-10 rounded border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                    >
+                      <option value="exact">Exact</option>
+                      <option value="approximate">Approximate</option>
+                      <option value="hidden">Hidden</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div>
+                  <Label>Notes</Label>
+                  <Textarea
+                    value={intentNotes}
+                    onChange={(event) => setIntentNotes(event.target.value)}
+                    placeholder="Optional notes about the intent contract."
+                    className="mt-2 min-h-[80px]"
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Enable to store creator intent rules alongside the original.
+              </p>
+            )}
+          </div>
+
           <div>
             <Label htmlFor="noise-upload-lyrics">Lyrics (optional)</Label>
             <Textarea
@@ -1269,8 +2521,9 @@ export function UploadOriginalsModal({
             />
           </div>
         </div>
+        )}
 
-        {uploadProgress && uploadProgress.length ? (
+        {!showIntentSummary && uploadProgress && uploadProgress.length ? (
           <div className="rounded-lg border border-white/10 bg-slate-950/60 p-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Uploading {uploadProgress.length} file(s)</span>
@@ -1313,30 +2566,53 @@ export function UploadOriginalsModal({
           </div>
         ) : null}
 
-        <DialogFooter className="gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => handleOpenChange(false)}
-            disabled={isUploading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={() => {
-              if (requiresAuth) {
-                onRequestSignIn?.();
-                return;
+        {showIntentSummary ? (
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={intentPrefsSaving}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleSaveIntentPreferences()}
+              disabled={
+                intentSummaryLoading || intentPrefsSaving || !intentSnapshot
               }
-              void handleSubmit();
-            }}
-            disabled={submitButtonDisabled}
-            className="min-w-[120px]"
-          >
-            {submitButtonLabel}
-          </Button>
-        </DialogFooter>
+              className="min-w-[140px]"
+            >
+              {intentPrefsSaving ? "Saving..." : "Save preferences"}
+            </Button>
+          </DialogFooter>
+        ) : (
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (requiresAuth) {
+                  onRequestSignIn?.();
+                  return;
+                }
+                void handleSubmit();
+              }}
+              disabled={submitButtonDisabled}
+              className="min-w-[120px]"
+            >
+              {submitButtonLabel}
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

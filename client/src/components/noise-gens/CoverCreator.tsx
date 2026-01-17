@@ -11,6 +11,7 @@ import {
   listKnowledgeFiles,
   saveKnowledgeFiles,
   updateKnowledgeFileTags,
+  type KnowledgeFileRecord,
 } from "@/lib/agi/knowledge-store";
 import {
   createCoverJob,
@@ -41,11 +42,13 @@ import type {
   BarWindow,
   CoverJobRequest,
   CoverJob,
+  PlanMeta,
   TempoMeta,
   KBTexture,
   KBMatch,
   RenderPlan,
   CoverEvidence,
+  EditionReceipt,
 } from "@/types/noise-gens";
 import type { NoisegenUiMode } from "@/hooks/useNoisegenUiMode";
 import { cn } from "@/lib/utils";
@@ -58,6 +61,7 @@ import { autoMatchTexture, resolveTextureById } from "@/lib/noise/kb-autoselect"
 import {
   COVER_FLOW_EVENT,
   COVER_FLOW_STORAGE_KEY,
+  clearCoverFlowPayload,
   readCoverFlowPayload,
   writeCoverFlowPayload,
   type CoverFlowPayload,
@@ -81,6 +85,7 @@ type PlanRankCandidate = {
   id: string;
   seed: string;
   plan?: RenderPlan;
+  planMeta?: PlanMeta;
   status: "planning" | "scoring" | "scored" | "error";
   idi?: number;
   confidence?: number;
@@ -146,6 +151,62 @@ const formatTimestamp = (value: number | undefined) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
   return date.toLocaleString();
+};
+
+const formatHashShort = (value?: string) =>
+  value && value.length > 10 ? `${value.slice(0, 8)}…` : value ?? "--";
+
+const formatIntentSimilarity = (value?: number) =>
+  typeof value === "number" && Number.isFinite(value)
+    ? `${Math.round(clamp01(value) * 100)}%`
+    : "--";
+
+const formatViolationPreview = (violations?: string[]) => {
+  if (!violations?.length) return null;
+  const preview = violations.slice(0, 2).join("; ");
+  return violations.length > 2
+    ? `${preview} +${violations.length - 2} more`
+    : preview;
+};
+
+const buildReceiptChips = (receipt?: EditionReceipt) => {
+  if (!receipt) return [];
+  const chips: string[] = [];
+  if (receipt.contract?.hash) {
+    chips.push(`Contract ${formatHashShort(receipt.contract.hash)}`);
+  }
+  if (receipt.contract?.intentSimilarity != null) {
+    chips.push(`Intent ${formatIntentSimilarity(receipt.contract.intentSimilarity)}`);
+  }
+  if (receipt.contract?.violations?.length) {
+    const count = receipt.contract.violations.length;
+    chips.push(`${count} violation${count === 1 ? "" : "s"}`);
+  }
+  if (receipt.ideology?.rootId) {
+    chips.push(`Ideology ${receipt.ideology.rootId}`);
+  }
+  if (receipt.ideology?.treeVersion != null) {
+    chips.push(`Tree v${receipt.ideology.treeVersion}`);
+  }
+  if (receipt.ideology?.allowedNodeIds?.length) {
+    chips.push(`${receipt.ideology.allowedNodeIds.length} nodes`);
+  }
+  if (receipt.provenance?.pulse?.source) {
+    chips.push(`Pulse ${receipt.provenance.pulse.source}`);
+  }
+  if (receipt.provenance?.placePrecision) {
+    chips.push(`Place ${receipt.provenance.placePrecision}`);
+  }
+  if (receipt.tools?.plannerVersion) {
+    chips.push(`Planner ${receipt.tools.plannerVersion}`);
+  }
+  if (receipt.tools?.modelVersion) {
+    chips.push(`Model ${receipt.tools.modelVersion}`);
+  }
+  if (receipt.tools?.toolVersions) {
+    chips.push(`Tools ${Object.keys(receipt.tools.toolVersions).length}`);
+  }
+  return chips;
 };
 
 const normalizeIdList = (list?: string[]) => {
@@ -378,6 +439,7 @@ const PLAN_ANALYSIS_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const PLAN_ANALYSIS_CACHE_LIMIT = 25;
 const PLAN_ANALYSIS_FILE_PREFIX = "noisegen-analysis-";
 const PLAN_ANALYSIS_TAGS = ["noisegen-analysis", "plan-analysis"];
+const MANUAL_PLAN_META: PlanMeta = { plannerVersion: "manual:v1" };
 const DEFAULT_LISTENER_MACROS: ListenerMacros = {
   energy: 0.5,
   space: 0.5,
@@ -505,8 +567,9 @@ export function CoverCreator({
   const effectiveMode: NoisegenUiMode = uiMode ?? "studio";
   const isListener = effectiveMode === "listener";
   const showRemixTools = effectiveMode !== "listener";
-  const showPlanEditor = showRemixTools;
-  const canEditPlan = effectiveMode === "studio" || effectiveMode === "labs";
+  const showRemixLayer = effectiveMode === "remix";
+  const showPlanEditor = effectiveMode === "studio" || effectiveMode === "labs";
+  const canEditPlan = showPlanEditor;
   const showRecipeTools =
     effectiveMode === "remix" || effectiveMode === "studio" || effectiveMode === "labs";
   const initialRenderPlanDraft = useMemo(() => readStoredRenderPlan(), []);
@@ -522,11 +585,16 @@ export function CoverCreator({
   const [weirdness, setWeirdness] = useState<number>(0.2);
   const [renderPlanDraft, setRenderPlanDraft] = useState<string>(initialRenderPlanDraft);
   const [renderPlan, setRenderPlan] = useState<RenderPlan | null>(null);
+  const [renderPlanMeta, setRenderPlanMeta] = useState<PlanMeta | null>(null);
   const [renderPlanEnabled, setRenderPlanEnabled] = useState(false);
   const [renderPlanError, setRenderPlanError] = useState<string | null>(null);
   const [renderPlanOpen, setRenderPlanOpen] = useState<boolean>(
     () => Boolean(initialRenderPlanDraft),
   );
+  const [ingredientsOpen, setIngredientsOpen] = useState(false);
+  const [ingredientFiles, setIngredientFiles] = useState<KnowledgeFileRecord[]>([]);
+  const [ingredientLoading, setIngredientLoading] = useState(false);
+  const [ingredientError, setIngredientError] = useState<string | null>(null);
   const [atomAutoFillRunning, setAtomAutoFillRunning] = useState(false);
   const [atomAutoFillStatus, setAtomAutoFillStatus] = useState<string | null>(
     null,
@@ -619,6 +687,7 @@ export function CoverCreator({
     const { plan, error } = parseRenderPlan(initialRenderPlanDraft);
     if (plan) {
       setRenderPlan(plan);
+      setRenderPlanMeta(MANUAL_PLAN_META);
       setRenderPlanEnabled(true);
       setRenderPlanError(null);
     } else if (error) {
@@ -657,6 +726,66 @@ export function CoverCreator({
       window.removeEventListener("storage", handleStorage);
     };
   }, []);
+
+  const loadIngredientOptions = useCallback(async () => {
+    setIngredientLoading(true);
+    setIngredientError(null);
+    try {
+      const files = await listKnowledgeFiles();
+      const audioFiles = files.filter(isAudioKnowledgeFile);
+      setIngredientFiles(audioFiles);
+      if (!audioFiles.length) {
+        setIngredientError("No audio files found in knowledge library.");
+      }
+    } catch (error) {
+      setIngredientError(
+        error instanceof Error ? error.message : "Unable to load ingredients.",
+      );
+    } finally {
+      setIngredientLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!ingredientsOpen) return;
+    void loadIngredientOptions();
+  }, [ingredientsOpen, loadIngredientOptions]);
+
+  const updateCoverFlowIngredients = useCallback(
+    (nextIds: string[]) => {
+      const normalized = normalizeIdList(nextIds);
+      if (!normalized.length) {
+        clearCoverFlowPayload();
+        setCoverFlowPayload(null);
+        return;
+      }
+      const persisted = writeCoverFlowPayload({
+        knowledgeFileIds: normalized,
+        kbTexture: coverFlowPayload?.kbTexture ?? undefined,
+        trackId: coverFlowPayload?.trackId,
+        trackName: coverFlowPayload?.trackName,
+        albumId: coverFlowPayload?.albumId,
+        albumName: coverFlowPayload?.albumName,
+        forceRemote: coverFlowPayload?.forceRemote,
+      });
+      setCoverFlowPayload(persisted);
+    },
+    [coverFlowPayload],
+  );
+
+  const handleToggleIngredient = useCallback(
+    (fileId: string) => {
+      const nextIds = selectedIngredientIds.includes(fileId)
+        ? selectedIngredientIds.filter((id) => id !== fileId)
+        : [...selectedIngredientIds, fileId];
+      updateCoverFlowIngredients(nextIds);
+    },
+    [selectedIngredientIds, updateCoverFlowIngredients],
+  );
+
+  const handleClearIngredients = useCallback(() => {
+    updateCoverFlowIngredients([]);
+  }, [updateCoverFlowIngredients]);
 
   useEffect(() => {
     if (!selectedOriginal || !kbTextures.length) {
@@ -922,6 +1051,24 @@ export function CoverCreator({
   }, [selectedOriginal]);
 
   const coverFlowAttachmentCount = coverFlowPayload?.knowledgeFileIds?.length ?? 0;
+  const selectedIngredientIds = useMemo(
+    () => normalizeIdList(coverFlowPayload?.knowledgeFileIds),
+    [coverFlowPayload?.knowledgeFileIds],
+  );
+  const ingredientNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const file of ingredientFiles) {
+      map.set(file.id, file.name);
+    }
+    return map;
+  }, [ingredientFiles]);
+  const selectedIngredientNames = useMemo(
+    () =>
+      selectedIngredientIds
+        .map((id) => ingredientNameById.get(id))
+        .filter((value): value is string => Boolean(value)),
+    [ingredientNameById, selectedIngredientIds],
+  );
 
   const immersionEvidence = job?.snapshot?.evidence ?? null;
 
@@ -1018,11 +1165,13 @@ export function CoverCreator({
     const { plan, error } = parseRenderPlan(renderPlanDraft);
     if (plan) {
       setRenderPlan(plan);
+      setRenderPlanMeta(MANUAL_PLAN_META);
       setRenderPlanEnabled(true);
       setRenderPlanError(null);
       return;
     }
     setRenderPlan(null);
+    setRenderPlanMeta(null);
     setRenderPlanEnabled(false);
     setRenderPlanError(error ?? "RenderPlan JSON is invalid.");
   }, [renderPlanDraft]);
@@ -1040,6 +1189,7 @@ export function CoverCreator({
   const clearRenderPlanDraft = useCallback(() => {
     setRenderPlanDraft("");
     setRenderPlan(null);
+    setRenderPlanMeta(null);
     setRenderPlanEnabled(false);
     setRenderPlanError(null);
   }, []);
@@ -1093,6 +1243,7 @@ export function CoverCreator({
       }
       setRenderPlan(result.plan);
       setRenderPlanDraft(JSON.stringify(result.plan, null, 2));
+      setRenderPlanMeta(MANUAL_PLAN_META);
       setRenderPlanEnabled(true);
       setRenderPlanError(null);
       setAtomAutoFillStatus(
@@ -1254,6 +1405,7 @@ export function CoverCreator({
     if (!candidate.plan) return;
     setRenderPlan(candidate.plan);
     setRenderPlanDraft(JSON.stringify(candidate.plan, null, 2));
+    setRenderPlanMeta(candidate.planMeta ?? null);
     setRenderPlanEnabled(true);
     setRenderPlanOpen(true);
     setRenderPlanError(null);
@@ -1264,7 +1416,7 @@ export function CoverCreator({
       coverRequest: CoverJobRequest,
       seedValue: string,
       analysisBundle?: PlanAnalysisBundle | null,
-    ): Promise<RenderPlan> => {
+    ): Promise<{ plan: RenderPlan; planMeta?: PlanMeta }> => {
       const payload = {
         originalId: coverRequest.originalId,
         barWindows: coverRequest.barWindows,
@@ -1288,11 +1440,25 @@ export function CoverCreator({
         const text = await response.text();
         throw new Error(text || `Plan request failed (${response.status})`);
       }
-      const json = (await response.json()) as { renderPlan?: RenderPlan };
+      const json = (await response.json()) as {
+        renderPlan?: RenderPlan;
+        meta?: {
+          plannerVersion?: string;
+          modelVersion?: string | number;
+          toolVersions?: Record<string, string>;
+        };
+      };
       if (!json?.renderPlan || !Array.isArray(json.renderPlan.windows)) {
         throw new Error("Plan response missing renderPlan windows.");
       }
-      return json.renderPlan;
+      const planMeta = json.meta
+        ? {
+            plannerVersion: json.meta.plannerVersion,
+            modelVersion: json.meta.modelVersion,
+            toolVersions: json.meta.toolVersions,
+          }
+        : undefined;
+      return { plan: json.renderPlan, planMeta };
     },
     [],
   );
@@ -1361,8 +1527,13 @@ export function CoverCreator({
       styleInfluence: macroStyleInfluence,
       weirdness: macroWeirdnessValue,
       tempo: tempoMeta ?? undefined,
-      renderPlan: resolvedRenderPlan,
     };
+    if (resolvedRenderPlan) {
+      coverRequest.renderPlan = resolvedRenderPlan;
+      if (renderPlanMeta) {
+        coverRequest.planMeta = renderPlanMeta;
+      }
+    }
     if (typeof kbConfidence === "number") {
       coverRequest.kbConfidence = kbConfidence;
     }
@@ -1391,6 +1562,7 @@ export function CoverCreator({
     coverFlowPayload,
     renderPlan,
     renderPlanEnabled,
+    renderPlanMeta,
   ]);
 
   const loadRecipes = useCallback(
@@ -1445,6 +1617,9 @@ export function CoverCreator({
       ...bundle.coverRequest,
       renderPlan: renderPlan ?? bundle.coverRequest.renderPlan,
     };
+    if (renderPlan && renderPlanMeta) {
+      coverRequest.planMeta = renderPlanMeta;
+    }
     setRecipeSaving(true);
     try {
       await saveRecipe({
@@ -1471,6 +1646,7 @@ export function CoverCreator({
     recipeNotes,
     recipeSearch,
     renderPlan,
+    renderPlanMeta,
     seed,
     selectedOriginal,
   ]);
@@ -1512,12 +1688,14 @@ export function CoverCreator({
       if (request.renderPlan) {
         setRenderPlan(request.renderPlan);
         setRenderPlanDraft(JSON.stringify(request.renderPlan, null, 2));
+        setRenderPlanMeta(request.planMeta ?? null);
         setRenderPlanEnabled(true);
         setRenderPlanOpen(true);
         setRenderPlanError(null);
       } else {
         setRenderPlan(null);
         setRenderPlanDraft("");
+        setRenderPlanMeta(null);
         setRenderPlanEnabled(false);
       }
       if (request.tempo) {
@@ -1620,12 +1798,18 @@ export function CoverCreator({
       setPlanRankStatus(`Generating plan ${index + 1} of ${count}...`);
 
       try {
-        const plan = await requestPlanCandidate(
+        const candidateResult = await requestPlanCandidate(
           bundle.coverRequest,
           seedValue,
           analysisBundle,
         );
-        candidate = { ...candidate, plan, status: "scoring" };
+        const plan = candidateResult.plan;
+        candidate = {
+          ...candidate,
+          plan,
+          planMeta: candidateResult.planMeta,
+          status: "scoring",
+        };
         results[index] = candidate;
         setPlanRankCandidates([...results]);
         setPlanRankStatus(
@@ -1706,11 +1890,12 @@ export function CoverCreator({
     }: SubmitCoverJobOptions) => {
       try {
         const response = await queueCoverJob(coverRequest);
+        const requestSnapshot = response.request ?? coverRequest;
         const now = Date.now();
         const snapshot: CoverJob = {
           id: response.id,
           status: "processing",
-          request: coverRequest,
+          request: requestSnapshot,
           createdAt: now,
           updatedAt: now,
         };
@@ -1723,7 +1908,7 @@ export function CoverCreator({
           sourceLabel,
           original: selectedOriginal,
           startedAt,
-          forceRemote: coverRequest.forceRemote,
+          forceRemote: requestSnapshot.forceRemote,
         });
         onRenderJobUpdate?.({
           jobId: response.id,
@@ -1734,7 +1919,11 @@ export function CoverCreator({
           startedAt,
           evidence: snapshot.evidence,
         });
-        setJobMessage(coverRequest.forceRemote ? "Queued for remote rendering" : "Queued for local rendering");
+        setJobMessage(
+          requestSnapshot.forceRemote
+            ? "Queued for remote rendering"
+            : "Queued for local rendering",
+        );
         setRenderProgress({ pct: 0.05, stage: "Queued" });
         setLocalPreviewUrl(null);
         setFulfillingJobId(null);
@@ -2247,7 +2436,7 @@ export function CoverCreator({
               <div className="space-y-4 text-sm">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Bar window
+                    Structure window
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
                     <span>Start</span>
@@ -2390,6 +2579,185 @@ export function CoverCreator({
                   ) : null}
                 </div>
               </div>
+              </div>
+            </div>
+          ) : null}
+
+          {showRemixLayer ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Ingredients
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Pick atoms from your knowledge library to anchor the remix.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedIngredientIds.length ? (
+                      <Button size="sm" variant="ghost" onClick={handleClearIngredients}>
+                        Clear
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setIngredientsOpen((current) => !current);
+                      }}
+                    >
+                      {ingredientsOpen ? "Hide" : "Edit"}
+                    </Button>
+                  </div>
+                </div>
+                {selectedIngredientIds.length ? (
+                  selectedIngredientNames.length === selectedIngredientIds.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedIngredientNames.map((name, index) => (
+                        <Badge
+                          key={`${name}-${index}`}
+                          variant="secondary"
+                          className="bg-slate-800/80 text-slate-200"
+                        >
+                          {name}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[11px] text-muted-foreground">
+                      {selectedIngredientIds.length} ingredients selected.
+                    </p>
+                  )
+                ) : (
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    No ingredients pinned yet.
+                  </p>
+                )}
+                {ingredientsOpen ? (
+                  <div className="mt-3 space-y-2">
+                    {ingredientLoading ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Loading ingredients...
+                      </p>
+                    ) : null}
+                    {ingredientError ? (
+                      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                        {ingredientError}
+                      </div>
+                    ) : null}
+                    {ingredientFiles.length ? (
+                      <div className="max-h-48 space-y-2 overflow-auto pr-2">
+                        {ingredientFiles.map((file) => {
+                          const checked = selectedIngredientIds.includes(file.id);
+                          return (
+                            <label
+                              key={file.id}
+                              className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-3 py-2 text-[11px] text-slate-200"
+                            >
+                              <span className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => handleToggleIngredient(file.id)}
+                                />
+                                <span className="text-slate-100">{file.name}</span>
+                              </span>
+                              {file.tags?.length ? (
+                                <span className="text-[10px] text-slate-400">
+                                  {file.tags.slice(0, 2).join(", ")}
+                                </span>
+                              ) : null}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Structure
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Shape the bar window and auto-pick a plan.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void runPlanRanking()}
+                    disabled={planRanking || !selectedOriginal}
+                  >
+                    {planRanking ? "Picking..." : "Auto-pick"}
+                  </Button>
+                </div>
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  Window {barWindowRange.start}-
+                  {Math.max(barWindowRange.start, barWindowRange.end - 1)} (end exclusive).
+                </p>
+                {renderPlanSummary ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                      Sections {renderPlanSummary.sectionCount}
+                    </Badge>
+                    <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                      Energy points {renderPlanSummary.energyPoints}
+                    </Badge>
+                    <Badge variant="secondary" className="bg-slate-800/80 text-slate-200">
+                      Windows {renderPlanSummary.windowCount}
+                    </Badge>
+                  </div>
+                ) : null}
+                {renderPlan?.global?.sections?.length ? (
+                  <div className="mt-3 space-y-2">
+                    {renderPlan.global.sections.map((section, index) => (
+                      <div
+                        key={`${section.name}-${index}`}
+                        className="flex items-center justify-between text-[11px] text-slate-300"
+                      >
+                        <span className="font-medium text-slate-100">{section.name}</span>
+                        <span>
+                          Bar {section.startBar} +{section.bars}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    No section map yet. Auto-pick will generate one.
+                  </p>
+                )}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <label className="text-[11px] text-muted-foreground">Candidates</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={6}
+                    value={planRankCount}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isNaN(next)) return;
+                      setPlanRankCount(Math.max(1, Math.min(6, Math.round(next))));
+                    }}
+                    className="h-8 w-20 bg-slate-950/60 text-xs"
+                  />
+                  {planRankStatus ? (
+                    <span className="text-[11px] text-muted-foreground">
+                      {planRankStatus}
+                    </span>
+                  ) : null}
+                </div>
+                {planRankError ? (
+                  <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                    {planRankError}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -2706,6 +3074,10 @@ export function CoverCreator({
               ) : recipes.length ? (
                 recipes.map((recipe) => {
                   const isMatch = selectedOriginal?.id === recipe.originalId;
+                  const receiptChips = buildReceiptChips(recipe.receipt);
+                  const violationPreview = formatViolationPreview(
+                    recipe.receipt?.contract?.violations,
+                  );
                   return (
                     <div
                       key={recipe.id}
@@ -2747,6 +3119,36 @@ export function CoverCreator({
                       {recipe.notes ? (
                         <div className="mt-2 text-[11px] text-slate-500">
                           {recipe.notes}
+                        </div>
+                      ) : null}
+                      {recipe.receipt ? (
+                        <div className="mt-2 rounded-md border border-slate-800/70 bg-slate-950/60 px-2 py-2 text-[11px] text-slate-300">
+                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-500">
+                            <span>Receipt</span>
+                            <span>{formatTimestamp(recipe.receipt.createdAt)}</span>
+                          </div>
+                          {receiptChips.length ? (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {receiptChips.map((chip) => (
+                                <Badge
+                                  key={`${recipe.id}-${chip}`}
+                                  variant="secondary"
+                                  className="bg-slate-800/80 text-slate-200"
+                                >
+                                  {chip}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-[11px] text-slate-500">
+                              Receipt recorded.
+                            </div>
+                          )}
+                          {violationPreview ? (
+                            <div className="mt-1 text-[11px] text-amber-200">
+                              Violations: {violationPreview}
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

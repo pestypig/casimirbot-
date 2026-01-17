@@ -4,6 +4,17 @@ import {
   buildPlanFromModel,
   type PlanAnalysis as ModelPlanAnalysis,
 } from "../services/noisegen-planner-model";
+import {
+  findOriginalById,
+  getNoisegenStore,
+  type NoisegenTimeSkyMeta,
+} from "../services/noisegen-store";
+import {
+  createIntentEnforcementState,
+  enforceIntentContractOnRequest,
+  enforceIntentContractOnRenderPlan,
+  finalizeIntentMeta,
+} from "../services/noisegen-intent";
 
 const aiPlanRouter = Router();
 
@@ -66,6 +77,7 @@ const planTextureSchema = z
         sat: z.number().finite().optional(),
         reverbSend: z.number().finite().optional(),
         comp: z.number().finite().optional(),
+        delay: z.number().finite().optional(),
       })
       .passthrough()
       .optional(),
@@ -144,6 +156,7 @@ const planRequestSchema = z
 type PlanWindowInput = z.infer<typeof barWindowSchema>;
 type PlanWindowAnalysis = z.infer<typeof planWindowAnalysisSchema>;
 type PlanAnalysis = z.infer<typeof planAnalysisSchema>;
+type TempoMeta = z.infer<typeof tempoMetaSchema>;
 
 const clamp01 = (value: number) =>
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
@@ -154,6 +167,110 @@ const hashString = (value: string) => {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
   }
   return hash >>> 0;
+};
+
+const hashPulseSeed = (value: string): number => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const hashPulseSalt = (value: string): string => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `h${(hash >>> 0).toString(16)}`;
+};
+
+const resolveTimeSkyContext = (timeSky?: NoisegenTimeSkyMeta) => {
+  const context = timeSky?.context;
+  return {
+    publishedAt: context?.publishedAt ?? timeSky?.publishedAt,
+    composedStart: context?.composedStart ?? timeSky?.composedStart,
+    composedEnd: context?.composedEnd ?? timeSky?.composedEnd,
+    timezone: context?.timezone,
+    place: context?.place ?? timeSky?.place,
+    placePrecision: context?.placePrecision ?? "approximate",
+    halobankSpanId: context?.halobankSpanId,
+    skySignature: context?.skySignature ?? timeSky?.skySignature,
+  };
+};
+
+const resolveTimeSkyPulse = (timeSky?: NoisegenTimeSkyMeta) => {
+  const pulse = timeSky?.pulse;
+  const round = pulse?.round ?? timeSky?.pulseRound;
+  const pulseTime = pulse?.pulseTime;
+  const valueHash = pulse?.valueHash ?? timeSky?.pulseHash;
+  const source =
+    pulse?.source ??
+    (round != null || pulseTime != null || valueHash ? "drand" : undefined);
+  return {
+    source,
+    round,
+    pulseTime,
+    valueHash,
+    seedSalt: pulse?.seedSalt,
+  };
+};
+
+const buildPulseSeed = (options: {
+  originalId?: string;
+  timeSky?: NoisegenTimeSkyMeta;
+}) => {
+  const originalId = options.originalId;
+  if (!originalId || !options.timeSky) {
+    return null;
+  }
+  const context = resolveTimeSkyContext(options.timeSky);
+  const pulse = resolveTimeSkyPulse(options.timeSky);
+  const pulseKey = pulse.round ?? pulse.pulseTime;
+  if (pulseKey == null || !pulse.valueHash) {
+    return null;
+  }
+  const placeSeed =
+    context.placePrecision === "hidden"
+      ? "hidden"
+      : (context.place ?? "").trim();
+  const publishedAt =
+    context.publishedAt != null ? String(context.publishedAt) : "";
+  const seedMaterial = `${originalId}|${publishedAt}|${placeSeed}|${pulseKey}|${pulse.valueHash}`;
+  return {
+    seed: hashPulseSeed(seedMaterial),
+    seedSalt: pulse.seedSalt ?? hashPulseSalt(seedMaterial),
+    source: pulse.source,
+    round: pulse.round,
+    pulseTime: pulse.pulseTime,
+    valueHash: pulse.valueHash,
+  };
+};
+
+const resolveIntentTempo = (
+  tempo: TempoMeta | undefined,
+  globals: { bpm?: number; timeSig?: string } | undefined,
+  apply: boolean,
+): TempoMeta | undefined => {
+  if (!apply || !globals) return tempo;
+  const bpm =
+    typeof globals.bpm === "number" && Number.isFinite(globals.bpm)
+      ? globals.bpm
+      : tempo?.bpm;
+  const timeSig =
+    typeof globals.timeSig === "string" && globals.timeSig.trim().length > 0
+      ? globals.timeSig
+      : tempo?.timeSig;
+  if (bpm == null && !timeSig) return tempo;
+  return {
+    bpm: bpm ?? 120,
+    timeSig: timeSig ?? "4/4",
+    offsetMs: tempo?.offsetMs ?? 0,
+    barsInLoop: tempo?.barsInLoop,
+    quantized: tempo?.quantized ?? true,
+  };
 };
 
 const makeRng = (seed: number) => {
@@ -288,6 +405,7 @@ const mergeFx = (
     sat: overrides.fx.sat ?? baseFx?.sat,
     reverbSend: overrides.fx.reverbSend ?? baseFx?.reverbSend,
     comp: overrides.fx.comp ?? baseFx?.comp,
+    delay: overrides.fx.delay ?? baseFx?.delay,
   };
 };
 
@@ -305,6 +423,7 @@ const buildFxFromFeatures = (
     0.45 + (1 - energy) * 0.35 + (1 - density) * 0.15 + (rng() - 0.5) * 0.08,
   ),
   comp: clamp01(0.2 + energy * 0.55 + density * 0.2 + (rng() - 0.5) * 0.06),
+  delay: clamp01(0.12 + (1 - energy) * 0.2 + (1 - density) * 0.1 + (rng() - 0.5) * 0.06),
 });
 
 const buildTexturePlan = ({
@@ -372,6 +491,84 @@ const buildTexturePlan = ({
     texturePlan.fx = fx;
   }
   return texturePlan;
+};
+
+const mergeIntentEqPeaks = (
+  base?: Array<{ freq: number; q: number; gainDb: number }>,
+  intent?: Array<{ freq: number; q: number; gainDb: number }>,
+) => {
+  if (intent?.length) return intent;
+  return base;
+};
+
+const mergeIntentFx = (
+  base: NonNullable<PlanWindowAnalysis["texture"]>["fx"] | undefined,
+  intent: NonNullable<PlanWindowAnalysis["texture"]>["fx"] | undefined,
+) => {
+  if (!intent) return base;
+  const merged = { ...(base ?? {}) } as NonNullable<
+    PlanWindowAnalysis["texture"]
+  >["fx"];
+  for (const [key, value] of Object.entries(intent)) {
+    if (typeof value !== "number") continue;
+    const current = merged[key as keyof typeof merged];
+    merged[key as keyof typeof merged] =
+      typeof current === "number" ? Math.max(current, value) : value;
+  }
+  return merged;
+};
+
+const clampIntentFxBounds = (
+  fx: NonNullable<PlanWindowAnalysis["texture"]>["fx"] | undefined,
+  bounds:
+    | {
+        [K in keyof NonNullable<PlanWindowAnalysis["texture"]>["fx"]]?:
+          | { min: number; max: number }
+          | undefined;
+      }
+    | undefined,
+) => {
+  if (!fx || !bounds) return fx;
+  const next = { ...fx } as NonNullable<PlanWindowAnalysis["texture"]>["fx"];
+  for (const [key, range] of Object.entries(bounds)) {
+    if (!range || typeof range !== "object") continue;
+    const value = next[key as keyof typeof next];
+    if (typeof value !== "number") continue;
+    const min = Number(range.min);
+    const max = Number(range.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max)) continue;
+    next[key as keyof typeof next] = clamp01(
+      Math.min(Math.max(value, min), max),
+    );
+  }
+  return next;
+};
+
+const mergeEnergyCurves = (
+  base: Array<{ bar: number; energy: number }> | undefined,
+  intent: Array<{ bar: number; energy: number }> | undefined,
+) => {
+  if (!intent?.length) return base;
+  const byBar = new Map<number, { base?: number; intent?: number }>();
+  for (const point of base ?? []) {
+    const bar = Math.max(1, Math.floor(point.bar));
+    const energy = clamp01(point.energy);
+    byBar.set(bar, { ...(byBar.get(bar) ?? {}), base: energy });
+  }
+  for (const point of intent) {
+    const bar = Math.max(1, Math.floor(point.bar));
+    const energy = clamp01(point.energy);
+    byBar.set(bar, { ...(byBar.get(bar) ?? {}), intent: energy });
+  }
+  return Array.from(byBar.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([bar, entry]) => {
+      const merged =
+        typeof entry.base === "number" && typeof entry.intent === "number"
+          ? (entry.base + entry.intent) / 2
+          : entry.intent ?? entry.base ?? 0.5;
+      return { bar, energy: clamp01(merged) };
+    });
 };
 
 const buildEnergyCurve = (
@@ -448,16 +645,70 @@ aiPlanRouter.post("/plan", async (req, res) => {
     return res.status(400).json({ error: "empty_windows" });
   }
 
-  const seedInput =
-    seed ??
-    (typeof originalId === "string" && originalId.trim().length > 0 ? originalId : "noisegen-plan");
-  const seedValue = typeof seedInput === "number" ? Math.trunc(seedInput) : hashString(String(seedInput));
+  const originalKey =
+    typeof originalId === "string" && originalId.trim().length > 0
+      ? originalId.trim()
+      : "";
+  let seedInput = seed ?? (originalKey ? originalKey : "noisegen-plan");
+  let original: ReturnType<typeof findOriginalById> | undefined;
+  if (originalKey) {
+    try {
+      const store = await getNoisegenStore();
+      original = findOriginalById(store, originalKey);
+      if (seed == null) {
+        const pulseSeedMeta = buildPulseSeed({
+          originalId: original?.id ?? originalKey,
+          timeSky: original?.timeSky,
+        });
+        if (pulseSeedMeta?.seed != null) {
+          seedInput = pulseSeedMeta.seed;
+        }
+      }
+    } catch {
+      // ignore pulse lookup failures
+    }
+  }
+  const seedValue =
+    typeof seedInput === "number"
+      ? Math.trunc(seedInput)
+      : hashString(String(seedInput));
   const rng = makeRng(seedValue);
   const phase = rng() * Math.PI * 2;
 
-  const baseSample = clamp01(base?.sampleInfluence ?? 0.7);
-  const baseStyle = clamp01(base?.styleInfluence ?? 0.3);
-  const baseWeird = clamp01(base?.weirdness ?? 0.2);
+  const contract = original?.intentContract ?? null;
+  const intentSnapshot = original?.intentSnapshot;
+  const intentPrefs = original?.intentSnapshotPreferences;
+  const hasIntentSnapshot = Boolean(intentSnapshot);
+  const applyIntentTempo = hasIntentSnapshot && (intentPrefs?.applyTempo ?? true);
+  const applyIntentMix = hasIntentSnapshot && (intentPrefs?.applyMix ?? true);
+  const applyIntentAutomation =
+    hasIntentSnapshot && (intentPrefs?.applyAutomation ?? false);
+  const intentTempo = resolveIntentTempo(
+    tempo,
+    intentSnapshot?.globals,
+    applyIntentTempo,
+  );
+  const intentDevice = applyIntentMix ? intentSnapshot?.deviceIntent : undefined;
+  const intentEnergyCurve = applyIntentAutomation
+    ? intentSnapshot?.automation?.energyCurve
+    : undefined;
+  const intentState = createIntentEnforcementState();
+  const baseRequest = enforceIntentContractOnRequest(
+    {
+      sampleInfluence: base?.sampleInfluence,
+      styleInfluence: base?.styleInfluence,
+      weirdness: base?.weirdness,
+      tempo: intentTempo ?? tempo,
+      key,
+    },
+    contract,
+    intentState,
+  );
+  const tempoMeta = baseRequest.tempo ?? intentTempo ?? tempo;
+  const resolvedKey = baseRequest.key ?? key;
+  const baseSample = clamp01(baseRequest.sampleInfluence ?? 0.7);
+  const baseStyle = clamp01(baseRequest.styleInfluence ?? 0.3);
+  const baseWeird = clamp01(baseRequest.weirdness ?? 0.2);
   const analysisWindowMap = buildAnalysisWindowMap(analysis);
   const densitySeries =
     analysis?.onsetDensityByBar?.length
@@ -507,7 +758,7 @@ aiPlanRouter.post("/plan", async (req, res) => {
       rng,
     );
     energyByWindow.set(windowKey, energy);
-    const texture = buildTexturePlan({
+    const textureBase = buildTexturePlan({
       analysisWindow,
       baseSample,
       baseStyle,
@@ -518,7 +769,20 @@ aiPlanRouter.post("/plan", async (req, res) => {
       kbTexture,
       rng,
       includeFx,
-    });
+    }) as PlanWindowAnalysis["texture"];
+    const eqPeaks = mergeIntentEqPeaks(
+      textureBase?.eqPeaks,
+      intentDevice?.eqPeaks,
+    );
+    const fx = clampIntentFxBounds(
+      mergeIntentFx(textureBase?.fx, intentDevice?.fx),
+      intentDevice?.bounds,
+    );
+    const texture = {
+      ...textureBase,
+      ...(eqPeaks?.length ? { eqPeaks } : {}),
+      ...(fx ? { fx } : {}),
+    };
     return {
       startBar: window.startBar,
       bars,
@@ -529,7 +793,7 @@ aiPlanRouter.post("/plan", async (req, res) => {
 
   const modelPlan = await buildPlanFromModel({
     analysis: (analysis ?? undefined) as ModelPlanAnalysis | undefined,
-    tempoBpm: tempo?.bpm,
+    tempoBpm: tempoMeta?.bpm,
     windows,
     kbTexture: kbTexture ?? undefined,
   });
@@ -562,24 +826,40 @@ aiPlanRouter.post("/plan", async (req, res) => {
       })
     : windowPlans;
 
-  const energyCurve =
+  const energyCurveBase =
     analysis?.energyCurve?.length
       ? analysis.energyCurve
       : buildEnergyCurve(windows, energyByWindow, analysis?.energyByBar);
+  const energyCurve = mergeEnergyCurves(energyCurveBase, intentEnergyCurve);
 
   const sections =
     analysis?.sections?.length ? analysis.sections : resolveSections(windows);
 
-  return res.json({
-    renderPlan: {
-      global: {
-        bpm: tempo?.bpm,
-        key,
-        sections,
-        energyCurve,
-      },
-      windows: mergedWindowPlans,
+  const rawPlan = {
+    global: {
+      bpm: tempoMeta?.bpm,
+      key: resolvedKey,
+      sections,
+      energyCurve,
     },
+    windows: mergedWindowPlans,
+  };
+  const enforcedPlan = enforceIntentContractOnRenderPlan(
+    rawPlan,
+    contract,
+    intentState,
+  );
+  const intentMeta = finalizeIntentMeta(intentState, contract);
+  if (intentMeta.violations.length) {
+    console.warn(
+      "[ai.plan] intent violations",
+      original?.id ?? originalKey,
+      intentMeta.violations,
+    );
+  }
+
+  return res.json({
+    renderPlan: enforcedPlan,
     meta: {
       seed: seedValue,
       generatedAt: Date.now(),
@@ -601,9 +881,11 @@ aiPlanRouter.post("/plan", async (req, res) => {
       plannerVersion: useModel
         ? `model:v${modelPlan?.modelVersion ?? "unknown"}`
         : "heuristic:v1",
+      modelVersion: useModel ? modelPlan?.modelVersion : undefined,
       modelConfidence: modelPlan?.confidence ?? 0,
       featureSourcesUsed: modelPlan?.featureSourcesUsed ?? [],
       modelTargetsUsed: modelPlan?.modelTargetsUsed ?? [],
+      intent: intentMeta,
     },
   });
 });

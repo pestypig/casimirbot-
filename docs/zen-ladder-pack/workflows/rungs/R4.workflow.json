@@ -1,0 +1,35 @@
+﻿{
+  "id": "workflow.entrepreneur.rung.R4.v1",
+  "kind": "entrepreneur.rung",
+  "rung": "R4",
+  "riskLevel": "medium",
+  "scores": {
+    "demand": { "min": 3 },
+    "capability": { "min": 3 },
+    "integritySafety": { "min": 3 },
+    "sustainability": { "min": 3 }
+  },
+  "requiredChecks": [
+    "check.interbeing.dependencies-mapped",
+    "check.sangha.mentorship-access",
+    "check.integrity.receipts-and-audits"
+  ],
+  "requiredArtifacts": [
+    "artifact.ops-map",
+    "artifact.supplier-staffing-plan",
+    "artifact.risk-controls",
+    "artifact.unit-econ-sketch",
+    "artifact.retention-signal"
+  ],
+  "gates": [
+    "gate.eligibility.zen-handrails.v1",
+    "gate.rung-approval.two-key.v1"
+  ],
+  "reviewCadenceDays": 180,
+  "valuesRefs": [
+    "capability-ambition-gradient",
+    "stewardship-ledger",
+    "interbeing-systems"
+  ],
+  "outcomeMetrics": ["fulfillment_sla", "support_load"]
+}

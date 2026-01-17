@@ -1,0 +1,29 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "utilityReport.schema.json",
+  "title": "UtilityReport",
+  "type": "object",
+  "required": ["id", "programId", "periodStart", "periodEnd", "metrics"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "programId": { "type": "string" },
+    "periodStart": { "type": "string", "format": "date" },
+    "periodEnd": { "type": "string", "format": "date" },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reviewedCount": { "type": "integer", "minimum": 0 },
+        "approvedCount": { "type": "integer", "minimum": 0 },
+        "deniedCount": { "type": "integer", "minimum": 0 },
+        "averageReviewDays": { "type": "number", "minimum": 0 },
+        "evidenceFreshnessRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "incidentRate": { "type": "number", "minimum": 0 },
+        "correctionRate": { "type": "number", "minimum": 0 },
+        "appealRate": { "type": "number", "minimum": 0 }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}

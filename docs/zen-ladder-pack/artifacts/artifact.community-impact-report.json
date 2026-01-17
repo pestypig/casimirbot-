@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.community-impact-report",
+  "name": "Community impact report",
+  "requiredFields": ["jobs", "serviceCoverage", "benefits", "complaints"],
+  "evidenceKinds": ["report", "survey"],
+  "freshnessDays": 365,
+  "ownerRole": "applicant"
+}

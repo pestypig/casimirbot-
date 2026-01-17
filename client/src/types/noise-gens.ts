@@ -10,12 +10,95 @@ export type Original = {
   status?: "pending" | "ranked";
 };
 
+export type PulseSource =
+  | "drand"
+  | "nist-beacon"
+  | "curby"
+  | "local-sky-photons";
+
+export type TimeSkyContext = {
+  publishedAt?: number;
+  composedStart?: number;
+  composedEnd?: number;
+  timezone?: string;
+  place?: string;
+  placePrecision?: "exact" | "approximate" | "hidden";
+  halobankSpanId?: string;
+  skySignature?: string;
+};
+
+export type TimeSkyPulse = {
+  source?: PulseSource;
+  round?: string | number;
+  pulseTime?: number;
+  valueHash?: string;
+  seedSalt?: string;
+};
+
 export type TimeSkyMeta = {
+  context?: TimeSkyContext;
+  pulse?: TimeSkyPulse;
   publishedAt?: number;
   composedStart?: number;
   composedEnd?: number;
   place?: string;
   skySignature?: string;
+  pulseRound?: string | number;
+  pulseHash?: string;
+};
+
+export type IntentContractRange = { min: number; max: number };
+
+export type IntentContract = {
+  version: 1;
+  createdAt: number;
+  updatedAt: number;
+  invariants?: {
+    tempoBpm?: number;
+    timeSig?: TimeSig;
+    key?: string;
+    grooveTemplateIds?: string[];
+    motifIds?: string[];
+    stemLocks?: string[];
+  };
+  ranges?: {
+    sampleInfluence?: IntentContractRange;
+    styleInfluence?: IntentContractRange;
+    weirdness?: IntentContractRange;
+    reverbSend?: IntentContractRange;
+    chorus?: IntentContractRange;
+    arrangementMoves?: string[];
+  };
+  meaning?: {
+    ideologyRootId?: string;
+    allowedNodeIds?: string[];
+  };
+  provenancePolicy?: {
+    storeTimeSky?: boolean;
+    storePulse?: boolean;
+    pulseSource?: PulseSource;
+    placePrecision?: "exact" | "approximate" | "hidden";
+  };
+  notes?: string;
+};
+
+export type ListenerMacroLocks = {
+  groove?: boolean;
+  harmony?: boolean;
+  drums?: boolean;
+  bass?: boolean;
+  music?: boolean;
+  textures?: boolean;
+  fx?: boolean;
+};
+
+export type ListenerMacros = {
+  energy: number;
+  space: number;
+  texture: number;
+  weirdness?: number;
+  drive?: number;
+  locks?: ListenerMacroLocks;
 };
 
 export type AbletonIntentSnapshot = {
@@ -39,6 +122,28 @@ export type AbletonIntentSnapshot = {
     locatorCount: number;
   };
   devices: Array<{ name: string; count: number }>;
+  deviceIntent?: {
+    eqPeaks?: Array<{ freq: number; q: number; gainDb: number }>;
+    fx?: {
+      reverbSend?: number;
+      comp?: number;
+      chorus?: number;
+      delay?: number;
+      sat?: number;
+    };
+    bounds?: {
+      reverbSend?: { min: number; max: number };
+      comp?: { min: number; max: number };
+      chorus?: { min: number; max: number };
+      delay?: { min: number; max: number };
+      sat?: { min: number; max: number };
+    };
+  };
+  automation?: {
+    envelopeCount: number;
+    pointCount: number;
+    energyCurve?: Array<{ bar: number; energy: number }>;
+  };
   tracks: Array<{
     name?: string;
     type: "audio" | "midi" | "return" | "group" | "master" | "unknown";
@@ -47,12 +152,20 @@ export type AbletonIntentSnapshot = {
   locators?: Array<{ name?: string; time?: number }>;
 };
 
+export type IntentSnapshotPreferences = {
+  applyTempo?: boolean;
+  applyMix?: boolean;
+  applyAutomation?: boolean;
+};
+
 export type OriginalDetails = Original & {
   lyrics?: string;
   timeSky?: TimeSkyMeta;
   processing?: ProcessingState;
   playback?: PlaybackAsset[];
   intentSnapshot?: AbletonIntentSnapshot;
+  intentSnapshotPreferences?: IntentSnapshotPreferences;
+  intentContract?: IntentContract;
 };
 
 export type OriginalStem = {
@@ -149,6 +262,38 @@ export type NoisegenRecipe = {
   seed?: string | number;
   coverRequest: CoverJobRequest;
   notes?: string;
+  featured?: boolean;
+  parentId?: string;
+  metrics?: {
+    idi?: number;
+  };
+  receipt?: EditionReceipt;
+};
+
+export type EditionReceipt = {
+  createdAt: number;
+  contract?: {
+    version?: number;
+    hash?: string;
+    intentSimilarity?: number;
+    violations?: string[];
+  };
+  ideology?: {
+    rootId?: string;
+    allowedNodeIds?: string[];
+    treeVersion?: number;
+    mappingHash?: string;
+  };
+  provenance?: {
+    timeSky?: TimeSkyMeta;
+    pulse?: TimeSkyPulse;
+    placePrecision?: "exact" | "approximate" | "hidden";
+  };
+  tools?: {
+    plannerVersion?: string;
+    modelVersion?: string;
+    toolVersions?: Record<string, string>;
+  };
 };
 
 export type MoodPreset = {
@@ -219,6 +364,8 @@ export type RenderPlan = {
     key?: string;
     sections?: Array<{ name: string; startBar: number; bars: number }>;
     energyCurve?: Array<{ bar: number; energy: number }>;
+    locks?: ListenerMacroLocks;
+    groups?: RenderPlanGroupLevels;
   };
   windows: Array<{
     startBar: number;
@@ -242,9 +389,19 @@ export type RenderPlan = {
         sat?: number;
         reverbSend?: number;
         comp?: number;
+        delay?: number;
       };
     };
   }>;
+};
+
+export type RenderPlanGroupKey = "drums" | "bass" | "music" | "textures" | "fx";
+export type RenderPlanGroupLevels = Partial<Record<RenderPlanGroupKey, number>>;
+
+export type PlanMeta = {
+  plannerVersion?: string;
+  modelVersion?: string | number;
+  toolVersions?: Record<string, string>;
 };
 
 export type MidiNote = {
@@ -277,6 +434,24 @@ export type MidiMotif = {
     sustain?: number;
     releaseMs?: number;
     gain?: number;
+  };
+  sampler?: {
+    mode?: "single" | "multi";
+    sourceId?: string;
+    rootNote?: number;
+    gain?: number;
+    attackMs?: number;
+    releaseMs?: number;
+    startMs?: number;
+    endMs?: number;
+    map?: Array<{
+      note: number;
+      sourceId: string;
+      rootNote?: number;
+      gain?: number;
+      startMs?: number;
+      endMs?: number;
+    }>;
   };
   notes: MidiNote[];
 };
@@ -343,6 +518,7 @@ export type CoverJobRequest = {
   weirdness?: number;
   tempo?: TempoMeta;
   renderPlan?: RenderPlan;
+  planMeta?: PlanMeta;
 };
 
 export type CoverJob = {

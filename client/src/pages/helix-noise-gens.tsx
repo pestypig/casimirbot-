@@ -48,15 +48,18 @@ import type {
   JobStatus,
   MoodPreset,
   Original,
+  ListenerMacros,
   HelixPacket,
   TempoMeta,
 } from "@/types/noise-gens";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalSession } from "@/hooks/useLocalSession";
 import { useNoisegenUiMode } from "@/hooks/useNoisegenUiMode";
+import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
 import type { SessionUser } from "@/lib/auth/session";
 import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
 import { useKnowledgeProjectsStore, type ProjectWithStats } from "@/store/useKnowledgeProjectsStore";
+import { fetchCoverJob, requestGeneration } from "@/lib/api/noiseGens";
 import {
   DEMO_PASSWORD,
   DEMO_USERNAME,
@@ -253,6 +256,13 @@ export default function HelixNoiseGensPage() {
   const recentUploadsRef = useRef<RecentUploadEntry[]>(recentUploads);
   const [activeRenderJob, setActiveRenderJob] = useState<RenderHistoryEntry | null>(null);
   const [renderHistory, setRenderHistory] = useState<RenderHistoryEntry[]>([]);
+  const [listenerVarying, setListenerVarying] = useState(false);
+  const [listenerVaryStatus, setListenerVaryStatus] = useState<{
+    jobId: string;
+    status: JobStatus;
+    previewUrl?: string | null;
+  } | null>(null);
+  const listenerVaryRef = useRef<string | null>(null);
   const [includeHelixPacket, setIncludeHelixPacket] = useState(Boolean(readHelixPacket()));
   const [helixPacket, setHelixPacket] = useState<HelixPacket | null>(() => readHelixPacket());
   const [sessionTempo, setSessionTempo] = useState<TempoMeta | null>(null);
@@ -266,17 +276,40 @@ export default function HelixNoiseGensPage() {
   const { user, signOut, signIn } = useLocalSession();
   const [currentLocation, setLocation] = useLocation();
   const isDesktopContext = currentLocation?.startsWith("/desktop");
-  const { uiMode, setUiMode, modeLabels, modes } = useNoisegenUiMode();
+  const { uiMode, setUiMode, modeLabels, modes, showAdvanced, setShowAdvanced } =
+    useNoisegenUiMode();
+  const { isMobile } = useIsMobileViewport();
+  const allowRemix = showAdvanced || renderHistory.length >= 3;
+  const allowStudio = showAdvanced;
+  const allowLabs = showAdvanced;
   const showListener = uiMode === "listener";
-  const showRemix = uiMode === "remix";
-  const showStudio = uiMode === "studio";
-  const showLabs = uiMode === "labs";
+  const showRemix = uiMode === "remix" && allowRemix;
+  const showStudio = uiMode === "studio" && allowStudio;
+  const showLabs = uiMode === "labs" && allowLabs;
+  const visibleModes = useMemo(() => {
+    if (showAdvanced) return modes;
+    return modes.filter((mode) => {
+      if (mode === "listener") return true;
+      if (mode === "remix") return allowRemix;
+      return false;
+    });
+  }, [allowRemix, modes, showAdvanced]);
   const isListenerLayout = showListener;
   const [remixMounted, setRemixMounted] = useState(showRemix);
   const [studioMounted, setStudioMounted] = useState(showStudio);
   const [labsMounted, setLabsMounted] = useState(showLabs);
   const originalsByIdRef = useRef<Map<string, Original>>(new Map());
   const pendingOriginalsRef = useRef<Map<string, Original>>(new Map());
+
+  useEffect(() => {
+    if (uiMode === "remix" && !allowRemix) {
+      setUiMode("listener");
+    } else if (uiMode === "studio" && !allowStudio) {
+      setUiMode("listener");
+    } else if (uiMode === "labs" && !allowLabs) {
+      setUiMode("listener");
+    }
+  }, [allowLabs, allowRemix, allowStudio, setUiMode, uiMode]);
 
   const selectOriginal = useCallback(
     (original: Original) => {
@@ -509,6 +542,94 @@ export default function HelixNoiseGensPage() {
     [],
   );
 
+  const pollListenerVariation = useCallback(
+    async (jobId: string) => {
+      listenerVaryRef.current = jobId;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        if (listenerVaryRef.current !== jobId) return;
+        try {
+          const job = await fetchCoverJob(jobId);
+          if (listenerVaryRef.current !== jobId) return;
+          setListenerVaryStatus({
+            jobId,
+            status: job.status,
+            previewUrl: job.previewUrl ?? null,
+          });
+          if (job.status === "ready" || job.status === "error") {
+            setListenerVarying(false);
+            return;
+          }
+        } catch (error) {
+          if (attempt === 0) {
+            toast({
+              title: "Variation check failed",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to check variation status.",
+            });
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      setListenerVarying(false);
+    },
+    [toast],
+  );
+
+  const handleListenerVary = useCallback(
+    async (preset?: MoodPreset, macros?: ListenerMacros, seed?: number) => {
+      if (!selectedOriginal) {
+        toast({
+          title: "Select a track",
+          description: "Pick a song before requesting a variation.",
+        });
+        return;
+      }
+      if (listenerVarying) return;
+      const fallbackMood = moodPresets[0];
+      const mood = preset ?? fallbackMood;
+      if (!mood) {
+        toast({
+          title: "Moods not ready",
+          description: "Mood presets are still loading.",
+        });
+        return;
+      }
+      setListenerVarying(true);
+      try {
+        const seedValue = Number.isFinite(seed) ? seed : undefined;
+        const payload = {
+          originalId: selectedOriginal.id,
+          moodId: mood.id,
+          seed: seedValue,
+          helixPacket: includeHelixPacket ? helixPacket ?? undefined : undefined,
+          macros: macros ?? undefined,
+        };
+        const { jobId } = await requestGeneration(payload);
+        setListenerVaryStatus({ jobId, status: "queued" });
+        void pollListenerVariation(jobId);
+      } catch (error) {
+        setListenerVarying(false);
+        toast({
+          title: "Variation failed",
+          description:
+            error instanceof Error ? error.message : "Unable to vary track.",
+          variant: "destructive",
+        });
+      }
+    },
+    [
+      helixPacket,
+      includeHelixPacket,
+      listenerVarying,
+      moodPresets,
+      pollListenerVariation,
+      selectedOriginal,
+      toast,
+    ],
+  );
+
   const markNoiseAlbumPublished = useCallback(
     async (payload: UploadCompletePayload, title: string, creator: string) => {
       if (!payload.knowledgeProjectId) return;
@@ -682,6 +803,12 @@ export default function HelixNoiseGensPage() {
   }, [originalAvailabilityVersion, selectedOriginal]);
 
   useEffect(() => {
+    setListenerVaryStatus(null);
+    setListenerVarying(false);
+    listenerVaryRef.current = null;
+  }, [selectedOriginal?.id]);
+
+  useEffect(() => {
     if (includeHelixPacket) {
       setHelixPacket(readHelixPacket());
     }
@@ -722,12 +849,29 @@ export default function HelixNoiseGensPage() {
     if (showLabs) setLabsMounted(true);
   }, [showLabs]);
 
+  useEffect(() => {
+    if (!showStudio) {
+      setUploadOpen(false);
+      setLibraryOpen(false);
+    }
+  }, [showStudio]);
+
   const handleHelixToggle = useCallback((value: boolean) => {
     setIncludeHelixPacket(value);
     if (value) {
       setHelixPacket(readHelixPacket());
     }
   }, []);
+
+  const handleAdvancedToggle = useCallback(
+    (value: boolean) => {
+      setShowAdvanced(value);
+      if (!value && uiMode !== "listener") {
+        setUiMode("listener");
+      }
+    },
+    [setShowAdvanced, setUiMode, uiMode],
+  );
 
 
   const handleDragEnd = useCallback(
@@ -771,9 +915,22 @@ export default function HelixNoiseGensPage() {
 
   const handleModeSelect = useCallback(
     (mode: typeof uiMode) => {
+      if (mode === "remix" && !allowRemix) {
+        toast({
+          title: "Remix locked",
+          description:
+            "Render three variations or enable Advanced to unlock Remix.",
+        });
+        return;
+      }
+      if (mode === "studio" || mode === "labs") {
+        if (!showAdvanced) setShowAdvanced(true);
+        setUiMode(mode);
+        return;
+      }
       setUiMode(mode);
     },
-    [setUiMode],
+    [allowRemix, setShowAdvanced, setUiMode, showAdvanced, toast],
   );
 
   const handleCreateCover = useCallback(() => {
@@ -784,8 +941,15 @@ export default function HelixNoiseGensPage() {
       });
       return;
     }
+    if (!allowRemix) {
+      setShowAdvanced(true);
+      toast({
+        title: "Remix unlocked",
+        description: "Advanced tools are now enabled for Remix.",
+      });
+    }
     setUiMode("remix");
-  }, [selectedOriginal, setUiMode, toast]);
+  }, [allowRemix, selectedOriginal, setShowAdvanced, setUiMode, toast]);
 
   const handlePickTrack = useCallback(() => {
     setUiMode("listener");
@@ -822,7 +986,7 @@ export default function HelixNoiseGensPage() {
             </div>
             <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
               <div className="flex w-full flex-wrap items-center justify-center gap-1 rounded-full border border-white/15 bg-white/5 p-1 text-[11px] uppercase tracking-[0.2em] text-slate-300 sm:w-auto sm:justify-start">
-                {modes.map((mode) => {
+                {visibleModes.map((mode) => {
                   const isActive = uiMode === mode;
                   return (
                     <button
@@ -841,10 +1005,27 @@ export default function HelixNoiseGensPage() {
                   );
                 })}
               </div>
-              <Button variant="secondary" className="gap-2" onClick={handleOpenLibraryRequest}>
-                <FolderOpen className="h-4 w-4" aria-hidden />
-                View Originals
-              </Button>
+              {!isMobile ? (
+                <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1">
+                  <Switch
+                    id="noisegen-advanced-toggle"
+                    checked={showAdvanced}
+                    onCheckedChange={handleAdvancedToggle}
+                  />
+                  <label
+                    htmlFor="noisegen-advanced-toggle"
+                    className="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-300"
+                  >
+                    Advanced
+                  </label>
+                </div>
+              ) : null}
+              {showStudio ? (
+                <Button variant="secondary" className="gap-2" onClick={handleOpenLibraryRequest}>
+                  <FolderOpen className="h-4 w-4" aria-hidden />
+                  View Originals
+                </Button>
+              ) : null}
               {user ? (
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" className="flex items-center gap-2">
@@ -915,6 +1096,12 @@ export default function HelixNoiseGensPage() {
                     playlist={availableOriginals}
                     onSelectOriginal={handleOriginalSelect}
                     autoPlayToken={autoPlayToken}
+                    moodPresets={moodPresets}
+                    onVary={handleListenerVary}
+                    isVarying={listenerVarying}
+                    varyStatus={listenerVaryStatus}
+                    canEditLyrics={showStudio || showAdvanced}
+                    canEditContract={showStudio || showAdvanced}
                   />
                   <div className="flex items-center justify-end">
                     <Button
@@ -996,7 +1183,6 @@ export default function HelixNoiseGensPage() {
                   onRenderJobUpdate={handleRenderJobUpdate}
                   onRenderJobComplete={handleRenderJobComplete}
                 />
-                <AtomLibraryPanel />
                 {renderHistory.length ? (
                   <RenderHistoryPanel entries={renderHistory} />
                 ) : null}
@@ -1020,6 +1206,7 @@ export default function HelixNoiseGensPage() {
                     onReveal={handleRecentReveal}
                   />
                 ) : null}
+                <AtomLibraryPanel />
                 <TrainingPlan />
               </section>
             ) : null}
@@ -1043,22 +1230,26 @@ export default function HelixNoiseGensPage() {
         ) : null}
       </div>
 
-      <OriginalsLibraryModal
-        open={libraryOpen}
-        onOpenChange={handleLibraryOpenChange}
-        onSelect={handleKnowledgeSelection}
-        onImportProject={handleProjectImport}
-        initialProjectId={libraryInitialProjectId}
-      />
+      {showStudio ? (
+        <>
+          <OriginalsLibraryModal
+            open={libraryOpen}
+            onOpenChange={handleLibraryOpenChange}
+            onSelect={handleKnowledgeSelection}
+            onImportProject={handleProjectImport}
+            initialProjectId={libraryInitialProjectId}
+          />
 
-      <UploadOriginalsModal
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-        isAuthenticated={Boolean(user)}
-        onRequestSignIn={handleRequestSignIn}
-        onUploaded={handleUploadComplete}
-        prefill={uploadPrefill}
-      />
+          <UploadOriginalsModal
+            open={uploadOpen}
+            onOpenChange={setUploadOpen}
+            isAuthenticated={Boolean(user)}
+            onRequestSignIn={handleRequestSignIn}
+            onUploaded={handleUploadComplete}
+            prefill={uploadPrefill}
+          />
+        </>
+      ) : null}
     </DndContext>
   );
 }

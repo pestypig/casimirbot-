@@ -103,6 +103,10 @@ const MIME_ALIASES: Record<string, string> = {
   "audio/mp3": "audio/mpeg",
   "audio/x-mp3": "audio/mpeg",
   "audio/x-wav": "audio/wav",
+  "audio/x-midi": "audio/midi",
+  "audio/mid": "audio/midi",
+  "application/midi": "audio/midi",
+  "application/x-midi": "audio/midi",
 };
 
 const EXTENSION_MIME: Record<string, string> = {
@@ -131,6 +135,8 @@ const EXTENSION_MIME: Record<string, string> = {
   ".mp3": "audio/mpeg",
   ".m4a": "audio/mpeg",
   ".aac": "audio/mpeg",
+  ".mid": "audio/midi",
+  ".midi": "audio/midi",
 };
 
 const PROJECT_SLUG_FALLBACK = "project";

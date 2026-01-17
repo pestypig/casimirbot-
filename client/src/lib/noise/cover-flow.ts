@@ -66,6 +66,20 @@ export const writeCoverFlowPayload = (payload: CoverFlowPayload): CoverFlowPaylo
   return normalized;
 };
 
+export const clearCoverFlowPayload = (): void => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage?.removeItem(COVER_FLOW_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors; this is best-effort.
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(COVER_FLOW_EVENT, { detail: null }));
+  } catch {
+    // Best-effort dispatch.
+  }
+};
+
 export const readCoverFlowPayload = (): CoverFlowPayload | null => {
   if (typeof window === "undefined") return null;
   try {

@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.anti-capture-compliance",
+  "name": "Anti-capture compliance",
+  "requiredFields": ["exclusivityClauses", "accessPolicy", "coiControls", "auditPlan"],
+  "evidenceKinds": ["policy", "contract"],
+  "freshnessDays": 365,
+  "ownerRole": "applicant"
+}

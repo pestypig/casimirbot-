@@ -1,0 +1,36 @@
+﻿{
+  "id": "workflow.entrepreneur.rung.R5.v1",
+  "kind": "entrepreneur.rung",
+  "rung": "R5",
+  "riskLevel": "high",
+  "scores": {
+    "demand": { "min": 4 },
+    "capability": { "min": 3 },
+    "integritySafety": { "min": 4 },
+    "sustainability": { "min": 3 }
+  },
+  "requiredChecks": [
+    "check.non-domination.no-insider-access",
+    "check.rightlivelihood.intermediary-transparency",
+    "check.integrity.receipts-and-audits"
+  ],
+  "requiredArtifacts": [
+    "artifact.anti-capture-compliance",
+    "artifact.unit-econ-sketch",
+    "artifact.ops-map",
+    "artifact.risk-controls",
+    "artifact.retention-signal"
+  ],
+  "gates": [
+    "gate.eligibility.zen-handrails.v1",
+    "gate.rung-approval.two-key.v1",
+    "gate.public-claims.two-key.v1"
+  ],
+  "reviewCadenceDays": 180,
+  "valuesRefs": [
+    "capture-resistance",
+    "external-interface-integrity",
+    "no-bypass-guardrail"
+  ],
+  "outcomeMetrics": ["unit_econ_margin", "audit_findings"]
+}

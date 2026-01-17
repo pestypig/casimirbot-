@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 export type NoisegenUiMode = "listener" | "remix" | "studio" | "labs";
 
 const STORAGE_KEY = "noisegen:uiMode";
+const ADVANCED_KEY = "noisegen:showAdvanced";
 const MODES: NoisegenUiMode[] = ["listener", "remix", "studio", "labs"];
 const DEFAULT_MODE: NoisegenUiMode = "listener";
 
@@ -23,8 +24,21 @@ const readStoredMode = (): NoisegenUiMode => {
   }
 };
 
+const readStoredAdvanced = (): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(ADVANCED_KEY);
+    return raw === "true";
+  } catch {
+    return false;
+  }
+};
+
 export function useNoisegenUiMode() {
   const [uiMode, setUiMode] = useState<NoisegenUiMode>(() => readStoredMode());
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(() =>
+    readStoredAdvanced(),
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -34,6 +48,15 @@ export function useNoisegenUiMode() {
       // best-effort storage only
     }
   }, [uiMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(ADVANCED_KEY, String(showAdvanced));
+    } catch {
+      // best-effort storage only
+    }
+  }, [showAdvanced]);
 
   const updateMode = useCallback((next: NoisegenUiMode) => {
     setUiMode(normalizeMode(next));
@@ -49,6 +72,12 @@ export function useNoisegenUiMode() {
     [],
   );
 
-  return { uiMode, setUiMode: updateMode, modeLabels: labels, modes: MODES };
+  return {
+    uiMode,
+    setUiMode: updateMode,
+    modeLabels: labels,
+    modes: MODES,
+    showAdvanced,
+    setShowAdvanced,
+  };
 }
-

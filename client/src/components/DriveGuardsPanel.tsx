@@ -23,6 +23,8 @@ import { SUB_THRESHOLD_MARGIN, RHO_CUTOFF } from "@/lib/parametric-sweep";
 
 
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useProofPack } from "@/hooks/useProofPack";
+import { useMathStageGate } from "@/hooks/useMathStageGate";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useCurvatureBrick } from "@/hooks/useCurvatureBrick";
 import { useCycleLedger, LEDGER_GUARD_THRESHOLD } from "@/hooks/useCycleLedger";
@@ -37,6 +39,12 @@ import {
 } from "@/lib/york-time";
 import type { AxesABC, YorkSample, Vec3 } from "@/lib/york-time";
 import { HELIX_DEV_MOCK_EVENT, getDevMockStatus, type DevMockStatus } from "@/lib/queryClient";
+import {
+  PROOF_PACK_STAGE_REQUIREMENTS,
+  getProofValue,
+  readProofNumber,
+} from "@/lib/proof-pack";
+import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
 
 
 import { DefinitionChip, useTermRegistry } from "@/components/DefinitionChip";
@@ -161,6 +169,7 @@ type FirstReadItem = {
   lookFor: string;
   value: ReactNode;
   muted?: boolean;
+  proxy?: boolean;
 };
 
 type Reference = {
@@ -301,6 +310,13 @@ const firstFinite = (...values: Array<unknown>): number => {
   return NaN;
 
 };
+
+const renderProxyBadge = (active?: boolean) =>
+  active ? (
+    <Badge className="ml-2 px-2 py-0.5 text-[10px] leading-tight bg-slate-800 text-slate-300">
+      PROXY
+    </Badge>
+  ) : null;
 
 const useHelixDevMockStatus = (): DevMockStatus => {
   const [status, setStatus] = useState<DevMockStatus>(() => getDevMockStatus());
@@ -1180,6 +1196,15 @@ function computeCurvatureProxy(pipeline: any, dEff: number) {
 export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = {}) {
   const { data: pipeline, sweepResults } = useEnergyPipeline({ refetchInterval: 1500 });
   const pipe = pipeline as any;
+  const { data: proofPack } = useProofPack({ refetchInterval: 1500, staleTime: 5000 });
+  const stageGate = useMathStageGate(PROOF_PACK_STAGE_REQUIREMENTS, { staleTime: 30000 });
+  const stageLabel = stageGate.pending ? "STAGE..." : STAGE_LABELS[stageGate.stage];
+  const stageProxy = !stageGate.ok || !proofPack;
+  const proofNum = (key: string) => readProofNumber(proofPack, key);
+  const proofProxy = (key: string) => stageProxy || Boolean(getProofValue(proofPack, key)?.proxy);
+  const proofProxyFrom = (keys: string[]) =>
+    stageProxy || keys.some((key) => Boolean(getProofValue(proofPack, key)?.proxy));
+
   const [readMode, setReadMode] = useState(false);
   const [helmholtzEnabled, setHelmholtzEnabled] = useState(false);
   const [natarioGateEnabled, setNatarioGateEnabled] = useState(true);
@@ -1339,47 +1364,61 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-  const { dEff, burstLocal, sectorsLive, sectorsTotal } = useMemo(
-
-
-
-    () => computeDutyEffective(pipe),
-
-
-
-    [pipe],
-
-
-
-  );
-
-
-
-
-
-
+  const dutyFallback = useMemo(() => computeDutyEffective(pipe), [pipe]);
+  const dutyEffectivePack = proofNum("duty_effective");
+  const dutyBurstPack = proofNum("duty_burst");
+  const sectorsLivePack = proofNum("sectors_live");
+  const sectorsTotalPack = proofNum("sectors_total");
+  const dEff = dutyEffectivePack ?? dutyFallback.dEff;
+  const burstLocal = dutyBurstPack ?? dutyFallback.burstLocal;
+  const sectorsLive = sectorsLivePack ?? dutyFallback.sectorsLive;
+  const sectorsTotal = sectorsTotalPack ?? dutyFallback.sectorsTotal;
+  const dutyProxy = proofProxyFrom([
+    "duty_effective",
+    "duty_burst",
+    "sectors_live",
+    "sectors_total",
+  ]);
 
   const tilePoints = useMemo(() => buildTilePoints(sweepResults), [sweepResults]);
 
-
-
   const tileStats = useMemo(() => tileSummary(tilePoints), [tilePoints]);
 
+  const massFallback = useMemo(() => computeMass(pipe, dEff), [pipe, dEff]);
+  const mass = {
+    mass: proofNum("M_exotic_kg") ?? massFallback.mass,
+    U_static: proofNum("U_static_J") ?? massFallback.U_static,
+    gammaGeo: proofNum("gamma_geo") ?? massFallback.gammaGeo,
+    gammaVdB: proofNum("gamma_vdb") ?? massFallback.gammaVdB,
+    N_tiles: proofNum("tile_count") ?? massFallback.N_tiles,
+  };
+  const massProxy = proofProxyFrom([
+    "M_exotic_kg",
+    "U_static_J",
+    "gamma_geo",
+    "gamma_vdb",
+    "tile_count",
+  ]);
 
-
-
-
-
-
-  const mass = useMemo(() => computeMass(pipe, dEff), [pipe, dEff]);
-
-
-
-  const curvature = useMemo(() => computeCurvatureProxy(pipe, dEff), [pipe, dEff]);
-
-
-
-
+  const curvatureFallback = useMemo(() => computeCurvatureProxy(pipe, dEff), [pipe, dEff]);
+  const curvature = {
+    kappa: proofNum("kappa_drive") ?? curvatureFallback.kappa,
+    powerW: proofNum("power_avg_W") ?? curvatureFallback.powerW,
+    hullArea: proofNum("hull_area_m2") ?? curvatureFallback.hullArea,
+    mathcalG:
+      proofNum("kappa_drive_gain") ??
+      proofNum("gamma_geo") ??
+      curvatureFallback.mathcalG,
+    gammaGeo: proofNum("gamma_geo") ?? curvatureFallback.gammaGeo,
+    gammaVdB: proofNum("gamma_vdb") ?? curvatureFallback.gammaVdB,
+  };
+  const kappaProxy = proofProxyFrom([
+    "kappa_drive",
+    "power_avg_W",
+    "hull_area_m2",
+    "kappa_drive_gain",
+    "gamma_geo",
+  ]);
 
 
 
@@ -1513,7 +1552,8 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     : "n/a";
   const lrlThresholdDisplay = toPercent(LRL_DRIFT_THRESHOLD, 2);
 
-  const zeta = Number(pipe?.zeta ?? pipe?.fordRoman?.value);
+  const zeta = proofNum("zeta") ?? Number(pipe?.zeta ?? pipe?.fordRoman?.value);
+  const zetaProxy = proofProxyFrom(["zeta"]);
 
 
 
@@ -1552,11 +1592,11 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-  const gammaGeo = Number(pipe?.gammaGeo);
+  const gammaGeo = curvature.gammaGeo;
+  const gammaGeoProxy = proofProxyFrom(["gamma_geo"]);
 
-
-
-  const gammaVdB = Number(pipe?.gammaVanDenBroeck ?? pipe?.gammaVanDenBroeck_vis ?? pipe?.gammaVdB);
+  const gammaVdB = curvature.gammaVdB;
+  const gammaVdBProxy = proofProxyFrom(["gamma_vdb"]);
 
 
 
@@ -1937,6 +1977,8 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
+  const tsPack = proofNum("ts_ratio");
+
   const ts = (() => {
     const tsFromClock = Number.isFinite((clocking as any)?.TS) ? Number((clocking as any).TS) : NaN;
     if (Number.isFinite(tsFromClock) && tsFromClock > 0) return tsFromClock;
@@ -1953,7 +1995,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-    if (Number.isFinite(pipe?.TS_ratio)) return pipe!.TS_ratio as number;
+    if (Number.isFinite(tsPack)) return tsPack as number;
 
 
 
@@ -2021,6 +2063,8 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const epsilonEffective = Number.isFinite(epsilonFromTimes) ? epsilonFromTimes : epsilonQL;
 
   // TS autoscale telemetry (defaults to target=100, idle)
+  const tsProxy = proofProxyFrom(["ts_ratio"]);
+
   const tsAutoscale = (pipe?.ts as any)?.autoscale ?? (pipe as any)?.tsAutoscale ?? null;
   const tsTarget = (() => {
     const t = Number(tsAutoscale?.target);
@@ -2289,6 +2333,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
   const scoreboardBadgeText = (() => {
+    if (stageProxy) return "Scoreboard proxy";
 
     if (!Number.isFinite(kappaBody)) return "Scoreboard pick body";
 
@@ -2307,6 +2352,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     Number.isFinite(kappaRatio) && !kappaMuted && zetaOk ? kappaRatioDisplay : "guarded";
 
   const N_tiles_nowCandidate = firstFinite(
+    proofNum("tile_count"),
 
     pipe?.tiles?.total,
 
@@ -2323,6 +2369,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
   const hullAreaCandidate = firstFinite(
+    proofNum("hull_area_m2"),
 
     pipe?.tiles?.hullArea_m2,
 
@@ -2337,6 +2384,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
   const tileAreaCm2Candidate = firstFinite(
+    proofNum("tile_area_cm2"),
 
     pipe?.tiles?.tileArea_cm2,
 
@@ -2808,6 +2856,9 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
   );
 
+  const greenZoneProxy = dutyProxy || zetaProxy || gammaVdBProxy || stageProxy;
+
+
 
 
 
@@ -2927,6 +2978,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
       value: Number.isFinite(gammaGeo) ? gammaGeo.toFixed(2) : "? ",
+      proxy: gammaGeoProxy,
 
 
 
@@ -3187,6 +3239,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
       value: toPercent(dEff, 3),
+      proxy: dutyProxy,
 
 
 
@@ -3215,6 +3268,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
       value: Number.isFinite(ts) ? ts.toFixed(1) : "? ",
+      proxy: tsProxy,
 
 
 
@@ -3243,6 +3297,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
       value: Number.isFinite(zeta) ? toFixed(zeta, 3) : "? ",
+      proxy: zetaProxy,
 
 
 
@@ -3283,6 +3338,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
       value: kappaDriveDisplay,
+      proxy: kappaProxy,
 
       muted: kappaMuted,
 
@@ -3341,6 +3397,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
       value: Number.isFinite(gammaVdB) ? gammaVdB.toExponential(2) : "? ",
+      proxy: gammaVdBProxy,
 
 
 
@@ -3416,6 +3473,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
+      proxy: greenZoneProxy,
     },
 
 
@@ -3457,6 +3515,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
       value: Number.isFinite(mass.mass) ? `${mass.mass.toExponential(3)} kg` : "? ",
+      proxy: massProxy,
 
 
 
@@ -3796,6 +3855,10 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200">
+          <Badge variant="outline" className={cn("border", STAGE_BADGE[stageGate.stage])}>
+            {stageLabel}
+          </Badge>
+          {renderProxyBadge(stageProxy)}
           <Badge className={`border ${natarioBadgeTone}`}>
             {natarioBadgeLabel}
           </Badge>
@@ -3837,6 +3900,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
           </Badge>
+          {renderProxyBadge(zetaProxy)}
 
 
 
@@ -3849,6 +3913,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
           </Badge>
+          {renderProxyBadge(kappaProxy)}
 
 
 
@@ -4590,7 +4655,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
                           <span className={`font-mono text-[11px] ${item.muted ? "text-slate-500" : "text-slate-200"}`}>
 
-                            {item.value}
+                            {item.value}{renderProxyBadge(item.proxy)}
 
                           </span>
 
@@ -4680,7 +4745,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                          <span className="font-mono text-[11px] text-slate-200">{item.value}</span>
+                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxyBadge(item.proxy)}</span>
 
 
 
@@ -4776,7 +4841,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                          <span className="font-mono text-[11px] text-slate-200">{item.value}</span>
+                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxyBadge(item.proxy)}</span>
 
 
 
@@ -4864,7 +4929,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                          <span className="font-mono text-[11px] text-slate-200">{item.value}</span>
+                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxyBadge(item.proxy)}</span>
 
 
 
@@ -4952,7 +5017,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                          <span className="font-mono text-[11px] text-slate-200">{item.value}</span>
+                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxyBadge(item.proxy)}</span>
 
 
 

@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.ops-map",
+  "name": "Operations map",
+  "requiredFields": ["processSteps", "dependencies", "owners", "riskPoints"],
+  "evidenceKinds": ["diagram", "doc"],
+  "freshnessDays": 365,
+  "ownerRole": "applicant"
+}

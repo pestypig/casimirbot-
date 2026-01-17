@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.retention-signal",
+  "name": "Retention signal",
+  "requiredFields": ["repeatRate", "usageSummary", "churnNotes"],
+  "evidenceKinds": ["analytics", "invoice"],
+  "freshnessDays": 120,
+  "ownerRole": "applicant"
+}

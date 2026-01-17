@@ -108,6 +108,7 @@ With this guide in place, Codex can confidently add or adjust Helix panels witho
 
 ## References
 
+- Proof pack contract: `docs/proof-pack.md`
 - Williamson & van der Mark, *Is the Electron a Photon with Toroidal Topology?* (2010) – conceptual basis for the toroidal core overlay and derived charge/magnetic moment values used in the simulator.
 - Griffiths, *Introduction to Quantum Mechanics* (2nd ed.) – canonical hydrogenic orbitals, quantum numbers, and expectation values that inform the orbital density plots.
 - NIST CODATA 2022, *Fundamental Physical Constants* – source for canonical Coulomb constant, Bohr radius, Compton wavelength, and fine-structure constant displayed in the telemetry cards.

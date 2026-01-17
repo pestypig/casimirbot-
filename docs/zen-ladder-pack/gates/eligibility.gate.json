@@ -1,0 +1,27 @@
+﻿{
+  "id": "gate.eligibility.zen-handrails.v1",
+  "name": "Zen handrails eligibility gate",
+  "appliesTo": {
+    "workflowKinds": ["entrepreneur.rung"],
+    "rungs": ["R0", "R1", "R2", "R3", "R4", "R5", "R6"],
+    "riskLevels": ["low", "medium", "high"]
+  },
+  "requiredChecks": [
+    "check.nonharm.no-predatory-terms",
+    "check.non-domination.no-insider-access",
+    "check.rightspeech.claims-bounded",
+    "check.data.dignity-minimization",
+    "check.coi.disclosure",
+    "check.appeals.path-exists",
+    "check.integrity.receipts-and-audits"
+  ],
+  "approvals": {
+    "minApprovers": 1,
+    "roles": ["reviewer"],
+    "twoKeyRequired": false
+  },
+  "audit": {
+    "samplingRate": 0.1,
+    "autoRevocationTriggers": ["evidence.fraud", "harm.incident.unreported"]
+  }
+}

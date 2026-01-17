@@ -147,9 +147,11 @@ import {
   resolveHullBasis,
   type HullBasisResolved,
 } from "../shared/hull-basis.js";
+import { buildProofPack } from "./helix-proof-pack.js";
 import { getSpectrumSnapshots, postSpectrum } from "./metrics/spectrum.js";
 import type { SpectrumSnapshot } from "./metrics/spectrum.js";
 import { slewPump } from "./instruments/pump.js";
+import { recordTrainingTrace } from "./services/observability/training-trace-store.js";
 
 /**
  * Monotonic sequence for pipeline snapshots served via GET /api/helix/pipeline.
@@ -2171,6 +2173,63 @@ export async function getPipelineState(req: Request, res: Response) {
     // helpful defaults
     localBurstFrac: (s as any).localBurstFrac ?? 0.01
   });
+}
+
+// Get proof pack for pipeline-derived metrics
+export async function getPipelineProofs(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Helix-Mock", "0");
+  res.setHeader("X-Server-PID", `${process.pid}`);
+
+  let s: EnergyPipelineState;
+  try {
+    s = await pipeMutex.lock(async () => {
+      const current = getGlobalPipelineState();
+      const refreshed = await calculateEnergyPipeline({ ...current });
+      setGlobalPipelineState(refreshed);
+      return refreshed;
+    });
+  } catch (err) {
+    console.error("[helix-core] getPipelineProofs failed:", err);
+    res.status(500).json({ error: "pipeline-proofs-compute-failed" });
+    return;
+  }
+
+  const proofPack = buildProofPack(s);
+  try {
+    const entries = Object.values(proofPack.values);
+    const missingCount = entries.filter((entry) => entry.value == null).length;
+    const proxyCount = entries.filter((entry) => entry.proxy).length;
+    recordTrainingTrace({
+      traceId: `proof-pack:${randomUUID()}`,
+      source: {
+        system: "helix",
+        component: "pipeline-proof-pack",
+        tool: "proof-pack",
+        version: "v1",
+        proxy: proxyCount > 0,
+      },
+      signal: {
+        kind: "proof-pack",
+        proxy: proxyCount > 0,
+      },
+      pass: missingCount === 0,
+      deltas: [],
+      metrics: {
+        fields_total: entries.length,
+        fields_missing: missingCount,
+        fields_proxy: proxyCount,
+        pipeline_seq: proofPack.pipeline?.seq ?? null,
+      },
+      notes: proofPack.notes,
+    });
+  } catch (error) {
+    console.warn("[helix-core] proof pack training trace emit failed", error);
+  }
+
+  res.json(proofPack);
 }
 
 // Update pipeline parameters

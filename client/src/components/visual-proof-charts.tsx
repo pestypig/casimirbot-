@@ -12,6 +12,15 @@ import {
 } from "recharts";
 import { TrendingUp, Activity, Target } from "lucide-react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useProofPack } from "@/hooks/useProofPack";
+import { useMathStageGate } from "@/hooks/useMathStageGate";
+import {
+  PROOF_PACK_STAGE_REQUIREMENTS,
+  getProofValue,
+  readProofNumber,
+} from "@/lib/proof-pack";
+import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
+import { cn } from "@/lib/utils";
 
 interface VisualProofChartsProps {
   // Optional overrides; if omitted, live pipeline values are used
@@ -43,48 +52,87 @@ const num = (v: unknown, d = 0) => (isFiniteNumber(v) ? (v as number) : d);
 
 export function VisualProofCharts({ results = {}, targets = {} }: VisualProofChartsProps) {
   const { data: pipeline } = useEnergyPipeline();
+  const { data: proofPack } = useProofPack({ refetchInterval: 5000, staleTime: 10000 });
+  const stageGate = useMathStageGate(PROOF_PACK_STAGE_REQUIREMENTS, { staleTime: 30000 });
+  const stageLabel = stageGate.pending ? "STAGE..." : STAGE_LABELS[stageGate.stage];
+  const stageProxy = !stageGate.ok || !proofPack;
+  const proofNum = (key: string) => readProofNumber(proofPack, key);
+  const proofProxyFrom = (keys: string[]) =>
+    stageProxy || keys.some((key) => Boolean(getProofValue(proofPack, key)?.proxy));
+
 
   // --- Live values from pipeline with safe fallbacks ---
   const mode = String((pipeline as any)?.currentMode ?? "").toLowerCase();
 
   // Power: server sends P_avg in MW — convert to W for this component
   const powerDrawW =
-    isFiniteNumber((pipeline as any)?.P_avg) ? ((pipeline as any).P_avg as number) * 1e6 :
-    isFiniteNumber(results.powerDraw) ? (results.powerDraw as number) :
-    0;
+    proofNum("power_avg_W") ??
+    (isFiniteNumber((pipeline as any)?.P_avg_W)
+      ? ((pipeline as any).P_avg_W as number)
+      : isFiniteNumber((pipeline as any)?.P_avg)
+        ? ((pipeline as any).P_avg as number) * 1e6
+        : isFiniteNumber(results.powerDraw)
+          ? (results.powerDraw as number)
+          : 0);
 
   // Mass
   const massKg =
-    isFiniteNumber((pipeline as any)?.M_exotic) ? (pipeline as any).M_exotic as number :
-    isFiniteNumber(results.totalExoticMass) ? (results.totalExoticMass as number) :
-    0;
+    proofNum("M_exotic_kg") ??
+    (isFiniteNumber((pipeline as any)?.M_exotic)
+      ? (pipeline as any).M_exotic as number
+      : isFiniteNumber(results.totalExoticMass)
+        ? (results.totalExoticMass as number)
+        : 0);
 
   // Gamma_geo, Q, ζ
   const gammaGeo =
-    isFiniteNumber((pipeline as any)?.gammaGeo) ? (pipeline as any).gammaGeo as number :
-    num(results.geometricBlueshiftFactor, 26);
+    proofNum("gamma_geo") ??
+    (isFiniteNumber((pipeline as any)?.gammaGeo)
+      ? (pipeline as any).gammaGeo as number
+      : num(results.geometricBlueshiftFactor, 26));
 
   const qCavity =
-    isFiniteNumber((pipeline as any)?.qCavity) ? (pipeline as any).qCavity as number :
-    num(results.qEnhancementFactor, 1e9);
+    proofNum("q_cavity") ??
+    (isFiniteNumber((pipeline as any)?.qCavity)
+      ? (pipeline as any).qCavity as number
+      : num(results.qEnhancementFactor, 1e9));
 
   const zeta =
-    isFiniteNumber((pipeline as any)?.zeta) ? (pipeline as any).zeta as number :
-    num(results.quantumInequalityMargin, 0.5);
+    proofNum("zeta") ??
+    (isFiniteNumber((pipeline as any)?.zeta)
+      ? (pipeline as any).zeta as number
+      : num(results.quantumInequalityMargin, 0.5));
 
   // Energy (J): prefer pipeline.U_cycle; else fallback
   const totalEnergyJ =
-    isFiniteNumber((pipeline as any)?.U_cycle) ? (pipeline as any).U_cycle as number :
-    num(results.totalEnergy, -2.55e-3);
+    proofNum("U_cycle_J") ??
+    (isFiniteNumber((pipeline as any)?.U_cycle)
+      ? (pipeline as any).U_cycle as number
+      : num(results.totalEnergy, -2.55e-3));
 
   // Duty (two notions)
   const dutyBurst =
-    isFiniteNumber((pipeline as any)?.dutyBurst) ? (pipeline as any).dutyBurst as number :
-    num(results.dutyFactor, 0.01);
+    proofNum("duty_burst") ??
+    (isFiniteNumber((pipeline as any)?.dutyBurst)
+      ? (pipeline as any).dutyBurst as number
+      : num(results.dutyFactor, 0.01));
 
   const dutyEff =
-    isFiniteNumber((pipeline as any)?.dutyEffective_FR) ? (pipeline as any).dutyEffective_FR as number :
-    num(results.effectiveDuty, 2.5e-5);
+    proofNum("duty_effective") ??
+    (isFiniteNumber((pipeline as any)?.dutyEffective_FR)
+      ? (pipeline as any).dutyEffective_FR as number
+      : num(results.effectiveDuty, 2.5e-5));
+
+  const chartProxy = proofProxyFrom([
+    "power_avg_W",
+    "M_exotic_kg",
+    "gamma_geo",
+    "q_cavity",
+    "zeta",
+    "U_cycle_J",
+    "duty_burst",
+    "duty_effective",
+  ]);
 
   // --- Targets (server-first if exposed; else sane fallbacks) ---
   const exoticMassTarget =
@@ -202,6 +250,12 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
         <TrendingUp className="h-5 w-5" />
         <h3 className="text-lg font-semibold">Visual Proof Analysis</h3>
         <Badge variant="outline">Real-time Validation</Badge>
+        <Badge variant="outline" className={cn("border", STAGE_BADGE[stageGate.stage])}>
+          {stageLabel}
+        </Badge>
+        {chartProxy ? (
+          <Badge className="bg-slate-800 text-slate-300">PROXY</Badge>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">

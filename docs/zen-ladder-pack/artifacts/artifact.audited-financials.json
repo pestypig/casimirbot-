@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.audited-financials",
+  "name": "Audited financials",
+  "requiredFields": ["fiscalYear", "auditor", "statements", "materialFindings"],
+  "evidenceKinds": ["audit-report"],
+  "freshnessDays": 365,
+  "ownerRole": "applicant"
+}

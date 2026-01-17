@@ -1,0 +1,9 @@
+﻿{
+  "id": "artifact.interview-log",
+  "name": "Interview log",
+  "requiredFields": ["interviewCount", "summary", "participantCriteria", "notes", "evidenceRefs"],
+  "evidenceKinds": ["notes", "recording", "transcript", "survey"],
+  "freshnessDays": 180,
+  "ownerRole": "applicant",
+  "templatePath": "docs/zen-ladder-pack/templates/artifacts/interview-log.md"
+}

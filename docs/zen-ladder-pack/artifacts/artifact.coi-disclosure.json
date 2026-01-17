@@ -1,0 +1,9 @@
+﻿{
+  "id": "artifact.coi-disclosure",
+  "name": "Conflict of interest disclosure",
+  "requiredFields": ["relationships", "financialInterests", "recusals", "attestation"],
+  "evidenceKinds": ["disclosure", "statement"],
+  "freshnessDays": 365,
+  "ownerRole": "applicant",
+  "templatePath": "docs/zen-ladder-pack/templates/artifacts/coi-disclosure.md"
+}

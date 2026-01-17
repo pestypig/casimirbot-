@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.business-model-sketch",
+  "name": "Business model sketch",
+  "requiredFields": ["customer", "problem", "solution", "pricing", "alternatives", "whyNow"],
+  "evidenceKinds": ["doc", "canvas"],
+  "freshnessDays": 180,
+  "ownerRole": "applicant"
+}

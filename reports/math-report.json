@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-01-12T04:57:46.102Z",
-  "registryCount": 65,
+  "generatedAt": "2026-01-17T17:59:07.802Z",
+  "registryCount": 69,
   "coverage": {
     "exploratory": {
       "count": 13,
@@ -21,7 +21,7 @@
       ]
     },
     "reduced-order": {
-      "count": 24,
+      "count": 28,
       "modules": [
         "modules/gr/stress-energy.ts",
         "server/gr/gr-constraint-policy.ts",
@@ -46,7 +46,11 @@
         "server/routes/agi.trace.ts",
         "server/routes/agi.debate.ts",
         "server/services/constraint-packs/constraint-pack-policy.ts",
-        "server/services/constraint-packs/constraint-pack-policy-store.ts"
+        "server/services/constraint-packs/constraint-pack-policy-store.ts",
+        "shared/curvature-proxy.ts",
+        "client/src/physics/curvature.ts",
+        "client/src/lib/warp-proof-math.ts",
+        "server/helix-proof-pack.ts"
       ]
     },
     "diagnostic": {
@@ -133,7 +137,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 65,
+    "entriesWithUnits": 69,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -142,8 +146,8 @@
         "missing": []
       },
       "reduced-order": {
-        "total": 24,
-        "withUnits": 24,
+        "total": 28,
+        "withUnits": 28,
         "missing": []
       },
       "diagnostic": {
@@ -169,8 +173,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 470,
-    "edgeCount": 975
+    "nodeCount": 477,
+    "edgeCount": 988
   },
   "evidenceProfiles": [
     {

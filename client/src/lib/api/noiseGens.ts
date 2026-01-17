@@ -12,9 +12,11 @@ import type {
   JobStatus,
   HelixPacket,
   CoverJobRequest,
+  ListenerMacros,
   CoverJob,
   NoiseFieldLoopRequest,
   NoiseFieldLoopResponse,
+  IntentContract,
 } from "@/types/noise-gens";
 
 const BASE = "/api/noise-gens";
@@ -24,6 +26,12 @@ const endpoints = {
   pendingOriginals: `${BASE}/originals/pending`,
   originalDetails: (originalId: string) =>
     `${BASE}/originals/${encodeURIComponent(originalId)}`,
+  originalLyrics: (originalId: string) =>
+    `${BASE}/originals/${encodeURIComponent(originalId)}/lyrics`,
+  originalIntentContract: (originalId: string) =>
+    `${BASE}/originals/${encodeURIComponent(originalId)}/intent-contract`,
+  originalIntentSnapshotPreferences: (originalId: string) =>
+    `${BASE}/originals/${encodeURIComponent(originalId)}/intent-snapshot-preferences`,
   originalStems: (originalId: string) =>
     `${BASE}/originals/${encodeURIComponent(originalId)}/stems`,
   stemPack: (originalId: string) =>
@@ -85,6 +93,69 @@ export async function fetchOriginalDetails(
 ): Promise<OriginalDetails> {
   const res = await apiRequest("GET", endpoints.originalDetails(originalId), undefined, signal);
   return parseJson<OriginalDetails>(res);
+}
+
+export async function fetchOriginalLyrics(
+  originalId: string,
+  signal?: AbortSignal,
+): Promise<{ id: string; lyrics: string }> {
+  const res = await apiRequest(
+    "GET",
+    endpoints.originalLyrics(originalId),
+    undefined,
+    signal,
+  );
+  return parseJson<{ id: string; lyrics: string }>(res);
+}
+
+export async function updateOriginalLyrics(
+  originalId: string,
+  lyrics: string,
+  signal?: AbortSignal,
+): Promise<{ id: string; lyrics: string }> {
+  const res = await apiRequest(
+    "PUT",
+    endpoints.originalLyrics(originalId),
+    { lyrics },
+    signal,
+  );
+  return parseJson<{ id: string; lyrics: string }>(res);
+}
+
+export async function updateOriginalIntentContract(
+  originalId: string,
+  intentContract: IntentContract | null,
+  signal?: AbortSignal,
+): Promise<{ id: string; intentContract: IntentContract | null }> {
+  const res = await apiRequest(
+    "PUT",
+    endpoints.originalIntentContract(originalId),
+    { intentContract },
+    signal,
+  );
+  return parseJson<{ id: string; intentContract: IntentContract | null }>(res);
+}
+
+export async function updateOriginalIntentSnapshotPreferences(
+  originalId: string,
+  intentSnapshotPreferences:
+    | OriginalDetails["intentSnapshotPreferences"]
+    | null,
+  signal?: AbortSignal,
+): Promise<{
+  id: string;
+  intentSnapshotPreferences: OriginalDetails["intentSnapshotPreferences"] | null;
+}> {
+  const res = await apiRequest(
+    "PUT",
+    endpoints.originalIntentSnapshotPreferences(originalId),
+    { intentSnapshotPreferences },
+    signal,
+  );
+  return parseJson<{
+    id: string;
+    intentSnapshotPreferences: OriginalDetails["intentSnapshotPreferences"] | null;
+  }>(res);
 }
 
 export async function fetchPendingOriginals(
@@ -204,10 +275,33 @@ export async function saveRecipe(
     coverRequest: CoverJobRequest;
     seed?: string | number;
     notes?: string;
+    featured?: boolean;
+    parentId?: string;
+    metrics?: NoisegenRecipe["metrics"];
   },
   signal?: AbortSignal,
 ): Promise<NoisegenRecipe> {
   const res = await apiRequest("POST", endpoints.recipes, payload, signal);
+  return parseJson<NoisegenRecipe>(res);
+}
+
+export async function updateRecipe(
+  recipeId: string,
+  payload: {
+    name?: string;
+    notes?: string | null;
+    featured?: boolean;
+    parentId?: string | null;
+    metrics?: NoisegenRecipe["metrics"];
+  },
+  signal?: AbortSignal,
+): Promise<NoisegenRecipe> {
+  const res = await apiRequest(
+    "PUT",
+    endpoints.recipe(recipeId),
+    payload,
+    signal,
+  );
   return parseJson<NoisegenRecipe>(res);
 }
 
@@ -229,6 +323,7 @@ export async function requestGeneration(payload: {
   moodId: string;
   seed?: number;
   helixPacket?: HelixPacket;
+  macros?: ListenerMacros;
 }): Promise<{ jobId: string }> {
   const res = await apiRequest("POST", endpoints.generate, payload);
   return parseJson<{ jobId: string }>(res);
@@ -237,7 +332,7 @@ export async function requestGeneration(payload: {
 export async function createCoverJob(
   payload: CreateCoverJobPayload,
   signal?: AbortSignal,
-): Promise<{ id: string }> {
+): Promise<{ id: string; request?: CoverJobRequest }> {
   const coverFlowPayload = readCoverFlowPayload();
   const mergedKnowledgeFileIds = mergeKnowledgeFileIds(
     payload.knowledgeFileIds,
@@ -260,7 +355,7 @@ export async function createCoverJob(
   }
 
   const res = await apiRequest("POST", `${BASE}/jobs`, body, signal);
-  return parseJson<{ id: string }>(res);
+  return parseJson<{ id: string; request?: CoverJobRequest }>(res);
 }
 
 export type UploadProgress = {

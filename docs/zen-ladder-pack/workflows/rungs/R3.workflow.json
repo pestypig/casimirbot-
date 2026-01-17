@@ -1,0 +1,36 @@
+﻿{
+  "id": "workflow.entrepreneur.rung.R3.v1",
+  "kind": "entrepreneur.rung",
+  "rung": "R3",
+  "riskLevel": "medium",
+  "scores": {
+    "demand": { "min": 3 },
+    "capability": { "min": 2 },
+    "integritySafety": { "min": 3 },
+    "sustainability": { "min": 2 }
+  },
+  "requiredChecks": [
+    "check.rightspeech.sources-linked",
+    "check.integrity.receipts-and-audits",
+    "check.repair.redress-path"
+  ],
+  "requiredArtifacts": [
+    "artifact.pilot-log",
+    "artifact.retention-signal",
+    "artifact.unit-econ-sketch",
+    "artifact.ops-map",
+    "artifact.risk-controls",
+    "artifact.coi-disclosure"
+  ],
+  "gates": [
+    "gate.eligibility.zen-handrails.v1",
+    "gate.rung-approval.two-key.v1"
+  ],
+  "reviewCadenceDays": 120,
+  "valuesRefs": [
+    "feedback-loop-hygiene",
+    "interbeing-systems",
+    "integrity-protocols"
+  ],
+  "outcomeMetrics": ["retention_rate", "incident_rate"]
+}

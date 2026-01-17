@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import request from "supertest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -160,6 +160,49 @@ describe("noise-gens routes", () => {
       .expect(200);
     expect(Array.isArray(stems.body?.stems)).toBe(true);
     expect(stems.body.stems.length).toBe(2);
+  });
+
+  it("stores Ableton intent snapshots on upload", async () => {
+    const app = await buildApp(dataDir);
+    const wav = buildTestWav(1);
+    const intentXml = await readFile(
+      path.join(process.cwd(), "server", "__tests__", "fixtures", "ableton-intent.xml"),
+    );
+    const upload = await request(app)
+      .post("/api/noise-gens/upload")
+      .field("title", "Intent Track")
+      .field("creator", "Helix Lab")
+      .attach("instrumental", wav, {
+        filename: "intent.wav",
+        contentType: "audio/wav",
+      })
+      .attach("intent", intentXml, {
+        filename: "intent.xml",
+        contentType: "application/xml",
+      })
+      .expect(200);
+    const trackId = upload.body?.trackId;
+    expect(trackId).toBeTruthy();
+
+    const details = await request(app)
+      .get(`/api/noise-gens/originals/${trackId}`)
+      .expect(200);
+    const snapshot = details.body?.intentSnapshot;
+    expect(snapshot).toBeTruthy();
+    expect(snapshot.source?.kind).toBe("xml");
+    expect(snapshot.globals?.bpm).toBe(128);
+    expect(snapshot.globals?.timeSig).toBe("4/4");
+    expect(snapshot.summary?.trackCount).toBe(3);
+    expect(snapshot.summary?.locatorCount).toBe(2);
+    const deviceNames = snapshot.devices?.map((entry: any) => entry.name) ?? [];
+    expect(deviceNames).toContain("Eq8");
+    expect(deviceNames).toContain("Reverb");
+    expect(deviceNames).toContain("Delay");
+    expect(typeof snapshot.deviceIntent?.fx?.reverbSend).toBe("number");
+    const prefs = details.body?.intentSnapshotPreferences;
+    expect(prefs?.applyTempo).toBe(true);
+    expect(prefs?.applyMix).toBe(true);
+    expect(prefs?.applyAutomation).toBe(false);
   });
 
   it("processes remote cover jobs when forced", async () => {

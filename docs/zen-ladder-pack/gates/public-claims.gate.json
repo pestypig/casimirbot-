@@ -1,0 +1,23 @@
+﻿{
+  "id": "gate.public-claims.two-key.v1",
+  "name": "Two-key approval for public claims and high-impact decisions",
+  "appliesTo": {
+    "workflowKinds": ["entrepreneur.rung", "curiosity.dividend"],
+    "riskLevels": ["high"]
+  },
+  "requiredChecks": [
+    "check.rightspeech.sources-linked",
+    "check.integrity.receipts-and-audits",
+    "check.repair.redress-path",
+    "check.non-domination.no-insider-access"
+  ],
+  "approvals": {
+    "minApprovers": 2,
+    "roles": ["reviewer", "verifier"],
+    "twoKeyRequired": true
+  },
+  "audit": {
+    "samplingRate": 0.25,
+    "autoRevocationTriggers": ["claim.false", "conflict.undisclosed"]
+  }
+}

@@ -7,6 +7,8 @@ export const KNOWLEDGE_FALLBACK_ALLOWED_MIME = [
   "application/pdf",
   "audio/wav",
   "audio/mpeg",
+  "audio/midi",
+  "audio/x-midi",
 ];
 
 export type KnowledgeFileKind = "text" | "json" | "code" | "audio" | "image";

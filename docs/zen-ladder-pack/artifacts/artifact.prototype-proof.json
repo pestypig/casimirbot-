@@ -1,0 +1,8 @@
+﻿{
+  "id": "artifact.prototype-proof",
+  "name": "Prototype proof",
+  "requiredFields": ["demoLink", "buildVersion", "limitations", "testResults"],
+  "evidenceKinds": ["video", "repo", "demo"],
+  "freshnessDays": 180,
+  "ownerRole": "applicant"
+}

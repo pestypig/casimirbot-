@@ -1670,6 +1670,34 @@ export const grAssistantReportRequestSchema = z
   .passthrough();
 export type GrAssistantReportRequest = z.infer<typeof grAssistantReportRequestSchema>;
 
+export const proofValueSchema = z.object({
+  value: z.union([z.number(), z.boolean(), z.string(), z.null()]),
+  unit: z.string().optional(),
+  source: z.string().optional(),
+  proxy: z.boolean().optional(),
+  note: z.string().optional(),
+  basis: z.record(z.string()).optional(),
+});
+export type ProofValue = z.infer<typeof proofValueSchema>;
+
+export const proofPackSchema = z.object({
+  kind: z.literal("proof-pack"),
+  version: z.number().int().positive(),
+  generatedAt: z.string(),
+  pipeline: z
+    .object({
+      seq: z.number().optional(),
+      ts: z.number().optional(),
+      mode: z.string().optional(),
+    })
+    .optional(),
+  values: z.record(proofValueSchema),
+  equations: z.record(z.string()).optional(),
+  sources: z.record(z.string()).optional(),
+  notes: z.array(z.string()).optional(),
+});
+export type ProofPack = z.infer<typeof proofPackSchema>;
+
 export const grOsStageSchema = ladderTierSchema;
 export type GrOsStage = z.infer<typeof grOsStageSchema>;
 
