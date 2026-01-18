@@ -16,6 +16,7 @@ export type RecentUploadEntry = {
 type RecentUploadsRailProps = {
   uploads: Array<RecentUploadEntry & { isReady: boolean; isRanked: boolean }>;
   onSelect: (upload: RecentUploadEntry) => void;
+  onRetry?: (upload: RecentUploadEntry) => void;
   onReveal?: (upload: RecentUploadEntry) => void;
 };
 
@@ -30,7 +31,12 @@ const formatTimeAgo = (timestamp: number) => {
   return `${diffDays}d ago`;
 };
 
-export function RecentUploadsRail({ uploads, onSelect, onReveal }: RecentUploadsRailProps) {
+export function RecentUploadsRail({
+  uploads,
+  onSelect,
+  onRetry,
+  onReveal,
+}: RecentUploadsRailProps) {
   if (!uploads.length) return null;
   return (
     <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-200 shadow-[0_20px_40px_-35px_rgba(14,165,233,0.55)]">
@@ -79,6 +85,17 @@ export function RecentUploadsRail({ uploads, onSelect, onReveal }: RecentUploads
                 >
                   {buttonLabel}
                 </Button>
+                {onRetry && upload.knowledgeProjectId ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => onRetry(upload)}
+                  >
+                    Retry upload
+                  </Button>
+                ) : null}
                 {onReveal && upload.knowledgeProjectId ? (
                   <Button
                     type="button"

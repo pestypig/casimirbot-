@@ -498,6 +498,32 @@ export default function HelixNoiseGensPage() {
     [setLibraryInitialProjectId, setLibraryOpen, toast],
   );
 
+  const handleRecentRetry = useCallback(
+    (upload: RecentUploadEntry) => {
+      if (!upload.knowledgeProjectId) {
+        toast({
+          title: "Missing project link",
+          description:
+            "This upload is not tied to a My Knowledge project, so it cannot be retried.",
+        });
+        return;
+      }
+      setUploadPrefill({
+        title: upload.title,
+        creator: upload.creator,
+        sourceHint: `Retry publishing ${upload.title}.`,
+        knowledgeProjectId: upload.knowledgeProjectId,
+        knowledgeProjectName: upload.knowledgeProjectName,
+        existingOriginalId: upload.trackId,
+        bpm: upload.tempo?.bpm,
+        offsetMs: upload.tempo?.offsetMs,
+        quantized: upload.tempo?.quantized,
+      });
+      setUploadOpen(true);
+    },
+    [setUploadOpen, setUploadPrefill, toast],
+  );
+
   const handleRenderJobUpdate = useCallback(
     (update: RenderJobUpdate | null) => {
       if (!update || !update.jobId || !update.status) {
@@ -1203,6 +1229,7 @@ export default function HelixNoiseGensPage() {
                   <RecentUploadsRail
                     uploads={decoratedRecentUploads}
                     onSelect={handleRecentSelect}
+                    onRetry={handleRecentRetry}
                     onReveal={handleRecentReveal}
                   />
                 ) : null}
