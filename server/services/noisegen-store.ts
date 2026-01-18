@@ -418,6 +418,7 @@ const getReplitClient = async (): Promise<ReplitStorageClient> => {
 };
 
 const NOISEGEN_STORAGE_PREFIX = "noisegen/originals";
+const NOISEGEN_STORE_SNAPSHOT_KEY = "noisegen/catalog/store.json";
 
 const buildNoisegenStorageKey = (originalId: string, relativePath: string) =>
   path.posix.join(
@@ -456,6 +457,18 @@ export const downloadReplitObjectStream = async (
 ): Promise<Readable> => {
   const client = await getReplitClient();
   return client.downloadAsStream(key);
+};
+
+const streamToBuffer = async (stream: Readable): Promise<Buffer> => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    if (Buffer.isBuffer(chunk)) {
+      chunks.push(chunk);
+    } else {
+      chunks.push(Buffer.from(chunk));
+    }
+  }
+  return Buffer.concat(chunks);
 };
 
 export const resolveBundledOriginalsRoots = (): string[] => {
@@ -660,25 +673,72 @@ const writeStoreToDb = async (store: NoisegenStore): Promise<void> => {
   );
 };
 
+const isStoreEmpty = (store: NoisegenStore): boolean =>
+  store.originals.length === 0 &&
+  store.pendingOriginals.length === 0 &&
+  store.generations.length === 0 &&
+  store.recipes.length === 0 &&
+  store.jobs.length === 0;
+
+const readStoreSnapshot = async (): Promise<NoisegenStore | null> => {
+  if (resolveNoisegenStorageBackend() !== "replit") return null;
+  try {
+    const stream = await downloadReplitObjectStream(NOISEGEN_STORE_SNAPSHOT_KEY);
+    const buffer = await streamToBuffer(stream);
+    const raw = buffer.toString("utf8");
+    if (!raw.trim()) return null;
+    return normalizeStore(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+};
+
+const writeStoreSnapshot = async (store: NoisegenStore): Promise<void> => {
+  if (resolveNoisegenStorageBackend() !== "replit") return;
+  try {
+    await uploadReplitObject(
+      NOISEGEN_STORE_SNAPSHOT_KEY,
+      Buffer.from(JSON.stringify(store)),
+    );
+  } catch {
+    // Best-effort snapshot for catalog recovery.
+  }
+};
+
 const readStore = async (): Promise<NoisegenStore> => {
   const backend = resolveNoisegenStoreBackend();
   if (backend === "db") {
     const dbStore = await readStoreFromDb();
     if (dbStore) return dbStore;
+    const snapshot = await readStoreSnapshot();
+    if (snapshot) {
+      await writeStoreToDb(snapshot);
+      return snapshot;
+    }
     const fallback = await readStoreFromFs();
     await writeStoreToDb(fallback);
     return fallback;
   }
-  return readStoreFromFs();
+  const fsStore = await readStoreFromFs();
+  if (isStoreEmpty(fsStore)) {
+    const snapshot = await readStoreSnapshot();
+    if (snapshot) {
+      await writeStoreToFs(snapshot);
+      return snapshot;
+    }
+  }
+  return fsStore;
 };
 
 const writeStore = async (store: NoisegenStore): Promise<void> => {
   const backend = resolveNoisegenStoreBackend();
   if (backend === "db") {
     await writeStoreToDb(store);
+    await writeStoreSnapshot(store);
     return;
   }
   await writeStoreToFs(store);
+  await writeStoreSnapshot(store);
 };
 
 const readBundledManifest = async (): Promise<BundledOriginalManifest[]> => {
