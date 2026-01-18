@@ -943,13 +943,13 @@ Prompt NG1 (Listener mode macros) - Status: complete
 - Do not: expose the full RenderPlan JSON in listener mode.
 - Acceptance: macros update renders, A/B toggles artist vs user plan, undo/reset are always visible.
 
-Prompt NG2 (Explorer mode groups + locks) - Status: pending
+Prompt NG2 (Explorer mode groups + locks) - Status: complete
 - Goal: add a mid-level UI with 4-8 stem groups and lock toggles.
 - Do: add group macros and lock switches; map to RenderPlan material or new global locks.
 - Do not: require DAW-level routing or 30+ tracks.
 - Acceptance: locked groups stay unchanged when plans are generated or ranked.
 
-Prompt NG3 (Creator mode timeline editor) - Status: pending
+Prompt NG3 (Creator mode timeline editor) - Status: complete
 - Goal: build a timeline editor for RenderPlan windows, sections, energy curve, textures, and materials.
 - Do: add a bar-grid timeline UI that serializes to RenderPlan and drives local renders.
 - Do not: require JSON editing for core tasks.
@@ -967,19 +967,19 @@ Prompt NG5 (Feature extraction hardening + cache) - Status: complete
 - Do not: recompute full analysis for every ranking run.
 - Acceptance: cached analysis is reused for plan generation and ranking.
 
-Prompt NG6 (Arrangement constraints) - Status: pending
+Prompt NG6 (Arrangement constraints) - Status: complete
 - Goal: enforce global arrangement constraints for long-form coherence.
 - Do: add section grammar, motif reuse scheduling, and energy continuity; enforce in the worker.
 - Do not: allow random plan drift across windows.
 - Acceptance: long renders follow section and motif rules.
 
-Prompt NG7 (Atom extraction pipeline) - Status: pending
+Prompt NG7 (Atom extraction pipeline) - Status: complete
 - Goal: automate atom extraction from stems with dedupe and labeling.
 - Do: add slicing (transient, loop, phrase), normalization, trimming, clustering/dedupe, and auto labels with key/bpm where relevant.
 - Do not: rely only on manual tagging.
 - Acceptance: extracted atoms appear in the Atom Library with tags and metadata.
 
-Prompt NG8 (Motif realism) - Status: pending
+Prompt NG8 (Motif realism) - Status: complete
 - Goal: make MIDI motifs sound like real instruments.
 - Do: add sample-based motif playback (single or multi-sample), macro mapping, and MIDI file ingestion from Ableton exports.
 - Do not: keep only the diagnostic oscillator synth.
@@ -997,7 +997,7 @@ Prompt NG10 (Recipe export and sharing) - Status: complete
 - Do not: export only WAV files.
 - Acceptance: saved recipes can be reloaded and reproduce the same output.
 
-Prompt NG11 (Latency-safe playback) - Status: pending
+Prompt NG11 (Latency-safe playback) - Status: complete
 - Goal: support near-real-time macro changes.
 - Do: add chunked pre-rendering or a realtime playback path with low-latency updates.
 - Do not: block on full offline renders for simple macro tweaks.
@@ -1170,14 +1170,14 @@ Prompt NG35 (Edition receipts in recipes) - Status: complete
 - Do not: store only audio without the receipt payload.
 - Acceptance: every saved edition can be reproduced and audited from its receipt.
 
-Prompt NG36 (Creator official editions) - Status: pending
+Prompt NG36 (Creator official editions) - Status: complete
 - Goal: let creators publish canonical editions (e.g., Original, Night Mix, Live Room, Ambient Drift).
 - Do: allow creators to save named, featured recipes that appear first for listeners.
 - Do: keep these editions within the intent contract and provenance policy.
 - Do not: let featured editions bypass locks or ranges.
 - Acceptance: listeners can select a creator-featured edition and see its receipts.
 
-Prompt NG37 (Edition lineage graph) - Status: pending
+Prompt NG37 (Edition lineage graph) - Status: complete
 - Goal: show edition history as a branching tree, not just a flat list.
 - Do: record parent/child relationships for each render; allow "fork from edition" and show plan deltas, mood changes, IDI, and intentSimilarity.
 - Do: let creators feature or annotate branches.
@@ -1291,6 +1291,38 @@ Prompt NG51 (Ableton intent import) - Status: complete
 - Plan-5: wire snapshot defaults into RenderPlan generation and Intent Contract bounds (clamp overrides, preserve intent).
 - Plan-6: add tests with a small fixture `.als`/`.xml` to validate extraction, sanitization, and device mapping coverage.
 
+Prompt NG52 (Catalog snapshot in object storage) - Status: complete
+- Goal: make the public NoiseGen catalog survive deploys/restarts by snapshotting to object storage.
+- Do: write the store snapshot to object storage on each store update; read from snapshot when local store is empty or missing.
+- Do not: let snapshot overwrite a non-empty store.
+- Acceptance: a clean deploy can recover the catalog from object storage without re-uploading.
+
+Prompt NG53 (Upload session records + resume) - Status: pending
+- Goal: make large uploads resilient to crashes or tab closes.
+- Do: persist per-track upload session records with stage states (received → assembled → analyzed → playback ready).
+- Do: allow resuming or reconciling partial uploads on next upload attempt.
+- Do not: require manual cleanup to retry a failed upload.
+- Acceptance: interrupted uploads can resume or safely restart without duplicate entries.
+
+Prompt NG54 (Asset checksums + manifest) - Status: pending
+- Goal: prevent duplicate or corrupted assets from becoming public.
+- Do: compute and store checksums + duration metadata per asset; write an idempotent manifest per original.
+- Do: skip re-uploads if the checksum already exists for a track.
+- Do not: publish assets with checksum or duration mismatches.
+- Acceptance: repeated uploads of the same files do not duplicate catalog entries; bad assets are rejected.
+
+Prompt NG55 (Catalog health endpoint) - Status: pending
+- Goal: expose a lightweight readiness check for catalog and storage.
+- Do: add a health endpoint that verifies store read/write plus object storage access.
+- Do not: expose secrets in the response.
+- Acceptance: health endpoint returns readiness status and last snapshot time.
+
+Prompt NG56 (Listener auto-refresh via SSE/polling) - Status: pending
+- Goal: make new uploads appear for listeners without typing/searching.
+- Do: add SSE or lightweight polling that notifies the listener list when new originals are published.
+- Do not: overwhelm the server; use sensible intervals and backoff.
+- Acceptance: listener lists update within seconds of a publish.
+
 ---
 
 ## Solar Model Track (Spectrum + Surface Coherence)
@@ -1341,7 +1373,7 @@ Solar Phase 1.5 (Center-to-limb validator) - Status: complete
 - Do not: conflate disk-integrated and disk-center spectra in comparisons.
 - Acceptance: mu curves are reproducible and exportable for model comparison.
 
-Solar Phase 2 (Dual forward models) - Status: pending
+Solar Phase 2 (Dual forward models) - Status: complete
 - Goal: compare an atmosphere proxy versus a material emissivity model.
 - Do: implement a baseline opacity-depth proxy that reproduces limb darkening   
   and continuum slope.
@@ -1363,7 +1395,7 @@ Solar Phase 2 (Dual forward models) - Status: pending
 - Plan-5: add a dual-model comparison report artifact + Essence envelope.
 - Plan-6: add fixtures/tests that exercise both models on SOLAR-ISS and HRS.
 
-Solar Guardrails (density/pressure constraints) - Status: pending
+Solar Guardrails (density/pressure constraints) - Status: complete
 - Goal: enforce realism checks alongside emissivity fits.
 - Do: add a guardrail report that flags density/pressure mismatches versus      
   standard photospheric ranges.
@@ -1380,7 +1412,7 @@ Solar Guardrails (density/pressure constraints) - Status: pending
 - Plan-4: add tests that trigger each guardrail and verify required follow-ups
   are attached to the report.
 
-Solar Surface Coherence Track (u_field + K-metrics) - Status: pending
+Solar Surface Coherence Track (u_field + K-metrics) - Status: complete
 - Goal: apply curvature-unit and coherence diagnostics to solar surface proxies.
 - Do: ingest magnetogram/EUV proxies (u_B, intensity, Doppler) into u_field     
   format.
@@ -1404,12 +1436,84 @@ Solar Surface Coherence Track (u_field + K-metrics) - Status: pending
 - Plan-6: add fixtures/tests for deterministic K-metric outputs and phase-lock
   stability.
 
-Solar Build Checklist (full pipeline) - Status: pending
+Solar Build Checklist (full pipeline) - Status: complete
 - Do: replace spectrum fixtures with full SOLAR-ISS/SOLAR-HRS datasets under
   datasets/solar/spectra and record hashes in a dataset manifest.
 - Do: run the spectrum ingest pipeline to persist envelopes for disk-integrated,
   disk-center, and mu-series outputs.
 - Do: run Phase 2 model fits + guardrails and export comparison reports.
 - Do: run surface coherence ingestion + diagnostics and export event timelines.
-- Acceptance: all solar track outputs have deterministic hashes, envelopes, and
+- Acceptance: all solar track outputs have deterministic hashes, envelopes, and 
   PASS Casimir verification gates.
+- Note: full SOLAR-ISS/SOLAR-HRS datasets are in place; fixture backups live under datasets/solar/spectra/fixtures.
+
+## Solar Build Follow-ups
+
+Solar Data Swap (Full datasets) - Status: complete
+- Goal: replace fixture spectra with full SOLAR-ISS/SOLAR-HRS and refresh hashes.
+- Do: drop full datasets into datasets/solar/spectra; update solar-spectra.manifest.json with byte counts and sha256; re-run ingest + model comparison + surface coherence.
+- Do not: delete fixture backups without a copy.
+- Acceptance: manifest matches full datasets and pipeline outputs reflect full data.
+- Note: fixture backups stored under datasets/solar/spectra/fixtures; full pipeline summary saved to artifacts/solar-pipeline.full.json.
+
+Solar Pipeline Runner (one-shot) - Status: complete
+- Goal: run the full solar build checklist from a single command.
+- Do: add scripts/solar-pipeline.ts with flags to run spectrum ingest, model comparison, and optional surface coherence; support --persist and --surface <fixture>.
+- Do not: hardcode fixture-only paths.
+- Acceptance: running the script completes on fixtures and logs outputs.
+
+Solar Surface Fixture + Event Timeline Test - Status: complete
+- Goal: add a deterministic u_field fixture manifest for surface coherence and a test that exercises event timelines.
+- Do: add datasets/solar/solar-surface.fixture.json with inputs and expected hashes; update tests to load the fixture.
+- Do not: inline fixture data only in tests.
+- Acceptance: test uses the fixture file and validates determinism plus event timeline output.
+
+Solar Pipeline Docs - Status: complete
+- Goal: document solar data sources and pipeline steps.
+- Do: add docs/solar-pipeline.md with data sources, dataset placement, and pipeline runner usage.
+- Do not: mix speculative physics claims.
+- Acceptance: docs explain running the pipeline on fixtures and full datasets.
+
+Repo Hygiene: Split Noise-gen vs Solar Commits - Status: complete
+- Goal: keep noise-gen and solar changes in separate commits.
+- Do: prepare a staging plan and ask for approval before creating commits.      
+- Do not: create commits without explicit request.
+- Acceptance: plan captured and ready once approved.
+- Staging plan (awaiting approval):
+- Commit A (noise-gen UX + audio tooling): client/src/components/noise-gens/AtomLibraryPanel.tsx, client/src/components/noise-gens/CoverCreator.tsx, client/src/components/noise-gens/OriginalsPlayer.tsx, client/src/lib/knowledge/atom-curation.ts, client/src/lib/knowledge/atom-extraction.ts, client/src/lib/noise/cover-runner.ts, client/src/lib/noise/midi-motif.ts, client/src/lib/noise/midi-file.ts, client/src/workers/cover-worker.ts.
+- Commit B (solar pipeline + guardrails + datasets): scripts/solar-pipeline.ts, scripts/solar-spectra-manifest.ts, datasets/solar/solar-pipeline.fixture.json, datasets/solar/solar-surface.fixture.json, datasets/solar/spectra/solar-spectra.manifest.json, configs/solar-guardrails.v1.json, server/services/essence/solar-guardrails.ts, server/services/essence/solar-spectrum-models.ts, server/services/essence/solar-surface-coherence.ts, shared/solar-guardrails.ts, shared/solar-model.ts, shared/solar-surface-coherence.ts, docs/solar-pipeline.md, tests/solar-guardrails.spec.ts, tests/solar-model-fit.spec.ts, tests/solar-surface-coherence.spec.ts, package.json, .github/workflows/casimir-verify.yml.
+- Commit C (warp/GR lattice diagnostics + fixtures): client/src/components/TimeDilationLatticePanel.tsx, tests/gr-advection-stability.spec.ts, tests/lattice-golden-hashes.spec.ts, tests/fixtures/gr-shift-stiffness.fixture.json, tests/fixtures/lattice-golden.fixture.json, reports/math-report.json, reports/math-report.md.
+- Commit D (task bookkeeping): task.md.
+- Exclude from commits: artifacts/training-trace.jsonl (generated).
+
+## Robustness Roadmap (Top 5)
+
+Solar Pipeline Determinism Gate - Status: complete
+- Goal: make solar pipeline runs deterministic and CI-visible.
+- Do: add a CI smoke step that runs `npm run solar:pipeline -- --surface datasets/solar/solar-surface.fixture.json` and asserts stable hashes; surface failures clearly.
+- Do not: rely on manual runs to detect pipeline drift.
+- Acceptance: CI job fails on hash drift and logs the pipeline summary.
+
+Solar Dataset Swap Validator - Status: complete
+- Goal: swap in full SOLAR-ISS/HRS data safely and update manifests.
+- Do: add a script to validate byte size + sha256 for spectrum files and refresh `datasets/solar/spectra/solar-spectra.manifest.json`.
+- Do not: overwrite fixture data without a backup.
+- Acceptance: validator reports mismatches and can regenerate manifest entries.
+
+Time Dilation Lattice Gating UX - Status: complete
+- Goal: make Alcubierre gating transparent in the time dilation lattice panel.
+- Do: show the banner state and top gating reasons, plus a details popover for full reasons.
+- Do not: hide gating failures or proxy fallbacks from users.
+- Acceptance: users can see why geometry warp is disabled and what is missing.
+
+Global Diagnostics Export - Status: complete
+- Goal: export a reproducible bundle for debugging and review.
+- Do: add a one-click export that includes render plan, hashes, and training trace id.
+- Do not: omit provenance or hash metadata.
+- Acceptance: export artifact is usable to reproduce a run.
+
+Deterministic Fixtures Across Pipelines - Status: complete
+- Goal: extend deterministic fixture coverage beyond solar.
+- Do: add minimal fixtures + expected hashes for key GR/lattice paths and validate in tests.
+- Do not: add heavy datasets that slow CI.
+- Acceptance: fixtures catch regressions with stable hash checks.
