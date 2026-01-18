@@ -15,6 +15,7 @@ import {
   Sparkles,
   Volume2,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import {
@@ -36,6 +37,7 @@ import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
 import { useToast } from "@/hooks/use-toast";
 import {
   fetchOriginalDetails,
+  fetchRecipes,
   fetchStemPack,
   saveRecipe,
   updateOriginalIntentContract,
@@ -47,10 +49,12 @@ import type {
   ListenerMacros,
   ListenerMacroLocks,
   MoodPreset,
+  EditionReceipt,
   Original,
   OriginalDetails,
   JobStatus,
   PulseSource,
+  NoisegenRecipe,
   RenderPlan,
   StemGroup,
   StemGroupSource,
@@ -133,6 +137,160 @@ const INTENT_RANGE_FIELDS: Array<{ key: IntentRangeKey; label: string }> = [
 
 const clamp01 = (value: number): number =>
   Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+
+const clamp = (value: number, min: number, max: number): number => {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+};
+
+type MacroEqPoint = { freq: number; q: number; gainDb: number };
+
+type MacroFxProfile = {
+  eq: MacroEqPoint[];
+  reverbSend: number;
+  drive: number;
+  energy: number;
+};
+
+type MacroFxChain = {
+  input: GainNode;
+  output: GainNode;
+  low: BiquadFilterNode;
+  mid: BiquadFilterNode;
+  high: BiquadFilterNode;
+  drive: GainNode;
+  shaper: WaveShaperNode;
+  reverbSend: GainNode;
+  reverbReturn: GainNode;
+  convolver: ConvolverNode;
+};
+
+const buildMacroFxProfile = (macros: ListenerMacros): MacroFxProfile => {
+  const energy = clamp01(macros.energy);
+  const space = clamp01(macros.space);
+  const texture = clamp01(macros.texture);
+  const drive = clamp01(macros.drive ?? 0.3);
+  return {
+    eq: [
+      { freq: 110, q: 0.9, gainDb: -5 + drive * 3 },
+      { freq: 820, q: 1.1, gainDb: -2 + texture * 4 },
+      { freq: 5200, q: 0.8, gainDb: -1 + texture * 6 },
+    ],
+    reverbSend: clamp01(0.2 + space * 0.6),
+    drive: clamp01(0.15 + drive * 0.6),
+    energy,
+  };
+};
+
+const buildImpulseResponse = (
+  ctx: AudioContext,
+  durationSec = 1.2,
+  decay = 2.5,
+): AudioBuffer => {
+  const length = Math.max(1, Math.floor(ctx.sampleRate * durationSec));
+  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+  for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+    const data = impulse.getChannelData(channel);
+    for (let i = 0; i < length; i += 1) {
+      const t = i / length;
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+    }
+  }
+  return impulse;
+};
+
+const buildSaturationCurve = (amount: number, samples = 1024): Float32Array => {
+  const curve = new Float32Array(samples);
+  const k = 1 + amount * 20;
+  for (let i = 0; i < samples; i += 1) {
+    const x = (i * 2) / (samples - 1) - 1;
+    curve[i] = Math.tanh(k * x);
+  }
+  return curve;
+};
+
+const createMacroFxChain = (ctx: AudioContext): MacroFxChain => {
+  const input = ctx.createGain();
+  const low = ctx.createBiquadFilter();
+  low.type = "lowshelf";
+  low.frequency.value = 110;
+  low.Q.value = 0.9;
+  const mid = ctx.createBiquadFilter();
+  mid.type = "peaking";
+  mid.frequency.value = 820;
+  mid.Q.value = 1.1;
+  const high = ctx.createBiquadFilter();
+  high.type = "highshelf";
+  high.frequency.value = 5200;
+  high.Q.value = 0.8;
+  const drive = ctx.createGain();
+  const shaper = ctx.createWaveShaper();
+  shaper.oversample = "2x";
+  const output = ctx.createGain();
+  input.connect(low);
+  low.connect(mid);
+  mid.connect(high);
+  high.connect(drive);
+  drive.connect(shaper);
+  shaper.connect(output);
+
+  const reverbSend = ctx.createGain();
+  const convolver = ctx.createConvolver();
+  convolver.normalize = true;
+  convolver.buffer = buildImpulseResponse(ctx);
+  const reverbReturn = ctx.createGain();
+  shaper.connect(reverbSend);
+  reverbSend.connect(convolver);
+  convolver.connect(reverbReturn);
+  reverbReturn.connect(output);
+
+  return {
+    input,
+    output,
+    low,
+    mid,
+    high,
+    drive,
+    shaper,
+    reverbSend,
+    reverbReturn,
+    convolver,
+  };
+};
+
+const applyMacroFxProfile = (
+  chain: MacroFxChain,
+  profile: MacroFxProfile,
+  ctx: AudioContext,
+) => {
+  const [low, mid, high] = profile.eq;
+  chain.low.frequency.setTargetAtTime(low.freq, ctx.currentTime, 0.05);
+  chain.low.Q.setTargetAtTime(low.q, ctx.currentTime, 0.05);
+  chain.low.gain.setTargetAtTime(low.gainDb, ctx.currentTime, 0.05);
+  chain.mid.frequency.setTargetAtTime(mid.freq, ctx.currentTime, 0.05);
+  chain.mid.Q.setTargetAtTime(mid.q, ctx.currentTime, 0.05);
+  chain.mid.gain.setTargetAtTime(mid.gainDb, ctx.currentTime, 0.05);
+  chain.high.frequency.setTargetAtTime(high.freq, ctx.currentTime, 0.05);
+  chain.high.Q.setTargetAtTime(high.q, ctx.currentTime, 0.05);
+  chain.high.gain.setTargetAtTime(high.gainDb, ctx.currentTime, 0.05);
+
+  chain.drive.gain.setTargetAtTime(
+    clamp(0.7 + profile.drive * 1.2, 0.5, 2),
+    ctx.currentTime,
+    0.05,
+  );
+  chain.shaper.curve = buildSaturationCurve(profile.drive);
+  chain.reverbSend.gain.setTargetAtTime(
+    clamp(profile.reverbSend * 0.6, 0, 0.8),
+    ctx.currentTime,
+    0.08,
+  );
+  chain.output.gain.setTargetAtTime(
+    clamp(0.85 + profile.energy * 0.3, 0.7, 1.2),
+    ctx.currentTime,
+    0.08,
+  );
+};
 
 const DEFAULT_INTENT_TIME_SIG = "4/4";
 
@@ -383,6 +541,21 @@ const formatTime = (value: number): string => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
+const formatTimestamp = (value?: number) => {
+  if (!Number.isFinite(value)) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString();
+};
+
+const formatHashShort = (value?: string) =>
+  value && value.length > 10 ? `${value.slice(0, 8)}…` : value ?? "--";
+
+const formatPercent = (value?: number) =>
+  typeof value === "number" && Number.isFinite(value)
+    ? `${Math.round(clamp01(value) * 100)}%`
+    : "--";
+
 const formatIsoDate = (value?: number): string | null => {
   if (!value || !Number.isFinite(value)) return null;
   const date = new Date(value);
@@ -600,6 +773,143 @@ const buildMacroCoverRequest = (params: {
     coverRequest.tempo = params.tempo;
   }
   return coverRequest;
+};
+
+type EditionNode = {
+  recipe: NoisegenRecipe;
+  children: EditionNode[];
+};
+
+const buildEditionTree = (recipes: NoisegenRecipe[]): EditionNode[] => {
+  const nodes = new Map<string, EditionNode>();
+  recipes.forEach((recipe) => {
+    nodes.set(recipe.id, { recipe, children: [] });
+  });
+  const roots: EditionNode[] = [];
+  recipes.forEach((recipe) => {
+    const node = nodes.get(recipe.id);
+    if (!node) return;
+    const parentId = recipe.parentId?.trim();
+    const parentNode = parentId ? nodes.get(parentId) : undefined;
+    if (parentNode) {
+      parentNode.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  const sortNodes = (items: EditionNode[]) => {
+    items.sort(
+      (left, right) => (right.recipe.updatedAt ?? 0) - (left.recipe.updatedAt ?? 0),
+    );
+    items.forEach((item) => sortNodes(item.children));
+  };
+  sortNodes(roots);
+  return roots;
+};
+
+const summarizeEditionDelta = (
+  child: NoisegenRecipe,
+  parent?: NoisegenRecipe | null,
+): string[] => {
+  if (!parent) return [];
+  const deltas: string[] = [];
+  const childReq = child.coverRequest;
+  const parentReq = parent.coverRequest;
+  const diff = (a?: number, b?: number) => (a ?? 0) - (b ?? 0);
+  const pushDelta = (label: string, value: number, threshold = 0.05) => {
+    if (Math.abs(value) < threshold) return;
+    const sign = value > 0 ? "+" : "";
+    deltas.push(`${label} ${sign}${value.toFixed(2)}`);
+  };
+  pushDelta("sample", diff(childReq.sampleInfluence, parentReq.sampleInfluence));
+  pushDelta("style", diff(childReq.styleInfluence, parentReq.styleInfluence));
+  pushDelta("weird", diff(childReq.weirdness, parentReq.weirdness));
+  if (childReq.kbTexture !== parentReq.kbTexture) {
+    deltas.push("texture");
+  }
+  const childTempo = childReq.tempo;
+  const parentTempo = parentReq.tempo;
+  if (
+    childTempo?.bpm !== parentTempo?.bpm ||
+    childTempo?.timeSig !== parentTempo?.timeSig
+  ) {
+    deltas.push("tempo");
+  }
+  const childPlan = childReq.renderPlan;
+  const parentPlan = parentReq.renderPlan;
+  if (Boolean(childPlan) !== Boolean(parentPlan)) {
+    deltas.push("plan");
+  } else if (childPlan && parentPlan) {
+    if ((childPlan.windows?.length ?? 0) !== (parentPlan.windows?.length ?? 0)) {
+      deltas.push("plan");
+    }
+  }
+  return deltas.slice(0, 4);
+};
+
+const resolveMoodVector = (recipe: NoisegenRecipe) => ({
+  sample: clamp01(recipe.coverRequest.sampleInfluence ?? 0),
+  style: clamp01(recipe.coverRequest.styleInfluence ?? 0),
+  weird: clamp01(recipe.coverRequest.weirdness ?? 0),
+});
+
+const summarizeMoodDelta = (
+  child: NoisegenRecipe,
+  parent?: NoisegenRecipe | null,
+): string[] => {
+  if (!parent) return [];
+  const childMood = resolveMoodVector(child);
+  const parentMood = resolveMoodVector(parent);
+  const deltas: string[] = [];
+  const pushDelta = (label: string, value: number, threshold = 0.03) => {
+    if (!Number.isFinite(value) || Math.abs(value) < threshold) return;
+    const sign = value > 0 ? "+" : "";
+    deltas.push(`${label} ${sign}${value.toFixed(2)}`);
+  };
+  pushDelta("sample", childMood.sample - parentMood.sample);
+  pushDelta("style", childMood.style - parentMood.style);
+  pushDelta("weird", childMood.weird - parentMood.weird);
+  return deltas.slice(0, 4);
+};
+
+const buildReceiptChips = (receipt?: EditionReceipt) => {
+  if (!receipt) return [];
+  const chips: string[] = [];
+  if (receipt.contract?.hash) {
+    chips.push(`Contract ${formatHashShort(receipt.contract.hash)}`);
+  }
+  if (receipt.contract?.intentSimilarity != null) {
+    chips.push(`Intent ${formatPercent(receipt.contract.intentSimilarity)}`);
+  }
+  if (receipt.contract?.violations?.length) {
+    const count = receipt.contract.violations.length;
+    chips.push(`${count} violation${count === 1 ? "" : "s"}`);
+  }
+  if (receipt.ideology?.rootId) {
+    chips.push(`Ideology ${receipt.ideology.rootId}`);
+  }
+  if (receipt.ideology?.treeVersion != null) {
+    chips.push(`Tree v${receipt.ideology.treeVersion}`);
+  }
+  if (receipt.ideology?.allowedNodeIds?.length) {
+    chips.push(`${receipt.ideology.allowedNodeIds.length} nodes`);
+  }
+  if (receipt.provenance?.pulse?.source) {
+    chips.push(`Pulse ${receipt.provenance.pulse.source}`);
+  }
+  if (receipt.provenance?.placePrecision) {
+    chips.push(`Place ${receipt.provenance.placePrecision}`);
+  }
+  if (receipt.tools?.plannerVersion) {
+    chips.push(`Planner ${receipt.tools.plannerVersion}`);
+  }
+  if (receipt.tools?.modelVersion) {
+    chips.push(`Model ${receipt.tools.modelVersion}`);
+  }
+  if (receipt.tools?.toolVersions) {
+    chips.push(`Tools ${Object.keys(receipt.tools.toolVersions).length}`);
+  }
+  return chips;
 };
 
 const buildNodeTokens = (node: {
@@ -834,6 +1144,10 @@ export function OriginalsPlayer({
   const [recipeName, setRecipeName] = useState("");
   const [recipeNotes, setRecipeNotes] = useState("");
   const [recipeSaving, setRecipeSaving] = useState(false);
+  const [editionRecipes, setEditionRecipes] = useState<NoisegenRecipe[]>([]);
+  const [editionLoading, setEditionLoading] = useState(false);
+  const [editionError, setEditionError] = useState<string | null>(null);
+  const [selectedEditionId, setSelectedEditionId] = useState<string | null>(null);
   const [lyricsEditorOpen, setLyricsEditorOpen] = useState(false);
   const [lyricsDraft, setLyricsDraft] = useState("");
   const [lyricsSaving, setLyricsSaving] = useState(false);
@@ -860,6 +1174,10 @@ export function OriginalsPlayer({
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
+  const macroFxRef = useRef<MacroFxChain | null>(null);
+  const elementSourceRef = useRef<Map<string, MediaElementAudioSourceNode>>(
+    new Map(),
+  );
   const buffersRef = useRef<Record<string, AudioBuffer | null>>({});
   const activeSourcesRef = useRef<SourceHandle[]>([]);
   const startAtRef = useRef<number | null>(null);
@@ -1012,6 +1330,39 @@ export function OriginalsPlayer({
   }, [original?.id, stopPlayback]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!original) {
+      setEditionRecipes([]);
+      setEditionLoading(false);
+      setEditionError(null);
+      return undefined;
+    }
+    const loadEditions = async () => {
+      setEditionLoading(true);
+      setEditionError(null);
+      try {
+        const records = await fetchRecipes();
+        if (cancelled) return;
+        const filtered = (records ?? []).filter(
+          (entry) => entry.originalId === original.id,
+        );
+        setEditionRecipes(filtered);
+      } catch (error) {
+        if (cancelled) return;
+        setEditionError(
+          error instanceof Error ? error.message : "Failed to load editions.",
+        );
+      } finally {
+        if (!cancelled) setEditionLoading(false);
+      }
+    };
+    void loadEditions();
+    return () => {
+      cancelled = true;
+    };
+  }, [original?.id]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem(
@@ -1022,13 +1373,6 @@ export function OriginalsPlayer({
       // best-effort persistence only
     }
   }, [listenerMacros]);
-
-  useEffect(
-    () => () => {
-      releaseAudioFocus(playerIdRef.current);
-    },
-    [releaseAudioFocus],
-  );
 
   const ensureAudioContext = useCallback(async () => {
     if (typeof window === "undefined") return null;
@@ -1047,6 +1391,61 @@ export function OriginalsPlayer({
     }
     return ctx;
   }, []);
+
+  const ensureMacroFxChain = useCallback(async () => {
+    const ctx = await ensureAudioContext();
+    if (!ctx || !masterGainRef.current) return null;
+    let chain = macroFxRef.current;
+    if (!chain) {
+      chain = createMacroFxChain(ctx);
+      chain.output.connect(masterGainRef.current);
+      macroFxRef.current = chain;
+    }
+    return chain;
+  }, [ensureAudioContext]);
+
+  useEffect(() => {
+    const ctx = audioContextRef.current;
+    const chain = macroFxRef.current;
+    if (ctx && chain) {
+      applyMacroFxProfile(chain, buildMacroFxProfile(listenerMacros), ctx);
+      return;
+    }
+    if (!isPlaying) return;
+    let canceled = false;
+    const sync = async () => {
+      const fx = await ensureMacroFxChain();
+      if (canceled) return;
+      const activeCtx = audioContextRef.current;
+      if (fx && activeCtx) {
+        applyMacroFxProfile(fx, buildMacroFxProfile(listenerMacros), activeCtx);
+      }
+    };
+    void sync();
+    return () => {
+      canceled = true;
+    };
+  }, [ensureMacroFxChain, isPlaying, listenerMacros]);
+
+  useEffect(
+    () => () => {
+      releaseAudioFocus(playerIdRef.current);
+    },
+    [releaseAudioFocus],
+  );
+
+  const attachElementToMacroFx = useCallback(
+    async (id: string, audio: HTMLAudioElement) => {
+      const chain = await ensureMacroFxChain();
+      const ctx = audioContextRef.current;
+      if (!chain || !ctx) return;
+      if (elementSourceRef.current.has(id)) return;
+      const source = ctx.createMediaElementSource(audio);
+      source.connect(chain.input);
+      elementSourceRef.current.set(id, source);
+    },
+    [ensureMacroFxChain],
+  );
 
   const pausePlayback = useCallback(() => {
     if (
@@ -1209,7 +1608,7 @@ export function OriginalsPlayer({
       const playbackKey = "playback";
       const audio = new Audio();
       audio.preload = "metadata";
-      audio.volume = volume;
+      audio.volume = macroFxRef.current ? 1 : volume;
       let currentIndex = 0;
 
       const setPlaybackSource = (index: number) => {
@@ -1260,6 +1659,7 @@ export function OriginalsPlayer({
       audio.addEventListener("ended", handleEnded);
       audio.addEventListener("error", handleError);
       setPlaybackSource(currentIndex);
+      void attachElementToMacroFx(playbackKey, audio);
 
       handlers.set(playbackKey, {
         loaded: handleLoaded,
@@ -1273,7 +1673,7 @@ export function OriginalsPlayer({
         const audio = new Audio();
         audio.preload = "metadata";
         audio.src = source.url;
-        audio.volume = volume;
+        audio.volume = macroFxRef.current ? 1 : volume;
 
         const handleLoaded = () => {
           if (cancelled) return;
@@ -1314,6 +1714,7 @@ export function OriginalsPlayer({
         audio.addEventListener("ended", handleEnded);
         audio.addEventListener("error", handleError);
         audio.load();
+        void attachElementToMacroFx(source.id, audio);
 
         handlers.set(source.id, {
           loaded: handleLoaded,
@@ -1345,6 +1746,15 @@ export function OriginalsPlayer({
         }
         audio.pause();
         audio.src = "";
+        const node = elementSourceRef.current.get(id);
+        if (node) {
+          try {
+            node.disconnect();
+          } catch {
+            // ignore disconnect failures
+          }
+          elementSourceRef.current.delete(id);
+        }
       });
       if (
         audioElementRef.current &&
@@ -1354,9 +1764,22 @@ export function OriginalsPlayer({
       }
       audioElementsRef.current.clear();
     };
-  }, [sources, sourceMode, useElementPlayback]);
+  }, [attachElementToMacroFx, sources, sourceMode, useElementPlayback]);
 
   useEffect(() => {
+    const ctx = audioContextRef.current;
+    const gain = masterGainRef.current;
+    if (ctx && gain && macroFxRef.current) {
+      gain.gain.setTargetAtTime(volume, ctx.currentTime, 0.01);
+      if (audioElementsRef.current.size) {
+        audioElementsRef.current.forEach((audio) => {
+          audio.volume = 1;
+        });
+      } else if (audioElementRef.current) {
+        audioElementRef.current.volume = 1;
+      }
+      return;
+    }
     if (audioElementsRef.current.size) {
       audioElementsRef.current.forEach((audio) => {
         audio.volume = volume;
@@ -1367,8 +1790,6 @@ export function OriginalsPlayer({
       audioElementRef.current.volume = volume;
       return;
     }
-    const ctx = audioContextRef.current;
-    const gain = masterGainRef.current;
     if (!ctx || !gain) return;
     gain.gain.setTargetAtTime(volume, ctx.currentTime, 0.01);
   }, [volume]);
@@ -1445,6 +1866,11 @@ export function OriginalsPlayer({
       stopPlayback();
 
       if (audioElementsRef.current.size || audioElementRef.current) {
+        const fx = await ensureMacroFxChain();
+        const ctx = audioContextRef.current;
+        if (fx && ctx) {
+          applyMacroFxProfile(fx, buildMacroFxProfile(listenerMacros), ctx);
+        }
         const elements = audioElementsRef.current.size
           ? Array.from(audioElementsRef.current.values())
           : audioElementRef.current
@@ -1478,6 +1904,10 @@ export function OriginalsPlayer({
 
       const ctx = await ensureAudioContext();
       if (!ctx) return;
+      const fx = await ensureMacroFxChain();
+      if (fx) {
+        applyMacroFxProfile(fx, buildMacroFxProfile(listenerMacros), ctx);
+      }
       let gain = masterGainRef.current;
       if (!gain) {
         gain = ctx.createGain();
@@ -1485,6 +1915,7 @@ export function OriginalsPlayer({
         masterGainRef.current = gain;
       }
       gain.gain.setValueAtTime(volume, ctx.currentTime);
+      const destination = fx?.input ?? gain;
       const startAt = ctx.currentTime + 0.05;
       const handles: SourceHandle[] = [];
       let longest = duration;
@@ -1499,7 +1930,7 @@ export function OriginalsPlayer({
         if (buffer.duration === 0 || startOffset >= buffer.duration) continue;
         const node = ctx.createBufferSource();
         node.buffer = buffer;
-        node.connect(gain);
+        node.connect(destination);
         node.start(startAt, startOffset);
         handles.push({ id: source.id, source: node });
         longest = Math.max(longest, buffer.duration);
@@ -1517,6 +1948,8 @@ export function OriginalsPlayer({
     [
       duration,
       ensureAudioContext,
+      ensureMacroFxChain,
+      listenerMacros,
       resolvePlayError,
       sources,
       startRaf,
@@ -1531,6 +1964,10 @@ export function OriginalsPlayer({
       const ctx = await ensureAudioContext();
       if (!ctx) return;
       stopWebAudioSources();
+      const fx = await ensureMacroFxChain();
+      if (fx) {
+        applyMacroFxProfile(fx, buildMacroFxProfile(listenerMacros), ctx);
+      }
       let master = masterGainRef.current;
       if (!master) {
         master = ctx.createGain();
@@ -1538,6 +1975,7 @@ export function OriginalsPlayer({
         masterGainRef.current = master;
       }
       master.gain.setValueAtTime(volume, ctx.currentTime);
+      const destination = fx?.input ?? master;
       const startAt = ctx.currentTime + 0.02;
       const handles: SourceHandle[] = [];
       const gains = new Map<string, GainNode>();
@@ -1557,7 +1995,7 @@ export function OriginalsPlayer({
         } else {
           groupGain.gain.setValueAtTime(targetGain, ctx.currentTime);
         }
-        groupGain.connect(master);
+        groupGain.connect(destination);
         const node = ctx.createBufferSource();
         node.buffer = buffer;
         node.connect(groupGain);
@@ -1580,7 +2018,15 @@ export function OriginalsPlayer({
       setRemixStatus("active");
       startRaf();
     },
-    [ensureAudioContext, remixGroups, startRaf, stopWebAudioSources, volume],
+    [
+      ensureAudioContext,
+      ensureMacroFxChain,
+      listenerMacros,
+      remixGroups,
+      startRaf,
+      stopWebAudioSources,
+      volume,
+    ],
   );
 
   const activateRemix = useCallback(async () => {
@@ -2266,11 +2712,16 @@ export function OriginalsPlayer({
     });
     setRecipeSaving(true);
     try {
-      await saveRecipe({
+      const saved = await saveRecipe({
         name,
         coverRequest,
         notes: recipeNotes.trim() || undefined,
       });
+      setEditionRecipes((prev) => {
+        const filtered = prev.filter((entry) => entry.id !== saved.id);
+        return [saved, ...filtered];
+      });
+      setSelectedEditionId(saved.id);
       setRecipeName("");
       setRecipeNotes("");
       setRecipeOpen(false);
@@ -2337,6 +2788,41 @@ export function OriginalsPlayer({
       : remixReady
         ? "Remix ready"
         : "Remix";
+  const featuredEditions = useMemo(() => {
+    return editionRecipes
+      .filter((recipe) => recipe.featured)
+      .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0));
+  }, [editionRecipes]);
+  const editionById = useMemo(() => {
+    return new Map(editionRecipes.map((recipe) => [recipe.id, recipe]));
+  }, [editionRecipes]);
+  const editionTree = useMemo(
+    () => buildEditionTree(editionRecipes),
+    [editionRecipes],
+  );
+  const selectedEdition = useMemo(() => {
+    if (selectedEditionId) {
+      const match = editionById.get(selectedEditionId);
+      if (match) return match;
+    }
+    return featuredEditions[0] ?? editionRecipes[0] ?? null;
+  }, [editionById, editionRecipes, featuredEditions, selectedEditionId]);
+  const selectedEditionParent = useMemo(() => {
+    if (!selectedEdition?.parentId) return null;
+    return editionById.get(selectedEdition.parentId) ?? null;
+  }, [editionById, selectedEdition]);
+  const selectedEditionPlanDeltas = useMemo(() => {
+    if (!selectedEdition) return [];
+    return summarizeEditionDelta(selectedEdition, selectedEditionParent);
+  }, [selectedEdition, selectedEditionParent]);
+  const selectedEditionMoodDeltas = useMemo(() => {
+    if (!selectedEdition) return [];
+    return summarizeMoodDelta(selectedEdition, selectedEditionParent);
+  }, [selectedEdition, selectedEditionParent]);
+  const selectedReceiptChips = useMemo(
+    () => buildReceiptChips(selectedEdition?.receipt),
+    [selectedEdition?.receipt],
+  );
   const intentContract = details?.intentContract;
   const intentSummary = useMemo(() => {
     if (!intentContract) return null;
@@ -2797,6 +3283,89 @@ export function OriginalsPlayer({
   );
 
   useEffect(() => {
+    if (!editionRecipes.length) {
+      if (selectedEditionId) {
+        setSelectedEditionId(null);
+      }
+      return;
+    }
+    if (
+      selectedEditionId &&
+      editionRecipes.some((entry) => entry.id === selectedEditionId)
+    ) {
+      return;
+    }
+    const nextId = featuredEditions[0]?.id ?? editionRecipes[0]?.id ?? null;
+    setSelectedEditionId(nextId);
+  }, [editionRecipes, featuredEditions, selectedEditionId]);
+
+  const renderEditionNode = (node: EditionNode, depth = 0) => {
+    const parent = node.recipe.parentId
+      ? editionById.get(node.recipe.parentId)
+      : null;
+    const planDeltas = summarizeEditionDelta(node.recipe, parent);
+    const moodDeltas = summarizeMoodDelta(node.recipe, parent);
+    const idiLabel = formatPercent(node.recipe.metrics?.idi);
+    const intentLabel = formatPercent(
+      node.recipe.receipt?.contract?.intentSimilarity,
+    );
+    const isSelected = selectedEdition?.id === node.recipe.id;
+    return (
+      <div key={node.recipe.id} style={{ marginLeft: depth * 14 }}>
+        <div
+          className={cn(
+            "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm",
+            isSelected && "border-sky-400/60 bg-sky-500/10",
+          )}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-100">
+                {node.recipe.name}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {formatTimestamp(node.recipe.updatedAt)}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {node.recipe.featured ? (
+                <Badge
+                  variant="secondary"
+                  className="bg-amber-500/20 text-amber-100"
+                >
+                  Featured
+                </Badge>
+              ) : null}
+              <Button
+                size="sm"
+                variant={isSelected ? "secondary" : "outline"}
+                onClick={() => setSelectedEditionId(node.recipe.id)}
+              >
+                {isSelected ? "Selected" : "Select"}
+              </Button>
+            </div>
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400">
+            Plan Δ: {planDeltas.length ? planDeltas.join(", ") : "--"}
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Mood Δ: {moodDeltas.length ? moodDeltas.join(", ") : "--"}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-slate-400">
+            <span>IDI {idiLabel}</span>
+            <span>Intent {intentLabel}</span>
+          </div>
+        </div>
+        {node.children.length ? (
+          <div className="mt-2 space-y-2">
+            {node.children.map((child) => renderEditionNode(child, depth + 1))}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  useEffect(() => {
     if (!original) {
       setAutoPlayPending(false);
       return;
@@ -2989,6 +3558,168 @@ export function OriginalsPlayer({
           </>
         ) : null}
 
+        {editionLoading || editionError || editionRecipes.length ? (
+          <div className="rounded-xl border border-border/60 bg-slate-950/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                Editions
+              </div>
+              {editionLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading editions
+                </div>
+              ) : null}
+            </div>
+            {editionError ? (
+              <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                {editionError}
+              </div>
+            ) : null}
+            {!editionLoading && !editionRecipes.length ? (
+              <div className="mt-2 text-xs text-muted-foreground">
+                No editions saved yet.
+              </div>
+            ) : editionRecipes.length ? (
+              <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                      Official Editions
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {featuredEditions.length ? (
+                        featuredEditions.map((recipe) => {
+                          const isSelected = selectedEdition?.id === recipe.id;
+                          return (
+                            <div
+                              key={recipe.id}
+                              className={cn(
+                                "flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2",
+                                isSelected && "border-sky-400/60 bg-sky-500/10",
+                              )}
+                            >
+                              <div>
+                                <div className="text-[11px] font-semibold text-slate-100">
+                                  {recipe.name}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {formatTimestamp(recipe.updatedAt)}
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant={isSelected ? "secondary" : "outline"}
+                                onClick={() => setSelectedEditionId(recipe.id)}
+                              >
+                                {isSelected ? "Selected" : "Select"}
+                              </Button>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-[11px] text-slate-500">
+                          No featured editions yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                      Lineage
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {editionTree.length ? (
+                        editionTree.map((node) => renderEditionNode(node, 0))
+                      ) : (
+                        <div className="text-[11px] text-slate-500">
+                          No lineage captured yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-slate-400">
+                    <span>Receipts</span>
+                    {selectedEdition?.receipt?.createdAt ? (
+                      <span className="text-[10px] text-slate-500">
+                        {formatTimestamp(selectedEdition.receipt.createdAt)}
+                      </span>
+                    ) : null}
+                  </div>
+                  {selectedEdition ? (
+                    <>
+                      <div className="mt-2 text-xs font-semibold text-slate-100">
+                        {selectedEdition.name}
+                      </div>
+                      {selectedReceiptChips.length ? (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {selectedReceiptChips.map((chip) => (
+                            <Badge
+                              key={`${selectedEdition.id}-${chip}`}
+                              variant="secondary"
+                              className="bg-slate-800/80 text-slate-200"
+                            >
+                              {chip}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-[11px] text-slate-500">
+                          Receipt recorded.
+                        </div>
+                      )}
+                      <div className="mt-2 text-[11px] text-slate-400">
+                        Plan Δ:{" "}
+                        {selectedEditionPlanDeltas.length
+                          ? selectedEditionPlanDeltas.join(", ")
+                          : "--"}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Mood Δ:{" "}
+                        {selectedEditionMoodDeltas.length
+                          ? selectedEditionMoodDeltas.join(", ")
+                          : "--"}
+                      </div>
+                      <div className="mt-2 grid gap-1 text-[11px] text-slate-400">
+                        <div>IDI {formatPercent(selectedEdition.metrics?.idi)}</div>
+                        <div>
+                          Intent{" "}
+                          {formatPercent(
+                            selectedEdition.receipt?.contract?.intentSimilarity,
+                          )}
+                        </div>
+                        {selectedEdition.receipt?.contract?.hash ? (
+                          <div>
+                            Contract {formatHashShort(selectedEdition.receipt.contract.hash)}
+                          </div>
+                        ) : null}
+                        {selectedEdition.receipt?.ideology?.mappingHash ? (
+                          <div>
+                            Ideology {formatHashShort(selectedEdition.receipt.ideology.mappingHash)}
+                          </div>
+                        ) : null}
+                        {selectedEdition.receipt?.provenance?.pulse?.valueHash ? (
+                          <div>
+                            Pulse {formatHashShort(selectedEdition.receipt.provenance.pulse.valueHash)}
+                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-2 text-[11px] text-slate-500">
+                      Select an edition to view receipts.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {canRemix ? (
           <div className="flex flex-wrap items-center gap-3">
             <Button
@@ -3104,14 +3835,14 @@ export function OriginalsPlayer({
       ) : null}
 
       <Drawer open={showLyricsDrawer} onOpenChange={setLyricsOpen}>
-        <DrawerContent className="bg-slate-950 text-slate-100">
-          <DrawerHeader>
+        <DrawerContent className="flex max-h-[92vh] flex-col bg-slate-950 text-slate-100">
+          <DrawerHeader className="shrink-0">
             <DrawerTitle>Lyrics &amp; Meaning</DrawerTitle>
             <p className="text-xs text-slate-400">
               Playback is a lens for context, values, and provenance.
             </p>
           </DrawerHeader>
-          <div className="px-4 pb-6">
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               {timeSkyPopover}
               {intentContractPopover}
