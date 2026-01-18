@@ -369,9 +369,30 @@ export type UploadOriginalOptions = {
   onProgress?: (progress: UploadProgress) => void;
 };
 
-const buildUploadErrorMessage = (status: number, responseText: string, statusText: string) => {
+const buildUploadErrorMessage = (
+  status: number,
+  response: unknown,
+  responseText: string,
+  statusText: string,
+) => {
+  const responseMessage = (() => {
+    if (response && typeof response === "object") {
+      const record = response as Record<string, unknown>;
+      const message =
+        typeof record.message === "string" ? record.message.trim() : "";
+      const error =
+        typeof record.error === "string" ? record.error.trim() : "";
+      return message || error;
+    }
+    if (typeof response === "string" && response.trim()) {
+      return response.trim();
+    }
+    return responseText;
+  })();
   const rawMessage =
-    responseText || statusText || `Upload failed with status ${status ?? "unknown"}`;
+    responseMessage ||
+    statusText ||
+    `Upload failed with status ${status ?? "unknown"}`;
   const isTooLarge =
     status === 413 || rawMessage.toLowerCase().includes("request entity too large");
   return isTooLarge
@@ -441,7 +462,14 @@ export async function uploadOriginal(
         return;
       }
       reject(
-        new Error(buildUploadErrorMessage(xhr.status, xhr.responseText, xhr.statusText)),
+        new Error(
+          buildUploadErrorMessage(
+            xhr.status,
+            xhr.response,
+            xhr.responseText,
+            xhr.statusText,
+          ),
+        ),
       );
     };
 
@@ -524,7 +552,14 @@ export async function uploadOriginalChunk(
         return;
       }
       reject(
-        new Error(buildUploadErrorMessage(xhr.status, xhr.responseText, xhr.statusText)),
+        new Error(
+          buildUploadErrorMessage(
+            xhr.status,
+            xhr.response,
+            xhr.responseText,
+            xhr.statusText,
+          ),
+        ),
       );
     };
 

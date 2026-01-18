@@ -4014,8 +4014,11 @@ router.post(
     const vocal = files?.vocal?.[0];
     const stems = files?.stems ?? [];
     const intentFile = files?.intent?.[0];
-    if (!instrumental && stems.length === 0) {
-      return res.status(400).json({ error: "instrumental_or_stems_required" });
+    const hasUploads = Boolean(
+      instrumental || vocal || stems.length > 0 || intentFile,
+    );
+    if (!hasUploads) {
+      return res.status(400).json({ error: "files_required" });
     }
 
     const stemCategoriesRaw = readStringField(req.body?.stemCategories);

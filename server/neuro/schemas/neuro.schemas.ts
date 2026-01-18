@@ -53,6 +53,9 @@ export interface NeuroState {
   gamma_sync_z?: number;
   gamma_sync_null_mean?: number;
   gamma_sync_null_std?: number;
+  gamma_baseline_ready?: number;
+  gamma_baseline_progress?: number;
+  gamma_baseline_count?: number;
   gamma_artifact_pass?: number;
   gamma_emg_plv?: number;
   gamma_emg_burst_ratio?: number;

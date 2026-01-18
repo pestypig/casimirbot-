@@ -1517,3 +1517,109 @@ Deterministic Fixtures Across Pipelines - Status: complete
 - Do: add minimal fixtures + expected hashes for key GR/lattice paths and validate in tests.
 - Do not: add heavy datasets that slow CI.
 - Acceptance: fixtures catch regressions with stable hash checks.
+
+## Neuro Coherence Gate Status (from receipts)
+
+According to the build receipts you pasted, you do now have an end-to-end engineering/control loop that can legitimately be called "integrated":
+raw frames -> gamma phase-locking (not power) -> artifact veto -> equilibrium boolean + timer -> governor blocks/permits commit -> UI shows why -> harness regresses it.
+
+That said, there are still some "not done yet" items - mostly production hardening + real-world validation, and (separately) the literal Orch-OR/DP physics layer.
+
+### What is already complete (engineering MVP)
+- A real stability signal exists: PLV-based gamma synchrony + surrogate/null -> gamma_sync_z, plus phase_dispersion, plus gamma_artifact_pass veto.
+- Equilibrium is operational: explicit thresholds + hold timer are implemented and surfaced.
+- The governor truly gates commit: collapse/commit is blocked unless equilibrium holds.
+- The integration seam is explicit: /api/neuro/features is the bridge into the star/telemetry loop.
+- Operator transparency exists: UI shows gamma_sync_z, equilibrium, thresholds, hold progress, artifacts.
+- There is at least a deterministic regression harness: baseline vs equilibrium-gated behavior is compared.
+
+So: for the "engineering/control system" version, the pipeline is functionally complete.
+
+### What is still not completed in the build
+1) Real-device runtime closure (still the biggest practical gap)
+- A live adapter that continuously posts actual running kernel outputs (gamma_sync_z, phase_dispersion, artifact flags) into the star loop at the correct cadence with timestamps and backpressure handling.
+- Notes repeatedly list this as a next step ("post NeurostateKernel outputs directly..."), which implies runtime streaming is not fully automated yet.
+- In progress: added a server-side neuro loop controller with /api/neuro/driver/select, /api/neuro/driver/stop, and /api/neuro/status plus a sim driver path and shared feature ingestion; still needs real device drivers and production backpressure guarantees.
+- Done when: you can plug in a real signal source, start the kernel, and watch the star snapshot update in real time without manual calls.
+
+2) Baseline persistence + calibration protocol (per-user/per-session)
+- Persist baseline across kernel restarts (session store).
+- Add a calibration phase (e.g., 60-120s eyes-open/eyes-closed + jaw clench artifact capture) that sets:
+  - null PLV distribution stability
+  - artifact thresholds
+  - reasonable R*/D*/T_hold for that person/device/montage
+- In progress: baseline store + warm-up gating (gammaBaselineMinCount) and /api/neuro/calibrate start/stop with summary export.
+- Done when: you can restart the kernel and keep comparable gamma_sync_z meaning, and you have a documented "calibrate then run" procedure.
+
+3) Artifact model is good but not complete (EMG is necessary, not sufficient)
+- Add EOG/blink/saccade handling, motion/electrode pop detection, and line noise/harmonics checks that do not bias gamma coherence.
+- Document reference strategy considerations (CAR vs Laplacian) because they change apparent synchrony.
+- Done when: typical movements/tasks do not cause false equilibrium.
+
+4) Volume conduction / "fake synchrony" mitigation (PLV limitation)
+- PLV can be sensitive to zero-lag coupling and shared sources.
+- Add a robust sync backend option (imaginary coherency or wPLI).
+- Done when: equilibrium is not trivially triggered by a shared reference/common noise source, or a robust sync mode is available in config.
+
+5) Timing/latency budget is not yet a spec (but it needs to be)
+- Window length, overlap, compute time per window, posting cadence to /api/neuro/features, governor decision cadence, end-to-end worst-case latency.
+- Done when: you can state "end-to-end equilibrium detection latency is <= X ms" and log/test it.
+
+6) CI / verification noise is unresolved
+- constraint-pack-telemetry-missing
+- occasional UV_HANDLE_CLOSING
+- "certificate hash not returned"
+- Done when: verification produces stable artifacts and does not need reruns to pass.
+
+7) Validation is still mostly simulated
+- Record real sessions, label outcomes, and show the gate improves metrics vs baseline across subjects and conditions.
+- Done when: evaluation reports show real benefit, not just sim benefit.
+
+8) SunPy "coherence collapse" stream needs empirical anchoring and separation of meaning
+- Ensure upstream cadence is sufficient to resolve 2-4 mHz phase (Nyquist wise).
+- Specify which alignment/entropy/phase_5min computations correspond to measurable helioseismic features.
+- Keep SunPy-derived collapse pressure as context, not an authority signal that overrides neuro equilibrium.
+
+### Additional research figures/spec targets to work within
+A) Neuro coherence / equilibrium markers
+- Gamma synchrony band: ~30-90 Hz coherent activity is the usual target in the literature.
+- 40 Hz anchor: 40 Hz period is ~25 ms, high gamma (80 Hz) period is ~12.5 ms.
+- The current T_hold_ms=100 implies ~4 cycles at 40 Hz, a reasonable stability rule of thumb.
+
+B) Phase-lock measurement (PLV + surrogates)
+- PLV + surrogate/null z-scores follow standard phase-locking methodology.
+- If targeting sub-100 ms responsiveness, ensure windowing + compute chain supports it.
+
+C) Robust synchrony metrics (volume conduction protection)
+- Imaginary coherency helps isolate interactions not explainable by instantaneous mixing.
+- wPLI is aimed at reducing spurious connectivity from volume conduction/noise/sample bias.
+- Offer a config switch: sync_metric = plv | imag_coh | wpli.
+
+D) Artifact constraints
+- EMG contamination is a major risk for gamma-band claims; keep gamma_artifact_pass as a hard veto.
+- Add artifact stress tests (jaw clench, talking, head turn) to keep the gate closed.
+
+E) Gamma burstiness
+- Gamma often appears in bursts rather than sustained sine waves.
+- Make equilibrium robust to burstiness by requiring stability across multiple overlapping windows or tracking burst density.
+
+F) Empirical examples of long-range gamma phase synchrony
+- Sustained gamma phase synchrony is reported in long-term meditators and in "communication through coherence" framing.
+- Treat phase coherence (not power) as the integration/ready-to-commit proxy, validated by task data.
+
+G) SunPy helioseismology anchors
+- Target the 2-4 mHz band (five-minute p-modes) for phase/energy features.
+- Expect low-degree p-mode peak spacing around 66-68 uHz.
+- A 3-sigma-ish threshold is a tuning start, not a theorem.
+
+### If you mean "complete" as physics-claim-ready Orch-OR/DP
+- By design, the build is not complete at that level yet.
+- A physics-claim-ready build needs experimental anchoring and models, not just software plumbing.
+
+### Practical definition-of-done checklist (engineering target)
+1) Live device driver + auto streaming into /api/neuro/features
+2) Calibration routine + baseline persistence
+3) Robust sync metric option (wPLI or imag coherency)
+4) Expanded artifact handling beyond EMG (EOG/motion/line noise)
+5) Latency budget + performance regression test
+6) Real-session evaluation report (gate improves flip-flops/error/calibration, not just sim)

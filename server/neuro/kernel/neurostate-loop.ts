@@ -34,6 +34,7 @@ export type NeuroKernelConfig = {
   gammaSurrogateSeed?: number;
   gammaMinSamples?: number;
   gammaBaselineAlpha?: number;
+  gammaBaselineMinCount?: number;
   gammaArtifactRequireEmg?: boolean;
   gammaArtifactEmgPlvMax?: number;
   gammaArtifactEmgBurstRatioMax?: number;
@@ -54,6 +55,7 @@ type ResolvedNeuroKernelConfig = {
   gammaSurrogateSeed?: number;
   gammaMinSamples: number;
   gammaBaselineAlpha: number;
+  gammaBaselineMinCount: number;
   gammaArtifactRequireEmg: boolean;
   gammaArtifactEmgPlvMax: number;
   gammaArtifactEmgBurstRatioMax: number;
@@ -96,6 +98,7 @@ const DEFAULT_CONFIG: ResolvedNeuroKernelConfig = {
   gammaSurrogateCount: 40,
   gammaMinSamples: 32,
   gammaBaselineAlpha: 0.2,
+  gammaBaselineMinCount: 0,
   gammaArtifactRequireEmg: false,
   gammaArtifactEmgPlvMax: 0.3,
   gammaArtifactEmgBurstRatioMax: 0.6,
@@ -362,6 +365,14 @@ export class NeurostateKernel {
     this.gammaBaseline = null;
   }
 
+  getGammaBaseline(): GammaPlvNullBaseline | null {
+    return this.gammaBaseline;
+  }
+
+  setGammaBaseline(next: GammaPlvNullBaseline | null): void {
+    this.gammaBaseline = next;
+  }
+
   tick(input: {
     stream: NeuroStreamKind;
     deviceId: string;
@@ -386,6 +397,25 @@ export class NeurostateKernel {
       config,
       lockStreak: this.lockStreak,
     });
+    const baselineGateEnabled = config.gammaBaselineMinCount > 0;
+    let gammaBaselineCount = this.gammaBaseline?.count ?? 0;
+    let gammaBaselineReady = !baselineGateEnabled;
+    let gammaBaselineProgress = baselineGateEnabled
+      ? clamp01(gammaBaselineCount / config.gammaBaselineMinCount)
+      : 1;
+    const updateBaselineState = () => {
+      gammaBaselineCount = this.gammaBaseline?.count ?? 0;
+      if (baselineGateEnabled) {
+        const denom = Math.max(1, config.gammaBaselineMinCount);
+        gammaBaselineProgress = clamp01(gammaBaselineCount / denom);
+        gammaBaselineReady = gammaBaselineCount >= config.gammaBaselineMinCount;
+      } else {
+        gammaBaselineReady = true;
+        gammaBaselineProgress = 1;
+      }
+    };
+    updateBaselineState();
+
     const gammaStats = computeGammaPlvFromWindowWithSurrogates(rawWindow, {
       bandHz: config.gammaBandHz,
       anchorHz: config.gammaAnchorHz,
@@ -400,24 +430,25 @@ export class NeurostateKernel {
         gammaStats,
         { alpha: config.gammaBaselineAlpha },
       );
+      updateBaselineState();
       const baseline =
         this.gammaBaseline ?? {
           mean: gammaStats.nullMean,
           std: gammaStats.nullStd,
           count: gammaStats.surrogateCount,
         };
-    const gammaSync = gammaStats.plv;
-    const gammaSyncZ = deriveGammaPlvZ(
-      gammaSync,
-      baseline.mean,
-      baseline.std,
-    );
-    const gammaValid =
-      gammaStats.channelCount >= 2 &&
-      gammaStats.sampleCount >= config.gammaMinSamples;
-    const gammaDispersion = gammaValid
-      ? clamp01(1 - gammaSync)
-      : undefined;
+      const gammaSync = gammaStats.plv;
+      const gammaSyncZ = deriveGammaPlvZ(
+        gammaSync,
+        baseline.mean,
+        baseline.std,
+      );
+      const gammaValid =
+        gammaStats.channelCount >= 2 &&
+        gammaStats.sampleCount >= config.gammaMinSamples;
+      const gammaDispersion = gammaValid
+        ? clamp01(1 - gammaSync)
+        : undefined;
       const coherence: Record<string, number> = {
         ...(result.state.coherence ?? {}),
         gamma_sync: gammaSync,
@@ -425,44 +456,78 @@ export class NeurostateKernel {
         gamma_sync_null_mean: baseline.mean,
         gamma_sync_null_std: baseline.std,
       };
-    if (gammaDispersion !== undefined) {
-      coherence.phase_dispersion = gammaDispersion;
-    }
+      if (gammaDispersion !== undefined) {
+        coherence.phase_dispersion = gammaDispersion;
+      }
       const summary: Record<string, number> = {
         ...result.state.summary,
         gamma_sync: gammaSync,
         gamma_sync_z: gammaSyncZ,
       };
-    if (gammaDispersion !== undefined) {
-      summary.phase_dispersion = gammaDispersion;
-    }
-    result.state = {
-      ...result.state,
-      phase_dispersion: gammaDispersion,
-      gamma_sync: gammaSync,
-      gamma_sync_z: gammaSyncZ,
-      gamma_sync_null_mean: baseline.mean,
-      gamma_sync_null_std: baseline.std,
-      coherence,
-      summary,
-    };
-    if (result.window) {
-      const features: Record<string, number> = {
-        ...result.window.features,
+      if (gammaDispersion !== undefined) {
+        summary.phase_dispersion = gammaDispersion;
+      }
+      result.state = {
+        ...result.state,
+        phase_dispersion: gammaDispersion,
         gamma_sync: gammaSync,
         gamma_sync_z: gammaSyncZ,
         gamma_sync_null_mean: baseline.mean,
         gamma_sync_null_std: baseline.std,
+        coherence,
+        summary,
       };
-      if (gammaDispersion !== undefined) {
-        features.phase_dispersion = gammaDispersion;
+      if (result.window) {
+        const features: Record<string, number> = {
+          ...result.window.features,
+          gamma_sync: gammaSync,
+          gamma_sync_z: gammaSyncZ,
+          gamma_sync_null_mean: baseline.mean,
+          gamma_sync_null_std: baseline.std,
+        };
+        if (gammaDispersion !== undefined) {
+          features.phase_dispersion = gammaDispersion;
+        }
+        result.window = {
+          ...result.window,
+          features,
+        };
       }
-      result.window = {
-        ...result.window,
-        features,
-      };
     }
-  }
+
+    if (baselineGateEnabled) {
+      const baselineReadyScore = gammaBaselineReady ? 1 : 0;
+      const artifactScores: Record<string, number> = {
+        ...result.state.artifactScores,
+        gamma_baseline_ready: baselineReadyScore,
+        gamma_baseline_progress: gammaBaselineProgress,
+      };
+      const summary: Record<string, number> = {
+        ...result.state.summary,
+        gamma_baseline_ready: baselineReadyScore,
+        gamma_baseline_progress: gammaBaselineProgress,
+        gamma_baseline_count: gammaBaselineCount,
+      };
+      result.state = {
+        ...result.state,
+        gamma_baseline_ready: baselineReadyScore,
+        gamma_baseline_progress: gammaBaselineProgress,
+        gamma_baseline_count: gammaBaselineCount,
+        artifactScores,
+        summary,
+      };
+      if (result.window) {
+        const artifacts: Record<string, number> = {
+          ...result.window.artifacts,
+          gamma_baseline_ready: baselineReadyScore,
+          gamma_baseline_progress: gammaBaselineProgress,
+        };
+        result.window = {
+          ...result.window,
+          artifacts,
+        };
+      }
+    }
     if (input.stream === "eeg") {
       const emgWindow = rawWindow
         ? this.buffer.getWindow({
@@ -477,16 +542,23 @@ export class NeurostateKernel {
         emgWindow,
         config,
       });
-      const gammaArtifactPass = gammaArtifact.pass ? 1 : 0;
+      const baselineGate = baselineGateEnabled && !gammaBaselineReady;
+      const gammaArtifactPass = gammaArtifact.pass && !baselineGate;
+      const gammaArtifactPassValue = gammaArtifactPass ? 1 : 0;
+      const gammaArtifactReason = !gammaArtifact.pass
+        ? gammaArtifact.reason ?? "gamma-artifact"
+        : baselineGate
+          ? "gamma-baseline"
+          : undefined;
       const emgGammaPlv = Number.isFinite(gammaArtifact.emgGammaPlv)
         ? (gammaArtifact.emgGammaPlv as number)
         : undefined;
-      const emgBurstRatio = Number.isFinite(gammaArtifact.emgBurstRatio)
+      const emgBurstRatio = Number.isFinite(gammaArtifact.emgBurstRatio)        
         ? (gammaArtifact.emgBurstRatio as number)
         : undefined;
       const artifactScores: Record<string, number> = {
         ...result.state.artifactScores,
-        gamma_artifact_pass: gammaArtifactPass,
+        gamma_artifact_pass: gammaArtifactPassValue,
       };
       if (emgGammaPlv !== undefined) {
         artifactScores.gamma_emg_plv = emgGammaPlv;
@@ -502,7 +574,7 @@ export class NeurostateKernel {
       }
       let summary: Record<string, number> = {
         ...result.state.summary,
-        gamma_artifact_pass: gammaArtifactPass,
+        gamma_artifact_pass: gammaArtifactPassValue,
       };
       if (emgGammaPlv !== undefined) {
         summary = {
@@ -516,7 +588,7 @@ export class NeurostateKernel {
           gamma_emg_burst_ratio: emgBurstRatio,
         };
       }
-      if (!gammaArtifact.pass) {
+      if (!gammaArtifactPass) {
         summary = {
           ...summary,
           lockStreak: 0,
@@ -524,7 +596,7 @@ export class NeurostateKernel {
       }
       result.state = {
         ...result.state,
-        gamma_artifact_pass: gammaArtifactPass,
+        gamma_artifact_pass: gammaArtifactPassValue,
         gamma_emg_plv: emgGammaPlv,
         gamma_emg_burst_ratio: emgBurstRatio,
         artifactScores,
@@ -534,7 +606,7 @@ export class NeurostateKernel {
       if (result.window) {
         const artifacts: Record<string, number> = {
           ...result.window.artifacts,
-          gamma_artifact_pass: gammaArtifactPass,
+          gamma_artifact_pass: gammaArtifactPassValue,
         };
         if (emgGammaPlv !== undefined) {
           artifacts.gamma_emg_plv = emgGammaPlv;
@@ -542,7 +614,7 @@ export class NeurostateKernel {
         if (emgBurstRatio !== undefined) {
           artifacts.gamma_emg_burst_ratio = emgBurstRatio;
         }
-        const quality = gammaArtifact.pass
+        const quality = gammaArtifactPass
           ? result.window.quality
           : { ...result.window.quality, confidence: 0 };
         result.window = {
@@ -551,13 +623,16 @@ export class NeurostateKernel {
           quality,
         };
       }
-      if (!gammaArtifact.pass) {
+      if (!gammaArtifactPass) {
         result.lockStreak = 0;
-        result.lockReason = gammaArtifact.reason ?? "gamma-artifact";
+        result.lockReason = gammaArtifactReason ?? "gamma-artifact";
         const residuals: Record<string, number> = {
           ...result.gate.residuals,
-          gamma_artifact_pass: gammaArtifactPass,
+          gamma_artifact_pass: gammaArtifactPassValue,
         };
+        if (baselineGateEnabled) {
+          residuals.gamma_baseline_ready = gammaBaselineReady ? 1 : 0;
+        }
         if (emgGammaPlv !== undefined) {
           residuals.gamma_emg_plv = emgGammaPlv;
         }
@@ -567,7 +642,7 @@ export class NeurostateKernel {
         result.gate = {
           status: "fail",
           residuals,
-          note: "gamma-artifact",
+          note: gammaArtifactReason ?? "gamma-artifact",
         };
         result.state = {
           ...result.state,
