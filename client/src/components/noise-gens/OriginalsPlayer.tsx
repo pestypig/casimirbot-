@@ -433,7 +433,7 @@ const buildIntentContractFromDraft = (
 };
 
 const MACROS_STORAGE_KEY = "noisegen:listenerMacros.v1";
-const MEANING_CACHE_PREFIX = "noisegen:meaning:v1";
+const MEANING_CACHE_PREFIX = "noisegen:meaning:v2";
 const FAIRNESS_BASELINE_IDS = [
   "worldview-integrity",
   "integrity-protocols",
