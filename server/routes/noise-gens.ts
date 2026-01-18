@@ -3356,6 +3356,11 @@ router.get("/api/noise-gens/originals/:id", async (req, res) => {
   const store = await getNoisegenStore();
   const original = findOriginalById(store, req.params.id ?? "");
   if (!original) {
+    console.warn("[noise-gens] original not found", {
+      id: req.params.id,
+      originals: store.originals.length,
+      pending: store.pendingOriginals.length,
+    });
     return res.status(404).json({ error: "not_found" });
   }
   const isPending = store.pendingOriginals.some(

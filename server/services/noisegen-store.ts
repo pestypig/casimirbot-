@@ -405,6 +405,28 @@ export const resolveNoisegenStoreBackend = (): NoisegenStoreBackend => {
   return raw === "db" ? "db" : "fs";
 };
 
+let sharedCatalogChecked = false;
+const enforceSharedNoisegenCatalog = (): void => {
+  if (sharedCatalogChecked) return;
+  const storageBackend = resolveNoisegenStorageBackend();
+  const storeBackend = resolveNoisegenStoreBackend();
+  if (process.env.NODE_ENV !== "production") {
+    if (storageBackend !== "replit" && storeBackend !== "db") {
+      console.warn(
+        "[noise-gens] shared catalog disabled; set NOISEGEN_STORAGE_BACKEND=replit or NOISEGEN_STORE_BACKEND=db for multi-instance deployments.",
+      );
+    }
+    sharedCatalogChecked = true;
+    return;
+  }
+  if (storageBackend !== "replit" && storeBackend !== "db") {
+    throw new Error(
+      "NOISEGEN_STORAGE_BACKEND=replit or NOISEGEN_STORE_BACKEND=db required for shared catalog in production.",
+    );
+  }
+  sharedCatalogChecked = true;
+};
+
 import type { Client as ReplitStorageClient } from "@replit/object-storage";
 
 let replitClientInstance: ReplitStorageClient | null = null;
@@ -1132,6 +1154,7 @@ const ensureDefaults = async (store: NoisegenStore): Promise<NoisegenStore> => {
 let writeQueue: Promise<NoisegenStore> = Promise.resolve(emptyStore());
 
 export const getNoisegenStore = async (): Promise<NoisegenStore> => {
+  enforceSharedNoisegenCatalog();
   const store = await readStore();
   const withDefaults = await ensureDefaults(store);
   const withPromotions = promotePendingOriginals(withDefaults);
@@ -1144,6 +1167,7 @@ export const getNoisegenStore = async (): Promise<NoisegenStore> => {
 export const updateNoisegenStore = async (
   updater: (store: NoisegenStore) => NoisegenStore | void,
 ): Promise<NoisegenStore> => {
+  enforceSharedNoisegenCatalog();
   let updated: NoisegenStore = emptyStore();
   writeQueue = writeQueue.then(async () => {
     const store = await readStore();
