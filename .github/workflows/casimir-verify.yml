@@ -38,6 +38,9 @@ jobs:
       - name: Generate CI reports
         run: npm run reports:ci
 
+      - name: Solar pipeline determinism gate
+        run: npm run solar:pipeline -- --surface datasets/solar/solar-surface.fixture.json --expect datasets/solar/solar-pipeline.fixture.json
+
       - name: Start AGI API
         run: |
           npm run dev:agi:5173 > /tmp/agi.log 2>&1 &

@@ -38,6 +38,8 @@
     "casimir:collect": "tsx cli/casimir-collect.ts",
     "casimir:verify": "tsx cli/casimir-verify.ts",
     "verify:local": "tsx scripts/verify-local.ts",
+    "solar:pipeline": "tsx scripts/solar-pipeline.ts",
+    "solar:manifest": "tsx scripts/solar-spectra-manifest.ts",
     "wallet:agent": "tsx scripts/wallet-agent.ts",
     "hooks:install": "git config core.hooksPath .githooks",
     "audit:init": "tsx scripts/audit-init.ts",

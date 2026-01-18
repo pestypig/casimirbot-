@@ -1,0 +1,53 @@
+{
+  "schema_version": "solar_guardrails/1",
+  "version": "v1",
+  "ranges": {
+    "density_kg_m3": {
+      "min": 1e-8,
+      "max": 1e-3,
+      "severity": "hard",
+      "units": "kg/m^3",
+      "citation": "VAL-C photosphere profiles; Allen Astrophysical Quantities (2000)",
+      "notes": "Broad photospheric density envelope for guardrail use."
+    },
+    "pressure_Pa": {
+      "min": 1e2,
+      "max": 1e6,
+      "severity": "hard",
+      "units": "Pa",
+      "citation": "VAL-C photosphere profiles; Allen Astrophysical Quantities (2000)",
+      "notes": "Guardrail band for photospheric pressure."
+    },
+    "scale_height_km": {
+      "min": 80,
+      "max": 300,
+      "severity": "soft",
+      "units": "km",
+      "citation": "Hydrostatic scale height estimates; solar atmosphere reviews",
+      "notes": "Scale-height proxy range (order-of-magnitude)."
+    },
+    "opacity_regime": {
+      "allowed": ["H-", "Thomson", "bound-free", "free-free"],
+      "severity": "soft",
+      "citation": "Solar atmosphere opacity summaries",
+      "notes": "Expected dominant opacity mechanisms for photospheric modeling."
+    }
+  },
+  "followups": {
+    "density": [
+      "limb-darkening-check",
+      "helioseismology-consistency"
+    ],
+    "pressure": [
+      "limb-darkening-check",
+      "scale-height-check"
+    ],
+    "scale_height": [
+      "scale-height-check",
+      "helioseismology-consistency"
+    ],
+    "opacity_regime": [
+      "opacity-regime-review"
+    ]
+  }
+}

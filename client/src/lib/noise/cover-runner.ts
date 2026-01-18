@@ -16,6 +16,7 @@ import type {
 import { listKnowledgeFiles } from "@/lib/agi/knowledge-store";
 import { isAudioKnowledgeFile } from "@/lib/knowledge/audio";
 import { normalizeMidiMotifPayload } from "@/lib/noise/midi-motif";
+import { parseMidiFile } from "@/lib/noise/midi-file";
 import {
   normalizeGrooveTemplatePayload,
   normalizeMacroCurvePayload,
@@ -150,21 +151,27 @@ export async function fulfillCoverJob(job: CoverJob, options: FulfillOptions = {
   const tempo = resolveTempo(job);
   const original = await resolveOriginalAudio(job.request.originalId);
   const materialIds = collectMaterialIds(job.request.renderPlan);
-  const mergedKnowledgeIds = mergeKnowledgeIds(
+  const baseKnowledgeIds = mergeKnowledgeIds(
     job.request.knowledgeFileIds,
     materialIds,
   );
   const needsStemAudio = materialIds.some(
     (id) => typeof id === "string" && id.trim().toLowerCase().startsWith("stem:"),
   );
-  const [knowledgeAudio, serverStems, midiMotifs, grooveTemplates, macroCurves] =
-    await Promise.all([
-      resolveKnowledgeAudio(mergedKnowledgeIds),
-      needsStemAudio ? resolveServerStemAudio(job.request.originalId) : [],
-      resolveKnowledgeMotifs(mergedKnowledgeIds),
-      resolveKnowledgeGrooves(mergedKnowledgeIds),
-      resolveKnowledgeMacros(mergedKnowledgeIds),
-    ]);
+  const [midiMotifs, grooveTemplates, macroCurves] = await Promise.all([
+    resolveKnowledgeMotifs(baseKnowledgeIds),
+    resolveKnowledgeGrooves(baseKnowledgeIds),
+    resolveKnowledgeMacros(baseKnowledgeIds),
+  ]);
+  const samplerSourceIds = collectSamplerSourceIds(midiMotifs);
+  const audioKnowledgeIds = mergeKnowledgeIds(
+    baseKnowledgeIds,
+    samplerSourceIds,
+  );
+  const [knowledgeAudio, serverStems] = await Promise.all([
+    resolveKnowledgeAudio(audioKnowledgeIds),
+    needsStemAudio ? resolveServerStemAudio(job.request.originalId) : [],
+  ]);
   const mergedKnowledgeAudio = [
     ...knowledgeAudio.sources,
     ...serverStems,
@@ -272,21 +279,27 @@ export async function scoreRenderPlan(
   const tempo = resolveTempoFromRequest(request);
   const original = await resolveOriginalAudio(request.originalId);
   const materialIds = collectMaterialIds(renderPlan);
-  const mergedKnowledgeIds = mergeKnowledgeIds(
+  const baseKnowledgeIds = mergeKnowledgeIds(
     request.knowledgeFileIds,
     materialIds,
   );
   const needsStemAudio = materialIds.some(
     (id) => typeof id === "string" && id.trim().toLowerCase().startsWith("stem:"),
   );
-  const [knowledgeAudio, serverStems, midiMotifs, grooveTemplates, macroCurves] =
-    await Promise.all([
-      resolveKnowledgeAudio(mergedKnowledgeIds),
-      needsStemAudio ? resolveServerStemAudio(request.originalId) : [],
-      resolveKnowledgeMotifs(mergedKnowledgeIds),
-      resolveKnowledgeGrooves(mergedKnowledgeIds),
-      resolveKnowledgeMacros(mergedKnowledgeIds),
-    ]);
+  const [midiMotifs, grooveTemplates, macroCurves] = await Promise.all([
+    resolveKnowledgeMotifs(baseKnowledgeIds),
+    resolveKnowledgeGrooves(baseKnowledgeIds),
+    resolveKnowledgeMacros(baseKnowledgeIds),
+  ]);
+  const samplerSourceIds = collectSamplerSourceIds(midiMotifs);
+  const audioKnowledgeIds = mergeKnowledgeIds(
+    baseKnowledgeIds,
+    samplerSourceIds,
+  );
+  const [knowledgeAudio, serverStems] = await Promise.all([
+    resolveKnowledgeAudio(audioKnowledgeIds),
+    needsStemAudio ? resolveServerStemAudio(request.originalId) : [],
+  ]);
   const mergedKnowledgeAudio = [
     ...knowledgeAudio.sources,
     ...serverStems,
@@ -470,7 +483,9 @@ async function resolveKnowledgeAudio(
   }
   try {
     const files = await listKnowledgeFiles();
-    const audioFiles = files.filter(isAudioKnowledgeFile);
+    const audioFiles = files
+      .filter(isAudioKnowledgeFile)
+      .filter((record) => !isMidiCandidate(record));
     const byId = new Map(audioFiles.map((record) => [record.id, record]));
     const sources: KnowledgeAudioSource[] = [];
     const urls: string[] = [];
@@ -525,7 +540,7 @@ async function resolveServerStemAudio(
 const normalizeMotifKey = (value: unknown) =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
 
-const isMotifCandidate = (record: { mime?: string; name?: string; kind?: string }) => {
+const isJsonCandidate = (record: { mime?: string; name?: string; kind?: string }) => {
   if (record.kind === "json") return true;
   if (record.mime?.includes("json")) return true;
   if (record.mime?.startsWith("text/")) return true;
@@ -533,7 +548,17 @@ const isMotifCandidate = (record: { mime?: string; name?: string; kind?: string 
   return false;
 };
 
-const isSymbolicCandidate = isMotifCandidate;
+const isMidiCandidate = (record: { mime?: string; name?: string }) => {
+  const name = record.name?.toLowerCase() ?? "";
+  if (record.mime?.includes("midi")) return true;
+  if (name.endsWith(".mid") || name.endsWith(".midi")) return true;
+  return false;
+};
+
+const isMotifCandidate = (record: { mime?: string; name?: string; kind?: string }) =>
+  isJsonCandidate(record) || isMidiCandidate(record);
+
+const isSymbolicCandidate = isJsonCandidate;
 
 async function resolveKnowledgeMotifs(
   knowledgeFileIds?: string[],
@@ -562,14 +587,19 @@ async function resolveKnowledgeMotifs(
       if (!record || processed.has(record.id)) continue;
       processed.add(record.id);
       if (!isMotifCandidate(record)) continue;
-      let parsed: unknown;
+      let motif: MidiMotif | null = null;
       try {
-        const text = await record.data.text();
-        parsed = JSON.parse(text);
+        if (isMidiCandidate(record)) {
+          const buffer = await record.data.arrayBuffer();
+          motif = parseMidiFile(buffer, record.name);
+        } else if (isJsonCandidate(record)) {
+          const text = await record.data.text();
+          const parsed = JSON.parse(text);
+          motif = normalizeMidiMotifPayload(parsed, record.name);
+        }
       } catch {
         continue;
       }
-      const motif = normalizeMidiMotifPayload(parsed, record.name);
       if (!motif) continue;
       motifs.push({
         id: record.id,
@@ -701,6 +731,29 @@ function collectMaterialIds(plan?: RenderPlan): string[] {
     }
   }
   return ids;
+}
+
+function collectSamplerSourceIds(
+  motifs: KnowledgeMidiSource[] | undefined,
+): string[] {
+  if (!motifs?.length) return [];
+  const ids = new Set<string>();
+  const pushId = (value?: string) => {
+    if (typeof value !== "string") return;
+    const trimmed = value.trim();
+    if (trimmed) ids.add(trimmed);
+  };
+  for (const source of motifs) {
+    const sampler = source?.motif?.sampler;
+    if (!sampler) continue;
+    pushId(sampler.sourceId);
+    if (Array.isArray(sampler.map)) {
+      for (const entry of sampler.map) {
+        pushId(entry?.sourceId);
+      }
+    }
+  }
+  return Array.from(ids);
 }
 
 function mergeKnowledgeIds(baseIds?: string[], extraIds?: string[]) {

@@ -5,6 +5,7 @@ import { Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
   deleteKnowledgeFile,
@@ -19,6 +20,7 @@ import {
   fetchJobStatus,
   fetchRecipes,
   saveRecipe,
+  updateRecipe,
   deleteRecipe,
   requestGeneration,
   uploadCoverPreview,
@@ -46,7 +48,10 @@ import type {
   TempoMeta,
   KBTexture,
   KBMatch,
+  ListenerMacroLocks,
   RenderPlan,
+  RenderPlanGroupKey,
+  RenderPlanGroupLevels,
   CoverEvidence,
   EditionReceipt,
 } from "@/types/noise-gens";
@@ -140,11 +145,79 @@ const clamp01 = (value: number): number => {
   return value;
 };
 
+const clampBarValue = (value: number, fallback: number): number => {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.round(value));
+};
+
+const clampPercent = (value: number): number =>
+  Math.max(0, Math.min(100, value));
+
+const parseIdList = (value: string): string[] =>
+  value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+const formatIdList = (value?: string[]): string =>
+  Array.isArray(value) && value.length ? value.join(", ") : "";
+
+const clonePlanWindow = (window: RenderPlan["windows"][number]) => ({
+  ...window,
+  material: window.material ? { ...window.material } : undefined,
+  texture: window.texture
+    ? {
+        ...window.texture,
+        fx: window.texture.fx ? { ...window.texture.fx } : undefined,
+      }
+    : undefined,
+});
+
+const cloneRenderPlan = (plan: RenderPlan): RenderPlan => ({
+  ...plan,
+  global: plan.global
+    ? {
+        ...plan.global,
+        sections: plan.global.sections
+          ? plan.global.sections.map((section) => ({ ...section }))
+          : undefined,
+        energyCurve: plan.global.energyCurve
+          ? plan.global.energyCurve.map((point) => ({ ...point }))
+          : undefined,
+        locks: plan.global.locks ? { ...plan.global.locks } : undefined,
+        groups: plan.global.groups ? { ...plan.global.groups } : undefined,
+      }
+    : undefined,
+  windows: plan.windows.map((window) => clonePlanWindow(window)),
+});
+
 type PlanWindowAnalysis = NonNullable<PlanAnalysis["windows"]>[number];
 
 const planWindowKey = (startBar: number, bars: number) => `${startBar}:${bars}`;
 
 const PLAN_RANK_PREVIEW_BARS = 16;
+
+const GROUP_KEYS: RenderPlanGroupKey[] = [
+  "drums",
+  "bass",
+  "music",
+  "textures",
+  "fx",
+];
+const GROUP_LABELS: Record<RenderPlanGroupKey, string> = {
+  drums: "Drums",
+  bass: "Bass",
+  music: "Music",
+  textures: "Textures",
+  fx: "FX",
+};
+const DEFAULT_GROUP_LEVELS: RenderPlanGroupLevels = {
+  drums: 0.5,
+  bass: 0.5,
+  music: 0.5,
+  textures: 0.5,
+  fx: 0.5,
+};
 
 const formatTimestamp = (value: number | undefined) => {
   if (!Number.isFinite(value)) return "--";
@@ -156,10 +229,12 @@ const formatTimestamp = (value: number | undefined) => {
 const formatHashShort = (value?: string) =>
   value && value.length > 10 ? `${value.slice(0, 8)}…` : value ?? "--";
 
-const formatIntentSimilarity = (value?: number) =>
+const formatPercent = (value?: number) =>
   typeof value === "number" && Number.isFinite(value)
     ? `${Math.round(clamp01(value) * 100)}%`
     : "--";
+
+const formatIntentSimilarity = (value?: number) => formatPercent(value);
 
 const formatViolationPreview = (violations?: string[]) => {
   if (!violations?.length) return null;
@@ -207,6 +282,103 @@ const buildReceiptChips = (receipt?: EditionReceipt) => {
     chips.push(`Tools ${Object.keys(receipt.tools.toolVersions).length}`);
   }
   return chips;
+};
+
+type EditionNode = {
+  recipe: NoisegenRecipe;
+  children: EditionNode[];
+};
+
+const buildEditionTree = (recipes: NoisegenRecipe[]): EditionNode[] => {
+  const nodes = new Map<string, EditionNode>();
+  recipes.forEach((recipe) => {
+    nodes.set(recipe.id, { recipe, children: [] });
+  });
+  const roots: EditionNode[] = [];
+  recipes.forEach((recipe) => {
+    const node = nodes.get(recipe.id);
+    if (!node) return;
+    const parentId = recipe.parentId?.trim();
+    const parentNode = parentId ? nodes.get(parentId) : undefined;
+    if (parentNode) {
+      parentNode.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  const sortNodes = (items: EditionNode[]) => {
+    items.sort(
+      (left, right) => (right.recipe.updatedAt ?? 0) - (left.recipe.updatedAt ?? 0),
+    );
+    items.forEach((item) => sortNodes(item.children));
+  };
+  sortNodes(roots);
+  return roots;
+};
+
+const resolveMoodVector = (recipe: NoisegenRecipe) => ({
+  sample: clamp01(recipe.coverRequest.sampleInfluence ?? 0),
+  style: clamp01(recipe.coverRequest.styleInfluence ?? 0),
+  weird: clamp01(recipe.coverRequest.weirdness ?? 0),
+});
+
+const summarizeMoodDelta = (
+  child: NoisegenRecipe,
+  parent?: NoisegenRecipe | null,
+): string[] => {
+  if (!parent) return [];
+  const childMood = resolveMoodVector(child);
+  const parentMood = resolveMoodVector(parent);
+  const deltas: string[] = [];
+  const pushDelta = (label: string, value: number, threshold = 0.03) => {
+    if (!Number.isFinite(value) || Math.abs(value) < threshold) return;
+    const sign = value > 0 ? "+" : "";
+    deltas.push(`${label} ${sign}${value.toFixed(2)}`);
+  };
+  pushDelta("sample", childMood.sample - parentMood.sample);
+  pushDelta("style", childMood.style - parentMood.style);
+  pushDelta("weird", childMood.weird - parentMood.weird);
+  return deltas.slice(0, 4);
+};
+
+const summarizeEditionDelta = (
+  child: NoisegenRecipe,
+  parent?: NoisegenRecipe | null,
+): string[] => {
+  if (!parent) return [];
+  const deltas: string[] = [];
+  const childReq = child.coverRequest;
+  const parentReq = parent.coverRequest;
+  const diff = (a?: number, b?: number) => (a ?? 0) - (b ?? 0);
+  const pushDelta = (label: string, value: number, threshold = 0.05) => {
+    if (!Number.isFinite(value) || Math.abs(value) < threshold) return;
+    const sign = value > 0 ? "+" : "";
+    deltas.push(`${label} ${sign}${value.toFixed(2)}`);
+  };
+  pushDelta("sample", diff(childReq.sampleInfluence, parentReq.sampleInfluence));
+  pushDelta("style", diff(childReq.styleInfluence, parentReq.styleInfluence));
+  pushDelta("weird", diff(childReq.weirdness, parentReq.weirdness));
+  if (childReq.kbTexture !== parentReq.kbTexture) {
+    deltas.push("texture");
+  }
+  const childTempo = childReq.tempo;
+  const parentTempo = parentReq.tempo;
+  if (
+    childTempo?.bpm !== parentTempo?.bpm ||
+    childTempo?.timeSig !== parentTempo?.timeSig
+  ) {
+    deltas.push("tempo");
+  }
+  const childPlan = childReq.renderPlan;
+  const parentPlan = parentReq.renderPlan;
+  if (Boolean(childPlan) !== Boolean(parentPlan)) {
+    deltas.push("plan");
+  } else if (childPlan && parentPlan) {
+    if ((childPlan.windows?.length ?? 0) !== (parentPlan.windows?.length ?? 0)) {
+      deltas.push("plan");
+    }
+  }
+  return deltas.slice(0, 4);
 };
 
 const normalizeIdList = (list?: string[]) => {
@@ -310,6 +482,120 @@ const applyListenerFxOverlay = (
       };
     }),
   };
+};
+
+const normalizeGroupLevels = (
+  levels: RenderPlanGroupLevels | null | undefined,
+): RenderPlanGroupLevels => {
+  if (!levels) return {};
+  const next: RenderPlanGroupLevels = {};
+  for (const key of GROUP_KEYS) {
+    const value = levels[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      next[key] = clamp01(value);
+    }
+  }
+  return next;
+};
+
+const mergeGroupLevels = (
+  base: RenderPlanGroupLevels,
+  incoming: RenderPlanGroupLevels | null | undefined,
+  locks: ListenerMacroLocks | null | undefined,
+): RenderPlanGroupLevels => {
+  const next = { ...base };
+  const normalizedIncoming = normalizeGroupLevels(incoming);
+  for (const key of GROUP_KEYS) {
+    const incomingValue = normalizedIncoming[key];
+    const locked = Boolean(locks?.[key]);
+    if (locked) {
+      if (next[key] == null && typeof incomingValue === "number") {
+        next[key] = incomingValue;
+      }
+      continue;
+    }
+    if (typeof incomingValue === "number") {
+      next[key] = incomingValue;
+    }
+  }
+  return next;
+};
+
+const extractGroupLocks = (
+  locks: ListenerMacroLocks | null | undefined,
+): ListenerMacroLocks => {
+  if (!locks) return {};
+  const next: ListenerMacroLocks = {};
+  for (const key of GROUP_KEYS) {
+    if (locks[key]) {
+      next[key] = true;
+    }
+  }
+  return next;
+};
+
+const mergePlanLocks = (
+  planLocks: ListenerMacroLocks | undefined,
+  overrides: ListenerMacroLocks,
+): ListenerMacroLocks | undefined => {
+  const merged = { ...(planLocks ?? {}), ...overrides };
+  return Object.values(merged).some(Boolean) ? merged : undefined;
+};
+
+const applyGroupOverrides = (
+  plan: RenderPlan,
+  levels: RenderPlanGroupLevels,
+  locks: ListenerMacroLocks,
+): RenderPlan => {
+  const mergedLocks = mergePlanLocks(plan.global?.locks, locks);
+  const normalizedLevels = normalizeGroupLevels(levels);
+  const hasLevels = Object.values(normalizedLevels).some(
+    (value) => typeof value === "number",
+  );
+  if (!mergedLocks && !hasLevels) return plan;
+  return {
+    ...plan,
+    global: {
+      ...(plan.global ?? {}),
+      ...(mergedLocks ? { locks: mergedLocks } : {}),
+      ...(hasLevels ? { groups: normalizedLevels } : {}),
+    },
+  };
+};
+
+const resolveGroupSettings = (
+  plan: RenderPlan,
+  baseLevels: RenderPlanGroupLevels,
+  baseLocks: ListenerMacroLocks,
+) => {
+  const planLocks = extractGroupLocks(plan.global?.locks);
+  const mergedLocks = { ...baseLocks, ...planLocks };
+  const mergedLevels = mergeGroupLevels(
+    baseLevels,
+    plan.global?.groups,
+    mergedLocks,
+  );
+  return { mergedLevels, mergedLocks };
+};
+
+const resolvePlanRange = (
+  plan: RenderPlan,
+  fallback: { start: number; end: number },
+) => {
+  let minStart = Number.POSITIVE_INFINITY;
+  let maxEnd = Number.NEGATIVE_INFINITY;
+  for (const window of plan.windows ?? []) {
+    const startBar = clampBarValue(window.startBar, fallback.start);
+    const bars = clampBarValue(window.bars, 1);
+    const endBar = startBar + bars;
+    if (startBar < minStart) minStart = startBar;
+    if (endBar > maxEnd) maxEnd = endBar;
+  }
+  if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd)) {
+    return fallback;
+  }
+  const safeEnd = Math.max(minStart + 1, maxEnd);
+  return { start: minStart, end: safeEnd };
 };
 
 const buildPreviewWindows = (
@@ -608,15 +894,45 @@ export function CoverCreator({
   const [listenerMacros, setListenerMacros] = useState<ListenerMacros>(
     DEFAULT_LISTENER_MACROS,
   );
+  const [groupLevels, setGroupLevels] = useState<RenderPlanGroupLevels>(() => ({
+    ...DEFAULT_GROUP_LEVELS,
+  }));
+  const [groupLocks, setGroupLocks] = useState<ListenerMacroLocks>({});
   const [recipes, setRecipes] = useState<NoisegenRecipe[]>([]);
   const [recipesLoading, setRecipesLoading] = useState(false);
   const [recipeName, setRecipeName] = useState("");
   const [recipeNotes, setRecipeNotes] = useState("");
+  const [recipeFeatured, setRecipeFeatured] = useState(false);
+  const [recipeParentId, setRecipeParentId] = useState<string | null>(null);
   const [recipeSearch, setRecipeSearch] = useState("");
   const [recipeStatus, setRecipeStatus] = useState<string | null>(null);
   const [recipeError, setRecipeError] = useState<string | null>(null);
   const [recipeSaving, setRecipeSaving] = useState(false);
   const [recipeBusyId, setRecipeBusyId] = useState<string | null>(null);
+  const sortedRecipes = useMemo(() => {
+    return [...recipes].sort((left, right) => {
+      const featuredDelta =
+        Number(Boolean(right.featured)) - Number(Boolean(left.featured));
+      if (featuredDelta !== 0) return featuredDelta;
+      return (right.updatedAt ?? 0) - (left.updatedAt ?? 0);
+    });
+  }, [recipes]);
+  const recipeById = useMemo(
+    () => new Map(recipes.map((recipe) => [recipe.id, recipe])),
+    [recipes],
+  );
+  const recipesByOriginal = useMemo(() => {
+    if (!selectedOriginal) return [];
+    return recipes.filter((recipe) => recipe.originalId === selectedOriginal.id);
+  }, [recipes, selectedOriginal]);
+  const editionTree = useMemo(
+    () => buildEditionTree(recipesByOriginal),
+    [recipesByOriginal],
+  );
+  const recipeParent = useMemo(() => {
+    if (!recipeParentId) return null;
+    return recipeById.get(recipeParentId) ?? null;
+  }, [recipeById, recipeParentId]);
   const [job, setJob] = useState<JobTracker | null>(null);
   const [jobMessage, setJobMessage] = useState<string | null>(null);
   const [renderProgress, setRenderProgress] = useState<{ pct: number; stage: string } | null>(null);
@@ -686,7 +1002,15 @@ export function CoverCreator({
     if (!initialRenderPlanDraft.trim()) return;
     const { plan, error } = parseRenderPlan(initialRenderPlanDraft);
     if (plan) {
-      setRenderPlan(plan);
+      const { mergedLevels, mergedLocks } = resolveGroupSettings(
+        plan,
+        DEFAULT_GROUP_LEVELS,
+        {},
+      );
+      const nextPlan = applyGroupOverrides(plan, mergedLevels, mergedLocks);
+      setGroupLevels(mergedLevels);
+      setGroupLocks(mergedLocks);
+      setRenderPlan(nextPlan);
       setRenderPlanMeta(MANUAL_PLAN_META);
       setRenderPlanEnabled(true);
       setRenderPlanError(null);
@@ -1161,10 +1485,44 @@ export function CoverCreator({
     };
   }, [renderPlan]);
 
+  const timelinePlan = useMemo(() => {
+    if (renderPlan?.windows?.length) return renderPlan;
+    const fallbackBars = Math.max(1, barWindowRange.end - barWindowRange.start);
+    return {
+      global: sessionTempo?.bpm ? { bpm: sessionTempo.bpm } : undefined,
+      windows: [{ startBar: barWindowRange.start, bars: fallbackBars }],
+    };
+  }, [barWindowRange, renderPlan, sessionTempo]);
+
+  const timelineRange = useMemo(
+    () => resolvePlanRange(timelinePlan, barWindowRange),
+    [barWindowRange, timelinePlan],
+  );
+  const timelineTotalBars = Math.max(
+    1,
+    timelineRange.end - timelineRange.start,
+  );
+  const timelineGridStyle = useMemo(() => {
+    const barWidth = 100 / timelineTotalBars;
+    return {
+      backgroundSize: `${barWidth}% 100%`,
+      backgroundImage:
+        "linear-gradient(to right, rgba(148, 163, 184, 0.2) 1px, transparent 1px)",
+    };
+  }, [timelineTotalBars]);
+
   const applyRenderPlanDraft = useCallback(() => {
     const { plan, error } = parseRenderPlan(renderPlanDraft);
     if (plan) {
-      setRenderPlan(plan);
+      const { mergedLevels, mergedLocks } = resolveGroupSettings(
+        plan,
+        groupLevels,
+        groupLocks,
+      );
+      const nextPlan = applyGroupOverrides(plan, mergedLevels, mergedLocks);
+      setGroupLevels(mergedLevels);
+      setGroupLocks(mergedLocks);
+      setRenderPlan(nextPlan);
       setRenderPlanMeta(MANUAL_PLAN_META);
       setRenderPlanEnabled(true);
       setRenderPlanError(null);
@@ -1174,7 +1532,7 @@ export function CoverCreator({
     setRenderPlanMeta(null);
     setRenderPlanEnabled(false);
     setRenderPlanError(error ?? "RenderPlan JSON is invalid.");
-  }, [renderPlanDraft]);
+  }, [groupLevels, groupLocks, renderPlanDraft]);
 
   const formatRenderPlanDraft = useCallback(() => {
     const { plan, error } = parseRenderPlan(renderPlanDraft);
@@ -1241,8 +1599,16 @@ export function CoverCreator({
         );
         return;
       }
-      setRenderPlan(result.plan);
-      setRenderPlanDraft(JSON.stringify(result.plan, null, 2));
+      const { mergedLevels, mergedLocks } = resolveGroupSettings(
+        result.plan,
+        groupLevels,
+        groupLocks,
+      );
+      const nextPlan = applyGroupOverrides(result.plan, mergedLevels, mergedLocks);
+      setGroupLevels(mergedLevels);
+      setGroupLocks(mergedLocks);
+      setRenderPlan(nextPlan);
+      setRenderPlanDraft(JSON.stringify(nextPlan, null, 2));
       setRenderPlanMeta(MANUAL_PLAN_META);
       setRenderPlanEnabled(true);
       setRenderPlanError(null);
@@ -1256,7 +1622,7 @@ export function CoverCreator({
     } finally {
       setAtomAutoFillRunning(false);
     }
-  }, [renderPlanDraft, selectedOriginal, sessionTempo]);
+  }, [groupLevels, groupLocks, renderPlanDraft, selectedOriginal, sessionTempo]);
 
   const updateListenerMacro = useCallback(
     (key: keyof ListenerMacros, value: number) => {
@@ -1281,6 +1647,282 @@ export function CoverCreator({
     setListenerMacros(DEFAULT_LISTENER_MACROS);
     setListenerMode("artist");
   }, []);
+
+  const handleGroupLevelChange = useCallback(
+    (key: RenderPlanGroupKey, value: number) => {
+      setGroupLevels((prev) => ({ ...prev, [key]: clamp01(value) }));
+    },
+    [],
+  );
+
+  const handleGroupLockChange = useCallback(
+    (key: RenderPlanGroupKey, value: boolean) => {
+      setGroupLocks((prev) => {
+        const next = { ...prev };
+        if (value) {
+          next[key] = true;
+        } else {
+          delete next[key];
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const buildFallbackPlan = useCallback((): RenderPlan => {
+    const fallbackBars = Math.max(1, barWindowRange.end - barWindowRange.start);
+    return {
+      global: sessionTempo?.bpm ? { bpm: sessionTempo.bpm } : undefined,
+      windows: [{ startBar: barWindowRange.start, bars: fallbackBars }],
+    };
+  }, [barWindowRange, sessionTempo]);
+
+  const getEditablePlan = useCallback(
+    (): RenderPlan =>
+      renderPlan?.windows?.length ? renderPlan : buildFallbackPlan(),
+    [buildFallbackPlan, renderPlan],
+  );
+
+  const applyTimelinePlan = useCallback(
+    (plan: RenderPlan) => {
+      const { mergedLevels, mergedLocks } = resolveGroupSettings(
+        plan,
+        groupLevels,
+        groupLocks,
+      );
+      const nextPlan = applyGroupOverrides(plan, mergedLevels, mergedLocks);
+      setGroupLevels(mergedLevels);
+      setGroupLocks(mergedLocks);
+      setRenderPlan(nextPlan);
+      setRenderPlanDraft(JSON.stringify(nextPlan, null, 2));
+      setRenderPlanMeta(MANUAL_PLAN_META);
+      setRenderPlanEnabled(true);
+      setRenderPlanError(null);
+      const range = resolvePlanRange(nextPlan, barWindowRange);
+      setStartBar(range.start);
+      setEndBar(range.end);
+    },
+    [barWindowRange, groupLevels, groupLocks],
+  );
+
+  const updateTimelinePlan = useCallback(
+    (updater: (draft: RenderPlan) => RenderPlan | void) => {
+      const draft = cloneRenderPlan(getEditablePlan());
+      const nextPlan = updater(draft) ?? draft;
+      if (!nextPlan.windows?.length) {
+        nextPlan.windows = buildFallbackPlan().windows;
+      }
+      applyTimelinePlan(nextPlan);
+    },
+    [applyTimelinePlan, buildFallbackPlan, getEditablePlan],
+  );
+
+  const updateWindow = useCallback(
+    (
+      index: number,
+      updater: (window: RenderPlan["windows"][number]) => RenderPlan["windows"][number],
+    ) => {
+      updateTimelinePlan((draft) => {
+        const windows = draft.windows.map((window, idx) =>
+          idx === index ? updater(clonePlanWindow(window)) : window,
+        );
+        return { ...draft, windows };
+      });
+    },
+    [updateTimelinePlan],
+  );
+
+  const handleAddWindow = useCallback(() => {
+    updateTimelinePlan((draft) => {
+      const windows = [...draft.windows];
+      const last = windows[windows.length - 1];
+      const defaultBars = Math.max(
+        1,
+        Math.round((barWindowRange.end - barWindowRange.start) / 2),
+      );
+      const startBar = last
+        ? clampBarValue(last.startBar + last.bars, barWindowRange.start)
+        : barWindowRange.start;
+      windows.push({ startBar, bars: defaultBars });
+      return { ...draft, windows };
+    });
+  }, [barWindowRange, updateTimelinePlan]);
+
+  const handleRemoveWindow = useCallback(
+    (index: number) => {
+      updateTimelinePlan((draft) => {
+        if (draft.windows.length <= 1) return draft;
+        const windows = draft.windows.filter((_, idx) => idx !== index);
+        return { ...draft, windows };
+      });
+    },
+    [updateTimelinePlan],
+  );
+
+  const handleAddSection = useCallback(() => {
+    updateTimelinePlan((draft) => {
+      const sections = [...(draft.global?.sections ?? [])];
+      const defaultBars = Math.max(
+        1,
+        Math.round((barWindowRange.end - barWindowRange.start) / 2),
+      );
+      sections.push({
+        name: `Section ${sections.length + 1}`,
+        startBar: barWindowRange.start,
+        bars: defaultBars,
+      });
+      const nextGlobal = { ...(draft.global ?? {}), sections };
+      return { ...draft, global: nextGlobal };
+    });
+  }, [barWindowRange, updateTimelinePlan]);
+
+  const handleRemoveSection = useCallback(
+    (index: number) => {
+      updateTimelinePlan((draft) => {
+        const sections = (draft.global?.sections ?? []).filter(
+          (_, idx) => idx !== index,
+        );
+        const nextGlobal = { ...(draft.global ?? {}) };
+        if (sections.length) {
+          nextGlobal.sections = sections;
+        } else {
+          delete nextGlobal.sections;
+        }
+        return { ...draft, global: Object.keys(nextGlobal).length ? nextGlobal : undefined };
+      });
+    },
+    [updateTimelinePlan],
+  );
+
+  const handleAddEnergyPoint = useCallback(() => {
+    updateTimelinePlan((draft) => {
+      const energyCurve = [...(draft.global?.energyCurve ?? [])];
+      energyCurve.push({ bar: barWindowRange.start, energy: 0.5 });
+      const nextGlobal = { ...(draft.global ?? {}), energyCurve };
+      return { ...draft, global: nextGlobal };
+    });
+  }, [barWindowRange, updateTimelinePlan]);
+
+  const updateWindowTextureValue = useCallback(
+    (
+      index: number,
+      key: "sampleInfluence" | "styleInfluence" | "weirdness",
+      value: number,
+    ) => {
+      updateWindow(index, (window) => {
+        const texture = { ...(window.texture ?? {}) };
+        texture[key] = clamp01(value);
+        return { ...window, texture };
+      });
+    },
+    [updateWindow],
+  );
+
+  const updateWindowTextureId = useCallback(
+    (index: number, value: string) => {
+      updateWindow(index, (window) => {
+        const texture = { ...(window.texture ?? {}) };
+        if (!value) {
+          delete texture.kbTexture;
+        } else {
+          texture.kbTexture = value;
+        }
+        return {
+          ...window,
+          texture: Object.keys(texture).length ? texture : undefined,
+        };
+      });
+    },
+    [updateWindow],
+  );
+
+  const updateWindowMaterialList = useCallback(
+    (
+      index: number,
+      key: "audioAtomIds" | "midiMotifIds" | "grooveTemplateIds",
+      raw: string,
+    ) => {
+      const ids = parseIdList(raw);
+      updateWindow(index, (window) => {
+        const material = { ...(window.material ?? {}) };
+        if (ids.length) {
+          material[key] = ids;
+        } else {
+          delete material[key];
+        }
+        return {
+          ...window,
+          material: Object.keys(material).length ? material : undefined,
+        };
+      });
+    },
+    [updateWindow],
+  );
+
+  const updateSection = useCallback(
+    (
+      index: number,
+      updater: (section: { name: string; startBar: number; bars: number }) => {
+        name: string;
+        startBar: number;
+        bars: number;
+      },
+    ) => {
+      updateTimelinePlan((draft) => {
+        const sections = [...(draft.global?.sections ?? [])];
+        const current = sections[index] ?? {
+          name: `Section ${index + 1}`,
+          startBar: barWindowRange.start,
+          bars: 1,
+        };
+        sections[index] = updater({ ...current });
+        const nextGlobal = { ...(draft.global ?? {}), sections };
+        return { ...draft, global: nextGlobal };
+      });
+    },
+    [barWindowRange.start, updateTimelinePlan],
+  );
+
+  const updateEnergyPoint = useCallback(
+    (
+      index: number,
+      updater: (point: { bar: number; energy: number }) => {
+        bar: number;
+        energy: number;
+      },
+    ) => {
+      updateTimelinePlan((draft) => {
+        const energyCurve = [...(draft.global?.energyCurve ?? [])];
+        const current = energyCurve[index] ?? {
+          bar: barWindowRange.start,
+          energy: 0.5,
+        };
+        energyCurve[index] = updater({ ...current });
+        const nextGlobal = { ...(draft.global ?? {}), energyCurve };
+        return { ...draft, global: nextGlobal };
+      });
+    },
+    [barWindowRange.start, updateTimelinePlan],
+  );
+
+  const handleRemoveEnergyPoint = useCallback(
+    (index: number) => {
+      updateTimelinePlan((draft) => {
+        const energyCurve = (draft.global?.energyCurve ?? []).filter(
+          (_, idx) => idx !== index,
+        );
+        const nextGlobal = { ...(draft.global ?? {}) };
+        if (energyCurve.length) {
+          nextGlobal.energyCurve = energyCurve;
+        } else {
+          delete nextGlobal.energyCurve;
+        }
+        return { ...draft, global: Object.keys(nextGlobal).length ? nextGlobal : undefined };
+      });
+    },
+    [updateTimelinePlan],
+  );
 
   const persistPlanAnalysisArtifact = useCallback(
     async (cacheKey: string, bundle: PlanAnalysisBundle | null, coverRequest: CoverJobRequest) => {
@@ -1401,15 +2043,30 @@ export function CoverCreator({
     [coverFlowPayload, persistPlanAnalysisArtifact, selectedOriginal, sessionTempo],
   );
 
-  const applyPlanCandidate = useCallback((candidate: PlanRankCandidate) => {
-    if (!candidate.plan) return;
-    setRenderPlan(candidate.plan);
-    setRenderPlanDraft(JSON.stringify(candidate.plan, null, 2));
-    setRenderPlanMeta(candidate.planMeta ?? null);
-    setRenderPlanEnabled(true);
-    setRenderPlanOpen(true);
-    setRenderPlanError(null);
-  }, []);
+  const applyPlanCandidate = useCallback(
+    (candidate: PlanRankCandidate) => {
+      if (!candidate.plan) return;
+      const { mergedLevels, mergedLocks } = resolveGroupSettings(
+        candidate.plan,
+        groupLevels,
+        groupLocks,
+      );
+      const nextPlan = applyGroupOverrides(
+        candidate.plan,
+        mergedLevels,
+        mergedLocks,
+      );
+      setGroupLevels(mergedLevels);
+      setGroupLocks(mergedLocks);
+      setRenderPlan(nextPlan);
+      setRenderPlanDraft(JSON.stringify(nextPlan, null, 2));
+      setRenderPlanMeta(candidate.planMeta ?? null);
+      setRenderPlanEnabled(true);
+      setRenderPlanOpen(true);
+      setRenderPlanError(null);
+    },
+    [groupLevels, groupLocks],
+  );
 
   const requestPlanCandidate = useCallback(
     async (
@@ -1514,7 +2171,11 @@ export function CoverCreator({
       Boolean(coverFlowPayload?.forceRemote) || !canFulfillLocally();
     const resolvedRenderPlan =
       renderPlanEnabled && renderPlan
-        ? applyListenerFxOverlay(renderPlan, macroState)
+        ? applyGroupOverrides(
+            applyListenerFxOverlay(renderPlan, macroState),
+            groupLevels,
+            groupLocks,
+          )
         : undefined;
 
     const coverRequest: CoverJobRequest = {
@@ -1560,6 +2221,8 @@ export function CoverCreator({
     styleInfluence,
     weirdness,
     coverFlowPayload,
+    groupLevels,
+    groupLocks,
     renderPlan,
     renderPlanEnabled,
     renderPlanMeta,
@@ -1596,6 +2259,16 @@ export function CoverCreator({
     return () => window.clearTimeout(handle);
   }, [loadRecipes, recipeSearch]);
 
+  useEffect(() => {
+    if (!recipeParentId) return;
+    if (recipeById.has(recipeParentId)) return;
+    setRecipeParentId(null);
+  }, [recipeById, recipeParentId]);
+
+  useEffect(() => {
+    setRecipeParentId(null);
+  }, [selectedOriginal?.id]);
+
   const handleSaveRecipe = useCallback(async () => {
     setRecipeError(null);
     setRecipeStatus(null);
@@ -1627,10 +2300,14 @@ export function CoverCreator({
         coverRequest,
         seed: seed.trim() ? seed.trim() : undefined,
         notes: recipeNotes.trim() || undefined,
+        featured: recipeFeatured,
+        parentId: recipeParentId ?? undefined,
       });
       setRecipeStatus(`Saved recipe "${name}".`);
       setRecipeName("");
       setRecipeNotes("");
+      setRecipeFeatured(false);
+      setRecipeParentId(null);
       await loadRecipes(recipeSearch);
     } catch (error) {
       setRecipeError(
@@ -1644,6 +2321,8 @@ export function CoverCreator({
     loadRecipes,
     recipeName,
     recipeNotes,
+    recipeFeatured,
+    recipeParentId,
     recipeSearch,
     renderPlan,
     renderPlanMeta,
@@ -1686,8 +2365,20 @@ export function CoverCreator({
         setKbTexture("auto");
       }
       if (request.renderPlan) {
-        setRenderPlan(request.renderPlan);
-        setRenderPlanDraft(JSON.stringify(request.renderPlan, null, 2));
+        const { mergedLevels, mergedLocks } = resolveGroupSettings(
+          request.renderPlan,
+          groupLevels,
+          groupLocks,
+        );
+        const nextPlan = applyGroupOverrides(
+          request.renderPlan,
+          mergedLevels,
+          mergedLocks,
+        );
+        setGroupLevels(mergedLevels);
+        setGroupLocks(mergedLocks);
+        setRenderPlan(nextPlan);
+        setRenderPlanDraft(JSON.stringify(nextPlan, null, 2));
         setRenderPlanMeta(request.planMeta ?? null);
         setRenderPlanEnabled(true);
         setRenderPlanOpen(true);
@@ -1725,12 +2416,55 @@ export function CoverCreator({
       setRecipeError(null);
     },
     [
+      groupLevels,
+      groupLocks,
       sampleInfluence,
       selectedOriginal,
       styleInfluence,
       toast,
       weirdness,
     ],
+  );
+
+  const handleForkRecipe = useCallback(
+    (recipe: NoisegenRecipe) => {
+      if (!selectedOriginal || selectedOriginal.id !== recipe.originalId) {
+        toast({
+          title: "Select the matching original",
+          description: `Recipe ${recipe.name} expects ${recipe.originalId}.`,
+        });
+        return;
+      }
+      handleApplyRecipe(recipe);
+      setRecipeParentId(recipe.id);
+      setRecipeStatus(`Forking from "${recipe.name}".`);
+      setRecipeError(null);
+    },
+    [handleApplyRecipe, selectedOriginal, toast],
+  );
+
+  const handleToggleFeatured = useCallback(
+    async (recipe: NoisegenRecipe) => {
+      setRecipeError(null);
+      setRecipeStatus(null);
+      setRecipeBusyId(recipe.id);
+      try {
+        const updated = await updateRecipe(recipe.id, {
+          featured: !recipe.featured,
+        });
+        setRecipeStatus(
+          `${updated.featured ? "Featured" : "Unfeatured"} "${updated.name}".`,
+        );
+        await loadRecipes(recipeSearch);
+      } catch (error) {
+        setRecipeError(
+          error instanceof Error ? error.message : "Recipe update failed.",
+        );
+      } finally {
+        setRecipeBusyId(null);
+      }
+    },
+    [loadRecipes, recipeSearch],
   );
 
   const handleDeleteRecipe = useCallback(
@@ -1752,6 +2486,67 @@ export function CoverCreator({
     },
     [loadRecipes, recipeSearch],
   );
+
+  const renderEditionNode = (node: EditionNode, depth = 0) => {
+    const parent =
+      node.recipe.parentId ? recipeById.get(node.recipe.parentId) : null;
+    const planDeltas = summarizeEditionDelta(node.recipe, parent);
+    const moodDeltas = summarizeMoodDelta(node.recipe, parent);
+    const idiLabel = formatPercent(node.recipe.metrics?.idi);
+    const intentLabel = formatPercent(
+      node.recipe.receipt?.contract?.intentSimilarity,
+    );
+    const isMatch = selectedOriginal?.id === node.recipe.originalId;
+    return (
+      <div key={node.recipe.id} style={{ marginLeft: depth * 14 }}>
+        <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-200">
+                {node.recipe.name}
+              </div>
+              <div className="text-[10px] text-slate-500">
+                {formatTimestamp(node.recipe.updatedAt)}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {node.recipe.featured ? (
+                <Badge
+                  variant="secondary"
+                  className="bg-amber-500/20 text-amber-100"
+                >
+                  Featured
+                </Badge>
+              ) : null}
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!isMatch}
+                onClick={() => handleForkRecipe(node.recipe)}
+              >
+                Fork
+              </Button>
+            </div>
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400">
+            Plan Δ: {planDeltas.length ? planDeltas.join(", ") : "--"}
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Mood Δ: {moodDeltas.length ? moodDeltas.join(", ") : "--"}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-slate-500">
+            <span>IDI {idiLabel}</span>
+            <span>Intent {intentLabel}</span>
+          </div>
+        </div>
+        {node.children.length ? (
+          <div className="mt-2 space-y-2">
+            {node.children.map((child) => renderEditionNode(child, depth + 1))}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   const runPlanRanking = useCallback(async () => {
     setPlanRankError(null);
@@ -1803,7 +2598,16 @@ export function CoverCreator({
           seedValue,
           analysisBundle,
         );
-        const plan = candidateResult.plan;
+        const { mergedLevels, mergedLocks } = resolveGroupSettings(
+          candidateResult.plan,
+          groupLevels,
+          groupLocks,
+        );
+        const plan = applyGroupOverrides(
+          candidateResult.plan,
+          mergedLevels,
+          mergedLocks,
+        );
         candidate = {
           ...candidate,
           plan,
@@ -1858,6 +2662,8 @@ export function CoverCreator({
   }, [
     applyPlanCandidate,
     buildCoverRequest,
+    groupLevels,
+    groupLocks,
     planRankCount,
     resolvePlanAnalysis,
     requestPlanCandidate,
@@ -2274,6 +3080,459 @@ export function CoverCreator({
     <div className="mt-3 flex flex-wrap gap-2">{macroActionButtons}</div>
   );
 
+  const groupPanel = (
+    <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Stem groups
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Balance core groups and lock them before ranking plans.
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 space-y-3">
+        {GROUP_KEYS.map((key) => {
+          const level = clamp01(
+            groupLevels[key] ?? DEFAULT_GROUP_LEVELS[key] ?? 0.5,
+          );
+          const locked = Boolean(groupLocks[key]);
+          return (
+            <div
+              key={key}
+              className="rounded-lg border border-white/10 bg-black/30 p-3"
+            >
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="font-medium text-slate-100">
+                  {GROUP_LABELS[key]}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span>{Math.round(level * 100)}%</span>
+                  <Switch
+                    checked={locked}
+                    onCheckedChange={(value) =>
+                      handleGroupLockChange(key, value)
+                    }
+                  />
+                </div>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={level}
+                onChange={(event) =>
+                  handleGroupLevelChange(key, Number(event.target.value))
+                }
+                className="mt-2 h-1.5 w-full accent-primary"
+                aria-label={`${GROUP_LABELS[key]} level`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Locks keep a group fixed when new plans are generated.
+      </p>
+    </div>
+  );
+
+  const timelineEditor = (
+    <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+            Timeline editor
+          </p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Edit windows, sections, and energy curve without JSON.
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={handleAddWindow}>
+          Add window
+        </Button>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-white/10 bg-black/40 p-3">
+        <div className="text-[11px] text-slate-400">
+          Bars {timelineRange.start}-{Math.max(timelineRange.start, timelineRange.end - 1)}
+        </div>
+        <div
+          className="relative mt-2 h-14 overflow-hidden rounded-md border border-white/10"
+          style={timelineGridStyle}
+        >
+          {(timelinePlan.global?.sections ?? []).map((section, index) => {
+            const startBar = clampBarValue(section.startBar, timelineRange.start);
+            const bars = clampBarValue(section.bars, 1);
+            const left = clampPercent(
+              ((startBar - timelineRange.start) / timelineTotalBars) * 100,
+            );
+            const width = clampPercent((bars / timelineTotalBars) * 100);
+            return (
+              <div
+                key={`${section.name}-${index}`}
+                className="absolute inset-y-0 rounded bg-emerald-500/10"
+                style={{ left: `${left}%`, width: `${width}%` }}
+              />
+            );
+          })}
+          {timelinePlan.windows.map((window, index) => {
+            const startBar = clampBarValue(window.startBar, timelineRange.start);
+            const bars = clampBarValue(window.bars, 1);
+            const left = clampPercent(
+              ((startBar - timelineRange.start) / timelineTotalBars) * 100,
+            );
+            const width = clampPercent((bars / timelineTotalBars) * 100);
+            return (
+              <div
+                key={`${startBar}-${bars}-${index}`}
+                className="absolute top-6 h-6 rounded border border-sky-400/50 bg-sky-500/20 text-[10px] text-slate-100"
+                style={{ left: `${left}%`, width: `${width}%` }}
+                title={`Window ${index + 1}`}
+              >
+                <span className="px-1">W{index + 1}</span>
+              </div>
+            );
+          })}
+          {(timelinePlan.global?.energyCurve ?? []).map((point, index) => {
+            const bar = clampBarValue(point.bar, timelineRange.start);
+            const left = clampPercent(
+              ((bar - timelineRange.start) / timelineTotalBars) * 100,
+            );
+            return (
+              <div
+                key={`${bar}-${index}`}
+                className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-amber-400"
+                style={{ left: `${left}%` }}
+                title={`Energy ${Math.round(clamp01(point.energy) * 100)}%`}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+            Windows
+          </p>
+        </div>
+        {timelinePlan.windows.map((window, index) => {
+          const startBar = clampBarValue(window.startBar, barWindowRange.start);
+          const bars = clampBarValue(window.bars, 1);
+          const texture = window.texture;
+          const sampleValue =
+            typeof texture?.sampleInfluence === "number"
+              ? texture.sampleInfluence
+              : sampleInfluence;
+          const styleValue =
+            typeof texture?.styleInfluence === "number"
+              ? texture.styleInfluence
+              : styleInfluence;
+          const weirdnessValue =
+            typeof texture?.weirdness === "number" ? texture.weirdness : weirdness;
+          const kbValue =
+            typeof texture?.kbTexture === "string" ? texture.kbTexture : "";
+          return (
+            <div
+              key={`${startBar}-${bars}-${index}`}
+              className="rounded-lg border border-white/10 bg-black/30 p-3"
+            >
+              <div className="flex items-center justify-between text-[11px] text-slate-300">
+                <span className="font-semibold text-slate-100">Window {index + 1}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleRemoveWindow(index)}
+                  disabled={timelinePlan.windows.length <= 1}
+                >
+                  Remove
+                </Button>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  Start bar
+                  <Input
+                    type="number"
+                    min={1}
+                    value={startBar}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isNaN(next)) return;
+                      updateWindow(index, (current) => ({
+                        ...current,
+                        startBar: clampBarValue(next, current.startBar),
+                      }));
+                    }}
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  Bars
+                  <Input
+                    type="number"
+                    min={1}
+                    value={bars}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isNaN(next)) return;
+                      updateWindow(index, (current) => ({
+                        ...current,
+                        bars: clampBarValue(next, current.bars),
+                      }));
+                    }}
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  KB texture
+                  <select
+                    value={kbValue}
+                    onChange={(event) => updateWindowTextureId(index, event.target.value)}
+                    className="mt-0.5 h-8 rounded border border-white/10 bg-slate-950/60 px-2 text-xs text-slate-100"
+                    disabled={!kbTexturesReady && kbTextures.length === 0}
+                  >
+                    <option value="">Use cover texture</option>
+                    {kbTextures.map((textureOption) => (
+                      <option key={textureOption.id} value={textureOption.id}>
+                        {textureOption.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <label className="text-[11px] text-slate-400">
+                  Sample influence
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={sampleValue}
+                    onChange={(event) =>
+                      updateWindowTextureValue(index, "sampleInfluence", Number(event.target.value))
+                    }
+                    className="mt-2 h-1.5 w-full accent-primary"
+                  />
+                </label>
+                <label className="text-[11px] text-slate-400">
+                  Style influence
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={styleValue}
+                    onChange={(event) =>
+                      updateWindowTextureValue(index, "styleInfluence", Number(event.target.value))
+                    }
+                    className="mt-2 h-1.5 w-full accent-primary"
+                  />
+                </label>
+                <label className="text-[11px] text-slate-400">
+                  Weirdness
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={weirdnessValue}
+                    onChange={(event) =>
+                      updateWindowTextureValue(index, "weirdness", Number(event.target.value))
+                    }
+                    className="mt-2 h-1.5 w-full accent-primary"
+                  />
+                </label>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  Audio atoms
+                  <Input
+                    value={formatIdList(window.material?.audioAtomIds)}
+                    onChange={(event) =>
+                      updateWindowMaterialList(index, "audioAtomIds", event.target.value)
+                    }
+                    placeholder="atom-1, atom-2"
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  MIDI motifs
+                  <Input
+                    value={formatIdList(window.material?.midiMotifIds)}
+                    onChange={(event) =>
+                      updateWindowMaterialList(index, "midiMotifIds", event.target.value)
+                    }
+                    placeholder="motif-1, motif-2"
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  Groove templates
+                  <Input
+                    value={formatIdList(window.material?.grooveTemplateIds)}
+                    onChange={(event) =>
+                      updateWindowMaterialList(index, "grooveTemplateIds", event.target.value)
+                    }
+                    placeholder="groove-1, groove-2"
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+            Sections
+          </p>
+          <Button size="sm" variant="outline" onClick={handleAddSection}>
+            Add section
+          </Button>
+        </div>
+        {(timelinePlan.global?.sections ?? []).length ? (
+          (timelinePlan.global?.sections ?? []).map((section, index) => (
+            <div
+              key={`${section.name}-${index}`}
+              className="rounded-lg border border-white/10 bg-black/30 p-3"
+            >
+              <div className="flex items-center justify-between text-[11px] text-slate-300">
+                <span className="font-semibold text-slate-100">Section {index + 1}</span>
+                <Button size="sm" variant="ghost" onClick={() => handleRemoveSection(index)}>
+                  Remove
+                </Button>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  Name
+                  <Input
+                    value={section.name}
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      if (!raw.trim()) return;
+                      updateSection(index, (current) => ({
+                        ...current,
+                        name: raw,
+                      }));
+                    }}
+                    placeholder={`Section ${index + 1}`}
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  Start bar
+                  <Input
+                    type="number"
+                    min={1}
+                    value={clampBarValue(section.startBar, barWindowRange.start)}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isNaN(next)) return;
+                      updateSection(index, (current) => ({
+                        ...current,
+                        startBar: clampBarValue(next, current.startBar),
+                      }));
+                    }}
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  Bars
+                  <Input
+                    type="number"
+                    min={1}
+                    value={clampBarValue(section.bars, 1)}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isNaN(next)) return;
+                      updateSection(index, (current) => ({
+                        ...current,
+                        bars: clampBarValue(next, current.bars),
+                      }));
+                    }}
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-[11px] text-slate-500">No sections yet.</p>
+        )}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+            Energy curve
+          </p>
+          <Button size="sm" variant="outline" onClick={handleAddEnergyPoint}>
+            Add point
+          </Button>
+        </div>
+        {(timelinePlan.global?.energyCurve ?? []).length ? (
+          (timelinePlan.global?.energyCurve ?? []).map((point, index) => (
+            <div
+              key={`${point.bar}-${index}`}
+              className="rounded-lg border border-white/10 bg-black/30 p-3"
+            >
+              <div className="flex items-center justify-between text-[11px] text-slate-300">
+                <span className="font-semibold text-slate-100">Point {index + 1}</span>
+                <Button size="sm" variant="ghost" onClick={() => handleRemoveEnergyPoint(index)}>
+                  Remove
+                </Button>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  Bar
+                  <Input
+                    type="number"
+                    min={1}
+                    value={clampBarValue(point.bar, barWindowRange.start)}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isNaN(next)) return;
+                      updateEnergyPoint(index, (current) => ({
+                        ...current,
+                        bar: clampBarValue(next, current.bar),
+                      }));
+                    }}
+                    className="h-8 bg-slate-950/60 text-xs"
+                  />
+                </label>
+                <label className="text-[11px] text-slate-400">
+                  Energy
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={clamp01(point.energy)}
+                    onChange={(event) =>
+                      updateEnergyPoint(index, (current) => ({
+                        ...current,
+                        energy: clamp01(Number(event.target.value)),
+                      }))
+                    }
+                    className="mt-2 h-1.5 w-full accent-primary"
+                  />
+                </label>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-[11px] text-slate-500">No energy points yet.</p>
+        )}
+      </div>
+    </div>
+  );
+
   const showCoverControls = !isListener || coverControlsEnabled;
   const emptyTitle = isListener
     ? "Select a song to start listening"
@@ -2585,6 +3844,7 @@ export function CoverCreator({
 
           {showRemixLayer ? (
             <div className="space-y-4">
+              {groupPanel}
               <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -2850,7 +4110,8 @@ export function CoverCreator({
                 </div>
               ) : null}
               {renderPlanOpen && canEditPlan ? (
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 space-y-3">
+                  {timelineEditor}
                   <textarea
                     className="min-h-[160px] w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-white focus:border-sky-500 focus:outline-none"
                     placeholder='{"windows":[{"startBar":1,"bars":4,"texture":{"sampleInfluence":0.7}}]}'
@@ -3027,8 +4288,37 @@ export function CoverCreator({
                 className="min-h-[72px] w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-white focus:border-sky-500 focus:outline-none"
                 placeholder="Notes (optional)"
                 value={recipeNotes}
-                onChange={(event) => setRecipeNotes(event.target.value)}
+                onChange={(event) => setRecipeNotes(event.target.value)}        
               />
+              {recipeParent ? (
+                <div className="flex items-center justify-between rounded-md border border-white/10 bg-black/30 px-3 py-2 text-[11px] text-slate-200">
+                  <div>
+                    <div className="font-semibold">Forking from edition</div>
+                    <div className="text-[10px] text-slate-400">
+                      {recipeParent.name}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setRecipeParentId(null)}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between rounded-md border border-white/10 bg-black/30 px-3 py-2 text-[11px] text-slate-200">
+                <div>
+                  <div className="font-semibold">Feature this edition</div>
+                  <div className="text-[10px] text-slate-400">
+                    Featured editions appear first for listeners.
+                  </div>
+                </div>
+                <Switch
+                  checked={recipeFeatured}
+                  onCheckedChange={setRecipeFeatured}
+                />
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
@@ -3044,6 +4334,8 @@ export function CoverCreator({
                   onClick={() => {
                     setRecipeName("");
                     setRecipeNotes("");
+                    setRecipeFeatured(false);
+                    setRecipeParentId(null);
                   }}
                 >
                   Clear
@@ -3071,8 +4363,8 @@ export function CoverCreator({
             <div className="mt-3 space-y-2">
               {recipesLoading ? (
                 <p className="text-[11px] text-muted-foreground">Loading recipes...</p>
-              ) : recipes.length ? (
-                recipes.map((recipe) => {
+              ) : sortedRecipes.length ? (
+                sortedRecipes.map((recipe) => {
                   const isMatch = selectedOriginal?.id === recipe.originalId;
                   const receiptChips = buildReceiptChips(recipe.receipt);
                   const violationPreview = formatViolationPreview(
@@ -3091,6 +4383,16 @@ export function CoverCreator({
                           <div className="text-[11px] text-slate-400">
                             {recipe.originalId} · {formatTimestamp(recipe.updatedAt)}
                           </div>
+                          {recipe.featured ? (
+                            <div className="mt-1">
+                              <Badge
+                                variant="secondary"
+                                className="bg-amber-500/20 text-amber-100"
+                              >
+                                Featured
+                              </Badge>
+                            </div>
+                          ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           {!isMatch ? (
@@ -3105,6 +4407,22 @@ export function CoverCreator({
                             onClick={() => handleApplyRecipe(recipe)}
                           >
                             Load
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!isMatch}
+                            onClick={() => handleForkRecipe(recipe)}
+                          >
+                            Fork
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={recipe.featured ? "secondary" : "ghost"}
+                            disabled={!isMatch || recipeBusyId === recipe.id}
+                            onClick={() => void handleToggleFeatured(recipe)}
+                          >
+                            {recipe.featured ? "Unfeature" : "Feature"}
                           </Button>
                           <Button
                             size="sm"
@@ -3158,6 +4476,28 @@ export function CoverCreator({
                 <p className="text-[11px] text-slate-500">No recipes saved yet.</p>
               )}
             </div>
+            {recipesByOriginal.length ? (
+              <div className="mt-4 rounded-lg border border-white/10 bg-black/30 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    Edition lineage
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {recipesByOriginal.length} edition
+                    {recipesByOriginal.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {editionTree.length ? (
+                    editionTree.map((node) => renderEditionNode(node, 0))
+                  ) : (
+                    <p className="text-[11px] text-slate-500">
+                      No lineage captured yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
           ) : null}
 

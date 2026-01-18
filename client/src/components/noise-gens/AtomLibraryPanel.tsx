@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
+import {
+  saveKnowledgeFiles,
+  updateKnowledgeFileAnalysis,
+  type KnowledgeFileRecord,
+} from "@/lib/agi/knowledge-store";
 import { isAudioKnowledgeFile } from "@/lib/knowledge/audio";
 import {
   ATOM_TAG,
@@ -11,6 +15,7 @@ import {
   collectTags,
   hasTag,
 } from "@/lib/knowledge/atom-curation";
+import { extractAtomsFromKnowledgeFiles } from "@/lib/knowledge/atom-extraction";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +65,8 @@ export function AtomLibraryPanel() {
   const [refreshing, setRefreshing] = useState(false);
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [extractStatus, setExtractStatus] = useState<string | null>(null);
 
   useEffect(() => {
     void refresh();
@@ -198,6 +205,57 @@ export function AtomLibraryPanel() {
     }
   };
 
+  const handleExtractAtoms = async () => {
+    setExtractStatus(null);
+    if (projectFilter === ALL_PROJECTS) {
+      setExtractStatus("Select a project to extract atoms.");
+      return;
+    }
+    const projectId = projectFilter;
+    const sources = (projectFiles[projectId] ?? [])
+      .filter(isAudioKnowledgeFile)
+      .filter((file) => !hasTag(file, ATOM_TAG));
+    if (!sources.length) {
+      setExtractStatus("No stem audio without atom tags found.");
+      return;
+    }
+    setExtracting(true);
+    try {
+      const result = await extractAtomsFromKnowledgeFiles(sources, {
+        maxAtomsPerSource: 6,
+        maxTotal: 32,
+        onProgress: setExtractStatus,
+      });
+      if (!result.atoms.length) {
+        setExtractStatus("No atom slices found.");
+        return;
+      }
+      const files = result.atoms.map((atom) => atom.file);
+      const saved = await saveKnowledgeFiles(files, { projectId });
+      for (let i = 0; i < saved.length; i += 1) {
+        const atom = result.atoms[i];
+        if (!atom) continue;
+        await updateKnowledgeFileAnalysis(saved[i].id, {
+          analysis: atom.analysis,
+          autoTags: atom.autoTags,
+        });
+      }
+      await refreshFiles(projectId);
+      await refresh();
+      const dedupeNote = result.deduped ? ` (${result.deduped} deduped)` : "";
+      const skipNote = result.skippedSources
+        ? `, skipped ${result.skippedSources} source(s)`
+        : "";
+      setExtractStatus(`Extracted ${saved.length} atoms${dedupeNote}${skipNote}.`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Atom extraction failed.";
+      setExtractStatus(message);
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   const emptyState = (() => {
     if (!projects.length) {
       return "No knowledge projects found yet.";
@@ -254,6 +312,14 @@ export function AtomLibraryPanel() {
           >
             Re-analyze
           </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void handleExtractAtoms()}
+            disabled={extracting || analysisRunning}
+          >
+            {extracting ? "Extracting..." : "Extract atoms"}
+          </Button>
         </div>
       </header>
 
@@ -265,6 +331,11 @@ export function AtomLibraryPanel() {
       {analysisStatus ? (
         <div className="mt-2 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-slate-200">
           {analysisStatus}
+        </div>
+      ) : null}
+      {extractStatus ? (
+        <div className="mt-2 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-slate-200">
+          {extractStatus}
         </div>
       ) : null}
 

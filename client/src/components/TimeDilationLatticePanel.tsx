@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
 
 declare const Buffer:
@@ -2379,6 +2380,10 @@ export default function TimeDilationLatticePanel({
     if (previewMatchesAsset(hullPreviewPayload, selectedAsset)) return hullPreviewPayload;
     return null;
   }, [selectedAsset, pipelinePreview, hullPreviewPayload]);
+  const previewArtifacts = useMemo(() => {
+    const preview = previewCandidate ?? pipelinePreview;
+    return preview ? buildPreviewArtifacts(preview) : null;
+  }, [previewCandidate, pipelinePreview]);
   const previewDims = useMemo(() => resolvePreviewDims(previewCandidate), [previewCandidate]);
   const canUsePreviewObb = Boolean(previewDims);
   const geometryStatus = updatePipeline.isPending
@@ -2392,6 +2397,17 @@ export default function TimeDilationLatticePanel({
     (pipelineState as any)?.geometryPreview?.mesh?.meshHash ??
     (pipelineState as any)?.geometryPreview?.preview?.meshHash ??
     null;
+  const diagnosticsHashes = useMemo(() => {
+    const lattice = previewArtifacts?.previewLattice ?? null;
+    const sdf = previewArtifacts?.previewSdf ?? null;
+    const mesh = previewArtifacts?.previewMesh ?? null;
+    return {
+      mesh_hash: mesh?.meshHash ?? geometryPreviewHash ?? null,
+      lattice_hashes: lattice?.hashes ?? null,
+      lattice_enabled: lattice?.enabled ?? null,
+      sdf_hash: sdf?.hash ?? lattice?.hashes?.sdf ?? null,
+    };
+  }, [previewArtifacts, geometryPreviewHash]);
   const assetsErrorMessage =
     hullAssetsQuery.error instanceof Error ? hullAssetsQuery.error.message : null;
   const buildGeometryUpdatePayload = React.useCallback(() => {
@@ -2789,6 +2805,10 @@ export default function TimeDilationLatticePanel({
     gridScale,
     gridDiv: GRID_DIV,
   });
+  const diagnosticsTraceId =
+    grAssistantQuery.data?.training_trace_id ??
+    grAssistantQuery.data?.trace_id ??
+    null;
   const driveDir = useMemo(() => normalizeDir((pipelineState as any)?.driveDir), [pipelineState]);
   const driveDirRef = useRef(driveDir);
   useEffect(() => {
@@ -3492,6 +3512,27 @@ export default function TimeDilationLatticePanel({
     renderPlanRef.current = renderPlan;
     setRenderPlanVersion((prev) => prev + 1);
   }, [renderPlan]);
+
+  const handleExportDiagnostics = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    const plan = renderPlanRef.current ?? renderPlan;
+    const payload = {
+      kind: "time_dilation_diagnostics",
+      exported_at: new Date().toISOString(),
+      render_plan: plan,
+      hashes: diagnosticsHashes,
+      training_trace_id: diagnosticsTraceId,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `time-dilation-diagnostics-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }, [renderPlan, diagnosticsHashes, diagnosticsTraceId]);
 
   const warpFieldType = renderPlan.mode;
   const alphaBrick = useMemo(() => {
@@ -4240,6 +4281,18 @@ export default function TimeDilationLatticePanel({
       missing,
     };
   }, [renderPlan, grRequested]);
+  const bannerDetails = useMemo(() => {
+    if (!renderBanner) return null;
+    const missing = renderBanner.missing.map((item) => `missing: ${item}`);
+    const full = [...missing, ...renderBanner.reasons];
+    const top = full.slice(0, 2);
+    return {
+      top,
+      full,
+      missing: renderBanner.missing,
+      reasons: renderBanner.reasons,
+    };
+  }, [renderBanner]);
 
   const debugStats = useMemo(() => {
     if (!debugEnabled) return null;
@@ -5443,87 +5496,98 @@ export default function TimeDilationLatticePanel({
     <div className={cn("space-y-3", className)}>
       <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border border-slate-800 bg-black/60">
         <canvas ref={canvasRef} className="h-full w-full block" />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-3 top-3 z-10 h-8 gap-1 border border-white/10 bg-slate-950/70 px-2 text-[11px] uppercase tracking-[0.2em] text-slate-200 hover:bg-slate-900/80"
-            >
-              Debug
-              <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[180px] border-white/10 bg-slate-950/95 text-slate-100">
-            <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
-              Clock rate
-            </DropdownMenuLabel>
-            <DropdownMenuCheckboxItem
-              checked={clockMode === "static"}
-              onCheckedChange={(value) => setClockMode(value ? "static" : "eulerian")}
-              className="text-xs text-slate-200"
-            >
-              Static (sqrt(-g_tt))
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
-              Viewer chart
-            </DropdownMenuLabel>
-            <DropdownMenuCheckboxItem
-              checked={viewerChart === "mp_like"}
-              onCheckedChange={(value) => setViewerChart(value ? "mp_like" : "adm")}
-              className="text-xs text-slate-200"
-            >
-              MP-like (prefer g_tt)
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator className="bg-white/10" />
-            <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
-              Overlays
-            </DropdownMenuLabel>
-            <DropdownMenuCheckboxItem
-              checked={debugEnabled}
-              onCheckedChange={(value) => setDebugEnabled(Boolean(value))}
-              className="text-xs text-slate-200"
-            >
-              Debug overlay
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={geometryControlsEnabled}
-              onCheckedChange={(value) => setGeometryControlsEnabled(Boolean(value))}
-              className="text-xs text-slate-200"
-            >
-              Geometry / GLB
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={casimirControlsEnabled}
-              onCheckedChange={(value) => setCasimirControlsEnabled(Boolean(value))}
-              className="text-xs text-slate-200"
-            >
-              Casimir tiles
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={grControlsEnabled}
-              onCheckedChange={(value) => setGrControlsEnabled(Boolean(value))}
-              className="text-xs text-slate-200"
-            >
-              GR controls
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={regionControlsEnabled}
-              onCheckedChange={(value) => setRegionControlsEnabled(Boolean(value))}
-              className="text-xs text-slate-200"
-            >
-              Region grid
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={visualControlsEnabled}
-              onCheckedChange={(value) => setVisualControlsEnabled(Boolean(value))}
-              className="text-xs text-slate-200"
-            >
-              Visual tuning
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleExportDiagnostics}
+            className="h-8 border border-white/10 bg-slate-950/70 px-2 text-[11px] uppercase tracking-[0.2em] text-slate-200 hover:bg-slate-900/80"
+          >
+            Export
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1 border border-white/10 bg-slate-950/70 px-2 text-[11px] uppercase tracking-[0.2em] text-slate-200 hover:bg-slate-900/80"
+              >
+                Debug
+                <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[180px] border-white/10 bg-slate-950/95 text-slate-100">
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                Clock rate
+              </DropdownMenuLabel>
+              <DropdownMenuCheckboxItem
+                checked={clockMode === "static"}
+                onCheckedChange={(value) => setClockMode(value ? "static" : "eulerian")}
+                className="text-xs text-slate-200"
+              >
+                Static (sqrt(-g_tt))
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                Viewer chart
+              </DropdownMenuLabel>
+              <DropdownMenuCheckboxItem
+                checked={viewerChart === "mp_like"}
+                onCheckedChange={(value) => setViewerChart(value ? "mp_like" : "adm")}
+                className="text-xs text-slate-200"
+              >
+                MP-like (prefer g_tt)
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                Overlays
+              </DropdownMenuLabel>
+              <DropdownMenuCheckboxItem
+                checked={debugEnabled}
+                onCheckedChange={(value) => setDebugEnabled(Boolean(value))}
+                className="text-xs text-slate-200"
+              >
+                Debug overlay
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={geometryControlsEnabled}
+                onCheckedChange={(value) => setGeometryControlsEnabled(Boolean(value))}
+                className="text-xs text-slate-200"
+              >
+                Geometry / GLB
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={casimirControlsEnabled}
+                onCheckedChange={(value) => setCasimirControlsEnabled(Boolean(value))}
+                className="text-xs text-slate-200"
+              >
+                Casimir tiles
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={grControlsEnabled}
+                onCheckedChange={(value) => setGrControlsEnabled(Boolean(value))}
+                className="text-xs text-slate-200"
+              >
+                GR controls
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={regionControlsEnabled}
+                onCheckedChange={(value) => setRegionControlsEnabled(Boolean(value))}
+                className="text-xs text-slate-200"
+              >
+                Region grid
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visualControlsEnabled}
+                onCheckedChange={(value) => setVisualControlsEnabled(Boolean(value))}
+                className="text-xs text-slate-200"
+              >
+                Visual tuning
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         {showContractionArrow && (
           <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[10px] text-slate-200">
             <div className="uppercase tracking-[0.2em] text-slate-400">contraction</div>
@@ -5545,23 +5609,63 @@ export default function TimeDilationLatticePanel({
             </div>
           </div>
         )}
-        {renderBanner && (
+        {renderBanner && bannerDetails && (
           <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center">
-            <div className="max-w-[360px] rounded-md border border-amber-500/40 bg-black/80 px-3 py-2 text-[11px] text-slate-200">
+            <div className="pointer-events-auto max-w-[360px] rounded-md border border-amber-500/40 bg-black/80 px-3 py-2 text-[11px] text-slate-200">
               <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300">
                 {renderBanner.title}
               </div>
-              {renderBanner.missing.length > 0 && (
-                <div className="mt-1 text-slate-300">
-                  missing: {renderBanner.missing.join(", ")}
-                </div>
-              )}
-              {renderBanner.reasons.length > 0 && (
+              {bannerDetails.top.length > 0 && (
                 <div className="mt-2 space-y-1 text-[10px] text-slate-400">
-                  {renderBanner.reasons.map((reason) => (
+                  {bannerDetails.top.map((reason) => (
                     <div key={reason}>{reason}</div>
                   ))}
                 </div>
+              )}
+              {bannerDetails.full.length > bannerDetails.top.length && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="mt-2 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-amber-200 transition hover:text-amber-100"
+                    >
+                      Details
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="center"
+                    sideOffset={8}
+                    className="w-64 border-white/10 bg-slate-950/95 text-slate-200"
+                  >
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-amber-200">
+                      Gating details
+                    </div>
+                    {bannerDetails.missing.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                          Missing
+                        </div>
+                        <div className="mt-1 space-y-1 text-[10px] text-slate-300">
+                          {bannerDetails.missing.map((item) => (
+                            <div key={`missing:${item}`}>{item}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {bannerDetails.reasons.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                          Reasons
+                        </div>
+                        <div className="mt-1 space-y-1 text-[10px] text-slate-300">
+                          {bannerDetails.reasons.map((reason) => (
+                            <div key={`reason:${reason}`}>{reason}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
           </div>

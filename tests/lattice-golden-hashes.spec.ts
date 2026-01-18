@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { HULL_BASIS_IDENTITY } from "@shared/hull-basis";
 import type { HullPreviewPayload } from "@shared/schema";
@@ -7,48 +9,61 @@ import { hashLatticeSdfDeterminism, hashLatticeVolumeDeterminism } from "@/lib/l
 import { voxelizeHullSurfaceStrobe } from "@/lib/lattice-surface";
 import type { HullSurfaceMesh } from "@/lib/resolve-wireframe-overlay";
 
+type LatticeGoldenFixture = {
+  frame: {
+    hullDims: { Lx_m: number; Ly_m: number; Lz_m: number };
+    boundsProfile: string;
+    preset: string;
+    profileTag: string;
+    overrides: Record<string, number>;
+    centerWorld: [number, number, number];
+  };
+  surface: {
+    positions: number[];
+    indices: number[];
+    meshHash: string;
+    sectorCount: number;
+  };
+  expected: {
+    volume_generation_hash: string;
+    volume_determinism_hash: string;
+    sdf_grid_key: string;
+    sdf_determinism_hash: string;
+  };
+};
+
+const fixturePath = path.resolve(process.cwd(), "tests", "fixtures", "lattice-golden.fixture.json");
+const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8")) as LatticeGoldenFixture;
+
 describe("lattice golden hashes (CI determinism)", () => {
   it("produces stable lattice generation + determinism hash for volume voxelization", async () => {
     const frame = buildLatticeFrame({
-      hullDims: { Lx_m: 1, Ly_m: 1, Lz_m: 1 },
+      hullDims: fixture.frame.hullDims,
       basis: HULL_BASIS_IDENTITY,
-      boundsProfile: "tight",
-      preset: "low",
-      profileTag: "preview",
-      overrides: {
-        paddingPct: 0,
-        paddingMin_m: 0,
-        paddingMax_m: 0,
-        targetVoxel_m: 0.5,
-        minVoxel_m: 0.5,
-        maxVoxel_m: 0.5,
-        maxDim: 2,
-        maxVoxels: 8,
-      },
-      centerWorld: [0, 0, 0],
+      boundsProfile: fixture.frame.boundsProfile as any,
+      preset: fixture.frame.preset as any,
+      profileTag: fixture.frame.profileTag as any,
+      overrides: fixture.frame.overrides,
+      centerWorld: fixture.frame.centerWorld,
     });
 
-    const positions = new Float32Array([
-      -0.25, -0.25, 0,
-       0.25, -0.25, 0,
-       0.00,  0.25, 0,
-    ]);
+    const positions = new Float32Array(fixture.surface.positions);
 
     const surface: HullSurfaceMesh = {
       key: "goldenSurface",
       lod: "preview",
       positions,
-      indices: new Uint32Array([0, 1, 2]),
+      indices: new Uint32Array(fixture.surface.indices),
       normals: null,
       tangents: null,
       vertexAngles01: new Float32Array([0, 0, 0]),
       vertexSectors: new Uint16Array([0, 0, 0]),
       triangleAngles01: new Float32Array([0]),
       triangleSectors: new Uint16Array([0]),
-      sectorCount: 1,
+      sectorCount: fixture.surface.sectorCount,
       triangleCount: 1,
       vertexCount: 3,
-      meshHash: "meshGolden",
+      meshHash: fixture.surface.meshHash,
       basis: HULL_BASIS_IDENTITY,
       handedness: 1,
       bounds: {
@@ -85,46 +100,33 @@ describe("lattice golden hashes (CI determinism)", () => {
       quantScale: 1e5,
     });
 
-    expect(generationHash).toBe("39d8ab50");
-    expect(determinismHash).toBe("7d915a432ddf54e0");
+    expect(generationHash).toBe(fixture.expected.volume_generation_hash);
+    expect(determinismHash).toBe(fixture.expected.volume_determinism_hash);
   });
 
   it("produces stable cache key + determinism hash for hull SDF band grid", async () => {
     const frame = buildLatticeFrame({
-      hullDims: { Lx_m: 1, Ly_m: 1, Lz_m: 1 },
+      hullDims: fixture.frame.hullDims,
       basis: HULL_BASIS_IDENTITY,
-      boundsProfile: "tight",
-      preset: "low",
-      profileTag: "preview",
-      overrides: {
-        paddingPct: 0,
-        paddingMin_m: 0,
-        paddingMax_m: 0,
-        targetVoxel_m: 0.5,
-        minVoxel_m: 0.5,
-        maxVoxel_m: 0.5,
-        maxDim: 2,
-        maxVoxels: 8,
-      },
-      centerWorld: [0, 0, 0],
+      boundsProfile: fixture.frame.boundsProfile as any,
+      preset: fixture.frame.preset as any,
+      profileTag: fixture.frame.profileTag as any,
+      overrides: fixture.frame.overrides,
+      centerWorld: fixture.frame.centerWorld,
     });
 
-    const positions = [
-      -0.25, -0.25, 0,
-       0.25, -0.25, 0,
-       0.00,  0.25, 0,
-    ];
+    const positions = fixture.surface.positions;
 
     const payload: HullPreviewPayload = {
       version: "v1",
       provenance: "preview",
-      meshHash: "meshGolden",
+      meshHash: fixture.surface.meshHash,
       lodCoarse: {
         tag: "coarse",
-        meshHash: "meshGolden",
+        meshHash: fixture.surface.meshHash,
         indexedGeometry: {
           positions,
-          indices: [0, 1, 2],
+          indices: fixture.surface.indices,
           vertexCount: 3,
           triangleCount: 1,
         },
@@ -146,7 +148,7 @@ describe("lattice golden hashes (CI determinism)", () => {
       quantScale: 1e5,
     });
 
-    expect(grid.key).toBe("meshGolden|d76552b58b6e2978|2x2x2|v0.50000|b0.6000");
-    expect(determinismHash).toBe("88075b46cdf5dbd1");
+    expect(grid.key).toBe(fixture.expected.sdf_grid_key);
+    expect(determinismHash).toBe(fixture.expected.sdf_determinism_hash);
   });
 });

@@ -1,0 +1,49 @@
+{
+  "started_at": "2026-01-18T15:40:05.458Z",
+  "persist": false,
+  "spectrum": [
+    {
+      "dataset": "solar-iss",
+      "view": "disk_integrated",
+      "file": "datasets\\solar\\spectra\\solar-iss\\v1.1\\spectrum.dat",
+      "inputs_hash": "sha256:b105239ddd1d10a3825b4c703909c15b50998827ee1f33b2bf79a0532b1c2246",
+      "features_hash": "sha256:706b6517f618ff2f9eafc38fb0516f4e0ad6c0005e1de55cffc9a4e1e2b9e828"
+    },
+    {
+      "dataset": "solar-hrs",
+      "view": "disk_integrated",
+      "file": "datasets\\solar\\spectra\\solar-hrs\\v1\\Spectre_HR_LATMOS_Meftah_V1.txt",
+      "inputs_hash": "sha256:5343cad227e8cb37f7a3f01a14c65bde216f134048dd69d373d15e16d6f9f882",
+      "features_hash": "sha256:a5f91d23207fdc6007a959f3fa801fbacf52c3eb74bf9075d2f19df9acc90b0a"
+    },
+    {
+      "dataset": "solar-hrs",
+      "view": "disk_center",
+      "file": "datasets\\solar\\spectra\\solar-hrs\\v1\\Spectre_HR_Disk_Center_LATMOS_Meftah_V1_1.txt",
+      "inputs_hash": "sha256:fba09b982c9a72f5b58bc979523623a95da68aba6e178d14237abaa710327ca4",
+      "features_hash": "sha256:8e88056a6c70ab3b84c9455ea98a47ebb246d3d6f80d212ad37717935bd76610"
+    },
+    {
+      "dataset": "solar-hrs",
+      "view": "intermediate",
+      "file": "datasets\\solar\\spectra\\solar-hrs\\v1\\Spectre_HR_Solar_position_LATMOS_Meftah_V1_1.txt",
+      "inputs_hash": "sha256:433385712cee47285123ef6cf95f7121a622bfaa7fba1e0647b0f33c58531723",
+      "features_hash": "sha256:104b06ca7c791284478c2b997342c9fbe474bce7f93347757247f68763cad4ac"
+    }
+  ],
+  "model": {
+    "inputs_hash": "sha256:6f22a76b500476762fe41ddecfc056b2e144b5ae8b5f470bd869d620e4de8167",
+    "features_hash": "sha256:02a637d375eaf1258f80bc24adc6ceb9bc150d2e63a20a8a6425198a9e2be326",
+    "best_model": "emissivity_drude",
+    "viability": {
+      "status": "pass",
+      "reasons": []
+    }
+  },
+  "surface": {
+    "inputs_hash": "sha256:974c772ac24d4709139d4944165790c204d098c1452698e3951c713c0decf054",
+    "features_hash": "sha256:671ab45df0a584c697d0bba66d3fd5924d73a6e9427811811890cbe8cfb71b94",
+    "u_field_inputs_hash": "sha256:c349640c4b445fc21085ae58ea8ef207788a2d7af9fbbe0274bc9c0d67320a7e"
+  },
+  "finished_at": "2026-01-18T15:52:32.127Z"
+}

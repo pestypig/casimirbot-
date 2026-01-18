@@ -1,0 +1,13 @@
+{
+  "schema_version": "gr_shift_stiffness_fixture/1",
+  "kind": "gr_shift_stiffness",
+  "grid": {
+    "dims": [12, 12, 12],
+    "bounds": { "min": [-1, -1, -1], "max": [1, 1, 1] }
+  },
+  "sigma_scale": 0.25,
+  "stencils": { "order": 2, "boundary": "clamp" },
+  "expected": {
+    "metrics_hash": "sha256:ba78a105aa08cff3bf48eaae705c68fb889fc9ae37b59381f196593211267030"
+  }
+}

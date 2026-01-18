@@ -40,6 +40,8 @@ type MidiMotifInput = {
   arpeggiator?: unknown;
   synth?: unknown;
   sound?: unknown;
+  sampler?: unknown;
+  sample?: unknown;
   notes?: MidiNoteInput[];
   events?: MidiNoteInput[];
   motif?: unknown;
@@ -162,7 +164,7 @@ const normalizeArp = (value: unknown): MidiMotif["arp"] | undefined => {
   };
 };
 
-const normalizeSynth = (value: unknown): MidiMotif["synth"] | undefined => {
+const normalizeSynth = (value: unknown): MidiMotif["synth"] | undefined => {    
   if (!isRecord(value)) return undefined;
   const waveform =
     typeof value.waveform === "string"
@@ -182,6 +184,68 @@ const normalizeSynth = (value: unknown): MidiMotif["synth"] | undefined => {
     ...(sustain != null ? { sustain } : {}),
     ...(releaseMs != null ? { releaseMs } : {}),
     ...(gain != null ? { gain } : {}),
+  };
+};
+
+const normalizeSamplerMapEntry = (
+  value: unknown,
+): NonNullable<MidiMotif["sampler"]>["map"][number] | null => {
+  if (!isRecord(value)) return null;
+  const note = parsePitch(value.note ?? value.pitch ?? value.midi ?? null);
+  const sourceId =
+    typeof value.sourceId === "string"
+      ? value.sourceId
+      : typeof value.id === "string"
+        ? value.id
+        : typeof value.sample === "string"
+          ? value.sample
+          : null;
+  if (note == null || !sourceId) return null;
+  const rootNote = parsePitch(value.rootNote ?? value.root ?? null) ?? undefined;
+  const gain = toNumber(value.gain ?? value.level ?? value.volume) ?? undefined;
+  const startMs = toNumber(value.startMs ?? value.start) ?? undefined;
+  const endMs = toNumber(value.endMs ?? value.end) ?? undefined;
+  return {
+    note,
+    sourceId,
+    ...(rootNote != null ? { rootNote } : {}),
+    ...(gain != null ? { gain } : {}),
+    ...(startMs != null ? { startMs } : {}),
+    ...(endMs != null ? { endMs } : {}),
+  };
+};
+
+const normalizeSampler = (value: unknown): MidiMotif["sampler"] | undefined => {
+  if (!isRecord(value)) return undefined;
+  const modeRaw = typeof value.mode === "string" ? value.mode.toLowerCase() : "";
+  const mode = modeRaw === "multi" ? "multi" : "single";
+  const sourceId =
+    typeof value.sourceId === "string"
+      ? value.sourceId
+      : typeof value.id === "string"
+        ? value.id
+        : undefined;
+  const rootNote = parsePitch(value.rootNote ?? value.root ?? null) ?? undefined;
+  const gain = toNumber(value.gain ?? value.level ?? value.volume) ?? undefined;
+  const attackMs = toNumber(value.attackMs ?? value.attack) ?? undefined;
+  const releaseMs = toNumber(value.releaseMs ?? value.release) ?? undefined;
+  const startMs = toNumber(value.startMs ?? value.start) ?? undefined;
+  const endMs = toNumber(value.endMs ?? value.end) ?? undefined;
+  const mapRaw = Array.isArray(value.map) ? value.map : [];
+  const map = mapRaw
+    .map(normalizeSamplerMapEntry)
+    .filter(Boolean) as NonNullable<MidiMotif["sampler"]>["map"];
+  if (!sourceId && map.length === 0) return undefined;
+  return {
+    mode: map.length > 0 ? "multi" : mode,
+    ...(sourceId ? { sourceId } : {}),
+    ...(rootNote != null ? { rootNote } : {}),
+    ...(gain != null ? { gain } : {}),
+    ...(attackMs != null ? { attackMs } : {}),
+    ...(releaseMs != null ? { releaseMs } : {}),
+    ...(startMs != null ? { startMs } : {}),
+    ...(endMs != null ? { endMs } : {}),
+    ...(map.length ? { map } : {}),
   };
 };
 
@@ -238,6 +302,7 @@ export const normalizeMidiMotifPayload = (
 
   const arp = normalizeArp(source.arp ?? source.arpeggiator);
   const synth = normalizeSynth(source.synth ?? source.sound);
+  const sampler = normalizeSampler(source.sampler ?? source.sample);
 
   return {
     id: typeof source.id === "string" ? source.id : undefined,
@@ -250,6 +315,7 @@ export const normalizeMidiMotifPayload = (
     quantize,
     arp,
     synth,
+    ...(sampler ? { sampler } : {}),
     notes,
   };
 };

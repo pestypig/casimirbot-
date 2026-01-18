@@ -98,7 +98,7 @@ const keywordTags: Array<[RegExp, string]> = [
   [/\b(outro)\b/i, "section:outro"],
 ];
 
-const deriveNameTags = (name: string): string[] => {
+export const deriveNameTags = (name: string): string[] => {
   const tags: string[] = [];
   for (const token of tokenizedName(name)) {
     const bpm = parseBpmToken(token);
@@ -165,6 +165,68 @@ const buildWaveformPeaks = (buffer: AudioBuffer): number[] => {
   return peaks;
 };
 
+export const analyzeAudioBuffer = (
+  audioBuffer: AudioBuffer,
+  name: string,
+): AtomAnalysisResult => {
+  const channels = audioBuffer.numberOfChannels;
+  const channelData = audioBuffer.getChannelData(0);
+  const sampleRate = audioBuffer.sampleRate;
+  const maxSamples = Math.min(
+    channelData.length,
+    Math.floor(sampleRate * DEFAULT_SAMPLE_SECONDS),
+  );
+  const stride = Math.max(1, Math.floor(maxSamples / MAX_SAMPLE_POINTS));
+  let sumSq = 0;
+  let peak = 0;
+  let zcr = 0;
+  let last = 0;
+  let count = 0;
+
+  for (let i = 0; i < maxSamples; i += stride) {
+    let sample = channelData[i] ?? 0;
+    if (channels > 1) {
+      sample += audioBuffer.getChannelData(1)?.[i] ?? 0;
+      sample /= channels;
+    }
+    sumSq += sample * sample;
+    peak = Math.max(peak, Math.abs(sample));
+    const sign = sample >= 0 ? 1 : -1;
+    if (i > 0 && sign !== last) {
+      zcr += 1;
+    }
+    last = sign;
+    count += 1;
+  }
+
+  const rms = Math.sqrt(sumSq / Math.max(1, count));
+  const zcrRate = count > 1 ? zcr / count : 0;
+  const brightness = clamp01((zcrRate - 0.02) / 0.23);
+  const durationSec = audioBuffer.duration;
+  const waveformPeaks = buildWaveformPeaks(audioBuffer);
+
+  const analysis: KnowledgeFileAnalysis = {
+    durationSec,
+    rms,
+    peak,
+    zcr: zcrRate,
+    brightness,
+    waveformPeaks,
+  };
+
+  const autoTags = uniqueTags(
+    [
+      ...deriveNameTags(name),
+      classifyDuration(durationSec),
+      classifyEnergy(rms),
+      classifyBrightness(brightness),
+      durationSec < 16 ? ATOM_TAG : "",
+    ].filter(Boolean),
+  );
+
+  return { analysis, autoTags };
+};
+
 export type AtomAnalysisResult = {
   analysis: KnowledgeFileAnalysis;
   autoTags: string[];
@@ -177,65 +239,11 @@ export async function analyzeKnowledgeAudio(
   try {
     const arrayBuffer = await record.data.arrayBuffer();
     const context = new AudioContext();
-    const audioBuffer = await context.decodeAudioData(arrayBuffer.slice(0));
+    const audioBuffer = await context.decodeAudioData(arrayBuffer.slice(0));    
     if (context.close) {
       void context.close();
     }
-
-    const channels = audioBuffer.numberOfChannels;
-    const channelData = audioBuffer.getChannelData(0);
-    const sampleRate = audioBuffer.sampleRate;
-    const maxSamples = Math.min(
-      channelData.length,
-      Math.floor(sampleRate * DEFAULT_SAMPLE_SECONDS),
-    );
-    const stride = Math.max(1, Math.floor(maxSamples / MAX_SAMPLE_POINTS));
-    let sumSq = 0;
-    let peak = 0;
-    let zcr = 0;
-    let last = 0;
-    let count = 0;
-
-    for (let i = 0; i < maxSamples; i += stride) {
-      let sample = channelData[i] ?? 0;
-      if (channels > 1) {
-        sample += audioBuffer.getChannelData(1)?.[i] ?? 0;
-        sample /= channels;
-      }
-      sumSq += sample * sample;
-      peak = Math.max(peak, Math.abs(sample));
-      const sign = sample >= 0 ? 1 : -1;
-      if (i > 0 && sign !== last) {
-        zcr += 1;
-      }
-      last = sign;
-      count += 1;
-    }
-
-    const rms = Math.sqrt(sumSq / Math.max(1, count));
-    const zcrRate = count > 1 ? zcr / count : 0;
-    const brightness = clamp01((zcrRate - 0.02) / 0.23);
-    const durationSec = audioBuffer.duration;
-    const waveformPeaks = buildWaveformPeaks(audioBuffer);
-
-    const analysis: KnowledgeFileAnalysis = {
-      durationSec,
-      rms,
-      peak,
-      zcr: zcrRate,
-      brightness,
-      waveformPeaks,
-    };
-
-    const autoTags = uniqueTags([
-      ...deriveNameTags(record.name),
-      classifyDuration(durationSec),
-      classifyEnergy(rms),
-      classifyBrightness(brightness),
-      durationSec < 16 ? ATOM_TAG : "",
-    ].filter(Boolean));
-
-    return { analysis, autoTags };
+    return analyzeAudioBuffer(audioBuffer, record.name);
   } catch {
     return null;
   }

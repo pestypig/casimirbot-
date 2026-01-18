@@ -1,9 +1,13 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createMinkowskiState, gridFromBounds } from "../modules/gr/bssn-state";
 import { computeShiftStiffnessMetrics } from "../modules/gr/gr-diagnostics";
 import { diff1, diff1Upwind } from "../modules/gr/stencils";
 import { runBssnEvolution } from "../server/gr/evolution/solver";
 import { buildGrEvolveBrick } from "../server/gr-evolve-brick";
+import { stableJsonStringify } from "../server/utils/stable-json";
 
 const buildStepField = (nx: number) => {
   const field = new Float32Array(nx);
@@ -73,6 +77,16 @@ const buildWallState = (grid: ReturnType<typeof gridFromBounds>, sigma: number) 
   return state;
 };
 
+type ShiftStiffnessFixture = {
+  grid: { dims: [number, number, number]; bounds: { min: [number, number, number]; max: [number, number, number] } };
+  sigma_scale: number;
+  stencils: { order: 2; boundary: "clamp" };
+  expected: { metrics_hash: string };
+};
+
+const fixturePath = path.resolve(process.cwd(), "tests", "fixtures", "gr-shift-stiffness.fixture.json");
+const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8")) as ShiftStiffnessFixture;
+
 const constraintRms = (constraints: { H: Float32Array; Mx: Float32Array; My: Float32Array; Mz: Float32Array }) => {
   const total = Math.max(0, constraints.H.length);
   let sumH2 = 0;
@@ -122,6 +136,18 @@ describe("advection stability knobs", () => {
     expect(upwindRange.min).toBeGreaterThanOrEqual(-1e-6);
     expect(upwindRange.max).toBeLessThanOrEqual(1 + 1e-6);
     expect(centeredRange.min).toBeLessThan(upwindRange.min);
+  });
+
+  it("matches the shift stiffness fixture hash", () => {
+    const grid = gridFromBounds(fixture.grid.dims, fixture.grid.bounds);
+    const sigma = grid.spacing[0] * fixture.sigma_scale;
+    const state = buildWallState(grid, sigma);
+    const metrics = computeShiftStiffnessMetrics(state, fixture.stencils);
+    const hash = `sha256:${crypto
+      .createHash("sha256")
+      .update(stableJsonStringify(metrics))
+      .digest("hex")}`;
+    expect(hash).toBe(fixture.expected.metrics_hash);
   });
 
   it("keeps sharp-wall evolution finite and reports stiffness", () => {
