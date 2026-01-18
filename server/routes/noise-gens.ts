@@ -92,6 +92,8 @@ const MAX_WAVEFORM_SAMPLES_PER_BUCKET = 2048;
 const MAX_JS_WAV_CONVERT_BYTES = 8 * 1024 * 1024;
 const MIXDOWN_SAMPLE_RATE = 44_100;
 const MIXDOWN_CHANNELS = 2;
+const MIXDOWN_PEAK_TARGET = 0.98;
+const PLAYBACK_LIMITER_FILTER = `alimiter=limit=${MIXDOWN_PEAK_TARGET}`;
 const PLAYBACK_OPUS_BITRATE = "160k";
 const PLAYBACK_AAC_BITRATE = "192k";
 const PLAYBACK_MP3_BITRATE = "192k";
@@ -1998,6 +2000,8 @@ const buildPlaybackDerivatives = async (params: {
       "error",
       "-i",
       "pipe:0",
+      "-af",
+      PLAYBACK_LIMITER_FILTER,
       "-c:a",
       "libopus",
       "-b:a",
@@ -2028,6 +2032,8 @@ const buildPlaybackDerivatives = async (params: {
       "error",
       "-i",
       "pipe:0",
+      "-af",
+      PLAYBACK_LIMITER_FILTER,
       "-c:a",
       "aac",
       "-b:a",
@@ -2058,6 +2064,8 @@ const buildPlaybackDerivatives = async (params: {
       "error",
       "-i",
       "pipe:0",
+      "-af",
+      PLAYBACK_LIMITER_FILTER,
       "-c:a",
       "libmp3lame",
       "-b:a",
@@ -2588,7 +2596,7 @@ const mixdownAssetsWithFfmpeg = async (
       "error",
       ...files.flatMap((file) => ["-i", file]),
       "-filter_complex",
-      `amix=inputs=${files.length}:normalize=0`,
+      `amix=inputs=${files.length}:normalize=1,alimiter=limit=${MIXDOWN_PEAK_TARGET}`,
       "-ac",
       String(MIXDOWN_CHANNELS),
       "-ar",
@@ -2713,6 +2721,22 @@ const mixdownPcm16WavBuffers = async (params: {
   const maxSamples = Math.max(...tracks.map((track) => track.length));
   const mixed = new Int16Array(maxSamples);
   const gain = 1 / Math.max(1, tracks.length);
+  let peak = 0;
+
+  for (let i = 0; i < maxSamples; i += 1) {
+    let sum = 0;
+    for (const track of tracks) {
+      if (i < track.length) {
+        sum += track[i];
+      }
+    }
+    const scaled = sum * gain;
+    const abs = Math.abs(scaled);
+    if (abs > peak) peak = abs;
+  }
+
+  const maxAllowed = 32767 * MIXDOWN_PEAK_TARGET;
+  const limiterGain = peak > maxAllowed ? maxAllowed / peak : 1;
   let sumSquares = 0;
   let sampleCount = 0;
 
@@ -2723,7 +2747,7 @@ const mixdownPcm16WavBuffers = async (params: {
         sum += track[i];
       }
     }
-    const scaled = sum * gain;
+    const scaled = sum * gain * limiterGain;
     const clamped = Math.max(-32768, Math.min(32767, Math.round(scaled)));
     mixed[i] = clamped;
     const normalized = clamped / 32768;
@@ -4573,6 +4597,7 @@ router.post("/api/noise-gens/upload/complete", async (req, res) => {
     return res.status(400).json({ error: "track_id_required" });
   }
   const autoMixdown = readBooleanField(req.body?.autoMixdown);
+  const forcePlayback = readBooleanField(req.body?.forcePlayback);
   const store = await getNoisegenStore();
   const original = findOriginalById(store, trackId);
   if (!original) {
@@ -4584,7 +4609,48 @@ router.post("/api/noise-gens/upload/complete", async (req, res) => {
   const buildStemGroupsIfNeeded = async () =>
     shouldBuildStemGroups ? await buildStemGroupAssets(original) : undefined;
 
-  if (original.assets.playback && original.assets.playback.length > 0) {
+  if (forcePlayback) {
+    if (original.assets.instrumental) {
+      try {
+        const buffer = await loadAssetBuffer(original.assets.instrumental);
+        const playbackAssets = await buildPlaybackAssetsFromBuffer({
+          originalId: trackId,
+          buffer,
+          mime: original.assets.instrumental.mime,
+          originalName: original.assets.instrumental.fileName,
+          fallbackAsset: original.assets.instrumental,
+        });
+        const stemGroupAssets = await buildStemGroupsIfNeeded();
+        await upsertOriginalRecord({
+          trackId,
+          title: original.title,
+          creator: original.artist,
+          durationSeconds: original.duration,
+          offsetMs: original.offsetMs ?? 0,
+          tempo: original.tempo,
+          notes: original.notes,
+          timeSky: original.timeSky,
+          playbackAssets,
+          stemGroupAssets,
+          processing: {
+            status: "ready",
+            detail: resolvePlaybackReadyDetail(playbackAssets),
+            updatedAt: Date.now(),
+          },
+        });
+        return res.json({ status: "ready", regenerated: true });
+      } catch {
+        return res
+          .status(500)
+          .json({ error: "playback_rebuild_failed" });
+      }
+    }
+    if (!original.assets.stems?.length && !original.assets.vocal) {
+      return res.status(400).json({ error: "playback_source_missing" });
+    }
+  }
+
+  if (!forcePlayback && original.assets.playback && original.assets.playback.length > 0) {
     const stemGroupAssets = await buildStemGroupsIfNeeded();
     await upsertOriginalRecord({
       trackId,
@@ -4660,7 +4726,7 @@ router.post("/api/noise-gens/upload/complete", async (req, res) => {
     }
   }
 
-  if (!autoMixdown) {
+  if (!autoMixdown && !forcePlayback) {
     await upsertOriginalRecord({
       trackId,
       title: original.title,
