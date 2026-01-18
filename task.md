@@ -1,4 +1,4 @@
-# GR Tool-Augmented Assistant (Local) - Task Spec
+﻿# GR Tool-Augmented Assistant (Local) - Task Spec
 
 ## Goal
 Build a local, tool-augmented assistant that helps derive and validate GR tensor
@@ -1299,7 +1299,7 @@ Prompt NG52 (Catalog snapshot in object storage) - Status: complete
 
 Prompt NG53 (Upload session records + resume) - Status: pending
 - Goal: make large uploads resilient to crashes or tab closes.
-- Do: persist per-track upload session records with stage states (received → assembled → analyzed → playback ready).
+- Do: persist per-track upload session records with stage states (received â†’ assembled â†’ analyzed â†’ playback ready).
 - Do: allow resuming or reconciling partial uploads on next upload attempt.
 - Do not: require manual cleanup to retry a failed upload.
 - Acceptance: interrupted uploads can resume or safely restart without duplicate entries.
@@ -1323,6 +1323,132 @@ Prompt NG56 (Listener auto-refresh via SSE/polling) - Status: pending
 - Do not: overwhelm the server; use sensible intervals and backoff.
 - Acceptance: listener lists update within seconds of a publish.
 
+Prompt NG57 (Live Instrument AI Mode: Ableton integration plan) - Status: pending
+- Goal: deliver a detailed project plan and feasibility overview for a Live Instrument AI
+  mode that integrates with Ableton while preserving NoiseGen's deterministic pipeline,
+  with optional AudioCraft materials.
+- Overview: three clocks and one constitution.
+  - Clock 1: Ableton transport (bar/beat/loop region).
+  - Clock 2: Planner windowing (1/2/4/8/16 bars).
+  - Clock 3: Lookahead horizon (next bar or next window).
+  - Constitution: imported Ableton intent snapshot (.als) that sets constraints and
+    style defaults.
+- Feasibility receipts (proof it is possible):
+  - Ableton .als sets are gzipped XML; read-only parsing is tractable and common for
+    extraction workflows.
+  - Max for Live devices can query Live API and emit MIDI in real time, making an
+    Ableton-native "bandmate" possible.
+  - Ableton Link provides tempo/phase sync across apps for external bridge fallback.
+  - AudioCraft (MusicGen/AudioGen) exists as a material generator to feed deterministic
+    planning without replacing it.
+- The big overview: what gets built.
+  - A creator loads an Ableton project, drops in the Live Instrument AI device, and it:
+    1) learns structure and intent from the project (tempo/sections/key/mix intent),
+    2) follows loop region and bar grid,
+    3) listens (lightly) to context (optional stem analysis or live meters),
+    4) generates MIDI for one role (bass or mid or high) within a selected
+       pitch/frequency band,
+    5) stays coherent by looking ahead and resolving into upcoming harmony.
+  - This is "AI bandmate", not "AI writes a song".
+- Architecture: four components.
+  - A) Ableton Intent Snapshot (from .als/.xml)
+    - Input: .als (or extracted XML).
+    - Output: compact JSON snapshot:
+      - tempo + time signature (+ tempo map if present),
+      - locators/sections,
+      - key (user-supplied or derived),
+      - track roles (bass, drums, vocal, etc.),
+      - device chain summaries (stock devices),
+      - optional automation curves (macro-ish).
+    - Why it is sane: .als is gzipped XML; safe read-only extraction.
+    - This snapshot is the contract moment that Live Mode obeys.
+  - B) DAW Bridge (the "plugin")
+    - V1: Max for Live MIDI effect (fastest iteration).
+    - Responsibilities:
+      - read current bar/beat, tempo, loop start/length,
+      - let user select role (Bass/Mid/High),
+      - loop length (1/2/4/8/16),
+      - pitch band (or frequency band to MIDI range),
+      - intensity/complexity/humanize,
+      - send context packet to planner,
+      - receive MIDI/CC from planner,
+      - output MIDI to Ableton instrument track.
+    - Optional sync helper: Ableton Link for external bridge fallback.
+  - C) Live Session Brain (local planner)
+    - Uses existing RenderPlan windowing (1/2/4/8/16 bars).
+    - Uses PlanAnalysis time series (energy/chroma/density/brightness), from:
+      - precomputed stem analysis (best), or
+      - lightweight live meters (later).
+    - Generates "next window" actions:
+      - notes (pitch/startBeat/duration/velocity),
+      - optional CC/macro automation.
+    - Generates slightly ahead (schedule next window one bar before).
+  - D) Optional Material Generator (AudioCraft)
+    - Use as ingredient factory, not real-time decision engine.
+    - Generate libraries of bass riffs, pads, arps, one-shots, fills.
+    - Tag/analyze; planner chooses and adapts (transpose/time-stretch/density).
+- Project plan: phases with deliverables.
+  - Phase 1: "AI Bass in Ableton" (Max for Live + local planner).
+    - Goal: prove looped bandmate experience quickly.
+    - Deliverables:
+      - M4L MIDI device with loop length selector (1/2/4/8/16), key selector,
+        role selector (Bass only), connect/disconnect indicator.
+      - Local endpoint: live/session/start, live/session/next, live/session/stop.
+      - Minimal next-window generator:
+        - stays in key,
+        - stays in pitch band,
+        - resolves into bar boundaries,
+        - avoids basic clashes.
+  - Phase 2: Import .als -> Intent Snapshot -> Live Defaults.
+    - Goal: AI musician feels like it learned the session.
+    - Deliverables:
+      - Accept .als upload (no manual unzip).
+      - Parse gzip XML to JSON snapshot.
+      - Pre-fill defaults: tempo/timeSig, loop region suggestions, track role
+        inference, mix intent bounds.
+  - Phase 3: "Listens to other stems" (conflict-aware notes).
+    - Goal: play in the pocket, not on top of everyone.
+    - Deliverables:
+      - Extend analysis artifacts with per-bar occupancy:
+        - pitch-class/chroma by bar,
+        - spectral band energy by stem (low/mid/high).
+      - Live brain uses signals to avoid collisions, choose inversions, and
+        anticipate resolution.
+  - Phase 4: AudioCraft as material generator (offline first).
+    - Goal: richer vocabulary without real-time inference risk.
+    - Deliverables:
+      - Job type: "Generate ingredients for project".
+      - Run AudioCraft/MusicGen to output loops/motifs/textures.
+      - Ingest into knowledge/atom library.
+      - Live brain can request: "8 bass atoms in this key, this tempo, 2 bars".
+  - Phase 5: Beyond Ableton (VST3/AU, optional).
+    - Deliverables:
+      - JUCE-based plugin.
+      - Ableton Link sync so it works across DAWs.
+      - Streams MIDI generation requests to local brain.
+- Core live brain logic (plain English):
+  1) Observe: current bar, key, chord context, loop length, spectral occupancy.
+  2) Look ahead: next bar/window chord change or section boundary.
+  3) Generate candidates: 10-50 small note patterns inside pitch band.
+  4) Score candidates:
+     - stays in key / chord tones,
+     - resolves into upcoming harmony,
+     - avoids pitch/frequency collisions,
+     - matches energy/density curve.
+  5) Commit: send winning pattern for next window.
+  6) Repeat each window with slight mutation.
+- How AudioCraft fits without derailing the system:
+  - Use offline generation of materials (atoms/motifs), not as the real-time
+    decision maker.
+  - Deterministic planner stays the conductor; AudioCraft builds instruments.
+- Product naming:
+  - "Live Mode: AI Bandmate"
+    - Bassmate (v1), Chordmate (v2), Leadmate (later).
+- Reference checklist:
+  - .als parsing is feasible because it is gzipped XML.
+  - Max for Live can read Live state and output MIDI in real time.
+  - Ableton Link can sync tempo/phase across apps.
+  - AudioCraft exists and can generate music/audio materials to feed the pipeline.
 ---
 
 ## Solar Model Track (Spectrum + Surface Coherence)
