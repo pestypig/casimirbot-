@@ -31,6 +31,7 @@ const TASKBAR_HEIGHT = 48;
 const WINDOW_CONTROL_SELECTOR = "[data-window-control='true']";
 const FULLSCREEN_EXIT_ZONE_PX = 64;
 const FULLSCREEN_HINT_HIDE_DELAY_MS = 800;
+const IDEOLOGY_PANEL_ID = "mission-ethos";
 
 type ViewportMetrics = {
   width: number;
@@ -358,7 +359,8 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
   const contentClasses = cn(
     "relative w-full overflow-x-auto overflow-y-auto",
     w.isFullscreen ? "h-full" : "h-[calc(100%-2.5rem)]",
-    enableBlend && "blend-text"
+    enableBlend && "blend-text",
+    id === IDEOLOGY_PANEL_ID && "bg-slate-950 overscroll-contain"
   );
 
   const windowClasses = cn(

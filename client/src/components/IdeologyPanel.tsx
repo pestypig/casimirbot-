@@ -5,6 +5,7 @@ import { useIdeologyBeliefGraph } from "@/hooks/use-ideology-belief-graph";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import CitizensArcView from "@/components/ideology/CitizensArcView";
 import { cn } from "@/lib/utils";
 
 type IdeologyPanelProps = {
@@ -14,6 +15,8 @@ type IdeologyPanelProps = {
 
 const formatMetric = (value: number | null | undefined, digits = 3) =>
   Number.isFinite(value) ? (value as number).toFixed(digits) : "--";
+
+const CITIZENS_ARC_ID = "citizens-arc";
 
 export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
   const { data, isLoading, error, childrenOf, resolve } = useIdeology();
@@ -177,7 +180,12 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
         : "border-slate-500/40 bg-slate-500/10 text-slate-300";
 
   return (
-    <div className={cn("grid h-full grid-cols-12 gap-3 p-3 text-slate-100 bg-slate-950/70", className)}>
+    <div
+      className={cn(
+        "grid min-h-full grid-cols-12 gap-3 p-3 text-slate-100 bg-slate-950/70",
+        className
+      )}
+    >
       <div className="col-span-12 lg:col-span-3 space-y-3">
         <Card className="p-3 bg-slate-950/50 border-white/10">
           <label className="block text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 mb-2">
@@ -266,7 +274,14 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
                 </div>
               ) : null}
               <Separator className="my-4 bg-white/10" />
-              {renderBody(selected)}
+              {selected.id === CITIZENS_ARC_ID ? (
+                <CitizensArcView
+                  onSelectNode={setSelectedId}
+                  resolve={resolve}
+                />
+              ) : (
+                renderBody(selected)
+              )}
               {selected.links && selected.links.length > 0 && (
                 <div className="mt-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">

@@ -1186,7 +1186,7 @@ export default function HelixNoiseGensPage() {
                     onVary={handleListenerVary}
                     isVarying={listenerVarying}
                     varyStatus={listenerVaryStatus}
-                    canEditLyrics={showStudio || showAdvanced}
+                    canEditLyrics={showStudio}
                     canEditContract={showStudio || showAdvanced}
                   />
                   <div className="flex items-center justify-end">

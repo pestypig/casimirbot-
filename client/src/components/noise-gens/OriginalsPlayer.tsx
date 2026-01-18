@@ -2487,13 +2487,14 @@ export function OriginalsPlayer({
       }
     });
 
-    const scoredNodes = Array.from(nodeScores.entries())
+    const allScoredNodes = Array.from(nodeScores.entries())
       .map(([nodeId, entry]) => ({ nodeId, ...entry }))
-      .filter((entry) =>
-        selectedBranch ? isInBranch(entry.nodeId, selectedBranch) : true,
-      )
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6);
+      .sort((a, b) => b.score - a.score);
+    const branchFiltered = selectedBranch
+      ? allScoredNodes.filter((entry) => isInBranch(entry.nodeId, selectedBranch))
+      : allScoredNodes;
+    const scoredNodes =
+      branchFiltered.length >= 3 ? branchFiltered.slice(0, 6) : allScoredNodes.slice(0, 6);
 
     const cards = scoredNodes.map((entry) => {
       const node = nodeById.get(entry.nodeId);

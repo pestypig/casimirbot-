@@ -9,7 +9,7 @@
       "excerpt": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.",
       "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.\n\nWhen measurements disagree with our story, we revise the story. The vow survives by truth, not by force.",
       "tags": ["stewardship", "compassion"],
-      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols", "jurisdictional-floor", "two-key-approval", "interbeing-systems", "sangha-architecture", "right-speech-infrastructure", "restorative-harm-repair", "impermanence-by-design", "koan-governance", "three-tenets-loop", "no-bypass-guardrail", "capture-resistance", "scarcity-justice", "data-dignity", "civic-memory-continuity", "skillful-mediation", "external-interface-integrity"],
+      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols", "jurisdictional-floor", "two-key-approval", "interbeing-systems", "sangha-architecture", "citizens-arc", "right-speech-infrastructure", "restorative-harm-repair", "impermanence-by-design", "koan-governance", "three-tenets-loop", "no-bypass-guardrail", "capture-resistance", "scarcity-justice", "data-dignity", "civic-memory-continuity", "skillful-mediation", "external-interface-integrity"],
       "links": [
         { "rel": "see-also", "to": "bodhisattva-craft" },
         { "rel": "see-also", "to": "beginners-mind" },
@@ -51,6 +51,33 @@
         { "rel": "see-also", "to": "values-over-images" },
         { "rel": "see-also", "to": "voice-integrity" },
         { "rel": "see-also", "to": "worldview-integrity" }
+      ]
+    },
+    {
+      "id": "citizens-arc",
+      "slug": "citizens-arc",
+      "title": "Citizen's Arc",
+      "excerpt": "A dignity-floor civilization that runs voluntary trials to select stewards and keeps power revisable.",
+      "bodyMD": "The citizen's arc is the societal ladder: soft ground, hard tests, clear mirrors.\n\nThe floor ends coercive scarcity, the ladder reveals competence, and the roof keeps tradeoffs explicit. This view is the civic mirror that keeps Mission Ethos honest.\n\nSee [[node:interbeing-systems]], [[node:scarcity-justice]], [[node:capability-ambition-gradient]], [[node:struggle-testament]], [[node:promise-trials]], [[node:koan-governance]], [[node:values-over-images]], [[node:worldview-integrity]], [[node:sangha-architecture]], [[node:no-bypass-guardrail]], [[node:integrity-protocols]], [[node:inner-spark]], [[node:lifetime-trust-ledger]], [[node:solitude-to-signal]], and [[node:habit-pressure-break]].",
+      "tags": ["society", "civic", "stewardship", "trials", "governance"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "interbeing-systems" },
+        { "rel": "see-also", "to": "scarcity-justice" },
+        { "rel": "see-also", "to": "capability-ambition-gradient" },
+        { "rel": "see-also", "to": "struggle-testament" },
+        { "rel": "see-also", "to": "promise-trials" },
+        { "rel": "see-also", "to": "koan-governance" },
+        { "rel": "see-also", "to": "values-over-images" },
+        { "rel": "see-also", "to": "worldview-integrity" },
+        { "rel": "see-also", "to": "sangha-architecture" },
+        { "rel": "see-also", "to": "no-bypass-guardrail" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "inner-spark" },
+        { "rel": "see-also", "to": "lifetime-trust-ledger" },
+        { "rel": "see-also", "to": "solitude-to-signal" },
+        { "rel": "see-also", "to": "habit-pressure-break" }
       ]
     },
     {
