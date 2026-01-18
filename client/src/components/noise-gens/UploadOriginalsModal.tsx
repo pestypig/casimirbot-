@@ -603,6 +603,7 @@ export type UploadCompletePayload = {
   knowledgeProjectName?: string;
   tempo?: TempoMeta;
   durationSeconds?: number | null;
+  publishedLyrics?: string;
 };
 
 const DEFAULT_BARS_IN_LOOP = 8;
@@ -1299,6 +1300,7 @@ export function UploadOriginalsModal({
           knowledgeProjectName: selectedProject?.name?.trim(),
           tempo: tempoMeta,
           durationSeconds: estimateLoopDurationSeconds(tempoMeta ?? undefined),
+          publishedLyrics: lyrics.trim() || undefined,
         });
         onOpenChange(false);
         return;
@@ -1682,6 +1684,7 @@ export function UploadOriginalsModal({
         knowledgeProjectName: selectedProjectName,
         tempo: tempoMeta,
         durationSeconds: estimateLoopDurationSeconds(tempoMeta ?? undefined),
+        publishedLyrics: lyrics.trim() || undefined,
       });
       if (intentFile) {
         setIntentSummaryLoading(true);

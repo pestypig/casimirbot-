@@ -11,6 +11,12 @@ export type RecentUploadEntry = {
   knowledgeProjectName?: string;
   tempo?: TempoMeta;
   durationSeconds?: number | null;
+  publishedLyrics?: string;
+  metaSummary?: {
+    saved: string;
+    published: string;
+    changed: boolean;
+  };
 };
 
 type RecentUploadsRailProps = {
@@ -70,7 +76,15 @@ export function RecentUploadsRail({
                   <span>{formatTimeAgo(upload.uploadedAt)}</span>
                   {!upload.isRanked ? <span className="text-amber-300">Syncing</span> : null}
                 </div>
-                {upload.tempo ? (
+                {upload.metaSummary ? (
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    Meta: {upload.metaSummary.saved} · Published:{" "}
+                    {upload.metaSummary.published}
+                    {upload.metaSummary.changed ? (
+                      <span className="ml-1 text-amber-300">updated</span>
+                    ) : null}
+                  </div>
+                ) : upload.tempo ? (
                   <div className="text-[11px] text-slate-500">
                     {Math.round(upload.tempo.bpm)} BPM · {upload.tempo.timeSig}
                   </div>

@@ -139,6 +139,13 @@ const estimateDurationFromTempo = (tempo?: TempoMeta | null): number | null => {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
 };
 
+const buildMetaLabel = (hasLyrics: boolean, hasTempo: boolean): string => {
+  const parts: string[] = [];
+  if (hasLyrics) parts.push("Lyrics");
+  if (hasTempo) parts.push("Tempo");
+  return parts.length ? parts.join(" · ") : "None";
+};
+
 const buildPlaceholderOriginal = (entry: RecentUploadEntry): Original => {
   const duration =
     entry.durationSeconds ??
@@ -207,6 +214,8 @@ const sanitizeRecentUploads = (value: unknown): RecentUploadEntry[] => {
         : tempo
           ? estimateDurationFromTempo(tempo)
           : null;
+    const publishedLyrics =
+      typeof record.publishedLyrics === "string" ? record.publishedLyrics : undefined;
     cleaned.push({
       trackId,
       title,
@@ -216,6 +225,7 @@ const sanitizeRecentUploads = (value: unknown): RecentUploadEntry[] => {
       knowledgeProjectName,
       tempo,
       durationSeconds: durationSeconds ?? undefined,
+      publishedLyrics,
     });
     if (cleaned.length >= MAX_RECENT_UPLOADS) break;
   }
@@ -404,6 +414,7 @@ export default function HelixNoiseGensPage() {
     setRecentUploads((previous) => {
       const trimmedTitle = payload.title.trim() || payload.title;
       const trimmedCreator = payload.creator.trim() || payload.creator;
+      const trimmedLyrics = payload.publishedLyrics?.trim();
       const inferredDuration =
         payload.durationSeconds ??
         estimateDurationFromTempo(payload.tempo) ??
@@ -418,6 +429,7 @@ export default function HelixNoiseGensPage() {
           knowledgeProjectName: payload.knowledgeProjectName,
           tempo: payload.tempo,
           durationSeconds: inferredDuration,
+          publishedLyrics: trimmedLyrics || undefined,
         },
         ...previous.filter((entry) => entry.trackId !== payload.trackId),
       ];
@@ -430,13 +442,34 @@ export default function HelixNoiseGensPage() {
       recentUploads.map((upload) => {
         const isRanked = originalsByIdRef.current.has(upload.trackId);
         const hasPending = pendingOriginalsRef.current.has(upload.trackId);
+        const project = upload.knowledgeProjectId
+          ? knowledgeProjects.find((entry) => entry.id === upload.knowledgeProjectId)
+          : undefined;
+        const projectTempo = project ? sanitizeTempoMeta((project.meta ?? {}).tempo) : undefined;
+        const projectLyrics =
+          project && typeof (project.meta as { lyrics?: unknown }).lyrics === "string"
+            ? String((project.meta as { lyrics?: unknown }).lyrics).trim()
+            : "";
+        const savedLyrics = Boolean(projectLyrics);
+        const savedTempo = Boolean(projectTempo);
+        const publishedLyrics = Boolean(upload.publishedLyrics?.trim());
+        const publishedTempo = Boolean(upload.tempo);
+        const metaSummary =
+          project
+            ? {
+                saved: buildMetaLabel(savedLyrics, savedTempo),
+                published: buildMetaLabel(publishedLyrics, publishedTempo),
+                changed: savedLyrics !== publishedLyrics || savedTempo !== publishedTempo,
+              }
+            : undefined;
         return {
           ...upload,
           isRanked,
           isReady: isRanked || hasPending,
+          metaSummary,
         };
       }),
-    [recentUploads, originalAvailabilityVersion],
+    [knowledgeProjects, recentUploads, originalAvailabilityVersion],
   );
 
   const handleOriginalsHydrated = useCallback(
