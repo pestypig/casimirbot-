@@ -535,6 +535,42 @@ const createUploadId = (): string => {
     .slice(2, 10)}`;
 };
 
+const fetchOriginalDetailsWithRetry = async (
+  originalId: string,
+  options: {
+    attempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    signal?: AbortSignal;
+  } = {},
+) => {
+  const attempts = options.attempts ?? 6;
+  const baseDelayMs = options.baseDelayMs ?? 400;
+  const maxDelayMs = options.maxDelayMs ?? 4000;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await fetchOriginalDetails(originalId, options.signal);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : "";
+      const statusMatch = message.match(/^(\d{3})\s*:/);
+      const status = statusMatch ? Number(statusMatch[1]) : null;
+      if (status != null && status !== 404) {
+        break;
+      }
+      if (options.signal?.aborted) {
+        throw error;
+      }
+      const delay = Math.min(maxDelayMs, baseDelayMs * 2 ** attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Unable to load track details.");
+};
+
 const isAudioFile = (record: KnowledgeFileRecord): boolean =>
   record.kind === "audio" || record.mime?.toLowerCase().startsWith("audio/");
 
@@ -1605,7 +1641,7 @@ export function UploadOriginalsModal({
         setIntentSummaryLoading(true);
         setIntentSummaryError(null);
         try {
-          const details = await fetchOriginalDetails(trackIdForUpload);
+          const details = await fetchOriginalDetailsWithRetry(trackIdForUpload);
           const snapshot = details.intentSnapshot ?? null;
           if (snapshot) {
             const prefs = details.intentSnapshotPreferences ?? {
