@@ -524,6 +524,33 @@ export default function HelixNoiseGensPage() {
     [setUploadOpen, setUploadPrefill, toast],
   );
 
+  const handleRecentEdit = useCallback(
+    (upload: RecentUploadEntry) => {
+      if (!upload.knowledgeProjectId) {
+        toast({
+          title: "Missing project link",
+          description:
+            "This upload is not tied to a My Knowledge project, so it cannot be edited here.",
+        });
+        return;
+      }
+      setUploadPrefill({
+        title: upload.title,
+        creator: upload.creator,
+        sourceHint: `Edit details for ${upload.title}.`,
+        knowledgeProjectId: upload.knowledgeProjectId,
+        knowledgeProjectName: upload.knowledgeProjectName,
+        existingOriginalId: upload.trackId,
+        bpm: upload.tempo?.bpm,
+        offsetMs: upload.tempo?.offsetMs,
+        quantized: upload.tempo?.quantized,
+        editOnly: true,
+      });
+      setUploadOpen(true);
+    },
+    [setUploadOpen, setUploadPrefill, toast],
+  );
+
   const handleRenderJobUpdate = useCallback(
     (update: RenderJobUpdate | null) => {
       if (!update || !update.jobId || !update.status) {
@@ -1229,6 +1256,7 @@ export default function HelixNoiseGensPage() {
                   <RecentUploadsRail
                     uploads={decoratedRecentUploads}
                     onSelect={handleRecentSelect}
+                    onEdit={handleRecentEdit}
                     onRetry={handleRecentRetry}
                     onReveal={handleRecentReveal}
                   />

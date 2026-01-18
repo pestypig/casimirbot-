@@ -3413,6 +3413,84 @@ router.get("/api/noise-gens/originals/:id", async (req, res) => {
   });
 });
 
+router.put("/api/noise-gens/originals/:id/meta", async (req, res) => {
+  const store = await getNoisegenStore();
+  const original = findOriginalById(store, req.params.id ?? "");
+  if (!original) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  const titleField = readStringField(req.body?.title);
+  const creatorField = readStringField(req.body?.creator);
+  const notesField = readStringField(req.body?.notes);
+  const offsetMsRaw = readStringField(req.body?.offsetMs);
+  const offsetMs = Number.isFinite(Number(offsetMsRaw))
+    ? clampNumber(Number(offsetMsRaw), -2000, 2000, original.offsetMs ?? 0)
+    : original.offsetMs ?? 0;
+
+  let tempo: z.infer<typeof tempoMetaSchema> | undefined;
+  if (req.body?.tempo != null) {
+    const tempoValidation = tempoMetaSchema.safeParse(req.body.tempo);
+    if (!tempoValidation.success) {
+      return res
+        .status(400)
+        .json({ error: "invalid_tempo", issues: tempoValidation.error.issues });
+    }
+    tempo = tempoValidation.data;
+  }
+
+  let timeSky: z.infer<typeof timeSkySchema> | undefined;
+  if (req.body?.timeSky != null) {
+    const timeSkyValidation = timeSkySchema.safeParse(req.body.timeSky);
+    if (!timeSkyValidation.success) {
+      return res.status(400).json({
+        error: "invalid_time_sky",
+        issues: timeSkyValidation.error.issues,
+      });
+    }
+    timeSky = timeSkyValidation.data;
+  }
+
+  const intentContractParsed = parseIntentContractField(
+    req.body?.intentContract,
+  );
+  if ("error" in intentContractParsed) {
+    return res.status(400).json(intentContractParsed.error);
+  }
+  const intentContract = intentContractParsed.contract;
+
+  const title = titleField?.trim() || original.title;
+  const creator = creatorField?.trim() || original.artist;
+  if (!title) {
+    return res.status(400).json({ error: "title_required" });
+  }
+  if (!creator) {
+    return res.status(400).json({ error: "creator_required" });
+  }
+
+  await upsertOriginalRecord({
+    trackId: original.id,
+    title,
+    creator,
+    durationSeconds: original.duration ?? 1,
+    offsetMs,
+    tempo: tempo ?? original.tempo,
+    notes: notesField?.trim() || original.notes,
+    timeSky: timeSky ?? original.timeSky,
+    intentSnapshot: original.intentSnapshot,
+    intentSnapshotPreferences: original.intentSnapshotPreferences,
+    intentContract: intentContract ?? original.intentContract,
+  });
+
+  return res.json({
+    id: original.id,
+    title,
+    creator,
+    tempo: tempo ?? original.tempo,
+    notes: notesField?.trim() || original.notes,
+    timeSky: timeSky ?? original.timeSky,
+  });
+});
+
 router.put(
   "/api/noise-gens/originals/:id/intent-snapshot-preferences",
   async (req, res) => {

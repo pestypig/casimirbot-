@@ -21,6 +21,7 @@ import {
   fetchOriginalDetails,
   fetchNoisegenCapabilities,
   updateOriginalIntentSnapshotPreferences,
+  updateOriginalMeta,
   uploadOriginal,
   uploadOriginalChunk,
 } from "@/lib/api/noiseGens";
@@ -591,6 +592,7 @@ export type UploadOriginalPrefill = {
   knowledgeProjectId?: string;
   knowledgeProjectName?: string;
   existingOriginalId?: string;
+  editOnly?: boolean;
 };
 
 export type UploadCompletePayload = {
@@ -709,6 +711,7 @@ export function UploadOriginalsModal({
   const [intentRanges, setIntentRanges] = useState(() => ({
     ...DEFAULT_INTENT_RANGES,
   }));
+  const [editOnlyMode, setEditOnlyMode] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(
     undefined,
   );
@@ -792,6 +795,7 @@ export function UploadOriginalsModal({
       setIntentPulseSource("drand");
       setIntentPlacePrecision("approximate");
       setIntentRanges({ ...DEFAULT_INTENT_RANGES });
+      setEditOnlyMode(false);
       setSelectedProjectId(undefined);
       setStemEntries([]);
       stemSourceRef.current = "";
@@ -824,6 +828,7 @@ export function UploadOriginalsModal({
         : null,
     });
     setLyrics(prefill.notes ?? "");
+    setEditOnlyMode(Boolean(prefill.editOnly));
     if (prefill.knowledgeProjectId) {
       setSelectedProjectId(prefill.knowledgeProjectId);
     }
@@ -1064,23 +1069,34 @@ export function UploadOriginalsModal({
     };
   }, [stemEntries]);
 
+  const isEditOnly = editOnlyMode && Boolean(prefill?.existingOriginalId);
   const hasAudio =
     Boolean(stemSummary.mixEntry) || stemSummary.stemUploads.length > 0;
   const hasRequiredFields =
-    hasAudio &&
+    (isEditOnly || hasAudio) &&
     !title.error &&
     !creator.error &&
     title.value.trim().length > 0 &&
     creator.value.trim().length > 0;
 
   const canSubmit =
-    !isSubmitting && hasRequiredFields && stemSummary.errors.length === 0;
+    !isSubmitting &&
+    hasRequiredFields &&
+    (isEditOnly || stemSummary.errors.length === 0);
   const requiresAuth = !isAuthenticated;
   const submitButtonLabel = requiresAuth
     ? "Sign in to upload"
     : isSubmitting
-      ? "Uploading..."
-      : "Upload";
+      ? isEditOnly
+        ? "Saving..."
+        : "Uploading..."
+      : isEditOnly
+        ? "Save details"
+        : "Upload";
+  const dialogTitle = isEditOnly ? "Edit details" : "Upload Originals";
+  const dialogDescription = isEditOnly
+    ? "Update metadata for this noise album. Files will not be reuploaded."
+    : "Choose a Noise Album project and tag each stem. Mark one mix if you have it, or keep stems-only to auto-build a playback mixdown from your stems.";
   const submitButtonDisabled = requiresAuth ? false : !canSubmit;
   const showIntentSummary = intentSummaryOpen || intentSummaryLoading;
   const handleOpenChange = useCallback(
@@ -1257,6 +1273,36 @@ export function UploadOriginalsModal({
             ]
           : []),
       ];
+      if (isEditOnly) {
+        if (!existingOriginalId) {
+          throw new Error("Missing original ID for metadata update.");
+        }
+        await updateOriginalMeta(existingOriginalId, {
+          title: title.value.trim(),
+          creator: creator.value.trim(),
+          notes: lyrics.trim(),
+          tempo: tempoMeta,
+          offsetMs,
+          timeSky: timeSkyMeta,
+          intentContract: intentContractEnabled ? intentContract : undefined,
+        });
+        toast({
+          title: "Details saved",
+          description: "Metadata updated for this noise album.",
+        });
+        void persistProjectMeta(tempoMeta, lyrics);
+        onUploaded?.({
+          trackId: existingOriginalId,
+          title: title.value.trim(),
+          creator: creator.value.trim(),
+          knowledgeProjectId: selectedProjectId,
+          knowledgeProjectName: selectedProject?.name?.trim(),
+          tempo: tempoMeta,
+          durationSeconds: estimateLoopDurationSeconds(tempoMeta ?? undefined),
+        });
+        onOpenChange(false);
+        return;
+      }
       if (uploadQueue.length === 0) {
         throw new Error("No audio files selected for upload.");
       }
@@ -1723,11 +1769,8 @@ export function UploadOriginalsModal({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Upload Originals</DialogTitle>
-          <DialogDescription>
-            Choose a Noise Album project and tag each stem. Mark one mix if you have it, or keep
-            stems-only to auto-build a playback mixdown from your stems.
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
             {capabilitiesLoading ? (
               <Badge variant="outline" className="border-slate-500/40 text-slate-300">
@@ -2075,7 +2118,7 @@ export function UploadOriginalsModal({
                   : "Select a Noise Album project to load stems."}
               </div>
             )}
-            {stemSummary.errors.length ? (
+            {stemSummary.errors.length && !isEditOnly ? (
               <p className="text-xs text-destructive">{stemSummary.errors[0]}</p>
             ) : (
               <p className="text-xs text-muted-foreground">

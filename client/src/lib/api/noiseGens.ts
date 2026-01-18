@@ -28,6 +28,8 @@ const endpoints = {
     `${BASE}/originals/${encodeURIComponent(originalId)}`,
   originalLyrics: (originalId: string) =>
     `${BASE}/originals/${encodeURIComponent(originalId)}/lyrics`,
+  originalMeta: (originalId: string) =>
+    `${BASE}/originals/${encodeURIComponent(originalId)}/meta`,
   originalIntentContract: (originalId: string) =>
     `${BASE}/originals/${encodeURIComponent(originalId)}/intent-contract`,
   originalIntentSnapshotPreferences: (originalId: string) =>
@@ -155,6 +157,42 @@ export async function updateOriginalIntentSnapshotPreferences(
   return parseJson<{
     id: string;
     intentSnapshotPreferences: OriginalDetails["intentSnapshotPreferences"] | null;
+  }>(res);
+}
+
+export async function updateOriginalMeta(
+  originalId: string,
+  payload: {
+    title: string;
+    creator: string;
+    notes?: string;
+    tempo?: TempoMeta;
+    offsetMs?: number;
+    timeSky?: OriginalDetails["timeSky"];
+    intentContract?: IntentContract | null;
+  },
+  signal?: AbortSignal,
+): Promise<{
+  id: string;
+  title: string;
+  creator: string;
+  tempo?: TempoMeta;
+  notes?: string;
+  timeSky?: OriginalDetails["timeSky"];
+}> {
+  const res = await apiRequest(
+    "PUT",
+    endpoints.originalMeta(originalId),
+    payload,
+    signal,
+  );
+  return parseJson<{
+    id: string;
+    title: string;
+    creator: string;
+    tempo?: TempoMeta;
+    notes?: string;
+    timeSky?: OriginalDetails["timeSky"];
   }>(res);
 }
 

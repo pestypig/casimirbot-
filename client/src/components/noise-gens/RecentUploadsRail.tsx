@@ -17,6 +17,7 @@ type RecentUploadsRailProps = {
   uploads: Array<RecentUploadEntry & { isReady: boolean; isRanked: boolean }>;
   onSelect: (upload: RecentUploadEntry) => void;
   onRetry?: (upload: RecentUploadEntry) => void;
+  onEdit?: (upload: RecentUploadEntry) => void;
   onReveal?: (upload: RecentUploadEntry) => void;
 };
 
@@ -35,6 +36,7 @@ export function RecentUploadsRail({
   uploads,
   onSelect,
   onRetry,
+  onEdit,
   onReveal,
 }: RecentUploadsRailProps) {
   if (!uploads.length) return null;
@@ -85,6 +87,17 @@ export function RecentUploadsRail({
                 >
                   {buttonLabel}
                 </Button>
+                {onEdit && upload.knowledgeProjectId ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs text-slate-200 hover:text-white"
+                    onClick={() => onEdit(upload)}
+                  >
+                    Edit details
+                  </Button>
+                ) : null}
                 {onRetry && upload.knowledgeProjectId ? (
                   <Button
                     type="button"
