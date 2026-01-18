@@ -390,17 +390,17 @@ const DEFAULT_MOODS: NoisegenMood[] = [
   },
 ];
 
-type NoisegenStorageBackend = "fs" | "replit" | "storage";
-type NoisegenStoreBackend = "fs" | "db";
+export type NoisegenStorageBackend = "fs" | "replit" | "storage";
+export type NoisegenStoreBackend = "fs" | "db";
 
-const resolveNoisegenStorageBackend = (): NoisegenStorageBackend => {
+export const resolveNoisegenStorageBackend = (): NoisegenStorageBackend => {
   const raw = process.env.NOISEGEN_STORAGE_BACKEND?.trim().toLowerCase();
   if (raw === "replit") return "replit";
   if (raw === "storage") return "storage";
   return "fs";
 };
 
-const resolveNoisegenStoreBackend = (): NoisegenStoreBackend => {
+export const resolveNoisegenStoreBackend = (): NoisegenStoreBackend => {
   const raw = process.env.NOISEGEN_STORE_BACKEND?.trim().toLowerCase();
   return raw === "db" ? "db" : "fs";
 };

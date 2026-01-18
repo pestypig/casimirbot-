@@ -31,6 +31,8 @@ import {
   type NoisegenRecipe,
   type NoisegenStemGroupAsset,
   type NoisegenStemAsset,
+  resolveNoisegenStorageBackend,
+  resolveNoisegenStoreBackend,
   resolvePlaybackAsset,
   resolvePlaybackAssetPath,
   resolveBundledOriginalsRoots,
@@ -3675,7 +3677,24 @@ router.get("/api/noise-gens/capabilities", (_req, res) => {
   if (ffmpeg) {
     codecs.push("aac", "opus", "mp3");
   }
-  return res.json({ ffmpeg, codecs });
+  const storeBackend = resolveNoisegenStoreBackend();
+  const storageBackend = resolveNoisegenStorageBackend();
+  const storageDriver =
+    storageBackend === "storage" &&
+    (process.env.STORAGE_BACKEND ?? "fs").toLowerCase() === "s3"
+      ? "s3"
+      : storageBackend === "storage"
+        ? "fs"
+        : undefined;
+  return res.json({
+    ffmpeg,
+    codecs,
+    store: { backend: storeBackend },
+    storage: {
+      backend: storageBackend,
+      ...(storageDriver ? { driver: storageDriver } : {}),
+    },
+  });
 });
 
 router.get("/api/noise-gens/recipes", async (req, res) => {

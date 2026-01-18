@@ -196,6 +196,13 @@ export type PlaybackAsset = {
 export type NoisegenCapabilities = {
   ffmpeg: boolean;
   codecs: string[];
+  store?: {
+    backend: "fs" | "db";
+  };
+  storage?: {
+    backend: "fs" | "replit" | "storage";
+    driver?: "fs" | "s3";
+  };
 };
 
 export type StemGroupSource = {

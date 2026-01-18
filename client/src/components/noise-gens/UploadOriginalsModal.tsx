@@ -703,6 +703,9 @@ export function UploadOriginalsModal({
   );
   const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
+  const storeBackend = capabilities?.store?.backend;
+  const storageBackend = capabilities?.storage?.backend;
+  const storageDriver = capabilities?.storage?.driver;
 
   useEffect(() => {
     if (!open) {
@@ -1709,6 +1712,38 @@ export function UploadOriginalsModal({
                 Codec status unavailable
               </Badge>
             )}
+            {capabilities ? (
+              storeBackend === "db" ? (
+                <Badge className="border-emerald-500/40 bg-emerald-500/10 text-emerald-100">
+                  Store: DB
+                </Badge>
+              ) : storeBackend === "fs" ? (
+                <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+                  Store: local disk
+                </Badge>
+              ) : null
+            ) : null}
+            {capabilities ? (
+              storageBackend === "storage" ? (
+                <Badge
+                  className={
+                    storageDriver === "s3"
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
+                      : "border-amber-500/40 bg-amber-500/10 text-amber-100"
+                  }
+                >
+                  Audio: {storageDriver === "s3" ? "S3" : "local disk"}
+                </Badge>
+              ) : storageBackend === "replit" ? (
+                <Badge className="border-emerald-500/40 bg-emerald-500/10 text-emerald-100">
+                  Audio: Replit
+                </Badge>
+              ) : storageBackend === "fs" ? (
+                <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+                  Audio: local disk
+                </Badge>
+              ) : null
+            ) : null}
             {capabilitiesError ? (
               <span className="text-muted-foreground">{capabilitiesError}</span>
             ) : null}
