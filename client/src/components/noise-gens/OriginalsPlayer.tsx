@@ -1181,6 +1181,8 @@ export function OriginalsPlayer({
   );
   const [intentSaving, setIntentSaving] = useState(false);
   const meaningCacheRef = useRef<Map<string, MeaningCard[]>>(new Map());
+  const meaningSeedOverridesRef = useRef<Map<string, number>>(new Map());
+  const [meaningSeedTick, setMeaningSeedTick] = useState(0);
   const [sources, setSources] = useState<PlayerSource[]>([]);
   const [sourceMode, setSourceMode] = useState<SourceMode>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -2325,12 +2327,27 @@ export function OriginalsPlayer({
     () => (lyricText ? hashString(lyricText) : null),
     [lyricText],
   );
+  const meaningSeedOverrideKey = useMemo(
+    () => (original?.id && lyricsHash ? `${original.id}:${lyricsHash}` : null),
+    [lyricsHash, original?.id],
+  );
 
   const meaningCards = useMemo<MeaningCard[]>(() => {
     if (!ideologyDoc || lyricLines.length === 0) return [];
-    const meaningSeed = lyricsHash
-      ? hashSeed(`${lyricsHash}:${original?.id ?? ""}:${ideologyDoc.version}`)
+    const meaningSeedOverride = meaningSeedOverrideKey
+      ? meaningSeedOverridesRef.current.get(meaningSeedOverrideKey)
       : null;
+    const baseSeed = lyricsHash
+      ? `${lyricsHash}:${original?.id ?? ""}:${ideologyDoc.version}`
+      : null;
+    const meaningSeed = baseSeed
+      ? hashSeed(
+          meaningSeedOverride != null
+            ? `${baseSeed}:${meaningSeedOverride}`
+            : baseSeed,
+        )
+      : null;
+    const allowPersistentCache = meaningSeedOverride == null;
     const cacheKey =
       lyricsHash && meaningSeed != null
         ? `${MEANING_CACHE_PREFIX}:${ideologyDoc.version}:${lyricsHash}:${meaningSeed}`
@@ -2338,7 +2355,7 @@ export function OriginalsPlayer({
     if (cacheKey) {
       const cached = meaningCacheRef.current.get(cacheKey);
       if (cached) return cached;
-      if (typeof window !== "undefined") {
+      if (allowPersistentCache && typeof window !== "undefined") {
         try {
           const raw = window.localStorage.getItem(cacheKey);
           if (raw) {
@@ -2627,7 +2644,7 @@ export function OriginalsPlayer({
     const resolved = cards.filter(Boolean) as MeaningCard[];
     if (cacheKey) {
       meaningCacheRef.current.set(cacheKey, resolved);
-      if (typeof window !== "undefined") {
+      if (allowPersistentCache && typeof window !== "undefined") {
         try {
           window.localStorage.setItem(cacheKey, JSON.stringify(resolved));
         } catch {
@@ -2636,7 +2653,24 @@ export function OriginalsPlayer({
       }
     }
     return resolved;
-  }, [ideologyDoc, lyricLines, lyricsHash]);
+  }, [
+    ideologyDoc,
+    lyricLines,
+    lyricsHash,
+    meaningSeedOverrideKey,
+    meaningSeedTick,
+    original?.id,
+  ]);
+
+  const handleRegenerateMeaning = useCallback(() => {
+    if (!meaningSeedOverrideKey) return;
+    const nextSeed =
+      typeof crypto !== "undefined" && "getRandomValues" in crypto
+        ? crypto.getRandomValues(new Uint32Array(1))[0]
+        : Math.floor(Math.random() * 1_000_000_000);
+    meaningSeedOverridesRef.current.set(meaningSeedOverrideKey, nextSeed);
+    setMeaningSeedTick((prev) => prev + 1);
+  }, [meaningSeedOverrideKey]);
 
   const currentLyricIndex = useMemo(() => {
     if (!duration || lyricLines.length === 0) return -1;
@@ -3377,8 +3411,16 @@ export function OriginalsPlayer({
           Add lyrics to generate ideology parallels.
         </div>
       )}
-      <div className="text-xs text-muted-foreground">
-        Interpretation, not author intent.
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Interpretation, not author intent.</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!meaningSeedOverrideKey}
+          onClick={handleRegenerateMeaning}
+        >
+          Regenerate meaning
+        </Button>
       </div>
     </div>
   );
