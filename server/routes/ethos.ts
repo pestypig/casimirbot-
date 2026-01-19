@@ -3,6 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop.js";
+import {
+  getIdeologyArtifactById,
+  searchIdeologyArtifacts
+} from "../services/ideology/artifacts";
 
 export const ethosRouter = Router();
 
@@ -201,6 +205,66 @@ ethosRouter.get("/ideology", async (_req, res) => {
       error: err instanceof Error ? err.message : String(err)
     });
   }
+});
+
+const readQuery = (value: unknown): string | undefined => {
+  if (Array.isArray(value)) {
+    return value.length > 0 ? String(value[0]) : undefined;
+  }
+  return typeof value === "string" ? value : undefined;
+};
+
+const parseTags = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((entry) => String(entry).split(","))
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const parseNumber = (value: unknown): number | undefined => {
+  const raw = readQuery(value);
+  if (!raw) return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+ethosRouter.get("/artifacts", (req, res) => {
+  const query = readQuery(req.query.q)?.trim();
+  const panelId = readQuery(req.query.panelId)?.trim();
+  const nodeId = readQuery(req.query.nodeId)?.trim();
+  const tags = parseTags(req.query.tags ?? req.query.tag);
+  const limit = parseNumber(req.query.limit);
+  const offset = parseNumber(req.query.offset);
+
+  const result = searchIdeologyArtifacts({
+    query,
+    panelId,
+    nodeId,
+    tags,
+    limit,
+    offset
+  });
+
+  res.json(result);
+});
+
+ethosRouter.get("/artifacts/:id", (req, res) => {
+  const artifactId = req.params.id;
+  const artifact = getIdeologyArtifactById(artifactId);
+  if (!artifact) {
+    res.status(404).json({ error: "artifact_not_found", id: artifactId });
+    return;
+  }
+  res.json(artifact);
 });
 
 const handleBeliefGraphRequest = async (req: any, res: any) => {

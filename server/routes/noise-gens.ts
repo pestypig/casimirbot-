@@ -2,7 +2,12 @@ import express, { Router } from "express";
 import { createHash, randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
-import { promises as fs, createReadStream, createWriteStream } from "node:fs";
+import {
+  promises as fs,
+  createReadStream,
+  createWriteStream,
+  existsSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { pipeline } from "node:stream/promises";
 import { gunzip } from "node:zlib";
@@ -2890,12 +2895,37 @@ const streamReplitAsset = async (
   res: express.Response,
   asset: { path: string; mime: string; bytes?: number },
 ) => {
-  res.setHeader("Content-Type", asset.mime);
-  res.setHeader("Accept-Ranges", "bytes");
-  
+  const key = resolveReplitStorageKey(asset.path);
   const rangeHeader = req.headers.range;
   const fileSize = asset.bytes ?? 0;
-  
+
+  const toReplitError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    const status =
+      (error as { status?: number }).status ??
+      (error as { statusCode?: number }).statusCode ??
+      (error as { response?: { status?: number } }).response?.status;
+    const lowered = message.toLowerCase();
+    const notFound =
+      status === 404 ||
+      lowered.includes("not found") ||
+      lowered.includes("no such key") ||
+      lowered.includes("nosuchkey");
+    const wrapped = new Error(message || "replit_download_failed");
+    (wrapped as Error & { code?: string }).code = notFound
+      ? "replit_not_found"
+      : "replit_failed";
+    return wrapped;
+  };
+
+  const openReplitStream = async () => {
+    try {
+      return await downloadReplitObjectStream(key);
+    } catch (error) {
+      throw toReplitError(error);
+    }
+  };
+
   if (rangeHeader && fileSize > 0) {
     const match = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
     if (match) {
@@ -2915,18 +2945,18 @@ const streamReplitAsset = async (
       
       const end = Math.min(requestedEnd, fileSize - 1);
       const chunkSize = end - start + 1;
-      
+
+      res.setHeader("Content-Type", asset.mime);
+      res.setHeader("Accept-Ranges", "bytes");
       res.status(206);
       res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
       res.setHeader("Content-Length", chunkSize);
-      
+
       if (req.method === "HEAD") {
         res.end();
         return;
       }
-      
-      const key = resolveReplitStorageKey(asset.path);
-      const stream = await downloadReplitObjectStream(key);
+      const stream = await openReplitStream();
       let bytesSkipped = 0;
       let bytesSent = 0;
       
@@ -2974,7 +3004,9 @@ const streamReplitAsset = async (
       return;
     }
   }
-  
+
+  res.setHeader("Content-Type", asset.mime);
+  res.setHeader("Accept-Ranges", "bytes");
   if (fileSize > 0) {
     res.setHeader("Content-Length", fileSize);
   }
@@ -2982,8 +3014,7 @@ const streamReplitAsset = async (
     res.status(200).end();
     return;
   }
-  const key = resolveReplitStorageKey(asset.path);
-  const stream = await downloadReplitObjectStream(key);
+  const stream = await openReplitStream();
   stream.on("error", (err: Error) => {
     console.error("Stream error:", err);
     if (!res.headersSent) {
@@ -2993,6 +3024,29 @@ const streamReplitAsset = async (
     }
   });
   stream.pipe(res);
+};
+
+const resolveLocalAssetFallback = (
+  originalId: string,
+  fileName: string,
+  subDir?: string,
+): string | null => {
+  if (!fileName) return null;
+  const { originalsDir } = getNoisegenPaths();
+  const candidates: string[] = [];
+  if (subDir) {
+    candidates.push(path.join(originalsDir, originalId, subDir, fileName));
+  } else {
+    candidates.push(path.join(originalsDir, originalId, fileName));
+  }
+  for (const root of resolveBundledOriginalsRoots()) {
+    candidates.push(
+      subDir
+        ? path.join(root, originalId, subDir, fileName)
+        : path.join(root, originalId, fileName),
+    );
+  }
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
 };
 
 const streamStorageAsset = async (
@@ -3080,8 +3134,22 @@ const serveOriginalAsset = async (req: any, res: any) => {
       return res.status(404).json({ error: "asset_not_found" });
     }
     if (isReplitStoragePath(asset.path)) {
-      await streamReplitAsset(req, res, asset);
-      return;
+      try {
+        await streamReplitAsset(req, res, asset);
+        return;
+      } catch (error) {
+        if ((error as { code?: string })?.code === "replit_not_found") {
+          const fallback = resolveLocalAssetFallback(
+            original.id,
+            asset.fileName,
+          );
+          if (fallback) {
+            return await streamAudioFile(req, res, fallback, asset.mime);
+          }
+          return res.status(404).json({ error: "asset_missing" });
+        }
+        throw error;
+      }
     }
     if (isStorageLocator(asset.path)) {
       await streamStorageAsset(req, res, asset);
@@ -3130,8 +3198,23 @@ const servePlaybackAsset = async (req: any, res: any) => {
       return res.status(404).json({ error: "playback_not_found" });
     }
     if (isReplitStoragePath(asset.path)) {
-      await streamReplitAsset(req, res, asset);
-      return;
+      try {
+        await streamReplitAsset(req, res, asset);
+        return;
+      } catch (error) {
+        if ((error as { code?: string })?.code === "replit_not_found") {
+          const fallback = resolveLocalAssetFallback(
+            original.id,
+            asset.fileName,
+            "playback",
+          );
+          if (fallback) {
+            return await streamAudioFile(req, res, fallback, asset.mime);
+          }
+          return res.status(404).json({ error: "playback_missing" });
+        }
+        throw error;
+      }
     }
     if (isStorageLocator(asset.path)) {
       await streamStorageAsset(req, res, asset);
@@ -3174,8 +3257,23 @@ const serveStemAsset = async (req: any, res: any) => {
       return res.status(404).json({ error: "stem_not_found" });
     }
     if (isReplitStoragePath(stem.path)) {
-      await streamReplitAsset(req, res, stem);
-      return;
+      try {
+        await streamReplitAsset(req, res, stem);
+        return;
+      } catch (error) {
+        if ((error as { code?: string })?.code === "replit_not_found") {
+          const fallback = resolveLocalAssetFallback(
+            original.id,
+            stem.fileName,
+            "stems",
+          );
+          if (fallback) {
+            return await streamAudioFile(req, res, fallback, stem.mime);
+          }
+          return res.status(404).json({ error: "stem_missing" });
+        }
+        throw error;
+      }
     }
     if (isStorageLocator(stem.path)) {
       await streamStorageAsset(req, res, stem);
@@ -3218,8 +3316,23 @@ const serveStemGroupAsset = async (req: any, res: any) => {
       return res.status(404).json({ error: "stem_group_not_found" });
     }
     if (isReplitStoragePath(asset.path)) {
-      await streamReplitAsset(req, res, asset);
-      return;
+      try {
+        await streamReplitAsset(req, res, asset);
+        return;
+      } catch (error) {
+        if ((error as { code?: string })?.code === "replit_not_found") {
+          const fallback = resolveLocalAssetFallback(
+            original.id,
+            asset.fileName,
+            "stem-groups",
+          );
+          if (fallback) {
+            return await streamAudioFile(req, res, fallback, asset.mime);
+          }
+          return res.status(404).json({ error: "stem_group_missing" });
+        }
+        throw error;
+      }
     }
     if (isStorageLocator(asset.path)) {
       await streamStorageAsset(req, res, asset);

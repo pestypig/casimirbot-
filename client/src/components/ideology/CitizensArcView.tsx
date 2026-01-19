@@ -300,6 +300,8 @@ const hideExportControls = (node: HTMLElement) => {
   };
 };
 
+const EXPORT_PADDING = 16;
+
 function ExportButton({ onClick, label, disabled }: ExportButtonProps) {
   return (
     <button
@@ -391,8 +393,10 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
         await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const computed = window.getComputedStyle(node);
         const rect = node.getBoundingClientRect();
-        const width = Math.ceil(rect.width || node.scrollWidth);
-        const height = Math.ceil(rect.height || node.scrollHeight);
+        const baseWidth = Math.ceil(rect.width || node.scrollWidth);
+        const baseHeight = Math.ceil(rect.height || node.scrollHeight);
+        const width = baseWidth + EXPORT_PADDING * 2;
+        const height = baseHeight + EXPORT_PADDING * 2;
         const borderRadius = computed.borderRadius;
         const exportBackground = resolveExportBackground(
           node,
@@ -406,12 +410,14 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
           canvasWidth: width,
           canvasHeight: height,
           style: {
-            width: `${width}px`,
-            height: `${height}px`,
+            width: `${baseWidth}px`,
+            height: `${baseHeight}px`,
             borderRadius,
             overflow: "hidden",
             boxSizing: "border-box",
-            backgroundColor: exportBackground
+            backgroundColor: exportBackground,
+            transform: `translate(${EXPORT_PADDING}px, ${EXPORT_PADDING}px)`,
+            transformOrigin: "top left"
           }
         });
         const anchor = document.createElement("a");

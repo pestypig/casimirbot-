@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { IdeologyNode } from "@/lib/ideology-types";
 import { useIdeology } from "@/hooks/use-ideology";
 import { useIdeologyBeliefGraph } from "@/hooks/use-ideology-belief-graph";
+import { useIdeologyArtifacts } from "@/hooks/use-ideology-artifacts";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -43,6 +44,21 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
   );
   const selected = selectedId ? resolve?.(selectedId) ?? null : null;
   const [query, setQuery] = useState("");
+  const [artifactQuery, setArtifactQuery] = useState("");
+  const artifactContextId = selected?.id ?? undefined;
+  const artifactPanelId = "mission-ethos";
+  const {
+    data: artifactsData,
+    isLoading: artifactsLoading,
+    error: artifactsError,
+  } = useIdeologyArtifacts({
+    query: artifactQuery.trim() || undefined,
+    panelId: artifactPanelId,
+    nodeId: artifactContextId,
+    limit: 12,
+  });
+  const artifactItems = artifactsData?.items ?? [];
+  const artifactTotal = artifactsData?.total ?? 0;
 
   useEffect(() => {
     if (!selectedId && data?.rootId) {
@@ -410,6 +426,68 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
                 </div>
               )}
             </>
+          )}
+        </Card>
+        <Card className="p-4 bg-slate-950/60 border-white/10">
+          <div className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-300">
+            Artifacts
+          </div>
+          <div className="mt-2 text-[11px] text-slate-500">
+            Context: {selected?.title ?? "Mission Ethos"} ({artifactTotal})
+          </div>
+          <input
+            aria-label="Search artifacts"
+            className="mt-3 w-full rounded-md border border-white/10 bg-slate-900/60 px-3 py-2 text-xs text-slate-200 focus:border-sky-400 focus:outline-none"
+            placeholder="Search artifacts..."
+            value={artifactQuery}
+            onChange={(event) => setArtifactQuery(event.target.value)}
+          />
+          {artifactsLoading ? (
+            <p className="mt-3 text-xs text-slate-400">Loading artifacts...</p>
+          ) : artifactsError ? (
+            <p className="mt-3 text-xs text-rose-300">
+              {artifactsError instanceof Error
+                ? artifactsError.message
+                : "Unable to load artifacts."}
+            </p>
+          ) : artifactItems.length === 0 ? (
+            <p className="mt-3 text-xs text-slate-500">
+              No artifacts matched this context.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {artifactItems.map((artifact) => (
+                <li
+                  key={artifact.id}
+                  className="rounded-md border border-white/10 bg-white/5 p-2"
+                >
+                  <div className="text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                    {artifact.exportKind}
+                  </div>
+                  <div className="text-sm font-medium text-white">{artifact.title}</div>
+                  {artifact.summary && (
+                    <div className="mt-1 text-xs text-slate-400">
+                      {artifact.summary}
+                    </div>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-400">
+                    {artifact.formats?.includes("png") && (
+                      <span className="rounded-full border border-white/10 bg-slate-950/60 px-2 py-0.5">
+                        PNG
+                      </span>
+                    )}
+                    {(artifact.tags ?? []).slice(0, 4).map((tag) => (
+                      <span
+                        key={`${artifact.id}-${tag}`}
+                        className="rounded-full border border-white/10 bg-slate-950/60 px-2 py-0.5"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </Card>
         <Card className="p-4 bg-slate-950/60 border-white/10">
