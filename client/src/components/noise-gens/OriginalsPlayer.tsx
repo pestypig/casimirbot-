@@ -462,6 +462,30 @@ const hashSeed = (value: string): number => {
   return hash >>> 0;
 };
 
+const createSeededRng = (seed: number) => {
+  let t = seed + 0x6d2b79f5;
+  return () => {
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const pickWeighted = <T,>(
+  items: Array<{ item: T; weight: number }>,
+  rng: () => number,
+): T | null => {
+  if (!items.length) return null;
+  const total = items.reduce((sum, entry) => sum + Math.max(0, entry.weight), 0);
+  if (total <= 0) return items[0]?.item ?? null;
+  let roll = rng() * total;
+  for (const entry of items) {
+    roll -= Math.max(0, entry.weight);
+    if (roll <= 0) return entry.item;
+  }
+  return items[items.length - 1]?.item ?? null;
+};
+
 const formatPulseSource = (source?: PulseSource): string => {
   switch (source) {
     case "drand":
@@ -2304,9 +2328,13 @@ export function OriginalsPlayer({
 
   const meaningCards = useMemo<MeaningCard[]>(() => {
     if (!ideologyDoc || lyricLines.length === 0) return [];
-    const cacheKey = lyricsHash
-      ? `${MEANING_CACHE_PREFIX}:${ideologyDoc.version}:${lyricsHash}`
+    const meaningSeed = lyricsHash
+      ? hashSeed(`${lyricsHash}:${original?.id ?? ""}:${ideologyDoc.version}`)
       : null;
+    const cacheKey =
+      lyricsHash && meaningSeed != null
+        ? `${MEANING_CACHE_PREFIX}:${ideologyDoc.version}:${lyricsHash}:${meaningSeed}`
+        : null;
     if (cacheKey) {
       const cached = meaningCacheRef.current.get(cacheKey);
       if (cached) return cached;
@@ -2427,8 +2455,21 @@ export function OriginalsPlayer({
       }
     >();
 
+    const segmentScores: Array<
+      Map<
+        string,
+        {
+          score: number;
+          matches: string[];
+          phraseHits: number;
+          segment: { text: string; lineIndices: number[] };
+        }
+      >
+    > = segments.map(() => new Map());
+
     const minScore = 1.8;
-    for (const segment of segments) {
+    for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
+      const segment = segments[segmentIndex];
       const lineTokens = new Set(tokenize(segment.text));
       if (lineTokens.size === 0) continue;
       const lineText = segment.text.toLowerCase();
@@ -2448,6 +2489,15 @@ export function OriginalsPlayer({
         const overlapRatio = matches.length / Math.max(1, lineTokens.size);
         const score = matches.length + phraseHits * 3 + overlapRatio * 2;
         if (score < minScore) continue;
+        const segmentMap = segmentScores[segmentIndex];
+        if (segmentMap) {
+          segmentMap.set(node.id, {
+            score,
+            matches,
+            phraseHits,
+            segment,
+          });
+        }
         const existing = nodeScores.get(node.id);
         if (!existing) {
           nodeScores.set(node.id, {
@@ -2476,27 +2526,77 @@ export function OriginalsPlayer({
       branchScores.set(branchId, (branchScores.get(branchId) ?? 0) + entry.score);
     });
 
-    let selectedBranch: string | null = null;
-    branchScores.forEach((score, branchId) => {
-      if (!selectedBranch) {
-        selectedBranch = branchId;
-        return;
+    const rng = createSeededRng(meaningSeed ?? hashSeed("meaning-default"));
+    const branchCandidates = Array.from(branchScores.entries()).map(
+      ([branchId, score]) => ({
+        item: branchId,
+        weight: Math.max(0.1, score),
+      }),
+    );
+    const selectedBranches = new Set<string>();
+    if (branchCandidates.length > 0) {
+      const first = pickWeighted(branchCandidates, rng);
+      if (first) selectedBranches.add(first);
+      if (branchCandidates.length > 1) {
+        const second = pickWeighted(
+          branchCandidates.filter((candidate) => candidate.item !== first),
+          rng,
+        );
+        if (second) selectedBranches.add(second);
       }
-      if (score > (branchScores.get(selectedBranch) ?? 0)) {
-        selectedBranch = branchId;
+    }
+
+    const allScoredNodes = Array.from(nodeScores.entries()).map(([nodeId, entry]) => ({
+      nodeId,
+      ...entry,
+    }));
+
+    const usedNodes = new Set<string>();
+    const picks: Array<{
+      nodeId: string;
+      score: number;
+      matches: string[];
+      phraseHits: number;
+      segment: { text: string; lineIndices: number[] };
+    }> = [];
+    const maxCards = Math.min(6, Math.max(3, Math.ceil(segments.length / 2)));
+
+    for (const segmentMap of segmentScores) {
+      if (!segmentMap || picks.length >= maxCards) break;
+      let candidates = Array.from(segmentMap.entries())
+        .map(([nodeId, entry]) => ({ nodeId, ...entry }))
+        .filter((entry) => !usedNodes.has(entry.nodeId));
+      if (selectedBranches.size > 0) {
+        const filtered = candidates.filter((entry) => {
+          for (const branchId of selectedBranches) {
+            if (isInBranch(entry.nodeId, branchId)) return true;
+          }
+          return false;
+        });
+        if (filtered.length) candidates = filtered;
       }
-    });
+      const pick = pickWeighted(
+        candidates.map((entry) => ({ item: entry, weight: entry.score })),
+        rng,
+      );
+      if (pick) {
+        usedNodes.add(pick.nodeId);
+        picks.push(pick);
+      }
+    }
 
-    const allScoredNodes = Array.from(nodeScores.entries())
-      .map(([nodeId, entry]) => ({ nodeId, ...entry }))
-      .sort((a, b) => b.score - a.score);
-    const branchFiltered = selectedBranch
-      ? allScoredNodes.filter((entry) => isInBranch(entry.nodeId, selectedBranch))
-      : allScoredNodes;
-    const scoredNodes =
-      branchFiltered.length >= 3 ? branchFiltered.slice(0, 6) : allScoredNodes.slice(0, 6);
+    if (picks.length < maxCards && allScoredNodes.length) {
+      const remaining = allScoredNodes
+        .filter((entry) => !usedNodes.has(entry.nodeId))
+        .sort((a, b) => b.score - a.score);
+      for (const entry of remaining) {
+        if (picks.length >= maxCards) break;
+        picks.push(entry);
+        usedNodes.add(entry.nodeId);
+      }
+    }
 
-    const cards = scoredNodes.map((entry) => {
+    const cards = picks.map((entry) => {
       const node = nodeById.get(entry.nodeId);
       if (!node) return null;
       const confidence =
