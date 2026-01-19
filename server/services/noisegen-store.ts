@@ -715,6 +715,91 @@ const readStoreSnapshot = async (): Promise<NoisegenStore | null> => {
   }
 };
 
+const getOriginalUpdatedAt = (original: NoisegenOriginal): number => {
+  const candidates: number[] = [];
+  if (Number.isFinite(original.uploadedAt)) {
+    candidates.push(Number(original.uploadedAt));
+  }
+  if (Number.isFinite(original.processing?.updatedAt)) {
+    candidates.push(Number(original.processing?.updatedAt));
+  }
+  const recordAsset = (asset?: { uploadedAt?: number }) => {
+    if (Number.isFinite(asset?.uploadedAt)) {
+      candidates.push(Number(asset?.uploadedAt));
+    }
+  };
+  recordAsset(original.assets.instrumental);
+  recordAsset(original.assets.vocal);
+  original.assets.playback?.forEach(recordAsset);
+  original.assets.stems?.forEach(recordAsset);
+  original.assets.stemGroups?.forEach(recordAsset);
+  return candidates.length ? Math.max(...candidates) : 0;
+};
+
+const mergeById = <T extends { id: string }>(
+  base: T[],
+  incoming: T[],
+  pick: (left: T, right: T) => T,
+): T[] => {
+  const merged = new Map<string, T>();
+  base.forEach((entry) => merged.set(entry.id.toLowerCase(), entry));
+  incoming.forEach((entry) => {
+    const key = entry.id.toLowerCase();
+    const existing = merged.get(key);
+    merged.set(key, existing ? pick(existing, entry) : entry);
+  });
+  return Array.from(merged.values());
+};
+
+const mergeStores = (
+  base: NoisegenStore,
+  snapshot: NoisegenStore,
+): NoisegenStore => {
+  const pickOriginal = (left: NoisegenOriginal, right: NoisegenOriginal) =>
+    getOriginalUpdatedAt(right) >= getOriginalUpdatedAt(left) ? right : left;
+  const pickRecipe = (left: NoisegenRecipe, right: NoisegenRecipe) =>
+    (right.updatedAt ?? right.createdAt ?? 0) >=
+    (left.updatedAt ?? left.createdAt ?? 0)
+      ? right
+      : left;
+  const pickGeneration = (
+    left: NoisegenGeneration,
+    right: NoisegenGeneration,
+  ) => (right.createdAt ?? 0) >= (left.createdAt ?? 0) ? right : left;
+  const pickJob = (left: NoisegenJob, right: NoisegenJob) =>
+    (right.updatedAt ?? 0) >= (left.updatedAt ?? 0) ? right : left;
+
+  const originals = mergeById(base.originals, snapshot.originals, pickOriginal);
+  const pendingOriginals = mergeById(
+    base.pendingOriginals,
+    snapshot.pendingOriginals,
+    pickOriginal,
+  );
+  const generations = mergeById(
+    base.generations,
+    snapshot.generations,
+    pickGeneration,
+  );
+  const recipes = mergeById(base.recipes, snapshot.recipes, pickRecipe);
+  const jobs = mergeById(base.jobs, snapshot.jobs, pickJob);
+
+  const originalsIndex = new Set(originals.map((entry) => entry.id.toLowerCase()));
+  const dedupedPending = pendingOriginals.filter(
+    (entry) => !originalsIndex.has(entry.id.toLowerCase()),
+  );
+
+  const moods = snapshot.moods.length > 0 ? snapshot.moods : base.moods;
+  return normalizeStore({
+    version: 1,
+    originals,
+    pendingOriginals: dedupedPending,
+    generations,
+    moods,
+    recipes,
+    jobs,
+  });
+};
+
 const writeStoreSnapshot = async (store: NoisegenStore): Promise<void> => {
   if (resolveNoisegenStorageBackend() !== "replit") return;
   try {
@@ -742,12 +827,14 @@ const readStore = async (): Promise<NoisegenStore> => {
     return fallback;
   }
   const fsStore = await readStoreFromFs();
+  const snapshot = await readStoreSnapshot();
+  if (snapshot) {
+    const merged = mergeStores(fsStore, snapshot);
+    await writeStoreToFs(merged);
+    return merged;
+  }
   if (isStoreEmpty(fsStore)) {
-    const snapshot = await readStoreSnapshot();
-    if (snapshot) {
-      await writeStoreToFs(snapshot);
-      return snapshot;
-    }
+    return fsStore;
   }
   return fsStore;
 };

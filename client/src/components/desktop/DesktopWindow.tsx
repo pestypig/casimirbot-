@@ -86,15 +86,23 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
   const [viewport, setViewport] = useState<ViewportMetrics | null>(() => readViewportMetrics());
   const [showFullscreenExitHint, setShowFullscreenExitHint] = useState(false);
   const fullscreenHintTimeoutRef = useRef<number | null>(null);
+  const isIdeologyPanel = id === IDEOLOGY_PANEL_ID;
 
   const style = useMemo(() => {
     if (!w) return {};
+    const ideologyVars = isIdeologyPanel
+      ? {
+          "--background": "hsl(240, 10%, 3.9%)",
+          "--border": "hsl(240, 3.7%, 15.9%)"
+        }
+      : {};
     return {
       width: w.w,
       height: w.h,
-      "--window-bg-strength": w.opacity
+      "--window-bg-strength": w.opacity,
+      ...ideologyVars
     } as React.CSSProperties;
-  }, [w]);
+  }, [isIdeologyPanel, w]);
 
   const safePosition = useMemo(() => {
     if (!w) return { x: 0, y: 0 };

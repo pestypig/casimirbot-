@@ -126,6 +126,11 @@
     text-decoration-thickness: 2px;
     transition: outline-color 0.15s ease, box-shadow 0.15s ease;
   }
+
+  [data-exporting="true"] [data-export-control="true"] {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 /* SurfaceKit layers */
