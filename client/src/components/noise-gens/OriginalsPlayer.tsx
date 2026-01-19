@@ -176,7 +176,7 @@ const buildMacroFxProfile = (macros: ListenerMacros): MacroFxProfile => {
       { freq: 820, q: 1.1, gainDb: -2 + texture * 4 },
       { freq: 5200, q: 0.8, gainDb: -1 + texture * 6 },
     ],
-    reverbSend: clamp01(0.2 + space * 0.6),
+    reverbSend: clamp01(space * 0.8),
     drive: clamp01(0.15 + drive * 0.6),
     energy,
   };
@@ -432,7 +432,7 @@ const buildIntentContractFromDraft = (
   };
 };
 
-const MACROS_STORAGE_KEY = "noisegen:listenerMacros.v1";
+const MACROS_STORAGE_KEY = "noisegen:listenerMacros.v2";
 const MEANING_CACHE_PREFIX = "noisegen:meaning:v2";
 const FAIRNESS_BASELINE_IDS = [
   "worldview-integrity",
@@ -615,7 +615,7 @@ const buildInitials = (title?: string, artist?: string): string => {
 
 const DEFAULT_LISTENER_MACROS: ListenerMacros = {
   energy: 0.6,
-  space: 0.45,
+  space: 0,
   texture: 0.5,
   weirdness: 0.5,
   drive: 0.3,
@@ -765,7 +765,7 @@ const buildMacroRenderPlan = (
           weirdness: clamp01(0.1 + weirdness * 0.6 + space * 0.2),
           eqPeaks,
           fx: {
-            reverbSend: clamp01(0.2 + space * 0.6),
+            reverbSend: clamp01(space * 0.8),
             comp: clamp01(0.25 + drive * 0.5),
             sat: clamp01(0.15 + drive * 0.6),
             chorus: clamp01(0.05 + texture * 0.5),
