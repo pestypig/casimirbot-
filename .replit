@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["gmsh", "emscripten", "jq", "ffmpeg"]
+packages = ["gmsh", "emscripten", "jq", "ffmpeg", "cmake"]
 
 [deployment]
 deploymentTarget = "cloudrun"
