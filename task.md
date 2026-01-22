@@ -2901,10 +2901,10 @@ G) SunPy helioseismology anchors
 - M1.3 CPU GGUF bench harness: DONE (bench binary built + reference models downloaded; CPU bench logged).
 - M1.4 Answerer-first LoRA/QLoRA path: DONE (doc + QLoRA flags), BLOCKED on off-box GPU.
 - M1.5 Holdout gate thresholds: DONE (defaults set in `.env` + `.env.example`).
-- M1.6 Runtime smoke: PRECHECK DONE (scripts/llm-local-smoke.ts supports LLM_LOCAL_SMOKE_MODE=preflight); full run pending (llama-cli model load + Replit object keys + SHA256).
+- M1.6 Runtime smoke: DONE (Replit full smoke passed, llama-cli spawn exits cleanly with `--single-turn`).
 
 ### Helix Ask Build Completion Gates - Status: in_progress
-- Runtime smoke pass: full local smoke (not just preflight) returns a response with small caps (512 ctx, 8-16 tokens) and no hang.
+- Runtime smoke pass: full local smoke (not just preflight) returns a response with small caps (512 ctx, 8-16 tokens) and no hang. DONE on Replit (duration ~8749 ms, ~12.5 t/s, output "The Local LLM").
 - Base model decision: choose single GGUF target (1.5B or 3B Q4) and pin in RC0->M1 notes.
 - Answerer adapter training: off-box LoRA/QLoRA run produces adapter artifact + hash.
 - Holdout gate pass: adapter meets precision/attribution recall/latency thresholds in `agi:holdout-gate`.
