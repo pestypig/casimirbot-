@@ -14,6 +14,14 @@ This directory contains the modular physics components for the Casimir-Tile rese
 - `materials/` - Advanced material models (Nb₃Sn, frequency-dependent)
 - `analysis/` - Data processing and visualization tools
 
+### Key entry points
+- `modules/core/module-registry.ts` registers module metadata and exports.
+- `modules/dynamic/gates/index.ts` centralizes dynamic gate hooks.
+- `modules/environment/context.ts` defines shared environment context wiring.
+- `modules/gr/stress-energy-integrals.ts` hosts GR stress-energy integral helpers.
+- `modules/sim_core/casimir-inference.ts` collects Casimir inference routines.
+- `modules/star-client/index.ts` exposes the star client module surface.
+
 ## Integration Points
 
 Each module integrates with the core simulation engine through:

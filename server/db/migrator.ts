@@ -21,6 +21,7 @@ import { migration019 } from "./migrations/019_profile_summaries";
 import { migration020 } from "./migrations/020_trace_debate_id";
 import { migration021 } from "./migrations/021_simulations";
 import { migration022 } from "./migrations/022_noisegen_store";
+import { migration023 } from "./migrations/023_chat_sessions";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -46,6 +47,7 @@ const MIGRATIONS = [
   migration020,
   migration021,
   migration022,
+  migration023,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

@@ -246,6 +246,13 @@ export function buildGrOsPayload(input: GrOsPayloadInput): GrOsPayload {
         }
       : undefined;
 
+  const voxelSize = diagnostics?.grid?.voxelSize_m
+    ? ([
+        diagnostics.grid.voxelSize_m[0],
+        diagnostics.grid.voxelSize_m[1],
+        diagnostics.grid.voxelSize_m[2],
+      ] as [number, number, number])
+    : undefined;
   const gridPayload = diagnostics?.grid
     ? {
         nx: diagnostics.grid.dims[0],
@@ -254,7 +261,7 @@ export function buildGrOsPayload(input: GrOsPayloadInput): GrOsPayload {
         dx_m: pickNumber(diagnostics.grid.voxelSize_m?.[0]),
         dy_m: pickNumber(diagnostics.grid.voxelSize_m?.[1]),
         dz_m: pickNumber(diagnostics.grid.voxelSize_m?.[2]),
-        voxelSize_m: diagnostics.grid.voxelSize_m,
+        voxelSize_m: voxelSize,
       }
     : undefined;
 

@@ -5,12 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { toPng } from "html-to-image";
+import { exportNodeToImage } from "@/lib/ideology/pill-export";
 import { Download } from "lucide-react";
 
 type CitizensArcViewProps = {
   onSelectNode: (id: string) => void;
   resolve?: (id: string) => IdeologyNode | null;
+  showExportControls?: boolean;
+  onToggleExportControls?: (value: boolean) => void;
 };
 
 const BRIDGE_LABELS: Record<string, string> = {
@@ -22,13 +24,28 @@ const BRIDGE_LABELS: Record<string, string> = {
   "koan-governance": "Koan Governance",
   "values-over-images": "Values Over Images",
   "worldview-integrity": "Worldview Integrity",
+  "beginners-mind": "Beginner's Mind",
+  "impermanence-by-design": "Impermanence by Design",
+  "verification-checklist": "Verification Checklist",
   "sangha-architecture": "Sangha Architecture",
   "no-bypass-guardrail": "No Bypass Guardrail",
   "integrity-protocols": "Integrity Protocols",
   "inner-spark": "Inner Spark",
   "lifetime-trust-ledger": "Lifetime Trust Ledger",
   "solitude-to-signal": "Solitude to Signal",
-  "habit-pressure-break": "Habit Pressure Break"
+  "habit-pressure-break": "Habit Pressure Break",
+  "civic-signal-loop": "Civic Signal Loop",
+  "three-tenets-loop": "Three Tenets Loop",
+  "lawful-interface-protocol": "Lawful Interface Protocol",
+  "federal-civic-listening-circuit": "Federal Civic Listening Circuit",
+  "metric-integrity-guardrail": "Metric Integrity Guardrail",
+  "harm-weighted-priority-standard": "Harm-Weighted Priority Standard",
+  "integration-ladder": "Integration Ladder",
+  "local-stability-compact": "Local Stability Compact",
+  "access-to-counsel-pathway": "Access-to-Counsel Pathway",
+  "training-certification-gate": "Training and Certification Gate",
+  "citizens-arc-anti-mutation": "Citizen's Arc: Anti-Mutation Addendum",
+  "citizens-arc-stress-test": "Citizen's Arc: Stress Test Note"
 };
 
 const FLOOR_GUARANTEES = [
@@ -158,6 +175,227 @@ const FAILURE_MODES = [
     counter: "Koan governance, decision journals, red teams, sunset clauses."
   }
 ];
+const ANTI_MUTATION_MECHANISMS = [
+  "Sortition oversight for trials, audits, and ledger disputes.",
+  "Rotating authority with hard term limits and cooling-off gaps.",
+  "Power decomposition: many small powers, few big ones.",
+  "Strong exit rights: portable credentials, safe dissent channels, mobility support.",
+  "Cultural immunology: distrust prestige narratives; reward refusal to glamorize pain."
+];
+const STRESS_TEST_PACKETS = [
+  {
+    title: "Charismatic trial-optimiser",
+    counter: "Cross-checks, ledger decay, and red-team interviews before authority is granted."
+  },
+  {
+    title: "Caregiver exodus",
+    counter: "Caregiving credit, alternate trials, and representation floors."
+  },
+  {
+    title: "Audit coup",
+    counter: "Audit authority split, rotation, and a public appeal path."
+  },
+  {
+    title: "Border koan",
+    counter: "Scarcity allocation charter plus a tradeoff ledger that names who bears the cost."
+  },
+  {
+    title: "Crisis velocity failure",
+    counter: "Emergency procedures with sunset clauses and review triggers."
+  }
+];
+const CIVIC_SIGNAL_STEPS = [
+  {
+    title: "Not-Knowing",
+    body: "State uncertainty, cite sources, and allow \"not sure\" responses."
+  },
+  {
+    title: "Bearing Witness",
+    body: "Collect grounded input with consent, safety, and data dignity."
+  },
+  {
+    title: "Taking Action",
+    body: "Translate signals into lawful, nonviolent moves with review triggers."
+  }
+];
+const SURVEY_SIGNAL_MAP = [
+  {
+    title: "Integration + stake",
+    signal: "Who is rooted, vulnerable, or carrying the local economy.",
+    nodes: ["interbeing-systems", "sangha-architecture", "scarcity-justice"],
+    action: "Stabilize services, protect livelihoods, reduce coercive scarcity."
+  },
+  {
+    title: "Rights awareness + trust",
+    signal: "Whether people know their rights and believe they will be honored.",
+    nodes: ["right-speech-infrastructure", "voice-integrity", "data-dignity"],
+    action: "Provide lawful rights education, multilingual updates, and safe channels."
+  },
+  {
+    title: "Safety + harm signals",
+    signal: "Reports of force, intimidation, or retaliation risk.",
+    nodes: ["no-bypass-guardrail", "integrity-protocols", "restorative-harm-repair"],
+    action: "Enforce de-escalation, independent review, and repair pathways."
+  },
+  {
+    title: "Incentives + legitimacy",
+    signal: "Perceived quotas, rewards, or opaque enforcement incentives.",
+    nodes: ["capture-resistance", "civic-memory-continuity", "koan-governance"],
+    action: "Publish tradeoffs, remove predatory incentives, and audit outcomes."
+  }
+];
+const LAWFUL_INTERFACE_CHECKLIST = [
+  "Publish cooperation boundaries, definitions, and correction logs.",
+  "Require dual-key approval for joint actions (legal + ethos).",
+  "Provide safe reporting channels with non-retaliation safeguards.",
+  "Enforce de-escalation, independent review, and repair pathways for force.",
+  "Maintain liaison councils and mediation pathways.",
+  "Audit incentives and publish outcomes to prevent capture."
+];
+const WARP_AMBITION_PUBLIC = [
+  "A stable civic floor keeps working people invested in long-horizon research.",
+  "Discovery must serve as public utility, not prestige theater.",
+  "Clear feedback loops prevent hope from drifting into hype.",
+  "Ambition is earned by protecting people from falling through the cracks."
+];
+const WARP_AMBITION_TECHNICAL = [
+  "Scarcity justice and interbeing keep the dependency graph honest.",
+  "The three-tenets loop turns uncertainty into public learning.",
+  "Integrity protocols and verification gates keep claims constraint-honest.",
+  "Koan governance and impermanence keep mandates revisable."
+];
+const WARP_AMBITION_STAGE = [
+  "Exploratory: hypothesis and bounds, not certainty.",
+  "Reduced-order: simplified models with stated limits.",
+  "Diagnostic: testable predictions and error budgets.",
+  "Certified: verified evidence and publishable constraints."
+];
+const PUBLIC_SAFETY_SPINE_PILLS = [
+  {
+    id: "federal-civic-listening-circuit",
+    label: "Federal civic listening circuit",
+    intent:
+      "Fixed listening cycles and response ledgers keep federal policy grounded.",
+    artifact: "Local Needs Docket + Response Ledger",
+    indicators: [
+      "hearing cadence",
+      "response lag",
+      "percent declines with rationale"
+    ],
+    nodes: [
+      "federal-civic-listening-circuit",
+      "right-speech-infrastructure",
+      "civic-memory-continuity",
+      "sangha-architecture",
+      "interbeing-systems"
+    ]
+  },
+  {
+    id: "metric-integrity-guardrail",
+    label: "Metric integrity guardrail",
+    intent: "Replace quota logic with harm-reduction indicators and reviews.",
+    artifact: "Metric Policy Register",
+    indicators: [
+      "quota-free compliance",
+      "review trigger adherence",
+      "harm-reduction metric coverage"
+    ],
+    nodes: [
+      "metric-integrity-guardrail",
+      "koan-governance",
+      "integrity-protocols",
+      "capture-resistance"
+    ]
+  },
+  {
+    id: "harm-weighted-priority-standard",
+    label: "Harm-weighted priority standard",
+    intent: "Prioritize credible harm with due process and independent review.",
+    artifact: "Harm-Weighted Priority Standard + Review Log",
+    indicators: [
+      "independent review rate",
+      "appeal resolution time",
+      "priority-tier audit pass rate"
+    ],
+    nodes: [
+      "harm-weighted-priority-standard",
+      "no-bypass-guardrail",
+      "restorative-harm-repair",
+      "integrity-protocols"
+    ]
+  },
+  {
+    id: "integration-ladder",
+    label: "Integration ladder",
+    intent: "Create a lawful on-ramp for long-term integrated residents.",
+    artifact: "Integration Ladder Charter",
+    indicators: ["case resolution time", "completion rate", "repeat-harm rate"],
+    nodes: [
+      "integration-ladder",
+      "restorative-harm-repair",
+      "interbeing-systems",
+      "data-dignity"
+    ]
+  },
+  {
+    id: "local-stability-compact",
+    label: "Local stability compact",
+    intent: "Assess and mitigate disruption to local economies and staffing.",
+    artifact: "Local Stability Compact + Stability Impact Statement",
+    indicators: [
+      "staffing shock index",
+      "small business closure rate",
+      "mitigation completion rate"
+    ],
+    nodes: [
+      "local-stability-compact",
+      "interbeing-systems",
+      "scarcity-justice",
+      "sangha-architecture"
+    ]
+  },
+  {
+    id: "access-to-counsel-pathway",
+    label: "Access-to-counsel pathway",
+    intent: "Ensure rights are usable with counsel and language access.",
+    artifact: "Access-to-Counsel Pathway",
+    indicators: [
+      "time-to-counsel",
+      "language access coverage",
+      "outcomes by access level"
+    ],
+    nodes: [
+      "access-to-counsel-pathway",
+      "right-speech-infrastructure",
+      "integrity-protocols",
+      "data-dignity"
+    ]
+  },
+  {
+    id: "training-certification-gate",
+    label: "Training and certification gate",
+    intent: "Keep safety doctrine alive through training and renewal.",
+    artifact: "Certification Register",
+    indicators: [
+      "renewal rate",
+      "complaint rate by training status",
+      "incident rate trend"
+    ],
+    nodes: [
+      "training-certification-gate",
+      "bodhisattva-craft",
+      "integrity-protocols",
+      "verification-checklist"
+    ]
+  }
+];
+const ADDENDA_PILLS = [
+  { id: "anti-mutation", label: "Anti-mutation addendum" },
+  { id: "stress-test", label: "Stress test register" },
+  { id: "lawful-interface-protocol", label: "Lawful interface protocol" },
+  { id: "public-safety-spine", label: "Public safety spine" },
+  { id: "warp-ambition-spine", label: "Warp ambition spine" }
+];
 
 const CORE_SHAPE_PILLS = [
   {
@@ -203,105 +441,6 @@ type ExportableCardProps = {
   children: ReactNode;
 };
 
-type RgbaColor = { r: number; g: number; b: number; a: number };
-
-const FALLBACK_EXPORT_BG: RgbaColor = { r: 11, g: 17, b: 32, a: 1 };
-
-const parseRgba = (value: string | null): RgbaColor | null => {
-  if (!value || value === "transparent") return null;
-  const parts = value.match(/[\d.]+/g);
-  if (!parts || parts.length < 3) return null;
-  const [r, g, b] = parts;
-  const a = parts[3] ?? "1";
-  return {
-    r: Number(r),
-    g: Number(g),
-    b: Number(b),
-    a: Number(a)
-  };
-};
-
-const compositeRgba = (foreground: RgbaColor, background: RgbaColor): RgbaColor => {
-  const alpha = foreground.a + background.a * (1 - foreground.a);
-  if (alpha <= 0) {
-    return { r: 0, g: 0, b: 0, a: 0 };
-  }
-  const r =
-    (foreground.r * foreground.a +
-      background.r * background.a * (1 - foreground.a)) /
-    alpha;
-  const g =
-    (foreground.g * foreground.a +
-      background.g * background.a * (1 - foreground.a)) /
-    alpha;
-  const b =
-    (foreground.b * foreground.a +
-      background.b * background.a * (1 - foreground.a)) /
-    alpha;
-  return { r, g, b, a: alpha };
-};
-
-const formatRgb = (color: RgbaColor) =>
-  `rgb(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)})`;
-
-const resolveBaseBackground = (node: HTMLElement | null): RgbaColor => {
-  const layers: RgbaColor[] = [];
-  let current = node;
-  while (current) {
-    const color = parseRgba(window.getComputedStyle(current).backgroundColor);
-    if (color && color.a > 0) {
-      layers.push(color);
-    }
-    current = current.parentElement;
-  }
-  if (layers.length === 0) {
-    return FALLBACK_EXPORT_BG;
-  }
-  let base = FALLBACK_EXPORT_BG;
-  for (let index = layers.length - 1; index >= 0; index -= 1) {
-    base = compositeRgba(layers[index], base);
-  }
-  return base;
-};
-
-const resolveExportBackground = (
-  node: HTMLElement,
-  backgroundColor: string
-): string => {
-  const overlay = parseRgba(backgroundColor);
-  const base = resolveBaseBackground(node.parentElement);
-  if (!overlay || overlay.a === 0) {
-    return formatRgb(base);
-  }
-  if (overlay.a >= 1) {
-    return formatRgb(overlay);
-  }
-  return formatRgb(compositeRgba(overlay, base));
-};
-
-const hideExportControls = (node: HTMLElement) => {
-  const controls = Array.from(
-    node.querySelectorAll<HTMLElement>('[data-export-control="true"]')
-  );
-  const previous = controls.map((control) => ({
-    control,
-    opacity: control.style.opacity,
-    pointerEvents: control.style.pointerEvents
-  }));
-  controls.forEach((control) => {
-    control.style.opacity = "0";
-    control.style.pointerEvents = "none";
-  });
-  return () => {
-    previous.forEach(({ control, opacity, pointerEvents }) => {
-      control.style.opacity = opacity;
-      control.style.pointerEvents = pointerEvents;
-    });
-  };
-};
-
-const EXPORT_PADDING = 16;
-
 function ExportButton({ onClick, label, disabled }: ExportButtonProps) {
   return (
     <button
@@ -332,6 +471,7 @@ function ExportableCard({
   return (
     <Card
       ref={registerRef(exportId)}
+      data-export-id={exportId}
       className={cn("relative", className)}
     >
       {showExportControls && (
@@ -365,8 +505,22 @@ function BridgeRow({ ids, onSelectNode, resolve }: BridgeRowProps) {
   );
 }
 
-export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps) {
-  const [showExportControls, setShowExportControls] = useState(false);
+export function CitizensArcView({
+  onSelectNode,
+  resolve,
+  showExportControls: externalShowExportControls,
+  onToggleExportControls
+}: CitizensArcViewProps) {
+  const [localShowExportControls, setLocalShowExportControls] = useState(false);
+  const showExportControls =
+    typeof externalShowExportControls === "boolean"
+      ? externalShowExportControls
+      : localShowExportControls;
+  const setShowExportControls =
+    onToggleExportControls ?? setLocalShowExportControls;
+  const isExternallyControlled =
+    typeof externalShowExportControls === "boolean" ||
+    typeof onToggleExportControls === "function";
   const [isExporting, setIsExporting] = useState(false);
   const pillRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -377,6 +531,12 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
     []
   );
 
+  const scrollToPill = useCallback((pillId: string) => {
+    const node = pillRefs.current[pillId];
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const exportPill = useCallback(
     async (pillId: string, filename: string) => {
       if (isExporting) return;
@@ -384,42 +544,9 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
       if (!node) return;
       setIsExporting(true);
       node.setAttribute("data-exporting", "true");
-      const restoreControls = hideExportControls(node);
       let exported = false;
       try {
-        if (document.fonts?.ready) {
-          await document.fonts.ready;
-        }
-        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-        const computed = window.getComputedStyle(node);
-        const rect = node.getBoundingClientRect();
-        const baseWidth = Math.ceil(rect.width || node.scrollWidth);
-        const baseHeight = Math.ceil(rect.height || node.scrollHeight);
-        const width = baseWidth + EXPORT_PADDING * 2;
-        const height = baseHeight + EXPORT_PADDING * 2;
-        const borderRadius = computed.borderRadius;
-        const exportBackground = resolveExportBackground(
-          node,
-          computed.backgroundColor
-        );
-        const dataUrl = await toPng(node, {
-          pixelRatio: 2,
-          backgroundColor: "transparent",
-          width,
-          height,
-          canvasWidth: width,
-          canvasHeight: height,
-          style: {
-            width: `${baseWidth}px`,
-            height: `${baseHeight}px`,
-            borderRadius,
-            overflow: "hidden",
-            boxSizing: "border-box",
-            backgroundColor: exportBackground,
-            transform: `translate(${EXPORT_PADDING}px, ${EXPORT_PADDING}px)`,
-            transformOrigin: "top left"
-          }
-        });
+        const dataUrl = await exportNodeToImage(node, "png");
         const anchor = document.createElement("a");
         anchor.href = dataUrl;
         anchor.download = `${filename.replace(/[^a-z0-9-_]+/gi, "_")}.png`;
@@ -428,12 +555,8 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
       } catch (err) {
         window.alert("Export failed. Please retry.");
       } finally {
-        restoreControls();
         node.removeAttribute("data-exporting");
         setIsExporting(false);
-        if (exported) {
-          setShowExportControls(false);
-        }
       }
     },
     [isExporting]
@@ -444,18 +567,40 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
       className="space-y-6 text-sm text-slate-200"
       data-exporting={isExporting ? "true" : "false"}
     >
+      {!isExternallyControlled && (
+        <Card className="p-3 bg-slate-950/50 border-white/10">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+              Pill exports
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Switch
+                checked={showExportControls}
+                onCheckedChange={(checked) => setShowExportControls(Boolean(checked))}
+                aria-label="Toggle pill export downloads"
+              />
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Card className="p-3 bg-slate-950/50 border-white/10">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
-            Pill exports
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <Switch
-              checked={showExportControls}
-              onCheckedChange={(checked) => setShowExportControls(Boolean(checked))}
-              aria-label="Toggle pill export downloads"
-            />
-          </div>
+        <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+          Addenda
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Quick jumps to the hardening guardrails and stress tests.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ADDENDA_PILLS.map((pill) => (
+            <button
+              key={pill.id}
+              className="rounded-md border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200 transition hover:border-sky-400/40"
+              onClick={() => scrollToPill(pill.id)}
+            >
+              {pill.label}
+            </button>
+          ))}
         </div>
       </Card>
 
@@ -483,6 +628,250 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
       </ExportableCard>
 
       <ExportableCard
+        exportId="civic-signal-loop"
+        filename="citizens-arc_civic-signal-loop"
+        exportLabel="Civic signal loop"
+        showExportControls={showExportControls}
+        onExport={exportPill}
+        registerRef={setPillRef}
+        disabled={isExporting}
+        className="p-4 bg-slate-950/50 border-white/10"
+      >
+        <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+          Civic signal loop
+        </div>
+        <p className="mt-2 text-sm text-slate-300">
+          Surveys become civic mindfulness instruments when they map signals to
+          lawful, nonviolent policy moves.
+        </p>
+        <BridgeRow
+          ids={[
+            "three-tenets-loop",
+            "civic-signal-loop",
+            "right-speech-infrastructure",
+            "data-dignity",
+            "integrity-protocols"
+          ]}
+          onSelectNode={onSelectNode}
+          resolve={resolve}
+        />
+        <Separator className="my-4 bg-white/10" />
+        <div className="grid gap-3 md:grid-cols-3">
+          {CIVIC_SIGNAL_STEPS.map((step) => (
+            <div
+              key={step.title}
+              className="rounded-lg border border-white/10 bg-slate-950/50 p-3"
+            >
+              <Badge variant="secondary">{step.title}</Badge>
+              <p className="mt-2 text-sm text-slate-300">{step.body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 space-y-3">
+          {SURVEY_SIGNAL_MAP.map((item) => (
+            <div
+              key={item.title}
+              className="rounded-lg border border-white/10 bg-slate-950/50 p-3"
+            >
+              <div className="text-sm font-semibold text-white">{item.title}</div>
+              <div className="mt-1 text-xs text-slate-400">Signal: {item.signal}</div>
+              <BridgeRow
+                ids={item.nodes}
+                onSelectNode={onSelectNode}
+                resolve={resolve}
+              />
+              <div className="mt-2 text-sm text-slate-300">
+                Policy move: {item.action}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-lg border border-white/10 bg-slate-950/50 p-3 text-xs text-slate-400">
+          Lawful boundary: emphasize rights education, oversight, and nonviolent
+          response. No evasion guidance or interference tactics.
+        </div>
+      </ExportableCard>
+
+      <ExportableCard
+        exportId="lawful-interface-protocol"
+        filename="citizens-arc_lawful-interface-protocol"
+        exportLabel="Lawful interface protocol"
+        showExportControls={showExportControls}
+        onExport={exportPill}
+        registerRef={setPillRef}
+        disabled={isExporting}
+        className="p-4 bg-slate-950/50 border-white/10"
+      >
+        <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+          Lawful interface protocol
+        </div>
+        <p className="mt-2 text-sm text-slate-300">
+          A reusable checklist for lawful, nonviolent interfaces between civic
+          institutions and enforcement agencies.
+        </p>
+        <BridgeRow
+          ids={[
+            "lawful-interface-protocol",
+            "jurisdictional-floor",
+            "two-key-approval",
+            "right-speech-infrastructure",
+            "data-dignity",
+            "integrity-protocols",
+            "restorative-harm-repair",
+            "skillful-mediation",
+            "capture-resistance",
+            "civic-memory-continuity",
+            "external-interface-integrity"
+          ]}
+          onSelectNode={onSelectNode}
+          resolve={resolve}
+        />
+        <Separator className="my-4 bg-white/10" />
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-300">
+          {LAWFUL_INTERFACE_CHECKLIST.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        <div className="mt-3 rounded-lg border border-white/10 bg-slate-950/50 p-3 text-xs text-slate-400">
+          Boundary: no interference tactics or evasion guidance. Only lawful
+          rights education, oversight design, and nonviolent response.
+        </div>
+      </ExportableCard>
+
+      <ExportableCard
+        exportId="public-safety-spine"
+        filename="citizens-arc_public-safety-spine"
+        exportLabel="Public safety governance spine"
+        showExportControls={showExportControls}
+        onExport={exportPill}
+        registerRef={setPillRef}
+        disabled={isExporting}
+        className="p-4 bg-slate-950/50 border-white/10"
+      >
+        <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+          Public safety governance spine
+        </div>
+        <p className="mt-2 text-sm text-slate-300">
+          A pack-ready set of bridges that keep enforcement lawful, transparent,
+          and grounded in harm reduction.
+        </p>
+        <BridgeRow
+          ids={[
+            "lawful-interface-protocol",
+            "metric-integrity-guardrail",
+            "harm-weighted-priority-standard",
+            "integration-ladder",
+            "access-to-counsel-pathway"
+          ]}
+          onSelectNode={onSelectNode}
+          resolve={resolve}
+        />
+        <Separator className="my-4 bg-white/10" />
+        <div className="grid gap-3 md:grid-cols-2">
+          {PUBLIC_SAFETY_SPINE_PILLS.map((pill) => (
+            <div
+              key={pill.id}
+              ref={setPillRef(pill.id)}
+              data-export-id={pill.id}
+              className="relative rounded-lg border border-white/10 bg-slate-950/50 p-3"
+            >
+              {showExportControls && (
+                <ExportButton
+                  onClick={() => exportPill(pill.id, `citizens-arc_${pill.id}`)}
+                  label={`Download ${pill.label}`}
+                  disabled={isExporting}
+                />
+              )}
+              <Badge variant="secondary">{pill.label}</Badge>
+              <p className="mt-2 text-sm text-slate-300">{pill.intent}</p>
+              <div className="mt-2 text-xs uppercase tracking-[0.3em] text-slate-500">
+                Minimal artifact
+              </div>
+              <div className="mt-1 text-sm text-slate-300">{pill.artifact}</div>
+              <div className="mt-2 text-xs uppercase tracking-[0.3em] text-slate-500">
+                Public indicators
+              </div>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-300">
+                {pill.indicators.map((indicator) => (
+                  <li key={indicator}>{indicator}</li>
+                ))}
+              </ul>
+              <BridgeRow ids={pill.nodes} onSelectNode={onSelectNode} resolve={resolve} />
+            </div>
+          ))}
+        </div>
+      </ExportableCard>
+
+      <ExportableCard
+        exportId="warp-ambition-spine"
+        filename="citizens-arc_warp-ambition-spine"
+        exportLabel="Warp ambition spine"
+        showExportControls={showExportControls}
+        onExport={exportPill}
+        registerRef={setPillRef}
+        disabled={isExporting}
+        className="p-4 bg-slate-950/50 border-white/10"
+      >
+        <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+          Warp ambition spine
+        </div>
+        <p className="mt-2 text-sm text-slate-300">
+          A civic-to-cosmos bridge: stable floor, reality-paced discovery, and
+          public utility guiding the warp bubble horizon.
+        </p>
+        <BridgeRow
+          ids={[
+            "scarcity-justice",
+            "interbeing-systems",
+            "three-tenets-loop",
+            "beginners-mind",
+            "integrity-protocols",
+            "verification-checklist",
+            "koan-governance",
+            "impermanence-by-design",
+            "worldview-integrity"
+          ]}
+          onSelectNode={onSelectNode}
+          resolve={resolve}
+        />
+        <Separator className="my-4 bg-white/10" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+              Public translation
+            </div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-300">
+              {WARP_AMBITION_PUBLIC.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+              Technical spine
+            </div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-300">
+              {WARP_AMBITION_TECHNICAL.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <div className="mt-3 text-xs uppercase tracking-[0.3em] text-slate-400">
+              Stage discipline
+            </div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-300">
+              {WARP_AMBITION_STAGE.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div className="mt-3 rounded-lg border border-white/10 bg-slate-950/50 p-3 text-xs text-slate-400">
+          Boundary: claims must match evidence stage; ambition stays in service
+          to public utility.
+        </div>
+      </ExportableCard>
+
+      <ExportableCard
         exportId="core-shape"
         filename="citizens-arc_core-shape"
         exportLabel="The core shape"
@@ -504,6 +893,7 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
             <div
               key={pill.id}
               ref={setPillRef(pill.id)}
+              data-export-id={pill.id}
               className="relative rounded-lg border border-white/10 bg-slate-950/50 p-3"
             >
               {showExportControls && (
@@ -1026,6 +1416,67 @@ export function CitizensArcView({ onSelectNode, resolve }: CitizensArcViewProps)
             <li key={mode.title}>
               <div className="font-semibold text-white">{mode.title}</div>
               <div className="text-slate-300">Counter: {mode.counter}</div>
+            </li>
+          ))}
+        </ul>
+      </ExportableCard>
+
+      <ExportableCard
+        exportId="anti-mutation"
+        filename="citizens-arc_anti-mutation"
+        exportLabel="Anti-mutation addendum"
+        showExportControls={showExportControls}
+        onExport={exportPill}
+        registerRef={setPillRef}
+        disabled={isExporting}
+        className="p-4 bg-slate-950/50 border-white/10"
+      >
+        <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+          Anti-mutation addendum
+        </div>
+        <p className="mt-2 text-sm text-slate-300">
+          These mechanisms stop trials and trust from hardening into a new caste.
+        </p>
+        <BridgeRow
+          ids={["citizens-arc-anti-mutation"]}
+          onSelectNode={onSelectNode}
+          resolve={resolve}
+        />
+        <Separator className="my-4 bg-white/10" />
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-300">
+          {ANTI_MUTATION_MECHANISMS.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </ExportableCard>
+
+      <ExportableCard
+        exportId="stress-test"
+        filename="citizens-arc_stress-test"
+        exportLabel="Stress test register"
+        showExportControls={showExportControls}
+        onExport={exportPill}
+        registerRef={setPillRef}
+        disabled={isExporting}
+        className="p-4 bg-slate-950/50 border-white/10"
+      >
+        <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+          Stress test register
+        </div>
+        <p className="mt-2 text-sm text-slate-300">
+          Attack packets keep the citizen's arc honest when the system scales.
+        </p>
+        <BridgeRow
+          ids={["citizens-arc-stress-test"]}
+          onSelectNode={onSelectNode}
+          resolve={resolve}
+        />
+        <Separator className="my-4 bg-white/10" />
+        <ul className="mt-3 space-y-3 text-sm text-slate-300">
+          {STRESS_TEST_PACKETS.map((packet) => (
+            <li key={packet.title}>
+              <div className="font-semibold text-white">{packet.title}</div>
+              <div className="text-slate-300">Counter: {packet.counter}</div>
             </li>
           ))}
         </ul>

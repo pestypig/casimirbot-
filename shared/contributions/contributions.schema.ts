@@ -81,9 +81,11 @@ export const ContributionKindSchema = z.enum([
   "local-context",
   "interpretation",
 ]);
+export type ContributionKind = z.infer<typeof ContributionKindSchema>;
 
 export const VerificationVerdictSchema = z.enum(["pass", "fail"]);
 export const PrivacyShareLevelSchema = z.enum(["local", "partial", "public"]);
+export type PrivacyShareLevel = z.infer<typeof PrivacyShareLevelSchema>;
 
 export const ContributionReceiptSchema = z
   .object({

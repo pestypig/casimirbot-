@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Settings } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Search, Settings } from "lucide-react";
 import { panelRegistry, getPanelDef } from "@/lib/desktop/panelRegistry";
 import { useDesktopStore } from "@/store/useDesktopStore";
 import { DesktopWindow } from "@/components/desktop/DesktopWindow";
@@ -14,9 +14,12 @@ import {
 } from "@/hooks/useHelixStartSettings";
 import { decodeLayout, resolvePanelIds, type DesktopLayoutHash } from "@/lib/desktop/shareState";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
+import { useAgiChatStore } from "@/store/useAgiChatStore";
+import { execute, plan } from "@/lib/agi/api";
 import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference } from "@/lib/agi/preferences";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
+import type { KnowledgeProjectExport } from "@shared/knowledge";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -24,6 +27,7 @@ const PENDING_PANEL_KEY = "helix:pending-panel";
 const NOISE_GENS_PANEL_ID = "helix-noise-gens";
 const ESSENCE_CONSOLE_PANEL_ID = "agi-essence-console";
 const NOISE_GENS_AUTO_OPEN_SUPPRESS = new Set([ESSENCE_CONSOLE_PANEL_ID]);
+const HELIX_ASK_CONTEXT_ID = "helix-ask-desktop";
 
 function collectPanelIdsFromStructure(
   input: unknown,
@@ -85,6 +89,17 @@ export default function DesktopPage() {
     refresh: state.refresh,
     selectProjects: state.selectProjects,
   }));
+  const { exportActiveContext } = useKnowledgeProjectsStore((state) => ({
+    exportActiveContext: state.exportActiveContext,
+  }));
+  const { ensureContextSession, addMessage, setActive } = useAgiChatStore();
+  const helixAskSessionRef = useRef<string | null>(null);
+  const [askInput, setAskInput] = useState("");
+  const [askBusy, setAskBusy] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
+  const [askReplies, setAskReplies] = useState<
+    Array<{ id: string; content: string; traceId?: string }>
+  >([]);
   const hashAppliedRef = useRef(false);
   const environmentAppliedRef = useRef(false);
   const autoOpenSuppressRef = useRef<Set<string> | null>(null);
@@ -277,6 +292,85 @@ export default function DesktopPage() {
     };
   }, [applyEnvironment, applyUiPreferences]);
 
+  const getHelixAskSessionId = useCallback(() => {
+    if (helixAskSessionRef.current) return helixAskSessionRef.current;
+    const sessionId = ensureContextSession(HELIX_ASK_CONTEXT_ID, "Helix Ask");
+    helixAskSessionRef.current = sessionId || null;
+    return helixAskSessionRef.current;
+  }, [ensureContextSession]);
+
+  const handleOpenConversationPanel = useCallback(() => {
+    const sessionId = getHelixAskSessionId();
+    if (!sessionId) return;
+    setActive(sessionId);
+    open(ESSENCE_CONSOLE_PANEL_ID);
+  }, [getHelixAskSessionId, open, setActive]);
+
+  const handleAskSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (askBusy) return;
+      const trimmed = askInput.trim();
+      if (!trimmed) return;
+      setAskBusy(true);
+      setAskError(null);
+      setAskInput("");
+      const sessionId = getHelixAskSessionId();
+      if (sessionId) {
+        setActive(sessionId);
+        addMessage(sessionId, { role: "user", content: trimmed });
+      }
+      try {
+        let knowledgeContext: KnowledgeProjectExport[] = [];
+        try {
+          knowledgeContext = await exportActiveContext();
+        } catch {
+          // best-effort knowledge context
+        }
+        const planResponse = await plan(
+          trimmed,
+          "default",
+          knowledgeContext,
+          undefined,
+          {
+            essenceConsole: true,
+            sessionId: sessionId ?? undefined,
+          },
+        );
+        const executeResponse = await execute(planResponse.traceId);
+        const responseText =
+          executeResponse.result_summary?.trim() ||
+          "Task completed. Open the conversation panel for full details.";
+        const replyId = crypto.randomUUID();
+        setAskReplies((prev) =>
+          [
+            { id: replyId, content: responseText, traceId: planResponse.traceId },
+            ...prev,
+          ].slice(0, 3),
+        );
+        if (sessionId) {
+          addMessage(sessionId, { role: "assistant", content: responseText });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Request failed";
+        setAskError(message);
+        if (sessionId) {
+          addMessage(sessionId, { role: "assistant", content: `Error: ${message}` });
+        }
+      } finally {
+        setAskBusy(false);
+      }
+    },
+    [
+      addMessage,
+      askBusy,
+      askInput,
+      exportActiveContext,
+      getHelixAskSessionId,
+      setActive,
+    ],
+  );
+
   return (
     <Dialog
       open={settingsOpen}
@@ -301,6 +395,63 @@ export default function DesktopPage() {
               <span className="hidden sm:inline">Settings</span>
             </button>
           </DialogTrigger>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex flex-col items-center px-6">
+          <form
+            className="pointer-events-auto w-full max-w-2xl"
+            onSubmit={handleAskSubmit}
+          >
+            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-slate-950/70 px-4 py-3 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-200">
+                <span className="h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.6)]" />
+              </div>
+              <input
+                aria-label="Ask Helix"
+                className="flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+                disabled={askBusy}
+                onChange={(event) => setAskInput(event.target.value)}
+                placeholder={askBusy ? "Working..." : "Ask anything about this system"}
+                type="text"
+                value={askInput}
+              />
+              <button
+                aria-label="Submit prompt"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
+                disabled={askBusy}
+                type="submit"
+              >
+                <Search className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
+          {askError ? (
+            <p className="pointer-events-auto mt-3 text-xs text-rose-200">
+              {askError}
+            </p>
+          ) : null}
+          {askReplies.length > 0 ? (
+            <div className="pointer-events-auto mt-4 w-full max-w-2xl space-y-3">
+              {askReplies.map((reply) => (
+                <div
+                  key={reply.id}
+                  className="rounded-2xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur"
+                >
+                  <p className="whitespace-pre-wrap leading-relaxed">{reply.content}</p>
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+                    <span>Saved in Helix Console</span>
+                    <button
+                      className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-200 transition hover:bg-white/10"
+                      onClick={handleOpenConversationPanel}
+                      type="button"
+                    >
+                      Open conversation
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {Object.values(windows)

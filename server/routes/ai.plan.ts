@@ -507,8 +507,8 @@ const mergeIntentFx = (
 ) => {
   if (!intent) return base;
   const merged = { ...(base ?? {}) } as NonNullable<
-    PlanWindowAnalysis["texture"]
-  >["fx"];
+    NonNullable<PlanWindowAnalysis["texture"]>["fx"]
+  >;
   for (const [key, value] of Object.entries(intent)) {
     if (typeof value !== "number") continue;
     const current = merged[key as keyof typeof merged];
@@ -529,13 +529,16 @@ const clampIntentFxBounds = (
     | undefined,
 ) => {
   if (!fx || !bounds) return fx;
-  const next = { ...fx } as NonNullable<PlanWindowAnalysis["texture"]>["fx"];
+  const next = { ...fx } as NonNullable<
+    NonNullable<PlanWindowAnalysis["texture"]>["fx"]
+  >;
   for (const [key, range] of Object.entries(bounds)) {
-    if (!range || typeof range !== "object") continue;
+    const rangeSpec = range as { min: number; max: number } | undefined;
+    if (!rangeSpec) continue;
     const value = next[key as keyof typeof next];
     if (typeof value !== "number") continue;
-    const min = Number(range.min);
-    const max = Number(range.max);
+    const min = Number(rangeSpec.min);
+    const max = Number(rangeSpec.max);
     if (!Number.isFinite(min) || !Number.isFinite(max)) continue;
     next[key as keyof typeof next] = clamp01(
       Math.min(Math.max(value, min), max),

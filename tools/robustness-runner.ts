@@ -268,14 +268,23 @@ const applyNoise = (
   return { ...payload, data_b64: encodeFloat32Raster(out) };
 };
 
-const buildBaselineMeans = (frames: Array<{ metrics: Record<string, number | undefined>; score: number }>) => {
-  const collect = (key: string) =>
-    frames.map((frame) => frame.metrics[key]).filter((value): value is number => Number.isFinite(value ?? NaN));
+const buildBaselineMeans = (
+  frames: Array<{
+    metrics: { k0?: number; k1?: number; k2?: number };
+    score: number;
+  }>,
+) => {
   const meanOf = (values: number[]) =>
     values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : undefined;
-  const k0 = collect("k0");
-  const k1 = collect("k1");
-  const k2 = collect("k2");
+  const k0 = frames
+    .map((frame) => frame.metrics.k0)
+    .filter((value): value is number => Number.isFinite(value ?? NaN));
+  const k1 = frames
+    .map((frame) => frame.metrics.k1)
+    .filter((value): value is number => Number.isFinite(value ?? NaN));
+  const k2 = frames
+    .map((frame) => frame.metrics.k2)
+    .filter((value): value is number => Number.isFinite(value ?? NaN));
   const scores = frames.map((frame) => frame.score).filter((value) => Number.isFinite(value));
   return {
     k0_mean: meanOf(k0),

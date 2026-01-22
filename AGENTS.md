@@ -26,6 +26,12 @@ When you make any code/config change:
 ### Trace export (for training/analytics)
 - Endpoint: `GET /api/agi/training-trace/export` (JSONL)
 
+## Training data lifecycle
+The training data pipeline is always present (trace capture -> gates -> export).
+Do not rebuild infrastructure per patch; re-run exports only when you want fresh
+datasets. A PASS Casimir verify confirms gate integrity at that moment but does
+not replace training data checks or guarantee future patches remain valid.
+
 ### Auth + tenant isolation (when enabled)
 - If `ENABLE_AGI_AUTH=1` or `AGI_TENANT_REQUIRED=1`, include:
   - `Authorization: Bearer <token>`

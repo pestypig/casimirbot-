@@ -84,7 +84,7 @@ type RemixStatus = "idle" | "loading" | "ready" | "active" | "error";
 
 type StemGroupPlayback = StemGroup & {
   gain: number;
-  source?: StemGroupSource | null;
+  source: StemGroupSource;
 };
 
 type MeaningCard = {
@@ -376,7 +376,9 @@ const buildIntentContractFromDraft = (
   const tempoBpm = parseOptionalNumber(draft.tempoBpm);
   if (tempoBpm != null) invariants.tempoBpm = tempoBpm;
   const timeSig = draft.timeSig.trim();
-  if (timeSig) invariants.timeSig = timeSig;
+  if (/^\d+\/\d+$/.test(timeSig)) {
+    invariants.timeSig = timeSig as TempoMeta["timeSig"];
+  }
   const key = draft.key.trim();
   if (key) invariants.key = key;
   const grooveTemplateIds = parseCsvList(draft.grooveTemplateIds);
@@ -566,7 +568,7 @@ const formatTime = (value: number): string => {
 };
 
 const formatTimestamp = (value?: number) => {
-  if (!Number.isFinite(value)) return "--";
+  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
   return date.toLocaleString();
@@ -2100,7 +2102,7 @@ export function OriginalsPlayer({
             source,
           };
         })
-        .filter((group): group is StemGroupPlayback => Boolean(group));
+        .filter((group): group is StemGroupPlayback => group !== null);
 
       if (baseGroups.length === 0) {
         throw new Error("No stem groups are available yet.");

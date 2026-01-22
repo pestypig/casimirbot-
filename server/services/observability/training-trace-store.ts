@@ -7,6 +7,7 @@ import {
   type TrainingTraceConstraint,
   type TrainingTraceDelta,
   type TrainingTraceMetrics,
+  type TrainingTracePayload,
   type TrainingTraceRecord,
   type TrainingTraceSignal,
   type TrainingTraceSource,
@@ -22,6 +23,7 @@ export type TrainingTraceInput = {
   metrics?: TrainingTraceMetrics;
   firstFail?: TrainingTraceConstraint;
   certificate?: TrainingTraceCertificate;
+  payload?: TrainingTracePayload;
   notes?: string[];
   ts?: string;
   id?: string;
@@ -112,6 +114,7 @@ export function recordTrainingTrace(input: TrainingTraceInput): TrainingTraceRec
     metrics: input.metrics,
     firstFail: input.firstFail,
     certificate: input.certificate,
+    payload: input.payload,
     notes: input.notes,
   };
   traceBuffer.push(record);

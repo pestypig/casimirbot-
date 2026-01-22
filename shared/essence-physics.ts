@@ -206,6 +206,7 @@ export const CurvatureKMetrics = z.object({
   k2: z.number().nonnegative(),
   k3: z.number().min(0).max(1).optional(),
 });
+export type TCurvatureKMetrics = z.infer<typeof CurvatureKMetrics>;
 
 export const CurvatureRidgeSummary = z.object({
   ridge_count: z.number().int().nonnegative(),
@@ -218,6 +219,7 @@ export const CurvatureRidgeSummary = z.object({
     low: z.number().nonnegative(),
   }),
 });
+export type TCurvatureRidgeSummary = z.infer<typeof CurvatureRidgeSummary>;
 
 export const CurvatureRidgePoint = z.object({
   x: z.number(),
@@ -240,11 +242,13 @@ export const CurvatureRidgeSpine = z.object({
   }),
   point_count: z.number().int().nonnegative(),
 });
+export type TCurvatureRidgeSpine = z.infer<typeof CurvatureRidgeSpine>;
 
 export const CurvatureRidgeFrame = z.object({
   summary: CurvatureRidgeSummary,
   spines: z.array(CurvatureRidgeSpine),
 });
+export type TCurvatureRidgeFrame = z.infer<typeof CurvatureRidgeFrame>;
 
 export const CurvatureSummary = z.object({
   total_energy_J: z.number().nonnegative(),

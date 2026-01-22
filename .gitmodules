@@ -1,3 +1,6 @@
 [submodule "external/agentic-architectures"]
 	path = external/agentic-architectures
 	url = https://github.com/FareedKhan-dev/all-agentic-architectures
+[submodule "external/webgpu-volume-pathtracer"]
+	path = external/webgpu-volume-pathtracer
+	url = https://github.com/Twinklebear/webgpu-volume-pathtracer

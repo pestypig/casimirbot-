@@ -6,6 +6,8 @@ import type { ConsoleTelemetryBundle, PanelTelemetry } from "@shared/desktop";
 import type { BadgeTelemetrySnapshot } from "@shared/badge-telemetry";
 import type { EssenceProfile, EssenceProfileUpdate } from "@shared/inferenceProfile";
 import type { PromptSpec } from "@shared/prompt-spec";
+import type { ChatSession } from "@shared/agi-chat";
+import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import { DEFAULT_DESKTOP_ID, pushConsoleTelemetry } from "@/lib/agi/consoleTelemetry";
 import { ensureLatestLattice } from "@/lib/agi/resonanceVersion";
 import { useResonanceStore } from "@/store/useResonanceStore";
@@ -258,6 +260,8 @@ export type PlanRequestOptions = {
   callSpec?: LocalCallSpec | null;
   essenceConsole?: boolean;
   warpParams?: Record<string, unknown>;
+  sessionId?: string;
+  refinery?: AgiRefineryRequest;
 };
 
 export async function plan(
@@ -292,6 +296,12 @@ export async function plan(
   }
   if (options?.warpParams) {
     body.warpParams = options.warpParams;
+  }
+  if (options?.sessionId) {
+    body.sessionId = options.sessionId;
+  }
+  if (options?.refinery) {
+    body.refinery = options.refinery;
   }
   const desktopId = options?.desktopId ?? DEFAULT_DESKTOP_ID;
   if (desktopId) {
@@ -404,6 +414,55 @@ export async function memorySearch({
   if (debateOnly) search.set("debateOnly", "1");
   return asJson(
     await fetch(`/api/agi/memory/search?${search.toString()}`, {
+      headers: { Accept: "application/json" },
+    }),
+  );
+}
+
+export async function listChatSessions(opts?: {
+  limit?: number;
+  offset?: number;
+  includeMessages?: boolean;
+}): Promise<ChatSession[]> {
+  const params = new URLSearchParams();
+  if (typeof opts?.limit === "number") params.set("limit", String(opts.limit));
+  if (typeof opts?.offset === "number") params.set("offset", String(opts.offset));
+  if (opts?.includeMessages === false) params.set("includeMessages", "0");
+  const suffix = params.toString();
+  const payload = await asJson<{ sessions?: ChatSession[] }>(
+    await fetch(`/api/agi/chat/sessions${suffix ? `?${suffix}` : ""}`, {
+      headers: { Accept: "application/json" },
+    }),
+  );
+  return payload.sessions ?? [];
+}
+
+export async function getChatSession(id: string): Promise<ChatSession | null> {
+  if (!id) return null;
+  const payload = await asJson<{ session?: ChatSession }>(
+    await fetch(`/api/agi/chat/sessions/${encodeURIComponent(id)}`, {
+      headers: { Accept: "application/json" },
+    }),
+  );
+  return payload.session ?? null;
+}
+
+export async function upsertChatSession(session: ChatSession): Promise<ChatSession> {
+  const payload = await asJson<{ session: ChatSession }>(
+    await fetch("/api/agi/chat/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session }),
+    }),
+  );
+  return payload.session;
+}
+
+export async function deleteChatSession(id: string): Promise<void> {
+  if (!id) return;
+  await asJson(
+    await fetch(`/api/agi/chat/sessions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
       headers: { Accept: "application/json" },
     }),
   );

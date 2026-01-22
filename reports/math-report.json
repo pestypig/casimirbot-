@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-01-18T08:49:24.265Z",
+  "generatedAt": "2026-01-22T00:18:42.859Z",
   "registryCount": 69,
   "coverage": {
     "exploratory": {
@@ -93,12 +93,14 @@
     }
   },
   "unstaged": {
-    "count": 6,
+    "count": 8,
     "modules": [
       "modules/gr/gr-diagnostics.ts",
       "server/gr/gr-assistant-adapter.ts",
       "server/gr/gr-os-payload.ts",
+      "server/routes/agi.chat.ts",
       "server/routes/agi.contributions.ts",
+      "server/routes/agi.refinery.ts",
       "server/services/observability/gr-os-payload-store.ts",
       "server/services/observability/tool-event-adapters.ts"
     ],
@@ -109,7 +111,9 @@
         "server/gr/gr-os-payload.ts"
       ],
       "reduced-order": [
-        "server/routes/agi.contributions.ts"
+        "server/routes/agi.chat.ts",
+        "server/routes/agi.contributions.ts",
+        "server/routes/agi.refinery.ts"
       ],
       "exploratory": [
         "server/services/observability/gr-os-payload-store.ts",
@@ -173,8 +177,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 487,
-    "edgeCount": 1036
+    "nodeCount": 512,
+    "edgeCount": 1107
   },
   "evidenceProfiles": [
     {

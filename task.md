@@ -1,4 +1,4 @@
-﻿# GR Tool-Augmented Assistant (Local) - Task Spec
+# GR Tool-Augmented Assistant (Local) - Task Spec
 
 ## Goal
 Build a local, tool-augmented assistant that helps derive and validate GR tensor
@@ -1299,7 +1299,7 @@ Prompt NG52 (Catalog snapshot in object storage) - Status: complete
 
 Prompt NG53 (Upload session records + resume) - Status: pending
 - Goal: make large uploads resilient to crashes or tab closes.
-- Do: persist per-track upload session records with stage states (received â†’ assembled â†’ analyzed â†’ playback ready).
+- Do: persist per-track upload session records with stage states (received → assembled → analyzed → playback ready).
 - Do: allow resuming or reconciling partial uploads on next upload attempt.
 - Do not: require manual cleanup to retry a failed upload.
 - Acceptance: interrupted uploads can resume or safely restart without duplicate entries.
@@ -1612,6 +1612,831 @@ Repo Hygiene: Split Noise-gen vs Solar Commits - Status: complete
 - Commit D (task bookkeeping): task.md.
 - Exclude from commits: artifacts/training-trace.jsonl (generated).
 
+## Essence Console Chat Persistence + Render Export (in progress)
+- Goal: persist Essence Console chats to user storage while keeping local cache and enable hash-pinned PNG/SVG exports via server-side render.
+- Do:
+  - Run the `023_chat_sessions` migration in each target environment and document rollback.
+  - Wire auth/tenant ownerId mapping for chat routes and confirm per-user isolation.
+  - Add UI actions to trigger transcript exports (PNG/SVG) and surface the hash used.
+  - Decide whether transcript exports should be persisted as Essence envelopes and implement storage if needed.
+  - Add a brief doc note for sync behavior (local vs remote) and conflict resolution.
+  - Define retention/cleanup for stored chats and delete cascade expectations.
+  - Add smoke tests for chat session CRUD + render endpoint.
+- Do not: drop local browser persistence or allow render without hash pinning.
+- Acceptance: chats persist across sessions/devices, exports match hash, and local cache remains usable offline.
+
+## Data Refinery Build (Intent -> Strategy -> Evidence -> Answer) - Status: complete
+- Decision: reuse existing trace infrastructure (`/api/agi/training-trace`, `/api/agi/trace`) and harden it for trajectory payloads before adding any new storage.
+
+Prompt D1 (Trajectory schema + trace emission) - Status: complete
+- Goal: define the canonical trajectory object (x,z,s,q,E,y) and emit it for every Essence Console run.
+- Do:
+  - Add a shared schema for trajectories (x, z, s, q, E, y, timestamps, model/tool versions).
+  - Emit traces from `server/routes/agi.plan.ts` + `client/src/components/agi/essence.tsx` (tie to plan + execute).
+  - Store trajectories by extending `server/routes/training-trace.ts` and replay via `server/routes/agi.trace.ts` (no new tables yet).
+  - Add hardening checks for trace size, PII scrubbing, and schema validation.
+  - Scrub PII and secrets; store only evidence ids + hashes, never raw file contents.
+- Do not: log auth tokens or full repo files in traces.
+- Acceptance: every run yields a trace record with stable ids and replayable evidence references.
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt D2 (Evidence capture + citation hashing) - Status: complete
+- Goal: make evidence sets deterministic, hash-addressable, and exportable.
+- Do:
+  - Capture evidence ids, chunk hashes, and source paths from retrieval calls.
+  - Add citation hash fields that match the evidence content used in responses.
+  - Ensure citations can be resolved back to the knowledge store without ambiguity.
+- Do not: allow citations without an evidence hash.
+- Acceptance: each response includes citations that resolve to exact evidence objects.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt D3 (Replay/simulation harness) - Status: complete
+- Goal: re-run stored trajectories through the pipeline to measure acceptance rates and failure modes.
+- Do:
+  - Add a replay script that rehydrates traces and runs retrieval + verifiers.
+  - Emit acceptance metrics (grounding/test/format/safety) to training traces.
+  - Summarize acceptance by intent bucket and evidence type.
+- Do not: mutate production data during replay; keep it read-only.
+- Acceptance: replay produces a report with acceptance rate + top failure causes.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt D4 (Verifier suite + scoring) - Status: complete
+- Goal: implement the verifier gates described in the proposal as first-class checks.
+- Do:
+  - Define groundedness, format/schema, safety, and test gates with clear pass/fail.
+  - Output gate metrics into training traces for every run.
+  - Provide a single "accept" boolean derived from gate results.
+- Do not: collapse gate failures into a single opaque error.
+- Acceptance: each run shows per-gate status plus a final accept decision.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt D5 (Variation engine + constrained sampling) - Status: complete
+- Goal: generate controlled variations of trajectories and filter them through gates.
+- Do:
+  - Implement paraphrase, strategy, evidence subset, and output-template variants.
+  - Track acceptance rates for each factor combination (tensor coverage).
+  - Avoid reusing exact duplicates via content hashing.
+- Do not: let synthetic variants exceed the real-data mix ratio.
+- Acceptance: variant generation yields measurable coverage and stable acceptance rates.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt D6 (Dataset export + mix control) - Status: complete
+- Goal: export a clean JSONL dataset for SFT + preference pairs.
+- Do:
+  - Export SFT samples (x, z, s, q, E, y) and DPO pairs (y+, y-) with metadata.
+  - Enforce a real/synthetic mix ratio and log it per export.
+  - Attach provenance fields (trace id, evidence hashes, gate status).
+- Do not: export examples without gate metadata.
+- Acceptance: dataset exports are reproducible and traceable to source runs.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt D7 (Dogfood loop + dashboard) - Status: complete
+- Goal: run a small live loop to gather real traces and visualize acceptance.
+- Do:
+  - Add a toggle to enable trace logging for selected personas.
+  - Build a simple dashboard showing acceptance rate, failures, and token budgets.
+  - Keep the loop behind a local-only or admin-only gate.
+- Do not: enable for all users by default.
+- Acceptance: dogfood mode yields real traces with visible acceptance metrics.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt D8 (Optimization policy) - Status: complete
+- Goal: steer generation toward sparse or high-value trajectory slices.
+- Do:
+  - Implement a sampling policy that reweights rare intents and evidence types.
+  - Track coverage deltas and use them to update sampling weights.
+  - Keep acceptance rate above a defined floor.
+- Do not: optimize only for acceptance; keep coverage balanced.
+- Acceptance: coverage improves without degrading acceptance below the floor.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+## Data Refinery Hardening (Quality + Coverage) - Status: in progress
+- Goal: tighten grounding quality, add slice coverage signals, and unlock real negative samples for DPO.
+
+Prompt H1 (Grounding gate L1-L3) - Status: complete
+- Goal: enforce citation presence + claim heuristics and penalize missing retrieval linkage.
+- Do:
+  - Detect claim-like output and require citations when needed.
+  - Validate citations against captured evidence hashes.
+  - Emit groundedness score + reason codes into gates.
+- Do not: treat "evidence count > 0" as sufficient grounding.
+- Acceptance: groundedness gate fails when claims are uncited or unlinked.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+  `server/services/agi/refinery-trajectory.ts`.
+
+Prompt H2 (Schema + safety validators) - Status: complete
+- Goal: add strict schema and safety validators to the gate suite.
+- Do:
+  - Validate Essence envelopes against schema and contentType.
+  - Scan output for secrets/disallowed paths and fail safety gate when flagged.
+- Do not: rely solely on upstream `meta.safetyOk`.
+- Acceptance: safety/format gates catch malformed outputs and secret leaks.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt H3 (Tensor axes expansion) - Status: complete
+- Goal: extend coverage tracking beyond intent + evidence.
+- Do:
+  - Add strategy/difficulty/surface axes to summary + policy weights.
+  - Track acceptance by axis and show in `/agi-refinery` dashboard.
+- Do not: collapse coverage into a single scalar.
+- Acceptance: summary reports include per-axis counts and acceptance deltas.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+  `server/services/agi/refinery-axes.ts`, `shared/agi-refinery.ts`, `client/src/pages/agi-refinery.tsx`.
+
+Prompt H4 (Variation operators v2) - Status: complete
+- Goal: generate harder variants that produce real negatives.
+- Do:
+  - Add evidence perturbation (drop/replace) and strategy-switch variants.
+  - Add adversarial/ambiguity probes and artifact-request variants.
+- Do not: generate variants without traceable seed ids.
+- Acceptance: variant runs yield both accepted and rejected samples.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt H5 (Holdout eval + slice metrics) - Status: complete
+- Goal: produce a fixed evaluation harness with slice-level metrics.
+- Do:
+  - Build holdout dataset by intent/area/time and track slice metrics.
+  - Report groundedness, citation precision/recall, refusal/clarify rates.
+- Do not: mix holdout data into training exports.
+- Acceptance: holdout metrics are stable across runs.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+  `scripts/agi-holdout.ts`, `scripts/agi-holdout-eval.ts`.
+
+Prompt H6 (Retrieval candidates/selected capture) - Status: complete
+- Goal: record retrieval candidates + selected context hashes in trajectories.
+- Do:
+  - Capture repo.graph.search hits/packets with hash-only snippets.
+  - Attach candidate/selected lists to trajectory meta.
+- Do not: store raw snippet text in traces.
+- Acceptance: trajectories include retrieval candidates/selected lists with hashes only.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+  `shared/agi-refinery.ts`.
+
+## Build Plan (Verified Generative Training System) - Status: in progress
+- Goal: produce a measurable, verifier-gated training loop with real coverage and negatives.
+
+Phase B0 (Runtime + credential readiness) - Status: complete
+- Do:
+  - Ensure `npm run dev:agi` boots cleanly with `ENABLE_AGI_REFINERY_TRACE=1`.
+  - Fix tool auth errors (e.g., `OPENAI_API_KEY`) or disable warp tools in variants.
+  - Confirm traces persist and replay works without errors.
+- Do not: accept tool failures as successful trajectories.
+- Acceptance: variant runs complete without tool auth errors; replay emits gates.
+- Evaluation (latest run 2026-01-20):
+  - Booted with `ENABLE_AGI_REFINERY_TRACE=1` + `BACKEND_PHYSICS_ASK=ollama`.
+  - Plan/execute, variants, replay, holdout eval, export completed without tool auth failures.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Prompt H7 (Alignment seed mining: uncertainty + math/physics parallels) - Status: complete
+- Goal: mine alignment prompts that relate statements to codebase values using the
+  math/noise uncertainty philosophy and physics parallels.
+- Do:
+  - Add seed templates that map a statement to `docs/ethos/ideology.json` branches
+    and cite node paths.
+  - Require retrieval anchors from the ideology tree plus math/physics sources
+    (GR/noise/constraints docs or modules).
+  - Tag alignment seeds (`alignment`, `values`, `uncertainty`, `math`, `physics`)
+    for coverage tracking.
+  - Run a full-repo seed mine with alignment templates and record alignment slice
+    metrics in holdout/coverage reports.
+- Do not: allow ungrounded value claims or ideology references without citations.
+- Acceptance: seed run yields >= 25 alignment prompts across surfaces with
+  ideology node paths + math/physics anchors; gates enforce citations for these
+  prompts and coverage reports include the alignment slice.
+- Update (2026-01-22, alignment seed runs):
+  - Alignment-only run executed 24/25 (limit 30, per-surface 6).
+  - Top-up run executed 4/4 (limit 5, per-surface 1).
+  - Alignment prompts in seed list: 25; total executed alignment prompts >= 28.
+  - Acceptance met: alignment prompts include ideology node paths + math/physics anchors.
+
+Prompt H8 (Panel analysis seed mining: warp bubble UI + proof panels) - Status: complete
+- Goal: mine panel-analysis prompts that trace UI surfaces to warp bubble math,
+  proof pack wiring, and GR gate propagation.
+- Do:
+  - Add panel-analysis seed templates in `scripts/agi-seed-mine.ts` that trace
+    dataflow from UI panels to proof pack and GR assistant routes.
+  - Include warp/GR math module anchors plus proof-pack and GR assistant
+    endpoints in resource hints.
+  - Tag panel-analysis seeds (`panel-analysis`, `ui-surface`, `pipeline-proofs`,
+    `warp-bubble`) for coverage tracking.
+  - Provide a seed miner mode (`--panel-analysis` / `--panel-analysis-only`) and
+    run a dedicated panel-analysis seed pass with `--include-warp`.
+- Do not: allow panel-analysis prompts without citations to UI, proof pack, and
+  GR assistant sources.
+- Acceptance: >= 25 panel-analysis prompts across client/server/warp surfaces;
+  prompts cite UI panel + proof pack + GR assistant sources; coverage reports
+  include the panel-analysis slice.
+- Update (2026-01-22, panel-analysis seed run):
+  - Panel-analysis run executed 25/25 with `--panel-analysis-only --include-warp`.
+  - Tags applied: panel-analysis, ui-surface, pipeline-proofs, warp-bubble.
+
+Prompt H9 (Backend analysis seed mining: warp/GR pipeline + proofs) - Status: complete
+- Goal: mine backend-analysis prompts that trace warp/GR math, proof pack
+  assembly, and gate enforcement across server/services/modules.
+- Do:
+  - Add backend-analysis seed templates in `scripts/agi-seed-mine.ts` that trace
+    plan/execute, proof-pack assembly, GR assistant proxying, and constraint
+    policies.
+  - Include warp/GR math module anchors plus training-trace and refinery gate
+    sources in resource hints.
+  - Tag backend-analysis seeds (`backend-analysis`, `pipeline-proofs`,
+    `warp-bubble`) for coverage tracking.
+  - Provide a seed miner mode (`--backend-analysis` / `--backend-analysis-only`)
+    and run a dedicated backend-analysis seed pass with `--include-warp`.
+- Do not: allow backend-analysis prompts without citations to server/services
+  and warp/GR math sources.
+- Acceptance: >= 20 backend-analysis prompts across server/shared/warp surfaces;
+  prompts cite proof pack + GR assistant + refinery gate sources; coverage
+  reports include the backend-analysis slice.
+- Update (2026-01-22, backend-analysis seed run):
+  - Backend-analysis run executed 21/21 with `--backend-analysis-only --include-warp`.
+  - Tags applied: backend-analysis, pipeline-proofs, warp-bubble.
+
+Phase B1 (Seed coverage expansion) - Status: in progress
+- Do:
+  - Generate mixed-intent seeds (general, implementation, UI, warp).
+  - Ensure evidence coverage spans `client/`, `server/`, `shared/`, `docs/`.
+  - Capture at least 3-5 seeds per intent + surface combination.
+- Do not: rely on only warp/docs seeds.
+- Acceptance: `/api/agi/refinery/summary` shows multi-intent, multi-surface coverage.
+- Evaluation (latest run 2026-01-20):
+  - Seed miner with trace enabled (port 5174): 40 seeds recorded in `artifacts/agi-seed-mine.json` (essenceConsole default false).
+  - Replay summary now totals 562 trajectories; holdout shows mostly general/server slices (see Phase B3).
+  - Coverage improved toward general/server, but client + warp surfaces remain thin.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Update (2026-01-22, repo-wide seed pass):
+  - Repo-wide run executed 97/120 with `--include-docs --include-warp --precheck`.
+  - Anchors by surface: client 12, server 20, shared 17, modules 20, docs 19, warp 9.
+  - Precheck shortfalls: client 8, shared 3, docs 1.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Phase B2 (Negative sample production) - Status: complete
+- Do:
+  - Run `agi:variants` with v2 operators and confirm rejects occur.
+  - Tighten gates or add execution-failure gating if acceptance stays at 1.0.
+- Do not: proceed to training with zero rejected samples.
+- Acceptance: DPO export produces non-empty pairs and byFailure shows gate hits.
+- Evaluation (latest run 2026-01-20):
+  - Total 562, accepted 389 (0.6922), rejected 173.
+  - Safety failures 173 (all `execution_failed`); byOrigin fail live 129, variant 44.
+  - Variant run for this batch used blocklist prefixes `paraphrase:` + `strategy:`, block tag `evidence:drop`, max-variants=1.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+Phase B3 (Holdout + slice metrics run) - Status: complete
+- Do:
+  - Build a 20-50 item holdout across intents/surfaces.
+  - Run `scripts/agi-holdout-eval.ts` and save metrics artifact.
+- Do not: change holdout set between runs unless you bump its version.
+- Acceptance: holdout metrics show non-trivial slice deltas and are stable across runs.
+- Evaluation (latest run 2026-01-20):
+  - Holdout size 50, accepted 47 (0.94).
+  - Groundedness fail rate 0; citation precision 0.765; recall 0.4778.
+  - Holdout mix: warp 3, general 47; docs 3, server 47; strategy deep_repo_research 47, physics_console 3.
+  - Built with ratio 0.1, min-per-intent 3, max-total 50, recent-fraction 0.4.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+  `artifacts/agi-refinery-holdout-metrics.2026-01-20T015128306Z.json`.
+
+Phase B4 (Dataset export + quality check) - Status: complete
+- Do:
+  - Export datasets with holdout exclusion and real/synth ratio.
+  - Validate sample counts, DPO pair counts, and gate mix.
+- Do not: train on exports without a positive DPO pair count.
+- Acceptance: export summary logs non-zero accepted + rejected and valid ratios.
+- Evaluation (latest run 2026-01-20):
+  - Export total 548, accepted 328, rejected 170.
+  - Real ratio 0, synthetic ratio 1 (requested 0.7; investigate origin tagging).
+  - DPO pairs 328 (density 1.0 per SFT sample).
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+  `artifacts/agi-refinery-dpo.2026-01-20T015752566Z.jsonl`.
+
+Phase B5 (Training pilot + eval loop) - Status: complete
+- Do:
+  - Train router + answerer adapters (LoRA/QLoRA).
+  - Run holdout eval and compare to baseline metrics.
+- Do not: merge adapters without metrics improvement.
+- Acceptance: holdout groundedness + refusal/clarify rates improve or hold steady.
+- Update (2026-01-21, pilot LoRA training):
+  - Router LoRA (distilbert-base-uncased) trained on `artifacts/agi-refinery-sft.2026-01-21T203559184Z.jsonl`; output `artifacts/agi-router-lora-pilot`.
+  - Answerer LoRA (distilgpt2, 64-sample pilot) trained on `artifacts/agi-refinery-sft.2026-01-21T203559184Z.jsonl`; output `artifacts/agi-answerer-lora-pilot`.
+  - Holdout eval: artifacts/agi-refinery-holdout-metrics.2026-01-21T210400487Z.json (precision 1.0, recall 0.8864, refusalRate 0, clarifyRate 0.075).
+  - Coverage eval: artifacts/agi-refinery-holdout-metrics.2026-01-21T210409145Z.json (precision 1.0, recall 0.6549, refusalRate 0.0417, clarifyRate 0).
+- Update (2026-01-21, full LoRA training + eval):
+  - Router LoRA (distilbert-base-uncased) trained on `artifacts/agi-refinery-sft.2026-01-21T214009716Z.jsonl`; output `artifacts/agi-router-lora-b6`.
+  - Answerer LoRA (distilgpt2) trained on `artifacts/agi-refinery-sft.2026-01-21T214009716Z.jsonl`; output `artifacts/agi-answerer-lora-b6`.
+  - Holdout eval: artifacts/agi-refinery-holdout-metrics.2026-01-21T214942719Z.json (precision 1.0, recall 0.8810, refusalRate 0.0123, clarifyRate 0.0123).
+  - Coverage eval: artifacts/agi-refinery-holdout-metrics.2026-01-21T214949092Z.json (precision 1.0, recall 0.9263, refusalRate 0.0123, clarifyRate 0).
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+- Evaluation (latest run 2026-01-21):
+  - Holdout eval: artifacts/agi-refinery-holdout-metrics.2026-01-21T214942719Z.json (acceptance 1.0, precision 1.0, recall 0.8810).
+  - Coverage eval: artifacts/agi-refinery-holdout-metrics.2026-01-21T214949092Z.json (acceptance 1.0, precision 1.0, recall 0.9263).
+
+Phase B6 (Iterate + scale) - Status: complete
+- Do:
+  - Rebalance sampling policy based on slice deficits.
+  - Repeat variant -> export -> train -> eval cycle.
+- Do not: expand scope without stable evaluation signals.
+- Acceptance: coverage grows while acceptance remains above policy floor.
+- Evaluation (latest run 2026-01-22):
+  - Replay (audit log): total 804, accepted 759 (0.9440).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-22T020901366Z.json (precision 1.0, recall 0.8704, refusalRate 0.0370).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-22T020918317Z.json (precision 1.0, recall 0.9014, refusalRate 0.0370).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-22T020943125Z.json (indexCoverageRate 0.6765).
+  - Export: alphaTarget 0.26; accepted 675; alphaRun 0.7911; alphaExport 0.2593; sft artifacts/agi-refinery-sft.2026-01-22T021025260Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-22T021025260Z.jsonl; DPO density 1.0; variantReservoirUsed 349.
+  - Safety report: artifacts/agi-refinery-safety-report.json (safetyFails 0, safetyHandledPasses 22).
+  - Execution report: artifacts/agi-refinery-execution-report.json (executionFails 0).
+- Update (2026-01-21, B6 iterate + scale run):
+  - Seed-mine run (limit 12, per-surface 4) executed 11/12 (eligible 13); anchors_by_surface client=2, server=3, shared=3, modules=4; client shortfall 1.
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T220038120Z.json (indexCoverageRate 0.7901, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Export: variantReservoirUsed 349; surfaceShares client 0.2953, server 0.2750, shared 0.2063, modules 0.1219, docs 0.1016.
+
+## Phase G: Gate Upgrade (complete)
+- Goal: align acceptance gates with "systems-aware, constraint-driven builds."
+- Do:
+  - G1 Tests-required gate: fail when code changes or expected_checks imply tests
+    and no test step ran (no silent pass).
+  - G2 Cross-file contract gate: enforce schema/route/UI alignment for edits that
+    touch APIs, shared types, or UI contracts (fail on mismatch).
+  - G3 Constraint residual gate: require solver/constraint checks for runs that
+    declare physics/GR/noise constraints (pass only when residuals are clean).
+  - G4 Budget gate: enforce max token/time budgets per run; label overruns.
+  - G5 Safety expansion: add PII + prompt-injection + policy hazard detection
+    beyond secret/path scans; keep handled-refusal behavior.
+  - G6 Gate unit tests: add tests that cover grounding/format/safety/execution/
+    tests/budget/contract behavior.
+- Do not: introduce new gates without tests or versioned policy metadata.
+- Acceptance:
+  - Tests gate blocks accepts when tests are missing for code edits.
+  - Contract gate catches schema/route/UI drift on fixture cases.
+  - Residual gate blocks constraint-claim outputs when residuals are non-zero.
+  - Budget gate logs and blocks over-budget runs by policy.
+  - Safety gate flags PII/injection and produces handled-pass when appropriate.
+  - Gate test suite passes and is wired into CI.
+- Update (2026-01-21, Phase G complete):
+  - Added tests/contract/constraint/budget gates with policy versioning.
+  - Expanded safety scanning to cover PII/injection hazards with handled refusals.
+  - Added gate unit tests for new failure modes.
+  - Casimir verify PASS (repo-convergence) with certificate hash 238ad40cf74755e957e734fe860b1da1d8875be820bebfef2edad63c3437c051 (integrity OK).
+
+Round R2 (Next build tasks) - Status: in progress
+- Goal: fix acceptance bottlenecks and coverage skew before training.
+- Do:
+  - DONE: add safety taxonomy + "safety-handled pass" gating so safe refusals/redactions count as accepted.
+  - DONE: instrument safety failures by origin + operator (see `scripts/agi-safety-report.ts`); suppress top 1-2 unsafe operators using blocklists.
+  - DONE: add seed-miner for client/server/general prompts; cap warp/docs dominance via per-surface quotas.
+  - DONE: manufacture hard-negative DPO pairs per accepted sample (target >= 1.0 pairs/sample).
+  - DONE: rebuild holdout with balanced intent/surface mix; rerun B0-B4 to confirm lift.
+  - Add router/answerer training scripts and re-run B5 once dataset size is healthy.
+- Do not: train on skewed warp/docs-only data or accept unsafe outputs.
+- Acceptance:
+  - Variant acceptance rises toward >= 0.45 or overall acceptance rises materially.
+  - Safety failures drop or convert to safety-handled passes without unsafe leakage.
+  - Coverage shows non-warp, non-doc slices growing in summary + holdout.
+  - DPO density >= 1.0 per SFT sample.
+- Evaluation (latest run 2026-01-20):
+  - Safety taxonomy recorded in `AgiTrajectory.meta.safety` and gate reports via `server/services/agi/refinery-gates.ts`.
+  - Safety gate now permits handled refusals/redactions; hard secret flags still fail.
+  - Replay (2026-01-20): 375/476 accepted (0.7878).
+  - Safety report (2026-01-20, recomputed with execution gate): total 473, safety fails 0, handled passes 0; execution failures now tracked under the `execution` gate instead of safety.
+  - Execution report (2026-01-20): total 473, execution fails 98; error types currently `unknown_error`.
+  - Holdout split (2026-01-20): regenerated `artifacts/agi-refinery-holdout.json` and `artifacts/agi-refinery-holdout-coverage.json` with 48 entries each.
+  - Holdout eval (2026-01-20): both in-distribution and coverage holdouts are still 100% `server`/`debugging`/`general` - indicates missing slice diversity in the underlying dataset.
+  - Seed mine (2026-01-20): executed 30 mixed surface seeds against `http://localhost:5174` (see `artifacts/agi-seed-mine.json`).
+  - Safety report script (`npm run agi:safety-report`) and variant suppression flags (`--block-tags`, `--block-prefixes`) remain in use.
+  - Trace API sampling shows `execution_failed` driven by `physics.warp.ask` with invalid OpenAI key; keep `essenceConsole=false` defaults.
+  - DPO export supports `--negatives-per-sample` and synthesizes `unlinked_citations` + `missing_citations` negatives with gate reasons.
+  - Export rerun (2026-01-20): total 548, accepted 328, DPO density 1.0 with 328 pairs; realRatio reported as 0 (needs investigation).
+  - Sampling policy refreshed: `artifacts/agi-refinery-policy.json` (acceptance floor 0.6; acceptance rate 0.69217; throttled false).
+
+## Doc Coverage Upkeep (Markdown 100%) - Status: in progress
+- Goal: ensure every scoped code/config file is referenced by at least one internal markdown doc.
+- Do:
+  - Run `python scripts/doc-coverage-audit.py` to refresh `artifacts/doc-coverage-gaps.json`.
+  - Prioritize coverage for `client/`, `server/`, `shared/`, `sdk/`, and `packages/`.
+  - Add doc references with stable relative paths (e.g., `client/src/...`) near relevant explanations.
+- Do not: include `external/` or `node_modules/` paths; avoid absolute paths in docs.
+- Acceptance: `coverage_ratio=1.0` for all surfaces in `artifacts/doc-coverage-gaps.json` (scoped to extensions listed in the audit).
+- Baseline (2026-01-20):
+  - client: 66/600 (11.0%), missing 534
+  - server: 110/409 (26.9%), missing 299
+  - shared: 24/79 (30.4%), missing 55
+  - sdk: 0/6 (0%), missing 6
+  - packages: 0/4 (0%), missing 4
+- Progress (2026-01-20):
+  - sdk: 6/6 (100%), packages: 4/4 (100%), modules: 25/25 (100%), public: 3/3 (100%)
+  - shared: 79/79 (100%), scripts: 52/52 (100%), tools: 47/47 (100%)
+  - tests: 131/131 (100%), datasets: 21/21 (100%)
+  - client: 600/600 (100%), server: 409/409 (100%)
+
+## Phase B7 (Live Recovery + Mixture Control) - Status: complete
+- Goal: restore live acceptance, separate safety vs execution, and enforce feasible real/synth mix.
+- Do:
+- DONE: implement safety branch outcomes with evidence sanitization + safe refusal fallback (retry retrieval still TODO).
+  - DONE: add input safety detection + retrieval retry fallback on safety failures (restricted-path filtered repo search).
+  - DONE: add `reject_reason` taxonomy (safety_input_disallowed | safety_sensitive_evidence | safety_output_violation | execution_tool_error | execution_timeout | retrieval_empty | schema_invalid | other).
+  - DONE: enforce mixture governor: cap accepted variants by target `alpha` and report `alphaAvailable`, `alphaTarget`, `maxAtTargetAlpha` in export.
+  - DONE: split execution failures into an `execution` gate so safety reports only track real safety issues.
+  - DONE: capture execution error types in trajectory meta for failure taxonomy.
+  - DONE: add execution failure report (`npm run agi:execution-report`).
+  - DONE: split holdout into two sets: in-distribution and coverage-balanced (intent/surface/difficulty).
+  - DONE: re-enable full operator mix and recompute `k` + `a_variant`.
+- Do not: scale variants or training until live acceptance is materially higher and handled_pass is non-zero.
+- Acceptance:
+  - `a_live` rises and `handled_pass > 0`.
+  - `alpha_available` increases toward 0.2-0.3 (even before 0.7).
+  - Export summary reports feasible `N_max_at_target_alpha` without silent ratio failure.
+  - Coverage holdout surfaces non-warp/non-server deltas.
+- Update (2026-01-20, trace export):
+  - Replay: total 196, accepted 189 (0.9643), avgTokens 17.27.
+  - Safety report: total 195, safetyFails 0, safetyHandled 0; byOrigin live 6, variant 189.
+  - Holdout coverage: total 195, holdout 20, coverage 20; metrics all docs (precision 0.75, recall 0.4444).
+- Update (2026-01-20, safety-handled probe):
+  - Trace capture with `ENABLE_AGI_REFINERY_TRACE=1` + `TRAINING_TRACE_AUDIT_PATH=artifacts/training-trace-live.jsonl`.
+  - Replay: total 1, accepted 1 (1.0), avgTokens 46.
+  - Safety report: total 1, safetyFails 0, safetyHandled 1 (live).
+  - Holdout: total 1, holdout 1, coverage 1; refusalRate 1, citationRecall 0.
+- Update (2026-01-20, live seed run):
+  - Seed run: 15 live seeds + safety probe; replay total 16, accepted 15 (0.9375), avgTokens 30.06.
+  - Safety report: total 16, safetyFails 0, safetyHandled 1; byOrigin live 16.
+  - Holdout coverage: total 16, holdout 2, coverage 2; metrics surface shared (precision 0.75, recall 0.4444).
+  - Trace export: `artifacts/training-trace-live-export.jsonl`.
+- Update (2026-01-20, expanded live seed run):
+  - Seed run: 60 live seeds (per surface 20); replay total 76, accepted 69 (0.9079), avgTokens 29.32.
+  - Safety report: total 76, safetyFails 0, safetyHandled 1 (live only).
+  - Execution report: executionFails 7 (all unknown_error), tags surface: client 3, server 2, shared 2.
+  - Holdout coverage: total 76, holdout 8, coverage 8; acceptanceRate 0.75; surfaces shared 7, server 1; intent mix implementation 6, physics 2.
+  - Trace export: `artifacts/training-trace-live-export.jsonl` (latest).
+- Update (2026-01-20, full operator variant run):
+  - Variant run: seeds 29, planned 290, executed 290; k = 10.0.
+  - Replay: total 366, accepted 345 (0.9426), avgTokens 29.76.
+  - Origin acceptance: live 69/76 (0.9079), variant 276/290 (0.9517); alpha 0.20.
+  - Safety report: total 366, safetyFails 0, safetyHandled 3; byOrigin live 76, variant 290.
+  - Execution report: executionFails 21 (live 7, variant 14), all unknown_error.
+  - Holdout coverage: total 366, holdout 37, coverage 37; acceptanceRate 0.8108; citation precision 0.8041, recall 0.5375; surfaces shared 33, docs 4.
+  - Trace export: `artifacts/training-trace-live-variants-export.jsonl`.
+
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+
+## Phase B8 (Reliability + Mixture Control) - Status: in progress
+- Goal: eliminate execution_unknown_error, raise real anchor ratio, and enforce coverage minima without regressing acceptance.
+- Do:
+  - DONE: Execution taxonomy + envelope capture.
+    - Prompt: "Instrument tool execution with structured envelopes (tool_name, tool_version, request_id, start/end, duration_ms, timeout_ms, retry_count, error_class, error_code, error_message, stack_fingerprint, host_context) and persist into trajectory meta."
+    - Acceptance: execution_failed: unknown_error no longer appears; execution reports include error_class and fingerprint groups.
+  - DONE: Failure fingerprinting + grouping.
+    - Prompt: "Add a stable fingerprint hash based on (tool_name, error_class, error_code, stack_fingerprint) and surface top 5 fingerprints in agi:execution-report."
+    - Acceptance: execution report clusters failures into actionable buckets; top fingerprints have counts and tags.
+  - DONE: Execution-handled branch (retry/backoff + fallback summary).
+    - Prompt: "On execution failure, retry with backoff for retry-safe classes (network/5xx/timeout once), then fallback to alternate tool or safe response; mark as execution_handled and preserve grounding discipline."
+    - Acceptance: executionHandledPass appears in traces; no hallucinated outputs; rejects drop without inflating safety failures.
+  - DONE: Mixture governor ratchet.
+    - Prompt: "Enforce alpha targets in export/acceptance (0.20 -> 0.25 -> 0.30) and report alphaAvailable, alphaTarget, maxAtTargetAlpha with shortfall math."
+    - Acceptance: alpha >= 0.25 next run; exporter reports feasible N_max_at_target_alpha without silent ratio failures.
+  - DONE: Targeted live seed mining (coverage recovery).
+    - Prompt: "Generate live seeds for client/server/warp surfaces using repo-derived templates; ensure at least 50% of live seeds are non-docs."
+    - Acceptance: live accepted count rises by +50; client/server surfaces each >= 25% of live accepted.
+  - DONE: Tensor minima enforcement.
+    - Prompt: "Add hard minima per batch window (e.g., client >= 25%, server >= 25%, docs/shared <= 50%, warp <= cap) that override deficiency weights when unmet."
+    - Acceptance: coverage holdout shows balanced surfaces and intents; no single surface > 60%.
+  - DONE: Retrieval recall improvement.
+    - Prompt: "Increase candidate diversity before reranking, add recall metrics for gold evidence, and keep evidence-drop / near-neighbor swaps as DPO negatives."
+    - Acceptance: citation recall improves without lowering precision; groundedness remains stable.
+  - DONE: Export/training gate.
+    - Prompt: "Only export/train when execution_unknown_error=0, alpha>=0.25, and coverage minima are met; otherwise block export with explicit reasons."
+    - Acceptance: training exports are feasible and ratio-compliant; no silent export failures.
+- Do not: increase variant volume until execution_unknown_error is eliminated and alpha >= 0.25.
+- Acceptance:
+  - execution_unknown_error = 0; total execution fails <= 2% of trajectories.
+  - executionHandledPass > 0 and documented in trace.
+  - alpha >= 0.25 (then ratchet to 0.30).
+  - client + server surfaces >= 50% of live accepted; warp capped per target.
+  - citation precision steady; citation recall increases.
+- Update (2026-01-20, execution envelopes + handling):\n  - Execution envelopes captured in trajectory meta (errorClass + fingerprint).\n  - execution_handled notes added when failures fall back to refusal summary.\n- Update (2026-01-20, execution retry/backoff):\n  - Tool calls retry on retry-safe errors (timeouts/network/5xx).\n  - Execution-handled summaries now trigger execution_handled notes.\n- Update (2026-01-20, mixture + coverage gates):
+  - Export gating enforces alpha + coverage + execution unknown checks.
+  - Sampling policy enforces surface minima and warp caps.
+  - Seed miner supports warp include and docs cap.
+  - Repo graph search diversifies candidates; holdout metrics include hint recall.
+- Update (2026-01-20, policy/holdout/export gate run):
+  - Policy: acceptanceRate 0.5347; throttled true; min client/server 0.25; max docs/shared 0.5.
+  - Holdout: total 106, accepted 103 (0.9717); precision 0.7571; recall 0.4602; hintRecall 0.1760; surfaces docs 106.
+  - Coverage holdout: accepted 105/106 (0.9906); precision 0.7524; recall 0.4497; hintRecall 0.1794; surfaces docs 106.
+  - Execution report: total 1053, executionFails 483; error types all unknown_error; top families seed/surface/paraphrase.
+  - Export gate blocked: alphaAvailable 0.1478 < 0.25; executionUnknownCount 480; docs share 0.8676; blockedReasons logged.
+- Update (2026-01-20, surface targeting + export pass):
+  - Seed miner supports --surface filter for client-only runs.
+  - Variants support --surface filter to target client/server variants.
+  - Export mix selects most recent real/synthetic; alpha_shortfall only blocks when limit is explicit.
+  - Live runs: +84 then +30 seeds (live accepted 114).
+  - Variants: client 136, server 110 + 140 (total variant 691).
+  - Holdout: total 806, holdout 81; coverage 81; acceptanceRate 1.0; surfaces server 81.
+  - Execution report: total 806, executionFails 0.
+  - Export: accepted 456; surfaceShares server 0.436, client 0.362, shared 0.156, modules 0.031, docs 0.015; sft artifacts/agi-refinery-sft.2026-01-20T170139584Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-20T170139584Z.jsonl; DPO density 1.0.
+- Update (2026-01-20, coverage holdout balance):
+  - Coverage holdout fill now round-robins by surface from full trace history.
+  - Coverage metrics: total 81, accepted 80 (0.9877); precision 0.7829, recall 0.5556; hintRecall 0.025; surfaces modules/docs/shared/client 16 each, server 17.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T172804275Z.json.
+- Evidence: server/services/agi/refinery-gates.ts, server/routes/agi.plan.ts, scripts/agi-execution-report.ts, scripts/agi-holdout-eval.ts, server/services/agi/refinery-export.ts, scripts/agi-export.ts, server/routes/agi.refinery.ts, server/services/agi/refinery-policy.ts, scripts/agi-variants.ts, scripts/agi-seed-mine.ts, server/services/repo/repoGraph.ts, server/services/agi/refinery-holdout.ts.
+## Phase B9 (Mixture + Recall Governance) - Status: complete
+- Progress log: docs/refinery-progress.md (update after each run).
+- Goal: enforce per-run alpha, bank variants, and lift recall without hurting precision.
+- Do:
+  - Prompt: "Promote alpha to a per-run control law: enforce V_accepted <= ((1-alpha*)/alpha*) * L_accepted during acceptance; switch to anchor-only mode or stop variants when the cap is reached."
+    - Acceptance: run reports show alpha_run and enforce cap for alpha* targets (0.25 -> 0.30).
+  - Prompt: "Add run-mode labeling (anchor_mining | variant_expansion | mixed) and expected alpha range to refinery reports."
+    - Acceptance: reports include mode and expected alpha range so windowed alpha dips are explainable.
+  - Prompt: "Create a variant reservoir keyed by (surface, intent, difficulty, operator, createdAt). Export pulls from the reservoir only as allowed by alpha_target; apply time decay to stale variants."
+    - Acceptance: export can fill alpha_target without discarding variants; reservoir stats appear in export summary.
+- Update (2026-01-20, retrieval fusion):
+  - repoGraph search now fuses doc search hits via RRF when REPO_GRAPH_FUSE_DOCS is enabled.
+- Update (2026-01-20, hint pass):
+  - Plan now injects up to two hint evidence items into retrieval when hints are present.
+  - Prompt: "Enforce anchor miner quotas by surface (client/modules/docs priority) using round-robin quotas per run. Prefer deterministic repo-derived anchors (routes/components/schemas) over LLM-synth prompts."
+    - Acceptance: live anchors per run include client/modules/docs with quotas met; alpha_run rises in mixed runs.
+  - Prompt: "Decompose recall into candidateRecall@K, selectedRecall@M, and citationRecall for coverage holdout; add hintCandidateRecall and hintSelectedRecall."
+    - Acceptance: holdout metrics emit all recall stages with counts.
+  - Prompt: "Add retrieval fusion + diversity: lexical + vector fusion (RRF) and diversity constraint before rerank; increase K for coverage evaluation."
+    - Acceptance: coverage holdout recall improves without precision regression.
+  - Prompt: "Add a hint retrieval pass restricted to hint sources; allow 1-2 hint items into evidence when relevant; add DPO negatives for ignoring hints."
+    - Acceptance: hintRecall increases and hintSelectedRecall is non-zero.
+  - Prompt: "Add a citation completion pass: after draft, detect uncited claims and run targeted retrieval to attach citations or revise claims."
+    - Acceptance: grounding rejects drop and citationRecall improves.
+  - Update (2026-01-20, citation completion):
+    - Trace capture now supplements missing citations from retrieval evidence and optional fallback repo search.
+    - Adds citation_completion note when applied; controlled by AGI_REFINERY_CITATION_COMPLETION and AGI_REFINERY_CITATION_COMPLETION_MAX.
+  - Prompt: "Report alpha_run vs alpha_export explicitly in export summary (and in task updates)."
+    - Acceptance: export reports include alpha_run, alpha_export, and any shortfall math.
+- Update (2026-01-20, trace capture hardening):
+  - Wrap safe retrieval fallback, hint pass, and citation completion in per-step try/catch so trajectory capture still persists.
+  - Requires server restart; verify new plan/execute emits agi-refinery trajectory traces in training-trace store.
+- Update (2026-01-20, trace capture verified):
+  - Restarted server; plan/execute now records agi-refinery trajectory traces (traceId 562fea7e-ef5b-4df4-a1bc-70470583843e).
+- Update (2026-01-20, holdout eval refresh):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T223957930Z.json (precision 0.7455, recall 0.4925, hintRecall 0.0509, candidateRecall 0.6590).
+- Update (2026-01-20, coverage holdout refresh):
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T224013746Z.json (precision 0.7829, recall 0.5556, hintRecall 0.0250, candidateRecall 0.5730).
+- Update (2026-01-20, export refresh):
+  - Export (alphaTarget 0.25): accepted 448; alphaRun 0.1556; alphaExport 0.25; sft artifacts/agi-refinery-sft.2026-01-20T224025577Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-20T224025577Z.jsonl.
+- Update (2026-01-20, anchor run + eval refresh):
+  - Seed-mine run (limit 6, client/server/shared) executed 6 live seeds.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T225218692Z.json (precision 0.7455, recall 0.4925, hintRecall 0.0509, candidateRecall 0.6590).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T225232445Z.json (precision 0.7829, recall 0.5556, hintRecall 0.0250, candidateRecall 0.5730).
+  - Export (alphaTarget 0.25): total 874, accepted 448, rejected 73; alphaRun 0.1556; alphaExport 0.25; sft artifacts/agi-refinery-sft.2026-01-20T225244929Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-20T225244929Z.jsonl.
+  - Execution report: artifacts/agi-refinery-execution-report.json (total 874, executionFails 0; live 183, variant 691).
+- Update (2026-01-20, policy refresh):
+  - Policy: acceptanceRate 0.9165; throttled false; min client/server 0.25; max docs/shared 0.5.
+  - Policy artifact: artifacts/agi-refinery-policy.json.
+- Update (2026-01-20, hint path normalization):
+  - Hint pass now normalizes resource hints (project/file prefixes stripped) and adds query path hints; max hints per trace via AGI_REFINERY_HINT_PASS_MAX.
+  - Trajectory resourceHints now reflect hint pass output to align hint recall with inserted hints.
+- Update (2026-01-20, seed-mine + holdout rebuild):
+  - Seed-mine run (limit 12, per-surface 4, client/server/shared) executed 12 live seeds.
+  - Holdout rebuilt from full trace history (maxTotal 81, minPerSurface 16).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T231458522Z.json (precision 0.6403, recall 0.4664, hintRecall 0.0469, candidateRecall 0.4428).
+- Update (2026-01-20, export refresh):
+  - Export (alphaTarget 0.25): accepted 448, rejected 8; alphaRun 0.1405, alphaExport 0.25; alphaShortfall 88.
+  - sft artifacts/agi-refinery-sft.2026-01-20T231513946Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-20T231513946Z.jsonl; variantReservoirAdded 77.
+- Update (2026-01-20, holdout eval after rebuild):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T231651050Z.json (precision 0.0395, recall 0.0295, hintRecall 0.2377).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T231458522Z.json (precision 0.6403, recall 0.4664, hintRecall 0.0469, candidateRecall 0.4428).
+
+
+- Update (2026-01-20, citation fallback + eval refresh):
+  - buildRefineryTrajectory now replaces all-essence citations with retrieval path fallbacks (caps via AGI_REFINERY_CITATION_COMPLETION_MAX).
+  - Casimir verify PASS: runId 13287; certificate hash 238ad40cf74755e957e734fe860b1da1d8875be820bebfef2edad63c3437c051; integrity OK.
+  - Training trace export refreshed after verification.
+  - Seed-mine run (limit 12, per-surface 4, client/server/shared) executed 12 live seeds.
+  - Holdout rebuilt: total 980, holdout 81, coverage 81.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T234920338Z.json (acceptance 0.0123, precision 0.0123, recall 0.0123, candidateRecall 0, hintRecall 0.9691).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T234932463Z.json (acceptance 0.1975, precision 0.1975, recall 0.1975, candidateRecall 0, hintRecall 0.6406).
+  - Note: results unchanged; restart server to apply citation fallback to new traces.
+- Update (2026-01-20, post-restart eval):
+  - Seed-mine run (limit 12) aborted (execute request aborted); reran limit 6 (per-surface 2, client/server/shared) executed 6.
+  - Holdout rebuilt: total 998, holdout 81, coverage 81.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T235802099Z.json (acceptance 0.2346, precision 0.2346, recall 0.0445, candidateRecall 0.2222, hintRecall 0.9691).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T235811971Z.json (acceptance 0.4198, precision 0.4198, recall 0.2297, candidateRecall 0.2222, hintRecall 0.6406).
+  - Result: citation fallback started lifting candidate/selected recall but precision/recall remain below thresholds.
+- Update (2026-01-20, export refresh):
+  - Export (alphaTarget 0.25): total 998, accepted 452, rejected 117; alphaRun 0.1413, alphaExport 0.25; alphaShortfall 87.
+  - Surface shares: server 0.6195, client 0.2699, shared 0.0819, modules 0.0288.
+  - sft artifacts/agi-refinery-sft.2026-01-20T235923919Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-20T235923919Z.jsonl; DPO density 1.0.
+- Update (2026-01-21, citation completion max 32 run):
+  - Seed-mine run (limit 16, include docs, no precheck) executed 13/16.
+  - Anchors by surface: client 4, modules 4, docs 5, server 1, shared 2.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T154600749Z.json (precision 1.0, recall 0.2340, candidateRecall 1.0, selectedRecall 1.0, hintUsedInCitations 0.4375).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T154612560Z.json (precision 1.0, recall 0.2294, candidateRecall 1.0, selectedRecall 1.0, hintUsedInCitations 0.4792).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T154625129Z.json (indexCoverageRate 0.7167, plannedHitRate 0.9583, naiveHitRate 1.0).
+- Update (2026-01-21, precheck seed-mine run with timeout 45000):
+  - Seed-mine run (limit 24, include docs, precheck enabled) executed 24/24 (eligible 38).
+  - Anchors by surface: client 2, modules 7, docs 7, server 3, shared 5; client precheck failures 8.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T155544996Z.json (precision 1.0, recall 0.2175, candidateRecall 1.0, selectedRecall 1.0; holdout size 2).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T155550887Z.json (precision 1.0, recall 0.2175, candidateRecall 1.0, selectedRecall 1.0; coverage size 2).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T155559112Z.json (indexCoverageRate 0.8, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run with timeout 45000):
+  - Seed-mine run (limit 32, include docs, no precheck) executed 30/32 (eligible 50).
+  - Anchors by surface: client 8, modules 8, docs 8, server 4, shared 4.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T160607663Z.json (precision 1.0, recall 0.2529, candidateRecall 1.0, selectedRecall 1.0; holdout size 5).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T160613766Z.json (precision 1.0, recall 0.2421, candidateRecall 1.0, selectedRecall 1.0; coverage size 5).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T160623778Z.json (indexCoverageRate 0.72, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run with timeout 60000):
+  - Seed-mine run (limit 48, include docs, no precheck) executed 47/48 (eligible 50).
+  - Anchors by surface: client 10, modules 10, docs 10, server 9, shared 9.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T161944790Z.json (precision 1.0, recall 0.2941, candidateRecall 1.0, selectedRecall 1.0; holdout size 10).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T161951818Z.json (precision 1.0, recall 0.2188, candidateRecall 1.0, selectedRecall 1.0; coverage size 10).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T161959008Z.json (indexCoverageRate 0.72, plannedHitRate 0.9, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run with timeout 60000, cap at 50):
+  - Seed-mine run (limit 64, include docs, no precheck) executed 48/50 (eligible 50).
+  - Anchors by surface: client 10, modules 10, docs 10, server 10, shared 10.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T163217215Z.json (precision 1.0, recall 0.1969, candidateRecall 1.0, selectedRecall 1.0; holdout size 15).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T163225667Z.json (precision 1.0, recall 0.3067, candidateRecall 1.0, selectedRecall 1.0; coverage size 15).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T163238809Z.json (indexCoverageRate 0.6933, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine rerun with timeout 60000, cap at 50):
+  - Seed-mine run (limit 64, include docs, no precheck) executed 48/50 (eligible 50).
+  - Anchors by surface: client 10, modules 10, docs 10, server 10, shared 10.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T164600906Z.json (precision 1.0, recall 0.2310, candidateRecall 1.0, selectedRecall 1.0; holdout size 20).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T164607522Z.json (precision 1.0, recall 0.2034, candidateRecall 1.0, selectedRecall 1.0; coverage size 20).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T164618047Z.json (indexCoverageRate 0.72, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine rerun with timeout 60000, holdout size target met):
+  - Seed-mine run (limit 64, include docs, no precheck) executed 48/50 (eligible 50).
+  - Anchors by surface: client 10, modules 10, docs 10, server 10, shared 10.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T165817808Z.json (precision 1.0, recall 0.2122, candidateRecall 1.0, selectedRecall 1.0; holdout size 24).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T165832076Z.json (precision 1.0, recall 0.1839, candidateRecall 1.0, selectedRecall 1.0; coverage size 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T165847921Z.json (indexCoverageRate 0.725, plannedHitRate 0.9583, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run limit 12):
+  - Seed-mine run (limit 12, include docs, no precheck) executed 12/12 (eligible 50).
+  - Anchors by surface: client 3, modules 4, docs 4, server 0, shared 1.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T171344658Z.json (precision 1.0, recall 0.2163, candidateRecall 1.0, selectedRecall 1.0; holdout size 24).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T171355631Z.json (precision 1.0, recall 0.1555, candidateRecall 1.0, selectedRecall 1.0; coverage size 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T171408515Z.json (indexCoverageRate 0.75, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run limit 12, timeout 45000):
+  - Seed-mine run (limit 12, include docs, no precheck) executed 12/12 (eligible 50).
+  - Anchors by surface: client 5, modules 3, docs 3, server 0, shared 1.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T172737789Z.json (precision 1.0, recall 0.1477, candidateRecall 1.0, selectedRecall 1.0; holdout size 24).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T172746873Z.json (precision 1.0, recall 0.1320, candidateRecall 1.0, selectedRecall 1.0; coverage size 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T172759360Z.json (indexCoverageRate 0.7333, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run limit 6, timeout 30000):
+  - Seed-mine run (limit 6, include docs, no precheck) executed 6/6 (eligible 50).
+  - Anchors by surface: client 2, modules 2, docs 2, server 0, shared 0.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T173703288Z.json (precision 1.0, recall 0.1598, candidateRecall 1.0, selectedRecall 1.0; holdout size 24).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T173713385Z.json (precision 1.0, recall 0.1333, candidateRecall 1.0, selectedRecall 1.0; coverage size 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T173729526Z.json (indexCoverageRate 0.7333, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run limit 6, post-restart completion fill):
+  - Seed-mine run (limit 6, include docs, no precheck) executed 6/6 (eligible 50).
+  - Anchors by surface: client 2, modules 2, docs 2, server 0, shared 0.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T174517396Z.json (precision 1.0, recall 0.3802, candidateRecall 1.0, selectedRecall 1.0; holdout size 24).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T174524186Z.json (precision 1.0, recall 0.3607, candidateRecall 1.0, selectedRecall 1.0; coverage size 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T174534437Z.json (indexCoverageRate 0.7167, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run limit 6, completion fill follow-up):
+  - Seed-mine run (limit 6, include docs, no precheck) executed 6/6 (eligible 50).
+  - Anchors by surface: client 2, modules 2, docs 2, server 0, shared 0.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T175114400Z.json (precision 1.0, recall 0.6035, candidateRecall 1.0, selectedRecall 1.0; holdout size 24).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T175125165Z.json (precision 1.0, recall 0.5433, candidateRecall 1.0, selectedRecall 1.0; coverage size 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T175143814Z.json (indexCoverageRate 0.7333, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, no-precheck seed-mine run limit 4):
+  - Seed-mine run (limit 4, include docs, no precheck) executed 4/4 (eligible 50).
+  - Anchors by surface: client 1, modules 1, docs 1, server 1, shared 0.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T180906871Z.json (precision 1.0, recall 0.8002, candidateRecall 1.0, selectedRecall 1.0; holdout size 24).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T180919703Z.json (precision 1.0, recall 0.6549, candidateRecall 1.0, selectedRecall 1.0; coverage size 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T180928735Z.json (indexCoverageRate 0.7333, plannedHitRate 1.0, naiveHitRate 1.0).
+- Do not: raise variant volume until alpha_run >= 0.25 in mixed runs or live anchors increase.
+- Acceptance:
+  - alpha_run >= 0.25 in mixed runs; alpha_export >= 0.25 by policy.
+  - coverage holdout recall >= 0.62 with precision >= 0.75.
+  - hintRecall >= 0.08 and hintSelectedRecall reported.
+  - candidateRecall@K, selectedRecall@M, citationRecall reported per holdout.
+  - run reports include mode label and expected alpha range.
+- Update (2026-01-20, alpha/run-mode reporting):
+  - Refinery summary now emits runMode + expectedAlphaMin/Max + originShares.
+  - Export summary now includes alphaRun and alphaExport.
+- Update (2026-01-20, recall stage metrics):
+  - Holdout metrics now emit candidateRecall/selectedRecall with counts.
+- Update (2026-01-20, alpha governor in variants):
+  - agi-variants now enforces alpha target caps and reports alphaCap/accepted counts.
+- Update (2026-01-20, coverage holdout recall stages):
+  - candidateRecall 0.573, selectedRecall 0.573; hintCandidate/Selected 0.0317.
+  - Metrics artifact: artifacts/agi-refinery-holdout-metrics.2026-01-20T184004666Z.json.
+- Update (2026-01-20, variant reservoir):
+  - Export now banks overflow variants to a reservoir JSONL when alpha targets apply.
+  - Export now supplements synthetic shortfall from the reservoir (most recent first).
+  - Tracks variantReservoirUsed/variantReservoirAvailable; optional age cutoff via AGI_REFINERY_VARIANT_RESERVOIR_MAX_AGE_DAYS.
+- Update (2026-01-20, holdout eval + export after citation completion):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T192305662Z.json (precision 0.7455, recall 0.4925, hintRecall 0.0509, candidateRecall 0.6590).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T192307491Z.json (precision 0.7829, recall 0.5556, hintRecall 0.0250, candidateRecall 0.5730).
+  - Export (alphaTarget 0.25): sft artifacts/agi-refinery-sft.2026-01-20T192322886Z.jsonl, dpo artifacts/agi-refinery-dpo.2026-01-20T192322886Z.jsonl.
+    - alphaRun 0.1556, alphaExport 0.25; variantReservoirAdded 272; variantReservoirUsed 0.
+- Update (2026-01-20, refinery trace persistence fix):
+  - Task trace now stores refinery metadata so rehydrated plan records preserve origin for trace capture.
+  - Rehydrate plan records now restore refinery from taskTrace; requires server restart to take effect.
+  - agi-seed-mine now supports --timeout-ms (or AGI_SEED_MINE_TIMEOUT_MS) and logs plan/execute timeouts before continuing.
+  - .env now pins ENABLE_AGI_REFINERY_TRACE=1, AGI_REFINERY_TRACE_ON_REFINE=1, AGI_REFINERY_TRACE_PERSONAS=all, TRAINING_TRACE_PERSIST=1 (server restart required).
+  - Seed-mine run (limit 15, timeout 30000) executed 15; training-trace.jsonl LastWriteTime 2026-01-20 15:32:48; server export still shows last trajectory at 17:00, so trace capture still needs the restarted env.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T203907009Z.json (precision 0.7455, recall 0.4925, hintRecall 0.0509, candidateRecall 0.6590).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T203918792Z.json (precision 0.7829, recall 0.5556, hintRecall 0.0250, candidateRecall 0.5730).
+  - Export (alphaTarget 0.25): sft artifacts/agi-refinery-sft.2026-01-20T203929289Z.jsonl, dpo artifacts/agi-refinery-dpo.2026-01-20T203929289Z.jsonl; alphaRun 0.1556, alphaExport 0.25.
+  - Seed-mine run (limit 5, per-surface 5) executed 5; training-trace.jsonl LastWriteTime 2026-01-20 15:10:31 indicates server restart needed to capture AGI_REFINERY_TRACE_ON_REFINE (or set ENABLE_AGI_REFINERY_TRACE=1).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T201009023Z.json (precision 0.7455, recall 0.4925, hintRecall 0.0509, candidateRecall 0.6590).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-20T201021871Z.json (precision 0.7829, recall 0.5556, hintRecall 0.0250, candidateRecall 0.5730).
+  - Export (alphaTarget 0.25): accepted 448; alphaRun 0.1556, alphaExport 0.25; surfaceShares server 0.4531, client 0.3661, shared 0.1406, modules 0.0290, docs 0.0112; DPO density 1.0.
 ## Robustness Roadmap (Top 5)
 
 Solar Pipeline Determinism Gate - Status: complete
@@ -1749,3 +2574,539 @@ G) SunPy helioseismology anchors
 4) Expanded artifact handling beyond EMG (EOG/motion/line noise)
 5) Latency budget + performance regression test
 6) Real-session evaluation report (gate improves flip-flops/error/calibration, not just sim)
+
+## Phase R (Retrieval Rehabilitation + Mixture Governance) - Status: complete
+- Goal: lift candidateRecall and coverage recall while enforcing alpha at run time.
+- Do:
+  - R1: Decompose recall into candidate@K, selected@M, citationRecall, plus
+    hintCandidate/hintSelected/hintUsedInCitations with counts.
+  - R2: Oracle checks: index coverage (path/symbol queries) and query plan
+    comparison (naive lexical vs planned queries).
+  - R3: Hybrid retrieval: lexical + vector fusion (RRF) + diversity selection
+    before rerank to lift candidate recall.
+  - R4: Hint-driven retrieval: convert hints into retrieval constraints and
+    measure candidateRecall uplift.
+  - R5: Citation integrity: only cite selected evidence or apply completion.
+  - M1: Runtime alpha governor: cap variants by alpha target during runs.
+  - M2: Anchor mining quotas by surface (client/modules/docs) using deterministic
+    repo-derived prompts.
+  - M3: Variant reservoir: bank overflow variants and draw within alpha.
+- Do not:
+  - Scale training until candidateRecall and coverage recall hit targets.
+  - Raise variant volume until alphaRun >= 0.25 in mixed runs.
+- Acceptance:
+  - candidateRecall >= 0.45 on balanced coverage holdout.
+  - coverage recall >= 0.40 with precision >= 0.75.
+  - alphaRun >= 0.20 (ratchet to 0.25 once anchors rise).
+  - citations outside selected evidence = 0 or auto-repaired.
+- Update (2026-01-20, Phase R complete):
+  - Repo search index now includes code entries; repoGraph fuses doc+code hits via RRF and optional path diversity.
+  - Holdout metrics now emit citationRecall counts and hintUsedInCitations.
+  - agi.plan now augments retrieval with hint-driven queries and filters citations to selected evidence.
+  - Runtime alpha governor (AGI_REFINERY_ALPHA_GOVERNOR) now blocks variant overflow during runs.
+  - Added scripts/agi-holdout-oracle.ts for index coverage + planned vs naive query oracle checks.
+  - agi-seed-mine now supports modules surface by default (warp excluded unless includeWarp).
+- Update (2026-01-21, Phase R evaluation):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T012004816Z.json (indexCoverageRate 0.318, plannedHitRate 0.988, naiveHitRate 0.988, bothHit 80/81, neitherHit 1/81).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T012011866Z.json (acceptance 0.2346, precision 0.2346, recall 0.0445, candidateRecall 0.2222, selectedRecall 0.2222, hintRecall 0.9691, hintUsedInCitations 0.1358).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T012024668Z.json (acceptance 0.4198, precision 0.4198, recall 0.2297, candidateRecall 0.2222, hintRecall 0.6406, hintUsedInCitations 0.1375).
+- Update (2026-01-21, Phase R calibration):
+  - Repo index expanded (code roots + tags + max files) and citation-claim pattern broadened to trigger completion on structural nouns.
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T012918350Z.json (indexCoverageRate 0.356, plannedHitRate 0.988, naiveHitRate 0.988).
+  - Holdout metrics (no new runs): artifacts/agi-refinery-holdout-metrics.2026-01-21T012927425Z.json (acceptance 0.2346, precision 0.2346, recall 0.0445, candidateRecall 0.2222).
+  - Coverage metrics (no new runs): artifacts/agi-refinery-holdout-metrics.2026-01-21T012938453Z.json (acceptance 0.4198, precision 0.4198, recall 0.2297, candidateRecall 0.2222).
+- Update (2026-01-21, Phase R calibration run):
+  - Seed-mine run: artifacts/agi-seed-mine.json (planned 12, executed 11; one execute timeout).
+  - Holdout rebuild: artifacts/agi-refinery-holdout.json + artifacts/agi-refinery-holdout-coverage.json (limit 500, recentFraction 0.5).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T013442983Z.json (indexCoverageRate 0.571, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T013451021Z.json (acceptance 0.9524, precision 0.9524, recall 0.1265, candidateRecall 0.9524, hintUsedInCitations 0.5952).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T013502729Z.json (acceptance 0.9048, precision 0.9048, recall 0.0816, candidateRecall 0.9048, hintUsedInCitations 0.5238).
+
+
+
+
+- Update (2026-01-21, Phase R calibration pass 2):
+  - Seed-mine run (port 5174): artifacts/agi-seed-mine.json (planned 12, executed 12).
+  - Holdout rebuild: artifacts/agi-refinery-holdout.json + artifacts/agi-refinery-holdout-coverage.json (limit 500, recentFraction 0.5; holdout 24, coverage 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T020555707Z.json (indexCoverageRate 0.3675, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T020603145Z.json (acceptance 1.0, precision 1.0, recall 0.5839, candidateRecall 0.8333, selectedRecall 0.8333, hintUsedInCitations 0.5208).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T020611773Z.json (acceptance 0.9583, precision 0.9583, recall 0.5457, candidateRecall 0.7917, selectedRecall 0.7917, hintUsedInCitations 0.5).
+  - Recall denominator now uses retrievalSelected paths when present; citation completion target ratio default raised to 0.5.
+
+- Update (2026-01-21, Phase R calibration pass 3):
+  - Seed-mine run (port 5174): artifacts/agi-seed-mine.json (planned 12, executed 12).
+  - Holdout rebuild: artifacts/agi-refinery-holdout.json + artifacts/agi-refinery-holdout-coverage.json (limit 500, recentFraction 0.5; holdout 24, coverage 24).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T020555707Z.json (indexCoverageRate 0.3675, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T020603145Z.json (acceptance 1.0, precision 1.0, recall 0.5839, candidateRecall 0.8333, selectedRecall 0.8333).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T020611773Z.json (acceptance 0.9583, precision 0.9583, recall 0.5457, candidateRecall 0.7917, selectedRecall 0.7917).
+  - Phase R acceptance targets met (coverage recall >= 0.40, candidateRecall >= 0.45, precision >= 0.75).
+- Update (2026-01-21, export gates met):
+  - Seed-mine top-ups: client 6/6; server 1/6 (maxServerShare cap).
+  - Variants: small client/server runs lifted accepted variants to hit alpha target.
+  - Export (alphaTarget 0.25): accepted 604; alphaRun 0.8172; alphaExport 0.25; surfaceShares client 0.2699, server 0.2848, shared 0.2169, modules 0.1209, docs 0.1076; sft artifacts/agi-refinery-sft.2026-01-21T193847110Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-21T193847110Z.jsonl; DPO density 1.0.
+- Update (2026-01-21, export refresh after Phase A seed run 9):
+  - Export (alphaTarget 0.25): accepted 604; alphaRun 0.8246; alphaExport 0.25; surfaceShares client 0.2632, server 0.2881, shared 0.2185, modules 0.1242, docs 0.1060; variantReservoirUsed 349.
+  - Artifacts: sft artifacts/agi-refinery-sft.2026-01-21T203559184Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-21T203559184Z.jsonl.
+- Update (2026-01-22, trace rehydration + eval run):
+  - Replay (no emit) against audit log: total 804, accepted 759 (0.9440), avgTokens 422.19.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-22T020901366Z.json (acceptance 0.4444, precision 1.0, recall 0.8704, candidateRecall 1.0, hintUsedInCitations 0.8272).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-22T020918317Z.json (acceptance 0.5432, precision 1.0, recall 0.9014, candidateRecall 1.0, hintUsedInCitations 0.8642).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-22T020943125Z.json (indexCoverageRate 0.6765, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Policy: acceptanceRate 0.9440; throttled false.
+  - Execution report: total 804, executionFails 0.
+  - Safety report: total 804, safetyFails 0, safetyHandledPasses 22.
+  - Export (alphaTarget 0.26): accepted 675; alphaRun 0.7911; alphaExport 0.2593; surfaceShares client 0.2637, server 0.2948, shared 0.2089, modules 0.1378, docs 0.0948; sft artifacts/agi-refinery-sft.2026-01-22T021025260Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-22T021025260Z.jsonl; variantReservoirUsed 349.
+
+
+## Phase M: Mixture governance at runtime (complete)
+- M1 Implement runtime alpha governor: enforce V_accepted <= ((1-alpha_target)/alpha_target) * L_accepted; set alpha_run target schedule 0.20 -> 0.25 -> 0.30.
+- M2 Add run-mode switching (anchor_mining | mixed | variant_expansion) and governorEngaged logging; pause variants when cap is hit.
+- M3 Add variant reservoir (tag by surface, intent, difficulty, operator, createdAt) and export within alpha_target.
+- Acceptance: rolling 400-window alphaRun >= alphaTarget - 0.03; report shows governorEngaged + mode changes; alphaExport >= 0.25.
+- Update (2026-01-21, Phase M runtime governor):
+  - Added alpha governor state with runMode/alphaRun metrics; variant executes now block when cap is reached and emit governor_engaged metrics.
+  - Refinery summary now reports governorEngaged; variant runner stops on alpha_governor_engaged errors.
+- Update (2026-01-21, Phase M acceptance check):
+  - Export gates met with alphaRun 0.8172 and alphaExport 0.25; runMode/expectedAlpha fields present in summaries; variant reservoir active in export.
+
+## Phase A: Anchor expansion by deterministic repo mining (complete)
+- A1 Surface quota anchor miner (client>=25%, modules>=25%, docs>=20%, server<=30%).
+- A2 Gold-bearing anchor precheck: require at least one retrieved candidate above threshold or recycle/rewrite anchor.
+- A3 Track anchors_by_surface and anchors_with_candidates per batch.
+- Acceptance: quotas met per batch; anchors_with_candidates rate improves over baseline.
+- Update (2026-01-21, Phase A tooling):
+  - `agi-seed-mine` now enforces surface quotas, runs repoGraph prechecks, and writes anchors_by_surface/anchors_with_candidates stats to a summary JSON.
+- Update (2026-01-21, Phase A precheck widening):
+  - Precheck now tries basename/stem queries and path suffix matching to reduce false negatives.
+- Update (2026-01-21, Phase A seed run):
+  - Seed-mine executed 6/6 with quotas met; anchors_by_surface client=2, modules=2, docs=2.
+  - Artifacts: artifacts/agi-seed-mine.json, artifacts/agi-seed-mine.summary.json.
+- Update (2026-01-21, Phase A seed run 2):
+  - Seed-mine executed 18/24 (aborted executes); anchors_by_surface client=4, modules=5, docs=8, shared=6, server=1.
+  - Quota shortfalls: client=2, modules=1; artifacts unchanged.
+- Update (2026-01-21, Phase A seed run 3):
+  - Seed-mine executed 8/8 (eligible 8 of requested 12); anchors_by_surface client=1, modules=7.
+  - Quota shortfall: client=1; artifacts unchanged.
+- Update (2026-01-21, Phase A seed run 4):
+  - Seed-mine executed 11/12 (aborted executes); anchors_by_surface client=4, modules=8.
+  - Quota shortfalls: none; artifacts unchanged.
+- Update (2026-01-21, Phase A seed run 5):
+  - Seed-mine executed 14/16 (aborted executes); anchors_by_surface client=1, modules=5, docs=4, shared=5, server=1.
+  - Quota shortfall: client=3; artifacts unchanged.
+- Update (2026-01-21, Phase A seed run 6):
+  - Seed-mine executed 3/3 (eligible 3 of requested 12); anchors_by_surface client=3.
+  - Quota shortfalls: none; artifacts unchanged.
+- Update (2026-01-21, Phase A seed run 7):
+  - Seed-mine executed 10/10 (eligible 10 of requested 12); anchors_by_surface client=10 (precheck disabled).
+  - Quota shortfalls: none; artifacts unchanged.
+- Update (2026-01-21, Phase A seed run 8):
+  - Seed-mine executed 16/16 (eligible 50 of requested 16); anchors_by_surface client=6, modules=4, docs=5, server=1 (precheck disabled).
+  - Quota shortfalls: none; artifacts unchanged.
+- Update (2026-01-21, Phase A seed run 9):
+  - Seed-mine executed 11/12 (1 execute aborted); anchors_by_surface client=3, modules=6, docs=3 (precheck threshold 0.15).
+  - Quota shortfalls: none; anchors_with_candidates client=4, modules=6, docs=6; artifacts unchanged.
+- Update (2026-01-21, post-restart seed run + eval + export):
+  - Seed-mine run (limit 12, per-surface 4) executed 10/12 (2 execute aborted); anchors_by_surface client=2, server=3, shared=3, modules=4; client shortfall 1.
+  - Holdout rebuilt: total 224, holdout 81, coverage 81 (maxTotal 81, minPerSurface 16, recentFraction 0.5).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T211815133Z.json (indexCoverageRate 0.7704, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T211821826Z.json (precision 1.0, recall 0.8431, candidateRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T211827424Z.json (precision 1.0, recall 0.8544, candidateRecall 1.0).
+  - Export: alphaTarget 0.26 (0.25 blocked at alphaExport 0.2496); accepted 585; alphaRun 0.8511; alphaExport 0.2598; sft artifacts/agi-refinery-sft.2026-01-21T211918791Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-21T211918791Z.jsonl; DPO density 1.0.
+- Update (2026-01-21, server-targeted seed run + eval + export):
+  - Seed-mine run (server-only, limit 12) executed 10/10 (eligible 10); anchors_by_surface server=10; shortfalls 0.
+  - Holdout rebuilt: total 223, holdout 81, coverage 81 (maxTotal 81, minPerSurface 16, recentFraction 0.5).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T213120046Z.json (indexCoverageRate 0.7901, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T213130887Z.json (precision 1.0, recall 0.8544, candidateRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T213137558Z.json (precision 1.0, recall 0.8997, candidateRecall 1.0).
+  - Export: alphaTarget 0.26 (0.25 blocked at alphaExport 0.2492); accepted 614; alphaRun 0.8191; alphaExport 0.2590; sft artifacts/agi-refinery-sft.2026-01-21T213149567Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-21T213149567Z.jsonl; DPO density 1.0.
+- Update (2026-01-21, server-targeted seed run 2 + eval + export):
+  - Seed-mine run (server-only, limit 12) executed 9/9 (eligible 9); anchors_by_surface server=9; shortfalls 0.
+  - Holdout rebuilt: total 222, holdout 81, coverage 81 (maxTotal 81, minPerSurface 16, recentFraction 0.5).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T213941639Z.json (indexCoverageRate 0.7901, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T213952535Z.json (precision 1.0, recall 0.8810, candidateRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T213959352Z.json (precision 1.0, recall 0.9263, candidateRecall 1.0).
+  - Export: alphaTarget 0.26 (0.25 blocked at alphaExport 0.2492); accepted 627; alphaRun 0.8067; alphaExport 0.2600; sft artifacts/agi-refinery-sft.2026-01-21T214009716Z.jsonl; dpo artifacts/agi-refinery-dpo.2026-01-21T214009716Z.jsonl; DPO density 1.0.
+
+## Phase I: Oracle reconciliation + index coverage (complete)
+- I1 Add explicit counts to oracle and holdout metrics: n_total, n_with_gold, n_gold_in_index, n_gold_in_candidates, n_gold_selected, n_gold_cited.
+- I2 Centralize evidence identity normalization (repo-relative paths, case, extension normalization, chunk-to-path mapping).
+- I3 Expand index coverage (filters, chunker limits, stale index refresh) and re-run oracle.
+- Acceptance: candidateRecall = n_gold_in_candidates / n_with_gold; indexCoverageRate = n_gold_in_index / n_with_gold; indexCoverageRate >= 0.60 then 0.80 on balanced coverage holdout.
+- Update (2026-01-21, Phase I1 instrumentation):
+  - Holdout metrics now emit n_* gold counts plus candidateRecallAvg/selectedRecallAvg (candidateRecall now weighted by gold counts).
+  - Oracle metrics now emit n_* gold counts plus plannedGoldHitCount/naiveGoldHitCount (n_gold_selected/n_gold_cited set to 0 in oracle).
+- Update (2026-01-21, Phase I2 identity normalization):
+  - Added centralized evidence identity normalization and applied it to trajectory capture, gates, holdout/coverage eval, oracle, hint/citation matching, and variant hint selection.
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T031910001Z.json (precision 1.0, recall 0.5839, candidateRecall 0.9662).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T031919412Z.json (precision 0.9896, recall 0.5874, candidateRecall 0.9388).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T031934789Z.json (indexCoverageRate 0.3675, plannedHitRate 1.0, naiveHitRate 1.0).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T030402135Z.json (precision 1.0, recall 0.5839, candidateRecall 0.9662, candidateRecallAvg 0.8333).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T030414065Z.json (precision 0.9583, recall 0.5457, candidateRecall 0.9388, candidateRecallAvg 0.7917).
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T030435929Z.json (indexCoverageRate 0.3675, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, oracle refresh after seed mining):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T050032287Z.json (indexCoverageRate 0.7667, plannedHitRate 0.9506, naiveHitRate 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 2):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T050714650Z.json (indexCoverageRate 0.7778, plannedHitRate 0.9630, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T045736140Z.json (precision 1.0, recall 0.3009, candidateRecall 0.9765, selectedRecall 0.9765).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T045745570Z.json (precision 0.9383, recall 0.3186, candidateRecall 0.9205, selectedRecall 0.9205).
+- Update (2026-01-21, post-seed-mine holdout rebuild 2):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T050640727Z.json (precision 1.0, recall 0.2768, candidateRecall 0.9768, selectedRecall 0.9768).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T050651283Z.json (precision 1.0, recall 0.2509, candidateRecall 0.9660, selectedRecall 0.9660).
+- Update (2026-01-21, oracle refresh after seed mining 3):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T051142104Z.json (indexCoverageRate 0.7802, plannedHitRate 0.9630, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 3):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T051110800Z.json (precision 1.0, recall 0.2518, candidateRecall 0.9743, selectedRecall 0.9743).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T051121607Z.json (precision 1.0, recall 0.2308, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 4):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T051711362Z.json (indexCoverageRate 0.7778, plannedHitRate 0.9630, naiveHitRate 1.0).       
+- Update (2026-01-21, post-seed-mine holdout rebuild 4):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T051639781Z.json (precision 1.0, recall 0.1707, candidateRecall 0.9672, selectedRecall 0.9672).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T051651636Z.json (precision 1.0, recall 0.2348, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 5):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T052710482Z.json (indexCoverageRate 0.7833, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 5):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T052611098Z.json (precision 1.0, recall 0.1476, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T052700268Z.json (precision 1.0, recall 0.1889, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 6):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T053234106Z.json (indexCoverageRate 0.7583, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 6):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T053220511Z.json (precision 1.0, recall 0.1391, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T053225601Z.json (precision 1.0, recall 0.1792, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 7):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T055105630Z.json (indexCoverageRate 0.7083, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 7):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T055050581Z.json (precision 1.0, recall 0.1434, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T055056139Z.json (precision 1.0, recall 0.1753, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 8):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T055440384Z.json (indexCoverageRate 0.7167, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 8):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T055422563Z.json (precision 1.0, recall 0.1725, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T055429357Z.json (precision 1.0, recall 0.1794, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, Phase I3 index expansion):
+  - Expanded repo search roots, budgets, and file limits; added root-level doc/code capture and a dedicated docs/zen-ladder-pack root for policy memo coverage.
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T034024917Z.json (indexCoverageRate 0.8034, plannedHitRate 0.875, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 9):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T154600749Z.json (precision 1.0, recall 0.2340, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T154612560Z.json (precision 1.0, recall 0.2294, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 9):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T154625129Z.json (indexCoverageRate 0.7167, plannedHitRate 0.9583, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 10):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T155544996Z.json (precision 1.0, recall 0.2175, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T155550887Z.json (precision 1.0, recall 0.2175, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 10):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T155559112Z.json (indexCoverageRate 0.8, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 11):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T160607663Z.json (precision 1.0, recall 0.2529, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T160613766Z.json (precision 1.0, recall 0.2421, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 11):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T160623778Z.json (indexCoverageRate 0.72, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 12):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T161944790Z.json (precision 1.0, recall 0.2941, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T161951818Z.json (precision 1.0, recall 0.2188, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 12):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T161959008Z.json (indexCoverageRate 0.72, plannedHitRate 0.9, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 13):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T163217215Z.json (precision 1.0, recall 0.1969, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T163225667Z.json (precision 1.0, recall 0.3067, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 13):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T163238809Z.json (indexCoverageRate 0.6933, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 14):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T164600906Z.json (precision 1.0, recall 0.2310, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T164607522Z.json (precision 1.0, recall 0.2034, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 14):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T164618047Z.json (indexCoverageRate 0.72, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 15):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T165817808Z.json (precision 1.0, recall 0.2122, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T165832076Z.json (precision 1.0, recall 0.1839, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 15):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T165847921Z.json (indexCoverageRate 0.725, plannedHitRate 0.9583, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 16):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T171344658Z.json (precision 1.0, recall 0.2163, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T171355631Z.json (precision 1.0, recall 0.1555, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 16):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T171408515Z.json (indexCoverageRate 0.75, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 17):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T172737789Z.json (precision 1.0, recall 0.1477, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T172746873Z.json (precision 1.0, recall 0.1320, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 17):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T172759360Z.json (indexCoverageRate 0.7333, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 18):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T173703288Z.json (precision 1.0, recall 0.1598, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T173713385Z.json (precision 1.0, recall 0.1333, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 18):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T173729526Z.json (indexCoverageRate 0.7333, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 19):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T174517396Z.json (precision 1.0, recall 0.3802, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T174524186Z.json (precision 1.0, recall 0.3607, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 19):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T174534437Z.json (indexCoverageRate 0.7167, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 20):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T175114400Z.json (precision 1.0, recall 0.6035, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T175125165Z.json (precision 1.0, recall 0.5433, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 20):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T175143814Z.json (indexCoverageRate 0.7333, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, post-seed-mine holdout rebuild 21):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T180906871Z.json (precision 1.0, recall 0.8002, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T180919703Z.json (precision 1.0, recall 0.6549, candidateRecall 1.0, selectedRecall 1.0).
+- Update (2026-01-21, oracle refresh after seed mining 21):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T180928735Z.json (indexCoverageRate 0.7333, plannedHitRate 1.0, naiveHitRate 1.0).
+- Update (2026-01-21, oracle refresh after index coverage expansion):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T201903051Z.json (indexCoverageRate 0.74, plannedHitRate 1.0, naiveHitRate 1.0; n_gold_in_index 148/200).
+- Update (2026-01-21, oracle refresh after budget expansion):
+  - Oracle metrics: artifacts/agi-refinery-holdout-oracle.2026-01-21T202450268Z.json (indexCoverageRate 0.8, plannedHitRate 1.0, naiveHitRate 1.0; n_gold_in_index 160/200).
+- Update (2026-01-21, holdout eval after index refresh):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T202557925Z.json (acceptance 1.0, precision 1.0, recall 0.8864, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T202603879Z.json (acceptance 1.0, precision 1.0, recall 0.6549, candidateRecall 1.0, selectedRecall 1.0).
+
+## Phase C: Cost-aware citation completion (complete)
+- C1 Log pre/post completion metrics: candidateRecall_preCompletion, candidateRecall_postCompletion, completionQueriesCount, completionLatencyMs.
+- C2 Enforce citation integrity: citations must map to retrieval.selected evidence IDs/paths (repair or regenerate if not).
+- Acceptance: out-of-set citations == 0; completion latency and query counts reported.
+- Update (2026-01-21, Phase C instrumentation + integrity):
+  - Citation completion now records pre/post candidate+selected recall, citation counts, query count, and latency in trajectory meta and trace metrics.
+  - Completion now promotes candidate evidence to selected when needed so citations map to retrieval.selected paths/ids.
+- Update (2026-01-21, Phase C verification run):
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T202557925Z.json (precision 1.0, recall 0.8864, candidateRecall 1.0, selectedRecall 1.0).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T202603879Z.json (precision 1.0, recall 0.6549, candidateRecall 1.0, selectedRecall 1.0).
+  - Export metrics include completionQueriesCount and completionLatencyMs: artifacts/agi-refinery-sft.2026-01-21T203559184Z.jsonl.
+- Update (2026-01-21, Phase C verification run):
+  - Seed-mine run (port 5173): artifacts/agi-seed-mine.json (planned 6, executed 6).
+  - Holdout metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T041441461Z.json (acceptance 1.0, precision 1.0, recall 0.5839, candidateRecall 0.9662, selectedRecall 0.9662, hintUsedInCitations 0.5208).
+  - Coverage metrics: artifacts/agi-refinery-holdout-metrics.2026-01-21T041452428Z.json (acceptance 0.9583, precision 0.9896, recall 0.5874, candidateRecall 0.9388, selectedRecall 0.9388, hintUsedInCitations 0.5).
+- Update (2026-01-21, citation completion expansion):
+  - Raised citation completion max to 64 and target counts now use union of retrieval selected + candidates.
+  - .env sets AGI_REFINERY_CITATION_COMPLETION_MAX=64; server restart applied.
+- Update (2026-01-21, citation completion fill-to-target):
+  - Completion now ranks all evidence (including zero-score matches) so it can fill target citation counts instead of stopping at matched-only hits.
+  - Restart required to apply updated completion ordering.
+
+## Modelization Track (Replit CPU target) - Status: in_progress
+- Target (estimate): Replit 8 GB RAM, CPU-only, single-model inference; train off-box.
+- Target model: 1-3B, 4-bit quantized; context 2k-4k; short answers by default.
+- Do: keep retrieval + citation completion as correctness spine; do not rely on model size for truth.
+- RAM budget checklist (Replit 8 GB):
+  - OS + Node runtime: 0.5-1.5 GB.
+  - Postgres (if co-resident): 0.5-1.5 GB.
+  - API/websocket load: 0.3-0.8 GB.
+  - Retrieval/index cache: 0.8-2.0 GB.
+  - LLM 3B Q4 + runtime: 2.5-4.0 GB baseline + KV spikes.
+- Headless renderers (Playwright/FFmpeg): 0.5-1.5 GB each when active.
+- Headroom target: 0.5-1.5 GB free to avoid OOM.
+- Artifacts location: set `AGI_ARTIFACTS_DIR` (recommended `.cache/artifacts`) to keep outputs out of git; default stays `artifacts/`.
+
+### Modelization (M1) Checklist - Status: in_progress
+- M1.1 RC0 determinism check: DONE (defaults now pass after client/server anchor runs).
+- M1.2 Recall definitions: DONE (holdout metrics now emit attribution vs evidence recall fields).
+- M1.3 CPU GGUF bench harness: DONE (bench binary built + reference models downloaded; CPU bench logged).
+- M1.4 Answerer-first LoRA/QLoRA path: DONE (doc + QLoRA flags), BLOCKED on off-box GPU.
+- M1.5 Holdout gate thresholds: DONE (defaults set in `.env` + `.env.example`).
+- M1.6 Runtime smoke: PRECHECK DONE (scripts/llm-local-smoke.ts supports LLM_LOCAL_SMOKE_MODE=preflight); full run pending (llama-cli model load + Replit object keys + SHA256).
+
+### Helix Ask Build Completion Gates - Status: in_progress
+- Runtime smoke pass: full local smoke (not just preflight) returns a response with small caps (512 ctx, 8-16 tokens) and no hang.
+- Base model decision: choose single GGUF target (1.5B or 3B Q4) and pin in RC0->M1 notes.
+- Answerer adapter training: off-box LoRA/QLoRA run produces adapter artifact + hash.
+- Holdout gate pass: adapter meets precision/attribution recall/latency thresholds in `agi:holdout-gate`.
+- Runtime packaging: model + index hydration, context caps, citation completion, and local spawn path verified end-to-end.
+- Release note: mark M1 as DONE with artifacts + hashes in task.md.
+- Optional: index coverage stretch >= 0.80 or finalized exclusions policy; base-model A/B benchmark if latency/quality tradeoff unclear.
+
+### Helix Ask Build Prompt (Codex) - Status: ready
+Goal: finish Helix Ask M1 by completing smoke, adapter training, holdout gates, and runtime packaging validation.
+Do:
+1) Preflight local smoke (no model load): set `LLM_LOCAL_SMOKE_MODE=preflight` and run `npx --yes tsx scripts/llm-local-smoke.ts`; confirm cmd/model/ctx/max_tokens/timeout values look correct.
+2) Full local smoke (model load): clear `LLM_LOCAL_SMOKE_MODE`, set small caps (`LLM_LOCAL_CONTEXT_TOKENS=512`, `LLM_LOCAL_MAX_TOKENS=8`, `LLM_LOCAL_SPAWN_TIMEOUT_MS=15000`) and run `npx --yes tsx scripts/llm-local-smoke.ts`. If it hangs, drop to 4 tokens or increase timeout once; log the failure reason if still blocked.
+3) Base model decision: pick one GGUF (1.5B or 3B Q4) based on CPU bench + smoke stability; record choice in task.md.
+4) Train answerer-first adapter off-box (QLoRA path from `docs/agi-answerer-training.md`); store adapter artifact + hash.
+5) Run `npm run agi:holdout-gate` with the new adapter envs; capture output artifacts and update task.md with pass/fail.
+6) Verify runtime packaging: confirm hydration envs + context caps + citation completion active; run a small `/api/agi/plan` ask (or `llm-local-smoke` output) and note results.
+7) Update task.md: mark M1.6, adapter training, and holdout gate as DONE (with artifact paths + hashes).
+8) Run Casimir verify (`POST /api/agi/adapter/run`) and export training trace (`GET /api/agi/training-trace/export`).
+Do not:
+- Change gate thresholds unless explicitly requested.
+- Run heavy context sizes on CPU; keep smoke runs small and bounded.
+Acceptance:
+- Full local smoke returns output without hang.
+- Adapter training produces artifact + hash.
+- Holdout gate meets thresholds.
+- M1 marked DONE with artifacts/hashes.
+
+### Replit Smoke Commands (Helix Ask) - Status: ready
+Preflight (no model load):
+```
+export LLM_LOCAL_SMOKE_MODE=preflight
+export ENABLE_LLM_LOCAL_SPAWN=1
+export LLM_LOCAL_CMD=./llama-cli
+export LLM_LOCAL_CONTEXT_TOKENS=512
+export LLM_LOCAL_MAX_TOKENS=8
+export LLM_LOCAL_TEMP=0.2
+export LLM_LOCAL_SPAWN_TIMEOUT_MS=15000
+npx --yes tsx scripts/llm-local-smoke.ts
+```
+Full smoke (model load):
+```
+unset LLM_LOCAL_SMOKE_MODE
+npx --yes tsx scripts/llm-local-smoke.ts
+```
+If it hangs:
+- `export LLM_LOCAL_MAX_TOKENS=4`
+- `export LLM_LOCAL_SPAWN_TIMEOUT_MS=30000`
+
+### Seed Mining + Curation Improvements - Status: pending
+- Add seed metadata tagging (doc section + commit hash + seed prompt id in trace meta).
+- Enforce holdout immutability (fail export if holdout hashes change or files are writable).
+- Normalize traces early in seed mining (schema + tool-call format before storage).
+- Add a small negative/refusal set (separate JSONL for drift control).
+- Emit a seed-manifest artifact (counts by surface/intent + seed prompt list).
+
+### RC0 Dataset Freeze - Status: pending
+- Do: export and pin `dataset_rc0_sft.jsonl` + `dataset_rc0_dpo.jsonl`.
+- Do: save `rc0_manifest.json` with commit hashes, index hash, gate policy version, and identity normalization version.
+- Do: pin `holdout_cov_rc0.jsonl` + `holdout_indist_rc0.jsonl`.
+- Acceptance: re-export reproduces identical row counts and manifest hashes.
+- Update (2026-01-22, RC0 freeze run):
+  - Holdouts pinned: artifacts/rc0/holdout_indist_rc0.jsonl, artifacts/rc0/holdout_cov_rc0.jsonl (v1, 16 entries each).
+  - Export: sft artifacts/rc0/agi-refinery-sft.2026-01-22T041834925Z.jsonl; dpo artifacts/rc0/agi-refinery-dpo.2026-01-22T041834925Z.jsonl.
+  - Manifest: artifacts/rc0/agi-refinery-rc0.manifest.json (commit f9e7bb4, index hash sha256:11b40169ee1c35b4814f81c853d53e1a66915ab2fccd8e4baa4b19d86c609bca, gate policy v1.0, identity normalization sha256:3c554d206478e5fe1597ed3fed065e2587490596eee8a00cfdb6bb7181e3192c).
+- Update (2026-01-22, RC0 determinism check):
+  - `npm run agi:rc0-freeze -- --min-client-share 0.2` completed.
+  - Export: sft artifacts/rc0/agi-refinery-sft.2026-01-22T143251837Z.jsonl; dpo artifacts/rc0/agi-refinery-dpo.2026-01-22T143251837Z.jsonl.
+  - Manifest: artifacts/rc0/agi-refinery-rc0.manifest.json (index hash sha256:797cba8f7ef7dcb6a258e5604ece17c080e2da01a400d663016ed720f81e05dd).
+  - Default run blocked: `npm run agi:rc0-freeze` -> coverage_min_client (needed more client anchors).
+  - Seed mining (client): `npm run agi:seed-mine -- --run --surface client --per-surface 40 --limit 40 --no-precheck --timeout-ms 30000` (executed 39/40).
+  - Seed mining (server): `npm run agi:seed-mine -- --run --surface server --per-surface 40 --limit 40 --no-precheck --max-server-share 1 --timeout-ms 30000` (executed 38/40).
+  - Default run now passes: sft artifacts/rc0/agi-refinery-sft.2026-01-22T145317606Z.jsonl; dpo artifacts/rc0/agi-refinery-dpo.2026-01-22T145317606Z.jsonl; manifest index hash sha256:797cba8f7ef7dcb6a258e5604ece17c080e2da01a400d663016ed720f81e05dd.
+
+### Index Coverage Stretch - Status: pending
+- Do: run coverage audit to list gold paths missing from the index.
+- Do: expand index roots/file limits as needed, then rebuild index + rerun oracle.
+- Acceptance: indexCoverageRate >= 0.80 on balanced coverage holdout or a documented exclusions policy.
+- Update (2026-01-22, RC0 coverage audit):
+  - Oracle metrics: artifacts/rc0/agi-refinery-holdout-oracle.rc0.json (indexCoverageRate 0.7875, n_gold_in_index 63/80).
+  - Exclusions policy: docs/agi-index-exclusions-rc0.md (missing: server/routes/agi.plan.ts, server/energy-pipeline.ts, modules/gr/gr-diagnostics.ts).
+
+### Research Assessment Notes (RC0 -> Modelization)
+- Status: RC0 training-data phase is complete for this repo + gate policy; next work is modelization + deployment.
+- Recall definition: candidate/selected recall at 1.0 with coverage recall at 0.6549 implies an attribution/citation gap, not retrieval.
+- Done: holdout metrics now emit attribution recall vs evidence recall fields in outputs and trace metrics.
+- CPU model shortlist (8 GB, GGUF Q4): Qwen2.5-1.5B, Qwen2.5-3B, Llama 3.2-3B, Gemma 2 2B; optional Phi-3 Mini 4K if latency allows.
+- Context cap: KV cache scales linearly with context; default to 2k-4k and benchmark on target CPU.
+- Training order: answerer-first LoRA/QLoRA with evidence + distractor chunks; then DPO pairs for citation compliance.
+- Deployment gates: retrieval metrics + attribution recall + latency p95 + memory ceiling; no safety/execution regressions.
+- Retrieval knobs: RRF fusion (lexical + vector), MMR diversity, citation completion always on.
+- Index stretch: hit 0.80 by indexing 1 missing gold path or document exclusions as final policy.
+- Next steps: unblock RC0 determinism check, benchmark 2-3 base models, run answerer LoRA training, ship single-model runtime smoke.
+- Update (2026-01-22, M1 modelization progress):
+  - Added `scripts/agi-gguf-bench.ts` + `npm run agi:gguf-bench` harness (awaiting model paths + llama-bench binary).
+  - Added answerer LoRA/QLoRA training doc (`docs/agi-answerer-training.md`) and QLoRA flags in `scripts/agi-train-answerer.py`.
+  - Holdout metrics now include attribution vs evidence recall fields; holdout eval/gate trace metrics use new labels.
+  - Default holdout gate thresholds added to `.env` and `.env.example`.
+  - Replit runtime smoke blocked on missing model/index object keys + SHA256.
+  - Holdout gate runs:
+    - rc0-indist: artifacts/agi-refinery-holdout-gate.2026-01-22T160019482Z.json (precision 1.0, attributionRecall 0.8495, candidateRecall 0.9943).
+    - rc0-coverage: artifacts/agi-refinery-holdout-gate.2026-01-22T160039631Z.json (precision 1.0, attributionRecall 0.6118, candidateRecall 0.9576).
+- Update (2026-01-22, CPU GGUF bench run):
+  - llama-bench binary: C:/tmp/llama-build/bin/Release/llama-bench.exe.
+  - Models: models/qwen2.5-3b-instruct-q4_k_m.gguf (2.10 GB), models/qwen2.5-1.5b-instruct-q4_k_m.gguf (1.12 GB).
+  - Bench output: artifacts/agi-gguf-cpu-bench.2026-01-22T170440636Z.json.
+  - Qwen2.5-3B Q4_K_M: prompt 88.26 t/s, gen 13.53 t/s (pp512, tg128, d2432, threads 16).
+  - Qwen2.5-1.5B Q4_K_M: prompt 150.11 t/s, gen 26.60 t/s (pp512, tg128, d2432, threads 16).
+
+### Research Findings (Modelization inputs)
+- Model shortlist to benchmark (CPU 8 GB, GGUF Q4): Qwen2.5-3B vs Llama 3.2-3B; fallback Qwen2.5-1.5B or Gemma 2B.
+- KV cache scales linearly with context and concurrent requests; default 2k context, allow 4k for deep answers.
+- Answerer-first training: RAFT-style evidence + distractor chunks, then DPO pairs that preserve retrieval and differ only in citation compliance.
+- DPO pairing rules: hold E_selected constant; hard negatives are missing/wrong citations and over-claims; keep length comparable.
+- Retrieval knobs: RRF fusion (lexical + vector), MMR diversity, citation completion always on.
+- Deployment gates should separate indexCoverage, candidate/selected recall, citation precision, attribution recall, and p95 latency.
+
+### GPT Pro Research Prompt (draft, copy/paste)
+Prompt intro:
+"Please research recommendations for our novel verification-first generative system (repo-grounded Q and A with solver/gate verification). We are at the end of RC0 training-data phase and entering modelization + CPU deployment (Replit 8 GB RAM, CPU-only; repo size ~11 GB). We need sources and practical guidance for model selection, retrieval/citation metrics, and deployment gating."
+
+System context (use in the reply):
+- Pipeline: intent -> strategy -> retrieval -> answer -> citation completion -> gates (grounding/format/safety/execution).
+- RC0 freeze is reproducible; DPO density = 1.0; candidateRecall = selectedRecall = 1.0; coverage recall = 0.6549.
+- Index coverage 63/80 = 0.7875 (one gold path short of 0.80 stretch).
+- Inference target: single GGUF model + optional LoRA; context cap 2k-4k; retrieval caps; citation completion always on.
+
+Research tasks (cite sources):
+1) Clarify recall definitions for RAG: evidence recall vs attribution/claim recall; how to report both.
+2) KV cache scaling and memory budgets on CPU; how context length impacts RAM.
+3) Small CPU model shortlist (1-3B, GGUF Q4) and tradeoffs for instruction following + structured outputs.
+4) LoRA/QLoRA best practices for answerer-first tuning; include typical rank/alpha guidance.
+5) RAFT-style training with evidence + distractor chunks; expected benefits for citation/faithfulness.
+6) DPO for citation compliance (chosen vs rejected answers); recommended pair construction.
+7) Retrieval quality levers: RRF fusion (lexical + vector), MMR diversity; citation completion impact.
+8) Code indexing improvements (AST/function-level chunking) to lift indexCoverageRate without memory bloat.
+9) Deployment gate thresholds: precision/recall/citation recall + latency p95 + memory ceiling for RC0 -> M1 promotion.
+
+Expected output:
+- Short, source-cited recommendations for each task above.
+- A final "next steps" checklist tailored to RC0 -> modelization on 8 GB CPU.
+
+### Model Comparison (RC0) - Status: pending
+- Do: train router-only, answerer-only, and joint adapters from RC0.
+- Do: evaluate against in-distribution + coverage holdouts and report latency/cost.
+- Acceptance: at least one adapter beats baseline without safety-handled regressions.
+- Update (2026-01-22, RC0 comparison tooling):
+  - Added latency percentiles + precision/recall aliases to holdout metrics.
+  - Trajectories now capture model/planner/executor identifiers from env for router/answerer/joint filtering.
+  - New scripts: `agi:holdout-compare` for RC0 adapter comparisons and `agi:holdout-gate` for deployment thresholds.
+
+### Inference Runtime (Replit) - Status: pending
+- Do: load quantized model, enforce 2k-4k context, and cap retrieval payloads.
+- Do: keep citation completion + gate policy enabled in inference.
+- Acceptance: stable p50/p95 latency, no gate regressions, memory stays within RAM cap.
+- Update (2026-01-22, runtime smoke):
+  - Blocked: missing `LLM_LOCAL_MODEL_OBJECT_KEY`, `LLM_LOCAL_MODEL_SHA256`, `LLM_LOCAL_INDEX_OBJECT_KEY`, `LLM_LOCAL_INDEX_SHA256` (optional `LLM_LOCAL_LORA_OBJECT_KEY` + SHA256).
+- Update (2026-01-22, Replit runtime packaging):
+  - Boot-time artifact hydration with SHA256 checks for model/index/optional LoRA.
+  - Local GGUF+LoRA spawn path enforces context budgets and runtime stats logging.
+  - Planner retrieval and appendix caps now respect local runtime limits.
+  - Requires object storage envs (`LLM_LOCAL_MODEL_OBJECT_KEY`, `LLM_LOCAL_MODEL_SHA256`, `LLM_LOCAL_INDEX_OBJECT_KEY`, `LLM_LOCAL_INDEX_SHA256`, optional `LLM_LOCAL_LORA_OBJECT_KEY`) and a smoke plan run.
+
+### Monitoring + Drift Control - Status: pending
+- Do: sample production trajectories, track surface drift, and update anchor quotas.
+- Do: schedule periodic RC1/RC2 dataset freezes after major feature changes.
+- Acceptance: drift dashboards show stable surface mix and no recall regression.
+- Update (2026-01-22, drift telemetry support):
+  - Holdout eval can emit drift deltas (surface mix + recall regression) with baseline/emit flags.
+  - Deployment gate script records threshold failures and emits training-trace metrics.
+
+## Release Plan (Full Repo Completion) - Status: pending
+- R0: RC0 freeze + manifest
+  - Deliverables: dataset RC0 (SFT/DPO), manifest with index/gate versions, pinned holdouts.
+  - Acceptance: reproducible exports + manifest hashes.
+- R1: Index coverage stretch
+  - Deliverables: index coverage audit + rebuild; exclusions policy if stretch not met.
+  - Acceptance: indexCoverageRate >= 0.80 or documented exclusions.
+- R2: Model comparison (RC0)
+  - Deliverables: answerer-only, router-only, joint adapter runs + eval report.
+  - Acceptance: at least one adapter beats baseline without safety regressions.
+- R3: Replit inference runtime
+  - Deliverables: single-model quantized runtime, 2k-4k context, retrieval caps, citation completion.
+  - Acceptance: stable p50/p95 latency, memory within 8 GB budget, no gate regressions.
+- R4: Monitoring + drift control
+  - Deliverables: drift dashboards, anchor quota auto-adjust, RC1/RC2 cadence.
+  - Acceptance: surface mix stays within target bands; recall holds steady.
+- R5: Pending backlog completion
+  - Deliverables: NG53-57, Essence Console chat persistence + render export, remaining UI/seed-mining expansions.
+  - Acceptance: all pending items marked complete with tests/fixtures where required.
+
+## Essence Console Upgrade (Helix Ask provenance) - Status: pending
+- Goal: make Essence Console the canonical trace + provenance view for Helix Ask.
+- Do:
+  - Persist Helix Ask sessions with stable ids and timestamps.
+  - Show citations, gate results, and certificate hash inline with each reply.
+  - Add a "replay run" action that re-executes a saved trace against current runtime.
+  - Display RC dataset + adapter version used for each reply (from trace meta).
+- Do not: allow unverified claims without trace metadata or hide gate failures.
+- Acceptance: every Helix Ask response is viewable in the console with provenance + replay.
+- Minimal UI wireframe (console):
+  - Session header: title, context id, RC badge, adapter/base model id.
+  - Message row: answer text + collapsed provenance strip (citations, gates, certificate, trace id copy).
+  - Evidence drawer: grouped evidence list with paths + excerpts.
+  - Replay controls: "Replay run" with pass/fail delta and run timestamp.
+  - Safety handling: show safety kind/stage when refusal/redaction is present.

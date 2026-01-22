@@ -189,8 +189,8 @@ export function kappaDriveProxy(params: {
 }
 
 // Small helpers
-export function fmtSci(v: number, digits = 3): string {
-  if (!Number.isFinite(v)) return "—";
+export function fmtSci(v: number | null | undefined, digits = 3): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
   const abs = Math.abs(v);
   if (abs === 0) return "0";
   if (abs >= 1e-2 && abs < 1e4) return v.toPrecision(digits);

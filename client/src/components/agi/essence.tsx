@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRightSquare, History, Plus, Send, Trash2, Wallet } from "lucide-react";
+import { ArrowUpRightSquare, Plus, Send, Trash2, Wallet } from "lucide-react";
 import {
   CHAT_CONTEXT_BUDGET,
   useAgiChatStore,
-  type ChatMessage,
   type ChatSession,
 } from "@/store/useAgiChatStore";
 import type { TTelemetrySnapshot } from "@shared/star-telemetry";
 import {
   execute,
+  deleteChatSession,
+  listChatSessions,
   listPersonas,
   memorySearch,
   plan,
@@ -17,6 +18,7 @@ import {
   syncKnowledgeProjects,
   getPanelSnapshots,
   getBadgeTelemetry,
+  upsertChatSession,
   type PersonaSummary,
   type MemorySearchResponse,
   type PanelSnapshotResponse,
@@ -33,7 +35,7 @@ import MemoryDrawer from "./MemoryDrawer";
 import EvalPanel from "./EvalPanel";
 import DebateView from "./DebateView";
 import { JobsBudgetModal } from "./JobsBudgetModal";
-import { RationaleOverlay } from "./RationaleOverlay";
+import { MessageBubble } from "./MessageBubble";
 import type { TMemorySearchHit } from "@shared/essence-persona";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
@@ -51,6 +53,7 @@ const sumCounts = (counts?: Record<string, number> | null): number => {
 };
 const KNOWLEDGE_ATTACHMENTS_ENABLED = isFlagEnabled("ENABLE_KNOWLEDGE_PROJECTS", true);
 const INFERENCE_PANEL_ENABLED = isFlagEnabled("ENABLE_INFERENCE_PANEL", true);
+const CHAT_SYNC_ENABLED = isFlagEnabled("ENABLE_AGI_CHAT_SYNC", true);
 const DEBATE_LAST_ID_KEY = "debate:last-id";
 
 const COHERENCE_HIGH_THRESHOLD = 0.7;
@@ -86,6 +89,7 @@ export default function EssenceConsole() {
     totals,
     clearSession,
     deleteSession,
+    mergeSessions,
   } = useAgiChatStore();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -115,6 +119,8 @@ export default function EssenceConsole() {
   const [inferenceStateless, setInferenceStateless] = useState(false);
   const [profileDraft, setProfileDraft] = useState<EssenceProfileUpdate>({});
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const syncTimerRef = useRef<number | null>(null);
+  const lastSyncKeyRef = useRef<string | null>(null);
   const [hull, setHull] = useState<
     {
       hull_mode: boolean;
@@ -153,6 +159,60 @@ export default function EssenceConsole() {
   const session: ChatSession | undefined = activeId ? sessions[activeId] : undefined;
   const messages = session?.messages ?? [];
   const personaId = session?.personaId ?? DEFAULT_PERSONA.id;
+
+  useEffect(() => {
+    if (!CHAT_SYNC_ENABLED) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const remote = await listChatSessions({ includeMessages: true });
+        if (!cancelled && remote.length > 0) {
+          mergeSessions(remote);
+        }
+      } catch (error) {
+        console.warn("[essence] chat session sync failed", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mergeSessions, CHAT_SYNC_ENABLED]);
+
+  useEffect(() => {
+    if (!CHAT_SYNC_ENABLED || !session) return;
+    const key = `${session.id}:${session.messages.length}:${session.title}:${session.personaId}`;
+    if (lastSyncKeyRef.current === key) return;
+    lastSyncKeyRef.current = key;
+    if (syncTimerRef.current) {
+      window.clearTimeout(syncTimerRef.current);
+    }
+    syncTimerRef.current = window.setTimeout(() => {
+      (async () => {
+        try {
+          const saved = await upsertChatSession(session);
+          mergeSessions([saved]);
+        } catch (error) {
+          console.warn("[essence] chat session save failed", error);
+          lastSyncKeyRef.current = null;
+        }
+      })();
+    }, 600);
+    return () => {
+      if (syncTimerRef.current) {
+        window.clearTimeout(syncTimerRef.current);
+      }
+    };
+  }, [session, mergeSessions, CHAT_SYNC_ENABLED]);
+  const handleDeleteSession = useCallback(
+    (id: string) => {
+      deleteSession(id);
+      if (!CHAT_SYNC_ENABLED) return;
+      deleteChatSession(id).catch((error) => {
+        console.warn("[essence] chat session delete failed", error);
+      });
+    },
+    [deleteSession, CHAT_SYNC_ENABLED],
+  );
   const contextTotals = useMemo(() => (session ? totals(session.id) : { tokens: 0, messages: 0 }), [session, totals]);
   const contextPct = clamp01(contextTotals.tokens / CHAT_CONTEXT_BUDGET);
   const runtimeMode: RuntimeMode = useMemo(() => {
@@ -684,6 +744,8 @@ export default function EssenceConsole() {
           collapseStrategy: decision.strategy,
           callSpec: callSpec ?? undefined,
           essenceConsole: true,
+          sessionId: session.id,
+          refinery: { origin: "live" },
         },
       );
       const planLatticeVersion = planned.lattice_version ?? null;
@@ -863,7 +925,7 @@ export default function EssenceConsole() {
           activeId={activeId}
           onNew={() => setActive(newSession("Ask to do anything"))}
           onSelect={setActive}
-          onDelete={deleteSession}
+          onDelete={handleDeleteSession}
         />
       </aside>
       <main className="flex-1 flex flex-col">
@@ -1330,60 +1392,29 @@ function SessionList({
       </div>
       <div className="flex-1 overflow-auto">
         {list.length === 0 && <div className="px-4 py-6 text-sm text-slate-400">No sessions yet.</div>}
-        {list.map((session) => (
-          <div
-            key={session.id}
-            className={`px-4 py-3 border-b border-white/5 text-sm ${
-              session.id === activeId ? "bg-white/10" : "hover:bg-white/5"
-            }`}
-          >
-            <button className="text-left w-full" onClick={() => onSelect(session.id)}>
-              <div className="font-semibold text-white truncate">{session.title || "Untitled chat"}</div>
-              <div className="text-[11px] text-slate-400">{new Date(session.createdAt).toLocaleString()}</div>
-            </button>
-            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-              <span>{session.messages.length} messages</span>
-              <button className="flex items-center gap-1 text-rose-200 hover:text-rose-100" onClick={() => onDelete(session.id)}>
-                <Trash2 size={12} /> delete
+        {list.map((session) => {
+          const messageCount = session.messageCount ?? session.messages.length;
+          return (
+            <div
+              key={session.id}
+              className={`px-4 py-3 border-b border-white/5 text-sm ${
+                session.id === activeId ? "bg-white/10" : "hover:bg-white/5"
+              }`}
+            >
+              <button className="text-left w-full" onClick={() => onSelect(session.id)}>
+                <div className="font-semibold text-white truncate">{session.title || "Untitled chat"}</div>
+                <div className="text-[11px] text-slate-400">{new Date(session.createdAt).toLocaleString()}</div>
               </button>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                <span>{messageCount} messages</span>
+                <button className="flex items-center gap-1 text-rose-200 hover:text-rose-100" onClick={() => onDelete(session.id)}>
+                  <Trash2 size={12} /> delete
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
-    </div>
-  );
-}
-
-function MessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === "user";
-  const isAssistant = message.role === "assistant";
-  const roleLabel = isUser ? "You" : isAssistant ? "essence" : message.role;
-  return (
-    <div
-      className={`flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}
-      data-chat-message="true"
-      data-role={message.role}
-      data-trace-id={message.traceId ?? undefined}
-    >
-      <div className="text-xs uppercase tracking-wide text-slate-400">{roleLabel}</div>
-      <div
-        className={`max-w-3xl whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-          isUser ? "bg-sky-500/80 text-white" : "bg-white/5 text-slate-100"
-        }`}
-        data-message-content="true"
-      >
-        {message.content}
-      </div>
-      {message.whyBelongs && !isUser && (
-        <div className="mt-2 w-full">
-          <RationaleOverlay why={message.whyBelongs} />
-        </div>
-      )}
-      {message.traceId && (
-        <div className="text-[11px] text-slate-500 flex items-center gap-2">
-          <History size={12} /> trace {message.traceId.slice(0, 8)}
-        </div>
-      )}
     </div>
   );
 }

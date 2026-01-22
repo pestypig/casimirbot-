@@ -67,6 +67,13 @@ client/public/originals/*
 .cal/
 *.bak
 
+# Local artifacts and model weights (keep repo lean)
+/artifacts/
+/models/
+/.cache/
+/tmp/
+/training-trace*.jsonl
+
 # Environment variable files (keep templates tracked)
 .env
 .env.*

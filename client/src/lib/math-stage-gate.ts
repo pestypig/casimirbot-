@@ -71,7 +71,7 @@ export type MathStageGate = {
 
 export const resolveMathStageGate = (
   index: Map<string, MathTreeNode>,
-  requirements: MathStageRequirement[],
+  requirements: ReadonlyArray<MathStageRequirement>,
 ): MathStageGate => {
   const modules = requirements.map((req) => {
     const node = index.get(req.module);

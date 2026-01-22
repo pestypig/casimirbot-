@@ -10,6 +10,7 @@ import {
   type TTokamakRzEnergyInput,
   type TTokamakRzSnapshotInput,
 } from "@shared/tokamak-energy-field";
+import type { TFloat32RasterB64 } from "@shared/essence-physics";
 import { SI_UNITS } from "@shared/unit-system";
 import { putBlob } from "../../storage";
 import { putEnvelope } from "./store";
@@ -107,7 +108,7 @@ const gradMagnitude2D = (
   return out;
 };
 
-const buildRasterPayload = (array: Float32Array) => ({
+const buildRasterPayload = (array: Float32Array): TFloat32RasterB64 => ({
   encoding: "base64",
   dtype: "float32",
   endian: "little",
@@ -267,8 +268,8 @@ export function buildTokamakRzEnergyField(
   const mask = decodeFloat32Raster(input.separatrix_mask.data_b64, expectedCount, "separatrix_mask");
   const maskBuf = Buffer.from(mask.buffer, mask.byteOffset, mask.byteLength);
 
-  const channelArrays: Partial<Record<TokamakChannelKey, Float32Array>> = {};
-  const channelBuffers: Partial<Record<TokamakChannelKey, Buffer>> = {};
+  const channelArrays: Partial<Record<TTokamakChannelKey, Float32Array>> = {};
+  const channelBuffers: Partial<Record<TTokamakChannelKey, Buffer>> = {};
   for (const key of channelKeys) {
     const payload = input.channels[key];
     if (!payload) continue;

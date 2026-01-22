@@ -1,11 +1,11 @@
 import { StateCreator } from "zustand";
 import { createWithEqualityFn } from "zustand/traditional";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { HelixPanelRef } from "@/pages/helix-core.panels";
-import { HELIX_PANELS } from "@/pages/helix-core.panels";
+import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
+import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import * as lumaWhispers from "@/lib/luma-whispers-core";
 
-type PanelLoader = HelixPanelRef["loader"];
+type PanelLoader = PanelDefinition["loader"];
 
 export type MobileAppEntry = {
   panelId: string;
@@ -25,7 +25,7 @@ type MobileAppState = {
 };
 
 const resolvePanel = (panelId: string) =>
-  HELIX_PANELS.find((panel) => panel.id === panelId);
+  panelRegistry.find((panel) => panel.id === panelId);
 
 const hydrateEntry = (panelId: string, openedAt?: number): MobileAppEntry | null => {
   const panel = resolvePanel(panelId);

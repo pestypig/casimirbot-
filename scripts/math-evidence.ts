@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import micromatch from "micromatch";
 import type { MathCheckType } from "../shared/math-stage.js";
+import { resolveArtifactsPath } from "./agi-artifacts";
 
 export type EvidenceProfileName =
   | "sanity_checks"
@@ -25,6 +26,8 @@ const DEFAULT_PATH = "math.evidence.json";
 
 const normalizePath = (filePath: string, repoRoot: string) =>
   path.relative(repoRoot, filePath).replace(/\\/g, "/");
+
+const DEFAULT_TRACE_OUT = resolveArtifactsPath("training-trace.jsonl");
 
 const DEFAULT_PROFILES: EvidenceProfile[] = [
   {
@@ -68,7 +71,7 @@ const DEFAULT_PROFILES: EvidenceProfile[] = [
       "**/*viability*.test.ts",
     ],
     commands: [
-      "npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl",
+      `npm run casimir:verify -- --ci --trace-out ${DEFAULT_TRACE_OUT}`,
     ],
   },
   {

@@ -7,6 +7,7 @@ import {
   trainingTraceConstraintSchema,
   trainingTraceDeltaSchema,
   trainingTraceMetricsSchema,
+  trainingTracePayloadSchema,
   trainingTraceSignalSchema,
   trainingTraceSourceSchema,
 } from "../../shared/schema.js";
@@ -49,6 +50,7 @@ const trainingTraceInputSchema = z.object({
   metrics: trainingTraceMetricsSchema.optional(),
   firstFail: trainingTraceConstraintSchema.optional(),
   certificate: trainingTraceCertificateSchema.optional(),
+  payload: trainingTracePayloadSchema.optional(),
   notes: z.array(z.string()).optional(),
   ts: z.string().optional(),
   id: z.string().optional(),
@@ -63,6 +65,33 @@ const normalizeTenantId = (value?: string): string | undefined => {
   if (!value) return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const parseBoundedInt = (
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(min, Math.floor(parsed)), max);
+};
+
+const TRAINING_TRACE_MAX_BYTES = parseBoundedInt(
+  process.env.TRAINING_TRACE_MAX_BYTES,
+  250000,
+  1024,
+  5000000,
+);
+
+const estimateBodyBytes = (value: unknown): number | null => {
+  try {
+    const raw = JSON.stringify(value);
+    return Buffer.byteLength(raw, "utf8");
+  } catch {
+    return null;
+  }
 };
 
 const resolveTenant = (
@@ -173,10 +202,24 @@ trainingTraceRouter.get("/training-trace/:id", (req: Request, res: Response) => 
 trainingTraceRouter.post("/training-trace", (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
+  const contentLength = Number(req.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > TRAINING_TRACE_MAX_BYTES) {
+    return res.status(413).json({
+      error: "payload_too_large",
+      limitBytes: TRAINING_TRACE_MAX_BYTES,
+    });
+  }
   const body =
     req.body && typeof req.body === "object"
       ? (req.body as Record<string, unknown>)
       : {};
+  const estimatedBytes = estimateBodyBytes(body);
+  if (estimatedBytes !== null && estimatedBytes > TRAINING_TRACE_MAX_BYTES) {
+    return res.status(413).json({
+      error: "payload_too_large",
+      limitBytes: TRAINING_TRACE_MAX_BYTES,
+    });
+  }
   const parsed = trainingTraceInputSchema.safeParse(body);
   if (!parsed.success) {
     return res.status(400).json({

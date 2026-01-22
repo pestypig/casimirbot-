@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Clock3, Home, PanelsTopLeft, Pin, X, XCircle } from "lucide-react";
 import { useLocation } from "wouter";
-import { HELIX_PANELS } from "@/pages/helix-core.panels";
+import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import { useMobileAppStore } from "@/store/useMobileAppStore";
 import { MobilePanelHost } from "@/components/mobile/MobilePanelHost";
 import { recordPanelActivity } from "@/lib/essence/activityReporter";
@@ -22,14 +22,14 @@ export default function MobileStartPage() {
   );
 
   const panelOrder = useMemo(
-    () => new Map(HELIX_PANELS.map((panel, index) => [panel.id, index])),
+    () => new Map(panelRegistry.map((panel, index) => [panel.id, index])),
     []
   );
   const pinnedPanels = useMemo(() => {
-    const pinned = HELIX_PANELS.filter(
+    const pinned = panelRegistry.filter(
       (panel) => panel.pinned || panel.id === "helix-noise-gens"
     );
-    const unique = new Map<string, (typeof HELIX_PANELS)[number]>();
+    const unique = new Map<string, (typeof panelRegistry)[number]>();
     pinned.forEach((panel) => unique.set(panel.id, panel));
     return Array.from(unique.values()).sort((a, b) => {
       if (a.id === "helix-noise-gens") return -1;
@@ -42,7 +42,7 @@ export default function MobileStartPage() {
     [pinnedPanels]
   );
   const gridPanels = useMemo(
-    () => HELIX_PANELS.filter((panel) => !pinnedIds.has(panel.id)),
+    () => panelRegistry.filter((panel) => !pinnedIds.has(panel.id)),
     [pinnedIds]
   );
 
@@ -74,7 +74,7 @@ export default function MobileStartPage() {
   };
 
   const handleTilePress = (panelId: string) => {
-    const panel = HELIX_PANELS.find((p) => p.id === panelId);
+    const panel = panelRegistry.find((p) => p.id === panelId);
     if (!panel) return;
     if (panel.heavy && typeof window !== "undefined") {
       const proceed = window.confirm(
@@ -306,7 +306,7 @@ export default function MobileStartPage() {
 
               {stack.map((entry) => {
                 const isActive = entry.panelId === activeId;
-                const panelDef = HELIX_PANELS.find((panel) => panel.id === entry.panelId);
+                const panelDef = panelRegistry.find((panel) => panel.id === entry.panelId);
                 const Icon = panelDef?.icon ?? PanelsTopLeft;
                 return (
                   <div

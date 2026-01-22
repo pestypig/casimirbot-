@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { IdeologyNode } from "@/lib/ideology-types";
+import type { IdeologyArtifact } from "@shared/ideology/ideology-artifacts";
 import { useIdeology } from "@/hooks/use-ideology";
 import { useIdeologyBeliefGraph } from "@/hooks/use-ideology-belief-graph";
 import { useIdeologyArtifacts } from "@/hooks/use-ideology-artifacts";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import CitizensArcView from "@/components/ideology/CitizensArcView";
 import { cn } from "@/lib/utils";
+import { exportNodeToImage } from "@/lib/ideology/pill-export";
+import { Download } from "lucide-react";
 
 type IdeologyPanelProps = {
   initialId?: string;
@@ -45,6 +49,11 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
   const selected = selectedId ? resolve?.(selectedId) ?? null : null;
   const [query, setQuery] = useState("");
   const [artifactQuery, setArtifactQuery] = useState("");
+  const [showExportControls, setShowExportControls] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [downloadingArtifactId, setDownloadingArtifactId] = useState<string | null>(null);
+  const selectedCardRef = useRef<HTMLDivElement | null>(null);
+  const searchQuery = query.trim();
   const artifactContextId = selected?.id ?? undefined;
   const artifactPanelId = "mission-ethos";
   const {
@@ -57,8 +66,22 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
     nodeId: artifactContextId,
     limit: 12,
   });
+  const {
+    data: artifactSearchData,
+    isLoading: artifactSearchLoading,
+    error: artifactSearchError,
+  } = useIdeologyArtifacts(
+    searchQuery
+      ? {
+          query: searchQuery,
+          panelId: artifactPanelId,
+          limit: 20,
+        }
+      : {},
+  );
   const artifactItems = artifactsData?.items ?? [];
   const artifactTotal = artifactsData?.total ?? 0;
+  const artifactSearchItems = artifactSearchData?.items ?? [];
 
   useEffect(() => {
     if (!selectedId && data?.rootId) {
@@ -79,7 +102,7 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
 
   const flatNodes = useMemo(() => data?.nodes ?? [], [data]);
   const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
+    const term = searchQuery.toLowerCase();
     if (!term) return [];
     return flatNodes.filter((node) => {
       const inTitle = node.title.toLowerCase().includes(term);
@@ -87,7 +110,7 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
       const inTags = node.tags?.some((tag) => tag.toLowerCase().includes(term)) ?? false;
       return inTitle || inExcerpt || inTags;
     });
-  }, [flatNodes, query]);
+  }, [flatNodes, searchQuery]);
 
   const parentOf = useMemo(() => {
     const pairs = new Map<string, string | null>();
@@ -142,6 +165,64 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
       );
     }
   };
+
+  const exportStatement = useCallback(async () => {
+    if (isExporting || !selected) return;
+    const node = selectedCardRef.current;
+    if (!node) return;
+    setIsExporting(true);
+    node.setAttribute("data-exporting", "true");
+    try {
+      const dataUrl = await exportNodeToImage(node, "png");
+      const anchor = document.createElement("a");
+      anchor.href = dataUrl;
+      anchor.download = `ideology_${selected.id}`.replace(/[^a-z0-9-_]+/gi, "_") + ".png";
+      anchor.click();
+    } catch (err) {
+      window.alert("Export failed. Please retry.");
+    } finally {
+      node.removeAttribute("data-exporting");
+      setIsExporting(false);
+    }
+  }, [isExporting, selected]);
+
+  const buildArtifactRenderUrl = useCallback(
+    (artifact: IdeologyArtifact, format: "png" | "svg" = "png") =>
+      `/api/ethos/artifacts/${encodeURIComponent(artifact.id)}/render?format=${format}`,
+    [],
+  );
+
+  const downloadArtifact = useCallback(
+    async (artifact: IdeologyArtifact) => {
+      if (downloadingArtifactId) return;
+      if (artifact.exportKind !== "pill" || !artifact.exportTargetId) {
+        window.alert("This artifact cannot be rendered as a sticker yet.");
+        return;
+      }
+      setDownloadingArtifactId(artifact.id);
+      const format = artifact.formats?.includes("svg") ? "svg" : "png";
+      const url = buildArtifactRenderUrl(artifact, format);
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`download_failed_${res.status}`);
+        }
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const safeName = (artifact.exportTargetId || artifact.id).replace(/[^a-z0-9-_]+/gi, "_");
+        anchor.href = objectUrl;
+        anchor.download = `${safeName}.${format}`;
+        anchor.click();
+        URL.revokeObjectURL(objectUrl);
+      } catch (err) {
+        window.alert("Download failed. Please retry.");
+      } finally {
+        setDownloadingArtifactId(null);
+      }
+    },
+    [buildArtifactRenderUrl, downloadingArtifactId],
+  );
 
   const renderBody = (node: IdeologyNode | null) => {
     if (!node?.bodyMD) return null;
@@ -207,7 +288,7 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
           <label className="block text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 mb-2">
             Search
             <input
-              aria-label="Search ideology nodes"
+              aria-label="Search ideology nodes and artifacts"
               className="mt-1 w-full rounded-md border border-white/10 bg-slate-900/60 px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
               placeholder="Titles, tags, excerpts..."
               value={query}
@@ -215,52 +296,207 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
             />
           </label>
           <Separator className="my-3 bg-white/10" />
-          <div className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Ideology Tree</div>
-          <nav aria-label="Ideology tree" role="tree" className="space-y-1 max-h-[60vh] overflow-y-auto pr-1">
-            {rootNode ? (
-              <TreeNode
-                nodeId={rootNode.id}
-                depth={0}
-                selectedId={selected?.id ?? null}
-                onSelect={(id) => setSelectedId(id)}
-                resolve={resolve}
-                childrenOf={childrenOf}
-              />
-            ) : (
-              <p className="text-sm text-slate-400">No root node defined.</p>
-            )}
-          </nav>
+          {searchQuery ? (
+            <>
+              <div className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">
+                Search results
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                    Nodes ({filtered.length})
+                  </div>
+                  {filtered.length === 0 ? (
+                    <p className="mt-2 text-sm text-slate-500">No node matches.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-sm">
+                      {filtered.slice(0, 40).map((node) => (
+                        <li key={node.id}>
+                          <button
+                            className={cn(
+                              "w-full rounded-md px-2 py-1 text-left transition",
+                              node.id === selected?.id
+                                ? "bg-sky-500/20 text-white"
+                                : "text-slate-300 hover:bg-white/5"
+                            )}
+                            onClick={() => setSelectedId(node.id)}
+                          >
+                            <span className="font-medium">{node.title}</span>
+                            {node.tags?.length ? (
+                              <span className="ml-2 text-xs text-slate-400">
+                                #{node.tags[0]}
+                              </span>
+                            ) : null}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <Separator className="bg-white/10" />
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                    Artifacts ({artifactSearchData?.total ?? 0})
+                  </div>
+                  {artifactSearchLoading ? (
+                    <p className="mt-2 text-sm text-slate-500">Loading artifacts...</p>
+                  ) : artifactSearchError ? (
+                    <p className="mt-2 text-sm text-rose-300">
+                      {artifactSearchError instanceof Error
+                        ? artifactSearchError.message
+                        : "Unable to load artifacts."}
+                    </p>
+                  ) : artifactSearchItems.length === 0 ? (
+                    <p className="mt-2 text-sm text-slate-500">No artifact matches.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-2 text-sm">
+                      {artifactSearchItems.map((artifact) => {
+                        const targetId = artifact.nodeId ?? null;
+                        const isRenderable =
+                          artifact.exportKind === "pill" && Boolean(artifact.exportTargetId);
+                        const previewUrl = isRenderable
+                          ? buildArtifactRenderUrl(artifact, "png")
+                          : null;
+                        const isDownloading = downloadingArtifactId === artifact.id;
+                        const item = (
+                          <>
+                            <div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">
+                              {artifact.exportKind}
+                            </div>
+                            <div className="text-sm font-medium text-white">
+                              {artifact.title}
+                            </div>
+                            {artifact.summary && (
+                              <div className="mt-1 text-xs text-slate-400">
+                                {artifact.summary}
+                              </div>
+                            )}
+                            {previewUrl && (
+                              <img
+                                className="mt-2 w-full max-h-40 rounded-md border border-white/10 bg-slate-950/60 object-contain"
+                                src={previewUrl}
+                                alt={`Preview of ${artifact.title}`}
+                                loading="lazy"
+                              />
+                            )}
+                            <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-400">
+                              {(artifact.tags ?? []).slice(0, 3).map((tag) => (
+                                <span
+                                  key={`${artifact.id}-${tag}`}
+                                  className="rounded-full border border-white/10 bg-slate-950/60 px-2 py-0.5"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        );
+                        return (
+                          <li
+                            key={artifact.id}
+                            className={cn(
+                              "rounded-md border border-white/10 bg-white/5 p-2 transition",
+                              targetId ? "hover:border-sky-400/40" : "opacity-80"
+                            )}
+                          >
+                            <div className="flex items-start gap-2">
+                              {targetId ? (
+                                <button
+                                  type="button"
+                                  className="flex-1 text-left"
+                                  onClick={() => setSelectedId(targetId)}
+                                  aria-label={`Open ${artifact.title}`}
+                                >
+                                  {item}
+                                </button>
+                              ) : (
+                                <div className="flex-1">{item}</div>
+                              )}
+                              <button
+                                type="button"
+                                data-export-control="true"
+                                className="mt-1 rounded-full border border-white/10 bg-slate-900/80 p-2 text-slate-200 transition hover:border-sky-400/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={() => downloadArtifact(artifact)}
+                                aria-label={`Download ${artifact.title}`}
+                                title={
+                                  isRenderable
+                                    ? "Download PNG sticker"
+                                    : "Sticker export unavailable"
+                                }
+                                disabled={!isRenderable || isDownloading}
+                              >
+                                <Download className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">
+                Ideology Tree
+              </div>
+              <nav
+                aria-label="Ideology tree"
+                role="tree"
+                className="space-y-1 max-h-[60vh] overflow-y-auto pr-1"
+              >
+                {rootNode ? (
+                  <TreeNode
+                    nodeId={rootNode.id}
+                    depth={0}
+                    selectedId={selected?.id ?? null}
+                    onSelect={(id) => setSelectedId(id)}
+                    resolve={resolve}
+                    childrenOf={childrenOf}
+                  />
+                ) : (
+                  <p className="text-sm text-slate-400">No root node defined.</p>
+                )}
+              </nav>
+            </>
+          )}
         </Card>
-        {query.trim() && (
-          <Card className="p-3 bg-slate-950/50 border-white/10">
-            <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Matches</div>
-            <ul className="mt-2 space-y-1 text-sm">
-              {filtered.length === 0 && <li className="text-slate-500">No matches.</li>}
-              {filtered.slice(0, 40).map((node) => (
-                <li key={node.id}>
-                  <button
-                    className={cn(
-                      "w-full rounded-md px-2 py-1 text-left transition",
-                      node.id === selected?.id
-                        ? "bg-sky-500/20 text-white"
-                        : "text-slate-300 hover:bg-white/5"
-                    )}
-                    onClick={() => setSelectedId(node.id)}
-                  >
-                    <span className="font-medium">{node.title}</span>
-                    {node.tags?.length ? (
-                      <span className="ml-2 text-xs text-slate-400">#{node.tags[0]}</span>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
       </div>
 
       <div className="col-span-12 space-y-3 lg:col-span-6">
-        <Card className="p-5 bg-slate-950/60 border-white/10 min-h-[60vh]">
+        <Card className="p-3 bg-slate-950/50 border-white/10">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+              Statement exports
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <span>{showExportControls ? "On" : "Off"}</span>
+              <Switch
+                checked={showExportControls}
+                onCheckedChange={setShowExportControls}
+              />
+            </div>
+          </div>
+        </Card>
+        <Card
+          ref={selectedCardRef}
+          data-export-id={selected?.id ?? undefined}
+          className="p-5 bg-slate-950/60 border-white/10 min-h-[60vh] relative"
+        >
+          {showExportControls && selected && (
+            <button
+              type="button"
+              data-export-control="true"
+              className="absolute right-3 top-3 rounded-full border border-white/10 bg-slate-900/80 p-2 text-slate-200 transition hover:border-sky-400/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={exportStatement}
+              aria-label="Download statement as PNG"
+              title="Download statement as PNG"
+              disabled={isExporting}
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          )}
           {selected ? (
             <>
               <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
@@ -294,6 +530,8 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
                 <CitizensArcView
                   onSelectNode={setSelectedId}
                   resolve={resolve}
+                  showExportControls={showExportControls}
+                  onToggleExportControls={setShowExportControls}
                 />
               ) : (
                 renderBody(selected)
@@ -474,6 +712,11 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
                     {artifact.formats?.includes("png") && (
                       <span className="rounded-full border border-white/10 bg-slate-950/60 px-2 py-0.5">
                         PNG
+                      </span>
+                    )}
+                    {artifact.formats?.includes("svg") && (
+                      <span className="rounded-full border border-white/10 bg-slate-950/60 px-2 py-0.5">
+                        SVG
                       </span>
                     )}
                     {(artifact.tags ?? []).slice(0, 4).map((tag) => (

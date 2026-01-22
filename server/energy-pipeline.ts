@@ -4405,7 +4405,7 @@ export async function calculateEnergyPipeline(
         ? Number(state.gr?.matter?.stressEnergy?.invariantMass_kg)
         : undefined;
     const invariantMassSigma_kg =
-      Number.isFinite(measuredScaleRelSigma) && Number.isFinite(invariantMass_kg)
+      Number.isFinite(measuredScaleRelSigma) && typeof invariantMass_kg === "number"
         ? Math.abs(invariantMass_kg) * (measuredScaleRelSigma as number)
         : undefined;
     state.invariantMassSigma_kg = invariantMassSigma_kg;

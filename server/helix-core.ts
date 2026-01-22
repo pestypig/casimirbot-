@@ -135,6 +135,8 @@ import type {
   AxisLabel,
   WarpGeometryFallback,
   GrConstraintContract,
+  GrAssistantReportPayload,
+  GrGrounding,
   GrRegionStats,
 } from "../shared/schema.js";
 import type { WarpConfig } from "../types/warpViability";
@@ -3340,7 +3342,7 @@ const probeGetPowerW = (pipeline?: EnergyPipelineState | null): number => {
   const megaWatts = probeFirstFinite((pipeline as any)?.P_avg_MW);
   if (Number.isFinite(megaWatts)) return (megaWatts as number) * 1e6;
   const raw = probeFirstFinite(pipeline?.P_avg, (pipeline as any)?.power);
-  if (!Number.isFinite(raw)) return Number.NaN;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return Number.NaN;
   if (raw === 0) return 0;
   if (raw > 0 && raw < 1e4) return raw * 1e6;
   return raw;
@@ -3371,21 +3373,22 @@ const probeResolvePowerW = (
 };
 
 const probeGetHullAreaM2 = (pipeline?: EnergyPipelineState | null): number => {
+  const tiles = (pipeline as any)?.tiles;
   const area = probeFirstFinite(
     pipeline?.hullArea_m2,
-    pipeline?.tiles?.hullArea_m2,
+    tiles?.hullArea_m2,
     pipeline?.hullAreaOverride_m2,
     (pipeline as any)?.__hullAreaEllipsoid_m2,
   );
   if (Number.isFinite(area) && (area as number) > 0) return area as number;
   const tileAreaCm2 = probeFirstFinite(
     pipeline?.tileArea_cm2,
-    pipeline?.tiles?.tileArea_cm2,
+    tiles?.tileArea_cm2,
   );
   const nTiles = probeFirstFinite(
     pipeline?.N_tiles,
-    pipeline?.tiles?.N_tiles,
-    pipeline?.tiles?.total,
+    tiles?.N_tiles,
+    tiles?.total,
   );
   if (
     Number.isFinite(tileAreaCm2) &&
@@ -3406,8 +3409,8 @@ const probeGetDutyEffective = (pipeline?: EnergyPipelineState | null): number =>
       pipeline?.dutyShip,
       pipeline?.dutyEff,
       pipeline?.dutyCycle,
-      pipeline?.dutyFR,
-      pipeline?.dutyGate,
+      (pipeline as any)?.dutyFR,
+      (pipeline as any)?.dutyGate,
     ) ?? 0,
   );
 
@@ -3421,8 +3424,8 @@ const probeResolveDutyEffective = (
     { value: pipeline?.dutyShip, source: "dutyShip", proxy: true },
     { value: pipeline?.dutyEff, source: "dutyEff", proxy: true },
     { value: pipeline?.dutyCycle, source: "dutyCycle", proxy: true },
-    { value: pipeline?.dutyFR, source: "dutyFR", proxy: true },
-    { value: pipeline?.dutyGate, source: "dutyGate", proxy: true },
+    { value: (pipeline as any)?.dutyFR, source: "dutyFR", proxy: true },
+    { value: (pipeline as any)?.dutyGate, source: "dutyGate", proxy: true },
   ]);
   if (direct) return { ...direct, value: clamp01(direct.value) };
   return { value: 0, source: "missing", proxy: true };
@@ -3561,15 +3564,18 @@ const probeResolveGammaVdB = (
   pipeline?: EnergyPipelineState | null,
 ): ProbeSourcedNumber => {
   const direct = probePickSourcedNumber([
-    { value: pipeline?.gammaVanDenBroeck_mass, source: "gammaVanDenBroeck_mass" },
+    {
+      value: (pipeline as any)?.gammaVanDenBroeck_mass,
+      source: "gammaVanDenBroeck_mass",
+    },
     { value: pipeline?.gammaVanDenBroeck, source: "gammaVanDenBroeck" },
     {
-      value: pipeline?.gammaVanDenBroeck_vis,
+      value: (pipeline as any)?.gammaVanDenBroeck_vis,
       source: "gammaVanDenBroeck_vis",
       proxy: true,
     },
-    { value: pipeline?.gammaVdB, source: "gammaVdB", proxy: true },
-    { value: pipeline?.gammaVdB_vis, source: "gammaVdB_vis", proxy: true },
+    { value: (pipeline as any)?.gammaVdB, source: "gammaVdB", proxy: true },
+    { value: (pipeline as any)?.gammaVdB_vis, source: "gammaVdB_vis", proxy: true },
     { value: (pipeline as any)?.gamma_vdb, source: "gamma_vdb", proxy: true },
   ]);
   if (direct) return { ...direct, value: Math.max(1, direct.value) };
@@ -3581,9 +3587,9 @@ const probeResolveQSpoiling = (
 ): ProbeSourcedNumber => {
   const direct = probePickSourcedNumber([
     { value: pipeline?.qSpoilingFactor, source: "qSpoilingFactor" },
-    { value: pipeline?.deltaAOverA, source: "deltaAOverA", proxy: true },
-    { value: pipeline?.qSpoil, source: "qSpoil", proxy: true },
-    { value: pipeline?.q, source: "q", proxy: true },
+    { value: (pipeline as any)?.deltaAOverA, source: "deltaAOverA", proxy: true },
+    { value: (pipeline as any)?.qSpoil, source: "qSpoil", proxy: true },
+    { value: (pipeline as any)?.q, source: "q", proxy: true },
   ]);
   if (direct) return { ...direct, value: Math.max(0, direct.value) };
   return { value: 1, source: "fallback", proxy: true };
@@ -8113,7 +8119,13 @@ export async function getGrAssistantReport(req: Request, res: Response) {
       return;
     }
 
-    const result = await grAssistantHandler(parsed.data);
+    const result = (await grAssistantHandler(parsed.data, {})) as {
+      report: GrAssistantReportPayload;
+      gate?: GrGrounding;
+      citations?: string[];
+      trace_id?: string;
+      training_trace_id?: string;
+    };
     const payload = grAssistantReportSchema.parse({
       kind: "gr-assistant-report",
       updatedAt: Date.now(),
@@ -8744,12 +8756,12 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
       let hasAmpMeasured = false;
       const setDynamicMeasured = (key: string, value: number | undefined) => {
         if (!Number.isFinite(value)) return;
-        nextDynamic[key] = value as number;
+        (nextDynamic as Record<string, number>)[key] = value as number;
         hasDynamicMeasured = true;
       };
       const setAmpMeasured = (key: string, value: number | undefined) => {
         if (!Number.isFinite(value)) return;
-        nextAmp[key] = value as number;
+        (nextAmp as Record<string, number>)[key] = value as number;
         hasAmpMeasured = true;
       };
 

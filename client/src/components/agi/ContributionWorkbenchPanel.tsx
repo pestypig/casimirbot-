@@ -78,7 +78,7 @@ const formatTimestamp = (value?: string) => {
   return Number.isFinite(parsed.getTime()) ? parsed.toLocaleString() : value;
 };
 
-const formatOptional = (value?: string) => {
+const formatOptional = (value?: string | null) => {
   if (!value) return "n/a";
   const trimmed = value.trim();
   return trimmed.length ? trimmed : "n/a";
@@ -374,12 +374,13 @@ export default function ContributionWorkbenchPanel() {
         vcu: Number.isFinite(vcu) ? vcu : undefined,
         capped: receiptCapped,
       });
-      if (payload.receipt) {
-        setReceipts((prev) => upsertById(prev, payload.receipt));
-        setSelectedReceiptId(payload.receipt.id);
+      const receipt = payload.receipt;
+      if (receipt) {
+        setReceipts((prev) => upsertById(prev, receipt));
+        setSelectedReceiptId(receipt.id);
         toast({
           title: "Receipt created",
-          description: `Receipt ${payload.receipt.id} stored.`,
+          description: `Receipt ${receipt.id} stored.`,
         });
       } else {
         toast({
@@ -406,8 +407,9 @@ export default function ContributionWorkbenchPanel() {
         decision: reviewDecision,
         notes: reviewNotes.trim() || undefined,
       });
-      if (payload.receipt) {
-        setReceipts((prev) => upsertById(prev, payload.receipt));
+      const receipt = payload.receipt;
+      if (receipt) {
+        setReceipts((prev) => upsertById(prev, receipt));
       }
       toast({
         title: "Review submitted",
@@ -431,11 +433,14 @@ export default function ContributionWorkbenchPanel() {
     setMintBusy(true);
     try {
       const payload = await mintContributionReceipt(selectedReceipt.id);
-      if (payload.receipt) {
-        setReceipts((prev) => upsertById(prev, payload.receipt));
+      const receipt = payload.receipt;
+      if (receipt) {
+        setReceipts((prev) => upsertById(prev, receipt));
       }
+      const ledgerOk =
+        payload.ledger?.ok ?? receipt?.status === "minted";
       toast({
-        title: payload.ok ? "Minted" : "Mint blocked",
+        title: ledgerOk ? "Minted" : "Mint blocked",
         description: payload.ledger?.reason ?? "Ledger processed.",
       });
     } catch (err) {
@@ -457,8 +462,9 @@ export default function ContributionWorkbenchPanel() {
         selectedReceipt.id,
         revokeReason.trim() || undefined,
       );
-      if (payload.receipt) {
-        setReceipts((prev) => upsertById(prev, payload.receipt));
+      const receipt = payload.receipt;
+      if (receipt) {
+        setReceipts((prev) => upsertById(prev, receipt));
       }
       toast({
         title: "Receipt revoked",

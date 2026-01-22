@@ -227,7 +227,7 @@ async function handleRender(request: CoverRenderRequest) {
             baseStyleInfluence,
             baseWeirdness,
             manifest,
-            energy: windowEnergy,
+            energy: windowEnergy ?? undefined,
           })
         : baseTexture!;
       const impulse = usePlan
@@ -248,7 +248,7 @@ async function handleRender(request: CoverRenderRequest) {
         midiMotifs: midiMotifBank,
         grooveTemplates: grooveTemplateBank,
         macroCurves: macroCurveBank,
-        energy: windowEnergy,
+        energy: windowEnergy ?? undefined,
         jobId,
       });
       segments.push(segment);
@@ -926,7 +926,7 @@ function sanitizeTempo(raw: TempoMeta): TempoMeta {
 }
 
 function applyPlanTempoOverride(tempo: TempoMeta, bpm?: number): TempoMeta {
-  if (!Number.isFinite(bpm)) return tempo;
+  if (typeof bpm !== "number" || !Number.isFinite(bpm)) return tempo;
   return { ...tempo, bpm: clampNumber(bpm, 40, 240) };
 }
 
@@ -1220,7 +1220,7 @@ const buildMotifSchedule = (
         }
       }
     }
-    const picked = winner?.ids ?? lastIds;
+    const picked: string[] | null = winner?.ids ?? lastIds;
     if (picked?.length) {
       schedule.set(section.name, picked);
       lastIds = picked;
@@ -2247,7 +2247,8 @@ function clamp01(value: number) {
 }
 
 function resolveEnergyAmount(value: number | undefined) {
-  return Number.isFinite(value) ? clamp01(value) : null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return clamp01(value);
 }
 
 function applyEnergyToInfluence(
@@ -2260,7 +2261,8 @@ function applyEnergyToInfluence(
 }
 
 function resolveFxAmount(value: number | undefined) {
-  return Number.isFinite(value) ? clamp01(value) : null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return clamp01(value);
 }
 
 function lerp(start: number, end: number, t: number) {

@@ -1,0 +1,58 @@
+# Scripts Index
+
+Coverage inventory for this surface. Update when files move or are added.
+
+Files
+- `scripts/agi-export.ts`
+- `scripts/agi-gguf-bench.ts`
+- `scripts/agi-holdout-eval.ts`
+- `scripts/agi-holdout.ts`
+- `scripts/agi-refinery-policy.ts`
+- `scripts/agi-replay.ts`
+- `scripts/agi-safety-report.ts`
+- `scripts/agi-seed-mine.ts`
+- `scripts/agi-variants.ts`
+- `scripts/alcubierre_invariants_fd.py`
+- `scripts/audit-bundle.ts`
+- `scripts/audit-init.ts`
+- `scripts/bench.ts`
+- `scripts/bridge/trace-to-codex.ts`
+- `scripts/build-code-lattice.ts`
+- `scripts/build-whispers.ts`
+- `scripts/build_verifier_dataset.py`
+- `scripts/ci-reports.ts`
+- `scripts/collect-ideology-node-ids.ts`
+- `scripts/convert_gsm8k_to_generations.py`
+- `scripts/doc-coverage-audit.py`
+- `scripts/eval-smoke.ts`
+- `scripts/extract-ideology.ts`
+- `scripts/extract-svg-labels.ts`
+- `scripts/generate-tiles.js`
+- `scripts/gr-perf-sweep.ts`
+- `scripts/math-config.ts`
+- `scripts/math-discovery.ts`
+- `scripts/math-evidence.ts`
+- `scripts/math-report.ts`
+- `scripts/math-trace.ts`
+- `scripts/math-waivers.ts`
+- `scripts/merge_lora.py`
+- `scripts/migrate-noisegen-assets-to-storage.ts`
+- `scripts/migrate-store-to-replit-paths.ts`
+- `scripts/noisegen/extract-4bar.ts`
+- `scripts/plan-train/build_renderplan_dataset.py`
+- `scripts/plan-train/predict_renderplan_model.py`
+- `scripts/plan-train/train_renderplan_model.py`
+- `scripts/precompute-lattice.ts`
+- `scripts/py/math_check.py`
+- `scripts/rejection_tune.py`
+- `scripts/solar-pipeline.ts`
+- `scripts/solar-spectra-manifest.ts`
+- `scripts/specialists-mini-loop.ts`
+- `scripts/train_verifier.py`
+- `scripts/upload-audio-to-storage.ts`
+- `scripts/v0.1-signoff.ts`
+- `scripts/validate-ideology-verifiers.ts`
+- `scripts/validate-math-stage.ts`
+- `scripts/verify-local.ts`
+- `scripts/wallet-agent.ts`
+- `scripts/warp_fields_npz.py`

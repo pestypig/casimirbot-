@@ -1235,135 +1235,6 @@ export function UploadOriginalsModal({
     if (!canSubmit) return;
     try {
       setIsSubmitting(true);
-      const uploadQueue: UploadQueueItem[] = [
-        ...(stemSummary.mixEntry
-          ? [
-              {
-                id: stemSummary.mixEntry.id,
-                name: stemSummary.mixEntry.name,
-                file: stemSummary.mixEntry.file,
-                field: "instrumental",
-              },
-            ]
-          : []),
-        ...(stemSummary.vocalEntry
-          ? [
-              {
-                id: stemSummary.vocalEntry.id,
-                name: stemSummary.vocalEntry.name,
-                file: stemSummary.vocalEntry.file,
-                field: "vocal",
-              },
-            ]
-          : []),
-        ...stemSummary.stemUploads.map((entry) => ({
-          id: entry.id,
-          name: entry.name,
-          file: entry.file,
-          field: "stems",
-          category: entry.category,
-        })),
-        ...(intentFile
-          ? [
-              {
-                id: `intent-${intentFile.name}-${intentFile.size}`,
-                name: intentFile.name,
-                file: intentFile,
-                field: "intent",
-              },
-            ]
-          : []),
-      ];
-      if (isEditOnly) {
-        if (!existingOriginalId) {
-          throw new Error("Missing original ID for metadata update.");
-        }
-        await updateOriginalMeta(existingOriginalId, {
-          title: title.value.trim(),
-          creator: creator.value.trim(),
-          notes: lyrics.trim(),
-          tempo: tempoMeta,
-          offsetMs,
-          timeSky: timeSkyMeta,
-          intentContract: intentContractEnabled ? intentContract : undefined,
-        });
-        toast({
-          title: "Details saved",
-          description: "Metadata updated for this noise album.",
-        });
-        void persistProjectMeta(tempoMeta, lyrics);
-        onUploaded?.({
-          trackId: existingOriginalId,
-          title: title.value.trim(),
-          creator: creator.value.trim(),
-          knowledgeProjectId: selectedProjectId,
-          knowledgeProjectName: selectedProject?.name?.trim(),
-          tempo: tempoMeta,
-          durationSeconds: estimateLoopDurationSeconds(tempoMeta ?? undefined),
-          publishedLyrics: lyrics.trim() || undefined,
-        });
-        onOpenChange(false);
-        return;
-      }
-      if (uploadQueue.length === 0) {
-        throw new Error("No audio files selected for upload.");
-      }
-      const uploadFiles: UploadFileProgress[] = uploadQueue.map((item) => ({
-        id: item.id,
-        name: item.name,
-        bytes: item.file.size,
-        loaded: 0,
-        pct: 0,
-        status: "queued",
-      }));
-      uploadFilesRef.current = uploadFiles;
-      const totalBytes = uploadFiles.reduce((sum, file) => sum + file.bytes, 0);
-      if (uploadFiles.length) {
-        setUploadProgress(uploadFiles);
-        setUploadTotalProgress({
-          loaded: 0,
-          total: totalBytes > 0 ? totalBytes : undefined,
-          pct: totalBytes > 0 ? 0 : undefined,
-        });
-      } else {
-        setUploadProgress(null);
-        setUploadTotalProgress(null);
-      }
-
-      const updateProgress = (
-        fileId: string,
-        loaded: number,
-        status?: UploadFileProgress["status"],
-        error?: string,
-      ) => {
-        const files = uploadFilesRef.current;
-        if (!files.length) return;
-        const next = files.map((file) => {
-          if (file.id !== fileId) return file;
-          const safeLoaded = Math.max(0, Math.min(file.bytes, loaded));
-          const pct = file.bytes > 0 ? safeLoaded / file.bytes : 1;
-          const resolvedStatus = status ?? file.status;
-          const nextStatus =
-            pct >= 1 && resolvedStatus === "uploading"
-              ? "processing"
-              : resolvedStatus;
-          return {
-            ...file,
-            loaded: safeLoaded,
-            pct,
-            status: nextStatus,
-            error,
-          };
-        });
-        uploadFilesRef.current = next;
-        setUploadProgress(next);
-        const loadedTotal = next.reduce((sum, file) => sum + file.loaded, 0);
-        setUploadTotalProgress({
-          loaded: loadedTotal,
-          total: totalBytes > 0 ? totalBytes : undefined,
-          pct: totalBytes > 0 ? Math.min(1, loadedTotal / totalBytes) : undefined,
-        });
-      };
       const existingOriginalId = prefill?.existingOriginalId?.trim();
       const trackIdForUpload = existingOriginalId || createUploadId();
       const timeSkyMeta = (() => {
@@ -1535,6 +1406,136 @@ export function UploadOriginalsModal({
           ...(notes ? { notes } : {}),
         } satisfies IntentContract;
       })();
+
+      const uploadQueue: UploadQueueItem[] = [
+        ...(stemSummary.mixEntry
+          ? [
+              {
+                id: stemSummary.mixEntry.id,
+                name: stemSummary.mixEntry.name,
+                file: stemSummary.mixEntry.file,
+                field: "instrumental" as const,
+              },
+            ]
+          : []),
+        ...(stemSummary.vocalEntry
+          ? [
+              {
+                id: stemSummary.vocalEntry.id,
+                name: stemSummary.vocalEntry.name,
+                file: stemSummary.vocalEntry.file,
+                field: "vocal" as const,
+              },
+            ]
+          : []),
+        ...stemSummary.stemUploads.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          file: entry.file,
+          field: "stems" as const,
+          category: entry.category,
+        })),
+        ...(intentFile
+          ? [
+              {
+                id: `intent-${intentFile.name}-${intentFile.size}`,
+                name: intentFile.name,
+                file: intentFile,
+                field: "intent" as const,
+              },
+            ]
+          : []),
+      ];
+      if (isEditOnly) {
+        if (!existingOriginalId) {
+          throw new Error("Missing original ID for metadata update.");
+        }
+        await updateOriginalMeta(existingOriginalId, {
+          title: title.value.trim(),
+          creator: creator.value.trim(),
+          notes: lyrics.trim(),
+          tempo: tempoMeta,
+          offsetMs,
+          timeSky: timeSkyMeta,
+          intentContract: intentContractEnabled ? intentContract : undefined,
+        });
+        toast({
+          title: "Details saved",
+          description: "Metadata updated for this noise album.",
+        });
+        void persistProjectMeta(tempoMeta, lyrics);
+        onUploaded?.({
+          trackId: existingOriginalId,
+          title: title.value.trim(),
+          creator: creator.value.trim(),
+          knowledgeProjectId: selectedProjectId,
+          knowledgeProjectName: selectedProject?.name?.trim(),
+          tempo: tempoMeta,
+          durationSeconds: estimateLoopDurationSeconds(tempoMeta ?? undefined),
+          publishedLyrics: lyrics.trim() || undefined,
+        });
+        onOpenChange(false);
+        return;
+      }
+      if (uploadQueue.length === 0) {
+        throw new Error("No audio files selected for upload.");
+      }
+      const uploadFiles: UploadFileProgress[] = uploadQueue.map((item) => ({
+        id: item.id,
+        name: item.name,
+        bytes: item.file.size,
+        loaded: 0,
+        pct: 0,
+        status: "queued",
+      }));
+      uploadFilesRef.current = uploadFiles;
+      const totalBytes = uploadFiles.reduce((sum, file) => sum + file.bytes, 0);
+      if (uploadFiles.length) {
+        setUploadProgress(uploadFiles);
+        setUploadTotalProgress({
+          loaded: 0,
+          total: totalBytes > 0 ? totalBytes : undefined,
+          pct: totalBytes > 0 ? 0 : undefined,
+        });
+      } else {
+        setUploadProgress(null);
+        setUploadTotalProgress(null);
+      }
+
+      const updateProgress = (
+        fileId: string,
+        loaded: number,
+        status?: UploadFileProgress["status"],
+        error?: string,
+      ) => {
+        const files = uploadFilesRef.current;
+        if (!files.length) return;
+        const next = files.map((file) => {
+          if (file.id !== fileId) return file;
+          const safeLoaded = Math.max(0, Math.min(file.bytes, loaded));
+          const pct = file.bytes > 0 ? safeLoaded / file.bytes : 1;
+          const resolvedStatus = status ?? file.status;
+          const nextStatus =
+            pct >= 1 && resolvedStatus === "uploading"
+              ? "processing"
+              : resolvedStatus;
+          return {
+            ...file,
+            loaded: safeLoaded,
+            pct,
+            status: nextStatus,
+            error,
+          };
+        });
+        uploadFilesRef.current = next;
+        setUploadProgress(next);
+        const loadedTotal = next.reduce((sum, file) => sum + file.loaded, 0);
+        setUploadTotalProgress({
+          loaded: loadedTotal,
+          total: totalBytes > 0 ? totalBytes : undefined,
+          pct: totalBytes > 0 ? Math.min(1, loadedTotal / totalBytes) : undefined,
+        });
+      };
       const appendSharedFields = (payload: FormData, trackId?: string) => {
         payload.append("title", title.value.trim());
         payload.append("creator", creator.value.trim());

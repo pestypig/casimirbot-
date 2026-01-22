@@ -1,8 +1,7 @@
 export {};
 
-declare const __APP_BUILD__: string;
-
 declare global {
+  const __APP_BUILD__: string;
   interface Window {
     WarpEngine?: any;
     setStrobingState?: (opts: { sectorCount: number; currentSector: number; split?: number }) => void;

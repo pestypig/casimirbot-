@@ -467,6 +467,8 @@ export interface EnergyPipelineState {
   U_geo: number;
   U_Q: number;
   U_cycle: number;
+  U_static_total?: number;
+  U_static_total_band?: { min: number; max: number };
   P_loss_raw: number;
   P_avg: number;
   M_exotic: number;

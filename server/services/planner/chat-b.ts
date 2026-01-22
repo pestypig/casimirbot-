@@ -36,6 +36,7 @@ import { composeKnowledgeAppendix } from "./knowledge-compositor";
 import { CASIMIR_PROMOTION_THRESHOLDS } from "../code-lattice/resonance.constants";
 import { startDebate, waitForDebateOutcome } from "../debate/orchestrator";
 import { summarizeConsoleTelemetry } from "../console-telemetry/summarize";
+import { resolveLocalRuntimeCaps } from "../llm/local-runtime";
 import {
   ensureGroundingReport,
   pushGroundingSource,
@@ -81,6 +82,19 @@ const DEFAULT_DEBATE_ATTACHMENTS = [
 ];
 const LOCAL_SPAWN_TOOL_NAME = "llm.local.spawn.generate";
 const AGENT_MAP_ENABLED = process.env.ENABLE_AGENT_MAP === "1";
+const resolveAppendixCaps = (maxSnippets: number, maxChars?: number) => {
+  const localRuntimeCaps = resolveLocalRuntimeCaps();
+  if (!localRuntimeCaps) {
+    return { maxSnippets, maxChars };
+  }
+  return {
+    maxSnippets: Math.min(maxSnippets, localRuntimeCaps.maxAppendixSnippets),
+    maxChars:
+      maxChars === undefined
+        ? localRuntimeCaps.maxAppendixChars
+        : Math.min(maxChars, localRuntimeCaps.maxAppendixChars),
+  };
+};
 
 const RESULT_SUMMARY_LIMIT = (() => {
   const fallback = 2000;
@@ -233,6 +247,69 @@ export type ExecutionResultFailure = ExecutionResultBase & { ok: false; output?:
 export type ExecutionResult = ExecutionResultSuccess | ExecutionResultFailure;
 
 const isFailedResult = (result: ExecutionResult): result is ExecutionResultFailure => result.ok === false;
+
+const TOOL_RETRY_MAX = (() => {
+  const raw = Number(process.env.AGI_TOOL_RETRY_MAX ?? 2);
+  if (!Number.isFinite(raw) || raw < 1) return 1;
+  return Math.min(Math.max(1, Math.floor(raw)), 3);
+})();
+const TOOL_RETRY_BASE_MS = (() => {
+  const raw = Number(process.env.AGI_TOOL_RETRY_BASE_MS ?? 200);
+  if (!Number.isFinite(raw) || raw < 0) return 0;
+  return Math.min(Math.max(0, Math.floor(raw)), 2000);
+})();
+const TOOL_RETRY_JITTER_MS = (() => {
+  const raw = Number(process.env.AGI_TOOL_RETRY_JITTER_MS ?? 120);
+  if (!Number.isFinite(raw) || raw < 0) return 0;
+  return Math.min(Math.max(0, Math.floor(raw)), 1000);
+})();
+
+const sleepMs = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+const normalizeRetryMessage = (value: unknown): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value.toLowerCase();
+  if (typeof value !== "object") return "";
+  const err = value as { message?: unknown; type?: unknown; code?: unknown; status?: unknown; name?: unknown };
+  return [
+    typeof err.message === "string" ? err.message : "",
+    typeof err.type === "string" ? err.type : "",
+    typeof err.code === "string" ? err.code : "",
+    typeof err.status === "number" ? String(err.status) : "",
+    typeof err.name === "string" ? err.name : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+};
+
+const isRetryableToolError = (error: unknown): boolean => {
+  const text = normalizeRetryMessage(error);
+  if (!text) return false;
+  return (
+    text.includes("timeout") ||
+    text.includes("timed out") ||
+    text.includes("etimedout") ||
+    text.includes("esockettimedout") ||
+    text.includes("econnrefused") ||
+    text.includes("eai_again") ||
+    text.includes("rate limit") ||
+    text.includes("rate_limited") ||
+    text.includes("429") ||
+    /(^|\\D)5\\d\\d(\\D|$)/.test(text) ||
+    text.includes("server error") ||
+    text.includes("network") ||
+    text.includes("socket")
+  );
+};
+
+const computeRetryDelayMs = (attempt: number): number => {
+  const base = TOOL_RETRY_BASE_MS;
+  if (base <= 0) return 0;
+  const jitter = TOOL_RETRY_JITTER_MS > 0 ? Math.floor(Math.random() * TOOL_RETRY_JITTER_MS) : 0;
+  return base * attempt + jitter;
+};
 
 export type ReasoningStrategy =
   | "deep_repo_research"
@@ -1688,10 +1765,12 @@ export function renderChatBPlannerPrompt(args: PlannerPromptArgs): string {
   }
 
   const knowledgeHeading = formatKnowledgeHeading("Knowledge Appendix", args.knowledgeHints);
+  const appendixCaps = resolveAppendixCaps(4);
   const appendix = composeKnowledgeAppendix({
     goal: args.goal,
     knowledgeContext: args.knowledgeContext,
-    maxSnippets: 4,
+    maxSnippets: appendixCaps.maxSnippets,
+    maxChars: appendixCaps.maxChars,
     heading: knowledgeHeading,
   });
   if (appendix.text) {
@@ -3075,12 +3154,13 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
           });
         }
         const appendixHeading = formatKnowledgeHeading("Attached knowledge", runtime.knowledgeHints);
+        const appendixCaps = resolveAppendixCaps(3, 1200);
         const appendix = composeKnowledgeAppendix({
           goal: runtime.goal,
           summary: summaryForPrompt,
           knowledgeContext: runtime.knowledgeContext,
-          maxChars: 1200,
-          maxSnippets: 3,
+          maxChars: appendixCaps.maxChars,
+          maxSnippets: appendixCaps.maxSnippets,
           heading: appendixHeading,
         });
         const debateNote = formatDebateNote(runtime.debateOutcome, runtime.debateId);
@@ -3234,38 +3314,56 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
         const paramsHash = hashPayload(input);
         let toolError: unknown;
         let essenceId: string | undefined;
+        let attempt = 0;
         try {
-          output = await tool.handler(input, toolContext);
-          essenceId = extractEssenceId(output);
-          if (step.tool === "debate.run" && output && typeof output === "object") {
-            const verdict = output as {
-              debateId?: string;
-              debate_id?: string;
-              verdict?: string;
-              confidence?: number;
-              key_turn_ids?: string[];
-              winning_role?: TDebateOutcome["winning_role"];
-              stop_reason?: string;
-              score?: number;
-              rounds?: number;
-              metrics?: TDebateRoundMetrics;
-            };
-            const debateOutcome: TDebateOutcome = {
-              debate_id: verdict.debate_id ?? verdict.debateId ?? runtime.debateId ?? step.id,
-              verdict: verdict.verdict ?? "unknown",
-              confidence: typeof verdict.confidence === "number" ? verdict.confidence : 0,
-              winning_role: verdict.winning_role,
-              key_turn_ids: verdict.key_turn_ids ?? [],
-              stop_reason: verdict.stop_reason,
-              score: typeof verdict.score === "number" ? verdict.score : 0,
-              rounds: typeof verdict.rounds === "number" ? Math.max(0, Math.floor(verdict.rounds)) : 0,
-              metrics: verdict.metrics,
-              created_at: new Date().toISOString(),
-            };
-            runtime.debateId = debateOutcome.debate_id;
-            runtime.debateOutcome = debateOutcome;
-            if (runtime.taskTrace) {
-              runtime.taskTrace.debate_id = debateOutcome.debate_id;
+          while (attempt < TOOL_RETRY_MAX) {
+            attempt += 1;
+            try {
+              output = await tool.handler(input, toolContext);
+              essenceId = extractEssenceId(output);
+              if (step.tool === "debate.run" && output && typeof output === "object") {
+                const verdict = output as {
+                  debateId?: string;
+                  debate_id?: string;
+                  verdict?: string;
+                  confidence?: number;
+                  key_turn_ids?: string[];
+                  winning_role?: TDebateOutcome["winning_role"];
+                  stop_reason?: string;
+                  score?: number;
+                  rounds?: number;
+                  metrics?: TDebateRoundMetrics;
+                };
+                const debateOutcome: TDebateOutcome = {
+                  debate_id: verdict.debate_id ?? verdict.debateId ?? runtime.debateId ?? step.id,
+                  verdict: verdict.verdict ?? "unknown",
+                  confidence: typeof verdict.confidence === "number" ? verdict.confidence : 0,
+                  winning_role: verdict.winning_role,
+                  key_turn_ids: verdict.key_turn_ids ?? [],
+                  stop_reason: verdict.stop_reason,
+                  score: typeof verdict.score === "number" ? verdict.score : 0,
+                  rounds: typeof verdict.rounds === "number" ? Math.max(0, Math.floor(verdict.rounds)) : 0,
+                  metrics: verdict.metrics,
+                  created_at: new Date().toISOString(),
+                };
+                runtime.debateId = debateOutcome.debate_id;
+                runtime.debateOutcome = debateOutcome;
+                if (runtime.taskTrace) {
+                  runtime.taskTrace.debate_id = debateOutcome.debate_id;
+                }
+              }
+              toolError = undefined;
+              break;
+            } catch (err) {
+              toolError = err;
+              const shouldRetry = attempt < TOOL_RETRY_MAX && isRetryableToolError(err);
+              if (!shouldRetry) {
+                throw err;
+              }
+              const delayMs = computeRetryDelayMs(attempt);
+              if (delayMs > 0) {
+                await sleepMs(delayMs);
+              }
             }
           }
         } catch (err) {
@@ -3495,12 +3593,13 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
               const summaryVal = lastCall.summaryRef ? outputs.get(lastCall.summaryRef) : undefined;
               const summaryText = formatSummaryForPrompt(summaryVal);
               const knowledgeHeading = formatKnowledgeHeading("Attached knowledge", runtime.knowledgeHints);
+              const appendixCaps = resolveAppendixCaps(3, 1200);
               const appendix = composeKnowledgeAppendix({
                 goal: runtime.goal,
                 summary: summaryText,
                 knowledgeContext: attachments,
-                maxChars: 1200,
-                maxSnippets: 3,
+                maxChars: appendixCaps.maxChars,
+                maxSnippets: appendixCaps.maxSnippets,
                 heading: knowledgeHeading,
               });
               const debateNote = formatDebateNote(runtime.debateOutcome, runtime.debateId);

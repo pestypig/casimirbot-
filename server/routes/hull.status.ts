@@ -2,6 +2,8 @@ import { Router } from "express";
 import { getQueueSnapshot } from "../queue";
 import { getGpuThermals } from "../services/hardware/gpu-scheduler";
 import { getToolLogs } from "../services/observability/tool-log-store";
+import { resolveLocalContextTokens } from "../services/llm/local-runtime";
+import { getLocalRuntimeStats } from "../services/llm/local-runtime-stats";
 import { getHullAllowList, hullModeEnabled, isHullAllowed } from "../security/hull-guard";
 
 type EndpointStatus = { url: string; allowed: boolean } | null;
@@ -41,6 +43,13 @@ hullStatusRouter.get("/", (_req, res) => {
     .reduce((sum, value) => sum + value, 0);
   const thermals = getGpuThermals();
   const kvBudget = Number(process.env.KV_BUDGET_BYTES ?? 0);
+  const localStats = getLocalRuntimeStats();
+  const hasContextEnv =
+    process.env.LLM_LOCAL_CONTEXT_TOKENS ||
+    process.env.LLM_LOCAL_CTX_TOKENS ||
+    process.env.LLM_LOCAL_CTX_SIZE ||
+    process.env.LLM_LOCAL_CONTEXT_SIZE;
+  const contextTokens = localStats?.contextTokens ?? (hasContextEnv ? resolveLocalContextTokens() : null);
 
   res.json({
     hull_mode: hullMode,
@@ -49,7 +58,10 @@ hullStatusRouter.get("/", (_req, res) => {
     llm_runtime: process.env.LLM_RUNTIME ?? null,
     llm_local: {
       base: process.env.LLM_LOCAL_BASE ?? null,
-      model: process.env.LLM_LOCAL_MODEL ?? null,
+      model: process.env.LLM_LOCAL_MODEL_PATH ?? process.env.LLM_LOCAL_MODEL ?? null,
+      lora: process.env.LLM_LOCAL_LORA_PATH ?? null,
+      context_tokens: contextTokens,
+      stats: localStats,
     },
     llm_http: describeEndpoint(process.env.LLM_HTTP_BASE),
     stt_http: describeEndpoint(process.env.WHISPER_HTTP_URL),

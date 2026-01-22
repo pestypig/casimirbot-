@@ -149,7 +149,8 @@ export const computeTimeDilationRenderPlan = (
   const hasLapseBrick = Boolean(lapseBrick);
   const reasons: string[] = [];
   const solverStatus = ui.solverStatus ?? "NOT_CERTIFIED";
-  const overrideUnstable = ui.exploratoryOverride && solverStatus !== "CERTIFIED";
+  const overrideUnstable =
+    Boolean(ui.exploratoryOverride) && solverStatus !== "CERTIFIED";
   const solverCertified = solverStatus === "CERTIFIED" || overrideUnstable;
   const grCertifiedForViz = ui.grCertified || overrideUnstable;
   const cinematicOverride = Boolean(ui.cinematicOverride);

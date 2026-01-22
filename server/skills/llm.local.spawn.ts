@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+﻿import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
@@ -8,14 +8,20 @@ import { putBlob } from "../storage";
 import { putEnvelopeWithPolicy } from "./provenance";
 import { beginLlMJob } from "../services/hardware/gpu-scheduler";
 import { llmLocalSpawnCalls, llmLocalSpawnLatency } from "../metrics";
+import { resolveLocalContextTokens } from "../services/llm/local-runtime";
+import { recordLocalRuntimeStats } from "../services/llm/local-runtime-stats";
 
 const DEFAULT_RPM = Math.max(1, Number(process.env.LLM_LOCAL_RPM ?? 60));
-const DEFAULT_MODEL = process.env.LLM_LOCAL_MODEL?.trim() || "./models/model.gguf";
+const DEFAULT_MODEL =
+  process.env.LLM_LOCAL_MODEL_PATH?.trim() ||
+  process.env.LLM_LOCAL_MODEL?.trim() ||
+  "./models/model.gguf";
 const DEFAULT_CMD = process.env.LLM_LOCAL_CMD?.trim() || "./llama";
 const DEFAULT_ARGS = parseArgs(process.env.LLM_LOCAL_ARGS_BASE ?? "");
 const DEFAULT_MAX_TOKENS = toPositiveInt(process.env.LLM_LOCAL_MAX_TOKENS, 512);
 const DEFAULT_TEMPERATURE = toNumber(process.env.LLM_LOCAL_TEMP, 0.2);
 const DEFAULT_SEED = toPositiveInt(process.env.LLM_LOCAL_SEED, 42);
+const DEFAULT_TIMEOUT_MS = toPositiveInt(process.env.LLM_LOCAL_SPAWN_TIMEOUT_MS, 60_000);
 const TOOL_NAME = "llm.local.spawn.generate";
 const TOOL_VERSION = process.env.LLM_LOCAL_SPAWN_VERSION?.trim() || "1.0.0";
 const TEXT_MIME = "text/plain";
@@ -64,13 +70,24 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   const sessionId = (ctx?.sessionId as string) || undefined;
   const prompt = parsed.prompt;
   const cmd = process.env.LLM_LOCAL_CMD?.trim() || DEFAULT_CMD;
-  const model = process.env.LLM_LOCAL_MODEL?.trim() || DEFAULT_MODEL;
+  const model =
+    process.env.LLM_LOCAL_MODEL_PATH?.trim() ||
+    process.env.LLM_LOCAL_MODEL?.trim() ||
+    DEFAULT_MODEL;
+  const loraPath = process.env.LLM_LOCAL_LORA_PATH?.trim() || "";
+  const loraScale = clampLoraScale(toNumber(process.env.LLM_LOCAL_LORA_SCALE, 1));
   const baseArgs = parseArgs(process.env.LLM_LOCAL_ARGS_BASE ?? "") ?? DEFAULT_ARGS;
-  const maxTokens = clampTokens(parsed.max_tokens ?? toPositiveInt(process.env.LLM_LOCAL_MAX_TOKENS, DEFAULT_MAX_TOKENS));
+  const promptTokens = countTokens(prompt);
+  const contextTokens = resolveLocalContextTokens();
+  const maxTokensRequested = clampTokens(
+    parsed.max_tokens ?? toPositiveInt(process.env.LLM_LOCAL_MAX_TOKENS, DEFAULT_MAX_TOKENS),
+  );
+  const maxTokens = clampCompletionTokens(maxTokensRequested, promptTokens, contextTokens);
   const temperature = clampTemperature(
     parsed.temperature ?? toNumber(process.env.LLM_LOCAL_TEMP, DEFAULT_TEMPERATURE),
   );
   const seed = parsed.seed ?? toPositiveInt(process.env.LLM_LOCAL_SEED, DEFAULT_SEED);
+  const timeoutMs = toPositiveInt(process.env.LLM_LOCAL_SPAWN_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
   const started = Date.now();
   llmLocalSpawnCalls.inc();
   const startedAt = new Date(started).toISOString();
@@ -79,14 +96,26 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     model,
     prompt,
     maxTokens,
+    contextTokens,
     temperature,
     seed,
     stop: parsed.stop,
+    loraPath,
+    loraScale,
   });
   const promptHash = sha256(Buffer.from(prompt, "utf8"));
   let outputText = "";
   const stderr: string[] = [];
   const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    try {
+      child.kill();
+    } catch {
+      // Ignore failures on teardown.
+    }
+  }, timeoutMs);
   child.stdout.setEncoding("utf8");
   child.stdout.on("data", (chunk: string) => {
     outputText += chunk;
@@ -99,18 +128,39 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     await new Promise<void>((resolve, reject) => {
       child.on("error", reject);
       child.on("close", (code) => {
-        if (code === 0) {
+        if (code === 0 && !timedOut) {
           resolve();
         } else {
-          reject(new Error(`llm spawn exit ${code}: ${stderr.join("").trim()}`));
+          const reason = timedOut
+            ? `llm spawn timeout after ${timeoutMs}ms`
+            : `llm spawn exit ${code}: ${stderr.join("").trim()}`;
+          reject(new Error(reason));
         }
       });
     });
   } catch (err) {
+    clearTimeout(timeout);
+    const memory = process.memoryUsage();
+    recordLocalRuntimeStats({
+      ts: new Date().toISOString(),
+      durationMs: Date.now() - started,
+      promptTokens,
+      completionTokens: 0,
+      totalTokens: promptTokens,
+      maxTokens,
+      contextTokens,
+      memory: {
+        rssBytes: memory.rss,
+        heapUsedBytes: memory.heapUsed,
+        heapTotalBytes: memory.heapTotal,
+        externalBytes: memory.external,
+        arrayBuffersBytes: memory.arrayBuffers,
+      },
+    });
     appendToolLog({
       tool: TOOL_NAME,
       version: TOOL_VERSION,
-      paramsHash: hashPayload({ prompt, maxTokens, temperature, seed, cmd, args }),
+      paramsHash: hashPayload({ prompt, maxTokens, contextTokens, temperature, seed, cmd, args, loraPath }),
       promptHash,
       durationMs: Date.now() - started,
       sessionId,
@@ -124,10 +174,27 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     release();
   }
 
+  clearTimeout(timeout);
   const trimmedOutput = outputText.trim();
-  const promptTokens = countTokens(prompt);
   const completionTokens = countTokens(trimmedOutput);
   const totalTokens = promptTokens + completionTokens;
+  const memory = process.memoryUsage();
+  recordLocalRuntimeStats({
+    ts: new Date().toISOString(),
+    durationMs: Date.now() - started,
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    maxTokens,
+    contextTokens,
+    memory: {
+      rssBytes: memory.rss,
+      heapUsedBytes: memory.heapUsed,
+      heapTotalBytes: memory.heapTotal,
+      externalBytes: memory.external,
+      arrayBuffersBytes: memory.arrayBuffers,
+    },
+  });
   const buffer = Buffer.from(trimmedOutput, "utf8");
   const blob = await putBlob(buffer, { contentType: TEXT_MIME });
   const textHash = sha256(buffer);
@@ -172,9 +239,12 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
           params: {
             model,
             max_tokens: maxTokens,
+            context_tokens: contextTokens,
             temperature,
             seed,
             stop: parsed.stop,
+            lora_path: loraPath || undefined,
+            lora_scale: loraPath ? loraScale : undefined,
             metadata: parsed.metadata,
           },
           seed: String(seed),
@@ -196,14 +266,20 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   appendToolLog({
     tool: TOOL_NAME,
     version: TOOL_VERSION,
-    paramsHash: hashPayload({ prompt, maxTokens, temperature, seed, cmd, args }),
+    paramsHash: hashPayload({ prompt, maxTokens, contextTokens, temperature, seed, cmd, args, loraPath }),
     promptHash,
     durationMs,
     sessionId,
     ok: true,
     essenceId,
     seed,
-    text: `✓ local spawn model=${model} tok<=${maxTokens}`,
+    text: formatLogText({
+      model,
+      maxTokens,
+      contextTokens,
+      loraPath,
+      memoryRssBytes: memory.rss,
+    }),
   });
 
   return GenerateOutput.parse({
@@ -223,15 +299,32 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
 
 function buildArgs(
   baseArgs: string[],
-  opts: { model: string; prompt: string; maxTokens: number; temperature: number; seed: number; stop?: unknown },
+  opts: {
+    model: string;
+    prompt: string;
+    maxTokens: number;
+    contextTokens: number;
+    temperature: number;
+    seed: number;
+    stop?: unknown;
+    loraPath?: string;
+    loraScale?: number;
+  },
 ): string[] {
   const args = [...baseArgs];
   args.push("-m", opts.model);
   args.push("-p", opts.prompt);
   args.push("-n", String(opts.maxTokens));
+  args.push("--ctx-size", String(opts.contextTokens));
   args.push("--temp", String(opts.temperature));
   args.push("--seed", String(opts.seed));
-  args.push("--no-color");
+  args.push("--simple-io");
+  if (opts.loraPath) {
+    args.push("--lora", opts.loraPath);
+    if (typeof opts.loraScale === "number" && Number.isFinite(opts.loraScale)) {
+      args.push("--lora-scale", String(opts.loraScale));
+    }
+  }
   if (Array.isArray(opts.stop)) {
     opts.stop.filter(Boolean).forEach((stop) => {
       args.push("--stop", String(stop));
@@ -260,9 +353,24 @@ function clampTokens(value: number): number {
   return Math.min(Math.round(value), 8_192);
 }
 
+function clampCompletionTokens(value: number, promptTokens: number, contextTokens: number): number {
+  const available = Math.max(0, contextTokens - promptTokens);
+  if (available <= 0) {
+    return 1;
+  }
+  return Math.min(Math.max(1, Math.floor(value)), available);
+}
+
 function clampTemperature(value: number): number {
   if (!Number.isFinite(value)) {
     return DEFAULT_TEMPERATURE;
+  }
+  return Math.min(Math.max(value, 0), 2);
+}
+
+function clampLoraScale(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 1;
   }
   return Math.min(Math.max(value, 0), 2);
 }
@@ -308,6 +416,31 @@ const hashPayload = (payload: unknown): string => {
   }
 };
 
+const formatLogText = (input: {
+  model: string;
+  maxTokens: number;
+  contextTokens: number;
+  loraPath?: string;
+  memoryRssBytes: number;
+}): string => {
+  const parts = [
+    "ok",
+    `model=${input.model}`,
+    `ctx=${input.contextTokens}`,
+    `tok<=${input.maxTokens}`,
+    `rss=${formatBytes(input.memoryRssBytes)}`,
+  ];
+  if (input.loraPath) {
+    parts.push(`lora=${input.loraPath}`);
+  }
+  return parts.join(" ");
+};
+
+const formatBytes = (bytes: number): string => {
+  const mb = Math.round(bytes / (1024 * 1024));
+  return `${mb}MB`;
+};
+
 const serializeError = (err: unknown): string => {
   if (err instanceof Error) {
     return err.message || err.name;
@@ -321,3 +454,4 @@ const serializeError = (err: unknown): string => {
     return String(err);
   }
 };
+

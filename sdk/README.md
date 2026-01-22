@@ -109,6 +109,13 @@ Auth + tenant isolation
 - Provide `token` and `tenantId` in the client options.
 - The SDK sets `Authorization: Bearer ...` and `X-Tenant-Id` headers.
 
+Source layout
+- `sdk/src/index.ts` re-exports the public SDK surface.
+- `sdk/src/client.ts` implements the HTTP client and adapter calls.
+- `sdk/src/runtime.ts` hosts the runtime telemetry helpers.
+- `sdk/src/types.ts` defines SDK request/response types.
+- `sdk/tsconfig.json` and `sdk/package.json` configure build + packaging.
+
 Build
 ```
 cd sdk

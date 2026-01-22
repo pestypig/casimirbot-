@@ -83,21 +83,21 @@ const makeDerivedNumber = (
 });
 
 const resolveHullDims = (state: EnergyPipelineState) => {
-  const hull = state.hull ?? {};
+  const hull = state.hull;
   const Lx = resolveNumber([
-    { value: hull.Lx_m, source: "hull.Lx_m" },
+    { value: hull?.Lx_m, source: "hull.Lx_m" },
     { value: (state as any).Lx_m, source: "state.Lx_m", proxy: true },
   ]);
   const Ly = resolveNumber([
-    { value: hull.Ly_m, source: "hull.Ly_m" },
+    { value: hull?.Ly_m, source: "hull.Ly_m" },
     { value: (state as any).Ly_m, source: "state.Ly_m", proxy: true },
   ]);
   const Lz = resolveNumber([
-    { value: hull.Lz_m, source: "hull.Lz_m" },
+    { value: hull?.Lz_m, source: "hull.Lz_m" },
     { value: (state as any).Lz_m, source: "state.Lz_m", proxy: true },
   ]);
   const wall = resolveNumber([
-    { value: hull.wallThickness_m, source: "hull.wallThickness_m" },
+    { value: hull?.wallThickness_m, source: "hull.wallThickness_m" },
     { value: (state as any).wallThickness_m, source: "state.wallThickness_m", proxy: true },
   ]);
   return { Lx, Ly, Lz, wall };

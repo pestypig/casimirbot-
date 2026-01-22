@@ -47,7 +47,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "societal-view",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/core-shape",
@@ -60,7 +60,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "core-shape",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/core-floor",
@@ -73,7 +73,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "core-floor",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/core-ladder",
@@ -86,7 +86,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "core-ladder",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/core-roof",
@@ -99,7 +99,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "core-roof",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/floor",
@@ -111,7 +111,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "floor",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/ladder",
@@ -123,7 +123,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "ladder",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/roof",
@@ -135,7 +135,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "roof",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/sangha-architecture",
@@ -146,7 +146,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "sangha-architecture",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/no-bypass",
@@ -157,7 +157,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "no-bypass",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/inner-spark",
@@ -168,7 +168,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "inner-spark",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/solitude-to-signal",
@@ -179,7 +179,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "solitude-to-signal",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/lifecycle",
@@ -190,7 +190,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "citizen-arc",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/reconciliation",
@@ -202,7 +202,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "reconciliation",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/failure-modes",
@@ -213,7 +213,176 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "failure-modes",
-    formats: ["png"]
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/civic-signal-loop",
+    title: "Civic signal loop",
+    summary: "Survey signals translated into lawful, accountable action.",
+    body:
+      "Use the three tenets loop to map community signals to policy moves with data dignity and review triggers.",
+    tags: ["citizens-arc", "survey", "policy", "three-tenets-loop"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "civic-signal-loop",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/lawful-interface-protocol",
+    title: "Lawful interface protocol",
+    summary: "Checklist for lawful, accountable civic interfaces with enforcement.",
+    body:
+      "Publish boundaries, require dual-key approval, provide safe reporting, enforce non-harm standards, and audit incentives.",
+    tags: ["citizens-arc", "lawful", "oversight", "accountability"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "lawful-interface-protocol",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/public-safety-spine",
+    title: "Public safety governance spine",
+    summary: "Pack-ready bridges for lawful, harm-reducing enforcement.",
+    body:
+      "A compact governance spine that keeps enforcement lawful, transparent, and grounded in harm reduction.",
+    tags: ["citizens-arc", "public-safety", "governance", "oversight"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "public-safety-spine",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/warp-ambition-spine",
+    title: "Warp ambition spine",
+    summary: "Civic floor to warp horizon, translated for public and technical audiences.",
+    body:
+      "Anchors warp ambition to a stable civic floor, reality-paced discovery, and constraint-honest verification.",
+    tags: ["citizens-arc", "warp", "ambition", "research"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "warp-ambition-spine",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/federal-civic-listening-circuit",
+    title: "Federal civic listening circuit",
+    summary: "Scheduled local input loops that keep policy grounded.",
+    body:
+      "Fixed listening cycles with response ledgers so federal policy reflects local realities.",
+    tags: ["citizens-arc", "listening", "civic-memory", "right-speech"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "federal-civic-listening-circuit",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/metric-integrity-guardrail",
+    title: "Metric integrity guardrail",
+    summary: "Replace quota logic with harm-reduction metrics.",
+    body:
+      "Metric registers and review triggers that block quota-driven capture.",
+    tags: ["citizens-arc", "metrics", "integrity", "capture-resistance"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "metric-integrity-guardrail",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/harm-weighted-priority-standard",
+    title: "Harm-weighted priority standard",
+    summary: "Prioritize credible harm with due process and independent review.",
+    body:
+      "A public standard for prioritization with audit and appeal loops.",
+    tags: ["citizens-arc", "non-harm", "priority", "due-process"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "harm-weighted-priority-standard",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/integration-ladder",
+    title: "Integration ladder",
+    summary: "Lawful on-ramp for long-term integrated residents.",
+    body:
+      "Convert long-term integration into legal status with clear criteria, timelines, and audits.",
+    tags: ["citizens-arc", "integration", "repair", "due-process"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "integration-ladder",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/local-stability-compact",
+    title: "Local stability compact",
+    summary: "Mitigate enforcement shocks to local economies.",
+    body:
+      "Requires impact statements and mitigation plans to avoid staffing or small-business disruption.",
+    tags: ["citizens-arc", "stability", "economy", "interbeing"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "local-stability-compact",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/access-to-counsel-pathway",
+    title: "Access-to-counsel pathway",
+    summary: "Ensure rights are usable with counsel and language access.",
+    body:
+      "Counsel access, referral SLAs, and language coverage for due process.",
+    tags: ["citizens-arc", "counsel", "rights", "integrity"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "access-to-counsel-pathway",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/training-certification-gate",
+    title: "Training and certification gate",
+    summary: "Safety doctrine enforced through training and renewal.",
+    body:
+      "Certification registers with renewal cycles and incident-linked reviews.",
+    tags: ["citizens-arc", "training", "safety", "verification"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "training-certification-gate",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/anti-mutation",
+    title: "Anti-mutation addendum",
+    summary: "Mechanisms that keep selection from hardening into status.",
+    body:
+      "Sortition oversight, rotating authority, power decomposition, exit rights, and cultural immunology keep trials from becoming a caste system.",
+    tags: ["citizens-arc", "anti-mutation", "governance", "selection"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "anti-mutation",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "citizens-arc/stress-test",
+    title: "Stress test register",
+    summary: "Attack packets mapped to civic countermeasures.",
+    body:
+      "Charismatic optimizers, caregiver exodus, audit coups, border koans, and crisis velocity failures must have named counters and reversal triggers.",
+    tags: ["citizens-arc", "stress-test", "risk", "resilience"],
+    panelId: "mission-ethos",
+    nodeId: "citizens-arc",
+    exportKind: "pill",
+    exportTargetId: "stress-test",
+    formats: ["png", "svg"]
   },
   {
     id: "citizens-arc/big-picture",
@@ -225,7 +394,7 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     nodeId: "citizens-arc",
     exportKind: "pill",
     exportTargetId: "big-picture",
-    formats: ["png"]
+    formats: ["png", "svg"]
   },
   {
     id: "ideology/mission-ethos",
@@ -246,6 +415,28 @@ export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
     tags: ["systems", "interdependence", "coherence"],
     panelId: "mission-ethos",
     nodeId: "interbeing-systems",
+    exportKind: "node-card",
+    formats: ["json", "md"]
+  },
+  {
+    id: "ideology/scarcity-justice",
+    title: "Scarcity Justice",
+    summary:
+      "Fairness under scarcity is a legitimacy engine when restoration is uneven.",
+    tags: ["scarcity", "justice", "allocation"],
+    panelId: "mission-ethos",
+    nodeId: "scarcity-justice",
+    exportKind: "node-card",
+    formats: ["json", "md"]
+  },
+  {
+    id: "ideology/three-tenets-loop",
+    title: "Three Tenets Loop",
+    summary:
+      "Not-knowing, bearing witness, taking action: a governance cycle that learns in public.",
+    tags: ["three-tenets", "governance", "feedback"],
+    panelId: "mission-ethos",
+    nodeId: "three-tenets-loop",
     exportKind: "node-card",
     formats: ["json", "md"]
   },

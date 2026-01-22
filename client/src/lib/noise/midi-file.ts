@@ -150,7 +150,10 @@ export const parseMidiFile = (
     0,
   );
   const bpm = tempoMicro > 0 ? Math.round(60000000 / tempoMicro) : undefined;
-  const timeSig = timeSigNum && timeSigDen ? `${timeSigNum}/${timeSigDen}` : undefined;
+  const timeSig =
+    timeSigNum && timeSigDen
+      ? (`${timeSigNum}/${timeSigDen}` as MidiMotif["timeSig"])
+      : undefined;
   const beatsPerBar = timeSigNum || 4;
   const bars = totalBeats > 0 ? Math.max(1, Math.ceil(totalBeats / beatsPerBar)) : undefined;
 

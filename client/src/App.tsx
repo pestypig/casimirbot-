@@ -25,6 +25,9 @@ import CodeAdminPage from "@/pages/code-admin";
 import DesktopPage from "@/pages/desktop";
 import SignInPage from "@/pages/sign-in";
 import StarHydrostaticPanel from "@/pages/star-hydrostatic-panel";
+import IdeologyRenderPage from "@/pages/ideology-render";
+import EssenceRenderPage from "@/pages/essence-render";
+import AgiRefineryDashboard from "@/pages/agi-refinery";
 import { useQiStream } from "@/hooks/useQiStream";
 import { LumaWhispersProvider } from "@/lib/luma-whispers";
 import MobileStartPage from "@/pages/mobile-start";
@@ -152,6 +155,9 @@ function Router() {
       <Route path="/code-admin" component={CodeAdminPage} />
       <Route path="/desktop" component={DesktopRoute} />
       <Route path="/sign-in" component={SignInPage} />
+      <Route path="/ideology-render" component={IdeologyRenderPage} />
+      <Route path="/essence-render" component={EssenceRenderPage} />
+      <Route path="/agi-refinery" component={AgiRefineryDashboard} />
       <Route path="/why" component={Why} />
       <Route path="/star-hydrostatic" component={StarHydrostaticPanel} />
       <Route path="/station/:role" component={StationPage} />

@@ -6,7 +6,7 @@ Example:
     python scripts/merge_lora.py \
         --base-model mistralai/Mistral-7B-Instruct-v0.3 \
         --lora-path checkpoints/lora-math-sft \
-        --output-dir artifacts/mistral7b-math-merged
+        --output-dir artifacts/mistral7b-math-merged  # or $AGI_ARTIFACTS_DIR/...
 """
 from __future__ import annotations
 

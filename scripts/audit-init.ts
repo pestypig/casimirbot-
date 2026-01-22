@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { resolveArtifactsPath } from "./agi-artifacts";
 
 type StepResult = {
   label: string;
@@ -78,6 +79,7 @@ const main = async () => {
   results.push(await runStep("reports:ci", ["run", "reports:ci"]));
 
   if (isTruthy(process.env.CI) && hasAdapterEnv()) {
+    const traceOut = resolveArtifactsPath("training-trace.jsonl");
     results.push(
       await runStep("casimir:verify", [
         "run",
@@ -85,7 +87,7 @@ const main = async () => {
         "--",
         "--ci",
         "--trace-out",
-        "artifacts/training-trace.jsonl",
+        traceOut,
       ]),
     );
   } else {

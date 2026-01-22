@@ -17,6 +17,7 @@ import type {
   NoiseFieldLoopRequest,
   NoiseFieldLoopResponse,
   IntentContract,
+  TempoMeta,
 } from "@/types/noise-gens";
 
 const BASE = "/api/noise-gens";

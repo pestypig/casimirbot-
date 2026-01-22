@@ -59,6 +59,9 @@ export interface PanelDefinition {
   skipTaskbar?: boolean;
   alwaysOnTop?: boolean;
   noMinimize?: boolean;
+  keywords?: string[];
+  mobileReady?: boolean;
+  heavy?: boolean;
   telemetryKind?: string;
   collectTelemetry?: PanelTelemetryCollector;
 }

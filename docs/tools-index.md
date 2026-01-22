@@ -1,0 +1,52 @@
+# Tools Index
+
+Coverage inventory for this surface. Update when files move or are added.
+
+Files
+- `tools/__tests__/liveSnapshot.spec.ts`
+- `tools/__tests__/physicsContext.spec.ts`
+- `tools/__tests__/warpViability.spec.ts`
+- `tools/agentic/collapse.ts`
+- `tools/agentic/run.ts`
+- `tools/collapse-benchmark-runner.ts`
+- `tools/eval_sweep.py`
+- `tools/generate-tokenizer-canary.ts`
+- `tools/gr_assistant/__init__.py`
+- `tools/gr_assistant/cas.py`
+- `tools/gr_assistant/checks.py`
+- `tools/gr_assistant/dataset.py`
+- `tools/gr_assistant/eval.py`
+- `tools/gr_assistant/orchestrator.py`
+- `tools/gr_assistant/schemas.py`
+- `tools/gr_assistant/server.py`
+- `tools/gr_assistant/tests/test_metrics.py`
+- `tools/gr_assistant/units.py`
+- `tools/hek_movie_export.py`
+- `tools/liveSnapshot.ts`
+- `tools/needle-ipeak-worksheet.ts`
+- `tools/needle_ipeak_candidates.py`
+- `tools/needle_ipeak_fill.py`
+- `tools/needle_ipeak_preview.py`
+- `tools/needle_ipeak_template.py`
+- `tools/physicsContext.ts`
+- `tools/physicsValidation.ts`
+- `tools/pulsed-power-calculator.ts`
+- `tools/remove_bg_edges.py`
+- `tools/robustness-runner.ts`
+- `tools/run_eval.py`
+- `tools/scaffold-hello-verifier/template/.github/workflows/hello-verifier.yml`
+- `tools/scaffold-hello-verifier/template/adapter-request.json`
+- `tools/scaffold-hello-verifier/template/package.json`
+- `tools/sunpy_bridge.py`
+- `tools/sunpy_hek_query.py`
+- `tools/test-fixed-mass-budget.ts`
+- `tools/test-needle-hull-scale.ts`
+- `tools/tokamak-added-value-report.ts`
+- `tools/tokamak-precursor-runner.ts`
+- `tools/tokenizer-verify.ts`
+- `tools/validate-phase-diagram.ts`
+- `tools/verifier_math.py`
+- `tools/verifyCertificate.ts`
+- `tools/wallet-agent.ts`
+- `tools/warpViability.ts`
+- `tools/warpViabilityCertificate.ts`

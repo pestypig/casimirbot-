@@ -27,6 +27,7 @@ import { shallow } from "zustand/shallow";
 import { VolumeModeToggle, type VolumeViz } from "@/components/VolumeModeToggle";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { Hull3DRenderer, Hull3DRendererMode, Hull3DSkyboxMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState, HullGeometryMode, HullGateSource, Hull3DVolumeDomain, type HullPreviewMeshPayload } from "./Hull3DRenderer.ts";
+import { Hull3DWebGPUPathTracer } from "@/lib/webgpu/hull-pathtracer";
 import { CurvatureVoxProvider, DEFAULT_FLUX_CHANNEL, DEFAULT_T00_CHANNEL } from "./CurvatureVoxProvider";
 import { smoothSectorWeights } from "@/lib/sector-weights";
 import { TheoryBadge } from "./common/TheoryBadge";
@@ -1063,6 +1064,7 @@ export default function AlcubierrePanel({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGL2RenderingContext|null>(null);
   const hullRendererRef = useRef<Hull3DRenderer | null>(null);
+  const hullWebGpuRef = useRef<Hull3DWebGPUPathTracer | null>(null);
   const hullStateRef = useRef<Hull3DRendererState | null>(null);
   const hullConfigRef = useRef<{ mode: Hull3DRendererMode; blend: number }>({
     mode: DEFAULT_HULL_MODE,
@@ -5594,91 +5596,22 @@ const res = 256;
         hullRendererRef.current.dispose();
         hullRendererRef.current = null;
       }
+      if (hullWebGpuRef.current) {
+        hullWebGpuRef.current.dispose();
+        hullWebGpuRef.current = null;
+      }
       return;
     }
     const cv = canvasRef.current;
     if (!cv) return;
-    const gl = cv.getContext("webgl2", { antialias: true, preserveDrawingBuffer: true });
-    if (!gl) {
-      setGlError("WebGL2 unavailable in this browser.");
-      return;
-    }
-    glRef.current = gl;
-    setGlError(null);
-
-    const onLost = (event: Event) => {
-      try {
-        (event as any).preventDefault?.();
-      } catch {}
-      console.warn("[Alcubierre][Hull3D] WebGL context lost", event);
-      setGlError("WebGL context lost â€“ attempting restore.");
-      try {
-        hullRendererRef.current?.dispose();
-      } catch {}
-      hullRendererRef.current = null;
-    };
-
-    const recreateRenderer = () => {
-      try {
-        hullRendererRef.current?.dispose();
-      } catch {}
-      const next = new Hull3DRenderer(gl, cv, {
-        quality: hullQuality,
-        qualityOverrides: hullQualityOverridesRef.current,
-        emaAlpha: 0.12,
-      });
-      const config = hullConfigRef.current;
-      next.setMode(config.mode, config.blend);
-      next.setQuality(hullQuality, hullQualityOverridesRef.current);
-      hullRendererRef.current = next;
-    };
-
-    const onRestored = () => {
-      console.warn("[Alcubierre][Hull3D] WebGL context restored â€“ recreating renderer");
-      try {
-        setGlError(null);
-        recreateRenderer();
-      } catch (err) {
-        console.error("[Alcubierre][Hull3D] Failed to recreate renderer after context restore", err);
-        setGlError("WebGL context restored but Hull3D renderer failed to reinitialize.");
-      }
-    };
-
-    cv.addEventListener("webglcontextlost", onLost as any, { passive: false } as any);
-    cv.addEventListener("webglcontextrestored", onRestored as any);
-
-    recreateRenderer();
-
-    if (!hullRendererRef.current) {
-      setGlError("Failed to initialize Hull3D renderer.");
-      return () => {
-        cv.removeEventListener("webglcontextlost", onLost as any);
-        cv.removeEventListener("webglcontextrestored", onRestored as any);
-      };
-    }
-
-    const resize = () => {
-      const rect = cv.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, READABILITY_DPR_MAX);
-      const w = Math.max(640, Math.floor(rect.width * dpr));
-      const h = Math.max(360, Math.floor(rect.height * dpr));
-      cv.width = w;
-      cv.height = h;
-      const overlayCanvas = overlayCanvasRef.current;
-      if (overlayCanvas) {
-        overlayCanvas.width = w;
-        overlayCanvas.height = h;
-      }
-      gl.viewport(0, 0, w, h);
-      setAspect(w / Math.max(1, h));
-    };
-
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(cv);
-
-    // Local diagnostic polling helpers for Hull 3D renderer
+    let disposed = false;
+    let usingWebGpu = false;
+    let gl: WebGL2RenderingContext | null = null;
+    let ro: ResizeObserver | null = null;
     let diagTimer: number | null = null;
+    let onLost: ((event: Event) => void) | null = null;
+    let onRestored: (() => void) | null = null;
+
     const startDiagPoll = () => {
       if (diagTimer) return;
       diagTimer = window.setInterval(() => {
@@ -5697,27 +5630,156 @@ const res = 256;
       }
     };
 
-    let disposed = false;
+    const cleanupWebGl = () => {
+      if (onLost) cv.removeEventListener("webglcontextlost", onLost as any);
+      if (onRestored) cv.removeEventListener("webglcontextrestored", onRestored as any);
+      try {
+        hullRendererRef.current?.dispose();
+      } catch {}
+      hullRendererRef.current = null;
+    };
+
+    const initWebGl = () => {
+      gl = cv.getContext("webgl2", { antialias: true, preserveDrawingBuffer: true });
+      if (!gl) {
+        setGlError("WebGL2 unavailable in this browser.");
+        return false;
+      }
+      glRef.current = gl;
+      setGlError(null);
+
+      onLost = (event: Event) => {
+        try {
+          (event as any).preventDefault?.();
+        } catch {}
+        console.warn("[Alcubierre][Hull3D] WebGL context lost", event);
+        setGlError("WebGL context lost - attempting restore.");
+        try {
+          hullRendererRef.current?.dispose();
+        } catch {}
+        hullRendererRef.current = null;
+      };
+
+      const recreateRenderer = () => {
+        try {
+          hullRendererRef.current?.dispose();
+        } catch {}
+        const next = new Hull3DRenderer(gl!, cv, {
+          quality: hullQuality,
+          qualityOverrides: hullQualityOverridesRef.current,
+          emaAlpha: 0.12,
+        });
+        const config = hullConfigRef.current;
+        next.setMode(config.mode, config.blend);
+        next.setQuality(hullQuality, hullQualityOverridesRef.current);
+        hullRendererRef.current = next;
+      };
+
+      onRestored = () => {
+        console.warn("[Alcubierre][Hull3D] WebGL context restored - recreating renderer");
+        try {
+          setGlError(null);
+          recreateRenderer();
+        } catch (err) {
+          console.error("[Alcubierre][Hull3D] Failed to recreate renderer after context restore", err);
+          setGlError("WebGL context restored but Hull3D renderer failed to reinitialize.");
+        }
+      };
+
+      cv.addEventListener("webglcontextlost", onLost as any, { passive: false } as any);
+      cv.addEventListener("webglcontextrestored", onRestored as any);
+      recreateRenderer();
+
+      if (!hullRendererRef.current) {
+        setGlError("Failed to initialize Hull3D renderer.");
+        cleanupWebGl();
+        return false;
+      }
+      return true;
+    };
+
+    const initWebGpu = async () => {
+      if (!(navigator as any).gpu) return false;
+      try {
+        hullWebGpuRef.current?.dispose();
+        const renderer = new Hull3DWebGPUPathTracer(cv);
+        await renderer.init();
+        hullWebGpuRef.current = renderer;
+        hullRendererRef.current?.dispose();
+        hullRendererRef.current = null;
+        glRef.current = null;
+        setHullDiagMsg(null);
+        setGlError(null);
+        return true;
+      } catch (err) {
+        console.warn("[Alcubierre][Hull3D] WebGPU init failed, falling back to WebGL", err);
+        try {
+          hullWebGpuRef.current?.dispose();
+        } catch {}
+        hullWebGpuRef.current = null;
+        return false;
+      }
+    };
+
+    const resize = () => {
+      const rect = cv.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, READABILITY_DPR_MAX);
+      const w = Math.max(640, Math.floor(rect.width * dpr));
+      const h = Math.max(360, Math.floor(rect.height * dpr));
+      cv.width = w;
+      cv.height = h;
+      const overlayCanvas = overlayCanvasRef.current;
+      if (overlayCanvas) {
+        overlayCanvas.width = w;
+        overlayCanvas.height = h;
+      }
+      if (usingWebGpu) {
+        hullWebGpuRef.current?.resize(w, h);
+      } else if (gl) {
+        gl.viewport(0, 0, w, h);
+      }
+      setAspect(w / Math.max(1, h));
+    };
+
     const loop = () => {
       if (disposed || planarVizMode !== 3) return;
       const base = hullStateRef.current;
-      const active = hullRendererRef.current;
-      if (base && active) {
+      if (base) {
         const config = hullConfigRef.current;
-        active.setMode(config.mode, config.blend);
-        active.update({
-          ...base,
-          blendFactor: config.blend,
-          timeSec: performance.now() / 1000,
-        });
-        active.draw();
-        // Begin polling diagnostics once renderer has drawn at least one frame
-        startDiagPoll();
+        if (usingWebGpu) {
+          hullWebGpuRef.current?.update({ ...base, blendFactor: config.blend, timeSec: performance.now() / 1000 });
+          hullWebGpuRef.current?.draw();
+        } else {
+          const active = hullRendererRef.current;
+          if (active) {
+            active.setMode(config.mode, config.blend);
+            active.update({ ...base, blendFactor: config.blend, timeSec: performance.now() / 1000 });
+            active.draw();
+            startDiagPoll();
+          }
+        }
       }
       hullRafRef.current = requestAnimationFrame(loop);
     };
 
-    hullRafRef.current = requestAnimationFrame(loop);
+    (async () => {
+      usingWebGpu = await initWebGpu();
+      if (disposed) {
+        if (usingWebGpu) {
+          hullWebGpuRef.current?.dispose();
+          hullWebGpuRef.current = null;
+        }
+        return;
+      }
+      if (!usingWebGpu) {
+        const ok = initWebGl();
+        if (!ok) return;
+      }
+      resize();
+      ro = new ResizeObserver(resize);
+      ro.observe(cv);
+      hullRafRef.current = requestAnimationFrame(loop);
+    })();
 
     return () => {
       disposed = true;
@@ -5725,14 +5787,13 @@ const res = 256;
         cancelAnimationFrame(hullRafRef.current);
         hullRafRef.current = 0;
       }
-      ro.disconnect();
+      if (ro) ro.disconnect();
       stopDiagPoll();
-      cv.removeEventListener("webglcontextlost", onLost as any);
-      cv.removeEventListener("webglcontextrestored", onRestored as any);
-      try {
-        hullRendererRef.current?.dispose();
-      } catch {}
-      hullRendererRef.current = null;
+      if (usingWebGpu) {
+        hullWebGpuRef.current?.dispose();
+        hullWebGpuRef.current = null;
+      }
+      cleanupWebGl();
     };
   }, [planarVizMode]);
 

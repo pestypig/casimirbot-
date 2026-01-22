@@ -1,28 +1,8 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { persist } from "zustand/middleware";
-import type { WhyBelongs } from "@shared/rationale";
+import type { ChatMessage, ChatRole, ChatSession } from "@shared/agi-chat";
 
-export type ChatRole = "user" | "assistant" | "tool" | "system";
-
-export interface ChatMessage {
-  id: string;
-  role: ChatRole;
-  content: string;
-  at: string;
-  tokens: number;
-  traceId?: string;
-  tool?: string;
-  whyBelongs?: WhyBelongs;
-}
-
-export interface ChatSession {
-  id: string;
-  title: string;
-  createdAt: string;
-  personaId: string;
-  contextId?: string;
-  messages: ChatMessage[];
-}
+export type { ChatMessage, ChatRole, ChatSession };
 
 interface AgiChatStore {
   sessions: Record<string, ChatSession>;
@@ -44,6 +24,7 @@ interface AgiChatStore {
   clearSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
   renameSession: (sessionId: string, title: string) => void;
+  mergeSessions: (incoming: ChatSession[]) => void;
   totals: (sessionId: string) => { tokens: number; messages: number };
 }
 
@@ -71,6 +52,7 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           id,
           title: title ?? "New chat",
           createdAt: now,
+          updatedAt: now,
           personaId: "default",
           contextId,
           messages: []
@@ -97,7 +79,8 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
               ...state.sessions,
               [sessionId]: {
                 ...target,
-                messages: [...target.messages, complete]
+                messages: [...target.messages, complete],
+                updatedAt: complete.at
               }
             }
           };
@@ -119,6 +102,7 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           id,
           title: title ?? key,
           createdAt: now,
+          updatedAt: now,
           personaId: "default",
           contextId: key,
           messages: []
@@ -148,10 +132,11 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
         set((state) => {
           const target = state.sessions[sessionId];
           if (!target) return state;
+          const updatedAt = new Date().toISOString();
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...target, personaId }
+              [sessionId]: { ...target, personaId, updatedAt }
             }
           };
         }),
@@ -159,10 +144,11 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
         set((state) => {
           const target = state.sessions[sessionId];
           if (!target) return state;
+          const updatedAt = new Date().toISOString();
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...target, messages: [] }
+              [sessionId]: { ...target, messages: [], updatedAt }
             }
           };
         }),
@@ -182,17 +168,60 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
         set((state) => {
           const target = state.sessions[sessionId];
           if (!target) return state;
+          const updatedAt = new Date().toISOString();
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...target, title }
+              [sessionId]: { ...target, title, updatedAt }
             }
           };
+        }),
+      mergeSessions: (incoming) =>
+        set((state) => {
+          if (!incoming || incoming.length === 0) {
+            return state;
+          }
+          const sessions = { ...state.sessions };
+          let activeId = state.activeId;
+          const scoreTimestamp = (value?: string) => {
+            if (!value) return 0;
+            const parsed = Date.parse(value);
+            return Number.isFinite(parsed) ? parsed : 0;
+          };
+          for (const session of incoming) {
+            const existing = sessions[session.id];
+            if (!existing) {
+              sessions[session.id] = session;
+              activeId = activeId ?? session.id;
+              continue;
+            }
+            const existingStamp = scoreTimestamp(existing.updatedAt ?? existing.createdAt);
+            const incomingStamp = scoreTimestamp(session.updatedAt ?? session.createdAt);
+            if (incomingStamp >= existingStamp) {
+              const incomingMessages = session.messages ?? [];
+              const hasIncomingMessages = incomingMessages.length > 0;
+              const hasZeroCount =
+                typeof session.messageCount === "number" &&
+                session.messageCount === 0;
+              sessions[session.id] = {
+                ...existing,
+                ...session,
+                messages:
+                  hasIncomingMessages || hasZeroCount
+                    ? incomingMessages
+                    : existing.messages
+              };
+            }
+          }
+          return { sessions, activeId };
         }),
       totals: (sessionId) => {
         const sess = get().sessions[sessionId];
         if (!sess) return { tokens: 0, messages: 0 };
-        const tokens = sess.messages.reduce((sum, m) => sum + m.tokens, 0);
+        const tokens = sess.messages.reduce(
+          (sum, m) => sum + (m.tokens ?? 0),
+          0,
+        );
         return { tokens, messages: sess.messages.length };
       }
     }),

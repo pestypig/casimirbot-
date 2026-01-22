@@ -7,6 +7,7 @@ import {
   getIdeologyArtifactById,
   searchIdeologyArtifacts
 } from "../services/ideology/artifacts";
+import { renderIdeologyPill } from "../services/ideology/render";
 
 export const ethosRouter = Router();
 
@@ -237,6 +238,23 @@ const parseNumber = (value: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const resolveBaseUrl = (req: any): string => {
+  const protoHeader = req.headers?.["x-forwarded-proto"];
+  const hostHeader = req.headers?.["x-forwarded-host"];
+  const proto =
+    typeof protoHeader === "string"
+      ? protoHeader.split(",")[0].trim()
+      : req.protocol;
+  const host =
+    typeof hostHeader === "string"
+      ? hostHeader.split(",")[0].trim()
+      : req.get("host");
+  if (!host) {
+    throw new Error("host_unavailable");
+  }
+  return `${proto}://${host}`;
+};
+
 ethosRouter.get("/artifacts", (req, res) => {
   const query = readQuery(req.query.q)?.trim();
   const panelId = readQuery(req.query.panelId)?.trim();
@@ -257,14 +275,66 @@ ethosRouter.get("/artifacts", (req, res) => {
   res.json(result);
 });
 
-ethosRouter.get("/artifacts/:id", (req, res) => {
+ethosRouter.get("/artifacts/:id(*)", (req, res) => {
+  const artifactId = req.params.id;
+  const artifact = getIdeologyArtifactById(artifactId);
+  if (!artifact) {
+    res.status(404).json({ error: "artifact_not_found", id: artifactId });      
+    return;
+  }
+  res.json(artifact);
+});
+
+ethosRouter.get("/artifacts/:id(*)/render", async (req, res) => {
   const artifactId = req.params.id;
   const artifact = getIdeologyArtifactById(artifactId);
   if (!artifact) {
     res.status(404).json({ error: "artifact_not_found", id: artifactId });
     return;
   }
-  res.json(artifact);
+  if (artifact.exportKind !== "pill" || !artifact.exportTargetId) {
+    res.status(400).json({ error: "artifact_not_renderable", id: artifactId });
+    return;
+  }
+  const formatParam = readQuery(req.query.format)?.toLowerCase();
+  const format = formatParam === "svg" ? "svg" : formatParam === "png" || !formatParam ? "png" : null;
+  if (!format) {
+    res.status(400).json({ error: "unsupported_format", format: formatParam });
+    return;
+  }
+  const pixelRatio = parseNumber(req.query.pixelRatio ?? req.query.scale);
+
+  let baseUrl: string;
+  try {
+    baseUrl = resolveBaseUrl(req);
+  } catch (err) {
+    res.status(400).json({ error: "invalid_host", message: String(err) });
+    return;
+  }
+
+  try {
+    const result = await renderIdeologyPill({
+      baseUrl,
+      pillId: artifact.exportTargetId,
+      format,
+      pixelRatio: pixelRatio && pixelRatio > 0 ? pixelRatio : undefined,
+    });
+    const extension = format === "svg" ? "svg" : "png";
+    const safeName = (artifact.exportTargetId || artifact.id).replace(/[^a-z0-9-_]+/gi, "_");
+    res.setHeader("Content-Type", result.contentType);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${safeName}.${extension}"`,
+    );
+    res.send(result.buffer);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "playwright_unavailable") {
+      res.status(503).json({ error: "render_unavailable", message });
+      return;
+    }
+    res.status(500).json({ error: "artifact_render_failed", message });
+  }
 });
 
 const handleBeliefGraphRequest = async (req: any, res: any) => {

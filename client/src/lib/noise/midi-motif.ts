@@ -148,7 +148,7 @@ const normalizeArp = (value: unknown): MidiMotif["arp"] | undefined => {
   const modeRaw = typeof value.mode === "string" ? value.mode.toLowerCase() : "";
   const mode =
     modeRaw === "down" || modeRaw === "updown" || modeRaw === "up"
-      ? (modeRaw as MidiMotif["arp"]["mode"])
+      ? (modeRaw as NonNullable<MidiMotif["arp"]>["mode"])
       : undefined;
   const rate =
     typeof value.rate === "string" || typeof value.rate === "number"
@@ -164,11 +164,11 @@ const normalizeArp = (value: unknown): MidiMotif["arp"] | undefined => {
   };
 };
 
-const normalizeSynth = (value: unknown): MidiMotif["synth"] | undefined => {    
+const normalizeSynth = (value: unknown): MidiMotif["synth"] | undefined => {
   if (!isRecord(value)) return undefined;
   const waveform =
     typeof value.waveform === "string"
-      ? (value.waveform.toLowerCase() as MidiMotif["synth"]["waveform"])
+      ? (value.waveform.toLowerCase() as NonNullable<MidiMotif["synth"]>["waveform"])
       : undefined;
   const detune = toNumber(value.detune);
   const attackMs = toNumber(value.attackMs ?? value.attack);
@@ -189,7 +189,7 @@ const normalizeSynth = (value: unknown): MidiMotif["synth"] | undefined => {
 
 const normalizeSamplerMapEntry = (
   value: unknown,
-): NonNullable<MidiMotif["sampler"]>["map"][number] | null => {
+): NonNullable<NonNullable<MidiMotif["sampler"]>["map"]>[number] | null => {
   if (!isRecord(value)) return null;
   const note = parsePitch(value.note ?? value.pitch ?? value.midi ?? null);
   const sourceId =
@@ -234,7 +234,7 @@ const normalizeSampler = (value: unknown): MidiMotif["sampler"] | undefined => {
   const mapRaw = Array.isArray(value.map) ? value.map : [];
   const map = mapRaw
     .map(normalizeSamplerMapEntry)
-    .filter(Boolean) as NonNullable<MidiMotif["sampler"]>["map"];
+    .filter(Boolean) as NonNullable<NonNullable<MidiMotif["sampler"]>["map"]>;
   if (!sourceId && map.length === 0) return undefined;
   return {
     mode: map.length > 0 ? "multi" : mode,
@@ -288,7 +288,9 @@ export const normalizeMidiMotifPayload = (
     toNumber(source.lengthBeats ?? source.loopBeats ?? source.beats) ?? undefined;
   const bpm = toNumber(source.bpm ?? source.tempo) ?? undefined;
   const timeSig =
-    typeof source.timeSig === "string" ? source.timeSig : undefined;
+    typeof source.timeSig === "string" && /^\d+\/\d+$/.test(source.timeSig)
+      ? (source.timeSig as MidiMotif["timeSig"])
+      : undefined;
   const quantize =
     typeof source.quantize === "string" || typeof source.quantize === "number"
       ? source.quantize

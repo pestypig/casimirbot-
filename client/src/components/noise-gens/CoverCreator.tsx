@@ -220,7 +220,7 @@ const DEFAULT_GROUP_LEVELS: RenderPlanGroupLevels = {
 };
 
 const formatTimestamp = (value: number | undefined) => {
-  if (!Number.isFinite(value)) return "--";
+  if (value === undefined || !Number.isFinite(value)) return "--";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
   return date.toLocaleString();
@@ -1097,6 +1097,26 @@ export function CoverCreator({
     [coverFlowPayload],
   );
 
+  const coverFlowAttachmentCount = coverFlowPayload?.knowledgeFileIds?.length ?? 0;
+  const selectedIngredientIds = useMemo(
+    () => normalizeIdList(coverFlowPayload?.knowledgeFileIds),
+    [coverFlowPayload?.knowledgeFileIds],
+  );
+  const ingredientNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const file of ingredientFiles) {
+      map.set(file.id, file.name);
+    }
+    return map;
+  }, [ingredientFiles]);
+  const selectedIngredientNames = useMemo(
+    () =>
+      selectedIngredientIds
+        .map((id) => ingredientNameById.get(id))
+        .filter((value): value is string => Boolean(value)),
+    [ingredientNameById, selectedIngredientIds],
+  );
+
   const handleToggleIngredient = useCallback(
     (fileId: string) => {
       const nextIds = selectedIngredientIds.includes(fileId)
@@ -1373,26 +1393,6 @@ export function CoverCreator({
     const seconds = (totalSeconds % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
   }, [selectedOriginal]);
-
-  const coverFlowAttachmentCount = coverFlowPayload?.knowledgeFileIds?.length ?? 0;
-  const selectedIngredientIds = useMemo(
-    () => normalizeIdList(coverFlowPayload?.knowledgeFileIds),
-    [coverFlowPayload?.knowledgeFileIds],
-  );
-  const ingredientNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const file of ingredientFiles) {
-      map.set(file.id, file.name);
-    }
-    return map;
-  }, [ingredientFiles]);
-  const selectedIngredientNames = useMemo(
-    () =>
-      selectedIngredientIds
-        .map((id) => ingredientNameById.get(id))
-        .filter((value): value is string => Boolean(value)),
-    [ingredientNameById, selectedIngredientIds],
-  );
 
   const immersionEvidence = job?.snapshot?.evidence ?? null;
 

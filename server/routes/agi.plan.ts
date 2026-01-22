@@ -10,6 +10,14 @@ import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { ConsoleTelemetryBundle, PanelTelemetry } from "@shared/desktop";
 import type { ResonanceBundle, ResonanceCollapse, ResonancePatch } from "@shared/code-lattice";
 import type { GroundingReport, GroundingSource } from "@shared/grounding";
+import {
+  agiRefineryRequestSchema,
+  type AgiEvidence,
+  type AgiExecutionEnvelope,
+  type AgiIntent,
+  type AgiRefineryRequest,
+  type AgiRunMode,
+} from "@shared/agi-refinery";
 import { Routine, type TRoutine } from "@shared/agi-instructions";
 import { PROMPT_SPEC_SCHEMA_VERSION, type PromptSpec } from "@shared/prompt-spec";
 import { zLocalCallSpec, type LocalCallSpec } from "@shared/local-call-spec";
@@ -21,6 +29,7 @@ import {
   formatPlanDsl,
   type BuildPlanArgs,
   type ExecutorStep,
+  type ExecutionResult,
   type ExecutionRuntime,
   type PlanNode,
   type ReasoningStrategy,
@@ -30,6 +39,7 @@ import {
   buildCandidatePlansFromResonance,
   compilePlan,
   executeCompiledPlan,
+  pickReadableText,
   summarizeExecutionResults,
   renderChatBPlannerPrompt,
   registerInMemoryTrace,
@@ -100,6 +110,11 @@ import { getTaskTrace, saveTaskTrace } from "../db/agi";
 import { metrics, sseConnections } from "../metrics";
 import { personaPolicy } from "../auth/policy";
 import { guardTenant } from "../auth/tenant";
+import { hashStableJson } from "../utils/information-boundary";
+import {
+  normalizeEvidencePath,
+  normalizeEvidenceRef,
+} from "../services/agi/refinery-identity";
 import {
   appendToolLog,
   getToolLogs,
@@ -117,7 +132,23 @@ import { sha256Hex } from "../utils/information-boundary";
 import { ensureSpecialistsRegistered } from "../specialists/bootstrap";
 import { hullModeEnabled, shouldRegisterExternalAdapter } from "../security/hull-guard";
 import { readKnowledgeConfig } from "../config/knowledge";
+import { resolveLocalRuntimeCaps } from "../services/llm/local-runtime";
 import { fetchKnowledgeForProjects } from "../services/knowledge/corpus";
+import {
+  getTrainingTraceExport,
+  recordTrainingTrace,
+} from "../services/observability/training-trace-store";
+import {
+  detectSafetyHandling,
+  hasRestrictedInput,
+  isRestrictedEvidencePath,
+  evaluateTrajectoryGates,
+} from "../services/agi/refinery-gates";
+import {
+  buildEvidenceFromRepoGraphHits,
+  buildRefineryTrajectory,
+} from "../services/agi/refinery-trajectory";
+import { searchRepoGraph } from "../services/repo/repoGraph";
 import {
   buildKnowledgeValidator,
   KnowledgeValidationError,
@@ -134,6 +165,23 @@ import { smallLlmCallSpecTriage } from "../services/small-llm";
 const planRouter = Router();
 const LOCAL_SPAWN_TOOL_NAME = "llm.local.spawn.generate";
 const HTTP_TOOL_NAME = "llm.http.generate";
+const normalizeEnv = (value?: string): string | undefined => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+};
+const resolveDefaultModel = (): string | undefined =>
+  normalizeEnv(process.env.LLM_HTTP_MODEL) ??
+  normalizeEnv(process.env.LLM_LOCAL_MODEL);
+const resolvePlannerModel = (): string | undefined =>
+  normalizeEnv(process.env.AGI_ROUTER_MODEL) ??
+  normalizeEnv(process.env.AGI_ROUTER_ADAPTER) ??
+  normalizeEnv(process.env.AGI_PLANNER_MODEL) ??
+  resolveDefaultModel();
+const resolveExecutorModel = (): string | undefined =>
+  normalizeEnv(process.env.AGI_ANSWERER_MODEL) ??
+  normalizeEnv(process.env.AGI_ANSWERER_ADAPTER) ??
+  normalizeEnv(process.env.AGI_EXECUTOR_MODEL) ??
+  resolveDefaultModel();
 const TRACE_SSE_LIMIT = (() => {
   const fallback = 50;
   const raw = Number(process.env.TRACE_SSE_BUFFER ?? fallback);
@@ -266,6 +314,7 @@ type PlanRecord = {
   createdAt: string;
   goal: string;
   personaId: string;
+  sessionId?: string;
   planDsl: string;
   nodes: PlanNode[];
   executorSteps: ExecutorStep[];
@@ -275,6 +324,11 @@ type PlanRecord = {
   knowledgeContext?: KnowledgeProjectExport[];
   knowledgeHash?: string | null;
   knowledgeHints?: string[];
+  resourceHints?: string[];
+  knowledgeProjects?: string[];
+  searchQuery?: string;
+  topK?: number;
+  summaryFocus?: string;
   desktopId?: string;
   telemetry?: ConsoleTelemetryBundle | null;
   telemetrySummary?: string | null;
@@ -284,17 +338,26 @@ type PlanRecord = {
   debateId?: string | null;
   strategy?: ReasoningStrategy;
   strategyNotes?: string[];
+  intent?: IntentFlags;
   groundingReport?: GroundingReport;
   debugSources?: boolean;
   promptSpec?: PromptSpec;
   collapseTrace?: TCollapseTraceEntry;
   collapseStrategy?: string;
   callSpec?: LocalCallSpec;
+  refinery?: AgiRefineryRequest;
 };
 
 type PlanRecordCacheEntry = { record: PlanRecord; expiresAt: number };
 
 const planRecords = new Map<string, PlanRecordCacheEntry>();
+const REFINERY_TRACE_ENABLED = process.env.ENABLE_AGI_REFINERY_TRACE === "1";
+const REFINERY_TRACE_PERSONAS = new Set(
+  (process.env.AGI_REFINERY_TRACE_PERSONAS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+);
 const PLAN_RECORD_CACHE_TTL_MS = (() => {
   const fallback = 30 * 60 * 1000;
   const raw = Number(process.env.PLAN_RECORD_CACHE_TTL_MS ?? fallback);
@@ -354,6 +417,142 @@ const getPlanRecord = (traceId: string): PlanRecord | null => {
 const planRecordCleanup = setInterval(prunePlanRecords, PLAN_RECORD_CACHE_CLEANUP_MS);
 planRecordCleanup.unref?.();
 
+const REFINERY_TRACE_ON_REFINE =
+  process.env.AGI_REFINERY_TRACE_ON_REFINE !== "0";
+
+const shouldCaptureRefineryTrace = (
+  personaId: string | undefined,
+  refinery?: AgiRefineryRequest,
+): boolean => {
+  if (REFINERY_TRACE_ENABLED) return true;
+  if (REFINERY_TRACE_ON_REFINE) return true;
+  if (!personaId) return false;
+  if (REFINERY_TRACE_PERSONAS.size === 0) return false;
+  return REFINERY_TRACE_PERSONAS.has(personaId) || REFINERY_TRACE_PERSONAS.has("all");
+};
+
+const clampRatio = (value: number): number => Math.min(Math.max(value, 0), 1);
+
+const parseAlphaTarget = (): number | undefined => {
+  const raw = process.env.AGI_REFINERY_ALPHA_TARGET;
+  if (!raw) return undefined;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return undefined;
+  return clampRatio(parsed);
+};
+
+const parseAlphaWindow = (): number => {
+  const parsed = Number(process.env.AGI_REFINERY_ALPHA_WINDOW ?? 400);
+  if (!Number.isFinite(parsed)) return 400;
+  return Math.min(Math.max(25, Math.floor(parsed)), 5000);
+};
+
+type AlphaGovernorState = {
+  enabled: boolean;
+  alphaTarget?: number;
+  live: number;
+  variant: number;
+  cap: number;
+  window: number;
+  alphaRun: number;
+  runMode: AgiRunMode;
+  engaged: boolean;
+};
+
+const collectAcceptedOrigins = (limit: number): { live: number; variant: number } => {
+  const traces = getTrainingTraceExport({ limit });
+  let live = 0;
+  let variant = 0;
+  for (const trace of traces) {
+    if (!trace.payload || trace.payload.kind !== "trajectory") continue;
+    if (!trace.pass) continue;
+    const origin = trace.payload.data.meta?.origin;
+    if (origin === "variant") {
+      variant += 1;
+    } else {
+      live += 1;
+    }
+  }
+  return { live, variant };
+};
+
+const computeVariantCap = (alphaTarget: number, live: number): number => {
+  if (alphaTarget >= 1) return 0;
+  if (alphaTarget <= 0) return Number.POSITIVE_INFINITY;
+  return Math.floor(((1 - alphaTarget) / alphaTarget) * live);
+};
+
+const classifyRunModeFromCounts = (live: number, variant: number): AgiRunMode => {
+  const total = live + variant;
+  const liveShare = total > 0 ? live / total : 0;
+  const variantShare = total > 0 ? variant / total : 0;
+  if (liveShare >= 0.8) return "anchor_mining";
+  if (variantShare >= 0.8) return "variant_expansion";
+  return "mixed";
+};
+
+const computeAlphaGovernorState = (): AlphaGovernorState => {
+  const alphaTarget = parseAlphaTarget();
+  const enabled = process.env.AGI_REFINERY_ALPHA_GOVERNOR !== "0";
+  const window = parseAlphaWindow();
+  if (!enabled || alphaTarget === undefined) {
+    return {
+      enabled,
+      alphaTarget,
+      live: 0,
+      variant: 0,
+      cap: Number.POSITIVE_INFINITY,
+      window,
+      alphaRun: 0,
+      runMode: "mixed",
+      engaged: false,
+    };
+  }
+  const { live, variant } = collectAcceptedOrigins(window);
+  const cap = computeVariantCap(alphaTarget, live);
+  const total = live + variant;
+  const alphaRun = total > 0 ? live / total : 0;
+  const runMode = classifyRunModeFromCounts(live, variant);
+  const engaged = Number.isFinite(cap) && variant >= cap;
+  return {
+    enabled,
+    alphaTarget,
+    live,
+    variant,
+    cap,
+    window,
+    alphaRun,
+    runMode,
+    engaged,
+  };
+};
+
+const evaluateAlphaGovernor = (
+  origin: string | undefined,
+  accepted: boolean,
+): {
+  allow: boolean;
+  alphaTarget?: number;
+  live: number;
+  variant: number;
+  cap: number;
+  window: number;
+  alphaRun: number;
+  runMode: AgiRunMode;
+  engaged: boolean;
+} => {
+  const state = computeAlphaGovernorState();
+  if (!state.enabled || state.alphaTarget === undefined || origin !== "variant" || !accepted) {
+    return { allow: true, ...state };
+  }
+  const projected = state.variant + 1;
+  return {
+    allow: projected <= state.cap,
+    ...state,
+    engaged: projected > state.cap,
+  };
+};
+
 const dedupeGroundingSources = (sources?: GroundingSource[] | null): GroundingSource[] => {
   if (!sources || sources.length === 0) return [];
   const seen = new Set<string>();
@@ -365,6 +564,1285 @@ const dedupeGroundingSources = (sources?: GroundingSource[] | null): GroundingSo
     result.push(source);
   }
   return result;
+};
+
+const detectStepErrorType = (step: unknown): string | undefined => {
+  if (!step || typeof step !== "object") return undefined;
+  const error = (step as { error?: unknown }).error;
+  if (!error || typeof error !== "object") return undefined;
+  const type = (error as { type?: unknown }).type;
+  return typeof type === "string" ? type : undefined;
+};
+
+type ExecutionErrorInfo = {
+  message?: string;
+  type?: string;
+  code?: string;
+  name?: string;
+  stack?: string;
+  policyReason?: string;
+};
+
+const MAX_EXECUTION_ERROR_MESSAGE = 220;
+
+const coerceString = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
+const normalizeErrorMessage = (value: unknown): string | undefined => {
+  const text = coerceString(value);
+  if (!text) return undefined;
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  return trimmed.length > MAX_EXECUTION_ERROR_MESSAGE
+    ? `${trimmed.slice(0, MAX_EXECUTION_ERROR_MESSAGE)}...`
+    : trimmed;
+};
+
+const extractExecutionErrorInfo = (error: unknown): ExecutionErrorInfo => {
+  if (!error) return {};
+  if (typeof error === "string") {
+    return { message: normalizeErrorMessage(error) };
+  }
+  if (typeof error !== "object") return {};
+  const err = error as {
+    message?: unknown;
+    type?: unknown;
+    code?: unknown;
+    status?: unknown;
+    statusCode?: unknown;
+    name?: unknown;
+    stack?: unknown;
+    policy?: { reason?: unknown };
+  };
+  const codeCandidate =
+    coerceString(err.code) ??
+    (typeof err.status === "number" ? String(err.status) : undefined) ??
+    (typeof err.statusCode === "number" ? String(err.statusCode) : undefined);
+  return {
+    message: normalizeErrorMessage(err.message),
+    type: coerceString(err.type),
+    code: codeCandidate,
+    name: coerceString(err.name),
+    stack: coerceString(err.stack),
+    policyReason: coerceString(err.policy?.reason),
+  };
+};
+
+const classifyExecutionErrorClass = (info: ExecutionErrorInfo): string | undefined => {
+  const parts = [info.type, info.message, info.code, info.name, info.policyReason]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!parts) return undefined;
+  if (/timeout|timed out|etimedout|esockettimedout/.test(parts)) {
+    return "execution_timeout";
+  }
+  if (/rate limit|rate_limited|429/.test(parts)) {
+    return "execution_rate_limited";
+  }
+  if (/unauthorized|forbidden|auth|401|403/.test(parts)) {
+    return "execution_auth";
+  }
+  if (/policy|blocked/.test(parts)) {
+    return "execution_policy";
+  }
+  if (/network|econnrefused|enotfound|ehostunreach|eai_again|socket/.test(parts)) {
+    return "execution_network";
+  }
+  if (/invalid|schema|mismatch|bad request|400/.test(parts)) {
+    return "execution_invalid_args";
+  }
+  if (/contract/.test(parts)) {
+    return "execution_tool_contract_mismatch";
+  }
+  if (/playwright/.test(parts)) {
+    return "execution_playwright_crash";
+  }
+  if (/out of memory|oom|heap/.test(parts)) {
+    return "execution_resource_exhaustion";
+  }
+  if (/5\\d\\d|server error|internal error/.test(parts)) {
+    return "execution_tool_5xx";
+  }
+  return "execution_tool_error";
+};
+
+const buildStackFingerprint = (stack?: string): string | undefined => {
+  if (!stack) return undefined;
+  const normalized = stack.split("\n").slice(0, 8).join("\n");
+  return normalized ? hashStableJson({ stack: normalized }) : undefined;
+};
+
+const buildExecutionFingerprint = (input: {
+  toolName?: string;
+  errorClass?: string;
+  errorCode?: string;
+  stackFingerprint?: string;
+}): string | undefined => {
+  if (!input.errorClass && !input.stackFingerprint) return undefined;
+  return hashStableJson({
+    tool: input.toolName,
+    class: input.errorClass,
+    code: input.errorCode,
+    stack: input.stackFingerprint,
+  });
+};
+
+const resolveToolName = (
+  step: ExecutionResult,
+  executorStep?: ExecutorStep,
+): string | undefined => {
+  if (executorStep?.kind === "tool.call") return executorStep.tool;
+  if (executorStep?.kind === "debate.run") return executorStep.tool;
+  if (executorStep?.kind === "specialist.run") return executorStep.solver;
+  if (executorStep?.kind === "specialist.verify") return executorStep.verifier;
+  if (executorStep?.kind) return executorStep.kind;
+  return step.kind;
+};
+
+const resolveToolKind = (
+  step: ExecutionResult,
+  executorStep?: ExecutorStep,
+): string | undefined => executorStep?.kind ?? step.kind;
+
+const extractRequestId = (value: unknown): string | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as { requestId?: unknown; request_id?: unknown };
+  return coerceString(record.requestId) ?? coerceString(record.request_id);
+};
+
+const resolveHostContext = (): string =>
+  process.env.CI ? "ci" : process.env.NODE_ENV ?? "local";
+
+const collectExecutionEnvelopes = (
+  steps: ExecutionResult[],
+  executorStepById: Map<string, ExecutorStep>,
+  startedAtMs: number,
+): AgiExecutionEnvelope[] => {
+  const envelopes: AgiExecutionEnvelope[] = [];
+  let cursorMs = startedAtMs;
+  for (const step of steps) {
+    const executorStep = executorStepById.get(step.id);
+    const latency = Number.isFinite(step.latency_ms)
+      ? Math.max(0, Math.floor(step.latency_ms ?? 0))
+      : 0;
+    const startTs = new Date(cursorMs).toISOString();
+    const endTs = new Date(cursorMs + latency).toISOString();
+    if (latency > 0) {
+      cursorMs += latency;
+    }
+    const toolName = resolveToolName(step, executorStep);
+    const toolKind = resolveToolKind(step, executorStep);
+    const errorInfo = extractExecutionErrorInfo(
+      (step as { error?: unknown }).error,
+    );
+    const errorClass = classifyExecutionErrorClass(errorInfo);
+    const stackFingerprint = buildStackFingerprint(errorInfo.stack);
+    const fingerprint = buildExecutionFingerprint({
+      toolName,
+      errorClass,
+      errorCode: errorInfo.code,
+      stackFingerprint,
+    });
+    const requestId =
+      extractRequestId(step.output) ??
+      extractRequestId((step as { error?: unknown }).error);
+    envelopes.push({
+      stepId: step.id,
+      stepKind: step.kind,
+      toolName,
+      toolKind,
+      requestId,
+      startTs,
+      endTs,
+      durationMs: latency,
+      ok: step.ok,
+      errorClass,
+      errorCode: errorInfo.code,
+      errorMessage: errorInfo.message,
+      stackFingerprint,
+      fingerprint,
+      hostContext: resolveHostContext(),
+    });
+  }
+  return envelopes;
+};
+
+const collectExecutionErrorTypes = (steps: unknown[]): string[] => {
+  const types = new Set<string>();
+  for (const step of steps) {
+    const error = step && typeof step === "object"
+      ? (step as { error?: unknown }).error
+      : undefined;
+    if (!error) continue;
+    const info = extractExecutionErrorInfo(error);
+    const errorClass = classifyExecutionErrorClass(info);
+    types.add(errorClass ?? "execution_tool_error");
+  }
+  return Array.from(types);
+};
+
+const detectSafetyFailure = (step: unknown): boolean => {
+  const type = detectStepErrorType(step);
+  if (type && ["forbidden", "policy", "blocked"].includes(type)) {
+    return true;
+  }
+  const error = step && typeof step === "object" ? (step as { error?: any }).error : null;
+  const message = typeof error?.message === "string" ? error.message : "";
+  return /forbidden|policy|blocked/i.test(message);
+};
+
+const detectTestsRun = (step: unknown): boolean => {
+  if (!step || typeof step !== "object") return false;
+  const kind =
+    (step as { kind?: unknown }).kind ??
+    (step as { tool?: unknown }).tool ??
+    (step as { id?: unknown }).id;
+  const label = typeof kind === "string" ? kind.toLowerCase() : "";
+  return label.includes("test");
+};
+
+const CODE_TOUCH_TOOL_HINTS = [
+  "repo.patch",
+  "repo.diff",
+  "apply_patch",
+  "write_file",
+  "file.write",
+];
+const DIFF_FILE_PATTERN = /^diff --git a\/(.+?) b\/(.+)$/;
+const DIFF_ADD_PATTERN = /^\+\+\+ b\/(.+)$/;
+const DIFF_REMOVE_PATTERN = /^--- a\/(.+)$/;
+const PATCH_FILE_PATTERN = /^\*\*\* (?:Update|Add|Delete) File: (.+)$/;
+const DIFF_SIGNAL_PATTERN = /(diff --git|\+\+\+ b\/|--- a\/|\*\*\* Begin Patch)/;
+
+const extractDiffPaths = (diff: string): string[] => {
+  const output = new Set<string>();
+  const lines = diff.split(/\r?\n/);
+  for (const line of lines) {
+    let match = line.match(DIFF_FILE_PATTERN);
+    if (match) {
+      const normalized = normalizeEvidencePath(match[2], {
+        lowercase: true,
+        normalizeExtensions: true,
+      });
+      if (normalized) output.add(normalized);
+      continue;
+    }
+    match = line.match(DIFF_ADD_PATTERN);
+    if (match && match[1] !== "/dev/null") {
+      const normalized = normalizeEvidencePath(match[1], {
+        lowercase: true,
+        normalizeExtensions: true,
+      });
+      if (normalized) output.add(normalized);
+      continue;
+    }
+    match = line.match(DIFF_REMOVE_PATTERN);
+    if (match && match[1] !== "/dev/null") {
+      const normalized = normalizeEvidencePath(match[1], {
+        lowercase: true,
+        normalizeExtensions: true,
+      });
+      if (normalized) output.add(normalized);
+      continue;
+    }
+    match = line.match(PATCH_FILE_PATTERN);
+    if (match) {
+      const normalized = normalizeEvidencePath(match[1], {
+        lowercase: true,
+        normalizeExtensions: true,
+      });
+      if (normalized) output.add(normalized);
+    }
+  }
+  return Array.from(output);
+};
+
+const extractDiffPayload = (value: unknown): string | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as { diff?: unknown; patch?: unknown; stdout?: unknown };
+  const candidates = [record.diff, record.patch, record.stdout];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const trimmed = candidate.trim();
+    if (!trimmed) continue;
+    if (DIFF_SIGNAL_PATTERN.test(trimmed)) return trimmed;
+  }
+  return undefined;
+};
+
+const collectCodeTouchedPaths = (
+  steps: ExecutionResult[],
+  executorStepById: Map<string, ExecutorStep>,
+): { paths: string[]; toolTouched: boolean } => {
+  const paths = new Set<string>();
+  let toolTouched = false;
+  for (const step of steps) {
+    const executorStep = executorStepById.get(step.id);
+    const toolName = resolveToolName(step, executorStep);
+    const toolLabel = toolName?.toLowerCase() ?? "";
+    if (CODE_TOUCH_TOOL_HINTS.some((hint) => toolLabel.includes(hint))) {
+      toolTouched = true;
+    }
+    const diffPayload = extractDiffPayload(step.output);
+    if (diffPayload) {
+      extractDiffPaths(diffPayload).forEach((entry) => paths.add(entry));
+    }
+  }
+  return { paths: Array.from(paths), toolTouched };
+};
+
+const CONTRACT_PATH_PREFIXES = [
+  "server/routes/",
+  "server/skills/",
+  "shared/",
+  "client/src/",
+  "sdk/",
+  "packages/",
+  "types/",
+];
+
+type ContractSurface = "server" | "client" | "shared" | "other";
+
+const classifyContractSurface = (value: string): ContractSurface => {
+  if (value.startsWith("server/")) return "server";
+  if (value.startsWith("client/")) return "client";
+  if (
+    value.startsWith("shared/") ||
+    value.startsWith("sdk/") ||
+    value.startsWith("packages/") ||
+    value.startsWith("types/")
+  ) {
+    return "shared";
+  }
+  return "other";
+};
+
+const isContractPath = (value: string): boolean =>
+  CONTRACT_PATH_PREFIXES.some((prefix) => value.startsWith(prefix));
+
+const resolveContractSignals = (
+  paths: string[],
+  testsRun: boolean,
+  testsOk: boolean,
+): {
+  contractRequired: boolean;
+  contractOk: boolean;
+  contractIssues: string[];
+} => {
+  const contractPaths = paths.filter(isContractPath);
+  const contractRequired = contractPaths.length > 0;
+  if (!contractRequired) {
+    return { contractRequired, contractOk: true, contractIssues: [] };
+  }
+  const surfaces = new Set<ContractSurface>(
+    contractPaths.map(classifyContractSurface).filter((surface) => surface !== "other"),
+  );
+  const crossSurface =
+    surfaces.size >= 2 ||
+    (surfaces.has("shared") && (surfaces.has("server") || surfaces.has("client")));
+  if (testsRun && testsOk) {
+    return { contractRequired, contractOk: true, contractIssues: [] };
+  }
+  if (crossSurface) {
+    return { contractRequired, contractOk: true, contractIssues: [] };
+  }
+  return {
+    contractRequired,
+    contractOk: false,
+    contractIssues: ["contract_surface_missing"],
+  };
+};
+
+type ConstraintSignal = {
+  ok: boolean;
+  source: string;
+  issues: string[];
+};
+
+const CONSTRAINT_STATUSES = new Set([
+  "admissible",
+  "marginal",
+  "inadmissible",
+  "not_certified",
+]);
+
+const evaluateConstraintArray = (
+  constraints: Array<Record<string, unknown>>,
+): { ok: boolean; issues: string[] } => {
+  const issues: string[] = [];
+  for (const constraint of constraints) {
+    const passed =
+      typeof constraint.passed === "boolean" ? constraint.passed : undefined;
+    const status =
+      typeof constraint.status === "string"
+        ? constraint.status.toLowerCase()
+        : undefined;
+    const severity =
+      typeof constraint.severity === "string"
+        ? constraint.severity.toUpperCase()
+        : undefined;
+    const isHard = severity === "HARD" || !severity;
+    let ok = true;
+    if (passed === false) ok = false;
+    if (status && ["fail", "failed", "error", "unknown"].includes(status)) {
+      ok = false;
+    }
+    if (!ok && isHard) {
+      const id =
+        typeof constraint.id === "string" ? constraint.id : "constraint_failed";
+      issues.push(id);
+    }
+  }
+  return { ok: issues.length === 0, issues };
+};
+
+const extractConstraintResult = (
+  output: unknown,
+  toolName?: string,
+): ConstraintSignal | null => {
+  if (!output || typeof output !== "object") return null;
+  const record = output as Record<string, unknown>;
+  const issues: string[] = [];
+  let ok: boolean | undefined;
+  if (record.gate && typeof record.gate === "object") {
+    const gate = record.gate as Record<string, unknown>;
+    if (typeof gate.pass === "boolean") {
+      ok = gate.pass;
+    }
+    if (Array.isArray(gate.constraints)) {
+      const evaluated = evaluateConstraintArray(
+        gate.constraints as Array<Record<string, unknown>>,
+      );
+      ok = ok ?? evaluated.ok;
+      issues.push(...evaluated.issues);
+    }
+  }
+  if (record.report && typeof record.report === "object") {
+    const report = record.report as Record<string, unknown>;
+    if (typeof report.passed === "boolean") {
+      ok = report.passed;
+    }
+    if (Array.isArray(report.failed_checks) && report.failed_checks.length > 0) {
+      ok = false;
+      issues.push("report_failed_checks");
+    }
+  }
+  if (Array.isArray(record.constraints)) {
+    const evaluated = evaluateConstraintArray(
+      record.constraints as Array<Record<string, unknown>>,
+    );
+    ok = ok ?? evaluated.ok;
+    issues.push(...evaluated.issues);
+  }
+  if (typeof record.pass === "boolean") {
+    ok = record.pass;
+  }
+  if (typeof record.status === "string") {
+    const status = record.status.toLowerCase();
+    if (CONSTRAINT_STATUSES.has(status) && status !== "admissible") {
+      ok = false;
+      issues.push(`status_${status}`);
+    }
+    if (CONSTRAINT_STATUSES.has(status) && status === "admissible") {
+      ok = ok ?? true;
+    }
+  }
+  if (record.integrityOk === false) {
+    ok = false;
+    issues.push("certificate_integrity");
+  }
+  const hasMarkers =
+    issues.length > 0 ||
+    typeof ok === "boolean" ||
+    Array.isArray(record.constraints) ||
+    typeof record.pass === "boolean" ||
+    record.gate !== undefined ||
+    record.report !== undefined;
+  if (!hasMarkers || typeof ok !== "boolean") return null;
+  return {
+    ok,
+    source: toolName ?? (typeof record.kind === "string" ? record.kind : "constraint"),
+    issues: issues.length > 0 ? issues : [],
+  };
+};
+
+const isConstraintIntentGoal = (goal: string): boolean =>
+  /\b(constraint|residual|bianchi|vacuum|admissible|viability|guardrail|invariant)\b/i.test(
+    goal,
+  );
+
+const collectConstraintSignals = (
+  steps: ExecutionResult[],
+  executorStepById: Map<string, ExecutorStep>,
+  goal: string,
+  intent?: IntentFlags,
+): {
+  constraintRequired: boolean;
+  constraintOk: boolean;
+  constraintIssues: string[];
+  constraintSources: string[];
+} => {
+  const signals: ConstraintSignal[] = [];
+  for (const step of steps) {
+    const executorStep = executorStepById.get(step.id);
+    const toolName = resolveToolName(step, executorStep);
+    const signal = extractConstraintResult(step.output, toolName);
+    if (signal) {
+      signals.push(signal);
+    }
+  }
+  const constraintRequired =
+    signals.length > 0 ||
+    Boolean(intent?.wantsPhysics || intent?.wantsWarp) ||
+    isWarpOrPhysicsIntentGoal(goal) ||
+    isConstraintIntentGoal(goal);
+  const constraintOk =
+    signals.length > 0 ? signals.every((signal) => signal.ok) : !constraintRequired;
+  const constraintIssues = signals.flatMap((signal) =>
+    signal.ok ? [] : signal.issues.length > 0 ? signal.issues : ["constraint_failed"],
+  );
+  const constraintSources = signals.map((signal) => signal.source);
+  return {
+    constraintRequired,
+    constraintOk,
+    constraintIssues,
+    constraintSources,
+  };
+};
+
+const estimateTokens = (value: string): number => {
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  return Math.max(1, Math.ceil(trimmed.length / 4));
+};
+
+const summarizeExecutionSignals = (
+  steps: ExecutionResult[],
+  goal: string,
+  executorStepById: Map<string, ExecutorStep>,
+  intent: IntentFlags | undefined,
+  executionErrorTypesOverride?: string[],
+): {
+  formatOk: boolean;
+  testsRun: boolean;
+  testsOk: boolean;
+  testsRequired: boolean;
+  safetyOk: boolean;
+  executionErrorTypes: string[];
+  codeTouched: boolean;
+  codeTouchedPaths: string[];
+  contractRequired: boolean;
+  contractOk: boolean;
+  contractIssues: string[];
+  constraintRequired: boolean;
+  constraintOk: boolean;
+  constraintIssues: string[];
+  constraintSources: string[];
+} => {
+  let formatOk = true;
+  let testsRun = false;
+  let testsOk = true;
+  let safetyOk = !hasRestrictedInput(goal);
+  for (const step of steps) {
+    if (detectStepErrorType(step) === "final_output_schema_mismatch") {
+      formatOk = false;
+    }
+    if (detectSafetyFailure(step)) {
+      safetyOk = false;
+    }
+    if (detectTestsRun(step)) {
+      testsRun = true;
+      const ok = (step as { ok?: unknown }).ok;
+      if (ok !== true) {
+        testsOk = false;
+      }
+    }
+  }
+  const executionErrorTypes =
+    executionErrorTypesOverride ?? collectExecutionErrorTypes(steps);
+  const codeTouch = collectCodeTouchedPaths(steps, executorStepById);
+  const contractSignals = resolveContractSignals(
+    codeTouch.paths,
+    testsRun,
+    testsOk,
+  );
+  const constraintSignals = collectConstraintSignals(
+    steps,
+    executorStepById,
+    goal,
+    intent,
+  );
+  const codeTouched = codeTouch.toolTouched || codeTouch.paths.length > 0;
+  const testsRequired = codeTouched || contractSignals.contractRequired;
+  return {
+    formatOk,
+    testsRun,
+    testsOk,
+    testsRequired,
+    safetyOk,
+    executionErrorTypes,
+    codeTouched,
+    codeTouchedPaths: codeTouch.paths,
+    contractRequired: contractSignals.contractRequired,
+    contractOk: contractSignals.contractOk,
+    contractIssues: contractSignals.contractIssues,
+    constraintRequired: constraintSignals.constraintRequired,
+    constraintOk: constraintSignals.constraintOk,
+    constraintIssues: constraintSignals.constraintIssues,
+    constraintSources: constraintSignals.constraintSources,
+  };
+};
+
+const SAFETY_REFUSAL_SUMMARY =
+  "Sorry, I cannot comply with that request. I can help if you share a non-sensitive excerpt or ask a high-level question.";
+const EXECUTION_FALLBACK_SUMMARY =
+  "Sorry, I am unable to complete that request because a tool step failed. You can retry or provide more details.";
+
+const resolveSafetyHandledSummary = (
+  summary: string,
+  safetyOk: boolean,
+): { summary: string; handled: boolean } => {
+  if (safetyOk) {
+    return { summary, handled: false };
+  }
+  const handling = detectSafetyHandling(summary);
+  if (handling.handled) {
+    return { summary, handled: true };
+  }
+  return { summary: SAFETY_REFUSAL_SUMMARY, handled: true };
+};
+
+const resolveExecutionHandledSummary = (
+  summary: string,
+  executionOk: boolean,
+): { summary: string; handled: boolean } => {
+  if (executionOk) {
+    return { summary, handled: false };
+  }
+  const handling = detectSafetyHandling(summary);
+  if (handling.handled) {
+    return { summary, handled: true };
+  }
+  return { summary: EXECUTION_FALLBACK_SUMMARY, handled: true };
+};
+
+type RepoGraphHitLike = {
+  id?: string;
+  kind?: string;
+  path?: string;
+  file_path?: string;
+  snippet?: string;
+  snippet_id?: string;
+  score?: number;
+  symbol_name?: string;
+};
+
+const collectStepCitations = (steps: ExecutionResult[]): string[] => {
+  const citations = new Set<string>();
+  for (const step of steps) {
+    if (Array.isArray(step.citations)) {
+      step.citations.forEach((citation) => {
+        if (typeof citation === "string" && citation.trim().length > 0) {
+          citations.add(citation.trim());
+        }
+      });
+    }
+    const output = step.output as { citations?: unknown } | undefined;
+    if (Array.isArray(output?.citations)) {
+      output.citations.forEach((citation) => {
+        if (typeof citation === "string" && citation.trim().length > 0) {
+          citations.add(citation.trim());
+        }
+      });
+    }
+  }
+  return Array.from(citations);
+};
+
+const coerceRepoGraphHits = (value: unknown): RepoGraphHitLike[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is RepoGraphHitLike => Boolean(item && typeof item === "object"),
+  );
+};
+
+const collectRepoGraphEvidence = (
+  steps: ExecutionResult[],
+  executorStepById: Map<string, ExecutorStep>,
+): { candidates: AgiEvidence[]; selected: AgiEvidence[] } => {
+  const candidates: AgiEvidence[] = [];
+  const selected: AgiEvidence[] = [];
+  for (const step of steps) {
+    const exec = executorStepById.get(step.id);
+    const tool = exec?.kind === "tool.call" ? exec.tool : undefined;
+    const isRepoGraph = tool === "repo.graph.search";
+    if (!isRepoGraph || step.ok !== true) continue;
+    if (!step.output || typeof step.output !== "object") continue;
+    const output = step.output as { hits?: unknown; packets?: unknown };
+    const hits = coerceRepoGraphHits(output.hits);
+    const packets = coerceRepoGraphHits(output.packets);
+    if (hits.length > 0) {
+      candidates.push(...buildEvidenceFromRepoGraphHits(hits, "repo_graph_hit"));
+    }
+    if (packets.length > 0) {
+      selected.push(
+        ...buildEvidenceFromRepoGraphHits(packets, "repo_graph_packet"),
+      );
+    }
+  }
+  return { candidates, selected };
+};
+
+const filterRepoGraphHits = (hits: RepoGraphHitLike[]): RepoGraphHitLike[] =>
+  hits.filter(
+    (hit) => !isRestrictedEvidencePath(hit.file_path ?? hit.path ?? undefined),
+  );
+
+const buildSafeRetrievalFallback = async (
+  query: string | undefined,
+): Promise<{ candidates: AgiEvidence[]; selected: AgiEvidence[] }> => {
+  if (!query) return { candidates: [], selected: [] };
+  try {
+    const result = await searchRepoGraph({ query, limit: 12 });
+    const safeHits = filterRepoGraphHits(result.hits ?? []);
+    const evidence = buildEvidenceFromRepoGraphHits(
+      safeHits as RepoGraphHitLike[],
+      "repo_graph_fallback",
+    );
+    return { candidates: evidence, selected: evidence };
+  } catch {
+    return { candidates: [], selected: [] };
+  }
+};
+
+const HINT_PATH_PATTERN =
+  /\b[a-z0-9_./-]+\.(ts|tsx|js|jsx|json|md|mdx|yml|yaml|py|go|rs|java|cpp|c|h)\b/gi;
+const HINT_PATH_TEST =
+  /\b[a-z0-9_./-]+\.(ts|tsx|js|jsx|json|md|mdx|yml|yaml|py|go|rs|java|cpp|c|h)\b/i;
+const HINT_PASS_MAX = (() => {
+  const parsed = Number(process.env.AGI_REFINERY_HINT_PASS_MAX);
+  if (!Number.isFinite(parsed)) return 2;
+  return Math.min(Math.max(1, Math.floor(parsed)), 10);
+})();
+const HINT_QUERY_LIMIT = (() => {
+  const parsed = Number(process.env.AGI_REFINERY_HINT_QUERY_LIMIT);
+  if (!Number.isFinite(parsed)) return 6;
+  return Math.min(Math.max(1, Math.floor(parsed)), 25);
+})();
+const HINT_QUERY_MAX = (() => {
+  const parsed = Number(process.env.AGI_REFINERY_HINT_QUERY_MAX);
+  if (!Number.isFinite(parsed)) return 4;
+  return Math.min(Math.max(1, Math.floor(parsed)), 12);
+})();
+
+const normalizeHintPath = (value: string): string | undefined => {
+  const normalized = normalizeEvidenceRef(value, {
+    normalizeExtensions: false,
+  });
+  if (!normalized) return undefined;
+  if (!HINT_PATH_TEST.test(normalized)) return undefined;
+  return normalized;
+};
+
+const extractHintPathsFromText = (value?: string): string[] => {
+  if (!value) return [];
+  const matches = value.match(HINT_PATH_PATTERN);
+  if (!matches) return [];
+  const output: string[] = [];
+  for (const match of matches) {
+    const normalized = normalizeHintPath(match);
+    if (normalized) output.push(normalized);
+  }
+  return output;
+};
+
+const collectHintInputs = (
+  inputs: string[],
+  extraText?: string,
+): string[] => {
+  const output: string[] = [];
+  const seen = new Set<string>();
+  const combined = [...inputs, ...extractHintPathsFromText(extraText)];
+  for (const hint of combined) {
+    const normalized = normalizeHintPath(hint);
+    if (!normalized) continue;
+    if (isRestrictedEvidencePath(normalized)) continue;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    output.push(normalized);
+  }
+  return output;
+};
+
+const buildHintQueries = (hints: string[]): string[] => {
+  const output: string[] = [];
+  const seen = new Set<string>();
+  for (const hint of hints) {
+    const normalized = normalizeHintPath(hint);
+    if (!normalized) continue;
+    const base = normalized.split("/").pop() ?? normalized;
+    const stem = base.replace(/\.[^.]+$/, "");
+    for (const candidate of [normalized, base, stem]) {
+      const cleaned = candidate.trim();
+      if (!cleaned || seen.has(cleaned)) continue;
+      seen.add(cleaned);
+      output.push(cleaned);
+      if (output.length >= HINT_QUERY_MAX) return output;
+    }
+  }
+  return output;
+};
+
+const buildIntentTags = (intent?: AgiIntent): string[] => {
+  if (!intent) return [];
+  if (intent.wantsWarp || intent.wantsPhysics) return ["warp-physics"];
+  return [];
+};
+
+const buildHintQueryEvidence = async (
+  hints: string[],
+  intentTags?: string[],
+): Promise<{
+  candidates: AgiEvidence[];
+  selected: AgiEvidence[];
+  queries: string[];
+}> => {
+  if (process.env.AGI_REFINERY_HINT_QUERY === "0") {
+    return { candidates: [], selected: [], queries: [] };
+  }
+  const queries = buildHintQueries(hints);
+  if (queries.length === 0) {
+    return { candidates: [], selected: [], queries: [] };
+  }
+  const candidates: AgiEvidence[] = [];
+  const selected: AgiEvidence[] = [];
+  for (const query of queries) {
+    try {
+      const result = await searchRepoGraph({
+        query,
+        limit: HINT_QUERY_LIMIT,
+        intentTags,
+      });
+      const safeHits = filterRepoGraphHits(result.hits ?? []);
+      candidates.push(
+        ...buildEvidenceFromRepoGraphHits(safeHits as RepoGraphHitLike[], "repo_hint_query"),
+      );
+      const packets = filterRepoGraphHits((result.packets ?? []) as RepoGraphHitLike[]);
+      selected.push(
+        ...buildEvidenceFromRepoGraphHits(packets as RepoGraphHitLike[], "repo_hint_query"),
+      );
+    } catch {
+      continue;
+    }
+  }
+  return { candidates, selected, queries };
+};
+
+const CITATION_COMPLETION_CLAIM_PATTERN =
+  /\b(is|are|does|returns|means|implements|uses|adds|removes|updates|exposes|requires|includes|defined|located|calls|builds|runs|function|class|module|endpoint|route|api|handler|schema|component|service|config)\b/i;
+const CITATION_COMPLETION_FILE_PATTERN =
+  /\b[a-z0-9_.-]+\.(ts|tsx|js|jsx|json|md|yml|yaml|py|go|rs|java|cpp|c|h)\b/i;
+const CITATION_COMPLETION_MAX = (() => {
+  const parsed = Number(process.env.AGI_REFINERY_CITATION_COMPLETION_MAX);
+  if (!Number.isFinite(parsed)) return 12;
+  return Math.min(Math.max(1, Math.floor(parsed)), 64);
+})();
+const CITATION_COMPLETION_MIN = (() => {
+  const parsed = Number(process.env.AGI_REFINERY_CITATION_COMPLETION_MIN);
+  if (!Number.isFinite(parsed)) return 2;
+  return Math.min(Math.max(0, Math.floor(parsed)), CITATION_COMPLETION_MAX);
+})();
+const CITATION_COMPLETION_RATIO = (() => {
+  const parsed = Number(process.env.AGI_REFINERY_CITATION_COMPLETION_RATIO);
+  if (!Number.isFinite(parsed)) return 0.5;
+  return Math.min(Math.max(0, parsed), 1);
+})();
+
+const hasCitationClaim = (value: string): boolean => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  return (
+    CITATION_COMPLETION_CLAIM_PATTERN.test(normalized) ||
+    CITATION_COMPLETION_FILE_PATTERN.test(normalized)
+  );
+};
+
+const buildEvidenceKey = (item: AgiEvidence): string =>
+  item.hash ?? `${item.kind ?? ""}:${item.id ?? ""}:${item.path ?? ""}`;
+
+const mergeEvidence = (
+  primary: AgiEvidence[],
+  extra: AgiEvidence[],
+): AgiEvidence[] => {
+  const output: AgiEvidence[] = [];
+  const seen = new Set<string>();
+  for (const item of [...primary, ...extra]) {
+    const key = buildEvidenceKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(item);
+  }
+  return output;
+};
+
+const collectEvidenceTokens = (item: AgiEvidence): string[] => {
+  const tokens = new Set<string>();
+  const path = normalizeEvidenceRef(item.path);
+  if (path) {
+    tokens.add(path);
+    const base = path.split("/").pop();
+    if (base) tokens.add(base);
+  }
+  if (item.id) tokens.add(item.id.toLowerCase());
+  if (Array.isArray(item.keys)) {
+    item.keys.forEach((key) => tokens.add(String(key).toLowerCase()));
+  }
+  if (item.extra && typeof item.extra === "object") {
+    const extra = item.extra as { snippetId?: unknown; symbolName?: unknown };
+    if (typeof extra.snippetId === "string") {
+      tokens.add(extra.snippetId.toLowerCase());
+    }
+    if (typeof extra.symbolName === "string") {
+      tokens.add(extra.symbolName.toLowerCase());
+    }
+  }
+  return Array.from(tokens).filter((token) => token.length >= 3);
+};
+
+const scoreEvidence = (textLower: string, item: AgiEvidence): number => {
+  let score = 0;
+  for (const token of collectEvidenceTokens(item)) {
+    if (textLower.includes(token)) score += 1;
+  }
+  return score;
+};
+
+const normalizeCitationRef = (value: string): string =>
+  normalizeEvidenceRef(value) ?? "";
+
+const buildEvidenceTokenSet = (items: AgiEvidence[]): string[] => {
+  const tokens = new Set<string>();
+  for (const item of items) {
+    collectEvidenceTokens(item).forEach((token) => tokens.add(token));
+    if (item.path) {
+      const normalized = normalizeCitationRef(item.path);
+      if (normalized) tokens.add(normalized);
+    }
+  }
+  return Array.from(tokens);
+};
+
+const citationMatchesEvidence = (
+  citation: string,
+  evidenceTokens: string[],
+): boolean => {
+  const normalized = normalizeCitationRef(citation);
+  if (!normalized) return false;
+  for (const token of evidenceTokens) {
+    if (!token) continue;
+    if (normalized === token) return true;
+    if (normalized.endsWith(token)) return true;
+    if (token.endsWith(normalized)) return true;
+  }
+  return false;
+};
+
+type CitationLinkStats = {
+  hasClaim: boolean;
+  citationCount: number;
+  linkedCount: number;
+  recall: number;
+};
+
+const normalizeCitations = (citations: string[]): string[] =>
+  Array.from(
+    new Set(
+      citations
+        .filter((value) => typeof value === "string" && value.trim().length > 0)
+        .map((value) => value.trim()),
+    ),
+  );
+
+const computeCitationLinkStats = ({
+  citations,
+  evidence,
+  hasClaim,
+}: {
+  citations: string[];
+  evidence: AgiEvidence[];
+  hasClaim: boolean;
+}): CitationLinkStats => {
+  const normalized = normalizeCitations(citations);
+  const evidenceTokens = buildEvidenceTokenSet(evidence);
+  let linkedCount = 0;
+  for (const citation of normalized) {
+    if (citationMatchesEvidence(citation, evidenceTokens)) linkedCount += 1;
+  }
+  if (!hasClaim) {
+    return {
+      hasClaim,
+      citationCount: normalized.length,
+      linkedCount,
+      recall: 1,
+    };
+  }
+  if (normalized.length === 0 || evidenceTokens.length === 0) {
+    return {
+      hasClaim,
+      citationCount: normalized.length,
+      linkedCount,
+      recall: 0,
+    };
+  }
+  return {
+    hasClaim,
+    citationCount: normalized.length,
+    linkedCount,
+    recall: linkedCount / normalized.length,
+  };
+};
+
+const resolveCitationValue = (item: AgiEvidence): string | undefined => {
+  if (item.path && !isRestrictedEvidencePath(item.path)) return item.path;
+  if (item.id) return item.id;
+  if (item.hash) return item.hash;
+  return undefined;
+};
+
+type CitationCompletionMetrics = {
+  candidateRecallPreCompletion: number;
+  candidateRecallPostCompletion: number;
+  selectedRecallPreCompletion: number;
+  selectedRecallPostCompletion: number;
+  citationsPreCompletion: number;
+  citationsPostCompletion: number;
+  completionQueriesCount: number;
+  completionLatencyMs: number;
+};
+
+const completeCitations = async (args: {
+  outputText: string;
+  citations: string[];
+  retrievalCandidates: AgiEvidence[];
+  retrievalSelected: AgiEvidence[];
+  searchQuery?: string;
+}): Promise<{
+  citations: string[];
+  retrievalCandidates: AgiEvidence[];
+  retrievalSelected: AgiEvidence[];
+  added: boolean;
+  metrics: CitationCompletionMetrics;
+}> => {
+  const completionStart = Date.now();
+  let completionQueriesCount = 0;
+  const baseCitations = normalizeCitations(args.citations);
+  const outputText = args.outputText.trim();
+  const forceCompletion =
+    process.env.AGI_REFINERY_CITATION_COMPLETION_FORCE === "1";
+  const hasClaim = forceCompletion
+    ? outputText.length > 0 || baseCitations.length > 0
+    : hasCitationClaim(outputText);
+  const preCandidateStats = computeCitationLinkStats({
+    citations: baseCitations,
+    evidence: args.retrievalCandidates,
+    hasClaim,
+  });
+  const preSelectedStats = computeCitationLinkStats({
+    citations: baseCitations,
+    evidence: args.retrievalSelected,
+    hasClaim,
+  });
+  const finalize = (result: {
+    citations: string[];
+    retrievalCandidates: AgiEvidence[];
+    retrievalSelected: AgiEvidence[];
+    added: boolean;
+  }): {
+    citations: string[];
+    retrievalCandidates: AgiEvidence[];
+    retrievalSelected: AgiEvidence[];
+    added: boolean;
+    metrics: CitationCompletionMetrics;
+  } => {
+    const finalCitations = normalizeCitations(result.citations);
+    const nextSelected =
+      finalCitations.length > 0 && result.retrievalSelected.length === 0
+        ? mergeEvidence(result.retrievalSelected, result.retrievalCandidates)
+        : result.retrievalSelected;
+    const postCandidateStats = computeCitationLinkStats({
+      citations: finalCitations,
+      evidence: result.retrievalCandidates,
+      hasClaim,
+    });
+    const postSelectedStats = computeCitationLinkStats({
+      citations: finalCitations,
+      evidence: nextSelected,
+      hasClaim,
+    });
+    return {
+      citations: finalCitations,
+      retrievalCandidates: result.retrievalCandidates,
+      retrievalSelected: nextSelected,
+      added: result.added,
+      metrics: {
+        candidateRecallPreCompletion: preCandidateStats.recall,
+        candidateRecallPostCompletion: postCandidateStats.recall,
+        selectedRecallPreCompletion: preSelectedStats.recall,
+        selectedRecallPostCompletion: postSelectedStats.recall,
+        citationsPreCompletion: baseCitations.length,
+        citationsPostCompletion: finalCitations.length,
+        completionQueriesCount,
+        completionLatencyMs: Math.max(0, Date.now() - completionStart),
+      },
+    };
+  };
+  if (!hasClaim && baseCitations.length === 0) {
+    return finalize({
+      citations: baseCitations,
+      retrievalCandidates: args.retrievalCandidates,
+      retrievalSelected: args.retrievalSelected,
+      added: false,
+    });
+  }
+  let retrievalCandidates = args.retrievalCandidates;
+  let retrievalSelected = args.retrievalSelected;
+  if (retrievalCandidates.length === 0 && retrievalSelected.length === 0) {     
+    if (args.searchQuery) completionQueriesCount += 1;
+    const fallback = await buildSafeRetrievalFallback(args.searchQuery);        
+    if (fallback.candidates.length > 0) {
+      retrievalCandidates = mergeEvidence(
+        retrievalCandidates,
+        fallback.candidates,
+      );
+    }
+    if (fallback.selected.length > 0) {
+      retrievalSelected = mergeEvidence(retrievalSelected, fallback.selected);
+    }
+  }
+  if (baseCitations.length > 0 && retrievalSelected.length === 0) {
+    retrievalSelected = mergeEvidence(retrievalSelected, retrievalCandidates);  
+  }
+  const targetEvidence = mergeEvidence(retrievalSelected, retrievalCandidates);
+  const targetCount = Math.min(
+    CITATION_COMPLETION_MAX,
+    Math.max(
+      CITATION_COMPLETION_MIN,
+      Math.ceil(
+        (targetEvidence.length > 0 ? targetEvidence : retrievalSelected.length > 0
+          ? retrievalSelected
+          : retrievalCandidates
+        ).length * CITATION_COMPLETION_RATIO,
+      ),
+    ),
+  );
+  const allowedEvidence =
+    retrievalSelected.length > 0 ? retrievalSelected : retrievalCandidates;
+  const allowedTokens = buildEvidenceTokenSet(allowedEvidence);
+  const linkedCitations = baseCitations.filter((citation) =>
+    citationMatchesEvidence(citation, allowedTokens),
+  );
+  const hasLinkedCitation = linkedCitations.length > 0;
+  const removedUnlinked = linkedCitations.length !== baseCitations.length;
+  if (
+    baseCitations.length > 0 &&
+    hasLinkedCitation &&
+    !removedUnlinked &&
+    baseCitations.length >= targetCount
+  ) {
+    return finalize({
+      citations: baseCitations,
+      retrievalCandidates,
+      retrievalSelected,
+      added: false,
+    });
+  }
+  if (baseCitations.length > 0 && hasLinkedCitation && removedUnlinked) {
+    return finalize({
+      citations: linkedCitations,
+      retrievalCandidates,
+      retrievalSelected,
+      added: true,
+    });
+  }
+  if (retrievalCandidates.length === 0 && retrievalSelected.length === 0) {
+    const nextCitations = baseCitations.length > 0 ? [] : baseCitations;
+    return finalize({
+      citations: nextCitations,
+      retrievalCandidates,
+      retrievalSelected,
+      added: nextCitations.length !== baseCitations.length,
+    });
+  }
+  const pool: Array<{ item: AgiEvidence; index: number }> = [];
+  const seen = new Set<string>();
+  let index = 0;
+  const addToPool = (item: AgiEvidence): void => {
+    const key = buildEvidenceKey(item);
+    if (seen.has(key)) return;
+    seen.add(key);
+    pool.push({ item, index });
+    index += 1;
+  };
+  retrievalSelected.forEach(addToPool);
+  retrievalCandidates.forEach(addToPool);
+
+  const textLower = outputText.toLowerCase();
+  const scored = pool.map(({ item, index }) => ({
+    item,
+    index,
+    score: scoreEvidence(textLower, item),
+  }));
+  const ordered = scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.index - b.index;
+  });
+  const nextCitations: string[] = [...linkedCitations];
+  const usedEvidence: AgiEvidence[] = [];
+  for (const entry of ordered) {
+    if (nextCitations.length >= CITATION_COMPLETION_MAX) break;
+    if (nextCitations.length >= targetCount) break;
+    const citation = resolveCitationValue(entry.item);
+    if (!citation) continue;
+    if (nextCitations.includes(citation)) continue;
+    nextCitations.push(citation);
+    usedEvidence.push(entry.item);
+  }
+  if (nextCitations.length === 0) {
+    return finalize({
+      citations: baseCitations,
+      retrievalCandidates,
+      retrievalSelected,
+      added: false,
+    });
+  }
+  const finalCitations = Array.from(new Set(nextCitations)).slice(
+    0,
+    CITATION_COMPLETION_MAX,
+  );
+  const nextCandidates = mergeEvidence(retrievalCandidates, usedEvidence);
+  const nextSelected = mergeEvidence(retrievalSelected, usedEvidence);
+  return finalize({
+    citations: finalCitations,
+    retrievalCandidates: nextCandidates,
+    retrievalSelected: nextSelected,
+    added: finalCitations.length !== baseCitations.length,
+  });
+};
+
+const buildGateMetrics = (
+  gates: { name: string; pass: boolean }[],
+  evidenceCount: number,
+  accepted: boolean,
+): Record<string, number> => {
+  const metrics: Record<string, number> = {
+    gate_accept: accepted ? 1 : 0,
+    evidence_count: evidenceCount,
+  };
+  for (const gate of gates) {
+    metrics[`gate_${gate.name}`] = gate.pass ? 1 : 0;
+  }
+  return metrics;
 };
 
 const pickResonancePatch = ({
@@ -459,6 +1937,7 @@ async function rehydratePlanRecord(traceId: string): Promise<PlanRecord | null> 
       debugSources: taskTrace.debug_sources ?? undefined,
       collapseTrace: taskTrace.collapse_trace ?? undefined,
       collapseStrategy,
+      refinery: (taskTrace as { refinery?: AgiRefineryRequest }).refinery,
     };
     registerInMemoryTrace(taskTrace);
     return record;
@@ -475,7 +1954,24 @@ if (hullMode) {
   process.env.LLM_POLICY = "local";
 }
 
-const knowledgeConfig = readKnowledgeConfig();
+const localRuntimeCaps = resolveLocalRuntimeCaps();
+const applyKnowledgeCaps = (config: ReturnType<typeof readKnowledgeConfig>) => {
+  if (!localRuntimeCaps) {
+    return config;
+  }
+  return {
+    ...config,
+    contextBytes: Math.min(config.contextBytes, localRuntimeCaps.maxKnowledgeBytes),
+    maxFilesPerProject: Math.min(config.maxFilesPerProject, localRuntimeCaps.maxKnowledgeFiles),
+  };
+};
+const knowledgeConfig = applyKnowledgeCaps(readKnowledgeConfig());
+const clampTopK = (value: number): number => {
+  if (!localRuntimeCaps) {
+    return value;
+  }
+  return Math.max(1, Math.min(value, localRuntimeCaps.maxTopK));
+};
 const validateKnowledgeContext = buildKnowledgeValidator(knowledgeConfig);
 const MAX_KNOWLEDGE_PREVIEW_CHARS = 2000;
 const KNOWLEDGE_FETCH_TIMEOUT_MS = (() => {
@@ -927,6 +2423,8 @@ const PlanRequest = z.object({
   call_spec: zLocalCallSpec.optional(),
   essenceConsole: z.boolean().optional(),
   warpParams: z.record(z.any()).optional(),
+  sessionId: z.string().min(1).max(128).optional(),
+  refinery: agiRefineryRequestSchema.optional(),
 });
 
 const ExecuteRequest = z.object({
@@ -1685,7 +3183,8 @@ planRouter.post("/plan", async (req, res) => {
   if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
     return res.status(403).json({ error: "forbidden" });
   }
-  const { searchQuery, topK, summaryFocus } = parsed.data;
+  const { searchQuery, summaryFocus, sessionId, refinery } = parsed.data;
+  const topK = clampTopK(parsed.data.topK);
   const promptGoal = (promptSpec?.user_question ?? "").trim();
   const goal = (promptGoal.length >= 3 ? promptGoal : parsed.data.goal).slice(0, 20000);
   const desktopId = parsed.data.desktopId?.trim() || DEFAULT_DESKTOP_ID;
@@ -1793,7 +3292,13 @@ planRouter.post("/plan", async (req, res) => {
     const anchorText = [goal, query].filter(Boolean).join("\n");
     if (anchorText.trim().length > 0) {
       const anchorIntent = routeIntent(anchorText, anchorConfig);
-      if (anchorIntent === "architecture" || anchorIntent === "hybrid") {
+      const wantsRepoHints =
+        anchorIntent === "architecture" ||
+        anchorIntent === "hybrid" ||
+        intent.wantsImplementation ||
+        callSpecIntent.has("repo_deep") ||
+        callSpecIntent.has("repo");
+      if (wantsRepoHints) {
         const anchorCandidates = retrieveCandidates({
           userText: anchorText,
           cfg: anchorConfig,
@@ -1827,7 +3332,10 @@ planRouter.post("/plan", async (req, res) => {
       }
     }
   }
-  if (intent.wantsWarp || intent.wantsPhysics || intent.wantsImplementation) {
+  if (
+    (intent.wantsWarp || intent.wantsPhysics || intent.wantsImplementation) &&
+    resourceHintPaths.length === 0
+  ) {
     const seeded = seedWarpPaths(callSpec?.resourceHints);
     for (const path of seeded) {
       if (!knowledgeHints.includes(path)) {
@@ -2061,6 +3569,7 @@ planRouter.post("/plan", async (req, res) => {
     strategy_notes: strategyNotes,
     grounding_report: groundingReport,
     debug_sources: debugSources,
+    refinery: refinery ?? undefined,
     collapse_strategy: collapseStrategy,
     collapse_trace: collapseTrace,
   };
@@ -2070,6 +3579,7 @@ planRouter.post("/plan", async (req, res) => {
     createdAt,
     goal,
     personaId,
+    sessionId,
     planDsl,
     nodes,
     executorSteps,
@@ -2079,6 +3589,11 @@ planRouter.post("/plan", async (req, res) => {
     knowledgeContext,
     knowledgeHash,
     knowledgeHints,
+    resourceHints: resourceHintPaths,
+    knowledgeProjects: requestedProjects,
+    searchQuery: query,
+    topK,
+    summaryFocus: focus,
     desktopId,
     telemetry: telemetryBundle ?? null,
     telemetrySummary: telemetrySummary ?? null,
@@ -2088,12 +3603,14 @@ planRouter.post("/plan", async (req, res) => {
     debateId: null,
     strategy,
     strategyNotes,
+    intent,
     groundingReport,
     debugSources,
     promptSpec: promptSpec ?? undefined,
     collapseTrace: collapseTrace ?? undefined,
     collapseStrategy,
     callSpec: callSpec ?? undefined,
+    refinery: refinery ?? undefined,
   };
 
   registerInMemoryTrace(taskTrace);
@@ -2164,6 +3681,48 @@ planRouter.post("/execute", async (req, res) => {
   }
   if (!personaPolicy.canAccess(req.auth, record.personaId, "plan")) {
     return res.status(403).json({ error: "forbidden" });
+  }
+  if (record.refinery?.origin === "variant") {
+    const alphaState = computeAlphaGovernorState();
+    if (alphaState.enabled && alphaState.alphaTarget !== undefined && alphaState.engaged) {
+      recordTrainingTrace({
+        traceId,
+        pass: false,
+        deltas: [],
+        metrics: {
+          alpha_blocked: 1,
+          governor_engaged: 1,
+          alpha_target: alphaState.alphaTarget ?? null,
+          alpha_run: alphaState.alphaRun,
+          alpha_live: alphaState.live,
+          alpha_variant: alphaState.variant,
+          alpha_cap: Number.isFinite(alphaState.cap) ? alphaState.cap : null,
+          alpha_window: alphaState.window,
+          run_mode: alphaState.runMode,
+        },
+        source: {
+          system: "agi-refinery",
+          component: "execute",
+          tool: "alpha_governor",
+        },
+        notes: [
+          "alpha_blocked",
+          "governor_engaged",
+          `origin=${record.refinery.origin}`,
+        ],
+      });
+      return res.status(409).json({
+        error: "alpha_governor_engaged",
+        alphaTarget: alphaState.alphaTarget ?? null,
+        alphaRun: alphaState.alphaRun,
+        alphaLive: alphaState.live,
+        alphaVariant: alphaState.variant,
+        alphaCap: Number.isFinite(alphaState.cap) ? alphaState.cap : null,
+        alphaWindow: alphaState.window,
+        runMode: alphaState.runMode,
+        governorEngaged: true,
+      });
+    }
   }
 
   const runtimeKnowledgeHash = hashKnowledgeContext(sanitizeKnowledgeContextForTrace(record.knowledgeContext));
@@ -2251,6 +3810,12 @@ planRouter.post("/execute", async (req, res) => {
     } as any);
   }
   const executorStepById = new Map(record.executorSteps.map((entry) => [entry.id, entry]));
+  const executionEnvelopes = collectExecutionEnvelopes(
+    steps,
+    executorStepById,
+    start,
+  );
+  const executionErrorTypes = collectExecutionErrorTypes(steps);
   const debateStepResult = steps.find((step) => {
     const exec = executorStepById.get(step.id);
     const isDebateRun =
@@ -2280,7 +3845,21 @@ planRouter.post("/execute", async (req, res) => {
   record.taskTrace.planner_prompt = record.plannerPrompt ?? record.taskTrace.planner_prompt ?? null;
   record.debateId = record.taskTrace.debate_id ?? record.debateId ?? null;
   record.taskTrace.debate_id = record.debateId;
-  const summary = record.taskTrace.result_summary ?? summarizeExecutionResults(steps);
+  const executionSignals = summarizeExecutionSignals(
+    steps,
+    record.goal,
+    executorStepById,
+    record.intent,
+    executionErrorTypes,
+  );
+  const rawSummary =
+    record.taskTrace.result_summary ?? summarizeExecutionResults(steps);
+  const executionSummary = resolveExecutionHandledSummary(rawSummary, ok);
+  const safetySummary = resolveSafetyHandledSummary(
+    executionSummary.summary,
+    executionSignals.safetyOk,
+  );
+  const summary = safetySummary.summary;
   record.taskTrace.result_summary = summary;
   try {
     await withTimeout(saveTaskTrace(record.taskTrace), SAVE_TASK_TRACE_TIMEOUT_MS, "save_task_trace");
@@ -2296,6 +3875,293 @@ planRouter.post("/execute", async (req, res) => {
     results: steps,
     knowledgeContext: record.knowledgeContext,
   });
+  if (shouldCaptureRefineryTrace(record.personaId, record.refinery)) {
+    try {
+      const {
+        formatOk,
+        testsRun,
+        testsOk,
+        testsRequired,
+        safetyOk,
+        executionErrorTypes,
+        codeTouched,
+        codeTouchedPaths,
+        contractRequired,
+        contractOk,
+        contractIssues,
+        constraintRequired,
+        constraintOk,
+        constraintIssues,
+        constraintSources,
+      } = executionSignals;
+      let citations = safetyOk ? collectStepCitations(steps) : [];
+      let { candidates: retrievalCandidates, selected: retrievalSelected } =
+        collectRepoGraphEvidence(steps, executorStepById);
+      const intentTags = buildIntentTags(record.intent);
+      if (!safetyOk) {
+        try {
+          const fallback = await buildSafeRetrievalFallback(
+            record.searchQuery ?? record.goal,
+          );
+          if (fallback.candidates.length > 0) {
+            retrievalCandidates = fallback.candidates;
+          }
+          if (fallback.selected.length > 0) {
+            retrievalSelected = fallback.selected;
+          }
+        } catch (error) {
+          console.warn("[agi.refinery] safe retrieval fallback failed", error);
+        }
+      }
+      const hintPassEnabled = process.env.AGI_REFINERY_HINT_PASS !== "0";
+      const hintPathInputs = collectHintInputs(
+        record.resourceHints ?? [],
+        record.searchQuery ?? record.goal,
+      );
+      let hintPathsUsed: string[] | undefined;
+      let hintQueryApplied = false;
+      if (hintPassEnabled && hintPathInputs.length > 0) {
+        try {
+          const hintPaths: string[] = [];
+          for (const hint of hintPathInputs) {
+            if (isRestrictedEvidencePath(hint)) continue;
+            hintPaths.push(hint);
+            if (hintPaths.length >= HINT_PASS_MAX) break;
+          }
+          if (hintPaths.length > 0) {
+            hintPathsUsed = hintPaths;
+            const hintHits = hintPaths.map((path, index) => ({
+              id: `hint:${index}:${path}`,
+              kind: "repo_hint",
+              path,
+              file_path: path,
+              score: 1,
+            }));
+            const hintEvidence = buildEvidenceFromRepoGraphHits(
+              hintHits,
+              "repo_hint",
+            );
+            if (hintEvidence.length > 0) {
+              retrievalCandidates = [...retrievalCandidates, ...hintEvidence];
+              retrievalSelected = [...retrievalSelected, ...hintEvidence];
+            }
+          }
+        } catch (error) {
+          console.warn("[agi.refinery] hint pass failed", error);
+        }
+      }
+      if (hintPathsUsed && hintPathsUsed.length > 0) {
+        const hintQueryEvidence = await buildHintQueryEvidence(
+          hintPathsUsed,
+          intentTags,
+        );
+        if (hintQueryEvidence.candidates.length > 0) {
+          retrievalCandidates = mergeEvidence(
+            retrievalCandidates,
+            hintQueryEvidence.candidates,
+          );
+          hintQueryApplied = true;
+        }
+        if (hintQueryEvidence.selected.length > 0) {
+          retrievalSelected = mergeEvidence(
+            retrievalSelected,
+            hintQueryEvidence.selected,
+          );
+          hintQueryApplied = true;
+        }
+      }
+      const citationCompletionEnabled =
+        process.env.AGI_REFINERY_CITATION_COMPLETION !== "0";
+      let citationCompletionApplied = false;
+      let citationCompletionMetrics: CitationCompletionMetrics | undefined;
+      if (citationCompletionEnabled && safetyOk) {
+        try {
+          const finalStep = steps[steps.length - 1];
+          const finalText =
+            finalStep && finalStep.ok
+              ? pickReadableText(finalStep.output)
+              : undefined;
+          const completionText = (finalText ?? summary).trim();
+          const completion = await completeCitations({
+            outputText: completionText.length > 0 ? completionText : summary,
+            citations,
+            retrievalCandidates,
+            retrievalSelected,
+            searchQuery: record.searchQuery ?? record.goal,
+          });
+          citations = completion.citations;
+          retrievalCandidates = completion.retrievalCandidates;
+          retrievalSelected = completion.retrievalSelected;
+          citationCompletionApplied = completion.added;
+          citationCompletionMetrics = completion.metrics;
+        } catch (error) {
+          console.warn("[agi.refinery] citation completion failed", error);
+        }
+      }
+      const tokens =
+        estimateTokens(record.goal) + estimateTokens(summary ?? "");
+      const plannerVersion = resolvePlannerModel();
+      const executorVersion = resolveExecutorModel();
+      const model = executorVersion ?? plannerVersion;
+      const trajectory = buildRefineryTrajectory({
+        trajectoryId: traceId,
+        traceId,
+        sessionId: record.sessionId,
+        personaId: record.personaId,
+        createdAt: record.createdAt,
+        goal: record.goal,
+        intent: record.intent,
+        strategy: record.strategy,
+        searchQuery: record.searchQuery,
+        topK: record.topK,
+        summaryFocus: record.summaryFocus,
+        model,
+        plannerVersion,
+        executorVersion,
+        knowledgeContext: safetyOk ? record.knowledgeContext : undefined,
+        groundingReport: safetyOk
+          ? record.groundingReport ?? record.taskTrace.grounding_report ?? undefined
+          : undefined,
+        knowledgeHash: record.knowledgeHash ?? undefined,
+        resourceHints: hintPassEnabled ? hintPathsUsed ?? [] : record.resourceHints,
+        knowledgeProjects: record.knowledgeProjects,
+        summary,
+        citations,
+        durationMs: duration,
+        tokens,
+        executionOk: ok,
+        executionErrorTypes:
+          executionErrorTypes.length > 0 ? executionErrorTypes : undefined,
+        executionEnvelopes:
+          executionEnvelopes.length > 0 ? executionEnvelopes : undefined,
+        formatOk,
+        testsRun,
+        testsOk,
+        testsRequired,
+        codeTouched,
+        codeTouchedPaths: codeTouchedPaths.length > 0 ? codeTouchedPaths : undefined,
+        contractRequired,
+        contractOk,
+        contractIssues: contractIssues.length > 0 ? contractIssues : undefined,
+        constraintRequired,
+        constraintOk,
+        constraintIssues:
+          constraintIssues.length > 0 ? constraintIssues : undefined,
+        constraintSources:
+          constraintSources.length > 0 ? constraintSources : undefined,
+        safetyOk,
+        sanitizeEvidence: !safetyOk,
+        retrievalCandidates:
+          retrievalCandidates.length > 0 ? retrievalCandidates : undefined,
+        retrievalSelected:
+          retrievalSelected.length > 0 ? retrievalSelected : undefined,
+        citationCompletionApplied,
+        candidateRecallPreCompletion:
+          citationCompletionMetrics?.candidateRecallPreCompletion,
+        candidateRecallPostCompletion:
+          citationCompletionMetrics?.candidateRecallPostCompletion,
+        selectedRecallPreCompletion:
+          citationCompletionMetrics?.selectedRecallPreCompletion,
+        selectedRecallPostCompletion:
+          citationCompletionMetrics?.selectedRecallPostCompletion,
+        citationsPreCompletion: citationCompletionMetrics?.citationsPreCompletion,
+        citationsPostCompletion:
+          citationCompletionMetrics?.citationsPostCompletion,
+        completionQueriesCount:
+          citationCompletionMetrics?.completionQueriesCount,
+        completionLatencyMs: citationCompletionMetrics?.completionLatencyMs,
+        refinery: record.refinery,
+      });
+      const gateReport = evaluateTrajectoryGates(trajectory);
+      const metricsPayload = buildGateMetrics(
+        gateReport.gates,
+        trajectory.E?.length ?? 0,
+        gateReport.accepted,
+      );
+      if (citationCompletionMetrics) {
+        metricsPayload.candidateRecall_preCompletion =
+          citationCompletionMetrics.candidateRecallPreCompletion;
+        metricsPayload.candidateRecall_postCompletion =
+          citationCompletionMetrics.candidateRecallPostCompletion;
+        metricsPayload.selectedRecall_preCompletion =
+          citationCompletionMetrics.selectedRecallPreCompletion;
+        metricsPayload.selectedRecall_postCompletion =
+          citationCompletionMetrics.selectedRecallPostCompletion;
+        metricsPayload.completionQueriesCount =
+          citationCompletionMetrics.completionQueriesCount;
+        metricsPayload.completionLatencyMs =
+          citationCompletionMetrics.completionLatencyMs;
+      }
+      const notes = record.refinery?.origin
+        ? [`origin=${record.refinery.origin}`]
+        : [];
+      if (!ok && executionSummary.handled) {
+        notes.push("execution_handled");
+      }
+      if (!safetyOk && safetySummary.handled) {
+        notes.push("safety_handled");
+      }
+      if (hintQueryApplied) {
+        notes.push("hint_query");
+      }
+      if (citationCompletionApplied) {
+        notes.push("citation_completion");
+      }
+      const alphaGate = evaluateAlphaGovernor(
+        trajectory.meta?.origin,
+        gateReport.accepted,
+      );
+      if (!alphaGate.allow) {
+        notes.push("alpha_blocked");
+        const alphaRun = alphaGate.alphaRun;
+        const traceNotes = notes.length > 0 ? notes : undefined;
+        recordTrainingTrace({
+          traceId,
+          pass: false,
+          deltas: [],
+          metrics: {
+            alpha_blocked: 1,
+            governor_engaged: alphaGate.engaged ? 1 : 0,
+            alpha_target: alphaGate.alphaTarget ?? null,
+            alpha_run: alphaRun,
+            alpha_live: alphaGate.live,
+            alpha_variant: alphaGate.variant,
+            alpha_cap: Number.isFinite(alphaGate.cap) ? alphaGate.cap : null,
+            alpha_window: alphaGate.window,
+            run_mode: alphaGate.runMode,
+          },
+          source: {
+            system: "agi-refinery",
+            component: "execute",
+            tool: "alpha_governor",
+          },
+          notes: traceNotes,
+        });
+      } else {
+        const traceNotes = notes.length > 0 ? notes : undefined;
+        recordTrainingTrace({
+          traceId,
+          pass: gateReport.accepted,
+          deltas: [],
+          metrics: metricsPayload,
+          source: { system: "agi-refinery", component: "execute", tool: "trajectory" },
+          payload: { kind: "trajectory", data: trajectory },
+          notes: traceNotes,
+        });
+        recordTrainingTrace({
+          traceId,
+          pass: gateReport.accepted,
+          deltas: [],
+          metrics: metricsPayload,
+          source: { system: "agi-refinery", component: "execute", tool: "gates" },
+          payload: { kind: "trajectory_gates", data: gateReport },
+          notes: traceNotes,
+        });
+      }
+    } catch (error) {
+      console.warn("[agi.refinery] trajectory capture failed", error);
+    }
+  }
 
   res.json({
     traceId,

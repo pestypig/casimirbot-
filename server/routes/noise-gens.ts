@@ -964,7 +964,9 @@ const extractTimeSigFromXml = (root: unknown): string | undefined => {
   return undefined;
 };
 
-const extractLocatorsFromXml = (root: unknown) => {
+const extractLocatorsFromXml = (
+  root: unknown,
+): Array<{ name?: string; time?: number }> => {
   const nodes: unknown[] = [];
   collectNodesByKey(root, "Locator", nodes);
   const locators = nodes
@@ -977,7 +979,10 @@ const extractLocatorsFromXml = (root: unknown) => {
       if (!name && time == null) return null;
       return { name: name || undefined, time: time ?? undefined };
     })
-    .filter((entry): entry is { name?: string; time?: number } => !!entry);
+    .filter(
+      (entry): entry is { name: string | undefined; time: number | undefined } =>
+        entry !== null,
+    );
   return locators;
 };
 
@@ -1035,9 +1040,9 @@ const mergeIntentBounds = (
   next: NonNullable<AbletonIntentSnapshot["deviceIntent"]>["bounds"] | undefined,
 ) => {
   if (!next) return base;
-  const merged = { ...(base ?? {}) } as NonNullable<
-    AbletonIntentSnapshot["deviceIntent"]
-  >["bounds"];
+  const merged: NonNullable<
+    NonNullable<AbletonIntentSnapshot["deviceIntent"]>["bounds"]
+  > = { ...(base ?? {}) };
   for (const [key, value] of Object.entries(next)) {
     if (!value || typeof value !== "object") continue;
     const range = value as { min: number; max: number };
@@ -2647,7 +2652,7 @@ const mixdownAssets = async (
 const ensurePcm16WavBuffer = (
   buffer: Buffer,
   mime: string,
-): { buffer: Buffer; format: ReturnType<typeof parseWavFormat> } | null => {    
+): { buffer: Buffer; format: WavFormat } | null => {
   const lower = mime.toLowerCase();
   if (!lower.includes("wav") && !lower.includes("wave")) return null;
   const format = parseWavFormat(buffer);
@@ -4217,10 +4222,11 @@ router.post(
     const offsetMs = clampNumber(Number(offsetMsRaw), -2000, 2000, 0);
     const storeSnapshot = existingOriginalId
       ? await getNoisegenStore()
-      : null;
-    const existingSnapshot = existingOriginalId
-      ? findOriginalById(storeSnapshot, existingOriginalId)
       : undefined;
+    const existingSnapshot =
+      existingOriginalId && storeSnapshot
+        ? findOriginalById(storeSnapshot, existingOriginalId)
+        : undefined;
 
     if (!title) {
       return res.status(400).json({ error: "title_required" });
@@ -4317,12 +4323,13 @@ router.post(
       ? resolveUploadAudio(instrumental)
       : null;
     const vocalPayload = vocal ? resolveUploadAudio(vocal) : null;
-    const intentSnapshot = intentFile
+    const intentSnapshotRaw = intentFile
       ? await parseAbletonIntentSnapshot({
           buffer: Buffer.from(intentFile.buffer),
           fileName: intentFile.originalname,
         })
       : undefined;
+    const intentSnapshot = intentSnapshotRaw ?? undefined;
     const intentSnapshotPreferences = buildIntentSnapshotPreferences({
       applyTempo: readBooleanField(req.body?.intentApplyTempo),
       applyMix: readBooleanField(req.body?.intentApplyMix),
@@ -4643,10 +4650,11 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
   const existingSnapshot = findOriginalById(storeSnapshot, trackId);
   if (kind === "intent") {
     const buffer = await fs.readFile(assembledPath);
-    const intentSnapshot = await parseAbletonIntentSnapshot({
+    const intentSnapshotRaw = await parseAbletonIntentSnapshot({
       buffer,
       fileName,
     });
+    const intentSnapshot = intentSnapshotRaw ?? undefined;
     const intentSnapshotPreferences = buildIntentSnapshotPreferences({
       applyTempo: readBooleanField(req.body?.intentApplyTempo),
       applyMix: readBooleanField(req.body?.intentApplyMix),

@@ -5,6 +5,7 @@ import type { ConsoleTelemetryBundle } from "./desktop";
 import { ToolRisk } from "./skills";
 import type { ToolManifestEntry } from "./skills";
 import type { GroundingReport } from "./grounding";
+import { agiRefineryRequestSchema } from "./agi-refinery";
 
 export const PersonaProfile = z.object({
   id: z.string(),
@@ -109,6 +110,7 @@ export const TaskTrace = z.object({
   strategy_notes: z.array(z.string()).optional(),
   grounding_report: z.any().optional(),
   debug_sources: z.boolean().optional(),
+  refinery: agiRefineryRequestSchema.optional(),
   // Agent instructions captured alongside the trace
   routine_json: z.any().optional(),
   collapse_strategy: z.string().optional(),

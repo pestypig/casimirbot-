@@ -354,7 +354,10 @@ const enforceRateLimit = (
 };
 
 const redactLedgerResult = (
-  ledger: ReturnType<typeof mintContributionReceiptToLedger> | undefined,
+  ledger:
+    | ReturnType<typeof mintContributionReceiptToLedger>
+    | ReturnType<typeof revokeReceiptFromLedger>
+    | undefined,
   receiptDisclosure: ReturnType<typeof discloseContributionReceipt> | null,
   isOwner: boolean,
 ) => {
@@ -499,7 +502,10 @@ contributionsRouter.post("/ingest", async (req, res) => {
     claims = normalizeClaims(parsed.data.claims);
   } else {
     try {
-      const extracted = await debateClaimExtractHandler({ text: parsed.data.text });
+      const extracted = (await debateClaimExtractHandler(
+        { text: parsed.data.text },
+        {},
+      )) as { claims?: unknown };
       const extractedClaims = Array.isArray(extracted?.claims)
         ? extracted.claims
         : [];

@@ -600,11 +600,12 @@ const promotePendingOriginals = (store: NoisegenStore): NoisegenStore => {
     if (!original?.id) continue;
     if (knownIds.has(original.id)) continue;
     const processingUpdatedAt = original.processing?.updatedAt;
-    const anchor = Number.isFinite(processingUpdatedAt)
-      ? processingUpdatedAt
-      : Number.isFinite(original.uploadedAt)
-        ? original.uploadedAt
-        : now;
+    const anchor =
+      typeof processingUpdatedAt === "number"
+        ? processingUpdatedAt
+        : typeof original.uploadedAt === "number"
+          ? original.uploadedAt
+          : now;
     const rawAgeMs = now - anchor;
     const ageMs = rawAgeMs < 0 ? PENDING_RANK_DELAY_MS : rawAgeMs;
     const playbackReady =
@@ -937,10 +938,14 @@ const resolveBundledOriginal = async (
     assets.playback = [buildPlaybackFromAsset(assets.instrumental)];
   }
 
-  const stemEntries =
-    manifest.stems && manifest.stems.length > 0
-      ? manifest.stems
-      : await listBundledStemFiles(rootDir);
+  const stemEntries = (manifest.stems && manifest.stems.length > 0
+    ? manifest.stems
+    : await listBundledStemFiles(rootDir)) as Array<{
+    file: string;
+    name?: string;
+    id?: string;
+    category?: string;
+  }>;
   if (stemEntries.length > 0) {
     const usedStemIds = new Set<string>();
     const stems: NoisegenStemAsset[] = [];
@@ -1476,18 +1481,6 @@ export const savePlaybackAsset = async (params: {
       uploadedAt: Date.now(),
     };
   }
-  if (backend === "storage") {
-    const record = await putBlob(params.buffer, { contentType: params.mime });
-    return {
-      kind: params.kind,
-      fileName,
-      path: record.uri,
-      mime: params.mime,
-      bytes: record.bytes,
-      uploadedAt: Date.now(),
-    };
-  }
-
   const { originalsDir, baseDir } = getNoisegenPaths();
   const targetDir = path.join(originalsDir, params.originalId, "playback");
   await fs.mkdir(targetDir, { recursive: true });

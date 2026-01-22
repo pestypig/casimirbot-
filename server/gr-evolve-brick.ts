@@ -404,7 +404,7 @@ const maxAbsFromChannel = (channel: GrEvolveBrickChannel) => {
 const percentileFromSamples = (samples: number[], p: number) => {
   if (!samples.length) return 0;
   const sorted = [...samples].sort((a, b) => a - b);
-  const q = clampNumber(p, 0, 1);
+  const q = Math.min(Math.max(p, 0), 1);
   const index = Math.floor((sorted.length - 1) * q);
   return sorted[index] ?? 0;
 };

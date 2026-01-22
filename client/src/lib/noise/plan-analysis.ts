@@ -147,8 +147,9 @@ const mixBuffers = async (buffers: AudioBuffer[]): Promise<AudioBuffer | null> =
     source.start(0);
   }
   const mixed = await context.startRendering();
-  if (context.close) {
-    await context.close();
+  const maybeClose = (context as OfflineAudioContext & { close?: () => Promise<void> }).close;
+  if (typeof maybeClose === "function") {
+    await maybeClose.call(context);
   }
   return mixed;
 };

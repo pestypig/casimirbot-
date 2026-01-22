@@ -23,19 +23,27 @@ verifies with solvers and tests, and escalates fidelity only when needed.
 ## Core value propositions
 - Reliability: higher build success rate and lower time-to-green
 - Auditability: constraints, certificates, and residuals are explicit artifacts
+- Provenance: every answer ties to evidence, gates, and replayable traces
 - Multi-fidelity reasoning: use cheap models first, expensive ones only when required
 - Domain transfer: same loop applies to GR, noise, images, and belief graphs
 
 ## Product and packaging (planned)
 - Open-source core stack (this repo)
 - Helix console for operators and visibility
+- Helix Ask surface for repo-grounded answers with inline provenance
+- Helix Ask desktop bar + conversation panel for system-wide Q and A
+- Seed mining and holdout panels for coverage and drift visibility
 - Headless runner or CLI for CI and agent orchestration
 - Enterprise deployment with policy controls and audit retention
+- CPU-first deployment track for constrained environments (8 GB class)
 
 ## Differentiators
 - Constraints are executable, not only documented
 - Solver-driven verification gates outcomes
 - Clear policy boundary for "viability" via `WARP_AGENTS.md`
+- Release-candidate datasets (RC0/RC1) with pinned holdouts and manifest hashes
+- Deployment gate with holdout thresholds before release
+- Evidence identity normalization to keep citations and audits deterministic
 
 ## Revenue model (draft)
 - Team licenses for agent orchestration and support
@@ -52,6 +60,9 @@ verifies with solvers and tests, and escalates fidelity only when needed.
 - Time-to-green after a change
 - Constraint violations per run (trend down)
 - Performance or efficiency gains vs baseline
+- Holdout precision/recall and citation recall (coverage and in-distribution)
+- Gate pass rate with safety-handled outcomes
+- RC dataset reproducibility (manifest hash stability)
 
 ## Benefit story across generation mediums (measurable targets)
 If every request (code, physics kernels, noise fields, diffusion stubs, coherence graphs)
@@ -105,6 +116,14 @@ Gaps:
 - Overclaiming physics: keep GR internal and use it as a stress-test domain
 - Compute cost: enforce model ladder and gating before high-fidelity runs
 - Trust and compliance: make audit logs persistent and reviewable
+- Deployment drift: enforce RC manifests + holdout gates before release
+- Artifact drift on non-persistent hosts: hydrate model/index artifacts by hash
+
+## Deployment constraints (2026)
+- Target 8 GB RAM CPU-only environments with quantized models (1-3B, 4-bit).
+- Treat models and indexes as versioned artifacts (object storage hydration).
+- Keep context budgets small and rely on retrieval + gates for correctness.
+- Reserve headroom for UI, retrieval, and render workloads (avoid OOM spikes).
 
 ## Next milestones
 - Persist audit logs and expose summary dashboards

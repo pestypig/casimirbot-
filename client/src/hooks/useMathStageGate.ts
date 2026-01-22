@@ -9,7 +9,7 @@ import {
 } from "@/lib/math-stage-gate";
 
 export function useMathStageGate(
-  requirements: MathStageRequirement[],
+  requirements: ReadonlyArray<MathStageRequirement>,
   options: { staleTime?: number } = {},
 ): MathStageGate & { pending: boolean } {
   const query = useQuery({

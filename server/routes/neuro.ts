@@ -7,6 +7,7 @@ import {
 import {
   autoStartNeuroLoopFromEnv,
   neuroLoopController,
+  type NeuroLoopStartOptions,
 } from "../neuro/loop-controller";
 
 const neuroRouter = Router();
@@ -131,7 +132,9 @@ neuroRouter.post("/driver/select", async (req, res) => {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
   try {
-    const status = await neuroLoopController.start(parsed.data);
+    const status = await neuroLoopController.start(
+      parsed.data as NeuroLoopStartOptions,
+    );
     res.json(status);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

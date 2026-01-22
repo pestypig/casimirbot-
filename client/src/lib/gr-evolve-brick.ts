@@ -283,16 +283,16 @@ const normalizeFixupStats = (raw: any): FixupStats | undefined => {
     ...step,
     totalCells: Number(raw.totalCells ?? 0),
     alphaClampByStep: Array.isArray(raw.alphaClampByStep)
-      ? raw.alphaClampByStep.map((value) => Number(value))
+      ? raw.alphaClampByStep.map((value: unknown) => Number(value))
       : [],
     kClampByStep: Array.isArray(raw.kClampByStep)
-      ? raw.kClampByStep.map((value) => Number(value))
+      ? raw.kClampByStep.map((value: unknown) => Number(value))
       : [],
     detFixByStep: Array.isArray(raw.detFixByStep)
-      ? raw.detFixByStep.map((value) => Number(value))
+      ? raw.detFixByStep.map((value: unknown) => Number(value))
       : [],
     traceFixByStep: Array.isArray(raw.traceFixByStep)
-      ? raw.traceFixByStep.map((value) => Number(value))
+      ? raw.traceFixByStep.map((value: unknown) => Number(value))
       : [],
     alphaClampMin: Number(raw.alphaClampMin ?? 0),
     alphaClampMax: Number(raw.alphaClampMax ?? 0),
@@ -325,7 +325,7 @@ const normalizeStiffness = (raw: any): GrShiftStiffnessMetrics | undefined => {
       ? (shockModeRaw as "off" | "diagnostic" | "stabilize")
       : undefined;
   const stabilizersApplied = Array.isArray(raw.stabilizersApplied)
-    ? raw.stabilizersApplied.map((value: any) => String(value))
+    ? raw.stabilizersApplied.map((value: unknown) => String(value))
     : undefined;
   if (
     !Number.isFinite(betaMaxAbs) &&
@@ -371,7 +371,9 @@ const normalizeSolverHealth = (raw: any): GrSolverHealth | undefined => {
   const status = String(raw.status ?? "").toUpperCase();
   return {
     status: status === "CERTIFIED" || status === "UNSTABLE" ? status : "NOT_CERTIFIED",
-    reasons: Array.isArray(raw.reasons) ? raw.reasons.map((value) => String(value)) : [],
+    reasons: Array.isArray(raw.reasons)
+      ? raw.reasons.map((value: unknown) => String(value))
+      : [],
     alphaClampFraction: Number(raw.alphaClampFraction ?? 0),
     kClampFraction: Number(raw.kClampFraction ?? 0),
     totalClampFraction: Number(raw.totalClampFraction ?? 0),
@@ -385,7 +387,9 @@ const normalizeBrickMeta = (raw: any): GrBrickMeta | undefined => {
   const status = String(raw.status ?? "").toUpperCase();
   return {
     status: status === "CERTIFIED" ? "CERTIFIED" : "NOT_CERTIFIED",
-    reasons: Array.isArray(raw.reasons) ? raw.reasons.map((value) => String(value)) : [],
+    reasons: Array.isArray(raw.reasons)
+      ? raw.reasons.map((value: unknown) => String(value))
+      : [],
   };
 };
 
@@ -629,7 +633,9 @@ const buildQuery = (request: GrEvolveBrickRequest) => {
     params.set("boundary", request.boundary);
   }
   if (Array.isArray(request.driveDir) && request.driveDir.length >= 3) {
-    const parts = request.driveDir.slice(0, 3).map((value) => Number(value));
+    const parts = request.driveDir
+      .slice(0, 3)
+      .map((value: number) => Number(value));
     if (parts.every((value) => Number.isFinite(value))) {
       params.set("driveDir", parts.join(","));
     }

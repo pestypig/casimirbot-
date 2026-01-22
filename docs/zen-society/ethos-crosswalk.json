@@ -155,6 +155,196 @@
       ]
     },
     {
+      "artifactId": "artifact-civic-signal-survey",
+      "title": "Civic signal survey template",
+      "templatePath": "docs/zen-society/templates/artifacts/civic-signal-survey.md",
+      "nodeRefs": [
+        "three-tenets-loop",
+        "civic-signal-loop",
+        "right-speech-infrastructure",
+        "data-dignity",
+        "integrity-protocols",
+        "sangha-architecture",
+        "skillful-mediation",
+        "civic-memory-continuity",
+        "no-bypass-guardrail"
+      ],
+      "requiredChecks": [
+        "survey_scope_declared",
+        "data_minimization_applied",
+        "lawful_boundaries_stated",
+        "response_playbook_defined",
+        "public_summary_cadence"
+      ]
+    },
+    {
+      "artifactId": "artifact-lawful-interface-protocol",
+      "title": "Lawful interface protocol template",
+      "templatePath": "docs/zen-society/templates/artifacts/lawful-interface-protocol.md",
+      "nodeRefs": [
+        "lawful-interface-protocol",
+        "jurisdictional-floor",
+        "two-key-approval",
+        "right-speech-infrastructure",
+        "data-dignity",
+        "integrity-protocols",
+        "restorative-harm-repair",
+        "skillful-mediation",
+        "capture-resistance",
+        "civic-memory-continuity",
+        "external-interface-integrity"
+      ],
+      "requiredChecks": [
+        "cooperation_boundaries_published",
+        "dual_key_approval_required",
+        "lawful_rights_guidance_posted",
+        "non_retaliation_channel_active",
+        "independent_review_defined",
+        "liaison_council_roster_current",
+        "incentives_audited"
+      ]
+    },
+    {
+      "artifactId": "artifact-federal-civic-listening-circuit",
+      "title": "Federal civic listening circuit template",
+      "templatePath": "docs/zen-society/templates/artifacts/federal-civic-listening-circuit.md",
+      "nodeRefs": [
+        "federal-civic-listening-circuit",
+        "right-speech-infrastructure",
+        "civic-memory-continuity",
+        "sangha-architecture",
+        "interbeing-systems",
+        "external-interface-integrity"
+      ],
+      "requiredChecks": [
+        "docket_published",
+        "response_ledger_published",
+        "hearing_cadence_set",
+        "declines_rationale_published"
+      ]
+    },
+    {
+      "artifactId": "artifact-metric-integrity-guardrail",
+      "title": "Metric integrity guardrail template",
+      "templatePath": "docs/zen-society/templates/artifacts/metric-integrity-guardrail.md",
+      "nodeRefs": [
+        "metric-integrity-guardrail",
+        "koan-governance",
+        "integrity-protocols",
+        "capture-resistance",
+        "verification-checklist",
+        "values-over-images"
+      ],
+      "requiredChecks": [
+        "metrics_defined",
+        "quota_prohibited",
+        "invalidators_published",
+        "review_triggers_set",
+        "harm_reduction_metrics_included"
+      ]
+    },
+    {
+      "artifactId": "artifact-harm-weighted-priority-standard",
+      "title": "Harm-weighted priority standard template",
+      "templatePath": "docs/zen-society/templates/artifacts/harm-weighted-priority-standard.md",
+      "nodeRefs": [
+        "harm-weighted-priority-standard",
+        "no-bypass-guardrail",
+        "restorative-harm-repair",
+        "integrity-protocols",
+        "data-dignity",
+        "jurisdictional-floor"
+      ],
+      "requiredChecks": [
+        "priority_tiers_defined",
+        "evidence_thresholds_set",
+        "independent_review_required",
+        "appeal_path_defined",
+        "data_minimized"
+      ]
+    },
+    {
+      "artifactId": "artifact-integration-ladder",
+      "title": "Integration ladder template",
+      "templatePath": "docs/zen-society/templates/artifacts/integration-ladder.md",
+      "nodeRefs": [
+        "integration-ladder",
+        "restorative-harm-repair",
+        "interbeing-systems",
+        "jurisdictional-floor",
+        "data-dignity",
+        "civic-memory-continuity",
+        "scarcity-justice"
+      ],
+      "requiredChecks": [
+        "eligibility_criteria_published",
+        "data_limits_defined",
+        "audit_hooks_defined",
+        "timeline_published",
+        "non_retaliation_clause"
+      ]
+    },
+    {
+      "artifactId": "artifact-local-stability-compact",
+      "title": "Local stability compact template",
+      "templatePath": "docs/zen-society/templates/artifacts/local-stability-compact.md",
+      "nodeRefs": [
+        "local-stability-compact",
+        "interbeing-systems",
+        "scarcity-justice",
+        "sangha-architecture",
+        "civic-memory-continuity",
+        "external-interface-integrity"
+      ],
+      "requiredChecks": [
+        "stability_impact_statement_required",
+        "mitigation_plan_defined",
+        "small_business_supports_listed",
+        "workforce_displacement_monitored",
+        "public_summary_cadence"
+      ]
+    },
+    {
+      "artifactId": "artifact-access-to-counsel-pathway",
+      "title": "Access-to-counsel pathway template",
+      "templatePath": "docs/zen-society/templates/artifacts/access-to-counsel-pathway.md",
+      "nodeRefs": [
+        "access-to-counsel-pathway",
+        "right-speech-infrastructure",
+        "integrity-protocols",
+        "data-dignity",
+        "restorative-harm-repair",
+        "skillful-mediation"
+      ],
+      "requiredChecks": [
+        "referral_path_defined",
+        "language_access_defined",
+        "response_time_targets",
+        "privacy_protections",
+        "appeal_path_defined"
+      ]
+    },
+    {
+      "artifactId": "artifact-training-certification-gate",
+      "title": "Training and certification gate template",
+      "templatePath": "docs/zen-society/templates/artifacts/training-certification-gate.md",
+      "nodeRefs": [
+        "training-certification-gate",
+        "bodhisattva-craft",
+        "integrity-protocols",
+        "verification-checklist",
+        "civic-memory-continuity",
+        "no-bypass-guardrail"
+      ],
+      "requiredChecks": [
+        "training_curriculum_published",
+        "renewal_cadence_set",
+        "incident_review_linked",
+        "certification_registry_current",
+        "waiver_policy_defined"
+      ]
+    },
+    {
       "artifactId": "signatory-registry",
       "title": "Signatory registry template",
       "templatePath": "docs/zen-society/templates/signatory-registry.md",

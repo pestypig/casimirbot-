@@ -185,7 +185,7 @@ type ConstraintPackOverride = {
   proxies?: ConstraintPackConstraintOverride[];
 };
 
-type ConstraintPackConstraintResult = ConstraintPackConstraint & {
+type ConstraintPackConstraintResult = Omit<ConstraintPackConstraint, "limit"> & {
   status?: "pass" | "fail" | "unknown";
   value?: number | null;
   limit?: string | null;
@@ -2030,13 +2030,14 @@ const resolveCertificatePass = (
   const status = certificate?.status;
   const statusOk =
     status === pack.certificate.admissibleStatus ||
-    (pack.certificate.allowMarginalAsViable && status === "MARGINAL");
+    (pack.certificate.allowMarginalAsViable === true &&
+      status === "MARGINAL");
   const integrityOk = certificate?.integrityOk !== false;
   if (!integrityOk) return false;
   if (!hasCertificate) {
     return !requiresCertificate;
   }
-  return statusOk;
+  return statusOk ?? false;
 };
 
 const resolveProxyFlagForTrace = (

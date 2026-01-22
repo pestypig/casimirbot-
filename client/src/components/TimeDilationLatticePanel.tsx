@@ -3066,10 +3066,12 @@ export default function TimeDilationLatticePanel({
   const wallDiagnostics = useMemo<WallDiagnostics | null>(() => {
     const regionWall = regionStats?.summary?.wall;
     if (regionWall) {
+      const p98 = Number.isFinite(regionWall.p98 as number) ? (regionWall.p98 as number) : null;
+      if (p98 == null) return null;
       return {
         source: regionWall.source,
         detected: regionWall.detected,
-        p98: regionWall.p98,
+        p98,
         threshold: regionWall.threshold,
         bandMin: regionWall.bandMin,
         bandMax: regionWall.bandMax,
@@ -3084,6 +3086,7 @@ export default function TimeDilationLatticePanel({
       ...collectAbsSamples(nodeWallInvariantRaw, sampleLimit, WARP_SAMPLE_MAX_ABS),
     ];
     const p98 = percentileFromSamples(samples, WALL_INVARIANT_PERCENTILE);
+    if (p98 == null) return null;
     const threshold = p98 * WALL_INVARIANT_FRACTION;
     const bandMin = threshold * (1 - WALL_INVARIANT_BAND_FRACTION);
     const bandMax = threshold * (1 + WALL_INVARIANT_BAND_FRACTION);

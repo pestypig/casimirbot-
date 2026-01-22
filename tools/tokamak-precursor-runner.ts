@@ -157,6 +157,14 @@ const toEpochSeconds = (iso: string): number | null => {
 const coerceFinite = (value: number | undefined | null, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
+const readMetricValue = (
+  metrics: TTokamakPrecursorFrameMetrics,
+  key: string,
+): number | undefined => {
+  const value = metrics[key as keyof TTokamakPrecursorFrameMetrics];
+  return typeof value === "number" ? value : undefined;
+};
+
 const clampContribution = (value: number): number =>
   Math.max(-1, Math.min(1, value));
 
@@ -221,9 +229,8 @@ type LogisticModel = {
   scales: number[];
 };
 
-const buildFeatureVector = (
-  metrics: Record<string, number | undefined>,
-): number[] => FEATURE_KEYS.map((key) => coerceFinite(metrics[key]));
+const buildFeatureVector = (metrics: TTokamakPrecursorFrameMetrics): number[] =>
+  FEATURE_KEYS.map((key) => coerceFinite(readMetricValue(metrics, key)));
 
 const buildPhysicsFeatureVector = (
   metrics: TTokamakPrecursorFrameMetrics,
@@ -247,12 +254,11 @@ const buildCurvatureFeatureVector = (
   metrics: TTokamakPrecursorFrameMetrics,
 ): number[] =>
   CURVATURE_FEATURE_KEYS.map((key) =>
-    coerceFinite((metrics as Record<string, number | undefined>)[key]),
+    coerceFinite(readMetricValue(metrics, key)),
   );
 
-const buildHazardVector = (
-  metrics: Record<string, number | undefined>,
-): number[] => HAZARD_FEATURE_KEYS.map((key) => coerceFinite(metrics[key]));
+const buildHazardVector = (metrics: TTokamakPrecursorFrameMetrics): number[] =>
+  HAZARD_FEATURE_KEYS.map((key) => coerceFinite(readMetricValue(metrics, key)));
 
 const sigmoid = (value: number): number => {
   const clamped = Math.max(-60, Math.min(60, value));
@@ -410,7 +416,7 @@ const toFluxBandMetrics = (
     ? toBandMetrics({
         k_metrics: diag.k_metrics,
         ridge_summary: diag.ridge_summary,
-        coverage,
+        coverage: coverage ?? 0,
       })
     : undefined;
 
@@ -1044,9 +1050,17 @@ const buildSeedFramesFromContexts = (
     const metrics: TTokamakPrecursorFrameMetrics = {
       u_total_p95: percentile(values, 0.95),
     };
+    const grid = {
+      ...context.grid,
+      thickness_m: context.grid.thickness_m ?? 1,
+    };
+    const frame = {
+      ...context.frame,
+      axis_order: context.frame.axis_order ?? ["r", "z"],
+    };
     const curvature = computeCurvatureDiagnosticsFromFields({
-      grid: context.grid,
-      frame: context.frame,
+      grid,
+      frame,
       boundary,
       u_field: context.u_total,
       mask: context.mask ?? undefined,
@@ -1327,14 +1341,14 @@ const scoreFromContexts = (args: {
   const seedFrames = buildSeedFramesFromContexts(args.contexts, args.boundary);
   const { framesWithRates } = buildFramesWithTracking(seedFrames, args.tracking);
   const featureVectors = framesWithRates.map((frame) =>
-    buildFeatureVector(frame.metrics as Record<string, number | undefined>),
+    buildFeatureVector(frame.metrics),
   );
   const scores = framesWithRates.map((frame, index) => {
     if (args.scoreKey === "k_combo_v1") {
       if (!args.comboModel) return null;
       return predictLogistic(featureVectors[index], args.comboModel);
     }
-    const value = (frame.metrics as Record<string, number | undefined>)[args.scoreKey];
+    const value = readMetricValue(frame.metrics, args.scoreKey);
     return value ?? null;
   });
   const pairs = scores
@@ -1802,7 +1816,7 @@ export function runTokamakPrecursorDataset(
       : undefined;
 
   const featureVectors = framesWithRates.map((frame) =>
-    buildFeatureVector(frame.metrics as Record<string, number | undefined>),
+    buildFeatureVector(frame.metrics),
   );
   const physicsVectors = framesWithRates.map((frame) =>
     buildPhysicsFeatureVector(frame.metrics),
@@ -1830,7 +1844,7 @@ export function runTokamakPrecursorDataset(
     : null;
   const hazardVectors = framesWithRates
     .slice(0, Math.max(0, framesWithRates.length - 1))
-    .map((frame) => buildHazardVector(frame.metrics as Record<string, number | undefined>));
+    .map((frame) => buildHazardVector(frame.metrics));
   const hazardLabels = labels.slice(1);
   const hazardModel =
     hazardVectors.length > 0
@@ -1890,7 +1904,7 @@ export function runTokamakPrecursorDataset(
     const score =
       scoreKey === "k_combo_v1"
         ? predictLogistic(featureVectors[index], comboModel as LogisticModel)
-        : (metrics as Record<string, number | undefined>)[scoreKey];
+        : readMetricValue(metrics, scoreKey);
     if (score === undefined) {
       throw new Error(`tokamak_precursor_missing_score:${scoreKey}`);
     }

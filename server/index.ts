@@ -873,6 +873,8 @@ app.use((req, res, next) => {
 
   const bootstrap = async () => {
     validateIdeologyVerifierPack();
+    const { hydrateRuntimeArtifacts } = await import("./services/llm/runtime-artifacts");
+    await hydrateRuntimeArtifacts();
 
     if (fastBoot) {
       log("FAST_BOOT=1: skipping module init, API routes, and background services");

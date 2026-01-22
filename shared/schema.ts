@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  agiDatasetExportSchema,
+  agiGateReportSchema,
+  agiRefinerySummarySchema,
+  agiTrajectorySchema,
+} from "./agi-refinery";
 import { InformationBoundary } from "./information-boundary";
 
 export const sweepGeometrySchema = z.enum(["parallel_plate", "cpw"]);
@@ -2394,6 +2400,17 @@ export const trainingTraceCertificateSchema = z.object({
 });
 export type TrainingTraceCertificate = z.infer<typeof trainingTraceCertificateSchema>;
 
+export const trainingTracePayloadSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("trajectory"), data: agiTrajectorySchema }),
+  z.object({ kind: z.literal("trajectory_gates"), data: agiGateReportSchema }),
+  z.object({
+    kind: z.literal("trajectory_replay_summary"),
+    data: agiRefinerySummarySchema,
+  }),
+  z.object({ kind: z.literal("dataset_export"), data: agiDatasetExportSchema }),
+]);
+export type TrainingTracePayload = z.infer<typeof trainingTracePayloadSchema>;
+
 export const trainingTraceSchema = z.object({
   kind: z.literal("training-trace"),
   version: z.number().int().positive(),
@@ -2409,6 +2426,7 @@ export const trainingTraceSchema = z.object({
   metrics: trainingTraceMetricsSchema.optional(),
   firstFail: trainingTraceConstraintSchema.optional(),
   certificate: trainingTraceCertificateSchema.optional(),
+  payload: trainingTracePayloadSchema.optional(),
   notes: z.array(z.string()).optional(),
 });
 export type TrainingTraceRecord = z.infer<typeof trainingTraceSchema>;

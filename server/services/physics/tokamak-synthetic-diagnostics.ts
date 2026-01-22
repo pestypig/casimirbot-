@@ -6,6 +6,7 @@ import {
   type TTokamakSyntheticChord,
   type TTokamakSyntheticProbeSample,
   type TTokamakSyntheticChordSpec,
+  type TTokamakSyntheticDiagnosticsReport,
 } from "@shared/tokamak-synthetic-diagnostics";
 import { TokamakPrecursorScoreKey } from "@shared/tokamak-precursor";
 import { computeCurvatureFieldMaps } from "../../skills/physics.curvature";
@@ -101,12 +102,10 @@ const toGridCoords = (
   grid: { dx_m: number; dy_m: number },
   frame: Extract<TGridFrame2D, { kind: "rz-plane" }>,
 ): { x: number; y: number } => {
-  const axisX = frame.axis_order?.[0] ?? "r";
-  const axisY = frame.axis_order?.[1] ?? "z";
-  const xCoord = axisX === "r" ? r_m : z_m;
-  const yCoord = axisY === "z" ? z_m : r_m;
-  const x0 = axisX === "r" ? frame.r_min_m : frame.z_min_m;
-  const y0 = axisY === "z" ? frame.z_min_m : frame.r_min_m;
+  const xCoord = r_m;
+  const yCoord = z_m;
+  const x0 = frame.r_min_m;
+  const y0 = frame.z_min_m;
   return {
     x: (xCoord - x0) / grid.dx_m,
     y: (yCoord - y0) / grid.dy_m,
@@ -119,15 +118,9 @@ const toPhysical = (
   grid: { dx_m: number; dy_m: number },
   frame: Extract<TGridFrame2D, { kind: "rz-plane" }>,
 ): [number, number] => {
-  const axisX = frame.axis_order?.[0] ?? "r";
-  const axisY = frame.axis_order?.[1] ?? "z";
-  const xVal =
-    (axisX === "r" ? frame.r_min_m : frame.z_min_m) + xIdx * grid.dx_m;
-  const yVal =
-    (axisY === "r" ? frame.r_min_m : frame.z_min_m) + yIdx * grid.dy_m;
-  const r = axisX === "r" ? xVal : yVal;
-  const z = axisX === "z" ? xVal : yVal;
-  return [r, z];
+  const xVal = frame.r_min_m + xIdx * grid.dx_m;
+  const yVal = frame.z_min_m + yIdx * grid.dy_m;
+  return [xVal, yVal];
 };
 
 const sampleBilinear = (
@@ -666,14 +659,19 @@ export function runTokamakSyntheticDiagnostics(
     reconScore = reconstruction.k_metrics.k2;
   }
   const scoreKeyUsed = TokamakPrecursorScoreKey.parse(scoreKey);
-  const scoreDelta = truthScore - reconScore;
+  const truthScoreValue = truthScore ?? truth.k_metrics.k2;
+  const reconScoreValue = reconScore ?? reconstruction.k_metrics.k2;
+  const scoreDelta = truthScoreValue - reconScoreValue;
   const scoreComparison = {
     score_key: scoreKeyUsed,
-    truth_score: truthScore,
-    recon_score: reconScore,
+    truth_score: truthScoreValue,
+    recon_score: reconScoreValue,
     delta: scoreDelta,
     abs_delta: Math.abs(scoreDelta),
-    rel_delta: truthScore !== 0 ? Math.abs(scoreDelta) / Math.abs(truthScore) : undefined,
+    rel_delta:
+      truthScoreValue !== 0
+        ? Math.abs(scoreDelta) / Math.abs(truthScoreValue)
+        : undefined,
     ...(scoreNote ? { notes: scoreNote } : {}),
   };
 

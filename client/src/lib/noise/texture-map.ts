@@ -366,7 +366,7 @@ function dbToNormalizedGain(db: number): number {
 }
 
 function resolveFxScalar(value: number | undefined) {
-  return Number.isFinite(value) ? clamp01(value) : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? clamp01(value) : undefined;
 }
 
 export function createDeterministicRng(seed: number): Xoroshiro128State {

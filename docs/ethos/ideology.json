@@ -9,7 +9,7 @@
       "excerpt": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.",
       "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.\n\nWhen measurements disagree with our story, we revise the story. The vow survives by truth, not by force.",
       "tags": ["stewardship", "compassion"],
-      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols", "jurisdictional-floor", "two-key-approval", "interbeing-systems", "sangha-architecture", "citizens-arc", "right-speech-infrastructure", "restorative-harm-repair", "impermanence-by-design", "koan-governance", "three-tenets-loop", "no-bypass-guardrail", "capture-resistance", "scarcity-justice", "data-dignity", "civic-memory-continuity", "skillful-mediation", "external-interface-integrity"],
+      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols", "jurisdictional-floor", "two-key-approval", "lawful-interface-protocol", "federal-civic-listening-circuit", "metric-integrity-guardrail", "harm-weighted-priority-standard", "integration-ladder", "local-stability-compact", "access-to-counsel-pathway", "training-certification-gate", "interbeing-systems", "sangha-architecture", "citizens-arc", "right-speech-infrastructure", "restorative-harm-repair", "impermanence-by-design", "koan-governance", "three-tenets-loop", "no-bypass-guardrail", "capture-resistance", "scarcity-justice", "data-dignity", "civic-memory-continuity", "skillful-mediation", "external-interface-integrity"],
       "links": [
         { "rel": "see-also", "to": "bodhisattva-craft" },
         { "rel": "see-also", "to": "beginners-mind" },
@@ -58,9 +58,9 @@
       "slug": "citizens-arc",
       "title": "Citizen's Arc",
       "excerpt": "A dignity-floor civilization that runs voluntary trials to select stewards and keeps power revisable.",
-      "bodyMD": "The citizen's arc is the societal ladder: soft ground, hard tests, clear mirrors.\n\nThe floor ends coercive scarcity, the ladder reveals competence, and the roof keeps tradeoffs explicit. This view is the civic mirror that keeps Mission Ethos honest.\n\nSee [[node:interbeing-systems]], [[node:scarcity-justice]], [[node:capability-ambition-gradient]], [[node:struggle-testament]], [[node:promise-trials]], [[node:koan-governance]], [[node:values-over-images]], [[node:worldview-integrity]], [[node:sangha-architecture]], [[node:no-bypass-guardrail]], [[node:integrity-protocols]], [[node:inner-spark]], [[node:lifetime-trust-ledger]], [[node:solitude-to-signal]], and [[node:habit-pressure-break]].",
+      "bodyMD": "The citizen's arc is the societal ladder: soft ground, hard tests, clear mirrors.\n\nThe floor ends coercive scarcity, the ladder reveals competence, and the roof keeps tradeoffs explicit. This view is the civic mirror that keeps Mission Ethos honest.\n\nAddenda: [[node:citizens-arc-anti-mutation]] and [[node:citizens-arc-stress-test]].\n\nSee [[node:interbeing-systems]], [[node:scarcity-justice]], [[node:capability-ambition-gradient]], [[node:struggle-testament]], [[node:promise-trials]], [[node:koan-governance]], [[node:values-over-images]], [[node:worldview-integrity]], [[node:sangha-architecture]], [[node:no-bypass-guardrail]], [[node:integrity-protocols]], [[node:inner-spark]], [[node:lifetime-trust-ledger]], [[node:solitude-to-signal]], and [[node:habit-pressure-break]].",
       "tags": ["society", "civic", "stewardship", "trials", "governance"],
-      "children": [],
+      "children": ["citizens-arc-anti-mutation", "citizens-arc-stress-test"],
       "links": [
         { "rel": "parent", "to": "mission-ethos" },
         { "rel": "see-also", "to": "interbeing-systems" },
@@ -77,7 +77,45 @@
         { "rel": "see-also", "to": "inner-spark" },
         { "rel": "see-also", "to": "lifetime-trust-ledger" },
         { "rel": "see-also", "to": "solitude-to-signal" },
+        { "rel": "see-also", "to": "habit-pressure-break" },
+        { "rel": "child", "to": "citizens-arc-anti-mutation" },
+        { "rel": "child", "to": "citizens-arc-stress-test" }
+      ]
+    },
+    {
+      "id": "citizens-arc-anti-mutation",
+      "slug": "citizens-arc-anti-mutation",
+      "title": "Citizen's Arc: Anti-Mutation Addendum",
+      "excerpt": "Anti-mutation mechanisms keep selection systems from hardening into status systems.",
+      "bodyMD": "Selection mutates into status unless the system is built to resist it. The citizen's arc must carry explicit anti-mutation mechanisms that reduce prestige capture and keep exit rights real.\n\nMechanisms:\n- Sortition oversight for trials, audits, and ledger disputes.\n- Rotating authority with hard term limits and cooling-off gaps.\n- Power decomposition: many small powers, few big ones; no single chokepoint.\n- Strong exit rights: portable credentials, safe dissent channels, and mobility support.\n- Cultural immunology: teach distrust of prestige narratives; reward refusal to glamorize pain.\n\nAnti-pattern: credential aristocracy or ritualized suffering.\n\nMinimal artifact: Anti-Mutation Charter, listing rotation schedules, sortition pools, exit guarantees, and prestige-shaping norms.\n\nSee [[node:capture-resistance]], [[node:impermanence-by-design]], [[node:no-bypass-guardrail]], [[node:integrity-protocols]], [[node:data-dignity]], and [[node:habit-pressure-break]].",
+      "tags": ["governance", "anti-capture", "selection", "status", "resilience"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "citizens-arc" },
+        { "rel": "see-also", "to": "capture-resistance" },
+        { "rel": "see-also", "to": "impermanence-by-design" },
+        { "rel": "see-also", "to": "no-bypass-guardrail" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "data-dignity" },
         { "rel": "see-also", "to": "habit-pressure-break" }
+      ]
+    },
+    {
+      "id": "citizens-arc-stress-test",
+      "slug": "citizens-arc-stress-test",
+      "title": "Citizen's Arc: Stress Test Note",
+      "excerpt": "Attack packets map predictable failure modes into checks the civic system must pass.",
+      "bodyMD": "Stress tests are how the citizen's arc proves it can scale without mutating.\n\nAttack packets:\n- Charismatic Trial-Optimiser: cross-checks, ledger decay, and red-team interviews before authority is granted.\n- Caregiver Exodus: caregiving credit, alternate trials, and representation floors so care labor is not punished.\n- Audit Coup: audit authority split, rotation, and public appeal path to prevent compliance capture.\n- Border Koan: scarcity allocation charter plus a tradeoff ledger that names who bears the cost.\n- Crisis Velocity Failure: emergency procedures with sunset clauses and review triggers.\n\nAnti-pattern: performing the test without changing the ladder.\n\nMinimal artifact: Citizen's Arc Stress-Test Register with triggers, metrics, and reversal thresholds.\n\nSee [[node:integrity-protocols]], [[node:scarcity-justice]], [[node:koan-governance]], [[node:impermanence-by-design]], [[node:capture-resistance]], and [[node:verification-checklist]].",
+      "tags": ["governance", "stress-test", "risk", "resilience", "accountability"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "citizens-arc" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "scarcity-justice" },
+        { "rel": "see-also", "to": "koan-governance" },
+        { "rel": "see-also", "to": "impermanence-by-design" },
+        { "rel": "see-also", "to": "capture-resistance" },
+        { "rel": "see-also", "to": "verification-checklist" }
       ]
     },
     {
@@ -145,15 +183,35 @@
       "slug": "three-tenets-loop",
       "title": "Three Tenets Loop",
       "excerpt": "Not-knowing, bearing witness, taking action: a governance cycle that learns in public.",
-      "bodyMD": "The three tenets loop is a social action cycle: Not-Knowing, Bearing Witness, Taking Action. We encode it as governance discipline.\n\nNot-Knowing: suspend certainty, avoid propaganda certainty, and name assumptions.\n\nBearing Witness: gather ground truth, listen to impacted communities, and publish indicators.\n\nTaking Action: act, then measure, then correct.\n\nAnti-pattern: action first, reality later.\n\nSee [[node:beginners-mind]], [[node:verification-checklist]], [[node:bodhisattva-craft]], and [[node:feedback-loop-hygiene]].",
+      "bodyMD": "The three tenets loop is a social action cycle: Not-Knowing, Bearing Witness, Taking Action. We encode it as governance discipline.\n\nNot-Knowing: suspend certainty, avoid propaganda certainty, and name assumptions.\n\nBearing Witness: gather ground truth, listen to impacted communities, and publish indicators.\n\nTaking Action: act, then measure, then correct.\n\nAnti-pattern: action first, reality later.\n\nSee [[node:beginners-mind]], [[node:verification-checklist]], [[node:bodhisattva-craft]], [[node:feedback-loop-hygiene]], and [[node:civic-signal-loop]].",
       "tags": ["loop", "practice", "governance", "learning", "accountability"],
-      "children": [],
+      "children": ["civic-signal-loop"],
       "links": [
         { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "child", "to": "civic-signal-loop" },
         { "rel": "see-also", "to": "beginners-mind" },
         { "rel": "see-also", "to": "verification-checklist" },
         { "rel": "see-also", "to": "bodhisattva-craft" },
         { "rel": "see-also", "to": "feedback-loop-hygiene" }
+      ]
+    },
+    {
+      "id": "civic-signal-loop",
+      "slug": "civic-signal-loop",
+      "title": "Civic Signal Loop",
+      "excerpt": "Survey-based civic sensing turns community signals into lawful, accountable action.",
+      "bodyMD": "Civic signals are how a society listens without panic. We apply the three tenets loop to surveys, listening sessions, and public indicators.\n\nNot-Knowing: acknowledge uncertainty, publish sources, and keep room for \"not sure\" responses.\n\nBearing Witness: gather grounded input with data dignity, safe channels, and consent-first framing.\n\nTaking Action: translate signals into lawful, nonviolent policy moves with review triggers.\n\nAnti-pattern: rumor-driven escalation, vigilantism, or data extraction without consent.\n\nMinimal artifact: Civic Signal Survey + Response Matrix (question categories -> node mapping -> action playbook).\n\nSee [[node:three-tenets-loop]], [[node:right-speech-infrastructure]], [[node:data-dignity]], [[node:integrity-protocols]], [[node:sangha-architecture]], [[node:skillful-mediation]], [[node:civic-memory-continuity]], and [[node:no-bypass-guardrail]].",
+      "tags": ["survey", "signals", "civic", "policy", "nonviolent"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "three-tenets-loop" },
+        { "rel": "see-also", "to": "right-speech-infrastructure" },
+        { "rel": "see-also", "to": "data-dignity" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "sangha-architecture" },
+        { "rel": "see-also", "to": "skillful-mediation" },
+        { "rel": "see-also", "to": "civic-memory-continuity" },
+        { "rel": "see-also", "to": "no-bypass-guardrail" }
       ]
     },
     {
@@ -743,6 +801,147 @@
         { "rel": "parent", "to": "mission-ethos" },
         { "rel": "see-also", "to": "jurisdictional-floor" },
         { "rel": "see-also", "to": "verification-checklist" },
+        { "rel": "see-also", "to": "no-bypass-guardrail" }
+      ]
+    },
+    {
+      "id": "lawful-interface-protocol",
+      "slug": "lawful-interface-protocol",
+      "title": "Lawful Interface Protocol",
+      "excerpt": "Bridge civic institutions and enforcement with lawful boundaries, non-harm, and accountability.",
+      "bodyMD": "This protocol defines how civic institutions interface with enforcement agencies without predation or interference. It focuses on lawful rights education, oversight design, and nonviolent response.\n\nPractice:\n- Publish cooperation boundaries and correction logs.\n- Require dual-key approval (legal + ethos) for joint actions.\n- Provide safe reporting channels with non-retaliation safeguards.\n- Enforce de-escalation, independent review, and repair pathways when force is used.\n- Maintain liaison councils and mediation pathways.\n- Audit incentives and publish outcomes to prevent capture.\n\nMinimal artifact: Lawful Interface Protocol.\n\nSee [[node:jurisdictional-floor]], [[node:two-key-approval]], [[node:right-speech-infrastructure]], [[node:integrity-protocols]], [[node:restorative-harm-repair]], [[node:skillful-mediation]], [[node:capture-resistance]], [[node:civic-memory-continuity]], and [[node:external-interface-integrity]].",
+      "tags": ["lawful", "oversight", "accountability", "interfaces", "non-harm"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "jurisdictional-floor" },
+        { "rel": "see-also", "to": "two-key-approval" },
+        { "rel": "see-also", "to": "right-speech-infrastructure" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "skillful-mediation" },
+        { "rel": "see-also", "to": "capture-resistance" },
+        { "rel": "see-also", "to": "civic-memory-continuity" },
+        { "rel": "see-also", "to": "external-interface-integrity" }
+      ]
+    },
+    {
+      "id": "federal-civic-listening-circuit",
+      "slug": "federal-civic-listening-circuit",
+      "title": "Federal Civic Listening Circuit",
+      "excerpt": "Scheduled listening cycles keep federal policy grounded in local reality.",
+      "bodyMD": "Federal policy loses legitimacy when listening is ad hoc. This circuit sets a fixed calendar for field hearings and hybrid sessions, with a Local Needs Docket submitted in advance and a Response Ledger published afterward.\n\nAnti-pattern: listening without response or only broadcasting from the top.\n\nMinimal artifact: Local Needs Docket + Response Ledger, with cadence and rationale archive.\n\nSee [[node:right-speech-infrastructure]], [[node:civic-memory-continuity]], [[node:sangha-architecture]], [[node:interbeing-systems]], and [[node:external-interface-integrity]].",
+      "tags": ["listening", "federal", "civic", "accountability"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "right-speech-infrastructure" },
+        { "rel": "see-also", "to": "civic-memory-continuity" },
+        { "rel": "see-also", "to": "sangha-architecture" },
+        { "rel": "see-also", "to": "interbeing-systems" },
+        { "rel": "see-also", "to": "external-interface-integrity" }
+      ]
+    },
+    {
+      "id": "metric-integrity-guardrail",
+      "slug": "metric-integrity-guardrail",
+      "title": "Metric Integrity Guardrail",
+      "excerpt": "Replace quota logic with harm-reduction indicators and review triggers.",
+      "bodyMD": "Metrics must reflect harm reduction and legitimacy, not throughput. This guardrail bans quota logic and requires public definitions, invalidators, and review triggers for every headline metric.\n\nAnti-pattern: treating counts as proof of justice.\n\nMinimal artifact: Metric Policy Register with definitions, invalidators, and review cadence.\n\nSee [[node:koan-governance]], [[node:integrity-protocols]], [[node:capture-resistance]], [[node:verification-checklist]], and [[node:values-over-images]].",
+      "tags": ["metrics", "guardrails", "governance", "accountability"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "koan-governance" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "capture-resistance" },
+        { "rel": "see-also", "to": "verification-checklist" },
+        { "rel": "see-also", "to": "values-over-images" }
+      ]
+    },
+    {
+      "id": "harm-weighted-priority-standard",
+      "slug": "harm-weighted-priority-standard",
+      "title": "Harm-Weighted Priority Standard",
+      "excerpt": "Priority decisions anchored to credible harm and due process.",
+      "bodyMD": "Prioritization must be anchored to credible harm and due process, not convenience. This standard documents priority tiers, evidence thresholds, and independent review.\n\nAnti-pattern: easy targets become the priority.\n\nMinimal artifact: Harm-Weighted Priority Standard + Review Log.\n\nSee [[node:no-bypass-guardrail]], [[node:restorative-harm-repair]], [[node:integrity-protocols]], [[node:data-dignity]], and [[node:jurisdictional-floor]].",
+      "tags": ["priority", "harm", "due-process", "policy"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "no-bypass-guardrail" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "data-dignity" },
+        { "rel": "see-also", "to": "jurisdictional-floor" }
+      ]
+    },
+    {
+      "id": "integration-ladder",
+      "slug": "integration-ladder",
+      "title": "Integration Ladder",
+      "excerpt": "A lawful on-ramp for long-term integrated residents.",
+      "bodyMD": "Long-term integrated residents need a lawful on-ramp that reduces fear and stabilizes communities. The ladder defines criteria, timelines, data limits, and audit hooks.\n\nAnti-pattern: permanent limbo that invites exploitation.\n\nMinimal artifact: Integration Ladder Charter.\n\nSee [[node:restorative-harm-repair]], [[node:interbeing-systems]], [[node:jurisdictional-floor]], [[node:data-dignity]], [[node:civic-memory-continuity]], and [[node:scarcity-justice]].",
+      "tags": ["integration", "repair", "stability"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "interbeing-systems" },
+        { "rel": "see-also", "to": "jurisdictional-floor" },
+        { "rel": "see-also", "to": "data-dignity" },
+        { "rel": "see-also", "to": "civic-memory-continuity" },
+        { "rel": "see-also", "to": "scarcity-justice" }
+      ]
+    },
+    {
+      "id": "local-stability-compact",
+      "slug": "local-stability-compact",
+      "title": "Local Stability Compact",
+      "excerpt": "Protect community stability during enforcement shifts.",
+      "bodyMD": "Local economies are fragile. The compact requires stability impact statements and mitigation plans when enforcement shifts would disrupt staffing, services, or supply chains.\n\nAnti-pattern: ignoring second-order effects.\n\nMinimal artifact: Local Stability Compact + Stability Impact Statement.\n\nSee [[node:interbeing-systems]], [[node:scarcity-justice]], [[node:sangha-architecture]], [[node:civic-memory-continuity]], and [[node:external-interface-integrity]].",
+      "tags": ["local", "stability", "economy", "impact"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "interbeing-systems" },
+        { "rel": "see-also", "to": "scarcity-justice" },
+        { "rel": "see-also", "to": "sangha-architecture" },
+        { "rel": "see-also", "to": "civic-memory-continuity" },
+        { "rel": "see-also", "to": "external-interface-integrity" }
+      ]
+    },
+    {
+      "id": "access-to-counsel-pathway",
+      "slug": "access-to-counsel-pathway",
+      "title": "Access-to-Counsel Pathway",
+      "excerpt": "Rights with access: counsel, language support, and clear timelines.",
+      "bodyMD": "Rights without access are ceremonial. This pathway guarantees referrals, language access, and timelines with data dignity safeguards.\n\nAnti-pattern: rights on paper that people cannot use.\n\nMinimal artifact: Access-to-Counsel Pathway.\n\nSee [[node:right-speech-infrastructure]], [[node:integrity-protocols]], [[node:data-dignity]], [[node:restorative-harm-repair]], and [[node:skillful-mediation]].",
+      "tags": ["counsel", "due-process", "access"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "right-speech-infrastructure" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "data-dignity" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "skillful-mediation" }
+      ]
+    },
+    {
+      "id": "training-certification-gate",
+      "slug": "training-certification-gate",
+      "title": "Training and Certification Gate",
+      "excerpt": "Doctrine stays alive through training, renewal, and review.",
+      "bodyMD": "Doctrine dies without practice. This gate requires training, renewal, and incident-linked review for safety-critical roles.\n\nAnti-pattern: stale certification or box-check training.\n\nMinimal artifact: Certification Register with renewal cadence and incident review hooks.\n\nSee [[node:bodhisattva-craft]], [[node:integrity-protocols]], [[node:verification-checklist]], [[node:civic-memory-continuity]], and [[node:no-bypass-guardrail]].",
+      "tags": ["training", "certification", "safety"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "see-also", "to": "bodhisattva-craft" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "verification-checklist" },
+        { "rel": "see-also", "to": "civic-memory-continuity" },
         { "rel": "see-also", "to": "no-bypass-guardrail" }
       ]
     }

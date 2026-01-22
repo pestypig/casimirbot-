@@ -1,0 +1,166 @@
+import path from "node:path";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+import type { Client as ReplitStorageClient } from "@replit/object-storage";
+
+type ArtifactSpec = {
+  label: string;
+  objectKey: string;
+  sha256: string;
+  targetPath: string;
+};
+
+let replitClient: ReplitStorageClient | null = null;
+
+const getReplitClient = async (): Promise<ReplitStorageClient> => {
+  if (!replitClient) {
+    const { Client } = await import("@replit/object-storage");
+    replitClient = new Client();
+  }
+  return replitClient;
+};
+
+const normalizeObjectKey = (value?: string | null): string | null => {
+  const raw = value?.trim();
+  if (!raw) return null;
+  if (raw.startsWith("replit://")) {
+    return raw.slice("replit://".length);
+  }
+  if (raw.startsWith("storage://")) {
+    return raw.slice("storage://".length);
+  }
+  return raw;
+};
+
+const normalizeSha256 = (value?: string | null): string | null => {
+  const raw = value?.trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.startsWith("sha256:")) {
+    return raw.slice("sha256:".length);
+  }
+  return raw;
+};
+
+const resolveTargetPath = (value: string): string => {
+  if (path.isAbsolute(value)) {
+    return value;
+  }
+  return path.resolve(process.cwd(), value);
+};
+
+const fileExists = async (filePath: string): Promise<boolean> => {
+  try {
+    const stat = await fs.stat(filePath);
+    return stat.isFile();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+};
+
+const hashFile = async (filePath: string): Promise<string> => {
+  const hash = createHash("sha256");
+  return new Promise((resolve, reject) => {
+    const stream = createReadStream(filePath);
+    stream.on("error", reject);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+};
+
+const downloadObject = async (key: string, targetPath: string): Promise<string> => {
+  const client = await getReplitClient();
+  const stream = await client.downloadAsStream(key);
+  const dir = path.dirname(targetPath);
+  await fs.mkdir(dir, { recursive: true });
+  const tmpPath = `${targetPath}.tmp`;
+  await pipeline(stream, createWriteStream(tmpPath));
+  return tmpPath;
+};
+
+const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
+  const expected = normalizeSha256(spec.sha256);
+  if (!expected) {
+    throw new Error(`[runtime] ${spec.label} sha256 is required for hydration`);
+  }
+  const target = resolveTargetPath(spec.targetPath);
+  if (await fileExists(target)) {
+    const existingHash = await hashFile(target);
+    if (existingHash === expected) {
+      console.log(`[runtime] ${spec.label} already hydrated (${target})`);
+      return;
+    }
+    console.warn(`[runtime] ${spec.label} hash mismatch; rehydrating (${target})`);
+  }
+
+  console.log(`[runtime] downloading ${spec.label} from object storage`);
+  const tmpPath = await downloadObject(spec.objectKey, target);
+  try {
+    const downloadedHash = await hashFile(tmpPath);
+    if (downloadedHash !== expected) {
+      throw new Error(
+        `[runtime] ${spec.label} sha256 mismatch (expected ${expected}, got ${downloadedHash})`,
+      );
+    }
+    if (await fileExists(target)) {
+      await fs.unlink(target);
+    }
+    await fs.rename(tmpPath, target);
+    console.log(`[runtime] ${spec.label} hydrated (${target})`);
+  } catch (error) {
+    await fs.unlink(tmpPath).catch(() => undefined);
+    throw error;
+  }
+};
+
+export const hydrateRuntimeArtifacts = async (): Promise<void> => {
+  const artifacts: ArtifactSpec[] = [];
+
+  const modelKey = normalizeObjectKey(process.env.LLM_LOCAL_MODEL_OBJECT_KEY);
+  if (modelKey) {
+    artifacts.push({
+      label: "model",
+      objectKey: modelKey,
+      sha256: process.env.LLM_LOCAL_MODEL_SHA256 ?? "",
+      targetPath: process.env.LLM_LOCAL_MODEL_PATH ?? process.env.LLM_LOCAL_MODEL ?? "./models/model.gguf",
+    });
+  }
+
+  const indexKey = normalizeObjectKey(process.env.LLM_LOCAL_INDEX_OBJECT_KEY);
+  if (indexKey) {
+    artifacts.push({
+      label: "index",
+      objectKey: indexKey,
+      sha256: process.env.LLM_LOCAL_INDEX_SHA256 ?? "",
+      targetPath: process.env.LLM_LOCAL_INDEX_PATH ?? "server/_generated/code-lattice.json",
+    });
+  }
+
+  const loraKey = normalizeObjectKey(process.env.LLM_LOCAL_LORA_OBJECT_KEY);
+  if (loraKey) {
+    const loraPath =
+      process.env.LLM_LOCAL_LORA_PATH ?? "./models/lora.safetensors";
+    if (!process.env.LLM_LOCAL_LORA_PATH) {
+      process.env.LLM_LOCAL_LORA_PATH = loraPath;
+    }
+    artifacts.push({
+      label: "lora",
+      objectKey: loraKey,
+      sha256: process.env.LLM_LOCAL_LORA_SHA256 ?? "",
+      targetPath: loraPath,
+    });
+  }
+
+  if (artifacts.length === 0) {
+    return;
+  }
+
+  console.log(`[runtime] hydrating ${artifacts.length} artifact(s)`);
+  for (const artifact of artifacts) {
+    await hydrateArtifact(artifact);
+  }
+};

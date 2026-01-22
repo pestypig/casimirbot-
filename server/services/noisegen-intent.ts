@@ -282,8 +282,10 @@ export function enforceIntentContractOnRenderPlan<T extends RenderPlanLike>(
 
   const stemLocks = normalizeIds(invariants?.stemLocks);
   if (stemLocks.length) {
-    const lockMap: Record<string, keyof NonNullable<RenderPlanLike["global"]>["locks"]> =
-      {
+    const lockMap: Record<
+      string,
+      keyof NonNullable<NonNullable<RenderPlanLike["global"]>["locks"]>
+    > = {
         groove: "groove",
         harmony: "harmony",
         drums: "drums",
@@ -291,7 +293,7 @@ export function enforceIntentContractOnRenderPlan<T extends RenderPlanLike>(
         music: "music",
         textures: "textures",
         fx: "fx",
-      };
+    };
     const currentLocks = { ...(nextPlan.global?.locks ?? {}) };
     let changed = false;
     for (const token of stemLocks) {

@@ -173,7 +173,7 @@ jobsRouter.post("/ubi/run", (req, res) => {
   if (!result.ok) {
     return res.status(409).json({ error: result.reason });
   }
-  return res.json({ ok: true, ...result });
+  return res.json(result);
 });
 
 jobsRouter.post("/ubi/fund", (req, res) => {

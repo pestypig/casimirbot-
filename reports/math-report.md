@@ -1,6 +1,6 @@
 # Math Report
 
-Generated: 2026-01-18T08:49:24.265Z
+Generated: 2026-01-22T00:18:42.859Z
 Registry entries: 69
 
 ## Coverage by Stage
@@ -13,13 +13,15 @@ Registry entries: 69
 - modules/gr/gr-diagnostics.ts
 - server/gr/gr-assistant-adapter.ts
 - server/gr/gr-os-payload.ts
+- server/routes/agi.chat.ts
 - server/routes/agi.contributions.ts
+- server/routes/agi.refinery.ts
 - server/services/observability/gr-os-payload-store.ts
 - server/services/observability/tool-event-adapters.ts
 
 ## Unstaged Stage Suggestions
 - diagnostic: 3
-- reduced-order: 1
+- reduced-order: 3
 - exploratory: 2
 - default: exploratory
 
@@ -51,8 +53,8 @@ none
 - tests considered: 0
 
 ## Auto-discovered Dependencies
-- nodes: 487
-- edges: 1036
+- nodes: 512
+- edges: 1107
 
 ## Stage Violations (Edges)
 none

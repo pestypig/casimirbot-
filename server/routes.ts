@@ -20,6 +20,7 @@ import noiseGensRouter from "./routes/noise-gens";
 import { aiPlanRouter } from "./routes/ai.plan";
 import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
+import { searchRouter } from "./routes/search";
 import { helixQiRouter } from "./routes/helix/qi";
 import { helixMathRouter } from "./routes/helix/math";
 import { helixAuditTreeRouter } from "./routes/helix/audit-tree";
@@ -31,6 +32,7 @@ import { grAgentRouter } from "./routes/gr-agent";
 import { trainingTraceRouter } from "./routes/training-trace";
 import { adapterRouter } from "./routes/agi.adapter";
 import { constraintPacksRouter } from "./routes/agi.constraint-packs";
+import { chatRouter } from "./routes/agi.chat";
 import { requireJwtMiddleware } from "./auth/jwt";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { vectorizerRouter } from "./routes/vectorizer";
@@ -71,6 +73,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/luma", lumaRouter);
   registerLumaWhisperRoute(app);
   app.use("/api/tools/remove-bg-edges", removeBgEdgesRouter);
+  app.use("/api/ethos", ethosRouter);
+  app.use("/api/search", searchRouter);
 
   if (!fastBoot) {
     const { knowledgeRouter } = await import("./routes/knowledge");
@@ -78,7 +82,6 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/code-lattice", codeLatticeRouter);
     app.use(trainStatusRouter);
     app.use("/api/stellar", stellarRouter);
-    app.use("/api/ethos", ethosRouter);
     app.use("/api/benchmarks/collapse", collapseBenchmarksRouter);
     app.use("/api/physics/warp", warpViabilityRouter);
     app.use("/api/physics/curvature", curvatureRouter);
@@ -140,6 +143,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     const { profileRouter } = await import("./routes/agi.profile");
     const { starTelemetryRouter } = await import("./routes/agi.star");
     const { contributionsRouter } = await import("./routes/agi.contributions");
+    const { refineryRouter } = await import("./routes/agi.refinery");
     const enableDebate = flagEnabled(process.env.ENABLE_DEBATE, false);
     if (enableDebate) {
       const { debateRouter } = await import("./routes/agi.debate");
@@ -149,7 +153,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi/memory", memoryRouter);
     app.use("/api/agi/profile", profileRouter);
     app.use("/api/agi/contributions", contributionsRouter);
+    app.use("/api/agi", chatRouter);
     app.use("/api/agi", trainingTraceRouter);
+    app.use("/api/agi", refineryRouter);
     app.use("/api/agi", constraintPacksRouter);
     app.use("/api/agi/adapter", adapterRouter);
     if (process.env.ENABLE_AGI === "1" && process.env.ENABLE_TRACE_API === "1") {
