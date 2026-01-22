@@ -319,6 +319,9 @@ function buildArgs(
   args.push("--temp", String(opts.temperature));
   args.push("--seed", String(opts.seed));
   args.push("--simple-io");
+  if (process.env.LLM_LOCAL_DISABLE_SINGLE_TURN !== "1") {
+    args.push("--single-turn");
+  }
   if (opts.loraPath) {
     args.push("--lora", opts.loraPath);
     if (typeof opts.loraScale === "number" && Number.isFinite(opts.loraScale)) {
