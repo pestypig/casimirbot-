@@ -72,6 +72,30 @@ const hashFile = async (filePath: string): Promise<string> => {
   });
 };
 
+const validateLocalArtifact = async (
+  label: string,
+  targetPath: string,
+  expectedSha?: string | null,
+): Promise<void> => {
+  const resolved = resolveTargetPath(targetPath);
+  if (!(await fileExists(resolved))) {
+    console.warn(`[runtime] ${label} not found at ${resolved}`);
+    return;
+  }
+  const expected = normalizeSha256(expectedSha);
+  if (!expected) {
+    console.log(`[runtime] ${label} present (${resolved})`);
+    return;
+  }
+  const existingHash = await hashFile(resolved);
+  if (existingHash !== expected) {
+    throw new Error(
+      `[runtime] ${label} sha256 mismatch (expected ${expected}, got ${existingHash})`,
+    );
+  }
+  console.log(`[runtime] ${label} verified (${resolved})`);
+};
+
 const downloadObject = async (key: string, targetPath: string): Promise<string> => {
   const client = await getReplitClient();
   const stream = await client.downloadAsStream(key);
@@ -130,14 +154,18 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
     });
   }
 
+  const indexPath =
+    process.env.LLM_LOCAL_INDEX_PATH ?? "server/_generated/code-lattice.json";
   const indexKey = normalizeObjectKey(process.env.LLM_LOCAL_INDEX_OBJECT_KEY);
   if (indexKey) {
     artifacts.push({
       label: "index",
       objectKey: indexKey,
       sha256: process.env.LLM_LOCAL_INDEX_SHA256 ?? "",
-      targetPath: process.env.LLM_LOCAL_INDEX_PATH ?? "server/_generated/code-lattice.json",
+      targetPath: indexPath,
     });
+  } else {
+    await validateLocalArtifact("index", indexPath, process.env.LLM_LOCAL_INDEX_SHA256);
   }
 
   const loraKey = normalizeObjectKey(process.env.LLM_LOCAL_LORA_OBJECT_KEY);
