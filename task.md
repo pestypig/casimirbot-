@@ -2883,7 +2883,7 @@ G) SunPy helioseismology anchors
 
 ## Modelization Track (Replit CPU target) - Status: in_progress
 - Target (estimate): Replit 8 GB RAM, CPU-only, single-model inference; train off-box.
-- Target model: 1-3B, 4-bit quantized; context 2k-4k; short answers by default.
+- Target model: Qwen2.5-3B-Instruct GGUF Q4_K_M (fallback Qwen2.5-1.5B-Instruct Q4_K_M); context 2k-4k; short answers by default.
 - Do: keep retrieval + citation completion as correctness spine; do not rely on model size for truth.
 - RAM budget checklist (Replit 8 GB):
   - OS + Node runtime: 0.5-1.5 GB.
@@ -2905,10 +2905,11 @@ G) SunPy helioseismology anchors
 
 ### Helix Ask Build Completion Gates - Status: in_progress
 - Runtime smoke pass: full local smoke (not just preflight) returns a response with small caps (512 ctx, 8-16 tokens) and no hang. DONE on Replit (duration ~8749 ms, ~12.5 t/s, output "The Local LLM").
-- Base model decision: choose single GGUF target (1.5B or 3B Q4) and pin in RC0->M1 notes.
+- Base model decision: DONE (primary Qwen2.5-3B-Instruct GGUF Q4_K_M; fallback Qwen2.5-1.5B-Instruct Q4_K_M).
 - Answerer adapter training: off-box LoRA/QLoRA run produces adapter artifact + hash.
 - Holdout gate pass: adapter meets precision/attribution recall/latency thresholds in `agi:holdout-gate`.
 - Runtime packaging: model + index hydration, context caps, citation completion, and local spawn path verified end-to-end.
+- UI wiring: /desktop Helix Ask bar with inline replies + Essence Console session threading. DONE.
 - Release note: mark M1 as DONE with artifacts + hashes in task.md.
 - Optional: index coverage stretch >= 0.80 or finalized exclusions policy; base-model A/B benchmark if latency/quality tradeoff unclear.
 
