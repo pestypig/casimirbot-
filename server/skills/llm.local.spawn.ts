@@ -75,7 +75,11 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     process.env.LLM_LOCAL_MODEL?.trim() ||
     DEFAULT_MODEL;
   const loraPath = process.env.LLM_LOCAL_LORA_PATH?.trim() || "";
-  const loraScale = clampLoraScale(toNumber(process.env.LLM_LOCAL_LORA_SCALE, 1));
+  const loraScaleRaw = process.env.LLM_LOCAL_LORA_SCALE?.trim();
+  const loraScale =
+    loraScaleRaw && loraScaleRaw.length > 0
+      ? clampLoraScale(toNumber(loraScaleRaw, 1))
+      : undefined;
   const baseArgs = parseArgs(process.env.LLM_LOCAL_ARGS_BASE ?? "") ?? DEFAULT_ARGS;
   const promptTokens = countTokens(prompt);
   const contextTokens = resolveLocalContextTokens();
