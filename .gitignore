@@ -73,6 +73,13 @@ client/public/originals/*
 /.cache/
 /tmp/
 /training-trace*.jsonl
+# Large model weights (prevent accidental commits)
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.bin
 
 # Environment variable files (keep templates tracked)
 .env
