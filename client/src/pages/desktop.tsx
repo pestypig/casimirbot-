@@ -15,7 +15,7 @@ import {
 import { decodeLayout, resolvePanelIds, type DesktopLayoutHash } from "@/lib/desktop/shareState";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
-import { execute, plan } from "@/lib/agi/api";
+import { askLocal, execute, plan } from "@/lib/agi/api";
 import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference } from "@/lib/agi/preferences";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
@@ -28,6 +28,12 @@ const NOISE_GENS_PANEL_ID = "helix-noise-gens";
 const ESSENCE_CONSOLE_PANEL_ID = "agi-essence-console";
 const NOISE_GENS_AUTO_OPEN_SUPPRESS = new Set([ESSENCE_CONSOLE_PANEL_ID]);
 const HELIX_ASK_CONTEXT_ID = "helix-ask-desktop";
+const HELIX_ASK_USE_KNOWLEDGE =
+  String((import.meta as any)?.env?.VITE_HELIX_ASK_USE_KNOWLEDGE ?? "").trim() === "1";
+const HELIX_ASK_MODE = String((import.meta as any)?.env?.VITE_HELIX_ASK_MODE ?? "")
+  .trim()
+  .toLowerCase();
+const HELIX_ASK_USE_PLAN = HELIX_ASK_MODE === "plan";
 
 function collectPanelIdsFromStructure(
   input: unknown,
@@ -321,30 +327,42 @@ export default function DesktopPage() {
         addMessage(sessionId, { role: "user", content: trimmed });
       }
       try {
-        let knowledgeContext: KnowledgeProjectExport[] = [];
-        try {
-          knowledgeContext = await exportActiveContext();
-        } catch {
-          // best-effort knowledge context
-        }
-        const planResponse = await plan(
-          trimmed,
-          "default",
-          knowledgeContext,
-          undefined,
-          {
-            essenceConsole: true,
+        let responseText = "";
+        let traceId: string | undefined;
+        if (HELIX_ASK_USE_PLAN) {
+          let knowledgeContext: KnowledgeProjectExport[] = [];
+          if (HELIX_ASK_USE_KNOWLEDGE) {
+            try {
+              knowledgeContext = await exportActiveContext();
+            } catch {
+              // best-effort knowledge context
+            }
+          }
+          const planResponse = await plan(
+            trimmed,
+            "default",
+            knowledgeContext.length ? knowledgeContext : undefined,
+            undefined,
+            {
+              includeTelemetry: false,
+              sessionId: sessionId ?? undefined,
+            },
+          );
+          traceId = planResponse.traceId;
+          const executeResponse = await execute(planResponse.traceId);
+          responseText =
+            executeResponse.result_summary?.trim() ||
+            "Task completed. Open the conversation panel for full details.";
+        } else {
+          const localResponse = await askLocal(trimmed, {
             sessionId: sessionId ?? undefined,
-          },
-        );
-        const executeResponse = await execute(planResponse.traceId);
-        const responseText =
-          executeResponse.result_summary?.trim() ||
-          "Task completed. Open the conversation panel for full details.";
+          });
+          responseText = localResponse.text?.trim() || "No response returned.";
+        }
         const replyId = crypto.randomUUID();
         setAskReplies((prev) =>
           [
-            { id: replyId, content: responseText, traceId: planResponse.traceId },
+            { id: replyId, content: responseText, traceId },
             ...prev,
           ].slice(0, 3),
         );
@@ -437,7 +455,9 @@ export default function DesktopPage() {
                   key={reply.id}
                   className="rounded-2xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur"
                 >
-                  <p className="whitespace-pre-wrap leading-relaxed">{reply.content}</p>
+                  <p className="max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    {reply.content}
+                  </p>
                   <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
                     <span>Saved in Helix Console</span>
                     <button

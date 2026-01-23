@@ -52,6 +52,20 @@ export type ExecuteResponse = {
   debate_id?: string | null;
 };
 
+export type LocalAskResponse = {
+  text: string;
+  model?: string;
+  essence_id?: string;
+  seed?: number;
+  duration_ms?: number;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    max_tokens?: number;
+  };
+};
+
 export type ToolLogEvent = {
   id?: string;
   seq?: number;
@@ -343,6 +357,33 @@ export async function execute(traceId: string): Promise<ExecuteResponse> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ traceId })
     })
+  );
+}
+
+export async function askLocal(
+  prompt: string,
+  options?: {
+    maxTokens?: number;
+    temperature?: number;
+    seed?: number;
+    stop?: string | string[];
+    sessionId?: string;
+    personaId?: string;
+  },
+): Promise<LocalAskResponse> {
+  const body: Record<string, unknown> = { prompt };
+  if (typeof options?.maxTokens === "number") body.max_tokens = options.maxTokens;
+  if (typeof options?.temperature === "number") body.temperature = options.temperature;
+  if (typeof options?.seed === "number") body.seed = options.seed;
+  if (options?.stop) body.stop = options.stop;
+  if (options?.sessionId) body.sessionId = options.sessionId;
+  if (options?.personaId) body.personaId = options.personaId;
+  return asJson(
+    await fetch("/api/agi/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   );
 }
 

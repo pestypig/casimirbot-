@@ -315,14 +315,24 @@ function buildArgs(
     loraScale?: number;
   },
 ): string[] {
-  const args = [...baseArgs];
+  const args = sanitizeBaseArgs(baseArgs);
   args.push("-m", opts.model);
   args.push("-p", opts.prompt);
   args.push("-n", String(opts.maxTokens));
   args.push("--ctx-size", String(opts.contextTokens));
   args.push("--temp", String(opts.temperature));
   args.push("--seed", String(opts.seed));
+  const hasLogFlag = args.some((arg) => arg.startsWith("--log-"));
+  const hasDisplayPromptFlag = args.includes("--display-prompt") || args.includes("--no-display-prompt");
+  const disableLogs = (process.env.LLM_LOCAL_LOG_DISABLE ?? "1") !== "0";
+  const displayPrompt = process.env.LLM_LOCAL_DISPLAY_PROMPT === "1";
   args.push("--simple-io");
+  if (!hasLogFlag && disableLogs) {
+    args.push("--log-disable");
+  }
+  if (!hasDisplayPromptFlag) {
+    args.push(displayPrompt ? "--display-prompt" : "--no-display-prompt");
+  }
   if (process.env.LLM_LOCAL_DISABLE_SINGLE_TURN !== "1") {
     args.push("--single-turn");
   }
@@ -340,6 +350,35 @@ function buildArgs(
     args.push("--stop", opts.stop);
   }
   return args;
+}
+
+function sanitizeBaseArgs(baseArgs: string[]): string[] {
+  if (!baseArgs.length) {
+    return [];
+  }
+  const sanitized: string[] = [];
+  let skipNext = false;
+  const skipFlags = new Set(["--ctx-size", "-c", "--n-gpu-layers", "-ngl"]);
+  for (const token of baseArgs) {
+    if (skipNext) {
+      skipNext = false;
+      continue;
+    }
+    if (skipFlags.has(token)) {
+      skipNext = true;
+      continue;
+    }
+    if (
+      token.startsWith("--ctx-size=") ||
+      token.startsWith("-c=") ||
+      token.startsWith("--n-gpu-layers=") ||
+      token.startsWith("-ngl=")
+    ) {
+      continue;
+    }
+    sanitized.push(token);
+  }
+  return sanitized;
 }
 
 function parseArgs(value: string): string[] {

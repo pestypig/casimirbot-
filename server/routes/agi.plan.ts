@@ -2427,6 +2427,16 @@ const PlanRequest = z.object({
   refinery: agiRefineryRequestSchema.optional(),
 });
 
+const LocalAskRequest = z.object({
+  prompt: z.string().min(1, "prompt required"),
+  max_tokens: z.coerce.number().int().min(1).max(8_192).optional(),
+  temperature: z.coerce.number().min(0).max(2).optional(),
+  seed: z.coerce.number().int().nonnegative().optional(),
+  stop: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
+  sessionId: z.string().min(1).max(128).optional(),
+  personaId: z.string().min(1).optional(),
+});
+
 const ExecuteRequest = z.object({
   traceId: z.string().min(8, "traceId required"),
   debugSources: z.boolean().optional(),
@@ -3158,6 +3168,39 @@ planRouter.post("/stt/local", async (req, res) => {
     return res.status(404).json({ error: "local_stt_disabled" });
   }
   return proxyBinaryPost(LOCAL_STT_URL, LOCAL_STT_TIMEOUT_MS, req, res, "local_stt");
+});
+
+planRouter.post("/ask", async (req, res) => {
+  const parsed = LocalAskRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  let personaId = parsed.data.personaId ?? "default";
+  if (personaPolicy.shouldRestrictRequest(req.auth) && (!personaId || personaId === "default") && req.auth?.sub) {
+    personaId = req.auth.sub;
+  }
+  if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  try {
+    const result = await llmLocalHandler(
+      {
+        prompt: parsed.data.prompt,
+        max_tokens: parsed.data.max_tokens,
+        temperature: parsed.data.temperature,
+        seed: parsed.data.seed,
+        stop: parsed.data.stop,
+      },
+      {
+        personaId,
+        sessionId: parsed.data.sessionId,
+      },
+    );
+    return res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ error: "llm_local_failed", message });
+  }
 });
 
 planRouter.post("/plan", async (req, res) => {

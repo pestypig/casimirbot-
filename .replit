@@ -1,5 +1,5 @@
 modules = ["nodejs-20", "web", "postgresql-16", "python-3.11", "python3"]
-run = "FAST_BOOT=0 PORT=5000 NOISEGEN_STORAGE_BACKEND=replit npm run dev"
+run = "env NODE_ENV=production PORT=$PORT HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=1 HEALTH_READY_ON_LISTEN=1 npm run build && node dist/index.js"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -64,7 +64,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "FAST_BOOT=0 PORT=5000 npm run dev"
+args = "env NODE_ENV=production PORT=$PORT HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=1 HEALTH_READY_ON_LISTEN=1 npm run build && node dist/index.js"
 waitForPort = 5000
 
 [objectStorage]
