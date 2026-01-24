@@ -16,6 +16,15 @@ const INDEX_PATH = path.join("server", "_generated", "code-lattice.json");
 
 function removePath(target) {
   if (!fs.existsSync(target)) return;
+  if (target === ".cache") {
+    const entries = fs.readdirSync(target);
+    for (const entry of entries) {
+      if (entry === "replit") continue;
+      fs.rmSync(path.join(target, entry), { recursive: true, force: true });
+      process.stdout.write(`[deploy-clean] removed ${path.join(target, entry)}\n`);
+    }
+    return;
+  }
   fs.rmSync(target, { recursive: true, force: true });
   process.stdout.write(`[deploy-clean] removed ${target}\n`);
 }
