@@ -2,9 +2,13 @@
 .github
 .vscode
 .idea
+
+# Local caches and build outputs
 node_modules
 dist
 .cache
+
+# Large artifacts and datasets (kept in object storage)
 models
 artifacts
 datasets
@@ -12,6 +16,8 @@ reports
 coverage
 tmp
 test-results
+
+# Common large model/data files
 *.gguf
 *.safetensors
 *.bin
