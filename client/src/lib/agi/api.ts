@@ -66,6 +66,19 @@ export type LocalAskResponse = {
   };
 };
 
+export async function searchCodeLattice(
+  query: string,
+  limit = 12,
+): Promise<KnowledgeProjectExport> {
+  return asJson(
+    await fetch("/api/code-lattice/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, limit }),
+    }),
+  );
+}
+
 export type ToolLogEvent = {
   id?: string;
   seq?: number;

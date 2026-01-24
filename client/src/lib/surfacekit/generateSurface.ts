@@ -96,7 +96,7 @@ export function generateSurfaceRecipe(options: GenerateSurfaceOptions): SurfaceR
   const laminate = pickOne(SURFACE_LAMINATES, rng);
   const meander = pickOne(SURFACE_MEANDERS, rng);
 
-  const tuning = CONTEXT_TUNING[context];
+  const tuning = CONTEXT_TUNING[context] ?? CONTEXT_TUNING["desktop-wallpaper"];
   const microChance = clamp01(tuning.microChance * DENSITY_MULTIPLIER[density]);
   const includeMicro = SURFACE_MICRO.length > 0 && rng() < microChance;
   const micro = includeMicro ? pickOne(SURFACE_MICRO, rng) : null;

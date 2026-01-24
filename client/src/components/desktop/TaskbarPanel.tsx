@@ -55,26 +55,14 @@ export function TaskbarShelf({ variant = "panel", onOpenFloatingTaskbar }: Taskb
       .sort((a, b) => b.z - a.z)[0]?.id;
   }, [windows]);
 
-  const pinnedEntries = useMemo(() => {
-    const entries = panelRegistry.filter(
-      (panel) => !panel.skipTaskbar && Boolean(pinned[panel.id] ?? panel.pinned)
-    );
-    return [...entries].sort((a, b) => {
-      if (a.id === "helix-noise-gens") return -1;
-      if (b.id === "helix-noise-gens") return 1;
-      return panelRegistry.indexOf(a) - panelRegistry.indexOf(b);
-    });
-  }, [pinned]);
-
   const runningEntries = useMemo(
     () =>
       panelRegistry.filter(
         (panel) =>
           !panel.skipTaskbar &&
-          !pinned[panel.id] &&
           Boolean(windows[panel.id]?.isOpen)
       ),
-    [pinned, windows]
+    [windows]
   );
 
   const baseButtonClass =
@@ -147,11 +135,6 @@ export function TaskbarShelf({ variant = "panel", onOpenFloatingTaskbar }: Taskb
                 Min
               </span>
             )}
-            {isPinned && (
-              <span className="ml-1 text-[10px] uppercase tracking-wide text-amber-300">
-                Pin
-              </span>
-            )}
           </Button>
         </ContextMenuTrigger>
         <ContextMenuContent>
@@ -177,7 +160,6 @@ export function TaskbarShelf({ variant = "panel", onOpenFloatingTaskbar }: Taskb
       }`}
     >
       <div className="flex flex-1 items-center gap-2 overflow-x-auto pr-4">
-        {pinnedEntries.map((panel) => renderIcon(panel))}
         {runningEntries.map((panel) => renderIcon(panel))}
       </div>
       <div className="ml-auto flex items-center gap-3">

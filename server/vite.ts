@@ -136,6 +136,22 @@ export function serveStatic(app: Express) {
   const distPath = resolveDistPath();
 
   app.use(express.static(distPath));
+  app.use((req, res, next) => {
+    if (req.method !== "GET") {
+      next();
+      return;
+    }
+    if (req.path.startsWith("/src/") || req.path.startsWith("/@vite/")) {
+      res
+        .status(404)
+        .type("text/plain")
+        .send(
+          "Vite dev module requested while running the static build. Run the dev server or rebuild the client assets.",
+        );
+      return;
+    }
+    next();
+  });
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {

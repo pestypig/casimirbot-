@@ -2910,6 +2910,10 @@ G) SunPy helioseismology anchors
 - Holdout gate pass: adapter meets precision/attribution recall/latency thresholds in `agi:holdout-gate`.
 - Runtime packaging: model + index hydration, context caps, citation completion, and local spawn path verified end-to-end.
 - UI wiring: /desktop Helix Ask bar with inline replies + Essence Console session threading. DONE.
+- Grounded ask mode: plan -> local answer with resonance/knowledge context; avoids execute-only command output. Default `VITE_HELIX_ASK_MODE=grounded`.
+- Helix Ask search fallback: if resonance patch is weak, call `/api/code-lattice/search` to inject top file snippets into the grounded prompt (`VITE_HELIX_ASK_SEARCH_FALLBACK=1`).
+- Helix Ask query expansion: issue multiple search queries (warp/solver/pipeline variants) and merge snippets before grounding.
+- Helix Ask status line: show a one-line "current action" under the pill (planning, searching, building context, generating).
 - Release note: mark M1 as DONE with artifacts + hashes in task.md.
 - Optional: index coverage stretch >= 0.80 or finalized exclusions policy; base-model A/B benchmark if latency/quality tradeoff unclear.
 
@@ -2953,6 +2957,42 @@ npx --yes tsx scripts/llm-local-smoke.ts
 If it hangs:
 - `export LLM_LOCAL_MAX_TOKENS=4`
 - `export LLM_LOCAL_SPAWN_TIMEOUT_MS=30000`
+
+### Helix Ask UX + Panel Control Prompts - Status: in_progress
+
+Prompt HX1 (Helix Ask panel deep links) - Status: done
+- Goal: let Helix Ask reference relevant panels so users can open the right surface from an answer.
+- Do: add a panel registry/lookup (id, title, route, summary) to Helix Ask responses and emit deep-link targets for panels with related content.
+- Do not: auto-open panels unless the user explicitly asks.
+- Acceptance: Helix Ask responses include panel links that open the correct panel when clicked.
+- Update (2026-01-23): Helix Ask now linkifies file paths and resolves panel targets; clicking links opens the mapped panel.
+
+Prompt HX2 (Helix Ask panel actions on request) - Status: done
+- Goal: allow Helix Ask to launch panels when asked.
+- Do: define an action schema (open_panel, focus_panel, close_panel) and wire it to the client event bus; require explicit user intent in the prompt.
+- Do not: trigger panel actions for informational replies.
+- Acceptance: "open the X panel" triggers the requested panel action reliably.
+- Update (2026-01-23): `/open <panel>` and panel name requests now open panels via client event bus with aliases.
+
+Prompt HX3 (Incognito panel auto-open cleanup) - Status: pending
+- Goal: prevent auto-open panels in incognito/private browsing sessions.
+- Do: disable panel auto-open defaults when storage is ephemeral; keep normal-mode preferences intact.
+- Do not: clear saved panel layout for standard sessions.
+- Acceptance: incognito sessions load with no panels auto-opened.
+
+Prompt HX4 (NoiseGen songs load outside incognito) - Status: pending
+- Goal: fix the bug where NoiseGen songs only load in incognito mode.
+- Do: identify the normal-mode blocker (cache, service worker, auth, storage schema, or CORS); add targeted logs; fix and add a regression check.
+- Do not: introduce a workaround that requires incognito.
+- Acceptance: NoiseGen songs load in a normal browser session.
+
+Prompt HX5 (Helix Ask-centric /mobile landing) - Status: pending
+- Goal: make `/mobile` Helix Ask-centric with a start icon that opens the app viewer.
+- Do: move the current `/mobile` content into the app viewer screen; set `/mobile` to mirror the `/desktop` background with a centered Helix Ask pill; add a bottom-left start icon that opens the app viewer (with the previous mobile landing content inside it).
+- Do not: remove access to existing mobile features.
+- Acceptance: `/mobile` defaults to the Helix Ask pill + start icon, and the app viewer exposes the prior mobile content.
+- Interpretation: `/mobile` is a focused “Ask” landing (same background + centered pill), with a persistent start icon that reveals the prior mobile UI in an app viewer layer.
+- Plan: reuse `/desktop` backdrop styles; add a compact Helix Ask pill with inline replies; wire start icon to open the app viewer containing the prior `/mobile` content; keep panel deep-links working.
 
 ### Seed Mining + Curation Improvements - Status: pending
 - Add seed metadata tagging (doc section + commit hash + seed prompt id in trace meta).

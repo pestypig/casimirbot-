@@ -1,5 +1,7 @@
-﻿import { spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import { copyFileSync, existsSync, readdirSync, renameSync, statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import { EssenceEnvelope } from "@shared/essence-schema";
@@ -74,13 +76,16 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     process.env.LLM_LOCAL_MODEL_PATH?.trim() ||
     process.env.LLM_LOCAL_MODEL?.trim() ||
     DEFAULT_MODEL;
-  const loraPath = process.env.LLM_LOCAL_LORA_PATH?.trim() || "";
+  const loraPathRaw = process.env.LLM_LOCAL_LORA_PATH?.trim() || "";
+  const loraPath = resolveLoraPath(loraPathRaw);
   const loraScaleRaw = process.env.LLM_LOCAL_LORA_SCALE?.trim();
   const loraScale =
     loraScaleRaw && loraScaleRaw.length > 0
       ? clampLoraScale(toNumber(loraScaleRaw, 1))
       : undefined;
   const baseArgs = parseArgs(process.env.LLM_LOCAL_ARGS_BASE ?? "") ?? DEFAULT_ARGS;
+  const cpuBackend = resolveCpuBackend(cmd, process.env.LLM_LOCAL_CPU_BACKEND?.trim());
+  prepareCpuBackend(cmd, cpuBackend);
   const promptTokens = countTokens(prompt);
   const contextTokens = resolveLocalContextTokens();
   const maxTokensRequested = clampTokens(
@@ -96,54 +101,129 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   llmLocalSpawnCalls.inc();
   const startedAt = new Date(started).toISOString();
   const release = beginLlMJob();
-  const args = buildArgs(baseArgs, {
-    model,
-    prompt,
-    maxTokens,
-    contextTokens,
-    temperature,
-    seed,
-    stop: parsed.stop,
-    loraPath,
-    loraScale,
-  });
+  const buildSpawnArgs = (override?: { loraPath?: string; loraScale?: number }) =>
+    buildArgs(baseArgs, {
+      model,
+      prompt,
+      maxTokens,
+      contextTokens,
+      temperature,
+      seed,
+      stop: parsed.stop,
+      loraPath: override?.loraPath ?? loraPath,
+      loraScale: override?.loraScale ?? loraScale,
+    });
+  const args = buildSpawnArgs();
+  let usedArgs = args;
+  let activeLoraPath = loraPath;
+  let activeLoraScale = loraScale;
   const promptHash = sha256(Buffer.from(prompt, "utf8"));
   let outputText = "";
   const stderr: string[] = [];
-  const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
   let timedOut = false;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    try {
-      child.kill();
-    } catch {
-      // Ignore failures on teardown.
-    }
-  }, timeoutMs);
-  child.stdout.setEncoding("utf8");
-  child.stdout.on("data", (chunk: string) => {
-    outputText += chunk;
-    emitToken(ctx, chunk);
-  });
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk: string) => stderr.push(chunk));
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      child.on("error", reject);
-      child.on("close", (code) => {
-        if (code === 0 && !timedOut) {
-          resolve();
-        } else {
-          const reason = timedOut
-            ? `llm spawn timeout after ${timeoutMs}ms`
-            : `llm spawn exit ${code}: ${stderr.join("").trim()}`;
-          reject(new Error(reason));
-        }
-      });
+  const runSpawn = async (spawnArgs: string[]) => {
+    outputText = "";
+    stderr.length = 0;
+    const child = spawn(cmd, spawnArgs, { stdio: ["ignore", "pipe", "pipe"] });
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      try {
+        child.kill();
+      } catch {
+        // Ignore failures on teardown.
+      }
+    }, timeoutMs);
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      outputText += chunk;
+      emitToken(ctx, chunk);
     });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => stderr.push(chunk));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        child.on("error", reject);
+        child.on("close", (code) => {
+          if (code === 0 && !timedOut) {
+            resolve();
+          } else {
+            const reason = timedOut
+              ? `llm spawn timeout after ${timeoutMs}ms`
+              : `llm spawn exit ${code}: ${stderr.join("").trim()}`;
+            reject(new Error(reason));
+          }
+        });
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  let lastSpawnError: unknown;
+  const attempt = async (spawnArgs: string[]): Promise<boolean> => {
+    try {
+      timedOut = false;
+      usedArgs = spawnArgs;
+      await runSpawn(spawnArgs);
+      lastSpawnError = null;
+      return true;
+    } catch (error) {
+      lastSpawnError = error;
+      return false;
+    }
+  };
+  let lastError: unknown;
+  try {
+    if (await attempt(args)) {
+      return await finalizeSuccess();
+    }
+    const error = lastSpawnError ?? new Error("llm spawn failed");
+    lastError = error;
+    const message = error instanceof Error ? error.message : String(error);
+    const isAccessViolation = /3221225477|0xC0000005/i.test(message);
+    if (loraPath && isAccessViolation) {
+      const noLoraArgs = buildSpawnArgs({ loraPath: "", loraScale: undefined });
+      if (await attempt(noLoraArgs)) {
+        activeLoraPath = "";
+        activeLoraScale = undefined;
+        return await finalizeSuccess();
+      }
+    }
+    const shouldTryNoMmap =
+      process.platform === "win32" &&
+      isAccessViolation &&
+      !args.includes("--no-mmap") &&
+      !args.includes("--mmap");
+    if (shouldTryNoMmap) {
+      const retryArgs = [...args, "--no-mmap"];
+      if (await attempt(retryArgs)) {
+        return await finalizeSuccess();
+      }
+    }
+    if (process.platform === "win32" && isAccessViolation) {
+      const availableBackends = listCpuBackends(cmd).filter((entry) => entry !== "haswell");
+      const fallbackOrder = Array.from(new Set(["sse42", "x64", ...availableBackends]));
+      const retryArgs = args.includes("--no-mmap") ? args : [...args, "--no-mmap"];
+      for (const backend of fallbackOrder) {
+        if (!applyCpuBackend(cmd, backend)) {
+          continue;
+        }
+        if (await attempt(retryArgs)) {
+          return await finalizeSuccess();
+        }
+      }
+    }
+    if (isAccessViolation) {
+      const available = listCpuBackends(cmd);
+      const hint = available.length
+        ? ` Available CPU backends: ${available.join(", ")}.`
+        : " No alternate CPU backends were found.";
+      const finalMessage = `${message}.${hint} Set LLM_LOCAL_CPU_BACKEND to a supported backend (sse42/x64), or install a compatible llama prebuilt.`;
+      throw new Error(finalMessage);
+    }
+    throw error;
   } catch (err) {
-    clearTimeout(timeout);
+    lastError = err;
     const memory = process.memoryUsage();
     recordLocalRuntimeStats({
       ts: new Date().toISOString(),
@@ -164,7 +244,17 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     appendToolLog({
       tool: TOOL_NAME,
       version: TOOL_VERSION,
-      paramsHash: hashPayload({ prompt, maxTokens, contextTokens, temperature, seed, cmd, args, loraPath }),
+      paramsHash: hashPayload({
+        prompt,
+        maxTokens,
+        contextTokens,
+        temperature,
+        seed,
+        cmd,
+        args: usedArgs,
+        loraPath: activeLoraPath,
+        loraScale: activeLoraScale,
+      }),
       promptHash,
       durationMs: Date.now() - started,
       sessionId,
@@ -173,133 +263,350 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       seed,
       text: `[err] ${TOOL_NAME} spawn failed`,
     });
-    throw err;
+    throw lastError;
   } finally {
     release();
   }
 
-  clearTimeout(timeout);
-  const trimmedOutput = outputText.trim();
-  const completionTokens = countTokens(trimmedOutput);
-  const totalTokens = promptTokens + completionTokens;
-  const memory = process.memoryUsage();
-  recordLocalRuntimeStats({
-    ts: new Date().toISOString(),
-    durationMs: Date.now() - started,
-    promptTokens,
-    completionTokens,
-    totalTokens,
-    maxTokens,
-    contextTokens,
-    memory: {
-      rssBytes: memory.rss,
-      heapUsedBytes: memory.heapUsed,
-      heapTotalBytes: memory.heapTotal,
-      externalBytes: memory.external,
-      arrayBuffersBytes: memory.arrayBuffers,
-    },
-  });
-  const buffer = Buffer.from(trimmedOutput, "utf8");
-  const blob = await putBlob(buffer, { contentType: TEXT_MIME });
-  const textHash = sha256(buffer);
-  const essenceId = randomUUID();
-  const envelope = EssenceEnvelope.parse({
-    header: {
-      id: essenceId,
-      version: "essence/1.0",
-      modality: "text",
-      created_at: startedAt,
-      source: {
-        uri: blob.uri,
-        cid: blob.cid,
-        original_hash: { algo: "sha256", value: textHash },
-        mime: TEXT_MIME,
-        creator_id: personaId,
-        license: parsed.metadata?.license ?? "CC-BY-4.0",
-      },
-      rights: { allow_mix: true, allow_remix: true, allow_commercial: false, attribution: true },
-      acl: { visibility: "private", groups: [] },
-    },
-    features: {
-      text: {
-        lang: parsed.metadata?.language ?? "en",
-        token_counts: {
-          prompt: promptTokens,
-          completion: completionTokens,
-          total: totalTokens,
-        },
-      },
-    },
-    embeddings: [],
-    provenance: {
-      pipeline: [
-        {
-          name: TOOL_NAME,
-          impl_version: TOOL_VERSION,
-          lib_hash: {
-            algo: "sha256",
-            value: sha256(Buffer.from(`${cmd}:${model}:${args.join(" ")}`)),
-          },
-          params: {
-            model,
-            max_tokens: maxTokens,
-            context_tokens: contextTokens,
-            temperature,
-            seed,
-            stop: parsed.stop,
-            lora_path: loraPath || undefined,
-            lora_scale: loraPath ? loraScale : undefined,
-            metadata: parsed.metadata,
-          },
-          seed: String(seed),
-          input_hash: { algo: "sha256", value: promptHash },
-          output_hash: { algo: "sha256", value: textHash },
-          started_at: startedAt,
-          ended_at: new Date().toISOString(),
-        },
-      ],
-      merkle_root: { algo: "sha256", value: textHash },
-      previous: null,
-      signatures: [],
-    },
-  });
-  await putEnvelopeWithPolicy(envelope);
-
-  const durationMs = Date.now() - started;
-  llmLocalSpawnLatency.observe(durationMs);
-  appendToolLog({
-    tool: TOOL_NAME,
-    version: TOOL_VERSION,
-    paramsHash: hashPayload({ prompt, maxTokens, contextTokens, temperature, seed, cmd, args, loraPath }),
-    promptHash,
-    durationMs,
-    sessionId,
-    ok: true,
-    essenceId,
-    seed,
-    text: formatLogText({
-      model,
+  async function finalizeSuccess(): Promise<LocalSpawnOutput> {
+    const trimmedOutput = stripCliNoise(outputText);
+    const completionTokens = countTokens(trimmedOutput);
+    const totalTokens = promptTokens + completionTokens;
+    const memory = process.memoryUsage();
+    recordLocalRuntimeStats({
+      ts: new Date().toISOString(),
+      durationMs: Date.now() - started,
+      promptTokens,
+      completionTokens,
+      totalTokens,
       maxTokens,
       contextTokens,
-      loraPath,
-      memoryRssBytes: memory.rss,
-    }),
-  });
+      memory: {
+        rssBytes: memory.rss,
+        heapUsedBytes: memory.heapUsed,
+        heapTotalBytes: memory.heapTotal,
+        externalBytes: memory.external,
+        arrayBuffersBytes: memory.arrayBuffers,
+      },
+    });
+    const buffer = Buffer.from(trimmedOutput, "utf8");
+    const blob = await putBlob(buffer, { contentType: TEXT_MIME });
+    const textHash = sha256(buffer);
+    const essenceId = randomUUID();
+    const envelope = EssenceEnvelope.parse({
+      header: {
+        id: essenceId,
+        version: "essence/1.0",
+        modality: "text",
+        created_at: startedAt,
+        source: {
+          uri: blob.uri,
+          cid: blob.cid,
+          original_hash: { algo: "sha256", value: textHash },
+          mime: TEXT_MIME,
+          creator_id: personaId,
+          license: parsed.metadata?.license ?? "CC-BY-4.0",
+        },
+        rights: { allow_mix: true, allow_remix: true, allow_commercial: false, attribution: true },
+        acl: { visibility: "private", groups: [] },
+      },
+      features: {
+        text: {
+          lang: parsed.metadata?.language ?? "en",
+          token_counts: {
+            prompt: promptTokens,
+            completion: completionTokens,
+            total: totalTokens,
+          },
+        },
+      },
+      embeddings: [],
+      provenance: {
+        pipeline: [
+          {
+            name: TOOL_NAME,
+            impl_version: TOOL_VERSION,
+            lib_hash: {
+              algo: "sha256",
+              value: sha256(Buffer.from(`${cmd}:${model}:${usedArgs.join(" ")}`)),
+            },
+            params: {
+              model,
+              max_tokens: maxTokens,
+              context_tokens: contextTokens,
+              temperature,
+              seed,
+              stop: parsed.stop,
+              lora_path: activeLoraPath || undefined,
+              lora_scale: activeLoraPath ? activeLoraScale : undefined,
+              metadata: parsed.metadata,
+            },
+            seed: String(seed),
+            input_hash: { algo: "sha256", value: promptHash },
+            output_hash: { algo: "sha256", value: textHash },
+            started_at: startedAt,
+            ended_at: new Date().toISOString(),
+          },
+        ],
+        merkle_root: { algo: "sha256", value: textHash },
+        previous: null,
+        signatures: [],
+      },
+    });
+    await putEnvelopeWithPolicy(envelope);
 
-  return GenerateOutput.parse({
-    text: trimmedOutput,
-    model,
-    essence_id: essenceId,
-    seed,
-    duration_ms: durationMs,
-    usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: totalTokens,
-      max_tokens: maxTokens,
-    },
-  });
+    const durationMs = Date.now() - started;
+    llmLocalSpawnLatency.observe(durationMs);
+    appendToolLog({
+      tool: TOOL_NAME,
+      version: TOOL_VERSION,
+      paramsHash: hashPayload({
+        prompt,
+        maxTokens,
+        contextTokens,
+        temperature,
+        seed,
+        cmd,
+        args: usedArgs,
+        loraPath: activeLoraPath,
+        loraScale: activeLoraScale,
+      }),
+      promptHash,
+      durationMs,
+      sessionId,
+      ok: true,
+      essenceId,
+      seed,
+      text: formatLogText({
+        model,
+        maxTokens,
+        contextTokens,
+        loraPath: activeLoraPath,
+        memoryRssBytes: memory.rss,
+      }),
+    });
+
+    return GenerateOutput.parse({
+      text: trimmedOutput,
+      model,
+      essence_id: essenceId,
+      seed,
+      duration_ms: durationMs,
+      usage: {
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        total_tokens: totalTokens,
+        max_tokens: maxTokens,
+      },
+    });
+  }
+
+  return await finalizeSuccess();
 };
+
+function listCpuBackends(cmdPath: string): string[] {
+  if (process.platform !== "win32") return [];
+  const resolved = resolve(cmdPath);
+  if (!existsSync(resolved)) return [];
+  const binDir = dirname(resolved);
+  const candidates: string[] = [];
+  const collect = (dir: string) => {
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.startsWith("ggml-cpu-") || !entry.endsWith(".dll")) continue;
+      if (entry.endsWith(".bak")) continue;
+      const backend = entry.replace(/^ggml-cpu-/, "").replace(/\.dll$/, "");
+      if (backend) candidates.push(backend);
+    }
+  };
+  collect(binDir);
+  collect(resolve(binDir, "generic"));
+  return Array.from(new Set(candidates));
+}
+
+function resolveCpuBackend(cmdPath: string, override?: string): string {
+  if (override) return override;
+  if (process.platform !== "win32") return "";
+  const available = listCpuBackends(cmdPath);
+  if (available.includes("sse42")) return "sse42";
+  if (available.includes("x64")) return "x64";
+  return "";
+}
+
+function prepareCpuBackend(cmdPath: string, backendOverride?: string): void {
+  if (process.platform != "win32") {
+    return;
+  }
+  const backend = backendOverride ?? process.env.LLM_LOCAL_CPU_BACKEND?.trim();
+  if (!backend) {
+    return;
+  }
+  const resolved = resolve(cmdPath);
+  if (!existsSync(resolved)) {
+    return;
+  }
+  const binDir = dirname(resolved);
+  let entries: string[];
+  try {
+    entries = readdirSync(binDir);
+  } catch {
+    return;
+  }
+  const target = `ggml-cpu-${backend}.dll`;
+  const targetBak = `${target}.bak`;
+  if (!entries.includes(target) && !entries.includes(targetBak)) {
+    const genericDir = resolve(binDir, "generic");
+    const genericTarget = resolve(genericDir, target);
+    if (existsSync(genericTarget)) {
+      try {
+        copyFileSync(genericTarget, resolve(binDir, target));
+        entries = readdirSync(binDir);
+      } catch {
+        return;
+      }
+    }
+  }
+  if (entries.includes(targetBak) && !entries.includes(target)) {
+    try {
+      renameSync(resolve(binDir, targetBak), resolve(binDir, target));
+    } catch {
+      return;
+    }
+  }
+  for (const entry of entries) {
+    if (!entry.startsWith("ggml-cpu-") || !entry.endsWith(".dll")) {
+      continue;
+    }
+    if (entry == target) {
+      continue;
+    }
+    try {
+      renameSync(resolve(binDir, entry), resolve(binDir, `${entry}.bak`));
+    } catch {
+      return;
+    }
+  }
+}
+
+function applyCpuBackend(cmdPath: string, backend: string): boolean {
+  if (process.platform != "win32") {
+    return false;
+  }
+  const resolved = resolve(cmdPath);
+  if (!existsSync(resolved)) {
+    return false;
+  }
+  const binDir = dirname(resolved);
+  let entries: string[];
+  try {
+    entries = readdirSync(binDir);
+  } catch {
+    return false;
+  }
+  const target = `ggml-cpu-${backend}.dll`;
+  const targetBak = `${target}.bak`;
+  const hasTarget = entries.includes(target);
+  const hasBak = entries.includes(targetBak);
+  if (!hasTarget && !hasBak) {
+    const genericDir = resolve(binDir, "generic");
+    const genericTarget = resolve(genericDir, target);
+    if (!existsSync(genericTarget)) {
+      return false;
+    }
+    try {
+      copyFileSync(genericTarget, resolve(binDir, target));
+      entries = readdirSync(binDir);
+    } catch {
+      return false;
+    }
+  }
+  if (hasBak && !hasTarget) {
+    try {
+      renameSync(resolve(binDir, targetBak), resolve(binDir, target));
+    } catch {
+      return false;
+    }
+  }
+  for (const entry of entries) {
+    if (!entry.startsWith("ggml-cpu-") || !entry.endsWith(".dll")) {
+      continue;
+    }
+    if (entry === target) {
+      continue;
+    }
+    try {
+      renameSync(resolve(binDir, entry), resolve(binDir, `${entry}.bak`));
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function stripCliNoise(output: string): string {
+  const raw = output.trim();
+  if (!raw) {
+    return raw;
+  }
+  const lines = raw.split(/\r?\n/);
+  const hasBanner = lines.some((line) => isCliBannerLine(line));
+  if (!hasBanner) {
+    return raw;
+  }
+  let startIdx = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].trim().startsWith(">")) {
+      startIdx = i + 1;
+    }
+  }
+  const cleaned = lines
+    .slice(startIdx)
+    .filter((line) => !isCliNoiseLine(line))
+    .join("\n")
+    .trim();
+  return cleaned || raw;
+}
+
+function isCliBannerLine(line: string): boolean {
+  const trimmed = line.trim().toLowerCase();
+  return (
+    trimmed.startsWith("loading model") ||
+    /^build\s*:/.test(trimmed) ||
+    /^model\s*:/.test(trimmed) ||
+    /^modalities\s*:/.test(trimmed) ||
+    trimmed.startsWith("available commands") ||
+    trimmed.startsWith("/exit") ||
+    trimmed.startsWith("/regen") ||
+    trimmed.startsWith("/clear") ||
+    trimmed.startsWith("/read")
+  );
+}
+
+function isCliNoiseLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith(">")) {
+    return true;
+  }
+  if (lower.startsWith("exiting")) {
+    return true;
+  }
+  if (lower.includes("prompt:") && lower.includes("t/s")) {
+    return true;
+  }
+  if (lower.includes("generation:") && lower.includes("t/s")) {
+    return true;
+  }
+  return isCliBannerLine(trimmed);
+}
 
 function buildArgs(
   baseArgs: string[],
@@ -390,6 +697,28 @@ function parseArgs(value: string): string[] {
     return [];
   }
   return tokens.map((token) => token.replace(/^(['"])(.*)\1$/, "$2"));
+}
+
+function resolveLoraPath(value: string): string {
+  if (!value) {
+    return "";
+  }
+  const resolved = resolve(value);
+  if (!existsSync(resolved)) {
+    return "";
+  }
+  try {
+    if (!statSync(resolved).isFile()) {
+      return "";
+    }
+  } catch {
+    return "";
+  }
+  const lower = resolved.toLowerCase();
+  if (!lower.endsWith(".gguf") && !lower.endsWith(".bin")) {
+    return "";
+  }
+  return resolved;
 }
 
 function clampTokens(value: number): number {
@@ -500,4 +829,5 @@ const serializeError = (err: unknown): string => {
     return String(err);
   }
 };
+
 

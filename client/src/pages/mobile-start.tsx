@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Clock3, Home, PanelsTopLeft, Pin, X, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Clock3,
+  Home,
+  MessageCircle,
+  PanelsTopLeft,
+  Pin,
+  X,
+  XCircle,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import { useMobileAppStore } from "@/store/useMobileAppStore";
 import { MobilePanelHost } from "@/components/mobile/MobilePanelHost";
 import { recordPanelActivity } from "@/lib/essence/activityReporter";
+import { SurfaceStack } from "@/components/surface/SurfaceStack";
+import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
+import { HelixAskPill } from "@/components/helix/HelixAskPill";
 
 const LONG_PRESS_MS = 650;
 const MAX_WARN_STACK = 4;
@@ -13,6 +24,7 @@ export default function MobileStartPage() {
   const [, setLocation] = useLocation();
   const { stack, activeId, open, activate, close, closeAll, goHome } = useMobileAppStore();
   const [showSwitcher, setShowSwitcher] = useState(false);
+  const [appViewerOpen, setAppViewerOpen] = useState(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout>>();
   const pressTriggered = useRef(false);
 
@@ -51,6 +63,27 @@ export default function MobileStartPage() {
     [stack]
   );
 
+  const wallpaperRecipe = useMemo(
+    () =>
+      generateSurfaceRecipe({
+        seed: "helix-wallpaper-v1",
+        context: "desktop-wallpaper",
+        density: "medium",
+      }),
+    []
+  );
+
+  const openAppViewer = useCallback(() => {
+    setAppViewerOpen(true);
+    setShowSwitcher(false);
+  }, []);
+
+  const closeAppViewer = useCallback(() => {
+    setAppViewerOpen(false);
+    setShowSwitcher(false);
+    goHome();
+  }, [goHome]);
+
   const startLongPress = () => {
     pressTriggered.current = false;
     if (pressTimer.current) clearTimeout(pressTimer.current);
@@ -87,8 +120,28 @@ export default function MobileStartPage() {
     }
     recordPanelActivity(panel.id, "openMobile");
     open(panelId);
+    setAppViewerOpen(true);
     setShowSwitcher(false);
   };
+
+  const handleOpenPanel = useCallback(
+    (panelId: string) => {
+      if (!panelId) return;
+      open(panelId);
+      setAppViewerOpen(true);
+      setShowSwitcher(false);
+    },
+    [open]
+  );
+
+  const handleOpenConversation = useCallback(
+    (_sessionId: string) => {
+      open("agi-essence-console");
+      setAppViewerOpen(true);
+      setShowSwitcher(false);
+    },
+    [open]
+  );
 
   useEffect(() => {
     recordPanelActivity("mobile-shell", "enter");
@@ -105,48 +158,57 @@ export default function MobileStartPage() {
       className="relative min-h-screen bg-slate-950 text-slate-100"
       style={{ minHeight: "max(100dvh, 100vh)" }}
     >
-      <div
-        className="mx-auto flex min-h-screen max-w-screen-lg flex-col"
-        style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)"
-        }}
-      >
-        <header
-          className="sticky top-0 z-20 flex items-center justify-start bg-slate-950/85 px-4 pb-3 backdrop-blur sm:px-5 sm:pb-4"
-          style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      <SurfaceStack recipe={wallpaperRecipe} />
+      {appViewerOpen ? (
+        <div
+          className="relative z-10 mx-auto flex min-h-screen max-w-screen-lg flex-col"
+          style={{
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)"
+          }}
         >
-          <button
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[13px] font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 sm:px-3.5 sm:py-1.5 min-h-[44px]"
-            onPointerDown={startLongPress}
-            onPointerUp={endLongPress}
-            onPointerLeave={cancelLongPress}
-            onPointerCancel={cancelLongPress}
-            onClick={() => {
-              if (!pressTriggered.current) {
-                goHome();
-              }
-            }}
+          <header
+            className="sticky top-0 z-20 flex items-center justify-between bg-slate-950/85 px-4 pb-3 backdrop-blur sm:px-5 sm:pb-4"
+            style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
           >
-            <Home className="h-4 w-4" />
-            Home
-          </button>
-        </header>
-
-        <main className="relative flex-1 overflow-hidden">
-          {activeEntry ? (
-            <MobilePanelHost
-              key={activeEntry.panelId}
-              panelId={activeEntry.panelId}
-              title={activeEntry.title}
-              loader={activeEntry.loader}
-              onHome={() => {
-                goHome();
-                setShowSwitcher(false);
+            <button
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[13px] font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 sm:px-3.5 sm:py-1.5 min-h-[44px]"
+              onPointerDown={startLongPress}
+              onPointerUp={endLongPress}
+              onPointerLeave={cancelLongPress}
+              onPointerCancel={cancelLongPress}
+              onClick={() => {
+                if (!pressTriggered.current) {
+                  goHome();
+                }
               }}
-              onShowSwitcher={() => setShowSwitcher(true)}
-            />
-          ) : (
-            <div className="space-y-6 px-5 pb-8">
+            >
+              <Home className="h-4 w-4" />
+              Home
+            </button>
+            <button
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[13px] font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 sm:px-3.5 sm:py-1.5 min-h-[44px]"
+              onClick={closeAppViewer}
+            >
+              <MessageCircle className="h-4 w-4" />
+              Ask
+            </button>
+          </header>
+
+          <main className="relative flex-1 overflow-hidden">
+            {activeEntry ? (
+              <MobilePanelHost
+                key={activeEntry.panelId}
+                panelId={activeEntry.panelId}
+                title={activeEntry.title}
+                loader={activeEntry.loader}
+                onHome={() => {
+                  goHome();
+                  setShowSwitcher(false);
+                }}
+                onShowSwitcher={() => setShowSwitcher(true)}
+              />
+            ) : (
+              <div className="space-y-6 px-5 pb-8">
               {pinnedPanels.length ? (
                 <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-sky-900/30">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
@@ -273,9 +335,37 @@ export default function MobileStartPage() {
             </div>
           )}
         </main>
-      </div>
+        </div>
+      ) : (
+        <div
+          className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6"
+          style={{
+            paddingTop: "env(safe-area-inset-top, 0px)",
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
+          }}
+        >
+          <HelixAskPill
+            className="w-full max-w-md"
+            contextId="helix-ask-mobile"
+            maxWidthClassName="max-w-md"
+            onOpenPanel={handleOpenPanel}
+            onOpenConversation={handleOpenConversation}
+          />
+        </div>
+      )}
 
-      {showSwitcher && (
+      {!appViewerOpen && (
+        <button
+          className="pointer-events-auto fixed bottom-6 left-5 z-20 flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-100 shadow-lg shadow-slate-900/40 transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 min-h-[48px]"
+          onClick={openAppViewer}
+          type="button"
+        >
+          <PanelsTopLeft className="h-4 w-4" />
+          Start
+        </button>
+      )}
+
+      {appViewerOpen && showSwitcher && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm">
           <div
             className="mx-auto mt-12 w-full max-w-screen-md px-5"

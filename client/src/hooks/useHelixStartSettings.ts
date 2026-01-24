@@ -5,6 +5,7 @@ export type StartSettings = {
   preferDesktop: boolean;
   showZen: boolean;
   enableSplashCursor: boolean;
+  showHelixAskDebug: boolean;
 };
 
 export type SettingsTab = "preferences" | "knowledge";
@@ -13,7 +14,8 @@ export const DEFAULT_SETTINGS: StartSettings = {
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
-  enableSplashCursor: false
+  enableSplashCursor: false,
+  showHelixAskDebug: false
 };
 
 export const SETTINGS_STORAGE_KEY = "helix-start-settings";

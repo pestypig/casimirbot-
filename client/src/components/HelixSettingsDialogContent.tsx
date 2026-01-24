@@ -93,6 +93,13 @@ export function HelixSettingsDialogContent({
             checked={userSettings.enableSplashCursor}
             onChange={(value) => updateSettings({ enableSplashCursor: value })}
           />
+          <PreferenceToggleRow
+            id="helix-ask-debug"
+            label="Helix Ask debug context"
+            description="Show which repo files were used to answer."
+            checked={userSettings.showHelixAskDebug}
+            onChange={(value) => updateSettings({ showHelixAskDebug: value })}
+          />
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
             <button
               className="text-sm text-slate-300 underline-offset-2 hover:text-white hover:underline"
