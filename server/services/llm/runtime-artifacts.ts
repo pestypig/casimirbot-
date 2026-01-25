@@ -10,6 +10,7 @@ type ArtifactSpec = {
   objectKey: string;
   sha256: string;
   targetPath: string;
+  executable?: boolean;
 };
 
 let replitClient: ReplitStorageClient | null = null;
@@ -134,6 +135,15 @@ const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
       await fs.unlink(target);
     }
     await fs.rename(tmpPath, target);
+    if (spec.executable) {
+      try {
+        await fs.chmod(target, 0o755);
+      } catch (error) {
+        console.warn(
+          `[runtime] ${spec.label} chmod skipped (${(error as Error).message})`,
+        );
+      }
+    }
     console.log(`[runtime] ${spec.label} hydrated (${target})`);
   } catch (error) {
     await fs.unlink(tmpPath).catch(() => undefined);
@@ -151,6 +161,23 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
       objectKey: modelKey,
       sha256: process.env.LLM_LOCAL_MODEL_SHA256 ?? "",
       targetPath: process.env.LLM_LOCAL_MODEL_PATH ?? process.env.LLM_LOCAL_MODEL ?? "./models/model.gguf",
+    });
+  }
+
+  const cmdKey = normalizeObjectKey(process.env.LLM_LOCAL_CMD_OBJECT_KEY);
+  if (cmdKey) {
+    const cmdPath =
+      process.env.LLM_LOCAL_CMD?.trim() ??
+      ".cache/llm/llama-build/bin/llama-cli";
+    if (!process.env.LLM_LOCAL_CMD) {
+      process.env.LLM_LOCAL_CMD = cmdPath;
+    }
+    artifacts.push({
+      label: "llama-cli",
+      objectKey: cmdKey,
+      sha256: process.env.LLM_LOCAL_CMD_SHA256 ?? "",
+      targetPath: cmdPath,
+      executable: true,
     });
   }
 

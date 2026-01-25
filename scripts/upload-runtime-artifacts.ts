@@ -10,6 +10,7 @@ type ArtifactConfig = {
   shaEnv: string;
   pathEnv: string;
   defaultPath: string;
+  alwaysIncludePath?: boolean;
 };
 
 const ARTIFACTS: ArtifactConfig[] = [
@@ -33,6 +34,14 @@ const ARTIFACTS: ArtifactConfig[] = [
     shaEnv: "LLM_LOCAL_INDEX_SHA256",
     pathEnv: "LLM_LOCAL_INDEX_PATH",
     defaultPath: "server/_generated/code-lattice.json",
+  },
+  {
+    label: "llama-cli",
+    keyEnv: "LLM_LOCAL_CMD_OBJECT_KEY",
+    shaEnv: "LLM_LOCAL_CMD_SHA256",
+    pathEnv: "LLM_LOCAL_CMD",
+    defaultPath: ".cache/llm/llama-build/bin/llama-cli",
+    alwaysIncludePath: true,
   },
 ];
 
@@ -91,7 +100,7 @@ async function main() {
 
     envLines.push(`${artifact.keyEnv}=${key}`);
     envLines.push(`${artifact.shaEnv}=${sha256}`);
-    if (process.env[artifact.pathEnv]?.trim()) {
+    if (artifact.alwaysIncludePath || process.env[artifact.pathEnv]?.trim()) {
       envLines.push(`${artifact.pathEnv}=${rawPath}`);
     }
   }
