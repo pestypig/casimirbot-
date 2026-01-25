@@ -2472,6 +2472,21 @@ function normalizeQuestionMatch(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function isPromptLine(value: string): boolean {
+  const cleaned = cleanPromptLine(value);
+  if (!cleaned) return false;
+  return (
+    /^(question|context|resonance patch)\s*:/i.test(cleaned) ||
+    /^you are helix ask/i.test(cleaned) ||
+    /^use only the evidence/i.test(cleaned) ||
+    /^if the context is insufficient/i.test(cleaned) ||
+    /^when the context includes/i.test(cleaned) ||
+    /^do not repeat the question/i.test(cleaned) ||
+    /^do not output tool logs/i.test(cleaned) ||
+    /^respond w/i.test(cleaned)
+  );
+}
+
 function stripLeadingQuestion(answer: string, question?: string): string {
   const lines = answer.split(/\r?\n/);
   const target = question?.trim();
@@ -2483,7 +2498,7 @@ function stripLeadingQuestion(answer: string, question?: string): string {
       index += 1;
       continue;
     }
-    if (/^(question|context|resonance patch)\s*:/i.test(cleaned)) {
+    if (isPromptLine(cleaned)) {
       index += 1;
       continue;
     }
@@ -2505,21 +2520,12 @@ function stripLeadingQuestion(answer: string, question?: string): string {
 function stripPromptEchoFromAnswer(answer: string, question?: string): string {
   let trimmed = stripLeadingQuestion(answer.trim(), question);
   if (!trimmed) return trimmed;
-  const removePrefixes = [
-    "you are helix ask",
-    "use only the evidence",
-    "if the context is insufficient",
-    "when the context includes",
-    "do not repeat the question",
-    "do not output tool logs",
-    "respond with only the answer",
-  ];
   trimmed = trimmed
     .split(/\r?\n/)
     .filter((line) => {
-      const cleaned = cleanPromptLine(line).toLowerCase();
+      const cleaned = cleanPromptLine(line);
       if (!cleaned) return false;
-      return !removePrefixes.some((prefix) => cleaned.startsWith(prefix));
+      return !isPromptLine(cleaned);
     })
     .join("\n")
     .trim();
@@ -3454,9 +3460,6 @@ planRouter.post("/ask", async (req, res) => {
     if (!prompt) {
       return res.status(400).json({ error: "bad_request", details: [{ path: ["prompt"], message: "prompt required" }] });
     }
-    const shouldStripPromptEcho =
-      Boolean(question) ||
-      /you are helix ask|use only the evidence|respond with only the answer/i.test(prompt);
     const result = await llmLocalHandler(
       {
         prompt,
@@ -3470,7 +3473,7 @@ planRouter.post("/ask", async (req, res) => {
         sessionId: parsed.data.sessionId,
       },
     );
-    if (shouldStripPromptEcho && typeof result.text === "string" && result.text.trim()) {
+    if (typeof result.text === "string" && result.text.trim()) {
       result.text = stripPromptEchoFromAnswer(result.text, question);
     }
     return res.json(result);
