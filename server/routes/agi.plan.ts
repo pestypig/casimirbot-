@@ -3454,6 +3454,9 @@ planRouter.post("/ask", async (req, res) => {
     if (!prompt) {
       return res.status(400).json({ error: "bad_request", details: [{ path: ["prompt"], message: "prompt required" }] });
     }
+    const shouldStripPromptEcho =
+      Boolean(question) ||
+      /you are helix ask|use only the evidence|respond with only the answer/i.test(prompt);
     const result = await llmLocalHandler(
       {
         prompt,
@@ -3467,7 +3470,7 @@ planRouter.post("/ask", async (req, res) => {
         sessionId: parsed.data.sessionId,
       },
     );
-    if (autoPrompt && typeof result.text === "string" && result.text.trim()) {
+    if (shouldStripPromptEcho && typeof result.text === "string" && result.text.trim()) {
       result.text = stripPromptEchoFromAnswer(result.text, question);
     }
     return res.json(result);
