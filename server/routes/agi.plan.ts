@@ -2481,6 +2481,8 @@ function isPromptLine(value: string): boolean {
     /^use only the evidence/i.test(cleaned) ||
     /^if the context is insufficient/i.test(cleaned) ||
     /^when the context includes/i.test(cleaned) ||
+    /^when listing multiple/i.test(cleaned) ||
+    /^keep paragraphs short/i.test(cleaned) ||
     /^do not repeat the question/i.test(cleaned) ||
     /^do not output tool logs/i.test(cleaned) ||
     /^respond w/i.test(cleaned)
@@ -2539,6 +2541,30 @@ function stripPromptEchoFromAnswer(answer: string, question?: string): string {
     }
   }
   return trimmed;
+}
+
+function formatHelixAskAnswer(answer: string): string {
+  if (!answer) return answer;
+  const lines = answer.split(/\r?\n/);
+  const formatted: string[] = [];
+  let lastWasBlank = true;
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    if (!line.trim()) {
+      if (!lastWasBlank && formatted.length) {
+        formatted.push("");
+        lastWasBlank = true;
+      }
+      continue;
+    }
+    const isListItem = /^\s*\d+\.\s+/.test(line);
+    if (isListItem && formatted.length && !lastWasBlank) {
+      formatted.push("");
+    }
+    formatted.push(line);
+    lastWasBlank = false;
+  }
+  return formatted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function tokenizeAskQuery(input: string): string[] {
@@ -2670,6 +2696,8 @@ function buildGroundedAskPrompt(question: string, context: string): string {
     "Use only the evidence in the context below. Cite file paths when referencing code.",
     "If the context is insufficient, say what is missing and ask a concise follow-up.",
     "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
+    "When listing multiple points, use a numbered list with one item per line.",
+    "Keep paragraphs short (2-3 sentences) and separate sections with blank lines.",
     "Do not repeat the question or include headings like Question or Context.",
     "Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.",
     'Respond with only the answer and prefix it with \"FINAL:\".',
@@ -3474,7 +3502,7 @@ planRouter.post("/ask", async (req, res) => {
       },
     );
     if (typeof result.text === "string" && result.text.trim()) {
-      result.text = stripPromptEchoFromAnswer(result.text, question);
+      result.text = formatHelixAskAnswer(stripPromptEchoFromAnswer(result.text, question));
     }
     return res.json(result);
   } catch (error) {

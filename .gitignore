@@ -73,6 +73,11 @@ client/public/originals/*
 /.cache/
 /tmp/
 /training-trace*.jsonl
+# Replit/local caches
+/.pythonlibs/
+/.local/
+sunpy_out/
+external/ollama/
 # Large model weights (prevent accidental commits)
 *.gguf
 *.safetensors
