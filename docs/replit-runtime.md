@@ -82,6 +82,18 @@ Expected:
 - JSON response with `text`, `model`, `duration_ms`
 - First request can take 20-40s on CPU
 
+## Grounded Ask (Repo-aware)
+
+To get repo-grounded answers, send a `question` (optionally `searchQuery` and `topK`).
+The server will search the code lattice and build the context automatically.
+
+```
+curl -sS --max-time 180 \
+  -H "Content-Type: application/json" \
+  -d '{"question":"how does the warp bubble get solved for in this system?","searchQuery":"warp bubble natario calculateNatarioWarpBubble","topK":12}' \
+  http://127.0.0.1:$PORT/api/agi/ask
+```
+
 ## Common Failures
 
 **`api_not_found`**
@@ -101,4 +113,3 @@ Expected:
 
 CPU-only: expect ~3-4 tokens/sec generation on Qwen2.5-3B Q4.
 Set longer timeouts on client requests (60-120s) for first response.
-

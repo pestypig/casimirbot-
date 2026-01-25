@@ -156,7 +156,7 @@ import {
 } from "../services/knowledge/validation";
 import { mergeKnowledgeBundles } from "../services/knowledge/merge";
 import { buildResonanceBundle } from "../services/code-lattice/resonance";
-import { getLatticeVersion } from "../services/code-lattice/loader";
+import { getLatticeVersion, loadCodeLattice } from "../services/code-lattice/loader";
 import { collectBadgeTelemetry } from "../services/telemetry/badges";
 import { collectPanelSnapshots } from "../services/telemetry/panels";
 import { getGlobalPipelineState } from "../energy-pipeline";
@@ -2427,15 +2427,201 @@ const PlanRequest = z.object({
   refinery: agiRefineryRequestSchema.optional(),
 });
 
-const LocalAskRequest = z.object({
-  prompt: z.string().min(1, "prompt required"),
-  max_tokens: z.coerce.number().int().min(1).max(8_192).optional(),
-  temperature: z.coerce.number().min(0).max(2).optional(),
-  seed: z.coerce.number().int().nonnegative().optional(),
-  stop: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
-  sessionId: z.string().min(1).max(128).optional(),
-  personaId: z.string().min(1).optional(),
-});
+const readNumber = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const clampNumber = (value: number, min: number, max: number): number => {
+  return Math.min(max, Math.max(min, value));
+};
+
+const clipAskText = (value: string | undefined, limit: number): string => {
+  if (!value) return "";
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit)}...`;
+};
+
+const HELIX_ASK_CONTEXT_FILES = clampNumber(
+  readNumber(process.env.HELIX_ASK_CONTEXT_FILES ?? process.env.VITE_HELIX_ASK_CONTEXT_FILES, 18),
+  4,
+  48,
+);
+const HELIX_ASK_CONTEXT_CHARS = clampNumber(
+  readNumber(process.env.HELIX_ASK_CONTEXT_CHARS ?? process.env.VITE_HELIX_ASK_CONTEXT_CHARS, 2200),
+  120,
+  2400,
+);
+const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
+const HELIX_ASK_WARP_PATH_BOOST =
+  /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline)/i;
+
+function ensureFinalMarker(value: string): string {
+  if (!value.trim()) return "FINAL:";
+  if (value.includes("FINAL:")) return value;
+  return `${value.trimEnd()}\n\nFINAL:`;
+}
+
+function tokenizeAskQuery(input: string): string[] {
+  return input
+    .toLowerCase()
+    .split(/[^a-z0-9_/.:-]+/g)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2);
+}
+
+function buildHelixAskSearchQueries(question: string): string[] {
+  const base = question.trim();
+  if (!base) return [];
+  const normalized = base.toLowerCase();
+  const queries = [base];
+  const seen = new Set([base.toLowerCase()]);
+  const push = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    queries.push(trimmed);
+  };
+
+  if (normalized.includes("warp") || normalized.includes("alcubierre") || normalized.includes("bubble")) {
+    push("warp bubble");
+    push("modules/warp/warp-module.ts");
+    push("calculateNatarioWarpBubble");
+    push("warp pipeline");
+    push("energy-pipeline warp");
+  }
+  if (normalized.includes("solve") || normalized.includes("solver")) {
+    push("warp solver");
+    push("constraint gate");
+    push("gr evaluation");
+  }
+
+  return queries.slice(0, 6);
+}
+
+function formatAskPreview({
+  doc,
+  snippet,
+  score,
+  filePath,
+  symbol,
+}: {
+  doc?: string;
+  snippet?: string;
+  score: number;
+  filePath: string;
+  symbol: string;
+}): string {
+  const parts: string[] = [];
+  if (doc) parts.push(clipAskText(doc, 400));
+  if (snippet) parts.push(clipAskText(snippet, 320));
+  parts.push(`score=${score.toFixed(3)} | symbol=${symbol} | file=${filePath}`);
+  return parts.join("\n");
+}
+
+async function buildAskContext(question: string, searchQuery?: string, topK?: number): Promise<string> {
+  const snapshot = await loadCodeLattice();
+  if (!snapshot) return "";
+  const queries = buildHelixAskSearchQueries(searchQuery ?? question);
+  if (!queries.length) return "";
+  const limit = clampNumber(topK ?? HELIX_ASK_CONTEXT_FILES, 1, HELIX_ASK_CONTEXT_FILES);
+  const perQueryLimit = Math.max(4, Math.ceil(limit / Math.max(1, queries.length)));
+  const scored: Array<{
+    filePath: string;
+    preview: string;
+    score: number;
+  }> = [];
+
+  for (const query of queries) {
+    const tokens = tokenizeAskQuery(query);
+    if (!tokens.length) continue;
+    for (const node of snapshot.nodes) {
+      const symbol = node.symbol ?? "";
+      const filePath = node.filePath ?? "";
+      if (!filePath) continue;
+      const signature = node.signature ?? "";
+      const doc = node.doc ?? "";
+      const snippet = node.snippet ?? "";
+      let score = 0;
+      for (const token of tokens) {
+        if (symbol.toLowerCase().includes(token)) score += 6;
+        if (filePath.toLowerCase().includes(token)) score += 5;
+        if (signature.toLowerCase().includes(token)) score += 3;
+        if (doc.toLowerCase().includes(token)) score += 1.5;
+        if (snippet.toLowerCase().includes(token)) score += 1;
+      }
+      if (score <= 0) continue;
+      if (HELIX_ASK_WARP_FOCUS.test(question) && HELIX_ASK_WARP_PATH_BOOST.test(filePath)) {
+        score += 8;
+      }
+      scored.push({
+        filePath,
+        preview: formatAskPreview({
+          doc,
+          snippet,
+          score,
+          filePath,
+          symbol,
+        }),
+        score,
+      });
+    }
+  }
+
+  if (!scored.length) return "";
+  scored.sort((a, b) => b.score - a.score);
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of scored) {
+    if (seen.has(entry.filePath)) continue;
+    const preview = clipAskText(entry.preview, HELIX_ASK_CONTEXT_CHARS);
+    if (!preview) continue;
+    lines.push(`${entry.filePath}\n${preview}`);
+    seen.add(entry.filePath);
+    if (lines.length >= limit) break;
+  }
+  return lines.join("\n\n");
+}
+
+function buildGroundedAskPrompt(question: string, context: string): string {
+  return [
+    "You are Helix Ask, a repo-grounded assistant.",
+    "Use only the evidence in the context below. Cite file paths when referencing code.",
+    "If the context is insufficient, say what is missing and ask a concise follow-up.",
+    "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
+    "Do not repeat the question or include headings like Question or Context.",
+    "Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.",
+    'Respond with only the answer and prefix it with \"FINAL:\".',
+    "",
+    `Question: ${question}`,
+    "",
+    "Context:",
+    context || "No repo context was attached to this request.",
+    "",
+    "FINAL:",
+  ].join("\n");
+}
+
+const LocalAskRequest = z
+  .object({
+    prompt: z.string().min(1).optional(),
+    question: z.string().min(1).optional(),
+    searchQuery: z.string().optional(),
+    topK: z.coerce.number().int().min(1).max(48).optional(),
+    context: z.string().optional(),
+    max_tokens: z.coerce.number().int().min(1).max(8_192).optional(),
+    temperature: z.coerce.number().min(0).max(2).optional(),
+    seed: z.coerce.number().int().nonnegative().optional(),
+    stop: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
+    sessionId: z.string().min(1).max(128).optional(),
+    personaId: z.string().min(1).optional(),
+  })
+  .refine((value) => Boolean(value.prompt || value.question), {
+    message: "prompt or question required",
+    path: ["prompt"],
+  });
 
 const ExecuteRequest = z.object({
   traceId: z.string().min(8, "traceId required"),
@@ -3183,9 +3369,20 @@ planRouter.post("/ask", async (req, res) => {
     return res.status(403).json({ error: "forbidden" });
   }
   try {
+    let prompt = parsed.data.prompt?.trim();
+    const question = parsed.data.question?.trim();
+    if (!prompt && question) {
+      const context =
+        parsed.data.context?.trim() ||
+        (await buildAskContext(question, parsed.data.searchQuery, parsed.data.topK));
+      prompt = ensureFinalMarker(buildGroundedAskPrompt(question, context));
+    }
+    if (!prompt) {
+      return res.status(400).json({ error: "bad_request", details: [{ path: ["prompt"], message: "prompt required" }] });
+    }
     const result = await llmLocalHandler(
       {
-        prompt: parsed.data.prompt,
+        prompt,
         max_tokens: parsed.data.max_tokens,
         temperature: parsed.data.temperature,
         seed: parsed.data.seed,
