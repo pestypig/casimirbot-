@@ -2462,6 +2462,79 @@ function ensureFinalMarker(value: string): string {
   return `${value.trimEnd()}\n\nFINAL:`;
 }
 
+function cleanPromptLine(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.replace(/^[\"'`.\-]+/g, "").replace(/[\"'`.\-]+$/g, "").trim();
+}
+
+function normalizeQuestionMatch(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function stripLeadingQuestion(answer: string, question?: string): string {
+  const lines = answer.split(/\r?\n/);
+  const target = question?.trim();
+  const normalizedTarget = target ? normalizeQuestionMatch(target) : "";
+  let index = 0;
+  while (index < lines.length) {
+    const cleaned = cleanPromptLine(lines[index] ?? "");
+    if (!cleaned) {
+      index += 1;
+      continue;
+    }
+    if (/^(question|context|resonance patch)\s*:/i.test(cleaned)) {
+      index += 1;
+      continue;
+    }
+    if (target) {
+      if (cleaned.toLowerCase() === target.toLowerCase()) {
+        index += 1;
+        continue;
+      }
+      if (normalizeQuestionMatch(cleaned) === normalizedTarget) {
+        index += 1;
+        continue;
+      }
+    }
+    break;
+  }
+  return lines.slice(index).join("\n").trim();
+}
+
+function stripPromptEchoFromAnswer(answer: string, question?: string): string {
+  let trimmed = stripLeadingQuestion(answer.trim(), question);
+  if (!trimmed) return trimmed;
+  const removePrefixes = [
+    "you are helix ask",
+    "use only the evidence",
+    "if the context is insufficient",
+    "when the context includes",
+    "do not repeat the question",
+    "do not output tool logs",
+    "respond with only the answer",
+  ];
+  trimmed = trimmed
+    .split(/\r?\n/)
+    .filter((line) => {
+      const cleaned = cleanPromptLine(line).toLowerCase();
+      if (!cleaned) return false;
+      return !removePrefixes.some((prefix) => cleaned.startsWith(prefix));
+    })
+    .join("\n")
+    .trim();
+  if (!trimmed) return trimmed;
+  const markers = ["FINAL:", "FINAL ANSWER:", "FINAL_ANSWER:", "Answer:"];
+  for (const marker of markers) {
+    const idx = trimmed.lastIndexOf(marker);
+    if (idx >= 0) {
+      const after = trimmed.slice(idx + marker.length).trim();
+      if (after) return after;
+    }
+  }
+  return trimmed;
+}
+
 function tokenizeAskQuery(input: string): string[] {
   return input
     .toLowerCase()
@@ -3371,6 +3444,7 @@ planRouter.post("/ask", async (req, res) => {
   try {
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
+    const autoPrompt = !prompt && Boolean(question);
     if (!prompt && question) {
       const context =
         parsed.data.context?.trim() ||
@@ -3393,6 +3467,9 @@ planRouter.post("/ask", async (req, res) => {
         sessionId: parsed.data.sessionId,
       },
     );
+    if (autoPrompt && typeof result.text === "string" && result.text.trim()) {
+      result.text = stripPromptEchoFromAnswer(result.text, question);
+    }
     return res.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
