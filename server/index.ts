@@ -934,7 +934,7 @@ app.use((req, res, next) => {
       } else if (app.get("env") !== "development") {
         log(`dev: NODE_ENV=${process.env.NODE_ENV ?? "undefined"}; serving prebuilt client instead of Vite HMR`);
       }
-      const { serveStatic } = await import("./vite");
+      const { serveStatic } = await import("./static");
       serveStatic(app);
     }
 
