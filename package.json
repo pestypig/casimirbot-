@@ -13,7 +13,7 @@
     "specialists:mini": "tsx scripts/specialists-mini-loop.ts",
     "signoff:v0.1": "tsx scripts/v0.1-signoff.ts",
     "chatl:bench": "tsx scripts/bench.ts",
-    "build": "node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build && node ./node_modules/esbuild/bin/esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build && npx --no-install esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "build:whispers": "tsx scripts/build-whispers.ts",
     "build:code-lattice": "tsx scripts/build-code-lattice.ts",
     "start": "cross-env NODE_ENV=production node dist/index.js",
