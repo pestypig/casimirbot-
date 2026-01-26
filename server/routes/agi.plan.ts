@@ -2482,6 +2482,7 @@ function isPromptLine(value: string): boolean {
     /^if the context is insufficient/i.test(cleaned) ||
     /^when the context includes/i.test(cleaned) ||
     /^when listing multiple/i.test(cleaned) ||
+    /^answer with a step/i.test(cleaned) ||
     /^keep paragraphs short/i.test(cleaned) ||
     /^do not repeat the question/i.test(cleaned) ||
     /^do not output tool logs/i.test(cleaned) ||
@@ -2697,6 +2698,7 @@ function buildGroundedAskPrompt(question: string, context: string): string {
     "If the context is insufficient, say what is missing and ask a concise follow-up.",
     "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
     "When listing multiple points, use a numbered list with one item per line.",
+    "Answer with a step-by-step explanation (6-10 steps) and end with a short in-practice walkthrough.",
     "Keep paragraphs short (2-3 sentences) and separate sections with blank lines.",
     "Do not repeat the question or include headings like Question or Context.",
     "Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.",

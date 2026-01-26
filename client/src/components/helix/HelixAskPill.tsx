@@ -58,9 +58,24 @@ const HELIX_ASK_CONTEXT_CHARS = clampNumber(
 const HELIX_ASK_MAX_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_TOKENS, 2048),
   64,
-  2048,
+  4096,
 );
-const HELIX_ASK_OUTPUT_TOKENS = Math.max(64, Math.floor(HELIX_ASK_MAX_TOKENS * 0.5));
+const HELIX_ASK_CONTEXT_TOKENS = clampNumber(
+  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_TOKENS, 2048),
+  512,
+  8192,
+);
+const HELIX_ASK_OUTPUT_TOKENS = clampNumber(
+  readNumber(
+    (import.meta as any)?.env?.VITE_HELIX_ASK_OUTPUT_TOKENS,
+    Math.min(
+      HELIX_ASK_MAX_TOKENS,
+      Math.max(64, Math.floor(HELIX_ASK_CONTEXT_TOKENS * 0.5)),
+    ),
+  ),
+  64,
+  HELIX_ASK_MAX_TOKENS,
+);
 const HELIX_ASK_PATH_REGEX =
   /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:ts|tsx|md|json|js|cjs|mjs|py|yml|yaml)/g;
 const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
@@ -171,6 +186,9 @@ function buildGroundedPrompt(question: string, context: string): string {
     "Use only the evidence in the context below. Cite file paths when referencing code.",
     "If the context is insufficient, say what is missing and ask a concise follow-up.",
     "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
+    "When listing multiple points, use a numbered list with one item per line.",
+    "Answer with a step-by-step explanation (6-10 steps) and end with a short in-practice walkthrough.",
+    "Keep paragraphs short (2-3 sentences) and separate sections with blank lines.",
     "Do not repeat the question or include headings like Question, Context, or Resonance patch.",
     "Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.",
     'Respond with only the answer and prefix it with \"FINAL:\".',
@@ -480,7 +498,7 @@ export function HelixAskPill({
     [addMessage, askBusy, getHelixAskSessionId, openPanelById, setActive],
   );
 
-  const maxWidthClass = maxWidthClassName ?? "max-w-2xl";
+  const maxWidthClass = maxWidthClassName ?? "max-w-4xl";
   const inputPlaceholder = placeholder ?? "Ask anything about this system";
 
   return (
@@ -512,7 +530,7 @@ export function HelixAskPill({
         <p className="mt-3 text-xs text-rose-200">{askError}</p>
       ) : null}
       {askReplies.length > 0 ? (
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-2">
           {askReplies.map((reply) => (
             <div
               key={reply.id}
@@ -523,7 +541,7 @@ export function HelixAskPill({
                   <span className="text-slate-400">Question:</span> {reply.question}
                 </p>
               ) : null}
-              <p className="max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+              <p className="whitespace-pre-wrap leading-relaxed">
                 {renderHelixAskContent(reply.content)}
               </p>
               {userSettings.showHelixAskDebug && reply.sources?.length ? (

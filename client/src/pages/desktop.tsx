@@ -42,16 +42,23 @@ const HELIX_ASK_USE_EXECUTE = HELIX_ASK_MODE === "execute";
 const HELIX_ASK_MAX_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_TOKENS, 2048),
   64,
-  2048,
+  4096,
 );
 const HELIX_ASK_CONTEXT_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_TOKENS, 2048),
   512,
   8192,
 );
-const HELIX_ASK_OUTPUT_TOKENS = Math.min(
+const HELIX_ASK_OUTPUT_TOKENS = clampNumber(
+  readNumber(
+    (import.meta as any)?.env?.VITE_HELIX_ASK_OUTPUT_TOKENS,
+    Math.min(
+      HELIX_ASK_MAX_TOKENS,
+      Math.max(64, Math.floor(HELIX_ASK_CONTEXT_TOKENS * 0.5)),
+    ),
+  ),
+  64,
   HELIX_ASK_MAX_TOKENS,
-  Math.max(64, Math.floor(HELIX_ASK_CONTEXT_TOKENS * 0.5)),
 );
 const HELIX_ASK_PROMPT_BUDGET_TOKENS = Math.max(
   256,
@@ -360,6 +367,9 @@ function buildGroundedPrompt(
     "Use only the evidence in the context below. Cite file paths when referencing code.",
     "If the context is insufficient, say what is missing and ask a concise follow-up.",
     "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
+    "When listing multiple points, use a numbered list with one item per line.",
+    "Answer with a step-by-step explanation (6-10 steps) and end with a short in-practice walkthrough.",
+    "Keep paragraphs short (2-3 sentences) and separate sections with blank lines.",
     "Do not repeat the question or include headings like Question, Context, or Resonance patch.",
     "Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.",
     'Respond with only the answer and prefix it with "FINAL:".',
@@ -1212,7 +1222,7 @@ export default function DesktopPage() {
 
         <div className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex flex-col items-center px-6">
           <form
-            className="pointer-events-auto w-full max-w-2xl"
+            className="pointer-events-auto w-full max-w-4xl"
             onSubmit={handleAskSubmit}
           >
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-slate-950/70 px-4 py-3 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur">
@@ -1247,7 +1257,7 @@ export default function DesktopPage() {
             </p>
           ) : null}
           {askReplies.length > 0 ? (
-            <div className="pointer-events-auto mt-4 w-full max-w-2xl space-y-3">
+            <div className="pointer-events-auto mt-4 w-full max-w-4xl max-h-[52vh] space-y-3 overflow-y-auto pr-2">
               {askReplies.map((reply) => (
                 <div
                   key={reply.id}
@@ -1258,7 +1268,7 @@ export default function DesktopPage() {
                       <span className="text-slate-400">Question:</span> {reply.question}
                     </p>
                   ) : null}
-                  <p className="max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                  <p className="whitespace-pre-wrap leading-relaxed">
                     {renderHelixAskContent(reply.content)}
                   </p>
                   {userSettings.showHelixAskDebug && reply.sources?.length ? (
