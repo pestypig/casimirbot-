@@ -8,11 +8,7 @@ packages = ["gmsh", "emscripten", "jq", "ffmpeg", "cmake"]
 
 [deployment]
 deploymentTarget = "cloudrun"
-build = [
-  "bash",
-  "-lc",
-  "npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"
-]
+build = ["sh", "-c", "bash -lc \"npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev\""]
 run = [
   "env",
   "NODE_ENV=production",
