@@ -21,6 +21,7 @@ import { aiPlanRouter } from "./routes/ai.plan";
 import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
 import { searchRouter } from "./routes/search";
+import { devTerminalRouter } from "./routes/dev-terminal";
 import { helixQiRouter } from "./routes/helix/qi";
 import { helixMathRouter } from "./routes/helix/math";
 import { helixAuditTreeRouter } from "./routes/helix/audit-tree";
@@ -75,6 +76,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/tools/remove-bg-edges", removeBgEdgesRouter);
   app.use("/api/ethos", ethosRouter);
   app.use("/api/search", searchRouter);
+  app.use("/api/dev-terminal", devTerminalRouter);
 
   if (!fastBoot) {
     const { knowledgeRouter } = await import("./routes/knowledge");

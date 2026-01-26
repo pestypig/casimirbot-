@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, readdirSync, renameSync, statSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import { EssenceEnvelope } from "@shared/essence-schema";
@@ -174,6 +174,13 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   };
   let lastError: unknown;
   try {
+    const missingDeps = verifyWindowsBinaryDeps(cmd, cpuBackend);
+    if (missingDeps.length) {
+      throw new Error(
+        `llm spawn missing runtime DLL(s): ${missingDeps.join(", ")}. ` +
+          `Ensure they exist next to ${basename(cmd)} or reinstall the llama prebuilt bundle.`,
+      );
+    }
     if (await attempt(args)) {
       return await finalizeSuccess();
     }
@@ -181,6 +188,8 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     lastError = error;
     const message = error instanceof Error ? error.message : String(error);
     const isAccessViolation = /3221225477|0xC0000005/i.test(message);
+    const isMissingDll =
+      /3221225781|0xC0000135|module could not be found/i.test(message);
     if (loraPath && isAccessViolation) {
       const noLoraArgs = buildSpawnArgs({ loraPath: "", loraScale: undefined });
       if (await attempt(noLoraArgs)) {
@@ -188,6 +197,11 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
         activeLoraScale = undefined;
         return await finalizeSuccess();
       }
+    }
+    if (process.platform === "win32" && isMissingDll) {
+      throw new Error(
+        `${message}. Missing Windows runtime DLLs. Install the Microsoft Visual C++ 2015-2022 Redistributable (x64) and restart.`,
+      );
     }
     const shouldTryNoMmap =
       process.platform === "win32" &&
@@ -427,6 +441,32 @@ function listCpuBackends(cmdPath: string): string[] {
   collect(binDir);
   collect(resolve(binDir, "generic"));
   return Array.from(new Set(candidates));
+}
+
+function verifyWindowsBinaryDeps(cmdPath: string, backendOverride?: string): string[] {
+  if (process.platform !== "win32") return [];
+  const resolved = resolve(cmdPath);
+  if (!existsSync(resolved)) return [];
+  const binDir = dirname(resolved);
+  const required = ["llama.dll", "ggml.dll", "ggml-base.dll", "libomp140.x86_64.dll"];
+  const missing: string[] = [];
+  for (const file of required) {
+    if (!existsSync(resolve(binDir, file))) {
+      missing.push(file);
+    }
+  }
+  const backend = backendOverride ?? resolveCpuBackend(cmdPath, backendOverride);
+  if (backend) {
+    const backendFile = `ggml-cpu-${backend}.dll`;
+    const backendPath = resolve(binDir, backendFile);
+    const backendBak = resolve(binDir, `${backendFile}.bak`);
+    if (!existsSync(backendPath) && !existsSync(backendBak)) {
+      missing.push(backendFile);
+    }
+  } else if (!listCpuBackends(cmdPath).length) {
+    missing.push("ggml-cpu-<backend>.dll");
+  }
+  return missing;
 }
 
 function resolveCpuBackend(cmdPath: string, override?: string): string {

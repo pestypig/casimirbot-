@@ -131,6 +131,7 @@
     "drizzle-orm": "^0.39.1",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",
+    "execa": "^8.0.1",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "ez_canvas_controller": "^1.0.0",

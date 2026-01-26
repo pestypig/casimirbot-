@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { AgiKnowledgePanel } from "@/components/AgiKnowledgePanel";
 import CoreKnowledgePanel from "@/components/CoreKnowledgePanel";
 import type { SettingsTab, StartSettings } from "@/hooks/useHelixStartSettings";
@@ -33,7 +34,7 @@ export function HelixSettingsDialogContent({
   const activeTab = knowledgeEnabled ? settingsTab : "preferences";
 
   return (
-    <DialogContent className="border border-white/10 bg-[#070d1b] text-slate-100 sm:max-w-4xl">
+    <DialogContent className="max-h-[85vh] overflow-y-auto border border-white/10 bg-[#070d1b] text-slate-100 sm:max-w-4xl">
       <DialogHeader>
         <DialogTitle>Helix Start Settings</DialogTitle>
         <DialogDescription>
@@ -100,6 +101,19 @@ export function HelixSettingsDialogContent({
             checked={userSettings.showHelixAskDebug}
             onChange={(value) => updateSettings({ showHelixAskDebug: value })}
           />
+          <PreferenceToggleRow
+            id="powershell-debug"
+            label="Developer terminal (PowerShell)"
+            description="Use a local scratchpad for commands."
+            checked={userSettings.showPowerShellDebug}
+            onChange={(value) => updateSettings({ showPowerShellDebug: value })}
+          />
+          {userSettings.showPowerShellDebug && (
+            <PowerShellTerminalPad
+              value={userSettings.powerShellScratch}
+              onChange={(value) => updateSettings({ powerShellScratch: value })}
+            />
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
             <button
               className="text-sm text-slate-300 underline-offset-2 hover:text-white hover:underline"
@@ -176,4 +190,131 @@ function PreferenceToggleRow({
       />
     </div>
   );
+}
+
+function PowerShellTerminalPad({
+  value,
+  onChange
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const [status, setStatus] = React.useState<"idle" | "running" | "done" | "error">("idle");
+  const [output, setOutput] = React.useState("");
+  const [exitCode, setExitCode] = React.useState<number | null>(null);
+  const [truncated, setTruncated] = React.useState(false);
+  const canCopy = value.trim().length > 0;
+  const canRun = value.trim().length > 0 && status !== "running";
+  const handleCopy = async () => {
+    if (!navigator?.clipboard?.writeText || !canCopy) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // ignore clipboard failures
+    }
+  };
+  const handleClear = () => onChange("");
+  const handleRun = async () => {
+    if (!canRun) return;
+    setStatus("running");
+    setOutput("");
+    setExitCode(null);
+    setTruncated(false);
+    try {
+      const response = await fetch("/api/dev-terminal/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: value }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message =
+          payload?.message ||
+          payload?.error ||
+          `Command failed (${response.status})`;
+        throw new Error(message);
+      }
+      const stdout = typeof payload.stdout === "string" ? payload.stdout : "";
+      const stderr = typeof payload.stderr === "string" ? payload.stderr : "";
+      const combined = [stdout.trimEnd(), stderr.trimEnd()]
+        .filter(Boolean)
+        .join("\n");
+      const decorated = appendTerminalHints(combined);
+      setOutput(decorated || "Command completed with no output.");
+      setExitCode(typeof payload.code === "number" ? payload.code : null);
+      setTruncated(Boolean(payload.truncated));
+      setStatus("done");
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : String(error));
+      setStatus("error");
+    }
+  };
+  return (
+    <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+      <div className="space-y-0.5">
+        <p className="text-sm font-semibold text-slate-100">Developer terminal</p>
+        <p className="text-xs text-slate-300">
+          Scratchpad only. Use Copy to send the command to your local terminal.
+        </p>
+      </div>
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Type PowerShell commands here..."
+        className="min-h-[140px] border-white/10 bg-black/40 font-mono text-xs text-slate-200"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          className="rounded-md border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={handleRun}
+          disabled={!canRun}
+        >
+          {status === "running" ? "Running" : "Run"}
+        </button>
+        <button
+          className="rounded-md border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={handleCopy}
+          disabled={!canCopy}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+        <button
+          className="rounded-md border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={handleClear}
+          disabled={!value}
+        >
+          Clear
+        </button>
+      </div>
+      {status !== "idle" && (
+        <div className="rounded-md border border-white/10 bg-black/50 px-3 py-2 text-xs text-slate-200">
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-400">
+            {status === "running" ? "Running" : status === "error" ? "Error" : "Output"}
+            {exitCode != null ? ` (exit ${exitCode})` : ""}
+            {truncated ? " (truncated)" : ""}
+          </div>
+          <pre className="whitespace-pre-wrap">{output || "..."}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function appendTerminalHints(output: string): string {
+  if (!output) return output;
+  const hints: string[] = [];
+  if (
+    /rg\s+:\s+The term 'rg' is not recognized/i.test(output) ||
+    /rg: command not found/i.test(output)
+  ) {
+    hints.push(
+      "rg not found. Install with: winget install BurntSushi.ripgrep",
+      "PowerShell alternative: Select-String -Path <file> -Pattern \"<text>\"",
+    );
+  }
+  if (!hints.length) return output;
+  return `${output}\n\n[hint] ${hints.join("\n[hint] ")}`;
 }
