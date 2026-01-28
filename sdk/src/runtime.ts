@@ -221,11 +221,9 @@ const normalizeUsage = (value: unknown): RuntimeTokenUsage | undefined => {
 const extractUsageFromResult = (result: unknown): RuntimeTokenUsage | undefined => {
   if (!result || typeof result !== "object") return undefined;
   const obj = result as Record<string, unknown>;
-  return (
-    normalizeUsage(obj.usage) ??
-    normalizeUsage(obj.data?.usage) ??
-    normalizeUsage(obj.response?.usage)
-  );
+  const data = obj.data as Record<string, unknown> | undefined;
+  const response = obj.response as Record<string, unknown> | undefined;
+  return normalizeUsage(obj.usage) ?? normalizeUsage(data?.usage) ?? normalizeUsage(response?.usage);
 };
 
 const toCount = (value?: boolean | number): number => {

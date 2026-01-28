@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildHelixAskMathAnswer,
+  isHelixAskMathQuestion,
+  solveHelixAskMathQuestion,
+} from "../server/services/helix-ask/math";
+
+describe("Helix Ask math solver", () => {
+  it("detects symbolic equations without numeric literals", () => {
+    const symbolic =
+      "thetaScaleCore = gammaGeo^3 * qEnhancement * sqrt(dutyFactor)";
+    expect(isHelixAskMathQuestion(symbolic)).toBe(true);
+  });
+
+  it("solves linear equations with implicit multiplication", async () => {
+    const result = await solveHelixAskMathQuestion(
+      "Solve for x: 2x + 5 = 17. Explain briefly",
+    );
+    expect(result?.ok).toBe(true);
+    expect(result?.variable).toBe("x");
+    expect(result?.solutions?.[0]).toBe("6");
+    expect(buildHelixAskMathAnswer(result!)).toContain("x = 6");
+  });
+
+  it("handles non-x derivatives", async () => {
+    const result = await solveHelixAskMathQuestion("What is d/dt of t^2 + 3t?");
+    expect(result?.ok).toBe(true);
+    expect(result?.variable).toBe("t");
+    expect(result?.final).toContain("2t");
+    expect(result?.final).toContain("+3");
+  });
+
+  it("solves small systems of equations", async () => {
+    const result = await solveHelixAskMathQuestion(
+      "Solve for x and y: x + y = 10; x - y = 4",
+    );
+    expect(result?.ok).toBe(true);
+    expect(result?.solutionMap?.x?.[0]).toBe("7");
+    expect(result?.solutionMap?.y?.[0]).toBe("3");
+    expect(buildHelixAskMathAnswer(result!)).toContain("x = 7");
+    expect(buildHelixAskMathAnswer(result!)).toContain("y = 3");
+  });
+
+  it("can isolate codebase-style variables symbolically", async () => {
+    const result = await solveHelixAskMathQuestion(
+      "Solve for gammaGeo: thetaScaleCore = gammaGeo^3 * qEnhancement * sqrt(dutyFactor)",
+    );
+    expect(result?.ok).toBe(true);
+    expect(result?.variable).toBe("gammaGeo");
+    expect(result?.registryId).toBe("natario.theta_scale_core.gamma_geo");
+    expect(result?.gatePass).toBe(true);
+    expect(result?.residualPass).toBe(true);
+    expect(result?.solutions?.[0]).toContain("thetaScaleCore");
+    expect(result?.solutions?.[0]).not.toMatch(/\bi\b/i);
+  });
+
+  it("refuses to claim a real solution when none exists", async () => {
+    const result = await solveHelixAskMathQuestion("Solve: x^2 + 1 = 0");
+    expect(result?.ok).toBe(true);
+    expect(result?.gatePass).toBe(false);
+    expect(buildHelixAskMathAnswer(result!)).toContain("admissible real solution");
+  });
+});

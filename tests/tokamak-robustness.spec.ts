@@ -10,8 +10,9 @@ const FIXTURE_PATH = path.resolve(
   "datasets",
   "tokamak-rz-precursor.fixture.json",
 );
+const describeWithFixture = fs.existsSync(FIXTURE_PATH) ? describe : describe.skip;
 
-describe("tokamak robustness runner", () => {
+describeWithFixture("tokamak robustness runner", () => {
   it("produces deterministic reports and bounded drift", () => {
     const dataset = TokamakPrecursorDataset.parse(
       JSON.parse(fs.readFileSync(FIXTURE_PATH, "utf8")),

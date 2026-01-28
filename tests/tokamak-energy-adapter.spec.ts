@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import crypto from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -19,6 +19,8 @@ type FixtureManifest = {
 };
 
 const FIXTURE_MANIFEST_PATH = path.resolve(process.cwd(), "datasets", "tokamak-rz-energy.fixture.json");
+const hasFixtureManifest = existsSync(FIXTURE_MANIFEST_PATH);
+const itWithFixtureManifest = hasFixtureManifest ? it : it.skip;
 
 let tmpDir = "";
 
@@ -110,7 +112,7 @@ describe("tokamak energy adapter", () => {
     expect(total[3]).toBeCloseTo(expected3, 6);
   });
 
-  it("matches fixture hashes and u_total output", () => {
+  itWithFixtureManifest("matches fixture hashes and u_total output", () => {
     const manifest = JSON.parse(readFileSync(FIXTURE_MANIFEST_PATH, "utf8")) as FixtureManifest;
     const entry = manifest.entries[0];
     const field = buildTokamakRzEnergyField(entry.input as any);
@@ -121,7 +123,7 @@ describe("tokamak energy adapter", () => {
     expect(field.components.u_total_Jm3.data_b64).toBe("ZmYGQM3MXECamZlAzczUQAAACEGamSVB");
   });
 
-  it("persists envelope with manifest + mask artifacts", async () => {
+  itWithFixtureManifest("persists envelope with manifest + mask artifacts", async () => {
     const manifest = JSON.parse(readFileSync(FIXTURE_MANIFEST_PATH, "utf8")) as FixtureManifest;
     const entry = manifest.entries[0];
     const field = await runTokamakEnergyField(entry.input as any, { personaId: "persona:tokamak-fixture" });

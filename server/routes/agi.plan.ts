@@ -91,6 +91,8 @@ import { debateClaimExtractHandler, debateClaimExtractSpec } from "../skills/deb
 import { citationVerifySpanHandler, citationVerifySpanSpec } from "../skills/citation.verify.span";
 import { docsContradictionScanHandler, docsContradictionScanSpec } from "../skills/docs.contradiction.scan";
 import { numericExtractUnitsHandler, numericExtractUnitsSpec } from "../skills/numeric.extract.units";
+import { hashEmbed } from "../services/hce-text";
+import { resolveLocalContextTokens } from "../services/llm/local-runtime";
 import {
   debateChecklistGenerateAliasSpec,
   debateChecklistGenerateHandler,
@@ -106,6 +108,54 @@ import { telemetryCrosscheckDocsHandler, telemetryCrosscheckDocsSpec } from "../
 import { repoGraphSearchHandler, repoGraphSearchSpec } from "../skills/repo.graph.search";
 import { repoDiffReviewHandler, repoDiffReviewSpec } from "../skills/repo.diff.review";
 import { repoPatchSimulateHandler, repoPatchSimulateSpec } from "../skills/repo.patch.simulate";
+import {
+  matchHelixAskIntent,
+  getDefaultHelixAskIntentProfile,
+  getHelixAskIntentProfileById,
+  type HelixAskIntentProfile,
+} from "../services/helix-ask/intent-directory";
+import {
+  enforceHelixAskAnswerFormat,
+  collapseEvidenceBullets,
+  resolveHelixAskFormat,
+  type HelixAskFormat,
+} from "../services/helix-ask/format";
+import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
+import { extractFilePathsFromText } from "../services/helix-ask/paths";
+import {
+  evaluateEvidenceEligibility,
+  filterSignalTokens,
+  tokenizeAskQuery,
+} from "../services/helix-ask/query";
+import {
+  buildConceptScaffold,
+  findConceptMatch,
+  renderConceptAnswer,
+  type HelixAskConceptMatch,
+} from "../services/helix-ask/concepts";
+import {
+  buildHelixAskMathAnswer,
+  solveHelixAskMathQuestion,
+  type HelixAskMathSolveResult,
+} from "../services/helix-ask/math";
+import {
+  applyHelixAskPlatonicGates,
+  type HelixAskDomain,
+} from "../services/helix-ask/platonic-gates";
+import {
+  buildHelixAskTopicProfile,
+  inferHelixAskTopicTags,
+  pathMatchesAny,
+  scoreHelixAskTopicPath,
+  topicMustIncludeSatisfied,
+  type HelixAskTopicTag,
+  type HelixAskTopicProfile,
+} from "../services/helix-ask/topic";
+import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
+import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
+import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
+import { runGrEvaluation } from "../gr/gr-evaluation";
+import { getGlobalPipelineState } from "../energy-pipeline";
 import { getTaskTrace, saveTaskTrace } from "../db/agi";
 import { metrics, sseConnections } from "../metrics";
 import { personaPolicy } from "../auth/policy";
@@ -159,7 +209,6 @@ import { buildResonanceBundle } from "../services/code-lattice/resonance";
 import { getLatticeVersion, loadCodeLattice } from "../services/code-lattice/loader";
 import { collectBadgeTelemetry } from "../services/telemetry/badges";
 import { collectPanelSnapshots } from "../services/telemetry/panels";
-import { getGlobalPipelineState } from "../energy-pipeline";
 import { smallLlmCallSpecTriage } from "../services/small-llm";
 
 const planRouter = Router();
@@ -2452,42 +2501,733 @@ const HELIX_ASK_CONTEXT_CHARS = clampNumber(
   120,
   2400,
 );
+const HELIX_ASK_LOCAL_CONTEXT_TOKENS = resolveLocalContextTokens();
+const HELIX_ASK_SCAFFOLD_CONTEXT_CHARS = Math.max(
+  800,
+  Math.min(6000, HELIX_ASK_CONTEXT_CHARS * 2),
+);
+const HELIX_ASK_TWO_PASS =
+  String(process.env.HELIX_ASK_TWO_PASS ?? process.env.VITE_HELIX_ASK_TWO_PASS ?? "")
+    .trim() === "1";
+const HELIX_ASK_SCAFFOLD_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_ASK_SCAFFOLD_TOKENS ?? process.env.VITE_HELIX_ASK_SCAFFOLD_TOKENS, 512),
+  64,
+  2048,
+);
+const HELIX_ASK_MICRO_PASS =
+  String(process.env.HELIX_ASK_MICRO_PASS ?? process.env.VITE_HELIX_ASK_MICRO_PASS ?? "1")
+    .trim() === "1";
+const HELIX_ASK_MICRO_PASS_AUTO =
+  String(process.env.HELIX_ASK_MICRO_PASS_AUTO ?? process.env.VITE_HELIX_ASK_MICRO_PASS_AUTO ?? "1")
+    .trim() === "1";
+const HELIX_ASK_MICRO_PASS_AUTO_MIN_WORDS = clampNumber(
+  readNumber(process.env.HELIX_ASK_MICRO_PASS_AUTO_MIN_WORDS ?? process.env.VITE_HELIX_ASK_MICRO_PASS_AUTO_MIN_WORDS, 18),
+  6,
+  80,
+);
+const HELIX_ASK_MICRO_PASS_AUTO_MIN_CHARS = clampNumber(
+  readNumber(process.env.HELIX_ASK_MICRO_PASS_AUTO_MIN_CHARS ?? process.env.VITE_HELIX_ASK_MICRO_PASS_AUTO_MIN_CHARS, 160),
+  40,
+  400,
+);
+const HELIX_ASK_MICRO_PASS_AUTO_MIN_CLAUSES = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_MICRO_PASS_AUTO_MIN_CLAUSES ?? process.env.VITE_HELIX_ASK_MICRO_PASS_AUTO_MIN_CLAUSES,
+    2,
+  ),
+  1,
+  6,
+);
+const HELIX_ASK_QUERY_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_ASK_QUERY_TOKENS ?? process.env.VITE_HELIX_ASK_QUERY_TOKENS, 128),
+  32,
+  512,
+);
+const HELIX_ASK_EVIDENCE_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_ASK_EVIDENCE_TOKENS ?? process.env.VITE_HELIX_ASK_EVIDENCE_TOKENS, 256),
+  64,
+  768,
+);
+const HELIX_ASK_REPAIR_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_ASK_REPAIR_TOKENS ?? process.env.VITE_HELIX_ASK_REPAIR_TOKENS, 192),
+  64,
+  512,
+);
+const HELIX_ASK_QUERY_HINTS_MAX = clampNumber(
+  readNumber(process.env.HELIX_ASK_QUERY_HINTS_MAX ?? process.env.VITE_HELIX_ASK_QUERY_HINTS_MAX, 6),
+  3,
+  12,
+);
+const HELIX_ASK_QUERY_MERGE_MAX = clampNumber(
+  readNumber(process.env.HELIX_ASK_QUERY_MERGE_MAX ?? process.env.VITE_HELIX_ASK_QUERY_MERGE_MAX, 8),
+  4,
+  16,
+);
+const HELIX_ASK_RRF_K = clampNumber(
+  readNumber(process.env.HELIX_ASK_RRF_K ?? process.env.VITE_HELIX_ASK_RRF_K, 60),
+  10,
+  200,
+);
+const HELIX_ASK_RRF_WEIGHT_LEXICAL = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_RRF_WEIGHT_LEXICAL ?? process.env.VITE_HELIX_ASK_RRF_WEIGHT_LEXICAL,
+    1,
+  ),
+  0.1,
+  3,
+);
+const HELIX_ASK_RRF_WEIGHT_SYMBOL = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_RRF_WEIGHT_SYMBOL ?? process.env.VITE_HELIX_ASK_RRF_WEIGHT_SYMBOL,
+    0.8,
+  ),
+  0.1,
+  3,
+);
+const HELIX_ASK_RRF_WEIGHT_FUZZY = clampNumber(
+  readNumber(process.env.HELIX_ASK_RRF_WEIGHT_FUZZY ?? process.env.VITE_HELIX_ASK_RRF_WEIGHT_FUZZY, 0.6),
+  0.1,
+  3,
+);
+const HELIX_ASK_MMR_LAMBDA = clampNumber(
+  readNumber(process.env.HELIX_ASK_MMR_LAMBDA ?? process.env.VITE_HELIX_ASK_MMR_LAMBDA, 0.72),
+  0.2,
+  0.95,
+);
+const HELIX_ASK_LONGPROMPT_CHUNK_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_CHUNK_TOKENS ?? process.env.VITE_HELIX_ASK_LONGPROMPT_CHUNK_TOKENS,
+    420,
+  ),
+  120,
+  1200,
+);
+const HELIX_ASK_LONGPROMPT_CHUNK_OVERLAP = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_CHUNK_OVERLAP ?? process.env.VITE_HELIX_ASK_LONGPROMPT_CHUNK_OVERLAP,
+    80,
+  ),
+  0,
+  400,
+);
+const HELIX_ASK_LONGPROMPT_TOPK_CANDIDATES = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_TOPK_CANDIDATES ?? process.env.VITE_HELIX_ASK_LONGPROMPT_TOPK_CANDIDATES,
+    18,
+  ),
+  4,
+  50,
+);
+const HELIX_ASK_LONGPROMPT_TOPM_SELECTED = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_TOPM_SELECTED ?? process.env.VITE_HELIX_ASK_LONGPROMPT_TOPM_SELECTED,
+    8,
+  ),
+  2,
+  20,
+);
+const HELIX_ASK_LONGPROMPT_CARD_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_CARD_TOKENS ?? process.env.VITE_HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+    256,
+  ),
+  64,
+  768,
+);
+const HELIX_ASK_LONGPROMPT_MAX_CARDS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_MAX_CARDS ?? process.env.VITE_HELIX_ASK_LONGPROMPT_MAX_CARDS,
+    12,
+  ),
+  4,
+  24,
+);
+const HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS ?? process.env.VITE_HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS,
+    Math.max(640, Math.floor(HELIX_ASK_LOCAL_CONTEXT_TOKENS * 0.6)),
+  ),
+  256,
+  HELIX_ASK_LOCAL_CONTEXT_TOKENS,
+);
+const HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS ?? process.env.VITE_HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS,
+    360,
+  ),
+  120,
+  1200,
+);
+const HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO ?? process.env.VITE_HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+    0.25,
+  ),
+  0.05,
+  0.9,
+);
+const HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS ?? process.env.VITE_HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+    2,
+  ),
+  1,
+  8,
+);
+const HELIX_ASK_RETRIEVAL_RETRY_ENABLED =
+  clampNumber(
+    readNumber(
+      process.env.HELIX_ASK_RETRIEVAL_RETRY_ENABLED ??
+        process.env.VITE_HELIX_ASK_RETRIEVAL_RETRY_ENABLED,
+      1,
+    ),
+    0,
+    1,
+  ) > 0;
+const HELIX_ASK_RETRIEVAL_RETRY_TOPK_BONUS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_RETRIEVAL_RETRY_TOPK_BONUS ??
+      process.env.VITE_HELIX_ASK_RETRIEVAL_RETRY_TOPK_BONUS,
+    4,
+  ),
+  0,
+  20,
+);
+const HELIX_ASK_SWEEP_OVERRIDES =
+  clampNumber(
+    readNumber(
+      process.env.HELIX_ASK_SWEEP_OVERRIDES ?? process.env.VITE_HELIX_ASK_SWEEP_OVERRIDES,
+      0,
+    ),
+    0,
+    1,
+  ) > 0;
+const HELIX_ASK_FORMAT_ENFORCEMENT_LEVEL = (() => {
+  const raw = String(
+    process.env.HELIX_ASK_FORMAT_ENFORCEMENT_LEVEL ??
+      process.env.VITE_HELIX_ASK_FORMAT_ENFORCEMENT_LEVEL ??
+      "strict",
+  )
+    .trim()
+    .toLowerCase();
+  return raw === "relaxed" ? "relaxed" : "strict";
+})();
+const HELIX_ASK_SOFT_EXPANSION_MAX_SENTENCES = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_SOFT_EXPANSION_MAX_SENTENCES ??
+      process.env.VITE_HELIX_ASK_SOFT_EXPANSION_MAX_SENTENCES,
+    0,
+  ),
+  0,
+  2,
+);
+const HELIX_ASK_ARBITER_REPO_RATIO = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_ARBITER_REPO_RATIO ?? process.env.VITE_HELIX_ASK_ARBITER_REPO_RATIO,
+    0.45,
+  ),
+  0.05,
+  0.95,
+);
+const HELIX_ASK_ARBITER_HYBRID_RATIO = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_ARBITER_HYBRID_RATIO ?? process.env.VITE_HELIX_ASK_ARBITER_HYBRID_RATIO,
+    0.25,
+  ),
+  0.05,
+  0.95,
+);
+const HELIX_ASK_TWO_PASS_TRIGGER =
+  /(how does|how do|why|explain|system|pipeline|architecture|workflow|flow|method|scientific method|plan|execute|trace|ask|assistant|llm)/i;
 const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
 const HELIX_ASK_WARP_PATH_BOOST =
   /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline)/i;
+const HELIX_ASK_CORE_FOCUS = /(helix ask|helix|ask system|ask pipeline|ask mode)/i;
+const HELIX_ASK_CORE_PATH_BOOST =
+  /(docs\/helix-ask-flow\.md|client\/src\/components\/helix\/HelixAskPill\.tsx|client\/src\/pages\/desktop\.tsx|server\/routes\/agi\.plan\.ts|server\/skills\/llm\.local|asklocal)/i;
+const HELIX_ASK_CORE_NOISE =
+  /(docs\/SMOKE\.md|docs\/V0\.1-SIGNOFF\.md|docs\/ESSENCE-CONSOLE|docs\/TRACE-API\.md|HullMetricsVisPanel|shared\/schema\.ts|server\/db\/)/i;
+const HELIX_ASK_REPO_FORCE =
+  /\b(cite files?|file paths?|codebase|repo|repository|where in the code|which file|which files|module|component|path\b|according to the codebase|according to the repo|according to the code)\b/i;
+const HELIX_ASK_REPO_EXPECTS =
+  /\b(in this system|in this repo|this repo|this system|helix ask|ask pipeline|ask system|codebase|repository|where in the code|which file|which files|file paths?|cite files?|according to the codebase|according to the repo|according to the code|per the codebase|per the repo|from the codebase|from the repo|from the code)\b/i;
+const HELIX_ASK_REPO_HINT =
+  /(helix|helix ask|ask system|ask pipeline|ask mode|this system|this repo|repository|repo\b|code|codebase|file|path|component|module|endpoint|api|server|client|ui|panel|pipeline|trace|essence|casimir|warp|alcubierre|resonance|code lattice|lattice|ideology|ethos|mission ethos|ideology tree|smoke test|smoke\.md|bug|error|crash|config|env|settings|docs\/)/i;
+const HELIX_ASK_VIABILITY_FOCUS =
+  /\b(viability|certificate|constraint gate|constraint gates|admissible|warp viability)\b/i;
+const HELIX_ASK_VIABILITY_PATHS =
+  /(server\/gr\/gr-evaluation\.ts|server\/gr\/gr-constraint-policy\.ts|server\/routes\/warp-viability\.ts|server\/skills\/physics\.warp\.viability|server\/skills\/physics\.gr\.grounding|types\/warpViability|server\/helix-core\.ts)/i;
+const HELIX_ASK_VERIFICATION_FOCUS =
+  /\b(scientific method|verification|verify|falsifiable|falsifiability|hypothesis|experiment)\b/i;
+const HELIX_ASK_VERIFICATION_ANCHOR_PATHS: RegExp[] = [
+  /server\/routes\/agi\.plan\.ts/i,
+  /server\/services\/helix-ask\/platonic-gates\.ts/i,
+  /server\/services\/observability\/training-trace-store\.ts/i,
+  /server\/services\/agi\/refinery-gates\.ts/i,
+  /server\/services\/agi\/refinery-policy\.ts/i,
+  /server\/services\/agi\/refinery-trajectory\.ts/i,
+  /server\/routes\/training-trace\.ts/i,
+];
+const HELIX_ASK_VERIFICATION_ANCHOR_FILES = [
+  "server/routes/agi.plan.ts",
+  "server/services/helix-ask/platonic-gates.ts",
+  "server/services/observability/training-trace-store.ts",
+  "server/services/agi/refinery-gates.ts",
+  "server/services/agi/refinery-policy.ts",
+  "server/services/agi/refinery-trajectory.ts",
+  "server/routes/training-trace.ts",
+];
+const HELIX_ASK_COMPOSITE_HINT =
+  /\b(synthesize|fit together|bring together|tie together|map (?:it|them)? together|relate (?:these|those|them|it)|connect (?:these|those|them|it)|how do .* fit together|how do .* relate)\b/i;
+const HELIX_ASK_COMPOSITE_MIN_TOPICS = 2;
+const HELIX_ASK_COMPOSITE_ALLOWLIST =
+  /(docs\/knowledge\/|docs\/ethos\/|server\/gr\/|server\/routes\/warp-viability\.ts|server\/skills\/physics\.warp\.viability\.ts|server\/helix-proof-pack\.ts|shared\/curvature-proxy\.ts|client\/src\/physics\/|client\/src\/pages\/star-hydrostatic-panel\.tsx|client\/src\/components\/WarpLedgerPanel\.tsx|client\/src\/components\/DriveGuardsPanel\.tsx|warp-web\/km-scale-warp-ledger\.html)/i;
+
+type HelixAskVerbosity = "brief" | "normal" | "extended";
+
+function resolveHelixAskVerbosity(
+  question: string,
+  intentProfile: HelixAskIntentProfile,
+  requested?: HelixAskVerbosity,
+): HelixAskVerbosity {
+  if (requested) return requested;
+  if (intentProfile.strategy !== "constraint_report") return "brief";
+  const normalized = question.toLowerCase();
+  if (/\bintegrity(_ok)?\b/.test(normalized)) {
+    return "extended";
+  }
+  if (
+    /\b(trace|end-to-end|end to end|data flow|modules|files|pipeline|full|detailed)\b/.test(
+      normalized,
+    )
+  ) {
+    return "extended";
+  }
+  if (/\b(decide|issue)\b/.test(normalized) && /\b(certificate|viability)\b/.test(normalized)) {
+    return "extended";
+  }
+  return "brief";
+}
+
+function shouldHelixAskCompositeSynthesis(
+  question: string,
+  topicTags: HelixAskTopicTag[],
+): { enabled: boolean; topics: HelixAskTopicTag[] } {
+  if (!question.trim()) {
+    return { enabled: false, topics: [] };
+  }
+  if (!HELIX_ASK_COMPOSITE_HINT.test(question)) {
+    return { enabled: false, topics: [] };
+  }
+  const compositeTopics = topicTags.filter((tag) => tag !== "helix_ask");
+  if (compositeTopics.length < HELIX_ASK_COMPOSITE_MIN_TOPICS) {
+    return { enabled: false, topics: compositeTopics };
+  }
+  return { enabled: true, topics: compositeTopics };
+}
+const HELIX_ASK_FILE_HINT =
+  /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|md|json|yml|yaml|mjs|cjs|py|rs|go|java|kt|swift|cpp|c|h)/i;
+const HELIX_ASK_ANSWER_START = "ANSWER_START";
+const HELIX_ASK_ANSWER_END = "ANSWER_END";
+const HELIX_ASK_PROGRESS_TOOL = "helix.ask.progress";
+const HELIX_ASK_PROGRESS_VERSION = "v1";
+const HELIX_ASK_STREAM_TOOL = "helix.ask.stream";
+const HELIX_ASK_STREAM_VERSION = "v1";
+const HELIX_ASK_STREAM_FLUSH_MS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_STREAM_FLUSH_MS ?? process.env.VITE_HELIX_ASK_STREAM_FLUSH_MS,
+    180,
+  ),
+  60,
+  1200,
+);
+const HELIX_ASK_STREAM_CHUNK_MAX = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_STREAM_CHUNK_MAX ?? process.env.VITE_HELIX_ASK_STREAM_CHUNK_MAX,
+    240,
+  ),
+  80,
+  1200,
+);
+const HELIX_ASK_STREAM_MAX_EVENTS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_STREAM_MAX_EVENTS ?? process.env.VITE_HELIX_ASK_STREAM_MAX_EVENTS,
+    64,
+  ),
+  8,
+  300,
+);
 
 function ensureFinalMarker(value: string): string {
-  if (!value.trim()) return "FINAL:";
-  if (value.includes("FINAL:")) return value;
-  return `${value.trimEnd()}\n\nFINAL:`;
+  if (!value.trim()) return `${HELIX_ASK_ANSWER_START}\n${HELIX_ASK_ANSWER_END}`;
+  if (value.includes(HELIX_ASK_ANSWER_START) || value.includes("FINAL:")) return value;
+  return `${value.trimEnd()}\n\n${HELIX_ASK_ANSWER_START}\n${HELIX_ASK_ANSWER_END}`;
 }
 
 function cleanPromptLine(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
-  return trimmed.replace(/^[\"'`.\-]+/g, "").replace(/[\"'`.\-]+$/g, "").trim();
+  return trimmed.replace(/^[\"'`.,;\-]+/g, "").replace(/[\"'`.,;\-]+$/g, "").trim();
 }
 
 function normalizeQuestionMatch(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+const SCAFFOLD_HEADING_RE =
+  /^(general reasoning|repo evidence|reasoning steps|reasoning bullets|evidence steps|evidence bullets)\s*:/i;
+const SCAFFOLD_LINE_RE =
+  /^(no (general reasoning|repo evidence) provided|definition|key questions|notes|scope)\s*:/i;
+const SCAFFOLD_LIST_RE = /^(\d+\.\s+|[-*]\s+)/;
+
+
+function resolveFallbackIntentProfile(target: "general" | "hybrid"): HelixAskIntentProfile {
+  if (target === "general") {
+    return getDefaultHelixAskIntentProfile();
+  }
+  const hybridProfile = getHelixAskIntentProfileById("hybrid.concept_plus_system_mapping");
+  if (hybridProfile) {
+    return {
+      ...hybridProfile,
+      formatPolicy: "auto",
+      evidencePolicy: { ...hybridProfile.evidencePolicy },
+    };
+  }
+  return {
+    id: "hybrid.fallback",
+    label: "Hybrid fallback",
+    domain: "hybrid",
+    tier: "F1",
+    secondaryTier: "F0",
+    strategy: "hybrid_explain",
+    formatPolicy: "auto",
+    stageTags: "on_request",
+    evidencePolicy: {
+      allowRepoCitations: true,
+      requireCitations: false,
+      allowedEvidenceKinds: ["repo_chunk", "prompt_chunk"],
+    },
+    matchers: [],
+  };
+}
+
+type HelixAskMicroPassDecision = {
+  enabled: boolean;
+  auto?: boolean;
+  reason?: string;
+};
+
+function countMicroPassClauses(value: string): number {
+  const matches = value.match(/[?;:]|\b(?:and|or|vs|versus|but)\b/gi);
+  return matches ? matches.length : 0;
+}
+
+function decideHelixAskMicroPass(question: string, formatSpec: { format: HelixAskFormat }): HelixAskMicroPassDecision {
+  const trimmed = question.trim();
+  if (!trimmed) {
+    return { enabled: false };
+  }
+  if (HELIX_ASK_MICRO_PASS) {
+    return { enabled: true, auto: false, reason: "flag" };
+  }
+  if (!HELIX_ASK_MICRO_PASS_AUTO) {
+    return { enabled: false };
+  }
+  const normalized = trimmed.toLowerCase();
+  if (HELIX_ASK_TWO_PASS_TRIGGER.test(normalized)) {
+    return { enabled: true, auto: true, reason: "trigger" };
+  }
+  if (formatSpec.format === "steps" || formatSpec.format === "compare") {
+    return { enabled: true, auto: true, reason: "format" };
+  }
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  if (wordCount >= HELIX_ASK_MICRO_PASS_AUTO_MIN_WORDS) {
+    return { enabled: true, auto: true, reason: "length_words" };
+  }
+  if (normalized.length >= HELIX_ASK_MICRO_PASS_AUTO_MIN_CHARS) {
+    return { enabled: true, auto: true, reason: "length_chars" };
+  }
+  if (countMicroPassClauses(normalized) >= HELIX_ASK_MICRO_PASS_AUTO_MIN_CLAUSES) {
+    return { enabled: true, auto: true, reason: "clauses" };
+  }
+  return { enabled: false };
+}
+
+function isHelixAskRepoQuestion(question: string): boolean {
+  const trimmed = question.trim();
+  if (!trimmed) return true;
+  if (HELIX_ASK_REPO_FORCE.test(trimmed)) return true;
+  if (HELIX_ASK_FILE_HINT.test(trimmed)) return true;
+  return HELIX_ASK_REPO_HINT.test(trimmed);
+}
+
+function hashHelixAskProgress(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+type HelixAskProgressArgs = {
+  stage: string;
+  detail?: string;
+  sessionId?: string;
+  traceId?: string;
+  startedAt?: number;
+  ok?: boolean;
+};
+
+function logHelixAskProgress({
+  stage,
+  detail,
+  sessionId,
+  traceId,
+  startedAt,
+  ok = true,
+}: HelixAskProgressArgs): void {
+  if (!sessionId) return;
+  const cleanedDetail = detail?.trim();
+  const label = cleanedDetail ? `Helix Ask: ${stage} - ${cleanedDetail}` : `Helix Ask: ${stage}`;
+  appendToolLog({
+    tool: HELIX_ASK_PROGRESS_TOOL,
+    version: HELIX_ASK_PROGRESS_VERSION,
+    paramsHash: hashHelixAskProgress(`${stage}:${cleanedDetail ?? ""}`),
+    durationMs: typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0,
+    sessionId,
+    traceId,
+    ok,
+    text: label,
+  });
+}
+
+type HelixAskStreamEmitter = {
+  onToken: (chunk: string) => void;
+  flush: () => void;
+  finalize: (fallback?: string) => void;
+};
+
+function createHelixAskStreamEmitter({
+  sessionId,
+  traceId,
+}: {
+  sessionId?: string;
+  traceId?: string;
+}): HelixAskStreamEmitter {
+  let buffer = "";
+  let pending = "";
+  let lastFlush = 0;
+  let eventCount = 0;
+  let seenStart = false;
+  let done = false;
+  let stopped = false;
+
+  const pushLog = (text: string): void => {
+    if (!sessionId || !text.trim()) return;
+    appendToolLog({
+      tool: HELIX_ASK_STREAM_TOOL,
+      version: HELIX_ASK_STREAM_VERSION,
+      paramsHash: hashHelixAskProgress(`stream:${eventCount}`),
+      durationMs: 0,
+      sessionId,
+      traceId,
+      ok: true,
+      text,
+    });
+  };
+
+  const flush = (): void => {
+    if (stopped || !buffer.trim()) return;
+    pushLog(buffer);
+    buffer = "";
+    lastFlush = Date.now();
+    eventCount += 1;
+    if (eventCount >= HELIX_ASK_STREAM_MAX_EVENTS) {
+      stopped = true;
+    }
+  };
+
+  const pushText = (text: string): void => {
+    if (stopped || !text) return;
+    buffer += text;
+    const now = Date.now();
+    if (buffer.length >= HELIX_ASK_STREAM_CHUNK_MAX || now - lastFlush >= HELIX_ASK_STREAM_FLUSH_MS) {
+      flush();
+    }
+  };
+
+  const onToken = (chunk: string): void => {
+    if (done || stopped || !chunk) return;
+    pending += chunk;
+    if (!seenStart) {
+      const startIndex = pending.indexOf(HELIX_ASK_ANSWER_START);
+      if (startIndex === -1) {
+        if (pending.length > HELIX_ASK_ANSWER_START.length * 2) {
+          pending = pending.slice(-HELIX_ASK_ANSWER_START.length);
+        }
+        return;
+      }
+      seenStart = true;
+      pending = pending.slice(startIndex + HELIX_ASK_ANSWER_START.length);
+      pending = pending.replace(/^\s*\n/, "");
+    }
+    if (!pending) return;
+    const endIndex = pending.indexOf(HELIX_ASK_ANSWER_END);
+    if (endIndex !== -1) {
+      const emitText = pending.slice(0, endIndex);
+      if (emitText) {
+        pushText(emitText);
+      }
+      pending = "";
+      done = true;
+      flush();
+      return;
+    }
+    pushText(pending);
+    pending = "";
+  };
+
+  const finalize = (fallback?: string): void => {
+    if (done || stopped) return;
+    if (!seenStart && fallback) {
+      pushText(fallback);
+    }
+    flush();
+    done = true;
+  };
+
+  return { onToken, flush, finalize };
+}
+
+function stripStageTags(value: string): string {
+  if (!value) return value;
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s*\((observe|hypothesis|experiment|analysis|explain)\)\s*$/i, "").trimEnd())
+    .join("\n")
+    .trim();
+}
+
+const QUESTION_PREFIX = /^question\s*:\s*/i;
+
+function stripInlineQuestionLine(line: string, question?: string): string | null {
+  if (!QUESTION_PREFIX.test(line)) return null;
+  let rest = line.replace(QUESTION_PREFIX, "").trimStart();
+  if (QUESTION_PREFIX.test(rest)) {
+    rest = rest.replace(QUESTION_PREFIX, "").trimStart();
+  }
+  const questionTrimmed = question?.trim();
+  if (questionTrimmed) {
+    const questionLower = questionTrimmed.toLowerCase();
+    if (rest.toLowerCase().startsWith(questionLower)) {
+      rest = rest
+        .slice(questionTrimmed.length)
+        .replace(/^[\s:;,.!?-]+/, "")
+        .trimStart();
+    }
+  }
+  if (!rest) return "";
+  const markIndex = rest.indexOf("?");
+  if (markIndex >= 0 && markIndex < 240) {
+    const after = rest.slice(markIndex + 1).replace(/^[\s:;,.!?-]+/, "").trimStart();
+    if (after) return after;
+  }
+  return rest;
+}
+
+function stripQuestionPrefixText(value: string, question?: string): string {
+  if (!value) return value;
+  const lines = value.split(/\r?\n/);
+  if (!lines.length) return value;
+  const stripped = stripInlineQuestionLine(lines[0] ?? "", question);
+  if (stripped === null) return value;
+  if (stripped) {
+    lines[0] = stripped;
+  } else {
+    lines.shift();
+  }
+  return lines.join("\n").trim();
+}
+
 function isPromptLine(value: string): boolean {
   const cleaned = cleanPromptLine(value);
   if (!cleaned) return false;
   return (
-    /^(question|context|resonance patch)\s*:/i.test(cleaned) ||
+    /^(question|context|prompt context|resonance patch)\s*:/i.test(cleaned) ||
+    SCAFFOLD_HEADING_RE.test(cleaned) ||
     /^you are helix ask/i.test(cleaned) ||
     /^use only the evidence/i.test(cleaned) ||
+    /^use only the evidence steps/i.test(cleaned) ||
+    /^use only the evidence bullets/i.test(cleaned) ||
+    /^use general knowledge/i.test(cleaned) ||
+    /^use only the reasoning/i.test(cleaned) ||
+    /^respond with only the answer between/i.test(cleaned) ||
+    /^answer_start$/i.test(cleaned) ||
+    /^answer_end$/i.test(cleaned) ||
     /^if the context is insufficient/i.test(cleaned) ||
+    /^if the question mentions/i.test(cleaned) ||
     /^when the context includes/i.test(cleaned) ||
     /^when listing multiple/i.test(cleaned) ||
+    /^if the question is comparative/i.test(cleaned) ||
     /^answer with a step/i.test(cleaned) ||
+    /^start directly with/i.test(cleaned) ||
+    /^each step should/i.test(cleaned) ||
+    /^answer in \d/i.test(cleaned) ||
+    /^do not use numbered steps/i.test(cleaned) ||
+    /^after the steps/i.test(cleaned) ||
+    /^avoid repetition/i.test(cleaned) ||
+    /^revise the answer\b/i.test(cleaned) ||
+    /^do not add new claims\b/i.test(cleaned) ||
+    /^preserve the format\b/i.test(cleaned) ||
+    /^keep the paragraph format\b/i.test(cleaned) ||
+    /^keep the numbered step list\b/i.test(cleaned) ||
+    /^use only file paths\b/i.test(cleaned) ||
+    /^evidence\s*:/i.test(cleaned) ||
+    /^answer\s*:/i.test(cleaned) ||
+    /^preserve any stage tags/i.test(cleaned) ||
+    /^do not include stage tags/i.test(cleaned) ||
+    /^no preamble\b/i.test(cleaned) ||
+    /^no headings\b/i.test(cleaned) ||
+    /^evidence steps\s*:/i.test(cleaned) ||
+    /^evidence bullets\s*:/i.test(cleaned) ||
+    /^reasoning steps\s*:/i.test(cleaned) ||
+    /^reasoning bullets\s*:/i.test(cleaned) ||
+    /^do not include\b/i.test(cleaned) ||
+    /^do not output\b/i.test(cleaned) ||
+    /^do not include the words/i.test(cleaned) ||
+    /^context sources\b/i.test(cleaned) ||
+    /^ask debug\b/i.test(cleaned) ||
+    /^(two-pass|two pass)\s*:/i.test(cleaned) ||
+    /^format\s*:/i.test(cleaned) ||
+    /^stage tags\s*:/i.test(cleaned) ||
     /^keep paragraphs short/i.test(cleaned) ||
+    /^end with a short paragraph/i.test(cleaned) ||
     /^do not repeat the question/i.test(cleaned) ||
     /^do not output tool logs/i.test(cleaned) ||
     /^respond w/i.test(cleaned)
   );
+}
+
+function stripScaffoldSections(value: string): string {
+  if (!value) return value;
+  const lines = value.split(/\r?\n/);
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of lines) {
+    const cleaned = cleanPromptLine(line);
+    if (!cleaned) {
+      if (!skipping) kept.push("");
+      continue;
+    }
+    if (SCAFFOLD_HEADING_RE.test(cleaned)) {
+      skipping = true;
+      continue;
+    }
+    if (skipping) {
+      if (SCAFFOLD_LINE_RE.test(cleaned) || SCAFFOLD_LIST_RE.test(cleaned) || isPromptLine(cleaned)) {
+        continue;
+      }
+      skipping = false;
+    }
+    kept.push(line);
+  }
+  return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function stripLeadingQuestion(answer: string, question?: string): string {
@@ -2496,6 +3236,15 @@ function stripLeadingQuestion(answer: string, question?: string): string {
   const normalizedTarget = target ? normalizeQuestionMatch(target) : "";
   let index = 0;
   while (index < lines.length) {
+    const inline = stripInlineQuestionLine(lines[index] ?? "", question);
+    if (inline !== null) {
+      if (inline) {
+        lines[index] = inline;
+        break;
+      }
+      index += 1;
+      continue;
+    }
     const cleaned = cleanPromptLine(lines[index] ?? "");
     if (!cleaned) {
       index += 1;
@@ -2521,7 +3270,27 @@ function stripLeadingQuestion(answer: string, question?: string): string {
 }
 
 function stripPromptEchoFromAnswer(answer: string, question?: string): string {
-  let trimmed = stripLeadingQuestion(answer.trim(), question);
+  let trimmed = stripQuestionPrefixText(answer.trim(), question);
+  trimmed = stripLeadingQuestion(trimmed, question);
+  trimmed = stripEvidencePromptBlock(trimmed);
+  trimmed = stripScaffoldSections(trimmed);
+  if (trimmed) {
+    const lines = trimmed.split(/\r?\n/);
+    let start = 0;
+    for (; start < lines.length; start += 1) {
+      const cleaned = cleanPromptLine(lines[start] ?? "");
+      if (!cleaned) continue;
+      if (/^question:/i.test(cleaned) && /(truncated|\.\.\.)/i.test(cleaned)) {
+        continue;
+      }
+      break;
+    }
+    trimmed = lines.slice(start).join("\n").trim();
+  }
+  const answerBlock = extractAnswerBlock(trimmed);
+  if (answerBlock) {
+    return stripScaffoldSections(answerBlock);
+  }
   if (!trimmed) return trimmed;
   trimmed = trimmed
     .split(/\r?\n/)
@@ -2532,6 +3301,8 @@ function stripPromptEchoFromAnswer(answer: string, question?: string): string {
     })
     .join("\n")
     .trim();
+  if (!trimmed) return trimmed;
+  trimmed = stripScaffoldSections(trimmed);
   if (!trimmed) return trimmed;
   const markers = ["FINAL:", "FINAL ANSWER:", "FINAL_ANSWER:", "Answer:"];
   for (const marker of markers) {
@@ -2544,13 +3315,49 @@ function stripPromptEchoFromAnswer(answer: string, question?: string): string {
   return trimmed;
 }
 
+function stripEvidencePromptBlock(value: string): string {
+  if (!value) return value;
+  const lines = value.split(/\r?\n/);
+  const cleaned = lines.map((line) => cleanPromptLine(line));
+  const evidenceIndex = cleaned.findIndex((line) => /^evidence\s*:/i.test(line));
+  if (evidenceIndex < 0) return value;
+  const answerIndex = cleaned.findIndex((line, index) => index > evidenceIndex && /^answer\s*:/i.test(line));
+  if (answerIndex < 0) return value;
+  const pruned = [...lines.slice(0, evidenceIndex), ...lines.slice(answerIndex + 1)];
+  return pruned.join("\n").trim();
+}
+
+function extractAnswerBlock(value: string): string {
+  if (!value) return "";
+  const startIndex = value.lastIndexOf(HELIX_ASK_ANSWER_START);
+  if (startIndex >= 0) {
+    const afterStart = value.slice(startIndex + HELIX_ASK_ANSWER_START.length);
+    const endIndex = afterStart.lastIndexOf(HELIX_ASK_ANSWER_END);
+    const slice = endIndex >= 0 ? afterStart.slice(0, endIndex) : afterStart;
+    const trimmed = slice.trim();
+    if (trimmed) return trimmed;
+  }
+  const markers = ["FINAL:", "FINAL ANSWER:", "FINAL_ANSWER:", "Answer:"];
+  for (const marker of markers) {
+    const idx = value.lastIndexOf(marker);
+    if (idx >= 0) {
+      const after = value.slice(idx + marker.length).trim();
+      if (after) return after;
+    }
+  }
+  return "";
+}
+
 function formatHelixAskAnswer(answer: string): string {
   if (!answer) return answer;
   const lines = answer.split(/\r?\n/);
   const formatted: string[] = [];
   let lastWasBlank = true;
   for (const rawLine of lines) {
-    const line = rawLine.trimEnd();
+    let line = rawLine.trimEnd();
+    if (line) {
+      line = line.replace(HELIX_ASK_LABEL_PREFIX_RE, "");
+    }
     if (!line.trim()) {
       if (!lastWasBlank && formatted.length) {
         formatted.push("");
@@ -2558,30 +3365,619 @@ function formatHelixAskAnswer(answer: string): string {
       }
       continue;
     }
-    const isListItem = /^\s*\d+\.\s+/.test(line);
+    const trimmedLine = line.trim();
+    if (/^paragraph\s+\d+\s*:/i.test(trimmedLine)) {
+      continue;
+    }
+    if (
+      /^(general reasoning|repo evidence|evidence bullets|reasoning bullets)\s*:/i.test(trimmedLine) ||
+      /^(details|key files|sources)\s*:?\s*$/i.test(trimmedLine)
+    ) {
+      continue;
+    }
+    const isListItem = /^\s*(\d+\.\s+|[-*]\s+)/.test(line);
     if (isListItem && formatted.length && !lastWasBlank) {
       formatted.push("");
     }
     formatted.push(line);
     lastWasBlank = false;
   }
-  return formatted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  const normalizedParagraph = (value: string): string =>
+    value
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  let packed = formatted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (!packed) return packed;
+  packed = packed.replace(HELIX_ASK_LABEL_PREFIX_RE, "").trim();
+  const seen = new Set<string>();
+  const deduped = packed
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => {
+      if (!paragraph) return false;
+      const key = normalizedParagraph(paragraph);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  return deduped.join("\n\n").trim();
 }
 
-function tokenizeAskQuery(input: string): string[] {
-  return input
-    .toLowerCase()
-    .split(/[^a-z0-9_/.:-]+/g)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2);
+const HELIX_ASK_TWO_PARAGRAPH_CONTRACT =
+  /\b(two|2)\s+(short\s+)?paragraphs?\b/i;
+const HELIX_ASK_LABEL_PREFIX_RE =
+  /\b(Definition|Key questions|Notes|Scope)\s*:\s*/gi;
+const HELIX_ASK_DRAWER_HEADER =
+  /^(details|key files|sources|proof)\s*:?\s*$/i;
+const HELIX_ASK_SOURCES_LINE = /^sources?\s*:/i;
+const HELIX_ASK_FILE_LIST_ITEM = /^[-*]\s+.+\.(md|json|ts|tsx|js|jsx|html|css|yml|yaml)\b/i;
+
+function stripDrawerSectionsFromAnswer(answer: string): string {
+  if (!answer) return answer;
+  const lines = answer.split(/\r?\n/);
+  const cleaned: string[] = [];
+  let skipSection = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (skipSection) {
+        skipSection = false;
+        continue;
+      }
+      cleaned.push("");
+      continue;
+    }
+    if (HELIX_ASK_DRAWER_HEADER.test(trimmed)) {
+      skipSection = true;
+      continue;
+    }
+    if (HELIX_ASK_SOURCES_LINE.test(trimmed)) {
+      continue;
+    }
+    if (skipSection) {
+      continue;
+    }
+    if (HELIX_ASK_FILE_LIST_ITEM.test(trimmed) && /[\\/]/.test(trimmed)) {
+      continue;
+    }
+    cleaned.push(line);
+  }
+  return cleaned.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function buildHelixAskSearchQueries(question: string): string[] {
-  const base = question.trim();
+function enforceHelixAskPromptContract(answer: string, question: string): string {
+  if (!answer) return answer;
+  if (!HELIX_ASK_TWO_PARAGRAPH_CONTRACT.test(question)) return answer;
+  const stripped = stripDrawerSectionsFromAnswer(answer);
+  const paragraphs = stripped
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  if (paragraphs.length <= 2) {
+    return paragraphs.join("\n\n").trim();
+  }
+  return paragraphs.slice(0, 2).join("\n\n").trim();
+}
+
+const hasTwoParagraphContract = (question: string): boolean =>
+  HELIX_ASK_TWO_PARAGRAPH_CONTRACT.test(question);
+
+function normalizeNumberedListLines(value: string): string {
+  if (!value) return value;
+  const lines = value.split(/\r?\n/);
+  const normalized = lines.map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+    const matches = trimmed.match(/\b\d+\.\s+/g) ?? [];
+    if (matches.length < 2) return line;
+    return line
+      .replace(/(\s)(\d+\.)\s+/g, "\n$2 ")
+      .replace(/(\S)(\d+\.)\s+/g, "$1\n$2 ");
+  });
+  return normalized.join("\n");
+}
+
+function repairAnswerFilePathFragments(
+  answer: string,
+  contextFiles: string[],
+  evidenceText: string,
+): string {
+  if (!answer || contextFiles.length === 0) return answer;
+  const replacements = contextFiles
+    .map((file) => {
+      const match = file.match(/^(.*)\.(ts|tsx|md|json|js|jsx)$/);
+      if (!match) return null;
+      return { stem: match[1], full: file };
+    })
+    .filter((value): value is { stem: string; full: string } => Boolean(value));
+  if (replacements.length === 0) return answer;
+  const knownPaths = new Set([
+    ...contextFiles,
+    ...extractFilePathsFromText(evidenceText),
+  ]);
+  const lines = answer.split(/\r?\n/);
+  const repaired = lines.map((line) => {
+    let updated = line;
+    for (const { stem, full } of replacements) {
+      if (updated.includes(full)) {
+        continue;
+      }
+      if (updated.includes(`${stem}.`)) {
+        const escapedStem = stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        updated = updated.replace(
+          new RegExp(`\\b${escapedStem}\\.(?!ts|tsx|md|json|js|jsx)`, "g"),
+          full,
+        );
+      }
+    }
+    if (
+      updated.includes("(") &&
+      !updated.includes(")") &&
+      /\b[\w./-]+\.(?:ts|tsx|md|json|js|jsx)\b/.test(updated)
+    ) {
+      updated = `${updated})`;
+    }
+    if (updated.includes("(")) {
+      const segments = updated.split("(");
+      if (segments.length > 1) {
+        const prefix = segments.shift() ?? "";
+        const tail = segments.join("(");
+        const parts = tail.split(")");
+        const inside = parts[0] ?? "";
+        const corrected = inside.replace(/([\w./-]+)\.(?=\s*(?:,|\)|$))/g, (match, stem) => {
+          for (const ext of ["ts", "tsx", "md", "json", "js", "jsx"]) {
+            const candidate = `${stem}.${ext}`;
+            if (knownPaths.has(candidate)) {
+              return candidate;
+            }
+          }
+          return match;
+        });
+        updated = `${prefix}(${corrected}${parts.length > 1 ? `)${parts.slice(1).join(")")}` : ")"}`;
+      }
+    }
+    return updated;
+  });
+  return repaired.join("\n");
+}
+
+function ensureSentence(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+function stripTruncationMarkers(value: string): string {
+  if (!value) return value;
+  const lines = value.split(/\r?\n/);
+  let start = 0;
+  for (; start < lines.length; start += 1) {
+    const trimmed = lines[start].trim();
+    if (!trimmed) continue;
+    if (/^(?:\.{3,}|…)(?:\s*\(truncated\))?$/i.test(trimmed)) {
+      continue;
+    }
+    if (/\(truncated\)/i.test(trimmed)) {
+      continue;
+    }
+    if (trimmed.length <= 120 && /\.{3,}\s*$/.test(trimmed)) {
+      continue;
+    }
+    break;
+  }
+  const remainder = lines.slice(start).join("\n").trim();
+  return remainder || "";
+}
+
+
+
+const LONGPROMPT_HEADING = /^#{1,6}\s+(.+)$/;
+const LONGPROMPT_CODE_FENCE = /^```/;
+const LONGPROMPT_EMBED_DIM = 128;
+
+type PromptBlock = {
+  heading: string;
+  text: string;
+};
+
+type PromptChunk = {
+  id: string;
+  section: string;
+  text: string;
+  tokens: string[];
+  embedding: Float64Array | null;
+};
+
+type PromptChunkCandidate = {
+  chunkId: string;
+  section: string;
+  text: string;
+  tokens: string[];
+  score: number;
+  rrfScore: number;
+};
+
+const dedupeTokens = (tokens: string[]): string[] => Array.from(new Set(tokens));
+
+const estimateTokenCount = (text: string): number => {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return Math.max(1, Math.ceil(trimmed.length / 4));
+};
+
+const tokenizePromptText = (text: string): string[] => dedupeTokens(tokenizeAskQuery(text));
+
+const splitPromptBlocks = (text: string): PromptBlock[] => {
+  const blocks: PromptBlock[] = [];
+  const lines = text.split(/\r?\n/);
+  let buffer: string[] = [];
+  let heading = "";
+  let inFence = false;
+  const flush = () => {
+    const joined = buffer.join("\n").trim();
+    buffer = [];
+    if (!joined) return;
+    blocks.push({ heading, text: joined });
+  };
+  for (const rawLine of lines) {
+    const line = rawLine ?? "";
+    if (LONGPROMPT_CODE_FENCE.test(line.trim())) {
+      inFence = !inFence;
+    }
+    if (!inFence) {
+      const headingMatch = line.match(LONGPROMPT_HEADING);
+      if (headingMatch) {
+        flush();
+        heading = headingMatch[1]?.trim() ?? heading;
+        buffer.push(line);
+        continue;
+      }
+      if (!line.trim()) {
+        flush();
+        continue;
+      }
+    }
+    buffer.push(line);
+  }
+  flush();
+  return blocks;
+};
+
+const splitLargeText = (text: string, maxChars: number, overlapChars: number): string[] => {
+  const segments: string[] = [];
+  let start = 0;
+  const safeOverlap = Math.min(Math.max(overlapChars, 0), Math.max(0, maxChars - 40));
+  while (start < text.length) {
+    let end = Math.min(text.length, start + maxChars);
+    const breakIndex = text.lastIndexOf("\n", end);
+    if (breakIndex > start + 120) {
+      end = breakIndex;
+    }
+    const slice = text.slice(start, end).trim();
+    if (slice) {
+      segments.push(slice);
+    }
+    if (end >= text.length) {
+      break;
+    }
+    start = Math.max(0, end - safeOverlap);
+  }
+  return segments;
+};
+
+const buildPromptChunks = (
+  text: string,
+  options: { chunkTokens: number; overlapTokens: number },
+): PromptChunk[] => {
+  const normalized = text.trim();
+  if (!normalized) return [];
+  const maxChars = Math.max(240, Math.floor(options.chunkTokens * 4));
+  const overlapChars = Math.max(0, Math.floor(options.overlapTokens * 4));
+  const baseHash = crypto.createHash("sha256").update(normalized).digest("hex").slice(0, 12);
+  const basePath = `prompt/longprompt/${baseHash}`;
+  const blocks = splitPromptBlocks(normalized);
+  const chunks: PromptChunk[] = [];
+  let current = "";
+  let currentHeading = "";
+  const pushChunk = (value: string, headingValue: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const chunkId = `${basePath}/chunk-${String(chunks.length + 1).padStart(4, "0")}.md`;
+    const tokens = tokenizePromptText(trimmed);
+    const embedding = trimmed ? hashEmbed(trimmed, LONGPROMPT_EMBED_DIM) : null;
+    chunks.push({
+      id: chunkId,
+      section: headingValue,
+      text: trimmed,
+      tokens,
+      embedding,
+    });
+  };
+
+  for (const block of blocks) {
+    const blockText = block.text.trim();
+    if (!blockText) continue;
+    const headingValue = block.heading || currentHeading;
+    if (!current) {
+      current = blockText;
+      currentHeading = headingValue;
+      continue;
+    }
+    const candidate = `${current}\n\n${blockText}`;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      currentHeading = headingValue || currentHeading;
+      continue;
+    }
+    pushChunk(current, currentHeading);
+    const overlap = overlapChars > 0 ? current.slice(-overlapChars) : "";
+    current = overlap ? `${overlap}\n\n${blockText}` : blockText;
+    currentHeading = headingValue || currentHeading;
+    if (current.length > maxChars) {
+      const splits = splitLargeText(current, maxChars, overlapChars);
+      const leading = splits.slice(0, Math.max(0, splits.length - 1));
+      leading.forEach((segment) => pushChunk(segment, currentHeading));
+      current = splits.length ? splits[splits.length - 1] : "";
+    }
+  }
+  if (current) {
+    pushChunk(current, currentHeading);
+  }
+  return chunks;
+};
+
+const dot = (a: Float64Array, b: Float64Array): number => {
+  const len = Math.min(a.length, b.length);
+  let acc = 0;
+  for (let i = 0; i < len; i += 1) {
+    acc += a[i] * b[i];
+  }
+  return acc;
+};
+
+const normalizeScore = (value: number): number => Math.max(0, Math.min(1, (value + 1) / 2));
+
+const keywordScore = (queryTokens: string[], docTokens: string[]): number => {
+  if (queryTokens.length === 0 || docTokens.length === 0) {
+    return 0;
+  }
+  const set = new Set(docTokens);
+  let hits = 0;
+  for (const token of queryTokens) {
+    if (set.has(token)) {
+      hits += 1;
+    }
+  }
+  return hits / queryTokens.length;
+};
+
+const embeddingScore = (query: Float64Array | null, doc: Float64Array | null): number => {
+  if (!query || !doc || query.length === 0 || doc.length === 0) {
+    return 0;
+  }
+  return normalizeScore(dot(query, doc));
+};
+
+const mergePromptCandidatesWithRrf = (candidateLists: PromptChunkCandidate[][], rrfK: number): PromptChunkCandidate[] => {
+  const merged = new Map<string, PromptChunkCandidate>();
+  candidateLists.forEach((list) => {
+    list.forEach((candidate, index) => {
+      const existing = merged.get(candidate.chunkId);
+      const bump = 1 / (rrfK + index + 1);
+      if (!existing) {
+        merged.set(candidate.chunkId, { ...candidate, rrfScore: bump });
+        return;
+      }
+      if (candidate.score > existing.score) {
+        existing.score = candidate.score;
+      }
+      existing.rrfScore += bump;
+    });
+  });
+  return Array.from(merged.values()).sort((a, b) => b.rrfScore - a.rrfScore);
+};
+
+const promptChunkSimilarity = (a: PromptChunkCandidate, b: PromptChunkCandidate): number => {
+  if (!a.tokens.length || !b.tokens.length) return 0;
+  const aSet = new Set(a.tokens);
+  const bSet = new Set(b.tokens);
+  let intersect = 0;
+  for (const token of aSet) {
+    if (bSet.has(token)) intersect += 1;
+  }
+  const union = aSet.size + bSet.size - intersect;
+  return union > 0 ? intersect / union : 0;
+};
+
+const selectPromptCandidatesWithMmr = (
+  candidates: PromptChunkCandidate[],
+  limit: number,
+  lambda: number,
+): PromptChunkCandidate[] => {
+  if (candidates.length <= 1) return candidates.slice(0, limit);
+  const remaining = candidates.slice();
+  const selected: PromptChunkCandidate[] = [];
+  while (selected.length < limit && remaining.length > 0) {
+    let bestIndex = 0;
+    let bestScore = -Infinity;
+    for (let i = 0; i < remaining.length; i += 1) {
+      const candidate = remaining[i];
+      const relevance = candidate.rrfScore;
+      let diversity = 0;
+      for (const picked of selected) {
+        diversity = Math.max(diversity, promptChunkSimilarity(candidate, picked));
+      }
+      const mmrScore = lambda * relevance - (1 - lambda) * diversity;
+      if (mmrScore > bestScore) {
+        bestScore = mmrScore;
+        bestIndex = i;
+      }
+    }
+    selected.push(remaining.splice(bestIndex, 1)[0]);
+  }
+  return selected;
+};
+
+const buildLongPromptContext = (
+  promptText: string,
+  query: string,
+  opts: {
+    chunkTokens: number;
+    overlapTokens: number;
+    topK: number;
+    topM: number;
+  },
+): {
+  context: string;
+  files: string[];
+  chunkCount: number;
+  selectedCount: number;
+} => {
+  const chunks = buildPromptChunks(promptText, {
+    chunkTokens: opts.chunkTokens,
+    overlapTokens: opts.overlapTokens,
+  });
+  if (!chunks.length) {
+    return { context: "", files: [], chunkCount: 0, selectedCount: 0 };
+  }
+  const queryTokens = tokenizePromptText(query);
+  const queryVector = queryTokens.length ? hashEmbed(query, LONGPROMPT_EMBED_DIM) : null;
+  const lexical: PromptChunkCandidate[] = [];
+  const semantic: PromptChunkCandidate[] = [];
+  for (const chunk of chunks) {
+    const kwScore = keywordScore(queryTokens, chunk.tokens);
+    if (kwScore > 0) {
+      lexical.push({
+        chunkId: chunk.id,
+        section: chunk.section,
+        text: chunk.text,
+        tokens: chunk.tokens,
+        score: kwScore,
+        rrfScore: 0,
+      });
+    }
+    const embedScore = embeddingScore(queryVector, chunk.embedding);
+    if (embedScore > 0) {
+      semantic.push({
+        chunkId: chunk.id,
+        section: chunk.section,
+        text: chunk.text,
+        tokens: chunk.tokens,
+        score: embedScore,
+        rrfScore: 0,
+      });
+    }
+  }
+  const topK = Math.max(1, opts.topK);
+  const lexicalTop = lexical.sort((a, b) => b.score - a.score).slice(0, topK);
+  const semanticTop = semantic.sort((a, b) => b.score - a.score).slice(0, topK);
+  const merged = mergePromptCandidatesWithRrf([lexicalTop, semanticTop], HELIX_ASK_RRF_K);
+  const selectLimit = Math.max(1, opts.topM);
+  let selected = selectPromptCandidatesWithMmr(merged, selectLimit, HELIX_ASK_MMR_LAMBDA);
+  if (!selected.length) {
+    selected = chunks.slice(0, selectLimit).map((chunk) => ({
+      chunkId: chunk.id,
+      section: chunk.section,
+      text: chunk.text,
+      tokens: chunk.tokens,
+      score: 0,
+      rrfScore: 0,
+    }));
+  }
+  const lines: string[] = [];
+  const files: string[] = [];
+  for (const entry of selected) {
+    const preview = clipAskText(entry.text, HELIX_ASK_CONTEXT_CHARS);
+    if (!preview) continue;
+    lines.push(`${entry.chunkId}\n${preview}`);
+    files.push(entry.chunkId);
+  }
+  return {
+    context: lines.join("\n\n"),
+    files,
+    chunkCount: chunks.length,
+    selectedCount: selected.length,
+  };
+};
+
+type LongPromptCandidate = {
+  text: string;
+  source: "context" | "prompt" | "question";
+};
+
+const resolveLongPromptCandidate = (input: {
+  prompt?: string;
+  question?: string;
+  contextText?: string;
+  hasQuestion: boolean;
+}): LongPromptCandidate | null => {
+  const contextText = input.contextText?.trim() ?? "";
+  if (contextText) {
+    return { text: contextText, source: "context" };
+  }
+  const promptText = input.prompt?.trim() ?? "";
+  if (promptText && !input.hasQuestion) {
+    return { text: promptText, source: "prompt" };
+  }
+  const questionText = input.question?.trim() ?? "";
+  if (questionText) {
+    return { text: questionText, source: "question" };
+  }
+  return null;
+};
+
+function stripQueryPrefix(value: string): string {
+  return value.replace(/^(\d+\.\s+|[-*]\s+)/, "").trim();
+}
+
+function parseQueryHints(raw: string, limit: number): string[] {
+  const hints: string[] = [];
+  const seen = new Set<string>();
+  for (const line of raw.split(/\r?\n/)) {
+    const cleaned = cleanPromptLine(stripQueryPrefix(line));
+    if (!cleaned) continue;
+    if (/^(question|context)\s*:/i.test(cleaned)) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    hints.push(cleaned);
+    if (hints.length >= limit) break;
+  }
+  return hints;
+}
+
+function mergeHelixAskQueries(base: string[], hints: string[], limit: number): string[] {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  const push = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(trimmed);
+  };
+  base.forEach(push);
+  hints.forEach(push);
+  return merged.slice(0, Math.max(1, limit));
+}
+
+function normalizeAskSearchSeed(value: string): string {
+  return value.replace(/^\s*question:\s*/i, "").trim();
+}
+
+function buildHelixAskSearchQueries(
+  question: string,
+  topicTags: HelixAskTopicTag[] = [],
+): string[] {
+  const base = normalizeAskSearchSeed(question.trim());
   if (!base) return [];
   const normalized = base.toLowerCase();
   const queries = [base];
   const seen = new Set([base.toLowerCase()]);
+  const hasTopic = (tag: HelixAskTopicTag) => topicTags.includes(tag);
   const push = (value: string) => {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -2591,12 +3987,61 @@ function buildHelixAskSearchQueries(question: string): string[] {
     queries.push(trimmed);
   };
 
-  if (normalized.includes("warp") || normalized.includes("alcubierre") || normalized.includes("bubble")) {
+  if (
+    hasTopic("helix_ask") ||
+    HELIX_ASK_CORE_FOCUS.test(normalized) ||
+    /\/api\/agi\/ask|helix ask|helixask|ask pipeline|ask system|agi ask/i.test(normalized)
+  ) {
+    push("/api/agi/ask");
+    push("docs/helix-ask-flow.md");
+    push("helix ask");
+    push("helix ask flow");
+    push("helix ask pipeline");
+    push("buildGroundedAskPrompt");
+    push("buildGroundedPrompt");
+    push("askLocal");
+    push("server/routes/agi.plan.ts");
+    push("client/src/pages/desktop.tsx");
+    push("client/src/components/helix/HelixAskPill.tsx");
+    push("server/skills/llm.local.spawn.ts");
+  }
+  if (hasTopic("warp") || /warp|alcubierre|bubble/i.test(normalized)) {
     push("warp bubble");
     push("modules/warp/warp-module.ts");
     push("calculateNatarioWarpBubble");
     push("warp pipeline");
     push("energy-pipeline warp");
+  }
+  if (hasTopic("ideology") || /ideology|ethos|mission ethos|ledger/i.test(normalized)) {
+    push("docs/ethos/ideology.json");
+    push("docs/ethos/why.md");
+    push("mission ethos");
+  }
+  if (hasTopic("ledger") || /ledger|stellar ledger|sun ledger|stewardship ledger/i.test(normalized)) {
+    push("docs/knowledge/sun-ledger.md");
+    push("docs/knowledge/stewardship-ledger.md");
+    push("docs/knowledge/warp-ledger.md");
+    push("docs/knowledge/kappa-proxy.md");
+    push("server/helix-proof-pack.ts");
+    push("client/src/components/WarpLedgerPanel.tsx");
+  }
+  if (hasTopic("star") || /save the sun|save-the-sun|solar restoration|stellar ledger|red giant/i.test(normalized)) {
+    push("docs/ethos/ideology.json");
+    push("docs/ethos/why.md");
+    push("docs/knowledge/sun-ledger.md");
+    push("docs/knowledge/stewardship-ledger.md");
+    push("docs/knowledge/star-hydrostatic.md");
+    push("client/src/pages/star-hydrostatic-panel.tsx");
+    push("client/src/physics/polytrope.ts");
+    push("client/src/physics/gamow.ts");
+  }
+  if (hasTopic("concepts") || /platonic|uncertainty|wavefunction|probability field|langevin/i.test(normalized)) {
+    push("docs/knowledge/platonic-reasoning.md");
+    push("server/services/helix-ask/platonic-gates.ts");
+    push("server/services/helix-ask/concepts.ts");
+    push("server/services/observability/training-trace-store.ts");
+    push("server/services/agi/refinery-gates.ts");
+    push("server/services/agi/refinery-policy.ts");
   }
   if (normalized.includes("solve") || normalized.includes("solver")) {
     push("warp solver");
@@ -2604,7 +4049,996 @@ function buildHelixAskSearchQueries(question: string): string[] {
     push("gr evaluation");
   }
 
-  return queries.slice(0, 6);
+  return queries.slice(0, 10);
+}
+
+function buildHybridConceptSkeleton(
+  question: string,
+  conceptMatch: HelixAskConceptMatch | null,
+): string[] {
+  const label =
+    conceptMatch?.card.label ?? conceptMatch?.card.id ?? "the concept";
+  if (!question.trim()) return [];
+  return [
+    `Hypothesis: what claim about ${label} is being tested or verified?`,
+    "Test/Gate: which gate or policy accepts or rejects outputs?",
+    "Evidence/Trace: where is evidence recorded or replayed?",
+    "Revision: how does the system repair, retry, or clarify?",
+  ];
+}
+
+function shouldRequireVerificationAnchors(
+  intentProfile: HelixAskIntentProfile | null,
+  question: string,
+  conceptMatch: HelixAskConceptMatch | null,
+): boolean {
+  if (!intentProfile) return false;
+  if (intentProfile.id !== "hybrid.concept_plus_system_mapping") return false;
+  const matchId = conceptMatch?.card.id.toLowerCase();
+  if (matchId) {
+    if (matchId.includes("scientific method") || matchId.includes("verification") || matchId.includes("falsifiability")) {
+      return true;
+    }
+  }
+  return HELIX_ASK_VERIFICATION_FOCUS.test(question);
+}
+
+function buildVerificationAnchorHints(question: string): string[] {
+  const hints = [...HELIX_ASK_VERIFICATION_ANCHOR_FILES];
+  if (HELIX_ASK_VIABILITY_FOCUS.test(question)) {
+    hints.push("server/gr/gr-evaluation.ts");
+    hints.push("server/gr/gr-constraint-policy.ts");
+  }
+  return hints;
+}
+
+function buildHelixAskQueryPrompt(
+  question: string,
+  options?: { conceptSkeleton?: string[]; anchorHints?: string[] },
+): string {
+  const lines = [
+    "You are Helix Ask query planner.",
+    `Return up to ${HELIX_ASK_QUERY_HINTS_MAX} short search queries or file path hints.`,
+    "Output ONLY the block between PLAN_START and PLAN_END.",
+    "Inside the block: emit optional directives (one per line), then a QUERIES_START line, then query hints.",
+    "Directive format:",
+    "preferred_surfaces: docs, ethos, knowledge, tests, code",
+    "avoid_surfaces: tokamak, qi",
+    "must_include_globs: docs/ethos/**, docs/knowledge/**",
+    "required_slots: definition, repo_mapping, verification, failure_path",
+    "clarify: <one short question if evidence is likely missing>",
+    "Use one line per query. Prefer module names, symbols, or paths.",
+    "No preamble, no numbering, no extra commentary.",
+    "PLAN_START",
+    "QUERIES_START",
+    "PLAN_END",
+    options?.conceptSkeleton?.length
+      ? "Use these conceptual slots to shape the queries:"
+      : "",
+    options?.conceptSkeleton?.length ? options.conceptSkeleton.join("\n") : "",
+    options?.anchorHints?.length ? "Prefer these verification anchors:" : "",
+    options?.anchorHints?.length ? options.anchorHints.map((entry) => `- ${entry}`).join("\n") : "",
+    "",
+    `Question: ${question}`,
+  ];
+  return lines.filter(Boolean).join("\n");
+}
+
+function filterCompositeContext(context: string): string {
+  if (!context.trim()) return "";
+  const blocks = context.split(/\n{2,}/);
+  const kept: string[] = [];
+  for (const block of blocks) {
+    const lines = block.split(/\r?\n/).filter(Boolean);
+    if (lines.length === 0) continue;
+    const header = lines[0].trim();
+    if (HELIX_ASK_COMPOSITE_ALLOWLIST.test(header)) {
+      kept.push(block.trim());
+    }
+  }
+  return kept.join("\n\n");
+}
+
+function collectCompositeMustIncludeFiles(tags: HelixAskTopicTag[]): string[] {
+  const files = new Set<string>();
+  for (const tag of tags) {
+    const profile = buildHelixAskTopicProfile([tag]);
+    if (!profile?.mustIncludeFiles?.length) continue;
+    for (const entry of profile.mustIncludeFiles) {
+      if (entry) files.add(entry);
+    }
+  }
+  return Array.from(files);
+}
+
+type AskCandidate = {
+  filePath: string;
+  preview: string;
+  score: number;
+  rrfScore: number;
+};
+
+type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path";
+type AskCandidateChannelStats = Record<AskCandidateChannel, number>;
+type AskCandidateChannelList = { channel: AskCandidateChannel; candidates: AskCandidate[] };
+
+const HELIX_ASK_CHANNELS: AskCandidateChannel[] = ["lexical", "symbol", "fuzzy", "path"];
+const HELIX_ASK_RRF_CHANNEL_WEIGHTS: AskCandidateChannelStats = {
+  lexical: HELIX_ASK_RRF_WEIGHT_LEXICAL,
+  symbol: HELIX_ASK_RRF_WEIGHT_SYMBOL,
+  fuzzy: HELIX_ASK_RRF_WEIGHT_FUZZY,
+  path: 1.5,
+};
+
+type HelixAskPlanDirectives = {
+  preferredSurfaces: string[];
+  avoidSurfaces: string[];
+  mustIncludeGlobs: string[];
+  requiredSlots: string[];
+  clarifyQuestion?: string;
+};
+
+type HelixAskPlanScope = {
+  allowlistTiers?: RegExp[][];
+  avoidlist?: RegExp[];
+  mustIncludeGlobs?: RegExp[];
+  docsFirst?: boolean;
+  docsAllowlist?: RegExp[][];
+};
+
+function initAskChannelStats(value = 0): AskCandidateChannelStats {
+  return { lexical: value, symbol: value, fuzzy: value, path: value };
+}
+
+function applyAskNodeBoosts(
+  score: number,
+  filePath: string,
+  question: string,
+  topicProfile?: HelixAskTopicProfile | null,
+): number {
+  let boosted = score;
+  if (HELIX_ASK_CORE_FOCUS.test(question)) {
+    if (HELIX_ASK_CORE_PATH_BOOST.test(filePath)) boosted += 10;
+    if (HELIX_ASK_CORE_NOISE.test(filePath)) boosted -= 8;
+  }
+  if (HELIX_ASK_WARP_FOCUS.test(question) && HELIX_ASK_WARP_PATH_BOOST.test(filePath)) {
+    boosted += 8;
+  }
+  if (topicProfile) {
+    boosted += scoreHelixAskTopicPath(filePath, topicProfile);
+  }
+  return boosted;
+}
+
+function scoreAskNodeLexical(
+  node: { symbol?: string; filePath?: string; signature?: string; doc?: string; snippet?: string },
+  tokens: string[],
+  question: string,
+  topicProfile?: HelixAskTopicProfile | null,
+): number {
+  const symbol = node.symbol ?? "";
+  const filePath = node.filePath ?? "";
+  if (!filePath) return 0;
+  const signature = node.signature ?? "";
+  const doc = node.doc ?? "";
+  const snippet = node.snippet ?? "";
+  let score = 0;
+  for (const token of tokens) {
+    if (symbol.toLowerCase().includes(token)) score += 6;
+    if (filePath.toLowerCase().includes(token)) score += 5;
+    if (signature.toLowerCase().includes(token)) score += 3;
+    if (doc.toLowerCase().includes(token)) score += 1.5;
+    if (snippet.toLowerCase().includes(token)) score += 1;
+  }
+  return applyAskNodeBoosts(score, filePath, question, topicProfile);
+}
+
+function scoreAskNodeSymbol(
+  node: { symbol?: string; filePath?: string; signature?: string },
+  tokens: string[],
+  question: string,
+  topicProfile?: HelixAskTopicProfile | null,
+): number {
+  const symbol = node.symbol ?? "";
+  const filePath = node.filePath ?? "";
+  if (!filePath) return 0;
+  const signature = node.signature ?? "";
+  let score = 0;
+  for (const token of tokens) {
+    if (symbol.toLowerCase().includes(token)) score += 7;
+    if (signature.toLowerCase().includes(token)) score += 4;
+    if (filePath.toLowerCase().includes(token)) score += 1.5;
+  }
+  return applyAskNodeBoosts(score, filePath, question, topicProfile);
+}
+
+function buildTrigramSet(value: string): Set<string> {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (!normalized) return new Set();
+  if (normalized.length < 3) return new Set([normalized]);
+  const trigrams = new Set<string>();
+  for (let i = 0; i < normalized.length - 2; i += 1) {
+    trigrams.add(normalized.slice(i, i + 3));
+  }
+  return trigrams;
+}
+
+function normalizePlanValue(value: string): string {
+  return value.trim().replace(/^[-\s]+/, "");
+}
+
+function parsePlanList(value: string): string[] {
+  return value
+    .split(/[,\|]/)
+    .map((entry) => normalizePlanValue(entry))
+    .filter(Boolean);
+}
+
+function globToRegex(glob: string): RegExp {
+  const escaped = glob.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  const pattern = escaped
+    .replace(/\*\*/g, ".*")
+    .replace(/\*/g, "[^/]*")
+    .replace(/\?/g, ".");
+  return new RegExp(pattern, "i");
+}
+
+function surfaceToRegexes(surface: string): RegExp[] {
+  const normalized = surface.toLowerCase();
+  if (normalized === "docs") return [/^docs\//i];
+  if (normalized === "ethos") return [/^docs\/ethos\//i];
+  if (normalized === "knowledge") return [/^docs\/knowledge\//i];
+  if (normalized === "tests") return [/^tests\//i];
+  if (normalized === "code")
+    return [/^(server|client|shared|modules|apps|tools|scripts|cli|packages)\//i];
+  if (normalized.includes("*") || normalized.includes("/")) {
+    return [globToRegex(normalized)];
+  }
+  return [new RegExp(normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")];
+}
+
+function buildPlanSurfaceRegexes(surfaces: string[]): RegExp[] {
+  const regexes: RegExp[] = [];
+  for (const surface of surfaces) {
+    regexes.push(...surfaceToRegexes(surface));
+  }
+  return regexes;
+}
+
+function parsePlanDirectives(text: string): { directives: HelixAskPlanDirectives; queryHints: string[] } {
+  const directives: HelixAskPlanDirectives = {
+    preferredSurfaces: [],
+    avoidSurfaces: [],
+    mustIncludeGlobs: [],
+    requiredSlots: [],
+  };
+  const isInstructionLine = (value: string): boolean => {
+    return (
+      value.startsWith("return up to") ||
+      value.startsWith("output only the block") ||
+      value.startsWith("inside the block") ||
+      value.startsWith("directive format") ||
+      value.startsWith("use one line per query") ||
+      value.startsWith("no preamble") ||
+      value.startsWith("use these conceptual slots") ||
+      value.startsWith("prefer these verification anchors")
+    );
+  };
+  const splitDirectiveValue = (line: string): string => {
+    if (line.includes(":")) return line.split(":").slice(1).join(":");
+    if (line.includes("=")) return line.split("=").slice(1).join("=");
+    return "";
+  };
+  const hintLines: string[] = [];
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  let inPlan = false;
+  let inQueries = false;
+  let sawMarkers = false;
+  for (const rawLine of lines) {
+    const cleaned = normalizePlanValue(rawLine);
+    const normalized = cleaned.toLowerCase();
+    if (!normalized) continue;
+    if (normalized.includes("plan_start")) {
+      inPlan = true;
+      inQueries = false;
+      sawMarkers = true;
+      continue;
+    }
+    if (normalized.includes("plan_end")) {
+      break;
+    }
+    if (!sawMarkers) {
+      inPlan = true;
+    }
+    if (!inPlan) continue;
+    if (normalized.includes("queries_start")) {
+      inQueries = true;
+      continue;
+    }
+    if (isInstructionLine(normalized)) continue;
+    if (
+      normalized.startsWith("preferred_surfaces") ||
+      normalized.startsWith("preferred")
+    ) {
+      directives.preferredSurfaces.push(...parsePlanList(splitDirectiveValue(cleaned)));
+      continue;
+    }
+    if (normalized.startsWith("avoid_surfaces") || normalized.startsWith("avoid")) {
+      directives.avoidSurfaces.push(...parsePlanList(splitDirectiveValue(cleaned)));
+      continue;
+    }
+    if (
+      normalized.startsWith("must_include_globs") ||
+      normalized.startsWith("must_include") ||
+      normalized.startsWith("must_include_paths")
+    ) {
+      directives.mustIncludeGlobs.push(...parsePlanList(splitDirectiveValue(cleaned)));
+      continue;
+    }
+    if (normalized.startsWith("required_slots") || normalized.startsWith("slots")) {
+      directives.requiredSlots.push(...parsePlanList(splitDirectiveValue(cleaned)));
+      continue;
+    }
+    if (normalized.startsWith("clarify")) {
+      const clarify = normalizePlanValue(splitDirectiveValue(cleaned));
+      if (clarify) directives.clarifyQuestion = clarify;
+      continue;
+    }
+    if (!inQueries && normalized.startsWith("queries")) {
+      continue;
+    }
+    if (inQueries || !sawMarkers) {
+      hintLines.push(cleaned);
+    }
+  }
+  const queryHints = parseQueryHints(hintLines.join("\n"), HELIX_ASK_QUERY_HINTS_MAX);
+  directives.preferredSurfaces = Array.from(new Set(directives.preferredSurfaces));
+  directives.avoidSurfaces = Array.from(new Set(directives.avoidSurfaces));
+  directives.mustIncludeGlobs = Array.from(new Set(directives.mustIncludeGlobs));
+  directives.requiredSlots = Array.from(new Set(directives.requiredSlots));
+  return { directives, queryHints };
+}
+
+function buildPlanScope({
+  directives,
+  topicTags,
+  requiresRepoEvidence,
+  repoExpectationLevel,
+}: {
+  directives?: HelixAskPlanDirectives | null;
+  topicTags: HelixAskTopicTag[];
+  requiresRepoEvidence: boolean;
+  repoExpectationLevel: "low" | "medium" | "high";
+}): HelixAskPlanScope {
+  const scope: HelixAskPlanScope = {};
+  const preferredSurfaces = new Set<string>(directives?.preferredSurfaces ?? []);
+  const mustIncludeGlobs = new Set<string>(directives?.mustIncludeGlobs ?? []);
+  const avoidSurfaces = new Set<string>(directives?.avoidSurfaces ?? []);
+  const docsFirst =
+    requiresRepoEvidence &&
+    repoExpectationLevel !== "low" &&
+    topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star");
+  if (docsFirst) {
+    preferredSurfaces.add("docs");
+    preferredSurfaces.add("ethos");
+    preferredSurfaces.add("knowledge");
+  }
+  const preferredRegexes = buildPlanSurfaceRegexes(Array.from(preferredSurfaces));
+  const avoidRegexes = buildPlanSurfaceRegexes(Array.from(avoidSurfaces));
+  const mustRegexes = Array.from(mustIncludeGlobs).map((glob) =>
+    glob.includes("*") || glob.includes("/") ? globToRegex(glob) : globToRegex(`**/${glob}/**`),
+  );
+  const allowlistTiers: RegExp[][] = [];
+  if (preferredRegexes.length) {
+    allowlistTiers.push(preferredRegexes);
+  }
+  if (mustRegexes.length) {
+    allowlistTiers.push(mustRegexes);
+  }
+  if (allowlistTiers.length) {
+    scope.allowlistTiers = allowlistTiers;
+  }
+  if (avoidRegexes.length) {
+    scope.avoidlist = avoidRegexes;
+  }
+  if (mustRegexes.length) {
+    scope.mustIncludeGlobs = mustRegexes;
+  }
+  if (docsFirst) {
+    const docsRegexes = buildPlanSurfaceRegexes(["docs", "ethos", "knowledge"]);
+    const docsAllowlist: RegExp[][] = [];
+    if (docsRegexes.length) docsAllowlist.push(docsRegexes);
+    if (mustRegexes.length) docsAllowlist.push(mustRegexes);
+    scope.docsFirst = true;
+    scope.docsAllowlist = docsAllowlist.length ? docsAllowlist : undefined;
+  }
+  return scope;
+}
+
+function normalizeSlotName(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function evaluateSlotCoverage({
+  contextText,
+  requiredSlots,
+  conceptMatch,
+}: {
+  contextText: string;
+  requiredSlots: string[];
+  conceptMatch: HelixAskConceptMatch | null;
+}): { required: string[]; covered: string[]; missing: string[]; ratio: number } {
+  const normalized = contextText.toLowerCase();
+  const filePaths = extractFilePathsFromText(contextText);
+  const required = requiredSlots.map(normalizeSlotName).filter(Boolean);
+  const covered: string[] = [];
+  const label = conceptMatch?.card.label?.toLowerCase() ?? "";
+  for (const slot of required) {
+    let ok = false;
+    if (slot === "definition") {
+      ok = /definition\b|defined as\b|what is\b/.test(normalized);
+      if (!ok && label) ok = normalized.includes(label);
+    } else if (slot === "repo_mapping") {
+      ok = filePaths.length > 0;
+    } else if (slot === "verification") {
+      ok = /verification|verify|gate|constraint|certificate|integrity_ok|test\b/.test(normalized);
+    } else if (slot === "failure_path") {
+      ok = /fail|failure|reject|clarify|not certified|missing\b/.test(normalized);
+    } else if (slot === "flow" || slot === "pipeline") {
+      ok = /pipeline|stage|flow|step\b/.test(normalized);
+    } else {
+      ok = normalized.includes(slot.replace(/_/g, " "));
+    }
+    if (ok) covered.push(slot);
+  }
+  const missing = required.filter((slot) => !covered.includes(slot));
+  const ratio = required.length ? covered.length / required.length : 1;
+  return { required, covered, missing, ratio };
+}
+
+function trigramSimilarity(a: string, b: string): number {
+  const aSet = buildTrigramSet(a);
+  const bSet = buildTrigramSet(b);
+  if (aSet.size === 0 || bSet.size === 0) return 0;
+  let intersect = 0;
+  for (const trigram of aSet) {
+    if (bSet.has(trigram)) intersect += 1;
+  }
+  const union = aSet.size + bSet.size - intersect;
+  return union > 0 ? intersect / union : 0;
+}
+
+function scoreAskNodeFuzzy(
+  node: { symbol?: string; filePath?: string; signature?: string },
+  query: string,
+  question: string,
+  topicProfile?: HelixAskTopicProfile | null,
+): number {
+  const filePath = node.filePath ?? "";
+  if (!filePath) return 0;
+  const queryLower = query.toLowerCase();
+  const symbol = node.symbol ?? "";
+  const signature = node.signature ?? "";
+  const candidates = [filePath, symbol, signature].filter(Boolean);
+  let best = 0;
+  for (const candidate of candidates) {
+    best = Math.max(best, trigramSimilarity(queryLower, candidate));
+  }
+  if (best < 0.25) return 0;
+  let score = best * 8;
+  if (filePath.toLowerCase().includes(queryLower)) score += 4;
+  return applyAskNodeBoosts(score, filePath, question, topicProfile);
+}
+
+function upsertAskCandidate(
+  byPath: Map<string, AskCandidate>,
+  node: { symbol?: string; filePath?: string; signature?: string; doc?: string; snippet?: string },
+  score: number,
+): void {
+  const filePath = node.filePath ?? "";
+  if (!filePath) return;
+  const preview = formatAskPreview({
+    doc: node.doc ?? "",
+    snippet: node.snippet ?? "",
+    score,
+    filePath,
+    symbol: node.symbol ?? "",
+  });
+  const existing = byPath.get(filePath);
+  if (!existing || score > existing.score) {
+    byPath.set(filePath, { filePath, preview, score, rrfScore: 0 });
+  }
+}
+
+function looksLikePathHint(value: string): boolean {
+  const normalized = value.trim().replace(/^[\-\s]+/, "");
+  if (!normalized) return false;
+  if (normalized.includes("/") || normalized.includes("\\")) {
+    return /\.(md|json|ya?ml|ts|tsx|js|jsx|mjs|cjs)$/i.test(normalized);
+  }
+  return false;
+}
+
+function collectPathCandidatesForQuery(
+  query: string,
+  question: string,
+  options?: { allowlist?: RegExp[]; avoidlist?: RegExp[]; topicProfile?: HelixAskTopicProfile | null },
+): AskCandidate[] {
+  const allowlist = options?.allowlist ?? [];
+  const avoidlist = options?.avoidlist ?? [];
+  const pathHints = extractFilePathsFromText(query);
+  if (!pathHints.length && looksLikePathHint(query)) {
+    pathHints.push(query.trim());
+  }
+  const candidates: AskCandidate[] = [];
+  for (const hint of pathHints) {
+    const normalized = hint.replace(/\\/g, "/");
+    if (allowlist.length > 0 && !pathMatchesAny(normalized, allowlist)) continue;
+    if (avoidlist.length > 0 && pathMatchesAny(normalized, avoidlist)) continue;
+    const fullPath = path.resolve(process.cwd(), normalized);
+    if (!fs.existsSync(fullPath)) continue;
+    let raw = "";
+    try {
+      raw = fs.readFileSync(fullPath, "utf8");
+    } catch {
+      continue;
+    }
+    const preview = clipAskText(raw, HELIX_ASK_CONTEXT_CHARS);
+    if (!preview) continue;
+    const baseScore = 40;
+    const score = applyAskNodeBoosts(baseScore, normalized, question, options?.topicProfile);
+    candidates.push({
+      filePath: normalized,
+      preview: formatAskPreview({
+        doc: preview,
+        snippet: "",
+        score,
+        filePath: normalized,
+        symbol: "path",
+      }),
+      score,
+      rrfScore: 0,
+    });
+  }
+  return candidates.sort((a, b) => b.score - a.score);
+}
+
+function collectDocsGrepCandidates(
+  queries: string[],
+  question: string,
+  options?: { allowlist?: RegExp[]; avoidlist?: RegExp[]; limit?: number },
+): AskCandidate[] {
+  const allowlist = options?.allowlist ?? [];
+  const avoidlist = options?.avoidlist ?? [];
+  const tokens = new Set<string>();
+  const phrases: string[] = [];
+  for (const query of queries) {
+    const cleaned = query.trim();
+    if (!cleaned) continue;
+    if (extractFilePathsFromText(cleaned).length > 0) continue;
+    const normalized = cleaned.toLowerCase();
+    if (normalized.length <= 120) phrases.push(normalized);
+    tokenizeAskQuery(cleaned).forEach((token) => tokens.add(token));
+  }
+  if (tokens.size === 0 && phrases.length === 0) return [];
+  const docsRoots = ["docs/ethos", "docs/knowledge", "docs"];
+  const files: string[] = [];
+  const seen = new Set<string>();
+  const maxFiles = options?.limit ?? 200;
+  const walk = (dir: string): void => {
+    if (files.length >= maxFiles) return;
+    if (!fs.existsSync(dir)) return;
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (files.length >= maxFiles) break;
+      const nextPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+        walk(nextPath);
+        continue;
+      }
+      if (!/\.(md|json|ya?ml|txt)$/i.test(entry.name)) continue;
+      const normalized = path.relative(process.cwd(), nextPath).replace(/\\/g, "/");
+      if (seen.has(normalized)) continue;
+      if (allowlist.length > 0 && !pathMatchesAny(normalized, allowlist)) continue;
+      if (avoidlist.length > 0 && pathMatchesAny(normalized, avoidlist)) continue;
+      seen.add(normalized);
+      files.push(normalized);
+    }
+  };
+  docsRoots.forEach((root) => walk(path.resolve(process.cwd(), root)));
+  const candidates: AskCandidate[] = [];
+  for (const filePath of files) {
+    let raw = "";
+    try {
+      raw = fs.readFileSync(path.resolve(process.cwd(), filePath), "utf8");
+    } catch {
+      continue;
+    }
+    const lower = raw.toLowerCase();
+    let score = 0;
+    for (const phrase of phrases) {
+      if (phrase.length > 3 && lower.includes(phrase)) score += 6;
+    }
+    for (const token of tokens) {
+      if (token.length > 2 && lower.includes(token)) score += 2;
+    }
+    if (score <= 0) continue;
+    const preview = clipAskText(raw, HELIX_ASK_CONTEXT_CHARS);
+    if (!preview) continue;
+    const boosted = applyAskNodeBoosts(score + 8, filePath, question, null);
+    candidates.push({
+      filePath,
+      preview: formatAskPreview({
+        doc: preview,
+        snippet: "",
+        score: boosted,
+        filePath,
+        symbol: "grep",
+      }),
+      score: boosted,
+      rrfScore: 0,
+    });
+  }
+  return candidates.sort((a, b) => b.score - a.score).slice(0, 12);
+}
+
+function collectAskCandidatesMultiChannel(
+  snapshot: { nodes: Array<{ symbol?: string; filePath?: string; signature?: string; doc?: string; snippet?: string }> },
+  query: string,
+  question: string,
+  options?: { topicProfile?: HelixAskTopicProfile | null; allowlist?: RegExp[]; avoidlist?: RegExp[] },
+): { lists: AskCandidateChannelList[]; queryHit: boolean } {
+  const tokens = tokenizeAskQuery(query);
+  if (!tokens.length) return { lists: [], queryHit: false };
+  const allowlist = options?.allowlist ?? [];
+  const avoidlist = options?.avoidlist ?? [];
+  const byPathLexical = new Map<string, AskCandidate>();
+  const byPathSymbol = new Map<string, AskCandidate>();
+  const byPathFuzzy = new Map<string, AskCandidate>();
+  for (const node of snapshot.nodes) {
+    const filePath = node.filePath ?? "";
+    if (!filePath) continue;
+    if (allowlist.length > 0 && !pathMatchesAny(filePath, allowlist)) continue;
+    if (avoidlist.length > 0 && pathMatchesAny(filePath, avoidlist)) continue;
+    const lexicalScore = scoreAskNodeLexical(node, tokens, question, options?.topicProfile);
+    if (lexicalScore > 0) upsertAskCandidate(byPathLexical, node, lexicalScore);
+    const symbolScore = scoreAskNodeSymbol(node, tokens, question, options?.topicProfile);
+    if (symbolScore > 0) upsertAskCandidate(byPathSymbol, node, symbolScore);
+    const fuzzyScore = scoreAskNodeFuzzy(node, query, question, options?.topicProfile);
+    if (fuzzyScore > 0) upsertAskCandidate(byPathFuzzy, node, fuzzyScore);
+  }
+  const lexical = Array.from(byPathLexical.values()).sort((a, b) => b.score - a.score);
+  const symbol = Array.from(byPathSymbol.values()).sort((a, b) => b.score - a.score);
+  const fuzzy = Array.from(byPathFuzzy.values()).sort((a, b) => b.score - a.score);
+  const lists: AskCandidateChannelList[] = [];
+  if (lexical.length) lists.push({ channel: "lexical", candidates: lexical });
+  if (symbol.length) lists.push({ channel: "symbol", candidates: symbol });
+  if (fuzzy.length) lists.push({ channel: "fuzzy", candidates: fuzzy });
+  const pathCandidates = collectPathCandidatesForQuery(query, question, {
+    allowlist,
+    avoidlist,
+    topicProfile: options?.topicProfile,
+  });
+  if (pathCandidates.length) lists.push({ channel: "path", candidates: pathCandidates });
+  const queryHit = lists.some((entry) => entry.candidates.length > 0);
+  return { lists, queryHit };
+}
+
+function mergeCandidatesWithWeightedRrf(
+  candidateLists: AskCandidateChannelList[],
+  rrfK: number,
+  channelWeights: AskCandidateChannelStats,
+): AskCandidate[] {
+  const merged = new Map<string, AskCandidate>();
+  candidateLists.forEach(({ channel, candidates }) => {
+    const weight = channelWeights[channel] ?? 1;
+    candidates.forEach((candidate, index) => {
+      const existing = merged.get(candidate.filePath);
+      const bump = weight / (rrfK + index + 1);
+      if (!existing) {
+        merged.set(candidate.filePath, {
+          ...candidate,
+          rrfScore: bump,
+        });
+        return;
+      }
+      if (candidate.score > existing.score) {
+        existing.score = candidate.score;
+        existing.preview = candidate.preview;
+      }
+      existing.rrfScore += bump;
+    });
+  });
+  return Array.from(merged.values()).sort((a, b) => b.rrfScore - a.rrfScore);
+}
+
+function pathSimilarity(a: string, b: string): number {
+  const aParts = a.toLowerCase().split(/[\\/]+/).filter(Boolean);
+  const bParts = b.toLowerCase().split(/[\\/]+/).filter(Boolean);
+  if (!aParts.length || !bParts.length) return 0;
+  const aSet = new Set(aParts);
+  const bSet = new Set(bParts);
+  let intersect = 0;
+  for (const part of aSet) {
+    if (bSet.has(part)) intersect += 1;
+  }
+  const union = aSet.size + bSet.size - intersect;
+  return union > 0 ? intersect / union : 0;
+}
+
+function selectCandidatesWithMmr(candidates: AskCandidate[], limit: number, lambda: number): AskCandidate[] {
+  if (candidates.length <= 1) return candidates.slice(0, limit);
+  const remaining = candidates.slice();
+  const selected: AskCandidate[] = [];
+  while (selected.length < limit && remaining.length > 0) {
+    let bestIndex = 0;
+    let bestScore = -Infinity;
+    for (let i = 0; i < remaining.length; i += 1) {
+      const candidate = remaining[i];
+      const relevance = candidate.rrfScore;
+      let diversity = 0;
+      for (const picked of selected) {
+        diversity = Math.max(diversity, pathSimilarity(candidate.filePath, picked.filePath));
+      }
+      const mmrScore = lambda * relevance - (1 - lambda) * diversity;
+      if (mmrScore > bestScore) {
+        bestScore = mmrScore;
+        bestIndex = i;
+      }
+    }
+    selected.push(remaining.splice(bestIndex, 1)[0]);
+  }
+  return selected;
+}
+
+function buildMustIncludeCandidates(
+  topicProfile: HelixAskTopicProfile | null | undefined,
+  question: string,
+): AskCandidate[] {
+  const mustIncludeFiles = topicProfile?.mustIncludeFiles ?? [];
+  if (!topicProfile || mustIncludeFiles.length === 0) return [];
+  const tokens = tokenizeAskQuery(question);
+  const candidates: AskCandidate[] = [];
+  for (const relativePath of mustIncludeFiles) {
+    const filePath = relativePath.replace(/\\/g, "/");
+    const fullPath = path.resolve(process.cwd(), filePath);
+    if (!fs.existsSync(fullPath)) continue;
+    let raw = "";
+    try {
+      raw = fs.readFileSync(fullPath, "utf8");
+    } catch {
+      continue;
+    }
+    const preview = clipAskText(raw, HELIX_ASK_CONTEXT_CHARS);
+    if (!preview) continue;
+    const baseScore = Math.max(1, scoreHelixAskTopicPath(filePath, topicProfile));
+    const tokenScore = tokens.length
+      ? tokens.reduce((acc, token) => (filePath.toLowerCase().includes(token) ? acc + 2 : acc), 0)
+      : 0;
+    const score = baseScore + tokenScore + 25;
+    candidates.push({
+      filePath,
+      preview: formatAskPreview({
+        doc: preview,
+        snippet: "",
+        score,
+        filePath,
+        symbol: "must-include",
+      }),
+      score,
+      rrfScore: score,
+    });
+  }
+  return candidates.sort((a, b) => b.score - a.score);
+}
+
+function injectMustIncludeCandidates(
+  selected: AskCandidate[],
+  mustInclude: AskCandidate[],
+  topicProfile: HelixAskTopicProfile | null | undefined,
+  limit: number,
+): { selected: AskCandidate[]; mustIncludeOk: boolean } {
+  if (!topicProfile || mustInclude.length === 0) {
+    const files = selected.map((entry) => entry.filePath);
+    return { selected, mustIncludeOk: topicMustIncludeSatisfied(files, topicProfile) };
+  }
+  const mustIncludeSet = new Set(mustInclude.map((entry) => entry.filePath));
+  const byPath = new Map<string, AskCandidate>();
+  for (const entry of selected) {
+    byPath.set(entry.filePath, entry);
+  }
+  for (const entry of mustInclude) {
+    const existing = byPath.get(entry.filePath);
+    if (!existing || entry.score > existing.score) {
+      byPath.set(entry.filePath, entry);
+    }
+  }
+  const merged = Array.from(byPath.values()).sort((a, b) => {
+    const aMust = mustIncludeSet.has(a.filePath) ? 1 : 0;
+    const bMust = mustIncludeSet.has(b.filePath) ? 1 : 0;
+    if (aMust !== bMust) return bMust - aMust;
+    return b.score - a.score;
+  });
+  let trimmed = merged;
+  if (merged.length > limit) {
+    const required = merged.filter((entry) => mustIncludeSet.has(entry.filePath));
+    const slots = Math.max(0, limit - required.length);
+    const optional = merged
+      .filter((entry) => !mustIncludeSet.has(entry.filePath))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, slots);
+    trimmed = [...required, ...optional];
+  }
+  const files = trimmed.map((entry) => entry.filePath);
+  const mustIncludeOk = topicMustIncludeSatisfied(files, topicProfile);
+  return { selected: trimmed, mustIncludeOk };
+}
+
+async function buildAskContextFromQueries(
+  question: string,
+  queries: string[],
+  topK?: number,
+  topicProfile?: HelixAskTopicProfile | null,
+  options?: { allowlistTiers?: RegExp[][]; avoidlist?: RegExp[]; overrideAllowlist?: boolean },
+): Promise<{
+  context: string;
+  files: string[];
+  topicTier?: number;
+  topicMustIncludeOk?: boolean;
+  queryHitCount?: number;
+  topScore?: number;
+  scoreGap?: number;
+  channelHits?: AskCandidateChannelStats;
+  channelTopScores?: AskCandidateChannelStats;
+}> {
+  const snapshot = await loadCodeLattice();
+  if (!snapshot) return { context: "", files: [] };
+  const cleanQueries = queries.filter(Boolean);
+  if (!cleanQueries.length) return { context: "", files: [] };
+  const limit = clampNumber(topK ?? HELIX_ASK_CONTEXT_FILES, 1, HELIX_ASK_CONTEXT_FILES);
+  const perQueryLimit = Math.max(6, Math.ceil(limit / Math.max(1, cleanQueries.length)));
+  const candidatePool = Math.max(limit * 3, perQueryLimit * 2, 12);
+  const baseAllowlistTiers =
+    topicProfile?.allowlistTiers?.length ? topicProfile.allowlistTiers : [[]];
+  const allowlistTiers =
+    options?.allowlistTiers?.length && options.overrideAllowlist
+      ? options.allowlistTiers
+      : options?.allowlistTiers?.length
+        ? [...options.allowlistTiers, ...baseAllowlistTiers]
+        : baseAllowlistTiers;
+  const minTierCandidates =
+    topicProfile && topicProfile.minTierCandidates > 0
+      ? Math.min(limit, topicProfile.minTierCandidates)
+      : 1;
+  let selected: AskCandidate[] = [];
+  let topicTier = 0;
+  let topicMustIncludeOk = true;
+  let queryHitCount = 0;
+  let topScore = 0;
+  let scoreGap = 0;
+  let channelHits = initAskChannelStats();
+  let channelTopScores = initAskChannelStats();
+
+  for (let tierIndex = 0; tierIndex < allowlistTiers.length; tierIndex += 1) {
+    const allowlist = allowlistTiers[tierIndex] ?? [];
+    const candidateLists: AskCandidateChannelList[] = [];
+    queryHitCount = 0;
+    channelHits = initAskChannelStats();
+    channelTopScores = initAskChannelStats();
+    for (const query of cleanQueries) {
+      const multi = collectAskCandidatesMultiChannel(snapshot, query, question, {
+        topicProfile,
+        allowlist,
+        avoidlist: options?.avoidlist,
+      });
+      if (multi.queryHit) queryHitCount += 1;
+      for (const entry of multi.lists) {
+        const candidates = entry.candidates.slice(0, candidatePool);
+        candidateLists.push({ channel: entry.channel, candidates });
+        if (candidates.length) {
+          channelHits[entry.channel] += 1;
+          channelTopScores[entry.channel] = Math.max(channelTopScores[entry.channel], candidates[0].score);
+        }
+      }
+    }
+    const merged = mergeCandidatesWithWeightedRrf(candidateLists, HELIX_ASK_RRF_K, HELIX_ASK_RRF_CHANNEL_WEIGHTS);
+    topScore = merged.length ? merged[0].rrfScore : 0;
+    scoreGap =
+      merged.length >= 2 ? Math.max(0, merged[0].rrfScore - merged[1].rrfScore) : topScore;
+    const tierSelected = selectCandidatesWithMmr(merged, limit, HELIX_ASK_MMR_LAMBDA);
+    if (!tierSelected.length) continue;
+    const files = tierSelected.map((entry) => entry.filePath);
+    let mustIncludeOk = topicMustIncludeSatisfied(files, topicProfile);
+    let tierFinal = tierSelected;
+    if (!mustIncludeOk && topicProfile?.mustIncludeFiles?.length) {
+      const mustIncludeCandidates = buildMustIncludeCandidates(topicProfile, question);
+      if (mustIncludeCandidates.length > 0) {
+        const injected = injectMustIncludeCandidates(
+          tierSelected,
+          mustIncludeCandidates,
+          topicProfile,
+          limit,
+        );
+        tierFinal = injected.selected;
+        mustIncludeOk = injected.mustIncludeOk;
+      }
+    }
+    selected = tierFinal;
+    topicTier = tierIndex + 1;
+    topicMustIncludeOk = mustIncludeOk;
+    if (tierFinal.length >= minTierCandidates && mustIncludeOk) {
+      break;
+    }
+    if (tierIndex === allowlistTiers.length - 1) {
+      break;
+    }
+  }
+  return finalizeAskContext({
+    selected,
+    topicTier: topicTier || undefined,
+    topicMustIncludeOk,
+    queryHitCount,
+    topScore,
+    scoreGap,
+    channelHits,
+    channelTopScores,
+  });
+}
+
+function finalizeAskContext({
+  selected,
+  topicTier,
+  topicMustIncludeOk,
+  queryHitCount,
+  topScore,
+  scoreGap,
+  channelHits,
+  channelTopScores,
+}: {
+  selected: AskCandidate[];
+  topicTier?: number;
+  topicMustIncludeOk?: boolean;
+  queryHitCount?: number;
+  topScore?: number;
+  scoreGap?: number;
+  channelHits?: AskCandidateChannelStats;
+  channelTopScores?: AskCandidateChannelStats;
+}): {
+  context: string;
+  files: string[];
+  topicTier?: number;
+  topicMustIncludeOk?: boolean;
+  queryHitCount?: number;
+  topScore?: number;
+  scoreGap?: number;
+  channelHits?: AskCandidateChannelStats;
+  channelTopScores?: AskCandidateChannelStats;
+} {
+  const lines: string[] = [];
+  const files: string[] = [];
+  for (const entry of selected) {
+    const preview = clipAskText(entry.preview, HELIX_ASK_CONTEXT_CHARS);
+    if (!preview) continue;
+    lines.push(`${entry.filePath}\n${preview}`);
+    files.push(entry.filePath);
+  }
+  return {
+    context: lines.join("\n\n"),
+    files,
+    topicTier,
+    topicMustIncludeOk,
+    queryHitCount,
+    topScore,
+    scoreGap,
+    channelHits,
+    channelTopScores,
+  };
 }
 
 function formatAskPreview({
@@ -2627,96 +5061,834 @@ function formatAskPreview({
   return parts.join("\n");
 }
 
-async function buildAskContext(question: string, searchQuery?: string, topK?: number): Promise<string> {
-  const snapshot = await loadCodeLattice();
-  if (!snapshot) return "";
-  const queries = buildHelixAskSearchQueries(searchQuery ?? question);
+async function buildAskContext(
+  question: string,
+  searchQuery?: string,
+  topK?: number,
+  topicProfile?: HelixAskTopicProfile | null,
+): Promise<string> {
+  const topicTags = topicProfile?.tags ?? [];
+  const queries = buildHelixAskSearchQueries(searchQuery ?? question, topicTags);
   if (!queries.length) return "";
-  const limit = clampNumber(topK ?? HELIX_ASK_CONTEXT_FILES, 1, HELIX_ASK_CONTEXT_FILES);
-  const perQueryLimit = Math.max(4, Math.ceil(limit / Math.max(1, queries.length)));
-  const scored: Array<{
-    filePath: string;
-    preview: string;
-    score: number;
-  }> = [];
-
-  for (const query of queries) {
-    const tokens = tokenizeAskQuery(query);
-    if (!tokens.length) continue;
-    for (const node of snapshot.nodes) {
-      const symbol = node.symbol ?? "";
-      const filePath = node.filePath ?? "";
-      if (!filePath) continue;
-      const signature = node.signature ?? "";
-      const doc = node.doc ?? "";
-      const snippet = node.snippet ?? "";
-      let score = 0;
-      for (const token of tokens) {
-        if (symbol.toLowerCase().includes(token)) score += 6;
-        if (filePath.toLowerCase().includes(token)) score += 5;
-        if (signature.toLowerCase().includes(token)) score += 3;
-        if (doc.toLowerCase().includes(token)) score += 1.5;
-        if (snippet.toLowerCase().includes(token)) score += 1;
-      }
-      if (score <= 0) continue;
-      if (HELIX_ASK_WARP_FOCUS.test(question) && HELIX_ASK_WARP_PATH_BOOST.test(filePath)) {
-        score += 8;
-      }
-      scored.push({
-        filePath,
-        preview: formatAskPreview({
-          doc,
-          snippet,
-          score,
-          filePath,
-          symbol,
-        }),
-        score,
-      });
-    }
-  }
-
-  if (!scored.length) return "";
-  scored.sort((a, b) => b.score - a.score);
-  const lines: string[] = [];
-  const seen = new Set<string>();
-  for (const entry of scored) {
-    if (seen.has(entry.filePath)) continue;
-    const preview = clipAskText(entry.preview, HELIX_ASK_CONTEXT_CHARS);
-    if (!preview) continue;
-    lines.push(`${entry.filePath}\n${preview}`);
-    seen.add(entry.filePath);
-    if (lines.length >= limit) break;
-  }
-  return lines.join("\n\n");
+  const result = await buildAskContextFromQueries(question, queries, topK, topicProfile);
+  return result.context;
 }
 
-function buildGroundedAskPrompt(question: string, context: string): string {
-  return [
+function buildGroundedAskPrompt(
+  question: string,
+  context: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = [
     "You are Helix Ask, a repo-grounded assistant.",
     "Use only the evidence in the context below. Cite file paths when referencing code.",
     "If the context is insufficient, say what is missing and ask a concise follow-up.",
     "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
-    "When listing multiple points, use a numbered list with one item per line.",
-    "Answer with a step-by-step explanation (6-10 steps) and end with a short in-practice walkthrough.",
-    "Keep paragraphs short (2-3 sentences) and separate sections with blank lines.",
-    "Do not repeat the question or include headings like Question or Context.",
-    "Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.",
-    'Respond with only the answer and prefix it with \"FINAL:\".',
-    "",
-    `Question: ${question}`,
-    "",
-    "Context:",
-    context || "No repo context was attached to this request.",
-    "",
-    "FINAL:",
-  ].join("\n");
+  ];
+  if (format === "steps") {
+    lines.push("Start directly with a numbered list using `1.` style; use 6-9 steps and no preamble.");
+    lines.push("Each step should be 2-3 sentences and grounded in repo details; cite file paths when relevant.");
+    if (stageTags) {
+      lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("After the steps, add a short paragraph starting with \"In practice,\" (2-3 sentences).");
+  } else if (format === "compare") {
+    lines.push("Answer in 2-3 short paragraphs; do not use numbered steps.");
+    lines.push("If the question is comparative, include a short bullet list (3-5 items) of concrete differences grounded in repo details.");
+    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    lines.push("End with a short paragraph starting with \"In practice,\" (2-3 sentences).");
+  } else {
+    lines.push("Answer in 2-3 short paragraphs; do not use numbered steps unless explicitly requested.");
+    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    lines.push("End with a short paragraph starting with \"In practice,\" (2-3 sentences).");
+  }
+  lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
+  lines.push("Do not include the words \"Question:\" or \"Context sources\".");
+  lines.push("Keep paragraphs short (2-3 sentences) and separate sections with blank lines.");
+  lines.push("Do not repeat the question or include headings like Question or Context.");
+  lines.push("Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push("Context:");
+  lines.push(context || "No repo context was attached to this request.");
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
 }
 
-const LocalAskRequest = z
+function buildGeneralAskPrompt(
+  question: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = [
+    "You are Helix Ask.",
+    "Answer using general knowledge; do not cite file paths or repo details.",
+  ];
+  if (format === "steps") {
+    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
+    lines.push("Each step should be 1-2 sentences.");
+    if (stageTags) {
+      lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+  } else if (format === "compare") {
+    lines.push("Answer in 1-2 short paragraphs; do not use numbered steps.");
+    lines.push("If the question is comparative, include a short bullet list (2-4 items) of concrete differences.");
+    lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+  } else {
+    lines.push("Answer in 1-2 short paragraphs; do not use numbered steps unless explicitly requested.");
+    lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+  }
+  lines.push("Avoid repetition; do not repeat the question.");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
+function extractQuestionFromPrompt(prompt: string): string {
+  const match = prompt.match(/(?:^|\n)Question:\s*([^\n]+)/i);
+  return match?.[1]?.trim() ?? "";
+}
+
+function extractContextFromPrompt(prompt: string): string {
+  const marker = "\nContext:\n";
+  const start = prompt.indexOf(marker);
+  if (start < 0) return "";
+  const after = prompt.slice(start + marker.length);
+  const end = after.lastIndexOf("\nFINAL:");
+  const context = end >= 0 ? after.slice(0, end) : after;
+  return context.trim();
+}
+
+const SCAFFOLD_JUNK_LINE_RE = [
+  /^",?\s*no headings\./i,
+  /^general reasoning\s*:/i,
+  /^repo evidence\s*:/i,
+  /^evidence\s*:/i,
+  /^ts[x]?[`.)\s]/i,
+  /^(md|json|html)[`.)\s]/i,
+];
+
+function normalizeScaffoldText(value: string): string {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !/^(error:|srv\s+send_error)/i.test(line))
+    .filter((line) => !/request\s*\(\d+\s+tokens\)\s+exceeds/i.test(line))
+    .filter((line) => !SCAFFOLD_JUNK_LINE_RE.some((re) => re.test(line)));
+  if (!lines.length) return "";
+  const listed = lines.filter((line) => /^(\d+\.\s+|[-*]\s+)/.test(line));
+  const trimmed = (listed.length ? listed : lines).slice(0, 12);
+  return trimmed.join("\n");
+}
+
+function buildHelixAskScaffoldPrompt(
+  question: string,
+  context: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = [
+    "You are Helix Ask evidence distiller.",
+    "Use only the evidence in the context below. Do not speculate.",
+  ];
+  if (format === "steps") {
+    lines.push("Return a numbered list (6-9 items) of the concrete steps the system actually performs.");
+    if (stageTags) {
+      lines.push(
+        "Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).",
+      );
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("Each step must cite at least one file path from the context in parentheses.");
+  } else {
+    lines.push("Return 6-9 short evidence bullets (not steps) grounded in the context.");
+    lines.push("Each bullet must cite at least one file path from the context in parentheses.");
+    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+  }
+  lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push("Context:");
+  lines.push(context || "No repo context was attached to this request.");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function buildHelixAskEvidencePrompt(
+  question: string,
+  context: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+  composite = false,
+  anchorHints: string[] = [],
+): string {
+  const lines = [
+    "You are Helix Ask evidence distiller.",
+    "Use only the evidence in the context below. Do not speculate.",
+  ];
+  if (anchorHints.length) {
+    lines.push("Prefer evidence from these verification anchors when present in context:");
+    lines.push(...anchorHints.map((entry) => `- ${entry}`));
+    lines.push("At least one bullet must cite a verification anchor if available.");
+    lines.push("Avoid UI-only files unless the question explicitly asks about UI.");
+  }
+  if (format === "steps") {
+    lines.push("Return a numbered list (6-9 items) of evidence steps the system actually performs.");
+    if (stageTags) {
+      lines.push(
+        "Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).",
+      );
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("Each step should be 1-2 sentences and cite at least one file path or prompt chunk id from the context.");
+  } else {
+    const count = composite ? "4-6" : "6-9";
+    lines.push(`Return ${count} short evidence bullets grounded in the context.`);
+    lines.push("Each bullet should be 1-2 sentences and cite at least one file path or prompt chunk id from the context.");
+    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    if (composite) {
+      lines.push("Prefer evidence from domain docs (ethos/knowledge) and core GR viability files over UI or prompt infrastructure.");
+      lines.push("Do not mention 'anchors' or list files without tying them to the question.");
+    }
+  }
+  lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push("Context:");
+  lines.push(context || "No repo context was attached to this request.");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function buildHelixAskPromptEvidencePrompt(
+  question: string,
+  context: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = [
+    "You are Helix Ask evidence distiller.",
+    "Use only the evidence in the prompt context below. Do not speculate.",
+  ];
+  if (format === "steps") {
+    lines.push("Return a numbered list (4-6 items) of concise reasoning steps.");
+    if (stageTags) {
+      lines.push(
+        "Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).",
+      );
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("Each step should be 1-2 sentences and cite at least one prompt chunk id from the context.");
+  } else {
+    lines.push("Return 4-6 short evidence bullets grounded in the prompt context.");
+    lines.push("Each bullet should be 1-2 sentences and cite at least one prompt chunk id from the context.");
+    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+  }
+  lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push("Prompt context:");
+  lines.push(context || "No prompt context was attached to this request.");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function buildGeneralAskEvidencePrompt(
+  question: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = [
+    "You are Helix Ask evidence distiller.",
+    "Use general knowledge only. Do not cite file paths or repo details.",
+  ];
+  if (format === "steps") {
+    lines.push("Return a numbered list (4-6 items) of concise reasoning steps.");
+    if (stageTags) {
+      lines.push(
+        "Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).",
+      );
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("Each step should be 1-2 sentences.");
+  } else {
+    lines.push("Return 4-6 short reasoning bullets.");
+    lines.push("Each bullet should be 1-2 sentences.");
+    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+  }
+  lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  return lines.join("\n");
+}
+
+function buildHelixAskSynthesisPrompt(
+  question: string,
+  scaffold: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+  softExpansionSentences = 0,
+): string {
+  const lines = [
+    "You are Helix Ask, a repo-grounded assistant.",
+  ];
+  const twoParagraphContract = hasTwoParagraphContract(question);
+  if (format === "steps") {
+    lines.push("Use only the evidence steps below. Do not add new steps.");
+    if (stageTags) {
+      lines.push("Preserve any stage tags present in the evidence steps.");
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("Start directly with a numbered list using `1.` style; use 6-9 steps and no preamble.");
+    lines.push("Each step should be 2-3 sentences and cite file paths or gate/certificate ids from the evidence steps.");
+    if (!twoParagraphContract) {
+      lines.push("After the steps, add a short paragraph starting with \"In practice,\" (2-3 sentences).");
+    }
+    lines.push("Evidence steps:");
+  } else {
+    lines.push("Use only the evidence bullets below. Do not add new claims.");
+    lines.push(
+      twoParagraphContract
+        ? "Answer in two short paragraphs; do not use numbered steps."
+        : "Answer in 2-3 short paragraphs; do not use numbered steps.",
+    );
+    lines.push(
+      "If the question is comparative, include a short bullet list (3-5 items) of concrete differences grounded in repo details.",
+    );
+    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    if (!twoParagraphContract) {
+      lines.push("End with a short paragraph starting with \"In practice,\" (2-3 sentences).");
+    }
+    lines.push("Evidence bullets:");
+  }
+  if (softExpansionSentences > 0) {
+    lines.push(
+      `If the evidence is strong, you may add up to ${softExpansionSentences} extra sentences of interpretation that do not introduce new uncited facts.`,
+    );
+  }
+  lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
+  lines.push("Do not include the words \"Question:\" or \"Context sources\".");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push(scaffold);
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
+function buildHelixAskPromptSynthesisPrompt(
+  question: string,
+  scaffold: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+  softExpansionSentences = 0,
+): string {
+  const lines = [
+    "You are Helix Ask, a grounded assistant.",
+  ];
+  const twoParagraphContract = hasTwoParagraphContract(question);
+  if (format === "steps") {
+    lines.push("Use only the evidence steps below. Do not add new steps.");
+    if (stageTags) {
+      lines.push("Preserve any stage tags present in the evidence steps.");
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
+    lines.push("Each step should be 1-2 sentences and cite file paths or prompt chunk ids from the evidence steps.");
+    if (!twoParagraphContract) {
+      lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    }
+    lines.push("Evidence steps:");
+  } else {
+    lines.push("Use only the evidence bullets below. Do not add new claims.");
+    lines.push(
+      twoParagraphContract
+        ? "Answer in two short paragraphs; do not use numbered steps."
+        : "Answer in 1-2 short paragraphs; do not use numbered steps.",
+    );
+    lines.push("If the question is comparative, include a short bullet list (2-4 items) of concrete differences.");
+    if (!twoParagraphContract) {
+      lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    }
+    lines.push("Evidence bullets:");
+  }
+  if (softExpansionSentences > 0) {
+    lines.push(
+      `If the evidence is strong, you may add up to ${softExpansionSentences} extra sentences of interpretation that do not introduce new uncited facts.`,
+    );
+  }
+  lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push(scaffold);
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
+function buildHelixAskHybridPrompt(
+  question: string,
+  generalScaffold: string,
+  repoScaffold: string,
+  hasRepoEvidence: boolean,
+  format: HelixAskFormat,
+  stageTags: boolean,
+  constraintEvidence?: string,
+  composite = false,
+): string {
+  const lines = [
+    "You are Helix Ask, a hybrid assistant.",
+    "Use only the general reasoning and repo evidence below. Do not invent citations.",
+  ];
+  const twoParagraphContract = hasTwoParagraphContract(question);
+  const hasConstraintEvidence = Boolean(constraintEvidence?.trim());
+  if (format === "steps") {
+    lines.push("Start directly with a numbered list using `1.` style; use 5-7 steps and no preamble.");
+    lines.push("First 1-2 steps define the general concept (no citations).");
+    if (hasRepoEvidence) {
+      lines.push("Remaining steps map to this system and must cite repo file paths from the repo evidence section.");
+    } else {
+      lines.push("Since repo evidence is missing, state that and ask for specific files or components (no citations).");
+    }
+    if (hasConstraintEvidence) {
+      lines.push(
+        "If constraint evidence is provided, include one step that states gate/certificate status and cite gate/certificate ids or sources.",
+      );
+    }
+    if (stageTags) {
+      lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    if (!twoParagraphContract) {
+      lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    }
+  } else {
+    lines.push(
+      twoParagraphContract
+        ? "Write two short paragraphs."
+        : composite
+        ? "Write two paragraphs with 2-3 sentences each (aim for 5-7 sentences total)."
+        : "Write two short paragraphs.",
+    );
+    lines.push("Paragraph 1: general explanation using only the general reasoning bullets (no citations).");
+    if (hasRepoEvidence) {
+      lines.push("Paragraph 2: map to this system using the repo evidence bullets and include file path citations.");
+    } else {
+      lines.push("Paragraph 2: state that no repo evidence was found and ask for the specific files to review (no citations).");
+    }
+    if (hasConstraintEvidence) {
+      lines.push(
+        "If constraint evidence is provided, add a sentence that states gate/certificate status and cite gate/certificate ids or sources.",
+      );
+    }
+    if (!composite && !twoParagraphContract) {
+      lines.push("If the question is comparative, include a short bullet list (2-4 items) after paragraph 2.");
+    }
+    if (composite) {
+      lines.push(
+        "Do not mention UI components or Helix Ask implementation details unless the question explicitly asks about the UI.",
+      );
+      lines.push("Do not start any sentence with a file path; place citations in parentheses at the end.");
+      lines.push("Avoid listing file names without explaining their role.");
+      lines.push("Do not mention evidence bullets, anchors, or the prompt structure.");
+    }
+    if (!composite && !twoParagraphContract) {
+      lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    }
+  }
+  lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push("General reasoning:");
+  lines.push(generalScaffold || "No general reasoning provided.");
+  lines.push("");
+  lines.push("Repo evidence:");
+  lines.push(repoScaffold || "No repo evidence provided.");
+  lines.push("");
+  lines.push("Constraint evidence:");
+  lines.push(constraintEvidence || "No constraint evidence provided.");
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
+function buildGeneralAskSynthesisPrompt(
+  question: string,
+  scaffold: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = ["You are Helix Ask."];
+  const twoParagraphContract = hasTwoParagraphContract(question);
+  if (format === "steps") {
+    lines.push("Use only the reasoning steps below. Do not add new steps.");
+    if (stageTags) {
+      lines.push("Preserve any stage tags present in the steps.");
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
+    lines.push("Each step should be 1-2 sentences.");
+    if (!twoParagraphContract) {
+      lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    }
+    lines.push("Reasoning steps:");
+  } else {
+    lines.push("Use only the reasoning bullets below. Do not add new claims.");
+    lines.push(
+      twoParagraphContract
+        ? "Answer in two short paragraphs; do not use numbered steps."
+        : "Answer in 1-2 short paragraphs; do not use numbered steps.",
+    );
+    lines.push("If the question is comparative, include a short bullet list (2-4 items) of concrete differences.");
+    if (!twoParagraphContract) {
+      lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    }
+    lines.push("Reasoning bullets:");
+  }
+  lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push(scaffold);
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
+function buildHelixAskConstraintPrompt(
+  question: string,
+  evidence: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = [
+    "You are Helix Ask, a constraint-grounded assistant.",
+    "Use only the evidence below. Do not speculate beyond the gate or certificate data.",
+    "Cite gate ids (gate:...) or certificate ids (certificate:...) when referencing residuals or viability.",
+  ];
+  if (format === "steps") {
+    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
+    lines.push("Each step should be 1-2 sentences and cite the relevant gate or certificate.");
+    if (stageTags) {
+      lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
+    }
+    lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+  } else {
+    lines.push("Answer in 1-2 short paragraphs; do not use numbered steps.");
+    lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+  }
+  lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push("Evidence:");
+  lines.push(evidence || "No constraint evidence available.");
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
+const resolveEnvelopeMode = (verbosity: HelixAskVerbosity) =>
+  verbosity === "normal" ? "standard" : verbosity;
+
+type ConstraintEvidenceResult = {
+  evidenceText: string;
+  refs: string[];
+};
+
+function extractWarpConstraintSummary(evidenceText: string): string | null {
+  if (!evidenceText) return null;
+  const lines = evidenceText.split(/\r?\n/);
+  let gate = "";
+  let status = "";
+  let certificate = "";
+  let integrityOk = "";
+  let constraintCount = "";
+  let residuals = "";
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("gate:")) {
+      gate = trimmed.replace("gate:", "").trim();
+    }
+    if (trimmed.startsWith("status:")) {
+      status = trimmed.replace("status:", "").trim();
+    } else if (trimmed.startsWith("certificate:")) {
+      certificate = trimmed.replace("certificate:", "").trim();
+    } else if (trimmed.startsWith("integrity_ok:")) {
+      integrityOk = trimmed.replace("integrity_ok:", "").trim();
+    } else if (trimmed.startsWith("constraints:")) {
+      constraintCount = trimmed.replace("constraints:", "").trim();
+    } else if (trimmed.startsWith("residuals:")) {
+      residuals = trimmed.replace("residuals:", "").trim();
+    }
+  }
+  if (!status && !certificate && !gate) return null;
+  return [
+    gate ? `Gate: gate:${gate}.` : "",
+    status ? `Gate status: ${status}.` : "",
+    residuals ? `Residuals: ${residuals}.` : "Residuals: not reported in gate evidence.",
+    constraintCount ? `Constraints: ${constraintCount}.` : "",
+    certificate ? `Certificate: ${certificate}.` : "",
+    integrityOk ? `Integrity ok: ${integrityOk}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function buildWarpViabilityTraceParagraph(question?: string, verbosity: HelixAskVerbosity = "brief"): string {
+  const wantsIntegrityDetail = /\bintegrity(_ok)?\b/i.test(question ?? "");
+  const parts = [
+    "Pipeline state and warp parameters are evaluated by the GR viability gate and constraint policy.",
+    "Certificate issuance is handled by the warp viability endpoint and tool bindings.",
+    "Warp viability status and certificate metadata are merged into the pipeline state and surfaced to the UI.",
+  ];
+  if (wantsIntegrityDetail) {
+    parts.push(
+      "If integrity_ok is false, GR evaluation records the integrity failure and helix-core treats the certificate as NOT_CERTIFIED.",
+    );
+  }
+  if (verbosity === "extended") {
+    parts.push(
+      "The certificate payload is attached to the pipeline viability snapshot and echoed into training traces for replay.",
+    );
+  }
+  return parts.join(" ");
+}
+
+function buildWarpConstraintAnswer(
+  evidenceText: string,
+  question?: string,
+  verbosity: HelixAskVerbosity = "brief",
+): string {
+  const summary = extractWarpConstraintSummary(evidenceText);
+  const pipeline = buildWarpViabilityTraceParagraph(question, verbosity);
+  const inPractice =
+    "In practice, a FAIL gate status blocks certification and the UI surfaces the non-admissible state along with the certificate metadata.";
+  if (verbosity === "extended") {
+    const detail = "Failures are surfaced as NOT_CERTIFIED/FAIL statuses in the viability snapshot and any missing or failed constraints are kept with the certificate record.";
+    return [summary, pipeline, detail, inPractice].filter(Boolean).join("\n\n");
+  }
+  return [summary, pipeline, inPractice].filter(Boolean).join("\n\n");
+}
+
+function buildHelixAskPipelineEvidence(): string {
+  const sources = [
+    "docs/helix-ask-flow.md",
+    "server/routes/agi.plan.ts",
+    "server/services/helix-ask/intent-directory.ts",
+    "server/services/helix-ask/topic.ts",
+    "server/services/helix-ask/query.ts",
+    "server/services/helix-ask/format.ts",
+    "server/services/helix-ask/envelope.ts",
+    "client/src/components/helix/HelixAskPill.tsx",
+  ];
+  return sources.map((source) => `source: ${source}`).join("\n");
+}
+
+function buildHelixAskPipelineAnswer(): string {
+  const steps = [
+    "Route intent + topic (server/services/helix-ask/intent-directory.ts, server/services/helix-ask/topic.ts).",
+    "Gather repo context and evaluate evidence eligibility (server/routes/agi.plan.ts, server/services/helix-ask/query.ts).",
+    "Distill evidence and resolve format (server/services/helix-ask/format.ts).",
+    "Synthesize the answer and repair citations if needed (server/routes/agi.plan.ts).",
+    "Package the response envelope and render in the UI (server/services/helix-ask/envelope.ts, client/src/components/helix/HelixAskPill.tsx).",
+  ];
+  return steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+}
+
+function buildHelixAskIdeologyAnswer(conceptMatch: HelixAskConceptMatch): string {
+  const core: string[] = [];
+  if (conceptMatch.card.definition) {
+    core.push(ensureSentence(conceptMatch.card.definition));
+  }
+  if (conceptMatch.card.keyQuestions) {
+    core.push(ensureSentence(`Key questions include: ${conceptMatch.card.keyQuestions}`));
+  }
+  const paragraph1 = core.join(" ").trim();
+  const paragraph2 = conceptMatch.card.notes ? ensureSentence(conceptMatch.card.notes) : "";
+  return [paragraph1, paragraph2].filter(Boolean).join("\n\n");
+}
+const formatConstraintStatus = (pass: boolean) => (pass ? "PASS" : "FAIL");
+
+function buildNoiseFieldEvidence(): ConstraintEvidenceResult {
+  const result = runNoiseFieldLoop({});
+  const last = result.attempts[result.attempts.length - 1];
+  const gate = last?.gate;
+  const constraints = last?.constraints as { laplacianRms?: number; laplacianMaxAbs?: number } | undefined;
+  const status = gate?.status === "pass";
+  const lines = [
+    "gate:noise-field",
+    `status: ${formatConstraintStatus(status)}`,
+    `residuals: laplacianRms=${constraints?.laplacianRms ?? "n/a"}, laplacianMaxAbs=${constraints?.laplacianMaxAbs ?? "n/a"}`,
+    "source: modules/analysis/noise-field-loop.ts",
+  ];
+  return { evidenceText: lines.join("\n"), refs: ["gate:noise-field", "modules/analysis/noise-field-loop.ts"] };
+}
+
+function buildDiffusionEvidence(): ConstraintEvidenceResult {
+  const result = runImageDiffusionLoop({});
+  const last = result.attempts[result.attempts.length - 1];
+  const gate = last?.gate;
+  const constraints = last?.constraints as { scoreRms?: number; fidelityRms?: number } | undefined;
+  const status = gate?.status === "pass";
+  const lines = [
+    "gate:diffusion-field",
+    `status: ${formatConstraintStatus(status)}`,
+    `residuals: scoreRms=${constraints?.scoreRms ?? "n/a"}, fidelityRms=${constraints?.fidelityRms ?? "n/a"}`,
+    "source: modules/analysis/diffusion-loop.ts",
+  ];
+  return { evidenceText: lines.join("\n"), refs: ["gate:diffusion-field", "modules/analysis/diffusion-loop.ts"] };
+}
+
+function buildBeliefGraphEvidence(): ConstraintEvidenceResult {
+  const result = runBeliefGraphLoop({});
+  const last = result.attempts[result.attempts.length - 1];
+  const gate = last?.gate;
+  const constraints = last?.constraints as { violationCount?: number; violationWeight?: number; axiomViolations?: number } | undefined;
+  const status = gate?.status === "pass";
+  const lines = [
+    "gate:belief-graph",
+    `status: ${formatConstraintStatus(status)}`,
+    `violations: count=${constraints?.violationCount ?? "n/a"}, weight=${constraints?.violationWeight ?? "n/a"}, axiom=${constraints?.axiomViolations ?? "n/a"}`,
+    "source: modules/analysis/belief-graph-loop.ts",
+  ];
+  return { evidenceText: lines.join("\n"), refs: ["gate:belief-graph", "modules/analysis/belief-graph-loop.ts"] };
+}
+
+async function buildGrViabilityEvidence(): Promise<ConstraintEvidenceResult> {
+  const state = getGlobalPipelineState();
+  const diagnostics = state?.gr ?? null;
+  const evaluation = await runGrEvaluation({
+    diagnostics,
+    warpConfig: {},
+    useLiveSnapshot: true,
+  });
+  const cert = evaluation.certificate;
+  const status = evaluation.evaluation.pass;
+  const certRef = cert.certificateHash
+    ? `certificate:warp-viability:${cert.certificateHash.slice(0, 12)}`
+    : "certificate:warp-viability:missing";
+  const lines = [
+    "gate:gr-constraint",
+    `status: ${formatConstraintStatus(status)}`,
+    `constraints: ${evaluation.evaluation.constraints.length} items`,
+    `certificate: ${certRef}`,
+    `integrity_ok: ${evaluation.integrityOk}`,
+    "source: server/gr/gr-evaluation.ts",
+    "source: server/gr/gr-constraint-policy.ts",
+    "source: server/routes/warp-viability.ts",
+    "source: server/skills/physics.warp.viability.ts",
+    "source: server/helix-core.ts",
+    "source: server/services/observability/training-trace-store.ts",
+  ];
+  return {
+    evidenceText: lines.join("\n"),
+    refs: [
+      certRef,
+      "gate:gr-constraint",
+      "server/gr/gr-evaluation.ts",
+      "server/gr/gr-constraint-policy.ts",
+      "server/routes/warp-viability.ts",
+      "server/skills/physics.warp.viability.ts",
+      "server/helix-core.ts",
+      "server/services/observability/training-trace-store.ts",
+    ],
+  };
+}
+
+function buildHelixAskCitationRepairPrompt(
+  question: string,
+  answer: string,
+  evidence: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = [
+    "You are Helix Ask citation fixer.",
+    "Revise the answer to include citations (file paths, prompt chunk ids, or gate/certificate ids) from the evidence list.",
+    "Do not add new claims or steps. Preserve the format and wording as much as possible.",
+  ];
+  if (format === "steps") {
+    lines.push("Keep the numbered step list and the trailing \"In practice,\" paragraph.");
+    if (stageTags) {
+      lines.push("Preserve any stage tags already present.");
+    }
+  } else {
+    lines.push("Keep the paragraph format; do not introduce numbered steps.");
+  }
+  lines.push("Use only citation identifiers that appear in the evidence list.");
+  lines.push("");
+  lines.push("Evidence:");
+  lines.push(evidence || "No evidence available.");
+  lines.push("");
+  lines.push("Answer:");
+  lines.push(answer);
+  lines.push("");
+  lines.push("FINAL:");
+  return lines.join("\n");
+}
+
+const HelixAskTuningOverrides = z
+  .object({
+    arbiter_repo_ratio: z.coerce.number().min(0.05).max(0.95).optional(),
+    arbiter_hybrid_ratio: z.coerce.number().min(0.05).max(0.95).optional(),
+    retrieval_retry_topk_bonus: z.coerce.number().int().min(0).max(20).optional(),
+    scaffold_tokens: z.coerce.number().int().min(64).max(2048).optional(),
+    evidence_tokens: z.coerce.number().int().min(64).max(768).optional(),
+    repair_tokens: z.coerce.number().int().min(64).max(512).optional(),
+    format_enforcement: z.enum(["strict", "relaxed"]).optional(),
+    soft_expansion: z.coerce.number().int().min(0).max(2).optional(),
+  })
+  .partial();
+
+  const LocalAskRequest = z
   .object({
     prompt: z.string().min(1).optional(),
     question: z.string().min(1).optional(),
+    debug: z.boolean().optional(),
+    dryRun: z.boolean().optional(),
+    verbosity: z.enum(["brief", "normal", "extended"]).optional(),
     searchQuery: z.string().optional(),
     topK: z.coerce.number().int().min(1).max(48).optional(),
     context: z.string().optional(),
@@ -2725,12 +5897,128 @@ const LocalAskRequest = z
     seed: z.coerce.number().int().nonnegative().optional(),
     stop: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
     sessionId: z.string().min(1).max(128).optional(),
+    traceId: z.string().min(1).max(128).optional(),
     personaId: z.string().min(1).optional(),
+    tuning: HelixAskTuningOverrides.optional(),
   })
   .refine((value) => Boolean(value.prompt || value.question), {
     message: "prompt or question required",
     path: ["prompt"],
   });
+
+const LUMA_MOOD_VALUES = ["mad", "upset", "shock", "question", "happy", "friend", "love"] as const;
+type LumaMood = (typeof LUMA_MOOD_VALUES)[number];
+const LumaMoodSchema = z.enum(LUMA_MOOD_VALUES);
+
+const MoodHintRequest = z.object({
+  text: z.string().min(1, "text required"),
+  sessionId: z.string().min(1).max(128).optional(),
+  personaId: z.string().min(1).optional(),
+});
+
+const MoodHintPayloadSchema = z.object({
+  mood: LumaMoodSchema.nullable().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  reason: z.string().min(1).optional(),
+});
+
+const HELIX_MOOD_HINT_MAX_CHARS = clampNumber(
+  readNumber(
+    process.env.HELIX_MOOD_HINT_MAX_CHARS ?? process.env.VITE_HELIX_MOOD_HINT_MAX_CHARS,
+    600,
+  ),
+  120,
+  2400,
+);
+const HELIX_MOOD_HINT_MAX_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_MOOD_HINT_MAX_TOKENS ?? process.env.VITE_HELIX_MOOD_HINT_MAX_TOKENS,
+    48,
+  ),
+  8,
+  256,
+);
+const HELIX_MOOD_HINT_TEMP = clampNumber(
+  readNumber(process.env.HELIX_MOOD_HINT_TEMP ?? process.env.VITE_HELIX_MOOD_HINT_TEMP, 0.1),
+  0,
+  1,
+);
+
+function clamp01(value: number | undefined, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.min(1, value));
+}
+
+function coerceLumaMood(value: unknown): LumaMood | null {
+  if (typeof value !== "string") return null;
+  const lowered = value.trim().toLowerCase();
+  return LUMA_MOOD_VALUES.includes(lowered as LumaMood) ? (lowered as LumaMood) : null;
+}
+
+function extractJsonObject(text: string): string | null {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return null;
+  return text.slice(start, end + 1);
+}
+
+function buildMoodHintPrompt(text: string): string {
+  const clipped = text.slice(0, HELIX_MOOD_HINT_MAX_CHARS);
+  const lines: string[] = [];
+  lines.push("You are a fast mood classifier for UI theming.");
+  lines.push(
+    `Choose exactly one mood from: ${LUMA_MOOD_VALUES.join(", ")}. Use question for neutral prompts.`,
+  );
+  lines.push(
+    "Return strict JSON only: {\"mood\":\"<mood|null>\",\"confidence\":0..1,\"reason\":\"short\"}.",
+  );
+  lines.push("If unclear, use mood null with low confidence.");
+  lines.push("");
+  lines.push("Text:");
+  lines.push(clipped);
+  return lines.join("\n");
+}
+
+function parseMoodHintResult(raw: string): {
+  mood: LumaMood | null;
+  confidence: number;
+  reason: string | null;
+} {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { mood: null, confidence: 0, reason: null };
+  }
+
+  const jsonCandidate = extractJsonObject(trimmed) ?? trimmed;
+  try {
+    const parsed = MoodHintPayloadSchema.safeParse(JSON.parse(jsonCandidate));
+    if (parsed.success) {
+      const mood = coerceLumaMood(parsed.data.mood ?? null);
+      const confidence = clamp01(parsed.data.confidence, mood ? 0.6 : 0.2);
+      const reason = parsed.data.reason?.trim() ?? null;
+      return { mood, confidence, reason };
+    }
+  } catch {
+    // Fall through to token parsing.
+  }
+
+  const lowered = trimmed.toLowerCase();
+  const mood =
+    LUMA_MOOD_VALUES.find((entry) => new RegExp(`\\b${entry}\\b`, "i").test(lowered)) ?? null;
+  return {
+    mood,
+    confidence: mood ? 0.35 : 0.1,
+    reason: mood ? "token-match" : null,
+  };
+}
+
+type LocalAskResult = {
+  text?: string;
+  prompt_ingested?: boolean;
+  prompt_ingest_source?: string;
+  prompt_ingest_reason?: string;
+  [key: string]: unknown;
+};
 
 const ExecuteRequest = z.object({
   traceId: z.string().min(8, "traceId required"),
@@ -2742,6 +6030,16 @@ const ToolLogsQuery = z.object({
   tool: z
     .string()
     .min(1, "tool name required")
+    .transform((value) => value.trim())
+    .optional(),
+  sessionId: z
+    .string()
+    .min(1, "sessionId required")
+    .transform((value) => value.trim())
+    .optional(),
+  traceId: z
+    .string()
+    .min(1, "traceId required")
     .transform((value) => value.trim())
     .optional(),
 });
@@ -3465,6 +6763,82 @@ planRouter.post("/stt/local", async (req, res) => {
   return proxyBinaryPost(LOCAL_STT_URL, LOCAL_STT_TIMEOUT_MS, req, res, "local_stt");
 });
 
+planRouter.post("/mood-hint", async (req, res) => {
+  const tenantGuard = guardTenant(req);
+  if (!tenantGuard.ok) {
+    return res.status(tenantGuard.status).json({ error: tenantGuard.error });
+  }
+  const parsed = MoodHintRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+
+  let personaId = parsed.data.personaId ?? "default";
+  if (
+    personaPolicy.shouldRestrictRequest(req.auth) &&
+    (!personaId || personaId === "default") &&
+    req.auth?.sub
+  ) {
+    personaId = req.auth.sub;
+  }
+  if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+
+  const text = parsed.data.text.trim();
+  if (!text) {
+    return res.status(400).json({ error: "bad_request", details: "text required" });
+  }
+
+  const sessionId = parsed.data.sessionId?.trim() || undefined;
+  const traceId = `mood:${crypto.randomUUID()}`;
+  const startedAt = Date.now();
+  const prompt = buildMoodHintPrompt(text);
+
+  try {
+    const result = await llmLocalHandler(
+      {
+        prompt,
+        max_tokens: HELIX_MOOD_HINT_MAX_TOKENS,
+        temperature: HELIX_MOOD_HINT_TEMP,
+        stop: ["\n\n"],
+        metadata: { kind: "helix.mood_hint" },
+      },
+      {
+        sessionId,
+        traceId,
+        personaId,
+        tenantId: tenantGuard.tenantId,
+      },
+    );
+    const raw = String((result as any)?.text ?? "");
+    const parsedHint = parseMoodHintResult(raw);
+    const rawPreview = raw.trim().slice(0, 320);
+    return res.json({
+      mood: parsedHint.mood,
+      confidence: parsedHint.confidence,
+      reason: parsedHint.reason,
+      source: "local-llm",
+      durationMs: Math.max(0, Date.now() - startedAt),
+      traceId,
+      sessionId: sessionId ?? null,
+      raw: rawPreview || null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.json({
+      mood: null,
+      confidence: 0,
+      reason: message || "mood_hint_failed",
+      source: "error",
+      durationMs: Math.max(0, Date.now() - startedAt),
+      traceId,
+      sessionId: sessionId ?? null,
+      raw: null,
+    });
+  }
+});
+
 planRouter.post("/ask", async (req, res) => {
   const parsed = LocalAskRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -3477,38 +6851,2289 @@ planRouter.post("/ask", async (req, res) => {
   if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
     return res.status(403).json({ error: "forbidden" });
   }
+  const askSessionId = parsed.data.sessionId;
+  const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
+  const dryRun = parsed.data.dryRun === true;
+  const debugEnabled = parsed.data.debug === true;
+  const HELIX_ASK_EVENT_HISTORY_LIMIT = clampNumber(
+    readNumber(process.env.HELIX_ASK_EVENT_HISTORY_LIMIT, 90),
+    20,
+    240,
+  );
+  const captureLiveHistory = debugEnabled || process.env.HELIX_ASK_LIVE_HISTORY_ALWAYS === "1";
+  const liveEventHistory: Array<{
+    ts: string;
+    tool: string;
+    stage: string;
+    detail?: string;
+    ok?: boolean;
+    durationMs?: number;
+    text?: string;
+  }> = [];
+  const pushLiveEvent = (entry: {
+    tool: string;
+    stage: string;
+    detail?: string;
+    ok?: boolean;
+    durationMs?: number;
+    text?: string;
+  }): void => {
+    if (!captureLiveHistory) return;
+    liveEventHistory.push({
+      ts: new Date().toISOString(),
+      ...entry,
+    });
+    if (liveEventHistory.length > HELIX_ASK_EVENT_HISTORY_LIMIT) {
+      liveEventHistory.splice(0, liveEventHistory.length - HELIX_ASK_EVENT_HISTORY_LIMIT);
+    }
+  };
+  const logProgress = (stage: string, detail?: string, startedAt?: number, ok?: boolean): void => {
+    logHelixAskProgress({
+      stage,
+      detail,
+      sessionId: askSessionId,
+      traceId: askTraceId,
+      startedAt,
+      ok,
+    });
+    const cleanedDetail = detail?.trim();
+    const label = cleanedDetail ? `Helix Ask: ${stage} - ${cleanedDetail}` : `Helix Ask: ${stage}`;
+    pushLiveEvent({
+      tool: HELIX_ASK_PROGRESS_TOOL,
+      stage,
+      detail: cleanedDetail,
+      ok,
+      durationMs: typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0,
+      text: clipEventText(label),
+    });
+  };
+  const HELIX_ASK_EVENT_TOOL = "helix.ask.event";
+  const HELIX_ASK_EVENT_VERSION = "v1";
+  const HELIX_ASK_EVENT_MAX_CHARS = clampNumber(
+    readNumber(
+      process.env.HELIX_ASK_EVENT_MAX_CHARS ?? process.env.VITE_HELIX_ASK_EVENT_MAX_CHARS,
+      1400,
+    ),
+    240,
+    8000,
+  );
+  const HELIX_ASK_EVENT_FILE_LIMIT = 14;
+  const clipEventText = (value?: string): string | undefined => {
+    if (!value) return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.length <= HELIX_ASK_EVENT_MAX_CHARS) return trimmed;
+    return `${trimmed.slice(0, Math.max(0, HELIX_ASK_EVENT_MAX_CHARS - 3))}...`;
+  };
+  const formatFileList = (files: string[] | undefined): string | undefined => {
+    if (!files || files.length === 0) return undefined;
+    const unique = Array.from(
+      new Set(
+        files
+          .map((entry) => entry?.trim())
+          .filter((entry): entry is string => Boolean(entry)),
+      ),
+    );
+    if (unique.length === 0) return undefined;
+    const preview = unique.slice(0, HELIX_ASK_EVENT_FILE_LIMIT);
+    const remainder = unique.length - preview.length;
+    const body = preview.map((entry) => `- ${entry}`).join("\n");
+    return remainder > 0 ? `${body}\n- ...and ${remainder} more` : body;
+  };
+  const logEvent = (
+    stage: string,
+    detail?: string,
+    text?: string,
+    startedAt?: number,
+    ok = true,
+  ): void => {
+    if (!askSessionId) return;
+    const cleanedDetail = detail?.trim();
+    const header = cleanedDetail ? `Helix Ask: ${stage} - ${cleanedDetail}` : `Helix Ask: ${stage}`;
+    const body = clipEventText(text);
+    appendToolLog({
+      tool: HELIX_ASK_EVENT_TOOL,
+      version: HELIX_ASK_EVENT_VERSION,
+      paramsHash: hashHelixAskProgress(`event:${stage}:${cleanedDetail ?? ""}`),
+      durationMs: typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0,
+      sessionId: askSessionId,
+      traceId: askTraceId,
+      ok,
+      text: body ? `${header}\n${body}` : header,
+    });
+    pushLiveEvent({
+      tool: HELIX_ASK_EVENT_TOOL,
+      stage,
+      detail: cleanedDetail,
+      ok,
+      durationMs: typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0,
+      text: body ? `${header}\n${body}` : header,
+    });
+  };
+  const streamEmitter = createHelixAskStreamEmitter({ sessionId: askSessionId, traceId: askTraceId });
   try {
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
-    const autoPrompt = !prompt && Boolean(question);
-    if (!prompt && question) {
-      const context =
-        parsed.data.context?.trim() ||
-        (await buildAskContext(question, parsed.data.searchQuery, parsed.data.topK));
-      prompt = ensureFinalMarker(buildGroundedAskPrompt(question, context));
+    let questionValue = question;
+    const tuningOverrides = HELIX_ASK_SWEEP_OVERRIDES ? parsed.data.tuning : undefined;
+    const arbiterRepoRatio = clampNumber(
+      typeof tuningOverrides?.arbiter_repo_ratio === "number"
+        ? tuningOverrides.arbiter_repo_ratio
+        : HELIX_ASK_ARBITER_REPO_RATIO,
+      0.05,
+      0.95,
+    );
+    const arbiterHybridRatio = clampNumber(
+      typeof tuningOverrides?.arbiter_hybrid_ratio === "number"
+        ? tuningOverrides.arbiter_hybrid_ratio
+        : HELIX_ASK_ARBITER_HYBRID_RATIO,
+      0.05,
+      0.95,
+    );
+    const retryTopKBonus = clampNumber(
+      typeof tuningOverrides?.retrieval_retry_topk_bonus === "number"
+        ? tuningOverrides.retrieval_retry_topk_bonus
+        : HELIX_ASK_RETRIEVAL_RETRY_TOPK_BONUS,
+      0,
+      20,
+    );
+    const scaffoldTokens = clampNumber(
+      typeof tuningOverrides?.scaffold_tokens === "number"
+        ? tuningOverrides.scaffold_tokens
+        : HELIX_ASK_SCAFFOLD_TOKENS,
+      64,
+      2048,
+    );
+    const evidenceTokens = clampNumber(
+      typeof tuningOverrides?.evidence_tokens === "number"
+        ? tuningOverrides.evidence_tokens
+        : HELIX_ASK_EVIDENCE_TOKENS,
+      64,
+      768,
+    );
+    const repairTokens = clampNumber(
+      typeof tuningOverrides?.repair_tokens === "number"
+        ? tuningOverrides.repair_tokens
+        : HELIX_ASK_REPAIR_TOKENS,
+      64,
+      512,
+    );
+    const formatEnforcementLevel =
+      (tuningOverrides?.format_enforcement ?? HELIX_ASK_FORMAT_ENFORCEMENT_LEVEL) === "relaxed"
+        ? "relaxed"
+        : "strict";
+    let softExpansionBudget = clampNumber(
+      typeof tuningOverrides?.soft_expansion === "number"
+        ? tuningOverrides.soft_expansion
+        : HELIX_ASK_SOFT_EXPANSION_MAX_SENTENCES,
+      0,
+      2,
+    );
+    const debugPayload: {
+      two_pass: boolean;
+      micro_pass?: boolean;
+      micro_pass_auto?: boolean;
+      micro_pass_reason?: string;
+      scaffold?: string;
+      evidence_cards?: string;
+      query_hints?: string[];
+      queries?: string[];
+      context_files?: string[];
+      prompt_ingested?: boolean;
+      prompt_ingest_source?: string;
+      prompt_ingest_reason?: string;
+      prompt_chunk_count?: number;
+      prompt_selected?: number;
+      prompt_context_files?: string[];
+      topic_tags?: string[];
+      composite_synthesis?: boolean;
+      composite_topics?: string[];
+      topic_tier?: number;
+      topic_must_include_ok?: boolean;
+      viability_must_include_ok?: boolean;
+      concept_id?: string;
+      concept_label?: string;
+      concept_source?: string;
+      math_solver_ok?: boolean;
+      math_solver_kind?: string;
+      math_solver_final?: string;
+      math_solver_reason?: string;
+      math_solver_variable?: string;
+      math_solver_gate_pass?: boolean;
+      math_solver_gate_reason?: string;
+      math_solver_domain_pass?: boolean;
+      math_solver_residual_pass?: boolean;
+      math_solver_residual_max?: number;
+      math_solver_registry_id?: string;
+      math_solver_selected_solution?: string;
+      math_solver_admissible_count?: number;
+      intent_id?: string;
+      intent_domain?: string;
+      intent_tier?: string;
+      intent_secondary_tier?: string;
+      intent_strategy?: string;
+      intent_reason?: string;
+      tuning_enabled?: boolean;
+      arbiter_repo_ratio?: number;
+      arbiter_hybrid_ratio?: number;
+      retry_topk_bonus?: number;
+      format_enforcement?: "strict" | "relaxed";
+      soft_expansion?: number;
+      scaffold_tokens?: number;
+      evidence_tokens?: number;
+      repair_tokens?: number;
+      arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
+      arbiter_reason?: string;
+      arbiter_strictness?: "low" | "med" | "high";
+      arbiter_user_expects_repo?: boolean;
+      requires_repo_evidence?: boolean;
+      explicit_repo_expectation?: boolean;
+      repo_expectation_score?: number;
+      repo_expectation_level?: "low" | "medium" | "high";
+      repo_expectation_signals?: string[];
+      plan_pass_used?: boolean;
+      plan_pass_forced?: boolean;
+      plan_directives?: HelixAskPlanDirectives;
+      clarify_triggered?: boolean;
+      obligation_violation?: boolean;
+      context_deferred?: boolean;
+      arbiter_repo_ok?: boolean;
+      arbiter_hybrid_ok?: boolean;
+      verification_anchor_required?: boolean;
+      verification_anchor_ok?: boolean;
+      evidence_gate_ok?: boolean;
+      evidence_match_ratio?: number;
+      evidence_match_count?: number;
+      evidence_token_count?: number;
+      retrieval_confidence?: number;
+      retrieval_doc_share?: number;
+      retrieval_doc_hits?: number;
+      retrieval_context_file_count?: number;
+      retrieval_query_hit_count?: number;
+      retrieval_top_score?: number;
+      retrieval_score_gap?: number;
+      retrieval_channel_hits?: AskCandidateChannelStats;
+      retrieval_channel_top_scores?: AskCandidateChannelStats;
+      slot_coverage_required?: string[];
+      slot_coverage_missing?: string[];
+      slot_coverage_ratio?: number;
+      slot_coverage_ok?: boolean;
+      plan_must_include_ok?: boolean;
+      constraint_evidence?: string;
+      citation_repair?: boolean;
+      format?: HelixAskFormat;
+      stage_tags?: boolean;
+      verbosity?: HelixAskVerbosity;
+      junk_clean_applied?: boolean;
+      junk_clean_reasons?: string[];
+      concept_lint_applied?: boolean;
+      concept_lint_reasons?: string[];
+      physics_lint_applied?: boolean;
+      physics_lint_reasons?: string[];
+      coverage_token_count?: number;
+      coverage_key_count?: number;
+      coverage_missing_key_count?: number;
+      coverage_ratio?: number;
+      coverage_missing_keys?: string[];
+      coverage_gate_applied?: boolean;
+      coverage_gate_reason?: string;
+      belief_claim_count?: number;
+      belief_supported_count?: number;
+      belief_unsupported_count?: number;
+      belief_unsupported_rate?: number;
+      belief_contradictions?: number;
+      belief_gate_applied?: boolean;
+      belief_gate_reason?: string;
+      rattling_score?: number;
+      rattling_gate_applied?: boolean;
+      answer_path?: string[];
+      live_events?: Array<{
+        ts: string;
+        tool: string;
+        stage: string;
+        detail?: string;
+        ok?: boolean;
+        durationMs?: number;
+        text?: string;
+      }>;
+    } | undefined = debugEnabled
+      ? { two_pass: false, micro_pass: false }
+      : undefined;
+    if (debugPayload) {
+      debugPayload.tuning_enabled = Boolean(tuningOverrides);
+      debugPayload.arbiter_repo_ratio = arbiterRepoRatio;
+      debugPayload.arbiter_hybrid_ratio = arbiterHybridRatio;
+      debugPayload.retry_topk_bonus = retryTopKBonus;
+      debugPayload.format_enforcement = formatEnforcementLevel;
+      debugPayload.soft_expansion = softExpansionBudget;
+      debugPayload.scaffold_tokens = scaffoldTokens;
+      debugPayload.evidence_tokens = evidenceTokens;
+      debugPayload.repair_tokens = repairTokens;
+    }
+    const answerPath: string[] = [];
+    if (!questionValue && prompt) {
+      const extracted = extractQuestionFromPrompt(prompt);
+      if (extracted) {
+        questionValue = extracted;
+      }
+    }
+    const baseQuestion = (questionValue ?? question ?? "").trim();
+    const hasFilePathHints = HELIX_ASK_FILE_HINT.test(baseQuestion);
+    const explicitRepoExpectation =
+      hasFilePathHints ||
+      HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
+      HELIX_ASK_REPO_EXPECTS.test(baseQuestion);
+    const topicTags = inferHelixAskTopicTags(baseQuestion, parsed.data.searchQuery);
+    const repoNativeTags = new Set([
+      "helix_ask",
+      "warp",
+      "ideology",
+      "ledger",
+      "star",
+      "constraints",
+    ]);
+    const repoExpectationSignals: string[] = [];
+    let repoExpectationScore = 0;
+    if (explicitRepoExpectation) {
+      repoExpectationScore = 3;
+      repoExpectationSignals.push("explicit_repo");
+    }
+    if (hasFilePathHints) {
+      repoExpectationScore = Math.max(repoExpectationScore, 3);
+      repoExpectationSignals.push("file_path");
+    }
+    const tagSignals = topicTags.filter((tag) => repoNativeTags.has(tag));
+    if (tagSignals.length) {
+      repoExpectationScore = Math.max(repoExpectationScore, 2);
+      repoExpectationSignals.push(...tagSignals.map((tag) => `tag:${tag}`));
+    }
+    if (HELIX_ASK_REPO_HINT.test(baseQuestion)) {
+      repoExpectationScore = Math.max(repoExpectationScore, 1);
+      repoExpectationSignals.push("repo_hint");
+    }
+    const repoExpectationLevel =
+      repoExpectationScore >= 3
+        ? "high"
+        : repoExpectationScore >= 2
+          ? "medium"
+          : "low";
+    let requiresRepoEvidence = explicitRepoExpectation;
+    const hasRepoHints =
+      explicitRepoExpectation ||
+      HELIX_ASK_REPO_HINT.test(baseQuestion) ||
+      repoExpectationLevel !== "low";
+    if (debugPayload) {
+      debugPayload.explicit_repo_expectation = explicitRepoExpectation;
+      debugPayload.repo_expectation_score = repoExpectationScore;
+      debugPayload.repo_expectation_level = repoExpectationLevel;
+      debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
+    }
+    if (explicitRepoExpectation) {
+      logEvent("Obligation", "requires_repo", baseQuestion);
+    }
+    if (repoExpectationLevel !== "low") {
+      logEvent(
+        "Repo expectation",
+        repoExpectationLevel,
+        repoExpectationSignals.length ? repoExpectationSignals.join(", ") : undefined,
+      );
+    }
+    const topicProfile = buildHelixAskTopicProfile(topicTags);
+    const intentMatch = matchHelixAskIntent({
+      question: baseQuestion,
+      hasRepoHints,
+      hasFilePathHints,
+    });
+    const compositeRequest = shouldHelixAskCompositeSynthesis(baseQuestion, topicTags);
+    const originalIntentProfile = intentMatch.profile;
+    let intentProfile = intentMatch.profile;
+    let intentReasonBase = intentMatch.reason;
+    let compositeApplied = false;
+    let compositeRequiredFiles: string[] = [];
+    if (compositeRequest.enabled) {
+      const compositeProfile = getHelixAskIntentProfileById(
+        "hybrid.composite_system_synthesis",
+      );
+      if (compositeProfile) {
+        const compositeReason = `composite:${intentProfile.id}`;
+        intentProfile = compositeProfile;
+        intentReasonBase = `${intentReasonBase}|${compositeReason}`;
+        compositeApplied = true;
+        compositeRequiredFiles = collectCompositeMustIncludeFiles(compositeRequest.topics);
+      }
+    }
+    if (requiresRepoEvidence && intentProfile.domain === "general") {
+      const fallbackProfile = resolveFallbackIntentProfile("hybrid");
+      intentProfile = fallbackProfile;
+      intentReasonBase = `${intentReasonBase}|obligation:repo_required`;
+      logEvent("Fallback", "obligation -> hybrid", intentReasonBase);
+    }
+    if (!requiresRepoEvidence && repoExpectationLevel !== "low" && intentProfile.domain === "general") {
+      const fallbackProfile = resolveFallbackIntentProfile("hybrid");
+      intentProfile = fallbackProfile;
+      intentReasonBase = `${intentReasonBase}|expectation:${repoExpectationLevel}`;
+      logEvent("Fallback", "repo_expectation -> hybrid", `level=${repoExpectationLevel}`);
+    }
+    let intentDomain = intentProfile.domain;
+    let intentTier = intentProfile.tier;
+    let intentSecondaryTier = intentProfile.secondaryTier;
+    let intentStrategy = intentProfile.strategy;
+    let formatSpec = resolveHelixAskFormat(baseQuestion, intentProfile, debugEnabled);
+    if (hasTwoParagraphContract(baseQuestion)) {
+      formatSpec = { format: "compare", stageTags: false };
+    }
+    if (intentStrategy === "hybrid_explain" && formatSpec.format !== "steps") {
+      formatSpec = { ...formatSpec, stageTags: false };
+    }
+    const compositeConstraintRequested =
+      compositeRequest.enabled &&
+      (originalIntentProfile.strategy === "constraint_report" ||
+        HELIX_ASK_VIABILITY_FOCUS.test(baseQuestion));
+    if (compositeConstraintRequested) {
+      intentSecondaryTier = "F3";
+    }
+    const verbosity = resolveHelixAskVerbosity(
+      baseQuestion,
+      intentProfile,
+      parsed.data.verbosity as HelixAskVerbosity | undefined,
+    );
+    let intentReason = intentReasonBase;
+    if (compositeConstraintRequested) {
+      intentReason = `${intentReason}|composite:constraint`;
+    }
+    const updateIntentDebug = () => {
+      if (!debugPayload) return;
+      debugPayload.format = formatSpec.format;
+      debugPayload.stage_tags = formatSpec.stageTags;
+      debugPayload.verbosity = verbosity;
+      if (topicTags.length > 0) {
+        debugPayload.topic_tags = topicTags.slice();
+      }
+      if (compositeApplied) {
+        debugPayload.composite_synthesis = true;
+        if (compositeRequest.topics.length > 0) {
+          debugPayload.composite_topics = compositeRequest.topics.slice();
+        }
+      }
+      debugPayload.intent_id = intentProfile.id;
+      debugPayload.intent_domain = intentDomain;
+      debugPayload.intent_tier = intentTier;
+      debugPayload.intent_secondary_tier = intentSecondaryTier;
+      debugPayload.intent_strategy = intentStrategy;
+      debugPayload.intent_reason = intentReason;
+    };
+    updateIntentDebug();
+    logEvent(
+      "Intent resolved",
+      "ok",
+      [
+        `id=${intentProfile.id}`,
+        `domain=${intentDomain}`,
+        `tier=${intentTier}`,
+        intentSecondaryTier ? `secondary=${intentSecondaryTier}` : "",
+        `strategy=${intentStrategy}`,
+        `reason=${intentReason}`,
+      ]
+        .filter(Boolean)
+        .join(" | "),
+    );
+    answerPath.push(`intent:${intentProfile.id}`);
+    answerPath.push(`domain:${intentDomain}`);
+    answerPath.push(`strategy:${intentStrategy}`);
+    if (compositeApplied) {
+      answerPath.push("composite:enabled");
+    }
+    let contextText = parsed.data.context?.trim() ?? "";
+    if (!contextText && prompt) {
+      contextText = extractContextFromPrompt(prompt);
+    }
+    let contextFiles = extractFilePathsFromText(contextText);
+    let isRepoQuestion =
+      intentProfile.evidencePolicy.allowRepoCitations &&
+      (intentDomain === "repo" || intentDomain === "hybrid");
+    if (intentStrategy === "constraint_report") {
+      isRepoQuestion = false;
+    }
+    const longPromptCandidate = resolveLongPromptCandidate({
+      prompt,
+      question: baseQuestion,
+      contextText,
+      hasQuestion: Boolean(questionValue ?? question),
+    });
+    const answerTokenBudget = Math.min(parsed.data.max_tokens ?? scaffoldTokens, 8192);
+    let promptIngested = false;
+    let promptIngestReason: string | undefined;
+    let promptIngestSource: string | undefined;
+    let promptContextText = "";
+    let promptContextFiles: string[] = [];
+    let promptChunkCount = 0;
+    let promptSelectedCount = 0;
+    if (longPromptCandidate) {
+      const estimatedTokens = estimateTokenCount(longPromptCandidate.text);
+      const estimatedTotal = estimatedTokens + answerTokenBudget + HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS;
+      if (
+        estimatedTokens >= HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS ||
+        estimatedTotal > HELIX_ASK_LOCAL_CONTEXT_TOKENS
+      ) {
+        promptIngested = true;
+        promptIngestReason =
+          estimatedTokens >= HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS ? "threshold" : "overflow";
+        promptIngestSource = longPromptCandidate.source;
+        const ingestStart = Date.now();
+        logProgress("Prompt ingest", "chunking", ingestStart);
+        const ingestResult = buildLongPromptContext(
+          longPromptCandidate.text,
+          baseQuestion || longPromptCandidate.text.slice(0, 200),
+          {
+            chunkTokens: HELIX_ASK_LONGPROMPT_CHUNK_TOKENS,
+            overlapTokens: HELIX_ASK_LONGPROMPT_CHUNK_OVERLAP,
+            topK: HELIX_ASK_LONGPROMPT_TOPK_CANDIDATES,
+            topM: Math.min(HELIX_ASK_LONGPROMPT_TOPM_SELECTED, HELIX_ASK_LONGPROMPT_MAX_CARDS),
+          },
+        );
+        promptContextText = ingestResult.context;
+        promptContextFiles = ingestResult.files;
+        promptChunkCount = ingestResult.chunkCount;
+        promptSelectedCount = ingestResult.selectedCount;
+        logProgress(
+          "Prompt ingest ready",
+          `${promptSelectedCount} chunks`,
+          ingestStart,
+        );
+        logEvent(
+          "Prompt ingest ready",
+          `${promptSelectedCount} chunks`,
+          formatFileList(promptContextFiles),
+          ingestStart,
+        );
+      }
+    }
+    if (promptIngested && debugPayload) {
+      debugPayload.prompt_ingested = true;
+      debugPayload.prompt_ingest_reason = promptIngestReason;
+      debugPayload.prompt_ingest_source = promptIngestSource;
+      debugPayload.prompt_chunk_count = promptChunkCount;
+      debugPayload.prompt_selected = promptSelectedCount;
+      debugPayload.prompt_context_files = promptContextFiles;
+    }
+    let conceptMatch: HelixAskConceptMatch | null = null;
+    let mathSolveResult: HelixAskMathSolveResult | null = null;
+    let verificationAnchorRequired = false;
+    let verificationAnchorHints: string[] = [];
+    const wantsConceptMatch =
+      intentDomain === "general" ||
+      intentDomain === "hybrid" ||
+      intentProfile.id === "repo.ideology_reference";
+    if (!promptIngested && wantsConceptMatch) {
+      conceptMatch = findConceptMatch(baseQuestion);
+      if (conceptMatch && debugPayload) {
+        debugPayload.concept_id = conceptMatch.card.id;
+        debugPayload.concept_label = conceptMatch.card.label ?? conceptMatch.card.id;
+        debugPayload.concept_source = conceptMatch.card.sourcePath;
+      }
+      if (conceptMatch) {
+        answerPath.push(`concept:${conceptMatch.card.id}`);
+      }
+    }
+    verificationAnchorRequired = shouldRequireVerificationAnchors(
+      intentProfile,
+      baseQuestion,
+      conceptMatch,
+    ) || shouldRequireVerificationAnchors(originalIntentProfile, baseQuestion, conceptMatch);
+    if (verificationAnchorRequired) {
+      verificationAnchorHints = buildVerificationAnchorHints(baseQuestion);
+    }
+    if (debugPayload) {
+      debugPayload.verification_anchor_required = verificationAnchorRequired;
+    }
+    if (!promptIngested && intentDomain === "general" && baseQuestion) {
+      mathSolveResult = await solveHelixAskMathQuestion(baseQuestion);
+      if (mathSolveResult?.ok) {
+        formatSpec = { format: "brief", stageTags: false };
+      }
+      if (debugPayload && mathSolveResult) {
+        debugPayload.math_solver_ok = mathSolveResult.ok;
+        debugPayload.math_solver_kind = mathSolveResult.kind;
+        debugPayload.math_solver_final = mathSolveResult.final;
+        debugPayload.math_solver_reason = mathSolveResult.reason;
+        debugPayload.math_solver_variable = mathSolveResult.variable;
+        debugPayload.math_solver_gate_pass = mathSolveResult.gatePass;
+        debugPayload.math_solver_gate_reason = mathSolveResult.gateReason;
+        debugPayload.math_solver_domain_pass = mathSolveResult.domainPass;
+        debugPayload.math_solver_residual_pass = mathSolveResult.residualPass;
+        debugPayload.math_solver_residual_max = mathSolveResult.residualMax;
+        debugPayload.math_solver_registry_id = mathSolveResult.registryId;
+        debugPayload.math_solver_selected_solution = mathSolveResult.selectedSolution;
+        debugPayload.math_solver_admissible_count = mathSolveResult.admissibleSolutions?.length;
+      }
+    }
+    let forcedAnswer: string | null = null;
+    let evidenceText = "";
+    let constraintEvidenceText = "";
+    let constraintEvidenceRefs: string[] = [];
+    const mathSolverOk = mathSolveResult?.ok === true;
+    if (mathSolveResult && mathSolveResult.ok) {
+      forcedAnswer = buildHelixAskMathAnswer(mathSolveResult);
+      answerPath.push("forcedAnswer:math_solver");
+    }
+    const shouldRunConstraintLoop =
+      intentStrategy === "constraint_report" || compositeConstraintRequested;
+    if (shouldRunConstraintLoop) {
+      const constraintStart = Date.now();
+      const constraintIntentId =
+        intentStrategy === "constraint_report"
+          ? intentProfile.id
+          : originalIntentProfile.strategy === "constraint_report"
+            ? originalIntentProfile.id
+            : "falsifiable.constraints.gr_viability_certificate";
+      const label =
+        intentStrategy === "constraint_report"
+          ? intentProfile.label ?? intentProfile.id
+          : constraintIntentId;
+      logProgress("Constraint loop", label, constraintStart);
+      answerPath.push("constraint:loop");
+      let constraintEvidence: ConstraintEvidenceResult | null = null;
+      if (constraintIntentId.includes("analysis_noise_field")) {
+        constraintEvidence = buildNoiseFieldEvidence();
+      } else if (constraintIntentId.includes("analysis_diffusion_field")) {
+        constraintEvidence = buildDiffusionEvidence();
+      } else if (constraintIntentId.includes("belief_graph_consistency")) {
+        constraintEvidence = buildBeliefGraphEvidence();
+      } else {
+        constraintEvidence = await buildGrViabilityEvidence();
+      }
+      constraintEvidenceText = constraintEvidence?.evidenceText ?? "";
+      constraintEvidenceRefs = constraintEvidence?.refs?.slice() ?? [];
+      if (debugPayload && constraintEvidenceText) {
+        debugPayload.constraint_evidence = constraintEvidenceText;
+      }
+      if (intentStrategy === "constraint_report") {
+        evidenceText = constraintEvidenceText;
+        if (debugPayload) {
+          debugPayload.evidence_cards = evidenceText || undefined;
+          if (constraintEvidenceRefs.length) {
+            debugPayload.context_files = constraintEvidenceRefs.slice();
+          }
+        }
+        if (constraintEvidenceRefs.length) {
+          contextFiles = constraintEvidenceRefs.slice();
+        }
+        if (intentProfile.id.includes("gr_viability_certificate")) {
+          const traceAnswer = buildWarpConstraintAnswer(evidenceText, baseQuestion, verbosity);
+          if (traceAnswer) {
+            forcedAnswer = traceAnswer;
+            answerPath.push("forcedAnswer:constraint_report");
+          }
+        }
+        prompt = ensureFinalMarker(
+          buildHelixAskConstraintPrompt(
+            baseQuestion || question || "Report constraint status.",
+            evidenceText,
+            formatSpec.format,
+            formatSpec.stageTags,
+          ),
+        );
+      } else if (compositeConstraintRequested && constraintEvidenceText) {
+        answerPath.push("constraint:evidence");
+      }
+      logProgress("Constraint evidence ready", label, constraintStart);
+    }
+    if (!isRepoQuestion) {
+      contextText = "";
+      contextFiles = [];
+    }
+    if (compositeConstraintRequested && constraintEvidenceRefs.length) {
+      const merged = new Set(contextFiles);
+      constraintEvidenceRefs.forEach((entry) => merged.add(entry));
+      contextFiles = Array.from(merged);
+      if (debugPayload) {
+        debugPayload.context_files = contextFiles.slice();
+      }
+    }
+    if (promptIngested && intentStrategy !== "constraint_report") {
+      prompt = undefined;
+    }
+    const deferAutoContext =
+      isRepoQuestion &&
+      (repoExpectationLevel !== "low" || requiresRepoEvidence) &&
+      !promptIngested;
+    if (debugPayload) {
+      debugPayload.context_deferred = deferAutoContext;
+    }
+    if (!prompt && question && intentStrategy !== "constraint_report") {
+        if (!contextText && isRepoQuestion && !deferAutoContext) {
+          const contextStart = Date.now();
+          contextText = await buildAskContext(
+            question,
+            parsed.data.searchQuery,
+            parsed.data.topK,
+            topicProfile,
+          );
+          contextFiles = extractFilePathsFromText(contextText);
+          logProgress("Context ready", "auto", contextStart);
+          logEvent(
+            "Context ready",
+            "auto",
+            formatFileList(extractFilePathsFromText(contextText)),
+            contextStart,
+          );
+        } else if (!contextText && isRepoQuestion && deferAutoContext) {
+          logEvent(
+            "Context deferred",
+            "plan_pass",
+            `expectation=${repoExpectationLevel}`,
+          );
+        }
+        if (compositeRequest.enabled && isRepoQuestion) {
+          const compositeStart = Date.now();
+          const compositeFiles = new Set(contextFiles);
+          const compositeContexts: string[] = [];
+          const compositeTags = compositeRequest.topics.slice(0, 4);
+          const searchSeed = parsed.data.searchQuery?.trim() || baseQuestion;
+          for (const tag of compositeTags) {
+            const profile = buildHelixAskTopicProfile([tag]);
+            if (!profile) continue;
+            const tagQueries = buildHelixAskSearchQueries(searchSeed, [tag]);
+            if (!tagQueries.length) continue;
+            const tagResult = await buildAskContextFromQueries(
+              baseQuestion,
+              tagQueries,
+              parsed.data.topK,
+              profile,
+            );
+            if (tagResult.context) {
+              compositeContexts.push(tagResult.context);
+            }
+            tagResult.files.forEach((entry) => compositeFiles.add(entry));
+          }
+          if (compositeContexts.length) {
+            const mergedContext = [contextText, ...compositeContexts].filter(Boolean).join("\n\n");
+            contextText = mergedContext;
+            contextFiles = Array.from(compositeFiles);
+            logProgress("Composite context ready", `${compositeTags.length} tags`, compositeStart);
+            logEvent(
+              "Composite context ready",
+              compositeTags.join(", "),
+              formatFileList(contextFiles),
+              compositeStart,
+            );
+          }
+          const filteredComposite = filterCompositeContext(contextText);
+          if (filteredComposite) {
+            contextText = filteredComposite;
+            contextFiles = extractFilePathsFromText(filteredComposite);
+          }
+          if (compositeRequiredFiles.length) {
+            const requiredHeader = [
+              "Required composite anchors (cite when relevant):",
+              ...compositeRequiredFiles.map((entry) => `- ${entry}`),
+              "",
+            ].join("\n");
+            contextText = `${requiredHeader}${contextText}`;
+          }
+        }
+      const basePrompt = isRepoQuestion
+        ? buildGroundedAskPrompt(question, contextText, formatSpec.format, formatSpec.stageTags)
+        : buildGeneralAskPrompt(question, formatSpec.format, formatSpec.stageTags);
+      prompt = ensureFinalMarker(basePrompt);
     }
     if (!prompt) {
       return res.status(400).json({ error: "bad_request", details: [{ path: ["prompt"], message: "prompt required" }] });
     }
-    const result = await llmLocalHandler(
-      {
-        prompt,
-        max_tokens: parsed.data.max_tokens,
-        temperature: parsed.data.temperature,
-        seed: parsed.data.seed,
-        stop: parsed.data.stop,
-      },
-      {
-        personaId,
-        sessionId: parsed.data.sessionId,
-      },
+
+    const forcePlanPass = repoExpectationLevel !== "low" || requiresRepoEvidence;
+    const microPassDecision = decideHelixAskMicroPass(baseQuestion, formatSpec);
+    const skipMicroPass = intentStrategy === "constraint_report" || mathSolverOk;
+    const microPassEnabled =
+      !skipMicroPass && (microPassDecision.enabled || promptIngested || forcePlanPass);
+    const microPassReason =
+      forcePlanPass && !microPassDecision.enabled && !promptIngested
+        ? "repo_expectation"
+        : promptIngested && !microPassDecision.enabled
+      ? "prompt_ingest"
+      : microPassDecision.reason;
+    const microPassStage = skipMicroPass
+      ? mathSolverOk
+        ? "math solver"
+        : "constraint report"
+      : microPassEnabled
+        ? "micro-pass"
+        : "single-pass";
+    logEvent(
+      "Plan",
+      microPassStage,
+      [
+        `intent=${intentProfile.id}`,
+        `strategy=${intentStrategy}`,
+        `format=${formatSpec.format}`,
+        `verbosity=${verbosity}`,
+        `microPass=${microPassEnabled ? microPassReason : "off"}`,
+      ].join(" | "),
     );
-    if (typeof result.text === "string" && result.text.trim()) {
-      result.text = formatHelixAskAnswer(stripPromptEchoFromAnswer(result.text, question));
+    let result: LocalAskResult;
+    let generalScaffold = "";
+    let repoScaffold = "";
+    let promptScaffold = "";
+    let topicMustIncludeOk: boolean | undefined;
+    let conceptAnswer: string | null = null;
+    let pipelineEvidence: string | null = null;
+    let planPassStart: number | null = null;
+    let planDirectives: HelixAskPlanDirectives | null = null;
+    let planScope: HelixAskPlanScope | null = null;
+    let requiredSlots: string[] = [];
+
+    if (debugPayload && skipMicroPass) {
+      debugPayload.micro_pass = false;
+      debugPayload.micro_pass_reason = mathSolverOk ? "math_solver" : "constraint_report";
     }
-    return res.json(result);
+    if (debugPayload) {
+      debugPayload.plan_pass_used = microPassEnabled;
+      debugPayload.plan_pass_forced = forcePlanPass;
+    }
+
+    if (microPassEnabled) {
+      planPassStart = Date.now();
+      logEvent(
+        "Plan pass",
+        "start",
+        [
+          `intent=${intentProfile.id}`,
+          `expectation=${repoExpectationLevel}`,
+          `forced=${forcePlanPass ? "yes" : "no"}`,
+          `verbosity=${verbosity}`,
+        ].join(" | "),
+        planPassStart,
+      );
+      if (debugPayload) {
+        debugPayload.micro_pass = true;
+        debugPayload.micro_pass_auto = microPassDecision.auto;
+        debugPayload.micro_pass_reason = isRepoQuestion
+          ? microPassReason
+          : promptIngested
+            ? "prompt_ingest"
+            : "general";
+      }
+      const conceptScaffold = conceptMatch ? buildConceptScaffold(conceptMatch) : "";
+      const hasConceptScaffold = Boolean(conceptScaffold);
+      if (hasConceptScaffold) {
+        generalScaffold = conceptScaffold;
+        const conceptStart = Date.now();
+        logProgress("Concept card ready", conceptMatch?.card.id, conceptStart);
+        logEvent("Concept card ready", conceptMatch?.card.id, conceptScaffold, conceptStart);
+      }
+      if (hasConceptScaffold && intentDomain === "general") {
+        conceptAnswer = renderConceptAnswer(conceptMatch);
+      }
+      let wantsHybrid = intentStrategy === "hybrid_explain";
+      let forceHybridNoEvidence = false;
+      if (isRepoQuestion) {
+        let queryHints: string[] = [];
+        if (!dryRun) {
+          try {
+            const queryStart = Date.now();
+            const conceptSkeleton =
+              intentProfile.id === "hybrid.concept_plus_system_mapping"
+                ? buildHybridConceptSkeleton(baseQuestion, conceptMatch)
+                : [];
+            const queryPrompt = buildHelixAskQueryPrompt(baseQuestion, {
+              conceptSkeleton,
+              anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
+            });
+            const queryResult = (await llmLocalHandler(
+              {
+                prompt: queryPrompt,
+                max_tokens: HELIX_ASK_QUERY_TOKENS,
+                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+              },
+            )) as LocalAskResult;
+            const planParse = parsePlanDirectives(queryResult.text ?? "");
+            planDirectives = planParse.directives;
+            queryHints = planParse.queryHints;
+            if (verificationAnchorHints.length > 0) {
+              queryHints = mergeHelixAskQueries(
+                queryHints,
+                verificationAnchorHints,
+                HELIX_ASK_QUERY_HINTS_MAX,
+              );
+            }
+            logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
+            logEvent(
+              "Query hints ready",
+              `${queryHints.length} hints`,
+              queryHints.length ? queryHints.map((hint) => `- ${hint}`).join("\n") : undefined,
+              queryStart,
+            );
+            if (planDirectives) {
+              const directiveSummary = [
+                planDirectives.preferredSurfaces.length
+                  ? `preferred=${planDirectives.preferredSurfaces.join(",")}`
+                  : "",
+                planDirectives.avoidSurfaces.length ? `avoid=${planDirectives.avoidSurfaces.join(",")}` : "",
+                planDirectives.mustIncludeGlobs.length
+                  ? `must=${planDirectives.mustIncludeGlobs.join(",")}`
+                  : "",
+                planDirectives.requiredSlots.length
+                  ? `slots=${planDirectives.requiredSlots.join(",")}`
+                  : "",
+                planDirectives.clarifyQuestion ? "clarify=provided" : "",
+              ]
+                .filter(Boolean)
+                .join(" | ");
+              logEvent("Plan directives", "ok", directiveSummary || "none", queryStart);
+            }
+          } catch {
+            queryHints = [];
+          }
+        }
+        if (debugPayload && queryHints.length > 0) {
+          debugPayload.query_hints = queryHints;
+        }
+        if (debugPayload && planDirectives) {
+          debugPayload.plan_directives = planDirectives;
+        }
+
+        const searchSeed = parsed.data.searchQuery?.trim() || baseQuestion;
+        const baseQueries = buildHelixAskSearchQueries(searchSeed, topicTags);
+        const queries = mergeHelixAskQueries(baseQueries, queryHints, HELIX_ASK_QUERY_MERGE_MAX);
+        if (debugPayload && queries.length > 0) {
+          debugPayload.queries = queries;
+        }
+        if (queries.length > 0) {
+          logEvent(
+            "Queries merged",
+            `${queries.length} queries`,
+            queries.map((query) => `- ${query}`).join("\n"),
+          );
+        }
+        if (!planScope) {
+          planScope = buildPlanScope({
+            directives: planDirectives,
+            topicTags,
+            requiresRepoEvidence,
+            repoExpectationLevel,
+          });
+          if (planScope.allowlistTiers?.length || planScope.avoidlist?.length) {
+            logEvent(
+              "Retrieval scope",
+              "ok",
+              [
+                planScope.allowlistTiers?.length ? `allowlistTiers=${planScope.allowlistTiers.length}` : "",
+                planScope.avoidlist?.length ? `avoidlist=${planScope.avoidlist.length}` : "",
+                planScope.mustIncludeGlobs?.length ? `mustIncludeGlobs=${planScope.mustIncludeGlobs.length}` : "",
+              ]
+                .filter(Boolean)
+                .join(" | "),
+            );
+          }
+        }
+        if (!requiredSlots.length) {
+          if (planDirectives?.requiredSlots?.length) {
+            requiredSlots = planDirectives.requiredSlots.slice(0, 6);
+          } else if (intentStrategy === "hybrid_explain" && (requiresRepoEvidence || intentDomain === "hybrid")) {
+            requiredSlots = ["definition", "repo_mapping"];
+            if (verificationAnchorRequired) {
+              requiredSlots.push("verification");
+            }
+          } else if (verificationAnchorRequired) {
+            requiredSlots = ["verification", "repo_mapping"];
+          }
+        }
+        if (requiredSlots.length > 0) {
+          const allowVerification =
+            verificationAnchorRequired || /verify|verification|gate|constraint|certificate|integrity_ok|audit/i.test(baseQuestion);
+          const allowFailure =
+            /fail|failure|retry|repair|clarify|fallback|when .* fail/i.test(baseQuestion);
+          requiredSlots = requiredSlots.filter((slot) => {
+            if (slot === "verification" && !allowVerification) return false;
+            if (slot === "failure_path" && !allowFailure) return false;
+            return true;
+          });
+        }
+
+        let contextMeta: {
+          files: string[];
+          topicTier?: number;
+          topicMustIncludeOk?: boolean;
+          queryHitCount?: number;
+          topScore?: number;
+          scoreGap?: number;
+          channelHits?: AskCandidateChannelStats;
+          channelTopScores?: AskCandidateChannelStats;
+        } = {
+          files: contextFiles.slice(),
+          queryHitCount: 0,
+          topScore: 0,
+          scoreGap: 0,
+          channelHits: initAskChannelStats(),
+          channelTopScores: initAskChannelStats(),
+        };
+
+        if (!contextText) {
+          const contextStart = Date.now();
+          const fallbackLimit = clampNumber(
+            parsed.data.topK ?? HELIX_ASK_CONTEXT_FILES,
+            1,
+            HELIX_ASK_CONTEXT_FILES,
+          );
+          let contextResult:
+            | {
+                context: string;
+                files: string[];
+                topicTier?: number;
+                topicMustIncludeOk?: boolean;
+                queryHitCount?: number;
+                topScore?: number;
+                scoreGap?: number;
+                channelHits?: AskCandidateChannelStats;
+                channelTopScores?: AskCandidateChannelStats;
+              }
+            | undefined;
+          let docsFirstOk = false;
+          if (planScope?.docsFirst && planScope.docsAllowlist?.length) {
+            const docsScope = await buildAskContextFromQueries(
+              baseQuestion,
+              queries,
+              parsed.data.topK,
+              topicProfile,
+              {
+                allowlistTiers: planScope.docsAllowlist,
+                avoidlist: planScope.avoidlist,
+                overrideAllowlist: true,
+              },
+            );
+            const planMustIncludeOk =
+              planScope.mustIncludeGlobs?.length
+                ? docsScope.files.some((filePath) =>
+                    pathMatchesAny(filePath, planScope.mustIncludeGlobs ?? []),
+                  )
+                : true;
+            docsFirstOk = docsScope.files.length > 0 && planMustIncludeOk;
+            logEvent(
+              "Docs-first scope",
+              docsFirstOk ? "ok" : "miss",
+              [
+                `files=${docsScope.files.length}`,
+                `mustInclude=${planMustIncludeOk ? "ok" : "missing"}`,
+              ].join(" | "),
+              contextStart,
+            );
+            if (debugPayload) {
+              debugPayload.docs_first_used = true;
+              debugPayload.docs_first_ok = docsFirstOk;
+            }
+            if (docsFirstOk) {
+              contextResult = docsScope;
+            } else if (requiresRepoEvidence) {
+              const docsAllowlist = (planScope.docsAllowlist ?? []).flat();
+              const grepCandidates = collectDocsGrepCandidates(queries, baseQuestion, {
+                allowlist: docsAllowlist,
+                avoidlist: planScope.avoidlist,
+                limit: 160,
+              });
+              if (grepCandidates.length > 0) {
+                const selected = selectCandidatesWithMmr(
+                  grepCandidates,
+                  fallbackLimit,
+                  HELIX_ASK_MMR_LAMBDA,
+                );
+                const topScore = selected[0]?.score ?? 0;
+                const scoreGap =
+                  selected.length >= 2 ? Math.max(0, topScore - selected[1].score) : topScore;
+                const normalizedTop = topScore > 0 ? Math.min(1, topScore / 100) : 0;
+                const normalizedGap = scoreGap > 0 ? Math.min(1, scoreGap / 100) : 0;
+                const channelHits = initAskChannelStats();
+                channelHits.lexical = selected.length ? 1 : 0;
+                const channelTopScores = initAskChannelStats();
+                channelTopScores.lexical = normalizedTop;
+                contextResult = buildAskContextFromCandidates({
+                  selected,
+                  topicTier: 0,
+                  topicMustIncludeOk: planMustIncludeOk,
+                  queryHitCount: selected.length ? 1 : 0,
+                  topScore: normalizedTop,
+                  scoreGap: normalizedGap,
+                  channelHits,
+                  channelTopScores,
+                });
+                logEvent(
+                  "Docs grep fallback",
+                  "ok",
+                  `hits=${grepCandidates.length}`,
+                  contextStart,
+                );
+                if (debugPayload) {
+                  debugPayload.docs_grep_hits = grepCandidates.length;
+                }
+              } else {
+                logEvent("Docs grep fallback", "miss", "hits=0", contextStart);
+                if (debugPayload) {
+                  debugPayload.docs_grep_hits = 0;
+                }
+              }
+            }
+          }
+          if (!contextResult) {
+            contextResult = await buildAskContextFromQueries(
+              baseQuestion,
+              queries,
+              parsed.data.topK,
+              topicProfile,
+              planScope ?? undefined,
+            );
+          }
+          contextText = contextResult.context;
+          contextFiles = contextResult.files.slice();
+          topicMustIncludeOk = contextResult.topicMustIncludeOk;
+          contextMeta = contextResult;
+          logProgress("Context ready", `${contextResult.files.length} files`, contextStart);
+          logEvent(
+            "Context ready",
+            `${contextResult.files.length} files`,
+            formatFileList(contextResult.files),
+            contextStart,
+          );
+          if (debugPayload && contextResult.files.length > 0) {
+            debugPayload.context_files = contextResult.files;
+          }
+          if (debugPayload) {
+            if (contextResult.topicTier) {
+              debugPayload.topic_tier = contextResult.topicTier;
+            }
+            if (typeof contextResult.topicMustIncludeOk === "boolean") {
+              debugPayload.topic_must_include_ok = contextResult.topicMustIncludeOk;
+            }
+          }
+        }
+
+        let evidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+          minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+          minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+        });
+        const viabilityFocus = HELIX_ASK_VIABILITY_FOCUS.test(baseQuestion);
+        const viabilityMustIncludeOk =
+          !viabilityFocus ||
+          pathMatchesAny(contextText, [HELIX_ASK_VIABILITY_PATHS]) ||
+          extractFilePathsFromText(contextText).some((filePath) =>
+            HELIX_ASK_VIABILITY_PATHS.test(filePath),
+          ) ||
+          (compositeConstraintRequested &&
+            constraintEvidenceRefs.some((filePath) => HELIX_ASK_VIABILITY_PATHS.test(filePath)));
+        const verificationAnchorOk =
+          !verificationAnchorRequired ||
+          pathMatchesAny(contextText, HELIX_ASK_VERIFICATION_ANCHOR_PATHS) ||
+          extractFilePathsFromText(contextText).some((filePath) =>
+            pathMatchesAny(filePath, HELIX_ASK_VERIFICATION_ANCHOR_PATHS),
+          );
+        let mustIncludeOk =
+          typeof topicMustIncludeOk === "boolean"
+            ? topicMustIncludeOk
+            : topicMustIncludeSatisfied(extractFilePathsFromText(contextText), topicProfile);
+        if (verificationAnchorRequired && !verificationAnchorOk) {
+          mustIncludeOk = false;
+        }
+        const contextFilesSnapshot = extractFilePathsFromText(contextText);
+        const planMustIncludeOk =
+          planScope?.mustIncludeGlobs?.length
+            ? contextFilesSnapshot.some((filePath) => pathMatchesAny(filePath, planScope?.mustIncludeGlobs ?? []))
+            : true;
+        if (!planMustIncludeOk) {
+          mustIncludeOk = false;
+        }
+        const slotCoverage = requiredSlots.length
+          ? evaluateSlotCoverage({ contextText, requiredSlots, conceptMatch })
+          : { required: [], covered: [], missing: [], ratio: 1 };
+        const slotCoverageOk = slotCoverage.missing.length === 0;
+        if (requiredSlots.length && !slotCoverageOk) {
+          mustIncludeOk = false;
+          evidenceGate = { ...evidenceGate, ok: false };
+        }
+        const queryHitCount = contextMeta.queryHitCount ?? 0;
+        const topScore = contextMeta.topScore ?? 0;
+        const scoreGap = contextMeta.scoreGap ?? 0;
+        const channelHits = contextMeta.channelHits ?? initAskChannelStats();
+        const channelTopScores = contextMeta.channelTopScores ?? initAskChannelStats();
+        const docsHits = contextFilesSnapshot.filter((filePath) => /(^|\/)docs\//i.test(filePath));
+        const docShare = contextFilesSnapshot.length
+          ? docsHits.length / contextFilesSnapshot.length
+          : 0;
+        const channelCoverage =
+          HELIX_ASK_CHANNELS.filter((channel) => channelHits[channel] > 0).length / HELIX_ASK_CHANNELS.length;
+        let retrievalConfidence = evidenceGate.matchRatio;
+        if (mustIncludeOk) retrievalConfidence += 0.15;
+        if (viabilityMustIncludeOk) retrievalConfidence += 0.05;
+        if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
+        if (contextFilesSnapshot.length >= 5) retrievalConfidence += 0.05;
+        if (docShare >= 0.4) retrievalConfidence += 0.1;
+        if (queryHitCount >= 2) retrievalConfidence += 0.05;
+        if (channelCoverage >= 0.67) retrievalConfidence += 0.05;
+        if (scoreGap >= 0.02 || topScore >= 0.05) retrievalConfidence += 0.05;
+        if (evidenceGate.matchCount === 0) retrievalConfidence = 0;
+        retrievalConfidence = Math.min(1, Math.max(0, retrievalConfidence));
+        if (debugPayload) {
+          debugPayload.topic_must_include_ok = mustIncludeOk;
+          debugPayload.viability_must_include_ok = viabilityMustIncludeOk;
+          debugPayload.verification_anchor_ok = verificationAnchorOk;
+          debugPayload.plan_must_include_ok = planMustIncludeOk;
+        }
+        if (debugPayload) {
+          debugPayload.evidence_gate_ok = evidenceGate.ok;
+          debugPayload.evidence_match_ratio = evidenceGate.matchRatio;
+          debugPayload.evidence_match_count = evidenceGate.matchCount;
+          debugPayload.evidence_token_count = evidenceGate.tokenCount;
+          debugPayload.retrieval_confidence = retrievalConfidence;
+          debugPayload.retrieval_doc_share = docShare;
+          debugPayload.retrieval_doc_hits = docsHits.length;
+          debugPayload.retrieval_context_file_count = contextFilesSnapshot.length;
+          debugPayload.retrieval_query_hit_count = queryHitCount;
+          debugPayload.retrieval_top_score = topScore;
+          debugPayload.retrieval_score_gap = scoreGap;
+          debugPayload.retrieval_channel_hits = channelHits;
+          debugPayload.retrieval_channel_top_scores = channelTopScores;
+          debugPayload.slot_coverage_required = slotCoverage.required;
+          debugPayload.slot_coverage_missing = slotCoverage.missing;
+          debugPayload.slot_coverage_ratio = slotCoverage.ratio;
+          debugPayload.slot_coverage_ok = slotCoverageOk;
+        }
+        if (requiredSlots.length > 0) {
+          logEvent(
+            "Slot coverage",
+            slotCoverageOk ? "ok" : "missing",
+            [
+              `ratio=${slotCoverage.ratio.toFixed(2)}`,
+              slotCoverage.missing.length ? `missing=${slotCoverage.missing.join(",")}` : "missing=none",
+            ].join(" | "),
+          );
+        }
+        logEvent(
+          "Evidence gate",
+          evidenceGate.ok ? "pass" : "fail",
+          [
+            `match=${evidenceGate.matchCount}/${evidenceGate.tokenCount}`,
+            `ratio=${evidenceGate.matchRatio.toFixed(2)}`,
+            `mustInclude=${mustIncludeOk ? "ok" : "missing"}`,
+            `planMust=${planMustIncludeOk ? "ok" : "missing"}`,
+            `viability=${viabilityMustIncludeOk ? "ok" : "missing"}`,
+            `verifyAnchors=${verificationAnchorRequired ? (verificationAnchorOk ? "ok" : "missing") : "n/a"}`,
+          ].join(" | "),
+        );
+        logEvent(
+          "Retrieval confidence",
+          retrievalConfidence >= 0.6 ? "high" : retrievalConfidence >= 0.35 ? "med" : "low",
+          [
+            `score=${retrievalConfidence.toFixed(2)}`,
+            `docShare=${docShare.toFixed(2)}`,
+            `files=${contextFilesSnapshot.length}`,
+            `queries=${queryHitCount}`,
+          ].join(" | "),
+        );
+        logEvent(
+          "Retrieval channels",
+          "ok",
+          [
+            `hits=lex:${channelHits.lexical},sym:${channelHits.symbol},fuz:${channelHits.fuzzy}`,
+            `tops=lex:${channelTopScores.lexical.toFixed(2)},sym:${channelTopScores.symbol.toFixed(
+              2,
+            )},fuz:${channelTopScores.fuzzy.toFixed(2)}`,
+          ].join(" | "),
+        );
+        const shouldRetryRetrieval =
+          HELIX_ASK_RETRIEVAL_RETRY_ENABLED &&
+          !promptIngested &&
+          hasRepoHints &&
+          retrievalConfidence < arbiterHybridRatio;
+        if (shouldRetryRetrieval) {
+          const retryStart = Date.now();
+          const retryHints = [
+            ...(topicProfile?.mustIncludeFiles ?? []),
+            ...compositeRequiredFiles,
+            ...verificationAnchorHints,
+          ];
+          const retryQueries = mergeHelixAskQueries(
+            baseQueries,
+            retryHints,
+            HELIX_ASK_QUERY_MERGE_MAX + 4,
+          );
+          const retryTopK = Math.min(
+            HELIX_ASK_CONTEXT_FILES,
+            (parsed.data.topK ?? HELIX_ASK_CONTEXT_FILES) + retryTopKBonus,
+          );
+          const retryResult = await buildAskContextFromQueries(
+            baseQuestion,
+            retryQueries,
+            retryTopK,
+            topicProfile,
+            planScope ?? undefined,
+          );
+          if (retryResult.context) {
+            contextText = retryResult.context;
+            contextFiles = retryResult.files.slice();
+            topicMustIncludeOk = retryResult.topicMustIncludeOk;
+            evidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+              minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+              minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+            });
+            mustIncludeOk =
+              typeof topicMustIncludeOk === "boolean"
+                ? topicMustIncludeOk
+                : topicMustIncludeSatisfied(extractFilePathsFromText(contextText), topicProfile);
+            const retryFiles = extractFilePathsFromText(contextText);
+            const retryPlanMustIncludeOk =
+              planScope?.mustIncludeGlobs?.length
+                ? retryFiles.some((filePath) => pathMatchesAny(filePath, planScope?.mustIncludeGlobs ?? []))
+                : true;
+            if (!retryPlanMustIncludeOk) {
+              mustIncludeOk = false;
+            }
+            const retrySlotCoverage = requiredSlots.length
+              ? evaluateSlotCoverage({ contextText, requiredSlots, conceptMatch })
+              : { required: [], covered: [], missing: [], ratio: 1 };
+            const retrySlotCoverageOk = retrySlotCoverage.missing.length === 0;
+            if (requiredSlots.length && !retrySlotCoverageOk) {
+              mustIncludeOk = false;
+              evidenceGate = { ...evidenceGate, ok: false };
+            }
+            const retryQueryHits = retryResult.queryHitCount ?? 0;
+            const retryTopScore = retryResult.topScore ?? 0;
+            const retryScoreGap = retryResult.scoreGap ?? 0;
+            const retryChannelHits = retryResult.channelHits ?? initAskChannelStats();
+            const retryChannelTopScores = retryResult.channelTopScores ?? initAskChannelStats();
+            const retryDocs = retryFiles.filter((filePath) => /(^|\/)docs\//i.test(filePath));
+            const retryDocShare = retryFiles.length ? retryDocs.length / retryFiles.length : 0;
+            const retryChannelCoverage =
+              HELIX_ASK_CHANNELS.filter((channel) => retryChannelHits[channel] > 0).length /
+              HELIX_ASK_CHANNELS.length;
+            retrievalConfidence = evidenceGate.matchRatio;
+            if (mustIncludeOk) retrievalConfidence += 0.15;
+            if (viabilityMustIncludeOk) retrievalConfidence += 0.05;
+            if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
+            if (retryFiles.length >= 5) retrievalConfidence += 0.05;
+            if (retryDocShare >= 0.4) retrievalConfidence += 0.1;
+            if (retryQueryHits >= 2) retrievalConfidence += 0.05;
+            if (retryChannelCoverage >= 0.67) retrievalConfidence += 0.05;
+            if (retryScoreGap >= 0.02 || retryTopScore >= 0.05) retrievalConfidence += 0.05;
+            if (evidenceGate.matchCount === 0) retrievalConfidence = 0;
+            retrievalConfidence = Math.min(1, Math.max(0, retrievalConfidence));
+            if (debugPayload) {
+              debugPayload.evidence_gate_ok = evidenceGate.ok;
+              debugPayload.evidence_match_ratio = evidenceGate.matchRatio;
+              debugPayload.evidence_match_count = evidenceGate.matchCount;
+              debugPayload.evidence_token_count = evidenceGate.tokenCount;
+              debugPayload.context_files = retryResult.files;
+              debugPayload.queries = retryQueries;
+              debugPayload.retrieval_confidence = retrievalConfidence;
+              debugPayload.retrieval_doc_share = retryDocShare;
+              debugPayload.retrieval_doc_hits = retryDocs.length;
+              debugPayload.retrieval_context_file_count = retryFiles.length;
+              debugPayload.retrieval_query_hit_count = retryQueryHits;
+              debugPayload.retrieval_top_score = retryTopScore;
+              debugPayload.retrieval_score_gap = retryScoreGap;
+              debugPayload.retrieval_channel_hits = retryChannelHits;
+              debugPayload.retrieval_channel_top_scores = retryChannelTopScores;
+              debugPayload.plan_must_include_ok = retryPlanMustIncludeOk;
+              debugPayload.slot_coverage_required = retrySlotCoverage.required;
+              debugPayload.slot_coverage_missing = retrySlotCoverage.missing;
+              debugPayload.slot_coverage_ratio = retrySlotCoverage.ratio;
+              debugPayload.slot_coverage_ok = retrySlotCoverageOk;
+            }
+            logProgress(
+              "Context retry ready",
+              `${retryResult.files.length} files`,
+              retryStart,
+            );
+            logEvent(
+              "Retrieval retry",
+              `match=${evidenceGate.matchCount}/${evidenceGate.tokenCount}`,
+              [
+                `ratio=${evidenceGate.matchRatio.toFixed(2)}`,
+                `mustInclude=${mustIncludeOk ? "ok" : "missing"}`,
+                `files=${retryResult.files.length}`,
+              ].join(" | "),
+              retryStart,
+            );
+            logEvent(
+              "Retrieval confidence",
+              retrievalConfidence >= 0.6 ? "high" : retrievalConfidence >= 0.35 ? "med" : "low",
+              [
+                `score=${retrievalConfidence.toFixed(2)}`,
+                `docShare=${retryDocShare.toFixed(2)}`,
+                `files=${retryFiles.length}`,
+                `queries=${retryQueryHits}`,
+              ].join(" | "),
+              retryStart,
+            );
+            if (requiredSlots.length > 0) {
+              logEvent(
+                "Slot coverage",
+                retrySlotCoverageOk ? "ok" : "missing",
+                [
+                  `ratio=${retrySlotCoverage.ratio.toFixed(2)}`,
+                  retrySlotCoverage.missing.length
+                    ? `missing=${retrySlotCoverage.missing.join(",")}`
+                    : "missing=none",
+                ].join(" | "),
+                retryStart,
+              );
+            }
+            logEvent(
+              "Retrieval channels",
+              "ok",
+              [
+                `hits=lex:${retryChannelHits.lexical},sym:${retryChannelHits.symbol},fuz:${retryChannelHits.fuzzy}`,
+                `tops=lex:${retryChannelTopScores.lexical.toFixed(2)},sym:${retryChannelTopScores.symbol.toFixed(
+                  2,
+                )},fuz:${retryChannelTopScores.fuzzy.toFixed(2)}`,
+              ].join(" | "),
+              retryStart,
+            );
+          } else {
+            logEvent("Retrieval retry", "no_context", "retry yielded empty context", retryStart);
+          }
+        }
+        requiresRepoEvidence =
+          requiresRepoEvidence || intentDomain === "repo" || intentDomain === "falsifiable";
+        const userExpectsRepo =
+          intentDomain === "falsifiable" || requiresRepoEvidence;
+        const hasHighStakesConstraints =
+          intentTier === "F3" ||
+          intentStrategy === "constraint_report" ||
+          compositeConstraintRequested;
+        const arbiterRepoOk =
+          retrievalConfidence >= 0.6 && mustIncludeOk && viabilityMustIncludeOk;
+        const arbiterHybridOk =
+          retrievalConfidence >= 0.35 &&
+          (conceptMatch || hasRepoHints || topicTags.length > 0) &&
+          (!verificationAnchorRequired || verificationAnchorOk);
+        const arbiterStrictness = hasHighStakesConstraints
+          ? "high"
+          : explicitRepoExpectation
+            ? "high"
+            : intentDomain === "general"
+              ? "low"
+              : "med";
+        let arbiterMode: "repo_grounded" | "hybrid" | "general" | "clarify" = "general";
+        let arbiterReason = "no_repo_expectation";
+        if (hasHighStakesConstraints) {
+          arbiterMode = "repo_grounded";
+          arbiterReason = "high_stakes";
+        } else if (arbiterRepoOk) {
+          arbiterMode = "repo_grounded";
+          arbiterReason = "repo_ratio";
+        } else if (arbiterHybridOk) {
+          arbiterMode = "hybrid";
+          arbiterReason = "hybrid_ratio";
+        } else if (userExpectsRepo) {
+          arbiterMode = "clarify";
+          arbiterReason = "expect_repo_weak_evidence";
+        } else {
+          arbiterMode = "general";
+          arbiterReason = "no_repo_expectation";
+        }
+        logEvent(
+          "Arbiter",
+          arbiterMode,
+          [
+            `reason=${arbiterReason}`,
+            `expectation=${repoExpectationLevel}`,
+            `score=${repoExpectationScore}`,
+          ].join(" | "),
+        );
+        if (debugPayload) {
+          debugPayload.arbiter_mode = arbiterMode;
+          debugPayload.arbiter_reason = arbiterReason;
+          debugPayload.arbiter_strictness = arbiterStrictness;
+          debugPayload.arbiter_user_expects_repo = userExpectsRepo;
+          debugPayload.requires_repo_evidence = requiresRepoEvidence;
+          debugPayload.arbiter_repo_ok = arbiterRepoOk;
+          debugPayload.arbiter_hybrid_ok = arbiterHybridOk;
+        }
+        const softExpansionAllowed =
+          softExpansionBudget > 0 &&
+          (arbiterMode === "repo_grounded" || arbiterMode === "hybrid") &&
+          evidenceGate.matchRatio >= arbiterRepoRatio;
+        if (!softExpansionAllowed) {
+          softExpansionBudget = 0;
+        }
+        if (debugPayload) {
+          debugPayload.soft_expansion = softExpansionBudget;
+        }
+        answerPath.push(`arbiter:${arbiterMode}`);
+        if (arbiterMode === "hybrid" || arbiterMode === "clarify") {
+          const fallbackProfile = resolveFallbackIntentProfile("hybrid");
+          intentProfile = fallbackProfile;
+          intentDomain = fallbackProfile.domain;
+          intentTier = fallbackProfile.tier;
+          intentSecondaryTier = fallbackProfile.secondaryTier;
+          intentStrategy = fallbackProfile.strategy;
+          formatSpec = resolveHelixAskFormat(baseQuestion, intentProfile, debugEnabled);
+          if (hasTwoParagraphContract(baseQuestion)) {
+            formatSpec = { format: "compare", stageTags: false };
+          }
+          if (intentStrategy === "hybrid_explain" && formatSpec.format !== "steps") {
+            formatSpec = { ...formatSpec, stageTags: false };
+          }
+          intentReason = `${intentReasonBase}|arbiter:${arbiterMode}`;
+          if (!mustIncludeOk) {
+            if (verificationAnchorRequired && !verificationAnchorOk) {
+              intentReason = `${intentReason}|anchor_gate:missing_verification`;
+            } else {
+              intentReason = `${intentReason}|topic_gate:missing_core`;
+            }
+          } else if (!viabilityMustIncludeOk) {
+            intentReason = `${intentReason}|viability_gate:missing_core`;
+          } else if (!evidenceGate.ok) {
+            intentReason = `${intentReason}|evidence_gate:no_repo_evidence`;
+          }
+          updateIntentDebug();
+          wantsHybrid = true;
+          isRepoQuestion = true;
+          if (arbiterMode === "clarify") {
+            forceHybridNoEvidence = true;
+            contextText = "";
+            contextFiles = [];
+            logEvent("Fallback", "clarify (arbiter)", intentReason);
+            logEvent("Clarify", "arbiter", baseQuestion);
+            if (debugPayload) {
+              debugPayload.clarify_triggered = true;
+            }
+          } else {
+            logEvent("Fallback", "hybrid (arbiter)", intentReason);
+          }
+        } else if (arbiterMode === "general") {
+          const fallbackProfile = resolveFallbackIntentProfile("general");
+          intentProfile = fallbackProfile;
+          intentDomain = fallbackProfile.domain;
+          intentTier = fallbackProfile.tier;
+          intentSecondaryTier = fallbackProfile.secondaryTier;
+          intentStrategy = fallbackProfile.strategy;
+          formatSpec = resolveHelixAskFormat(baseQuestion, intentProfile, debugEnabled);
+          if (hasTwoParagraphContract(baseQuestion)) {
+            formatSpec = { format: "compare", stageTags: false };
+          }
+          intentReason = `${intentReasonBase}|arbiter:general`;
+          updateIntentDebug();
+          isRepoQuestion =
+            intentProfile.evidencePolicy.allowRepoCitations &&
+            (intentDomain === "repo" || intentDomain === "hybrid");
+          wantsHybrid = intentStrategy === "hybrid_explain";
+          if (!isRepoQuestion) {
+            contextText = "";
+            contextFiles = [];
+          }
+          logEvent("Fallback", `intent -> ${fallbackProfile.id}`, intentReason);
+        }
+
+        if (compositeConstraintRequested) {
+          intentSecondaryTier = "F3";
+          updateIntentDebug();
+        }
+
+        if (debugPayload && promptContextFiles.length > 0) {
+          const existing = new Set(debugPayload.context_files ?? []);
+          promptContextFiles.forEach((entry) => existing.add(entry));
+          debugPayload.context_files = Array.from(existing);
+        }
+        if (promptContextFiles.length > 0) {
+          const merged = new Set(contextFiles);
+          promptContextFiles.forEach((entry) => merged.add(entry));
+          contextFiles = Array.from(merged);
+        }
+      }
+
+      if (isRepoQuestion && !dryRun) {
+        const combinedContext = wantsHybrid
+          ? contextText
+          : [promptContextText, contextText].filter(Boolean).join("\n\n");
+        const evidenceContext = clipAskText(combinedContext, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
+        if (evidenceContext) {
+          const evidenceStart = Date.now();
+          const evidencePrompt = buildHelixAskEvidencePrompt(
+            baseQuestion,
+            evidenceContext,
+            formatSpec.format,
+            formatSpec.stageTags,
+            compositeRequest.enabled,
+            verificationAnchorRequired ? verificationAnchorHints : [],
+          );
+          const evidenceResult = (await llmLocalHandler(
+            {
+              prompt: evidencePrompt,
+              max_tokens: evidenceTokens,
+              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+              seed: parsed.data.seed,
+              stop: parsed.data.stop,
+            },
+            {
+              personaId,
+              sessionId: parsed.data.sessionId,
+              traceId: askTraceId,
+            },
+          )) as LocalAskResult;
+          repoScaffold = normalizeScaffoldText(
+            stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+          );
+          if (repoScaffold && !formatSpec.stageTags) {
+            repoScaffold = stripStageTags(repoScaffold);
+          }
+          if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
+            const missing = compositeRequiredFiles.filter(
+              (entry) => entry && !repoScaffold.toLowerCase().includes(entry.toLowerCase()),
+            );
+            if (missing.length) {
+              debugPayload.composite_topics = [
+                ...(debugPayload.composite_topics ?? []),
+                "missing_anchors",
+              ];
+            }
+          }
+          logProgress(
+            "Evidence cards ready",
+            repoScaffold ? "ok" : "empty",
+            evidenceStart,
+          );
+          logEvent(
+            "Evidence cards ready",
+            repoScaffold ? "repo" : "empty",
+            repoScaffold,
+            evidenceStart,
+          );
+        }
+      }
+
+      if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
+        if (promptContextText) {
+          const evidenceStart = Date.now();
+          const evidencePrompt = buildHelixAskPromptEvidencePrompt(
+            baseQuestion,
+            promptContextText,
+            formatSpec.format,
+            formatSpec.stageTags,
+          );
+          const evidenceResult = (await llmLocalHandler(
+            {
+              prompt: evidencePrompt,
+              max_tokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+              seed: parsed.data.seed,
+              stop: parsed.data.stop,
+            },
+            {
+              personaId,
+              sessionId: parsed.data.sessionId,
+              traceId: askTraceId,
+            },
+          )) as LocalAskResult;
+          promptScaffold = normalizeScaffoldText(
+            stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+          );
+          if (promptScaffold && !formatSpec.stageTags) {
+            promptScaffold = stripStageTags(promptScaffold);
+          }
+          logProgress(
+            "Prompt context cards ready",
+            promptScaffold ? "ok" : "empty",
+            evidenceStart,
+          );
+          const promptRefs = formatFileList(promptContextFiles);
+          const promptEventText = [promptScaffold, promptRefs ? `Prompt refs:\n${promptRefs}` : ""]
+            .filter(Boolean)
+            .join("\n\n");
+          logEvent(
+            "Prompt context cards ready",
+            promptScaffold ? "ok" : "empty",
+            promptEventText,
+            evidenceStart,
+          );
+          if (debugPayload && promptContextFiles.length > 0) {
+            const existing = new Set(debugPayload.context_files ?? []);
+            promptContextFiles.forEach((entry) => existing.add(entry));
+            debugPayload.context_files = Array.from(existing);
+          }
+          if (promptContextFiles.length > 0) {
+            const merged = new Set(contextFiles);
+            promptContextFiles.forEach((entry) => merged.add(entry));
+            contextFiles = Array.from(merged);
+          }
+        } else if (!hasConceptScaffold) {
+          const evidenceStart = Date.now();
+          const evidencePrompt = buildGeneralAskEvidencePrompt(
+            baseQuestion,
+            formatSpec.format,
+            formatSpec.stageTags,
+          );
+          const evidenceResult = (await llmLocalHandler(
+            {
+              prompt: evidencePrompt,
+              max_tokens: evidenceTokens,
+              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+              seed: parsed.data.seed,
+              stop: parsed.data.stop,
+            },
+            {
+              personaId,
+              sessionId: parsed.data.sessionId,
+              traceId: askTraceId,
+            },
+          )) as LocalAskResult;
+          generalScaffold = normalizeScaffoldText(
+            stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+          );
+          if (generalScaffold && !formatSpec.stageTags) {
+            generalScaffold = stripStageTags(generalScaffold);
+          }
+          logProgress(
+            "Reasoning scaffold ready",
+            generalScaffold ? "ok" : "empty",
+            evidenceStart,
+          );
+          logEvent(
+            "Reasoning scaffold ready",
+            generalScaffold ? "ok" : "empty",
+            generalScaffold,
+            evidenceStart,
+          );
+        }
+      }
+
+      const generalEvidence = promptScaffold || generalScaffold;
+      if (intentStrategy === "hybrid_explain" && generalEvidence) {
+        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(repoScaffold.trim());
+        if (conceptMatch) {
+          const coreSentences: string[] = [];
+          if (conceptMatch.card.definition) {
+            coreSentences.push(ensureSentence(conceptMatch.card.definition));
+          }
+          if (conceptMatch.card.keyQuestions) {
+            coreSentences.push(
+              ensureSentence(`Key questions include: ${conceptMatch.card.keyQuestions}`),
+            );
+          }
+          if (conceptMatch.card.notes) {
+            coreSentences.push(ensureSentence(conceptMatch.card.notes));
+          }
+          const paragraph1 = coreSentences.join(" ").trim();
+          let paragraph2 = "";
+          if (hasRepoEvidence) {
+            paragraph2 = collapseEvidenceBullets(repoScaffold);
+          } else {
+            paragraph2 =
+              "No repo evidence was found for this system mapping; please point to the relevant files or modules.";
+          }
+          let inPractice = "";
+          if (conceptMatch.card.notes) {
+            inPractice = ensureSentence(
+              "In practice, those standards guide how evidence and justification are weighed in specific contexts.",
+            );
+          } else {
+            inPractice = ensureSentence(
+              "In practice, verification emphasizes repeatable checks and falsifiable evidence.",
+            );
+          }
+          forcedAnswer = [paragraph1, paragraph2, inPractice].filter(Boolean).join("\n\n");
+        }
+        const hybridPrompt = buildHelixAskHybridPrompt(
+          baseQuestion,
+          generalEvidence,
+          repoScaffold,
+          hasRepoEvidence,
+          formatSpec.format,
+          formatSpec.stageTags,
+          constraintEvidenceText,
+          compositeRequest.enabled,
+        );
+        prompt = ensureFinalMarker(hybridPrompt);
+        evidenceText = [repoScaffold, generalEvidence, constraintEvidenceText]
+          .filter(Boolean)
+          .join("\n\n");
+        if (debugPayload) {
+          const cards: string[] = [];
+          if (generalEvidence) {
+            cards.push(`General reasoning:\n${generalEvidence}`);
+          }
+          if (repoScaffold) {
+            cards.push(`Repo evidence:\n${repoScaffold}`);
+          }
+          if (constraintEvidenceText) {
+            cards.push(`Constraint evidence:\n${constraintEvidenceText}`);
+          }
+          if (cards.length) {
+            debugPayload.evidence_cards = cards.join("\n\n");
+          }
+        }
+        logEvent(
+          "Synthesis prompt ready",
+          "hybrid",
+          [
+            `repoEvidence=${hasRepoEvidence ? "yes" : "no"}`,
+            `generalEvidence=${generalEvidence ? "yes" : "no"}`,
+          ].join(" | "),
+        );
+      } else if (isRepoQuestion && repoScaffold) {
+        if (intentProfile.id === "repo.ideology_reference" && conceptMatch) {
+          forcedAnswer = buildHelixAskIdeologyAnswer(conceptMatch);
+          answerPath.push("forcedAnswer:ideology");
+        }
+        if (intentProfile.id === "repo.helix_ask_pipeline_explain") {
+          forcedAnswer = buildHelixAskPipelineAnswer();
+          pipelineEvidence = buildHelixAskPipelineEvidence();
+          answerPath.push("forcedAnswer:helix_pipeline");
+        }
+        prompt = ensureFinalMarker(
+          buildHelixAskSynthesisPrompt(
+            baseQuestion,
+            repoScaffold,
+            formatSpec.format,
+            formatSpec.stageTags,
+            softExpansionBudget,
+          ),
+        );
+        evidenceText = pipelineEvidence ?? repoScaffold;
+        if (debugPayload && repoScaffold) {
+          debugPayload.evidence_cards = pipelineEvidence ?? repoScaffold;
+        }
+        logEvent(
+          "Synthesis prompt ready",
+          "repo",
+          formatFileList(extractFilePathsFromText(evidenceText)),
+        );
+      } else if (promptScaffold) {
+        prompt = ensureFinalMarker(
+          buildHelixAskPromptSynthesisPrompt(
+            baseQuestion,
+            promptScaffold,
+            formatSpec.format,
+            formatSpec.stageTags,
+            softExpansionBudget,
+          ),
+        );
+        evidenceText = promptScaffold;
+        if (debugPayload && promptScaffold) {
+          debugPayload.evidence_cards = promptScaffold;
+        }
+        logEvent(
+          "Synthesis prompt ready",
+          "prompt context",
+          formatFileList(promptContextFiles) ?? promptScaffold,
+        );
+      } else if (generalScaffold) {
+        prompt = ensureFinalMarker(
+          buildGeneralAskSynthesisPrompt(
+            baseQuestion,
+            generalScaffold,
+            formatSpec.format,
+            formatSpec.stageTags,
+          ),
+        );
+        if (debugPayload && generalScaffold) {
+          debugPayload.evidence_cards = generalScaffold;
+        }
+        logEvent(
+          "Synthesis prompt ready",
+          "general",
+          generalScaffold,
+        );
+      } else if (baseQuestion) {
+        prompt = ensureFinalMarker(buildGeneralAskPrompt(baseQuestion, formatSpec.format, formatSpec.stageTags));
+      }
+    } else if (!skipMicroPass && !dryRun) {
+      const useTwoPass =
+        HELIX_ASK_TWO_PASS &&
+        Boolean(questionValue) &&
+        HELIX_ASK_TWO_PASS_TRIGGER.test(questionValue ?? "");
+      if (useTwoPass) {
+        if (debugPayload) {
+          debugPayload.two_pass = true;
+        }
+        const extractedContext = extractContextFromPrompt(prompt);
+        if (extractedContext) {
+          const scaffoldStart = Date.now();
+          const scaffoldContext = clipAskText(extractedContext, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
+          const scaffoldPrompt = buildHelixAskScaffoldPrompt(
+            questionValue ?? "",
+            scaffoldContext,
+            formatSpec.format,
+            formatSpec.stageTags,
+          );
+          const scaffoldResult = (await llmLocalHandler(
+            {
+              prompt: scaffoldPrompt,
+              max_tokens: Math.min(
+                scaffoldTokens,
+                parsed.data.max_tokens ?? scaffoldTokens,
+              ),
+              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+              seed: parsed.data.seed,
+              stop: parsed.data.stop,
+            },
+            {
+              personaId,
+              sessionId: parsed.data.sessionId,
+              traceId: askTraceId,
+            },
+          )) as LocalAskResult;
+          logProgress("Scaffold ready", "two-pass", scaffoldStart);
+          let scaffoldText = normalizeScaffoldText(
+            stripPromptEchoFromAnswer(scaffoldResult.text ?? "", questionValue ?? ""),
+          );
+          if (scaffoldText && !formatSpec.stageTags) {
+            scaffoldText = stripStageTags(scaffoldText);
+          }
+          if (scaffoldText) {
+            if (debugPayload) {
+              debugPayload.scaffold = scaffoldText;
+            }
+            prompt = ensureFinalMarker(
+              buildHelixAskSynthesisPrompt(
+                questionValue ?? "",
+                scaffoldText,
+                formatSpec.format,
+                formatSpec.stageTags,
+                softExpansionBudget,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    if (dryRun) {
+      const dryPayload: LocalAskResult = { text: "", prompt_ingested: promptIngested };
+      if (promptIngested) {
+        if (promptIngestSource) {
+          dryPayload.prompt_ingest_source = promptIngestSource;
+        }
+        if (promptIngestReason) {
+          dryPayload.prompt_ingest_reason = promptIngestReason;
+        }
+      }
+      const responsePayload = debugPayload ? { ...dryPayload, debug: debugPayload, dry_run: true } : { ...dryPayload, dry_run: true };
+      return res.json(responsePayload);
+    }
+
+    if (planPassStart !== null) {
+      logEvent(
+        "Plan pass",
+        "end",
+        `intent=${intentProfile.id}`,
+        planPassStart,
+      );
+    }
+    const answerStart = Date.now();
+    logProgress("Generating answer");
+    if (conceptAnswer || forcedAnswer) {
+      result = { text: forcedAnswer ?? conceptAnswer ?? "" } as LocalAskResult;
+      logProgress("Answer ready", "concept", answerStart);
+      answerPath.push("answer:forced");
+    } else {
+      result = (await llmLocalHandler(
+        {
+          prompt,
+          max_tokens: parsed.data.max_tokens,
+          temperature: parsed.data.temperature,
+          seed: parsed.data.seed,
+          stop: parsed.data.stop,
+        },
+        {
+          personaId,
+          sessionId: parsed.data.sessionId,
+          traceId: askTraceId,
+          onToken: streamEmitter.onToken,
+        },
+      )) as LocalAskResult;
+      logProgress("Answer ready", undefined, answerStart);
+      answerPath.push("answer:llm");
+    }
+
+    let cleanedText: string | undefined;
+    if (typeof result.text === "string" && result.text.trim()) {
+      let cleaned = formatHelixAskAnswer(stripPromptEchoFromAnswer(result.text, baseQuestion));
+      const rawPreview = clipAskText(
+        stripPromptEchoFromAnswer(result.text, baseQuestion)
+          .replace(/\s+/g, " ")
+          .trim(),
+        240,
+      );
+      if (rawPreview) {
+        logEvent("Answer raw preview", "llm", rawPreview, answerStart);
+      }
+      const enforceFormat =
+        formatEnforcementLevel === "strict" || intentDomain !== "hybrid";
+      if (enforceFormat) {
+        cleaned = enforceHelixAskAnswerFormat(cleaned, formatSpec.format, baseQuestion);
+      }
+      cleaned = stripTruncationMarkers(cleaned);
+      if (!cleaned.trim()) {
+        const fallback = stripPromptEchoFromAnswer(result.text, baseQuestion);
+        cleaned = fallback.trim() ? fallback.trim() : result.text.trim();
+        cleaned = stripTruncationMarkers(cleaned);
+      }
+      const allowCitationRepair =
+        (microPassEnabled || intentStrategy === "constraint_report") &&
+        intentProfile.id !== "repo.ideology_reference";
+      if (allowCitationRepair) {
+        const hasEvidencePaths = extractFilePathsFromText(evidenceText).length > 0;
+        const hasAnswerPaths = extractFilePathsFromText(cleaned).length > 0;
+        if (hasEvidencePaths && !hasAnswerPaths) {
+          const repairStart = Date.now();
+          const repairPrompt = buildHelixAskCitationRepairPrompt(
+            baseQuestion,
+            cleaned,
+            evidenceText,
+            formatSpec.format,
+            formatSpec.stageTags,
+          );
+          const repairResult = (await llmLocalHandler(
+            {
+              prompt: repairPrompt,
+              max_tokens: repairTokens,
+              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+              seed: parsed.data.seed,
+              stop: parsed.data.stop,
+            },
+            {
+              personaId,
+              sessionId: parsed.data.sessionId,
+              traceId: askTraceId,
+            },
+          )) as LocalAskResult;
+          const repaired = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
+          if (repaired.trim()) {
+            cleaned = repaired;
+            if (debugPayload) {
+              debugPayload.citation_repair = true;
+            }
+            answerPath.push("citationRepair:applied");
+            logProgress("Citation repair", "applied", repairStart);
+            logEvent(
+              "Citation repair",
+              "applied",
+              formatFileList(extractFilePathsFromText(cleaned)),
+              repairStart,
+            );
+          }
+        } else {
+          answerPath.push(hasAnswerPaths ? "citationRepair:skipped(grounded)" : "citationRepair:skipped(no_evidence)");
+        }
+      } else {
+        answerPath.push("citationRepair:skipped(intent)");
+      }
+      const hasRepoEvidence = intentStrategy === "hybrid_explain" && Boolean(repoScaffold.trim());
+      const allowHybridFallback = formatEnforcementLevel === "strict";
+      const hasRepoCitations = extractFilePathsFromText(cleaned).length > 0;
+      const hasHybridPlaceholder =
+        /(map to this system|repo evidence bullets|paragraph\s*2|paragraph\s*1)/i.test(cleaned);
+      if (allowHybridFallback && hasRepoEvidence && (!hasRepoCitations || hasHybridPlaceholder)) {
+        const generalEvidence = promptScaffold || generalScaffold;
+        let paragraph1 = "";
+        if (generalEvidence) {
+          const collapsed = collapseEvidenceBullets(generalEvidence);
+          const stripped = stripPromptEchoFromAnswer(generalEvidence, baseQuestion)
+            .replace(/^question:\s*/i, "")
+            .trim();
+          paragraph1 = clipAskText(collapsed || stripped, 420);
+        }
+        let paragraph2 = collapseEvidenceBullets(repoScaffold);
+        if (paragraph2 && extractFilePathsFromText(paragraph2).length === 0) {
+          const repoPaths = extractFilePathsFromText(repoScaffold).slice(0, 6);
+          if (repoPaths.length) {
+            paragraph2 = `${paragraph2} (${repoPaths.join(", ")})`;
+          }
+        }
+        const fallback = [paragraph1, paragraph2].filter(Boolean).join("\n\n").trim();
+        if (fallback) {
+          cleaned = fallback;
+          answerPath.push("hybridFallback:repoEvidence");
+        }
+      }
+      if (!formatSpec.stageTags) {
+        cleaned = stripStageTags(cleaned);
+      }
+      if (requiresRepoEvidence && extractFilePathsFromText(cleaned).length === 0) {
+        const generalEvidence = promptScaffold || generalScaffold;
+        let paragraph1 = "";
+        if (generalEvidence) {
+          const collapsed = collapseEvidenceBullets(generalEvidence);
+          const stripped = stripPromptEchoFromAnswer(generalEvidence, baseQuestion)
+            .replace(/^question:\s*/i, "")
+            .trim();
+          paragraph1 = clipAskText(collapsed || stripped, 420);
+        }
+        const planClarify = planDirectives?.clarifyQuestion?.trim() ?? "";
+        const clarifyLine =
+          planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)
+            ? planClarify
+            : "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
+        const paragraph2 = clarifyLine;
+        const clarified = [paragraph1, paragraph2].filter(Boolean).join("\n\n").trim();
+        cleaned = clarified || paragraph2;
+        answerPath.push("obligation:missing_repo_evidence");
+        logEvent("Obligation", "missing_repo_evidence", baseQuestion);
+        if (debugPayload) {
+          debugPayload.obligation_violation = true;
+        }
+      }
+      if (
+        intentDomain === "repo" &&
+        extractFilePathsFromText(evidenceText).length > 0 &&
+        extractFilePathsFromText(cleaned).length === 0
+      ) {
+        cleaned =
+          "Repo evidence was available but the answer could not be grounded with file citations. Please point to the relevant files or narrow the request.";
+        logProgress("Citation missing", "fallback");
+        logEvent(
+          "Citation missing",
+          "fallback",
+          formatFileList(extractFilePathsFromText(evidenceText)),
+        );
+      }
+      const platonicDomain: HelixAskDomain =
+        intentDomain === "repo" || intentDomain === "hybrid"
+          ? intentDomain
+          : intentStrategy === "constraint_report"
+            ? "falsifiable"
+            : "general";
+      const evidencePaths = Array.from(
+        new Set([
+          ...contextFiles,
+          ...promptContextFiles,
+          conceptMatch?.card.sourcePath ?? "",
+          ...extractFilePathsFromText(evidenceText),
+          ...extractFilePathsFromText(repoScaffold),
+          ...extractFilePathsFromText(generalScaffold),
+          ...extractFilePathsFromText(promptScaffold),
+        ]),
+      );
+      const platonicResult = applyHelixAskPlatonicGates({
+        question: baseQuestion,
+        answer: cleaned,
+        domain: platonicDomain,
+        tier: intentTier,
+        intentId: intentProfile.id,
+        format: formatSpec.format,
+        evidenceText,
+        evidencePaths,
+        generalScaffold,
+        repoScaffold,
+        promptScaffold,
+        conceptMatch,
+      });
+      logEvent(
+        "Platonic gates",
+        "ok",
+        [
+          platonicResult.conceptLintApplied ? "conceptLint=on" : "conceptLint=off",
+          platonicResult.physicsLintApplied ? "physicsLint=on" : "physicsLint=off",
+          `coverage=${platonicResult.coverageSummary.coverageRatio.toFixed(2)}`,
+          `beliefUnsupported=${platonicResult.beliefSummary.unsupportedRate.toFixed(2)}`,
+          `rattling=${platonicResult.rattlingScore.toFixed(2)}`,
+        ].join(" | "),
+      );
+      cleaned = platonicResult.answer;
+      if (allowHybridFallback && intentStrategy === "hybrid_explain" && repoScaffold.trim()) {
+        const guarded =
+          /please point to the relevant files|available evidence was weakly reflected|repo evidence did not cover/i.test(
+            cleaned,
+          );
+        if (!guarded) {
+          const paragraphs = cleaned.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+          const hasRepoCitations = extractFilePathsFromText(cleaned).length > 0;
+          if (paragraphs.length < 2 || !hasRepoCitations) {
+            const generalEvidence = promptScaffold || generalScaffold;
+            let paragraph1 = "";
+            if (generalEvidence) {
+              const collapsed = collapseEvidenceBullets(generalEvidence);
+              const stripped = stripPromptEchoFromAnswer(generalEvidence, baseQuestion)
+                .replace(/^question:\s*/i, "")
+                .trim();
+              paragraph1 = clipAskText(collapsed || stripped, 420);
+            }
+            let paragraph2 = collapseEvidenceBullets(repoScaffold);
+            if (paragraph2 && extractFilePathsFromText(paragraph2).length === 0) {
+              const repoPaths = extractFilePathsFromText(repoScaffold).slice(0, 6);
+              if (repoPaths.length) {
+                paragraph2 = `${paragraph2} (${repoPaths.join(", ")})`;
+              }
+            }
+            const fallback = [paragraph1, paragraph2].filter(Boolean).join("\n\n").trim();
+            if (fallback) {
+              cleaned = fallback;
+              answerPath.push("hybridFallback:post_platonic");
+            }
+          }
+        }
+      }
+      cleaned = normalizeNumberedListLines(cleaned);
+      cleaned = repairAnswerFilePathFragments(cleaned, contextFiles, evidenceText);
+      cleaned = enforceHelixAskPromptContract(cleaned, baseQuestion);
+      const cleanedPreview = clipAskText(cleaned.replace(/\s+/g, " ").trim(), 240);
+      if (cleanedPreview) {
+        logEvent("Answer cleaned preview", "final", cleanedPreview, answerStart);
+      }
+      answerPath.push("platonic:gates");
+      if (debugPayload) {
+        debugPayload.junk_clean_applied = platonicResult.junkCleanApplied;
+        debugPayload.junk_clean_reasons = platonicResult.junkCleanReasons;
+        debugPayload.concept_lint_applied = platonicResult.conceptLintApplied;
+        debugPayload.concept_lint_reasons = platonicResult.conceptLintReasons;
+        debugPayload.physics_lint_applied = platonicResult.physicsLintApplied;
+        debugPayload.physics_lint_reasons = platonicResult.physicsLintReasons;
+        debugPayload.coverage_token_count = platonicResult.coverageSummary.tokenCount;
+        debugPayload.coverage_key_count = platonicResult.coverageSummary.keyCount;
+        debugPayload.coverage_missing_key_count = platonicResult.coverageSummary.missingKeyCount;
+        debugPayload.coverage_ratio = platonicResult.coverageSummary.coverageRatio;
+        debugPayload.coverage_missing_keys = platonicResult.coverageSummary.missingKeys;
+        debugPayload.coverage_gate_applied = platonicResult.coverageGateApplied;
+        debugPayload.coverage_gate_reason = platonicResult.coverageGateReason;
+        debugPayload.belief_claim_count = platonicResult.beliefSummary.claimCount;
+        debugPayload.belief_supported_count = platonicResult.beliefSummary.supportedCount;
+        debugPayload.belief_unsupported_count = platonicResult.beliefSummary.unsupportedCount;
+        debugPayload.belief_unsupported_rate = platonicResult.beliefSummary.unsupportedRate;
+        debugPayload.belief_contradictions = platonicResult.beliefSummary.contradictionCount;
+        debugPayload.belief_gate_applied = platonicResult.beliefGateApplied;
+        debugPayload.belief_gate_reason = platonicResult.beliefGateReason;
+        debugPayload.rattling_score = platonicResult.rattlingScore;
+        debugPayload.rattling_gate_applied = platonicResult.rattlingGateApplied;
+        debugPayload.answer_path = answerPath;
+      }
+      cleanedText = cleaned;
+      result.text = cleaned;
+    }
+    if (cleanedText) {
+      result.envelope = buildHelixAskEnvelope({
+        answer: cleanedText,
+        format: formatSpec.format,
+        tier: intentTier,
+        secondaryTier: intentSecondaryTier,
+        mode: resolveEnvelopeMode(verbosity),
+        evidenceText,
+        traceId: askTraceId,
+      });
+    }
+    streamEmitter.finalize(cleanedText);
+    result.prompt_ingested = promptIngested;
+    if (promptIngested) {
+      if (promptIngestSource) {
+        result.prompt_ingest_source = promptIngestSource;
+      }
+      if (promptIngestReason) {
+        result.prompt_ingest_reason = promptIngestReason;
+      }
+    }
+    if (debugPayload && captureLiveHistory) {
+      debugPayload.live_events = liveEventHistory.slice();
+    }
+    const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
+    return res.json(responsePayload);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    streamEmitter.finalize();
+    logProgress("Failed", "llm_local_failed", undefined, false);
     return res.status(500).json({ error: "llm_local_failed", message });
   }
 });
@@ -4548,8 +10173,8 @@ planRouter.get("/tools/logs", (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
-  const { limit, tool } = parsed.data;
-  const logs = getToolLogs({ limit, tool, tenantId: tenantGuard.tenantId });
+  const { limit, tool, sessionId, traceId } = parsed.data;
+  const logs = getToolLogs({ limit, tool, tenantId: tenantGuard.tenantId, sessionId, traceId });
   res.json({ logs, limit, tool });
 });
 
@@ -4707,7 +10332,7 @@ planRouter.get("/tools/logs/stream", (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
-  const { limit, tool } = parsed.data;
+  const { limit, tool, sessionId, traceId } = parsed.data;
   const tenantId = tenantGuard.tenantId;
   const lastEventId = req.get("last-event-id") ?? req.get("Last-Event-ID");
   res.set({
@@ -4737,14 +10362,20 @@ planRouter.get("/tools/logs/stream", (req, res) => {
   };
 
   const backlog = lastEventId
-    ? getToolLogsSince(lastEventId, { tool, tenantId })
-    : getToolLogs({ limit, tool, tenantId }).sort((a, b) => a.seq - b.seq);
+    ? getToolLogsSince(lastEventId, { tool, tenantId, sessionId, traceId })
+    : getToolLogs({ limit, tool, tenantId, sessionId, traceId }).sort((a, b) => a.seq - b.seq);
   for (const entry of backlog) {
     sendEvent(entry);
   }
 
   const unsubscribe = subscribeToolLogs((entry) => {
     if (tenantId && entry.tenantId !== tenantId) {
+      return;
+    }
+    if (sessionId && entry.sessionId !== sessionId) {
+      return;
+    }
+    if (traceId && entry.traceId !== traceId) {
       return;
     }
     if (tool && entry.tool !== tool) {

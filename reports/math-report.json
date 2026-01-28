@@ -1,0 +1,225 @@
+{
+  "generatedAt": "2026-01-27T07:16:56.808Z",
+  "registryCount": 69,
+  "coverage": {
+    "exploratory": {
+      "count": 13,
+      "modules": [
+        "server/gr/gr-worker-client.ts",
+        "server/gr/gr-worker-types.ts",
+        "server/gr/gr-worker.ts",
+        "server/services/observability/tool-log-store.ts",
+        "shared/neuro-config.ts",
+        "modules/analysis/constraint-loop.ts",
+        "modules/analysis/noise-field-loop.ts",
+        "modules/analysis/diffusion-loop.ts",
+        "modules/analysis/belief-graph-loop.ts",
+        "server/routes/analysis-loops.ts",
+        "server/services/observability/otel-tracing.ts",
+        "server/services/observability/otel-middleware.ts",
+        "server/services/observability/otel-span-store.ts"
+      ]
+    },
+    "reduced-order": {
+      "count": 28,
+      "modules": [
+        "modules/gr/stress-energy.ts",
+        "server/gr/gr-constraint-policy.ts",
+        "server/gr/gr-agent-loop-schema.ts",
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+        "server/stress-energy-brick.ts",
+        "server/gr/evolution/stress-energy.ts",
+        "modules/dynamic/stress-energy-equations.ts",
+        "modules/dynamic/dynamic-casimir.ts",
+        "modules/dynamic/natario-metric.ts",
+        "server/energy-pipeline.ts",
+        "modules/physics/warpAgents.ts",
+        "server/routes/agi.plan.ts",
+        "server/routes/agi.eval.ts",
+        "server/routes/agi.memory.ts",
+        "server/routes/agi.memory.trace.ts",
+        "server/routes/agi.persona.ts",
+        "server/routes/agi.profile.ts",
+        "server/routes/agi.specialists.ts",
+        "server/routes/agi.star.ts",
+        "server/routes/agi.trace.ts",
+        "server/routes/agi.debate.ts",
+        "server/services/constraint-packs/constraint-pack-policy.ts",
+        "server/services/constraint-packs/constraint-pack-policy-store.ts",
+        "shared/curvature-proxy.ts",
+        "client/src/physics/curvature.ts",
+        "client/src/lib/warp-proof-math.ts",
+        "server/helix-proof-pack.ts"
+      ]
+    },
+    "diagnostic": {
+      "count": 21,
+      "modules": [
+        "modules/gr/bssn-state.ts",
+        "modules/gr/bssn-evolve.ts",
+        "server/gr/evolution/solver.ts",
+        "server/gr-evolve-brick.ts",
+        "modules/gr/rk4.ts",
+        "modules/gr/stencils.ts",
+        "modules/gr/stress-energy-integrals.ts",
+        "server/gr-initial-brick.ts",
+        "server/gr/evolution.ts",
+        "server/gr/evolution/brick.ts",
+        "server/gr/evolution/initial-data.ts",
+        "server/gr/gr-constraint-network.ts",
+        "tools/warpViability.ts",
+        "server/services/observability/training-trace-store.ts",
+        "server/routes/training-trace.ts",
+        "server/services/observability/gr-agent-loop-store.ts",
+        "server/routes/agi.adapter.ts",
+        "server/services/observability/constraint-pack-evaluator.ts",
+        "server/services/observability/constraint-pack-normalizer.ts",
+        "server/services/observability/constraint-pack-telemetry.ts",
+        "server/routes/agi.constraint-packs.ts"
+      ]
+    },
+    "certified": {
+      "count": 7,
+      "modules": [
+        "server/gr/constraint-evaluator.ts",
+        "server/gr/gr-evaluation.ts",
+        "server/gr/gr-agent-loop.ts",
+        "tools/warpViabilityCertificate.ts",
+        "tools/verifyCertificate.ts",
+        "server/skills/physics.warp.viability.ts",
+        "server/routes/warp-viability.ts"
+      ]
+    }
+  },
+  "unstaged": {
+    "count": 8,
+    "modules": [
+      "modules/gr/gr-diagnostics.ts",
+      "server/gr/gr-assistant-adapter.ts",
+      "server/gr/gr-os-payload.ts",
+      "server/routes/agi.chat.ts",
+      "server/routes/agi.contributions.ts",
+      "server/routes/agi.refinery.ts",
+      "server/services/observability/gr-os-payload-store.ts",
+      "server/services/observability/tool-event-adapters.ts"
+    ],
+    "suggested": {
+      "diagnostic": [
+        "modules/gr/gr-diagnostics.ts",
+        "server/gr/gr-assistant-adapter.ts",
+        "server/gr/gr-os-payload.ts"
+      ],
+      "reduced-order": [
+        "server/routes/agi.chat.ts",
+        "server/routes/agi.contributions.ts",
+        "server/routes/agi.refinery.ts"
+      ],
+      "exploratory": [
+        "server/services/observability/gr-os-payload-store.ts",
+        "server/services/observability/tool-event-adapters.ts"
+      ]
+    },
+    "defaultStage": "exploratory"
+  },
+  "evidenceIssues": {
+    "count": 0,
+    "items": []
+  },
+  "narrativeIssues": {
+    "count": 0,
+    "items": []
+  },
+  "stageViolations": {
+    "edge": {
+      "count": 0,
+      "items": []
+    },
+    "pipeline": {
+      "count": 0,
+      "items": []
+    }
+  },
+  "unitCoverage": {
+    "entriesWithUnits": 69,
+    "entriesMissingUnits": [],
+    "byStage": {
+      "exploratory": {
+        "total": 13,
+        "withUnits": 13,
+        "missing": []
+      },
+      "reduced-order": {
+        "total": 28,
+        "withUnits": 28,
+        "missing": []
+      },
+      "diagnostic": {
+        "total": 21,
+        "withUnits": 21,
+        "missing": []
+      },
+      "certified": {
+        "total": 7,
+        "withUnits": 7,
+        "missing": []
+      }
+    }
+  },
+  "unitViolations": {
+    "count": 0,
+    "errors": [],
+    "warnings": []
+  },
+  "autoEvidence": {
+    "moduleCount": 0,
+    "testCount": 0,
+    "modules": []
+  },
+  "autoGraph": {
+    "nodeCount": 526,
+    "edgeCount": 1135
+  },
+  "evidenceProfiles": [
+    {
+      "name": "sanity_checks",
+      "label": "Sanity checks",
+      "commands": [
+        "npm run lint",
+        "npm test -- --run '*sanity*'"
+      ],
+      "tests": 0
+    },
+    {
+      "name": "residual_check",
+      "label": "Residual checks",
+      "commands": [
+        "npm run math:validate",
+        "npm test -- --run '*constraint*'"
+      ],
+      "tests": 0
+    },
+    {
+      "name": "certificate",
+      "label": "Certificate / policy checks",
+      "commands": [
+        "npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl"
+      ],
+      "tests": 0
+    },
+    {
+      "name": "regression",
+      "label": "Regression tests",
+      "commands": [
+        "npm test"
+      ],
+      "tests": 0
+    }
+  ],
+  "missingEvidenceProfiles": [],
+  "waivers": {
+    "edgeCount": 0,
+    "moduleCount": 0
+  },
+  "waivedIssues": []
+}

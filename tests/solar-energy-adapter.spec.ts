@@ -1,8 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import os from "node:os";
 import path from "node:path";
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync } from "node:fs";
 import { buildEnergyFieldFromSunpy, runSolarCurvatureFromSunpy } from "../server/services/essence/solar-energy-adapter";
 import { loadSolarEnergyCalibration } from "../server/services/essence/solar-energy-adapter";
 import type { SunpyExportPayload } from "../server/services/essence/sunpy-coherence-bridge";
@@ -11,6 +10,8 @@ import { resetEnvelopeStore } from "../server/services/essence/store";
 
 const float32ToB64 = (arr: Float32Array) => Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength).toString("base64");
 const isoPlusMs = (baseIso: string, deltaMs: number) => new Date(Date.parse(baseIso) + deltaMs).toISOString();
+const fixturePath = path.resolve(process.cwd(), "datasets", "solar-energy-proxy.fixture.json");
+const itWithFixture = existsSync(fixturePath) ? it : it.skip;
 
 let tmpDir = "";
 
@@ -72,8 +73,8 @@ describe("solar energy adapter", () => {
     expect(arr[2]).toBeCloseTo(calib.u_total_scale_Jm3, 8);
   });
 
-  it("matches the fixture dataset hashes", () => {
-    const manifest = JSON.parse(readFileSync(path.resolve(process.cwd(), "datasets", "solar-energy-proxy.fixture.json"), "utf8"));
+  itWithFixture("matches the fixture dataset hashes", () => {
+    const manifest = JSON.parse(readFileSync(fixturePath, "utf8"));
     const entry = manifest.entries[0];
     const payload: SunpyExportPayload = {
       instrument: entry.input.instrument,

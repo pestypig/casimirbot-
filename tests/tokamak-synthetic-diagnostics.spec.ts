@@ -13,8 +13,9 @@ const FIXTURE_MANIFEST_PATH = path.resolve(
   "datasets",
   "tokamak-rz-energy.fixture.json",
 );
+const describeWithFixture = fs.existsSync(FIXTURE_MANIFEST_PATH) ? describe : describe.skip;
 
-describe("tokamak synthetic diagnostics", () => {
+describeWithFixture("tokamak synthetic diagnostics", () => {
   it("generates sensor diagnostics and info-loss metrics", () => {
     const manifest = JSON.parse(
       fs.readFileSync(FIXTURE_MANIFEST_PATH, "utf8"),

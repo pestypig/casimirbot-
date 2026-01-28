@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import crypto from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CurvatureUnitInput } from "../shared/essence-physics";
@@ -23,6 +23,8 @@ type FixtureManifest = {
 };
 
 const FIXTURE_MANIFEST_PATH = path.resolve(process.cwd(), "datasets", "u-field-rz.fixture.json");
+const hasFixtureManifest = existsSync(FIXTURE_MANIFEST_PATH);
+const itWithFixtureManifest = hasFixtureManifest ? it : it.skip;
 
 function synthesizeGaussianField(grid: { nx: number; ny: number; dx_m: number; dy_m: number }, sources: GaussianSource[]) {
   const { nx, ny, dx_m, dy_m } = grid;
@@ -434,7 +436,7 @@ describe("CurvatureUnit v2: determinism + hashing", () => {
     expect(maskedMax).toBeLessThan(1e-6);
   });
 
-  it("produces deterministic hashes for the RZ u_field fixtures", async () => {
+  itWithFixtureManifest("produces deterministic hashes for the RZ u_field fixtures", async () => {
     const manifest = JSON.parse(readFileSync(FIXTURE_MANIFEST_PATH, "utf8")) as FixtureManifest;
 
     for (let i = 0; i < manifest.entries.length; i++) {

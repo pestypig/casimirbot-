@@ -15,6 +15,7 @@ import { ThemeInstrumentDeck } from "@/components/start/ThemeInstrumentDeck";
 import { useEssenceThemes } from "@/hooks/useEssenceThemes";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { DOC_VIEWER_PANEL_ID, saveDocViewerIntent, type DocViewerIntent } from "@/lib/docs/docViewer";
+import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 
 const PENDING_PANEL_KEY = "helix:pending-panel";
 
@@ -31,14 +32,14 @@ const PROFILES: Record<ProfileKey, {
     name: "Radiant Optimist",
     zen: "\"The light we save today will shine for a billion tomorrows.\"",
     physics:
-      "Energy-positivity balance; emphasizes Ford–Roman compliance as a guiding constraint.",
+      "Energy-positivity balance; emphasizes Ford-Roman compliance as a guiding constraint.",
   },
   engineer: {
     icon: "⚙️",
     name: "The Engineer",
     zen: "\"Every equation is a bridge; every weld, a promise.\"",
     physics:
-      "Sector strobing, γ_geo, γ_VdB, Q_cavity; trade-offs and tolerances explained.",
+      "Sector strobing, gamma_geo, gamma_VdB, Q_cavity; trade-offs and tolerances explained.",
   },
   diplomat: {
     icon: "🐼",
@@ -65,6 +66,7 @@ export default function StartPortal() {
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab>("preferences");
   const { userSettings, updateSettings } = useHelixStartSettings();
   const [, setLocation] = useLocation();
+  useLumaMoodTheme({ randomize: true });
   const {
     data: themeDeck,
     isLoading: themeLoading,
@@ -133,9 +135,17 @@ export default function StartPortal() {
   const desktopIsPrimary = userSettings.preferDesktop;
 
   const primaryButtonClass =
-    "px-3.5 py-2 rounded-lg bg-sky-500/90 hover:bg-sky-500 text-white text-sm font-medium";
+    "rounded-lg bg-primary/92 px-3.5 py-2 text-sm font-semibold text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.32)] transition hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
   const secondaryButtonClass =
-    "px-3.5 py-2 rounded-lg border border-white/20 bg-transparent hover:bg-white/5 text-slate-100 text-sm";
+    "rounded-lg border border-primary/35 bg-card/70 px-3.5 py-2 text-sm font-medium text-foreground/92 shadow-[inset_0_0_20px_hsl(var(--primary)/0.08)] transition hover:border-primary/55 hover:bg-card/85 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  const launchButtonClass =
+    "rounded-lg border border-primary/45 bg-primary/16 px-3.5 py-2 text-sm font-medium text-primary shadow-[0_0_18px_hsl(var(--primary)/0.22)] transition hover:border-primary/70 hover:bg-primary/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  const surfaceCardClass =
+    "relative overflow-hidden rounded-2xl border border-primary/25 bg-card/72 p-5 md:p-6 text-foreground shadow-[0_35px_110px_hsl(var(--primary)/0.18)]";
+  const surfaceCardTintClass =
+    "pointer-events-none absolute inset-0 opacity-85 bg-[radial-gradient(160%_220%_at_6%_12%,hsl(var(--primary)/0.2)_0%,transparent_72%)]";
+  const surfaceCardHaloClass =
+    "pointer-events-none absolute inset-0 opacity-75 bg-[radial-gradient(140%_190%_at_94%_18%,hsl(var(--primary)/0.14)_0%,transparent_74%)]";
 
   return (
     <Dialog
@@ -146,13 +156,26 @@ export default function StartPortal() {
       }}
     >
       {userSettings.enableSplashCursor && <SplashCursor />}
-      <div className="relative min-h-screen bg-[#0b1020] text-slate-100 grid place-items-center px-4">
+      <div className="mood-transition-scope relative min-h-screen bg-background text-foreground grid place-items-center px-4">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ backgroundColor: "var(--surface-laminate)" }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(140%_200%_at_8%_12%,hsl(var(--primary)/0.26)_0%,transparent_70%)]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-80 bg-[radial-gradient(150%_210%_at_96%_10%,hsl(var(--primary)/0.18)_0%,transparent_72%)]"
+        />
         <div className="pointer-events-none absolute left-0 right-0 top-4 flex items-center justify-end gap-2">
-          <p className="hidden text-xs uppercase tracking-[0.25em] text-slate-400 sm:block">
+          <p className="hidden text-xs uppercase tracking-[0.25em] text-muted-foreground/80 sm:block">
             Helix Controls
           </p>
           <button
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-100 transition hover:bg-indigo-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+            className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-primary/45 bg-primary/18 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary shadow-[0_0_20px_hsl(var(--primary)/0.28)] transition hover:bg-primary/28 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={() => requestPanelWindow("helix-phoenix")}
           >
             Phoenix Panel
@@ -160,7 +183,7 @@ export default function StartPortal() {
           <DialogTrigger asChild>
             <button
               aria-label="Open Helix Start settings"
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-primary/25 bg-card/65 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground transition hover:border-primary/45 hover:bg-card/82 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Settings</span>
@@ -177,17 +200,17 @@ export default function StartPortal() {
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
               Choose Your Mission View
             </h1>
-            <p className="text-slate-300/80 text-sm mt-1">
+            <p className="text-muted-foreground/85 text-sm mt-1">
               A quiet beginning. Same physics. Your preferred lens.
             </p>
             <div className="mt-4 flex flex-col items-center gap-2">
               <button
-                className="rounded-lg bg-indigo-500/85 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500"
+                className={primaryButtonClass}
                 onClick={() => requestPanelWindow("helix-phoenix")}
               >
                 Open Phoenix Averaging Panel
               </button>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-muted-foreground">
                 Opens the Desktop with the Phoenix averaging window already staged.
               </p>
             </div>
@@ -207,11 +230,13 @@ export default function StartPortal() {
                 key={k}
                 role="listitem"
                 className={[
-                  "aspect-square rounded-2xl bg-white/5 hover:bg-white/7.5",
-                  "border border-white/10 shadow-sm",
-                  "flex flex-col items-center justify-center",
-                  "transition-transform focus:outline-none focus:ring-2 focus:ring-sky-400/40",
-                  isSel ? "scale-[1.04]" : "",
+                  "aspect-square rounded-2xl border border-primary/25 bg-card/65 text-foreground",
+                  "flex flex-col items-center justify-center shadow-[0_20px_60px_hsl(var(--primary)/0.16)]",
+                  "transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/55 hover:bg-card/85 hover:text-primary",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]",
+                  isSel
+                    ? "scale-[1.04] border-primary/70 bg-primary/18 text-primary shadow-[0_0_28px_hsl(var(--primary)/0.34)]"
+                    : "",
                 ].join(" ")}
                 onClick={() => pick(k)}
                 onKeyDown={(e) => {
@@ -222,7 +247,7 @@ export default function StartPortal() {
                 }}
               >
                 <div className="text-5xl md:text-6xl mb-2">{p.icon}</div>
-                <div className="text-sm md:text-base font-medium opacity-90">
+                <div className="text-sm md:text-base font-medium text-foreground/90">
                   {p.name}
                 </div>
               </button>
@@ -236,19 +261,21 @@ export default function StartPortal() {
             className="mt-6 md:mt-8"
             aria-live="polite"
           >
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
-              <div className="flex items-start gap-3">
+            <div className={`${surfaceCardClass} p-4 md:p-5`}>
+              <div aria-hidden className={surfaceCardTintClass} />
+              <div aria-hidden className={surfaceCardHaloClass} />
+              <div className="relative z-[1] flex items-start gap-3">
                 <div className="text-3xl md:text-4xl">{PROFILES[selected].icon}</div>
                 <div className="flex-1">
-                  <h2 className="text-base md:text-lg font-semibold">
+                  <h2 className="text-base md:text-lg font-semibold text-foreground">
                     {PROFILES[selected].name}
                   </h2>
                   {userSettings.showZen && (
-                    <p className="text-slate-200/90 text-sm md:text-[15px] mt-1">
+                    <p className="mt-1 text-sm text-foreground/92 md:text-[15px]">
                       {PROFILES[selected].zen}
                     </p>
                   )}
-                  <p className="text-slate-300/80 text-xs md:text-sm mt-2 leading-relaxed">
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground/85 md:text-sm">
                     {PROFILES[selected].physics}
                   </p>
 
@@ -260,7 +287,7 @@ export default function StartPortal() {
                       Enter Station
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg bg-white/7 hover:bg-white/10 text-slate-100 text-sm"
+                      className="rounded-lg bg-card/78 px-3.5 py-2 text-sm font-medium text-foreground transition hover:bg-card/92 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       onClick={() => setSelected(null)}
                     >
                       Change choice
@@ -272,55 +299,55 @@ export default function StartPortal() {
                       Open Desktop
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-emerald-400/40 bg-emerald-400/10 text-emerald-200 text-sm"
+                      className={launchButtonClass}
                       onClick={() => requestPanelWindow("energy-flux")}
                     >
                       Launch Energy Flux Panel
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-cyan-300/50 bg-cyan-500/10 text-cyan-100 text-sm"
+                      className={launchButtonClass}
                       onClick={() => requestPanelWindow("pipeline-proof")}
                     >
                       Pipeline Proof Panel
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-cyan-400/40 bg-cyan-400/10 text-cyan-100 text-sm"
+                      className={launchButtonClass}
                       onClick={() => requestPanelWindow("electron-orbital")}
                     >
                       Launch Electron Orbitals Panel
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-amber-400/50 bg-amber-400/10 text-amber-100 text-sm"
+                      className={launchButtonClass}
                       onClick={() => requestPanelWindow("star-hydrostatic")}
                     >
                       Launch Hydrostatic Panel
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 text-cyan-100 text-sm"
+                      className={launchButtonClass}
                       onClick={() => requestPanelWindow("star-watcher")}
                     >
                       Open Star Watcher
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-sky-400/50 bg-sky-400/10 text-sky-100 text-sm"
+                      className={launchButtonClass}
                       onClick={() => requestPanelWindow("star-coherence")}
                     >
                       Star Coherence Governor
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-emerald-400/40 bg-emerald-400/10 text-emerald-100 text-sm"
+                      className={launchButtonClass}
                       onClick={() => requestPanelWindow("collapse-monitor")}
                     >
                       Collapse Watch Panel
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-indigo-300/50 bg-indigo-500/10 text-indigo-100 text-sm"
+                      className={launchButtonClass}
                       onClick={() => requestPanelWindow("helix-phoenix")}
                     >
                       Phoenix Averaging Panel
                     </button>
                     <button
-                      className="px-3.5 py-2 rounded-lg border border-slate-400/40 bg-slate-800/30 text-slate-100 text-sm"
+                      className={launchButtonClass}
                       onClick={() =>
                         requestPanelWindow(DOC_VIEWER_PANEL_ID, { docIntent: { mode: "directory" } })
                       }
@@ -330,7 +357,7 @@ export default function StartPortal() {
                   </div>
                 </div>
               </div>
-              <p className="text-[11px] text-slate-400 mt-4">
+              <p className="relative z-[1] mt-4 text-[11px] text-muted-foreground">
                 No account is created. Your choice is for this visit only.
               </p>
             </div>
@@ -347,12 +374,12 @@ export default function StartPortal() {
         />
 
         <section className="mt-10">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+          <div className={surfaceCardClass}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
               <div className="space-y-2 lg:max-w-sm">
-                <p className="text-[11px] uppercase tracking-[0.35em] text-sky-300">Time dilation</p>
-                <h3 className="text-lg font-semibold text-white">Spacetime lattice preview</h3>
-                <p className="text-sm leading-relaxed text-slate-300/80">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-primary/80">Time dilation</p>
+                <h3 className="text-lg font-semibold text-foreground">Spacetime lattice preview</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground/85">
                   Visualize a 3D lattice warped by a shared potential field. Local clock pulses slow near mass while the
                   grid deformation remains a visual cue, keeping space and time meanings separate.
                 </p>
@@ -365,12 +392,12 @@ export default function StartPortal() {
         </section>
 
         <section className="mt-10">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+          <div className={surfaceCardClass}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
-                <p className="text-[11px] uppercase tracking-[0.35em] text-indigo-300">New panel</p>
-                <h3 className="text-lg font-semibold text-white">Phoenix Averaging — Needle Hull</h3>
-                <p className="text-sm leading-relaxed text-slate-300/80">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-primary/80">New panel</p>
+                <h3 className="text-lg font-semibold text-foreground">Phoenix Averaging - Needle Hull</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground/85">
                   Shows GR-proxy curvature built from Casimir tile power, Hann-averaged over local light-crossing
                   windows in the ship frame. Includes a worldline strip, spacetime tile band, and the always-on Phoenix
                   badge so operators remember this is a control foliation, not an outside simultaneity view.
@@ -378,12 +405,12 @@ export default function StartPortal() {
               </div>
               <div className="flex flex-col gap-2 md:max-w-xs">
                 <button
-                  className="rounded-lg bg-indigo-500/85 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500"
+                  className={primaryButtonClass}
                   onClick={() => requestPanelWindow("helix-phoenix")}
                 >
                   Open Phoenix Panel
                 </button>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   Opens the Desktop and auto-starts the Phoenix Averaging window.
                 </p>
               </div>
@@ -392,24 +419,24 @@ export default function StartPortal() {
         </section>
 
         <section className="mt-10">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+          <div className={surfaceCardClass}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
-                <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">New panel</p>
-                <h3 className="text-lg font-semibold text-white">Fleet Hull Cards</h3>
-                <p className="text-sm leading-relaxed text-slate-300/80">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-primary/80">New panel</p>
+                <h3 className="text-lg font-semibold text-foreground">Fleet Hull Cards</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground/85">
                   Pick a ship hull card (Needle, Clipper, Courier, Heavy Lancer) and apply its dimensions directly into
                   the pipeline. Mirrors the Helix Start card flow so hull swaps stay simple and falsifiable.
                 </p>
               </div>
               <div className="flex flex-col gap-2 md:max-w-xs">
                 <button
-                  className="rounded-lg bg-cyan-500/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition hover:bg-cyan-500"
+                  className={primaryButtonClass}
                   onClick={() => setLocation("/helix-core#hull-cards")}
                 >
                   Open Hull Cards in Station
                 </button>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   Jumps to Helix Core with the hull card panel in view; applying a card updates pipeline.hull.
                 </p>
               </div>
@@ -418,25 +445,25 @@ export default function StartPortal() {
         </section>
 
         <section className="mt-10">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+          <div className={surfaceCardClass}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
-                <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">New panel</p>
-                <h3 className="text-lg font-semibold text-white">Energy Flux Stability Monitor</h3>
-                <p className="text-sm leading-relaxed text-slate-300/80">
-                  Real-time |T⁰⁰| and ∇·S slices with a stability histogram for
-                  R = (∇·S)/(ε + |T⁰⁰|). Launch it whenever you need to inspect which sectors are steady
+                <p className="text-[11px] uppercase tracking-[0.35em] text-primary/80">New panel</p>
+                <h3 className="text-lg font-semibold text-foreground">Energy Flux Stability Monitor</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground/85">
+                  Real-time |T00| and div(S) slices with a stability histogram for
+                  R = (div(S))/(epsilon + |T00|). Launch it whenever you need to inspect which sectors are steady
                   versus oscillatory before touching duty or strobe settings.
                 </p>
               </div>
               <div className="flex flex-col gap-2 md:max-w-xs">
                 <button
-                  className="rounded-lg bg-cyan-500/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition hover:bg-cyan-500"
+                  className={primaryButtonClass}
                   onClick={() => requestPanelWindow("energy-flux")}
                 >
                   Open as Desktop Window
                 </button>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   Takes you to the Desktop and auto-opens the panel as a window.
                 </p>
               </div>
@@ -445,23 +472,23 @@ export default function StartPortal() {
         </section>
 
         <section className="mt-6">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+          <div className={surfaceCardClass}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
-                <p className="text-[11px] uppercase tracking-[0.35em] text-purple-300">New panel</p>
-                <h3 className="text-lg font-semibold text-white">Electron Orbital Simulator</h3>
-                <p className="text-sm leading-relaxed text-slate-300/80">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-primary/80">New panel</p>
+                <h3 className="text-lg font-semibold text-foreground">Electron Orbital Simulator</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground/85">
                   Visualize orbital density clouds, sweep Coulomb probes, and watch toroidal spin packets stay tied to the live energy pipeline. Perfect for deriving k, q, and g inside the same telemetry loop you trust for duty changes.
                 </p>
               </div>
               <div className="flex flex-col gap-2 md:max-w-xs">
                 <button
-                  className="rounded-lg bg-purple-500/80 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:bg-purple-500"
+                  className={primaryButtonClass}
                   onClick={() => requestPanelWindow("electron-orbital")}
                 >
                   Open Orbital Panel
                 </button>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   Opens the Desktop with the orbital window already instrumented.
                 </p>
               </div>
@@ -470,26 +497,26 @@ export default function StartPortal() {
         </section>
 
         <section className="mt-6">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+          <div className={surfaceCardClass}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
-                <p className="text-[11px] uppercase tracking-[0.35em] text-amber-300">Docs & digests</p>
-                <h3 className="text-lg font-semibold text-white">Docs & Papers Viewer</h3>
-                <p className="text-sm leading-relaxed text-slate-300/80">
+                <p className="text-[11px] uppercase tracking-[0.35em] text-primary/80">Docs & digests</p>
+                <h3 className="text-lg font-semibold text-foreground">Docs & Papers Viewer</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground/85">
                   Browse every repo note, ethos memo, and Ford-Roman digest without leaving the Desktop.
                   The new panel includes a searchable directory plus anchor support for theory badges.
                 </p>
               </div>
               <div className="flex flex-col gap-2 md:max-w-xs">
                 <button
-                  className="rounded-lg bg-slate-800/80 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/40 transition hover:bg-slate-800"
+                  className={secondaryButtonClass}
                   onClick={() =>
                     requestPanelWindow(DOC_VIEWER_PANEL_ID, { docIntent: { mode: "directory" } })
                   }
                 >
                   Open Docs Directory
                 </button>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   Launches the Desktop with the docs viewer already focused on the directory.
                 </p>
               </div>
@@ -498,25 +525,25 @@ export default function StartPortal() {
         </section>
 
         <section className="mt-6">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+          <div className={surfaceCardClass}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
-                <p className="text-[11px] uppercase tracking-[0.35em] text-amber-200">Stellar ledger</p>
-                <h3 className="text-lg font-semibold text-white">Hydrostatic Equilibrium — HR Map</h3>
-                <p className="text-sm leading-relaxed text-slate-300/80">
-                  Compare κ_drive to κ_body at stellar densities, watch the Gamow window light up, and keep the
+                <p className="text-[11px] uppercase tracking-[0.35em] text-primary/80">Stellar ledger</p>
+                <h3 className="text-lg font-semibold text-foreground">Hydrostatic Equilibrium - HR Map</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground/85">
+                  Compare kappa_drive to kappa_body at stellar densities, watch the Gamow window light up, and keep the
                   potato threshold story intact from rubble piles to stars. HR presets plus polytrope solver are one
                   click away.
                 </p>
               </div>
               <div className="flex flex-col gap-2 md:max-w-xs">
                 <button
-                  className="rounded-lg bg-amber-500/85 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/30 transition hover:bg-amber-500"
+                  className={primaryButtonClass}
                   onClick={() => requestPanelWindow("star-hydrostatic")}
                 >
                   Open Hydrostatic Panel
                 </button>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   Opens Desktop mode with the Hydrostatic Equilibrium window ready to explore.
                 </p>
               </div>

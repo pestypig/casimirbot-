@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { loadTokamakPrecursorDataset } from "../tools/tokamak-precursor-runner";
@@ -14,6 +14,7 @@ const DATASET_PATH = path.resolve(
   "datasets",
   "tokamak-rz-precursor.fixture.json",
 );
+const describeWithDataset = existsSync(DATASET_PATH) ? describe : describe.skip;
 
 let tmpDir = "";
 
@@ -35,7 +36,7 @@ afterAll(() => {
   delete process.env.DATABASE_URL;
 });
 
-describe("tokamak added value report", () => {
+describeWithDataset("tokamak added value report", () => {
   it("is deterministic and persists an essence envelope", async () => {
     const dataset = await loadTokamakPrecursorDataset(DATASET_PATH);
     const generatedAt = "2025-01-01T00:00:00.000Z";

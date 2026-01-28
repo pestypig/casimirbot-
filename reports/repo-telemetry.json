@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-01-26T15:09:26.696Z",
+  "repo": {
+    "tests": {
+      "total": 450,
+      "failed": 0,
+      "passed": 450,
+      "status": "pass",
+      "ok": false
+    },
+    "typecheck": {
+      "status": "pass"
+    },
+    "deps": {
+      "coherence": true
+    },
+    "build": {
+      "status": "pass",
+      "ok": true,
+      "exitCode": 0,
+      "durationMs": 49658
+    },
+    "schema": {
+      "contracts": "pass",
+      "ok": true
+    }
+  }
+}

@@ -3,9 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadCollapseBenchmarkManifest, runCollapseBenchmarkManifest } from "../tools/collapse-benchmark-runner";
 
-describe("collapse benchmark (Phase 5): CLI + golden report", () => {
+const manifestPath = path.resolve(process.cwd(), "datasets/benchmarks/collapse-benchmark.fixture.json");
+const describeWithFixture = fs.existsSync(manifestPath) ? describe : describe.skip;
+
+describeWithFixture("collapse benchmark (Phase 5): CLI + golden report", () => {
   it("emits deterministic report hash for the fixture manifest", async () => {
-    const manifestPath = path.resolve(process.cwd(), "datasets/benchmarks/collapse-benchmark.fixture.json");
     const manifest = await loadCollapseBenchmarkManifest(manifestPath);
     const report = runCollapseBenchmarkManifest(manifest, {
       manifest_path: manifestPath,

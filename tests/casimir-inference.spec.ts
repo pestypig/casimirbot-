@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import { PHYSICS_CONSTANTS } from "../modules/core/physics-constants";
@@ -14,6 +14,12 @@ type DatasetOptions = {
   sigmaSepFrac: number;
   noiseFrac: number;
 };
+
+const referenceDatasetPath = fileURLToPath(
+  new URL("../datasets/casimir/gaas-au-equilibrium-zenodo-10791253.json", import.meta.url),
+);
+const hasReferenceDataset = existsSync(referenceDatasetPath);
+const itWithReference = hasReferenceDataset ? it : it.skip;
 
 const idealParallelPlateForce = (area_m2: number, separation_m: number) => {
   const a = Math.max(1e-12, separation_m);
@@ -47,10 +53,7 @@ const buildDataset = (opts: DatasetOptions): CasimirForceDataset => {
 };
 
 const loadReferenceDataset = (): CasimirForceDataset => {
-  const path = fileURLToPath(
-    new URL("../datasets/casimir/gaas-au-equilibrium-zenodo-10791253.json", import.meta.url),
-  );
-  const raw = readFileSync(path, "utf8");
+  const raw = readFileSync(referenceDatasetPath, "utf8");
   return JSON.parse(raw) as CasimirForceDataset;
 };
 
@@ -140,7 +143,7 @@ describe("casimir force inference", () => {
     expect(energy.forceSign?.autoFlipApplied).toBe(true);
   });
 
-  it("matches published GaAs/Au equilibrium reference dataset", () => {
+  itWithReference("matches published GaAs/Au equilibrium reference dataset", () => {
     const dataset = loadReferenceDataset();
     const golden = loadGoldenSnapshot();
     const scale = inferCasimirForceScale(dataset);

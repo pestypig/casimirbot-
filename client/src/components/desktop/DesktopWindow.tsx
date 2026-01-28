@@ -92,8 +92,8 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
     if (!w) return {};
     const ideologyVars = isIdeologyPanel
       ? {
-          "--background": "hsl(240, 10%, 3.9%)",
-          "--border": "hsl(240, 3.7%, 15.9%)"
+          "--background": "240 10% 3.9%",
+          "--border": "240 3.7% 15.9%"
         }
       : {};
     return {

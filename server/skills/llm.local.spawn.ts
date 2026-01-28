@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { copyFileSync, existsSync, readdirSync, renameSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
@@ -24,9 +24,41 @@ const DEFAULT_MAX_TOKENS = toPositiveInt(process.env.LLM_LOCAL_MAX_TOKENS, 512);
 const DEFAULT_TEMPERATURE = toNumber(process.env.LLM_LOCAL_TEMP, 0.2);
 const DEFAULT_SEED = toPositiveInt(process.env.LLM_LOCAL_SEED, 42);
 const DEFAULT_TIMEOUT_MS = toPositiveInt(process.env.LLM_LOCAL_SPAWN_TIMEOUT_MS, 60_000);
+const DEFAULT_CONCURRENCY = Math.max(1, Number(process.env.LLM_LOCAL_CONCURRENCY ?? 1));
 const TOOL_NAME = "llm.local.spawn.generate";
 const TOOL_VERSION = process.env.LLM_LOCAL_SPAWN_VERSION?.trim() || "1.0.0";
 const TEXT_MIME = "text/plain";
+const PROMPT_INLINE_MAX = 8000;
+const PROMPT_FILE_DIR = resolve(process.env.LLM_LOCAL_PROMPT_DIR?.trim() || "tmp/llm-prompts");
+let activeSpawns = 0;
+const spawnWaiters: Array<() => void> = [];
+
+const acquireSpawnSlot = async (): Promise<() => void> => {
+  if (activeSpawns < DEFAULT_CONCURRENCY) {
+    activeSpawns += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      activeSpawns = Math.max(0, activeSpawns - 1);
+      const next = spawnWaiters.shift();
+      if (next) next();
+    };
+  }
+  return new Promise((resolve) => {
+    spawnWaiters.push(() => {
+      activeSpawns += 1;
+      let released = false;
+      resolve(() => {
+        if (released) return;
+        released = true;
+        activeSpawns = Math.max(0, activeSpawns - 1);
+        const next = spawnWaiters.shift();
+        if (next) next();
+      });
+    });
+  });
+};
 
 const GenerateInput = z.object({
   prompt: z.string().min(1, "prompt required"),
@@ -70,7 +102,9 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   const parsed = GenerateInput.parse(rawInput ?? {});
   const personaId = (ctx?.personaId as string) || "persona:unknown";
   const sessionId = (ctx?.sessionId as string) || undefined;
+  const traceId = (ctx?.traceId as string) || undefined;
   const prompt = parsed.prompt;
+  let promptFilePath: string | null = null;
   const cmd = process.env.LLM_LOCAL_CMD?.trim() || DEFAULT_CMD;
   const model =
     process.env.LLM_LOCAL_MODEL_PATH?.trim() ||
@@ -101,10 +135,21 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   llmLocalSpawnCalls.inc();
   const startedAt = new Date(started).toISOString();
   const release = beginLlMJob();
+  let releaseSpawn: (() => void) | null = null;
+  const cleanupPromptFile = () => {
+    if (!promptFilePath) return;
+    try {
+      unlinkSync(promptFilePath);
+    } catch {
+      // best-effort cleanup
+    }
+    promptFilePath = null;
+  };
   const buildSpawnArgs = (override?: { loraPath?: string; loraScale?: number }) =>
     buildArgs(baseArgs, {
       model,
       prompt,
+      promptFile: promptFilePath ?? undefined,
       maxTokens,
       contextTokens,
       temperature,
@@ -113,7 +158,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       loraPath: override?.loraPath ?? loraPath,
       loraScale: override?.loraScale ?? loraScale,
     });
-  const args = buildSpawnArgs();
+  let args = buildSpawnArgs();
   let usedArgs = args;
   let activeLoraPath = loraPath;
   let activeLoraScale = loraScale;
@@ -173,7 +218,19 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     }
   };
   let lastError: unknown;
+  let triedNoLora = false;
   try {
+    releaseSpawn = await acquireSpawnSlot();
+    if (shouldUsePromptFile(prompt)) {
+      try {
+        mkdirSync(PROMPT_FILE_DIR, { recursive: true });
+        promptFilePath = resolve(PROMPT_FILE_DIR, `prompt-${randomUUID()}.txt`);
+        writeFileSync(promptFilePath, prompt, "utf8");
+      } catch {
+        promptFilePath = null;
+      }
+      args = buildSpawnArgs();
+    }
     const missingDeps = verifyWindowsBinaryDeps(cmd, cpuBackend);
     if (missingDeps.length) {
       throw new Error(
@@ -190,8 +247,19 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     const isAccessViolation = /3221225477|0xC0000005/i.test(message);
     const isMissingDll =
       /3221225781|0xC0000135|module could not be found/i.test(message);
+    const isBackendLoad = /load_backend/i.test(message);
     if (loraPath && isAccessViolation) {
       const noLoraArgs = buildSpawnArgs({ loraPath: "", loraScale: undefined });
+      triedNoLora = true;
+      if (await attempt(noLoraArgs)) {
+        activeLoraPath = "";
+        activeLoraScale = undefined;
+        return await finalizeSuccess();
+      }
+    }
+    if (loraPath && !triedNoLora && isBackendLoad) {
+      const noLoraArgs = buildSpawnArgs({ loraPath: "", loraScale: undefined });
+      triedNoLora = true;
       if (await attempt(noLoraArgs)) {
         activeLoraPath = "";
         activeLoraScale = undefined;
@@ -235,6 +303,15 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       const finalMessage = `${message}.${hint} Set LLM_LOCAL_CPU_BACKEND to a supported backend (sse42/x64), or install a compatible llama prebuilt.`;
       throw new Error(finalMessage);
     }
+    const isMemoryAlloc =
+      /failed to allocate|unable to allocate|alloc_tensor_range|ggml_backend_cpu_buffer_type_alloc_buffer/i.test(
+        message,
+      );
+    if (isMemoryAlloc) {
+      throw new Error(
+        `${message}. Likely insufficient contiguous RAM. Close heavy apps, reboot, reduce model size/context, or remove --no-mmap.`,
+      );
+    }
     throw error;
   } catch (err) {
     lastError = err;
@@ -272,6 +349,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       promptHash,
       durationMs: Date.now() - started,
       sessionId,
+      traceId,
       ok: false,
       error: serializeError(err),
       seed,
@@ -279,7 +357,11 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     });
     throw lastError;
   } finally {
+    cleanupPromptFile();
     release();
+    if (releaseSpawn) {
+      releaseSpawn();
+    }
   }
 
   async function finalizeSuccess(): Promise<LocalSpawnOutput> {
@@ -388,6 +470,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       promptHash,
       durationMs,
       sessionId,
+      traceId,
       ok: true,
       essenceId,
       seed,
@@ -653,6 +736,7 @@ function buildArgs(
   opts: {
     model: string;
     prompt: string;
+    promptFile?: string;
     maxTokens: number;
     contextTokens: number;
     temperature: number;
@@ -664,7 +748,11 @@ function buildArgs(
 ): string[] {
   const args = sanitizeBaseArgs(baseArgs);
   args.push("-m", opts.model);
-  args.push("-p", opts.prompt);
+  if (opts.promptFile) {
+    args.push("-f", opts.promptFile);
+  } else {
+    args.push("-p", opts.prompt);
+  }
   args.push("-n", String(opts.maxTokens));
   args.push("--ctx-size", String(opts.contextTokens));
   args.push("--temp", String(opts.temperature));
@@ -697,6 +785,10 @@ function buildArgs(
     args.push("--stop", opts.stop);
   }
   return args;
+}
+
+function shouldUsePromptFile(prompt: string): boolean {
+  return /[\r\n]/.test(prompt) || prompt.length > PROMPT_INLINE_MAX;
 }
 
 function sanitizeBaseArgs(baseArgs: string[]): string[] {

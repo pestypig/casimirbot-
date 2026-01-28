@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import os from "node:os";
 import path from "node:path";
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import {
   DEFAULT_SOLAR_SPECTRUM_SPECS,
   ingestSolarSpectrumFile,
@@ -15,6 +15,26 @@ import { resetDbClient } from "../server/db/client";
 import { resetEnvelopeStore } from "../server/services/essence/store";
 
 let tmpDir = "";
+const SOLAR_ISS_PATH = path.resolve(
+  process.cwd(),
+  "datasets",
+  "solar",
+  "spectra",
+  "solar-iss",
+  "v1.1",
+  "spectrum.dat",
+);
+const SOLAR_HRS_PATH = path.resolve(
+  process.cwd(),
+  "datasets",
+  "solar",
+  "spectra",
+  "solar-hrs",
+  "v1",
+  "Spectre_HR_Solar_position_LATMOS_Meftah_V1_1.txt",
+);
+const itWithSolarIss = existsSync(SOLAR_ISS_PATH) ? it : it.skip;
+const itWithSolarHrs = existsSync(SOLAR_HRS_PATH) ? it : it.skip;
 
 beforeAll(async () => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "solar-spectrum-ingest-"));
@@ -35,7 +55,7 @@ afterAll(() => {
 });
 
 describe("solar spectrum ingest", () => {
-  it("ingests the SOLAR-ISS fixture deterministically and converts units", async () => {
+  itWithSolarIss("ingests the SOLAR-ISS fixture deterministically and converts units", async () => {
     const spec = DEFAULT_SOLAR_SPECTRUM_SPECS[0];
     const first = await ingestSolarSpectrumFile(spec, { persistEnvelope: false });
     const second = await ingestSolarSpectrumFile(spec, { persistEnvelope: false });
@@ -52,7 +72,7 @@ describe("solar spectrum ingest", () => {
     expect(ssi[0]).toBeCloseTo(1.0e9, 6);
   });
 
-  it("parses the mu grid into multiple series", async () => {
+  itWithSolarHrs("parses the mu grid into multiple series", async () => {
     const spec = DEFAULT_SOLAR_SPECTRUM_SPECS[3];
     const result = await ingestSolarSpectrumFile(spec, { persistEnvelope: false });
     expect(result.spectrum.series.length).toBe(3);
@@ -60,7 +80,7 @@ describe("solar spectrum ingest", () => {
     expect(mus).toEqual([1, 0.5, 0.1]);
   });
 
-  it("computes limb darkening curves for mu bands", async () => {
+  itWithSolarHrs("computes limb darkening curves for mu bands", async () => {
     const spec = DEFAULT_SOLAR_SPECTRUM_SPECS[3];
     const band = { id: "uv", lambda_min_m: 200e-9, lambda_max_m: 202e-9 };
     const result = await ingestSolarSpectrumFile(spec, {

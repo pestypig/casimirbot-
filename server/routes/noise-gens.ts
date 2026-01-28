@@ -639,6 +639,15 @@ const readBooleanField = (value: unknown): boolean => {
   return false;
 };
 
+const readOptionalBooleanField = (value: unknown): boolean | undefined => {
+  if (value == null) return undefined;
+  if (Array.isArray(value)) {
+    if (!value.length) return undefined;
+    return readBooleanField(value[0]);
+  }
+  return readBooleanField(value);
+};
+
 const buildIntentSnapshotPreferences = (params: {
   applyTempo?: boolean;
   applyMix?: boolean;
@@ -4331,9 +4340,9 @@ router.post(
       : undefined;
     const intentSnapshot = intentSnapshotRaw ?? undefined;
     const intentSnapshotPreferences = buildIntentSnapshotPreferences({
-      applyTempo: readBooleanField(req.body?.intentApplyTempo),
-      applyMix: readBooleanField(req.body?.intentApplyMix),
-      applyAutomation: readBooleanField(req.body?.intentApplyAutomation),
+      applyTempo: readOptionalBooleanField(req.body?.intentApplyTempo),
+      applyMix: readOptionalBooleanField(req.body?.intentApplyMix),
+      applyAutomation: readOptionalBooleanField(req.body?.intentApplyAutomation),
       hasSnapshot: Boolean(intentSnapshot),
     });
     const stemPayloads = stems.length
@@ -4656,9 +4665,9 @@ router.post("/api/noise-gens/upload/chunk", upload.single("chunk"), async (req, 
     });
     const intentSnapshot = intentSnapshotRaw ?? undefined;
     const intentSnapshotPreferences = buildIntentSnapshotPreferences({
-      applyTempo: readBooleanField(req.body?.intentApplyTempo),
-      applyMix: readBooleanField(req.body?.intentApplyMix),
-      applyAutomation: readBooleanField(req.body?.intentApplyAutomation),
+      applyTempo: readOptionalBooleanField(req.body?.intentApplyTempo),
+      applyMix: readOptionalBooleanField(req.body?.intentApplyMix),
+      applyAutomation: readOptionalBooleanField(req.body?.intentApplyAutomation),
       hasSnapshot: Boolean(intentSnapshot),
     });
     await upsertOriginalRecord({

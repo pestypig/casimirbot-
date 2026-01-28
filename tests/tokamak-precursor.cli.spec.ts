@@ -5,8 +5,9 @@ import { describe, expect, it } from "vitest";
 import { loadTokamakPrecursorDataset, runTokamakPrecursorDataset } from "../tools/tokamak-precursor-runner";
 
 const DATASET_PATH = path.resolve(process.cwd(), "datasets", "tokamak-rz-precursor.fixture.json");
+const describeWithDataset = fs.existsSync(DATASET_PATH) ? describe : describe.skip;
 
-describe("tokamak precursor CLI", () => {
+describeWithDataset("tokamak precursor CLI", () => {
   it("computes a deterministic precursor report with AUC", async () => {
     const dataset = await loadTokamakPrecursorDataset(DATASET_PATH);
     const artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), "tokamak-precursor-"));

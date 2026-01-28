@@ -8,9 +8,11 @@ import type { EssenceProfile, EssenceProfileUpdate } from "@shared/inferenceProf
 import type { PromptSpec } from "@shared/prompt-spec";
 import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
+import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import { DEFAULT_DESKTOP_ID, pushConsoleTelemetry } from "@/lib/agi/consoleTelemetry";
 import { ensureLatestLattice } from "@/lib/agi/resonanceVersion";
 import { useResonanceStore } from "@/store/useResonanceStore";
+import type { LumaMood } from "@/lib/luma-moods";
 import type { CollapseDecision, CollapseStrategyName } from "./orchestrator";
 import type { LocalCallSpec } from "@shared/local-call-spec";
 
@@ -54,16 +56,101 @@ export type ExecuteResponse = {
 
 export type LocalAskResponse = {
   text: string;
+  envelope?: HelixAskResponseEnvelope;
   model?: string;
   essence_id?: string;
   seed?: number;
   duration_ms?: number;
+  prompt_ingested?: boolean;
+  prompt_ingest_source?: string;
+  prompt_ingest_reason?: string;
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
     max_tokens?: number;
   };
+  debug?: {
+    two_pass?: boolean;
+    micro_pass?: boolean;
+    micro_pass_auto?: boolean;
+    micro_pass_reason?: string;
+    scaffold?: string;
+    evidence_cards?: string;
+    query_hints?: string[];
+    queries?: string[];
+    context_files?: string[];
+    prompt_ingested?: boolean;
+    prompt_ingest_source?: string;
+    prompt_ingest_reason?: string;
+    prompt_chunk_count?: number;
+    prompt_selected?: number;
+    prompt_context_files?: string[];
+    intent_id?: string;
+    intent_domain?: string;
+    intent_tier?: string;
+    intent_secondary_tier?: string;
+    intent_strategy?: string;
+    intent_reason?: string;
+    arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
+    arbiter_reason?: string;
+    arbiter_strictness?: "low" | "med" | "high";
+    arbiter_user_expects_repo?: boolean;
+    arbiter_repo_ok?: boolean;
+    arbiter_hybrid_ok?: boolean;
+    math_solver_ok?: boolean;
+    math_solver_kind?: string;
+    math_solver_final?: string;
+    math_solver_reason?: string;
+    math_solver_variable?: string;
+    math_solver_gate_pass?: boolean;
+    math_solver_gate_reason?: string;
+    math_solver_domain_pass?: boolean;
+    math_solver_residual_pass?: boolean;
+    math_solver_residual_max?: number;
+    math_solver_registry_id?: string;
+    math_solver_selected_solution?: string;
+    math_solver_admissible_count?: number;
+    evidence_gate_ok?: boolean;
+    evidence_match_ratio?: number;
+    evidence_match_count?: number;
+    evidence_token_count?: number;
+    citation_repair?: boolean;
+    format?: "steps" | "compare" | "brief";
+    stage_tags?: boolean;
+    verbosity?: "brief" | "normal" | "extended";
+    junk_clean_applied?: boolean;
+    junk_clean_reasons?: string[];
+    concept_lint_applied?: boolean;
+    concept_lint_reasons?: string[];
+    coverage_token_count?: number;
+    coverage_key_count?: number;
+    coverage_missing_key_count?: number;
+    coverage_ratio?: number;
+    coverage_missing_keys?: string[];
+    coverage_gate_applied?: boolean;
+    coverage_gate_reason?: string;
+    belief_claim_count?: number;
+    belief_supported_count?: number;
+    belief_unsupported_count?: number;
+    belief_unsupported_rate?: number;
+    belief_contradictions?: number;
+    belief_gate_applied?: boolean;
+    belief_gate_reason?: string;
+    rattling_score?: number;
+    rattling_gate_applied?: boolean;
+  };
+};
+
+export type MoodHintResponse = {
+  mood: LumaMood | null;
+  confidence: number;
+  reason?: string | null;
+  source?: string;
+  durationMs?: number;
+  traceId?: string;
+  sessionId?: string | null;
+  raw?: string | null;
 };
 
 export async function searchCodeLattice(
@@ -84,6 +171,7 @@ export type ToolLogEvent = {
   seq?: number;
   ts?: string;
   traceId?: string;
+  sessionId?: string;
   tool?: string;
   ok?: boolean;
   text?: string;
@@ -374,37 +462,93 @@ export async function execute(traceId: string): Promise<ExecuteResponse> {
 }
 
 export async function askLocal(
-  prompt: string,
+  prompt?: string,
   options?: {
     maxTokens?: number;
     temperature?: number;
     seed?: number;
     stop?: string | string[];
     sessionId?: string;
+    traceId?: string;
     personaId?: string;
+    question?: string;
+    debug?: boolean;
+    verbosity?: "brief" | "normal" | "extended";
+    searchQuery?: string;
+    topK?: number;
+    context?: string;
+    signal?: AbortSignal;
   },
 ): Promise<LocalAskResponse> {
-  const body: Record<string, unknown> = { prompt };
+  const body: Record<string, unknown> = {};
+  const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
+  if (trimmedPrompt) {
+    body.prompt = prompt;
+  }
   if (typeof options?.maxTokens === "number") body.max_tokens = options.maxTokens;
   if (typeof options?.temperature === "number") body.temperature = options.temperature;
   if (typeof options?.seed === "number") body.seed = options.seed;
   if (options?.stop) body.stop = options.stop;
   if (options?.sessionId) body.sessionId = options.sessionId;
+  if (options?.traceId) body.traceId = options.traceId;
   if (options?.personaId) body.personaId = options.personaId;
+  if (options?.question) body.question = options.question;
+  if (typeof options?.debug === "boolean") body.debug = options.debug;
+  if (options?.verbosity) body.verbosity = options.verbosity;
+  if (typeof options?.searchQuery === "string" && options.searchQuery.trim()) {
+    body.searchQuery = options.searchQuery.trim();
+  }
+  if (typeof options?.topK === "number") body.topK = options.topK;
+  if (typeof options?.context === "string" && options.context.trim()) {
+    body.context = options.context;
+  }
   return asJson(
     await fetch("/api/agi/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: options?.signal,
     }),
   );
 }
 
-export function subscribeToolLogs(onEvent: (event: ToolLogEvent) => void): () => void {
+export async function askMoodHint(
+  text: string,
+  options?: { sessionId?: string; personaId?: string; signal?: AbortSignal },
+): Promise<MoodHintResponse> {
+  const trimmed = typeof text === "string" ? text.trim() : "";
+  if (!trimmed) {
+    return { mood: null, confidence: 0 };
+  }
+  const body: Record<string, unknown> = { text: trimmed };
+  if (options?.sessionId) body.sessionId = options.sessionId;
+  if (options?.personaId) body.personaId = options.personaId;
+  return asJson(
+    await fetch("/api/agi/mood-hint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    }),
+  );
+}
+
+export function subscribeToolLogs(
+  onEvent: (event: ToolLogEvent) => void,
+  options?: { tool?: string; sessionId?: string; traceId?: string; limit?: number },
+): () => void {
   if (typeof window === "undefined" || typeof EventSource === "undefined") {
     return () => {};
   }
-  const source = new EventSource("/api/agi/tools/logs/stream");
+  const params = new URLSearchParams();
+  if (options?.tool) params.set("tool", options.tool);
+  if (options?.sessionId) params.set("sessionId", options.sessionId);
+  if (options?.traceId) params.set("traceId", options.traceId);
+  if (typeof options?.limit === "number") params.set("limit", String(options.limit));
+  const url = params.toString()
+    ? `/api/agi/tools/logs/stream?${params.toString()}`
+    : "/api/agi/tools/logs/stream";
+  const source = new EventSource(url);
   source.onmessage = (event) => {
     try {
       onEvent(JSON.parse(event.data) as ToolLogEvent);

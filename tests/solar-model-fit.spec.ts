@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import os from "node:os";
 import path from "node:path";
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import {
   DEFAULT_SOLAR_SPECTRUM_SPECS,
   ingestSolarSpectrumFile,
@@ -12,6 +12,16 @@ import { resetDbClient } from "../server/db/client";
 import { resetEnvelopeStore } from "../server/services/essence/store";
 
 let tmpDir = "";
+const SOLAR_HRS_PATH = path.resolve(
+  process.cwd(),
+  "datasets",
+  "solar",
+  "spectra",
+  "solar-hrs",
+  "v1",
+  "Spectre_HR_Solar_position_LATMOS_Meftah_V1_1.txt",
+);
+const itWithSolarHrs = existsSync(SOLAR_HRS_PATH) ? it : it.skip;
 
 beforeAll(async () => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "solar-model-fit-"));
@@ -32,7 +42,7 @@ afterAll(() => {
 });
 
 describe("solar model comparison", () => {
-  it("compares opacity-depth and emissivity models on mu-grid spectra", async () => {
+  itWithSolarHrs("compares opacity-depth and emissivity models on mu-grid spectra", async () => {
     const spec =
       DEFAULT_SOLAR_SPECTRUM_SPECS.find((item) => item.id === "solar-hrs-v1-mu-grid") ??
       DEFAULT_SOLAR_SPECTRUM_SPECS[3];

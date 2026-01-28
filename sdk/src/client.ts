@@ -7,7 +7,7 @@ import type {
   ConstraintPackPolicyProfile,
   ConstraintPackPolicyProfileInput,
   TrainingTraceRecord,
-} from "./types";
+} from "./types.js";
 
 export type FetchLike = (input: RequestInfo, init?: RequestInit) => Promise<Response>;
 

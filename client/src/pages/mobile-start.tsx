@@ -16,6 +16,7 @@ import { recordPanelActivity } from "@/lib/essence/activityReporter";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 import { HelixAskPill } from "@/components/helix/HelixAskPill";
+import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 
 const LONG_PRESS_MS = 650;
 const MAX_WARN_STACK = 4;
@@ -62,6 +63,22 @@ export default function MobileStartPage() {
     () => [...stack].sort((a, b) => b.openedAt - a.openedAt),
     [stack]
   );
+  useLumaMoodTheme({ randomize: true });
+
+  const navButtonClass =
+    "min-h-[44px] items-center gap-1.5 rounded-full border border-primary/35 bg-card/72 px-3 py-1 text-[13px] font-medium text-foreground transition hover:border-primary/55 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-3.5 sm:py-1.5";
+  const navPrimaryButtonClass =
+    "min-h-[44px] items-center gap-1.5 rounded-full border border-primary/45 bg-primary/18 px-3 py-1 text-[13px] font-semibold text-primary shadow-[0_0_18px_hsl(var(--primary)/0.28)] transition hover:bg-primary/26 active:scale-[0.99] active:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-3.5 sm:py-1.5";
+  const sectionCardClass =
+    "rounded-2xl border border-primary/25 bg-card/74 p-4 text-foreground shadow-[0_35px_110px_hsl(var(--primary)/0.18)]";
+  const tileButtonClass =
+    "group flex flex-col justify-between rounded-2xl border border-primary/25 bg-card/72 p-3 text-left text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  const tileIconClass =
+    "flex items-center justify-center rounded-2xl border border-primary/25 bg-primary/16 text-primary shadow-[0_0_18px_hsl(var(--primary)/0.26)]";
+  const pinnedBadgeClass =
+    "rounded-full border border-primary/35 bg-card/72 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/85";
+  const recentButtonClass =
+    "flex w-full min-h-[48px] items-center justify-between rounded-xl border border-primary/25 bg-card/72 px-4 py-3 text-left text-foreground transition hover:border-primary/60 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
   const wallpaperRecipe = useMemo(
     () =>
@@ -155,10 +172,23 @@ export default function MobileStartPage() {
 
   return (
     <div
-      className="relative min-h-screen bg-slate-950 text-slate-100"
+      className="mood-transition-scope relative min-h-screen bg-background text-foreground"
       style={{ minHeight: "max(100dvh, 100vh)" }}
     >
       <SurfaceStack recipe={wallpaperRecipe} />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{ backgroundColor: "var(--surface-laminate)" }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(140%_200%_at_8%_12%,hsl(var(--primary)/0.24)_0%,transparent_70%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-80 bg-[radial-gradient(150%_210%_at_96%_10%,hsl(var(--primary)/0.18)_0%,transparent_72%)]"
+      />
       {appViewerOpen ? (
         <div
           className="relative z-10 mx-auto flex min-h-screen max-w-screen-lg flex-col"
@@ -167,11 +197,11 @@ export default function MobileStartPage() {
           }}
         >
           <header
-            className="sticky top-0 z-20 flex items-center justify-between bg-slate-950/85 px-4 pb-3 backdrop-blur sm:px-5 sm:pb-4"
+            className="sticky top-0 z-20 flex items-center justify-between border-b border-primary/25 bg-background/85 px-4 pb-3 backdrop-blur sm:px-5 sm:pb-4"
             style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
           >
             <button
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[13px] font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 sm:px-3.5 sm:py-1.5 min-h-[44px]"
+              className={`inline-flex ${navButtonClass}`}
               onPointerDown={startLongPress}
               onPointerUp={endLongPress}
               onPointerLeave={cancelLongPress}
@@ -186,7 +216,7 @@ export default function MobileStartPage() {
               Home
             </button>
             <button
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[13px] font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 sm:px-3.5 sm:py-1.5 min-h-[44px]"
+              className={`inline-flex ${navPrimaryButtonClass}`}
               onClick={closeAppViewer}
             >
               <MessageCircle className="h-4 w-4" />
@@ -210,9 +240,9 @@ export default function MobileStartPage() {
             ) : (
               <div className="space-y-6 px-5 pb-8">
               {pinnedPanels.length ? (
-                <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-sky-900/30">
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
-                    <Pin className="h-4 w-4 text-sky-300" />
+                <section className={sectionCardClass}>
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground/80">
+                    <Pin className="h-4 w-4 text-primary" />
                     Pinned
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -221,23 +251,23 @@ export default function MobileStartPage() {
                       return (
                         <button
                           key={panel.id}
-                          className="group flex h-28 flex-col justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:-translate-y-0.5 hover:border-sky-400/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                          className={`${tileButtonClass} h-28`}
                           onClick={() => handleTilePress(panel.id)}
                         >
                           <div className="flex items-start justify-between">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-200 shadow-inner shadow-sky-900/50">
+                            <div className={`${tileIconClass} h-11 w-11`}>
                               <Icon className="h-5 w-5" />
                             </div>
-                            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200">
+                            <span className={pinnedBadgeClass}>
                               Pin
                             </span>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm font-semibold text-white line-clamp-2">
+                            <p className="line-clamp-2 text-sm font-semibold text-foreground">
                               {panel.title}
                             </p>
                             {panel.keywords && panel.keywords.length > 0 && (
-                              <p className="text-[11px] text-slate-400 line-clamp-1">
+                              <p className="line-clamp-1 text-[11px] text-muted-foreground/80">
                                 {panel.keywords.slice(0, 2).join(" / ")}
                               </p>
                             )}
@@ -248,16 +278,16 @@ export default function MobileStartPage() {
                   </div>
                 </section>
               ) : null}
-              <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-sky-900/30">
+              <section className={sectionCardClass}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-semibold text-white">Pick a panel</h2>
-                    <p className="text-sm text-slate-300/85">
+                    <h2 className="text-base font-semibold text-foreground">Pick a panel</h2>
+                    <p className="text-sm text-muted-foreground/85">
                       Tap a tile to open it full-screen. Long-press Home to jump between open panels.
                     </p>
                   </div>
                   <button
-                    className="hidden rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 min-h-[44px] md:inline-block"
+                    className={`hidden md:inline-flex ${navButtonClass}`}
                     onClick={() => setLocation("/desktop?desktop=1")}
                   >
                     Desktop
@@ -266,41 +296,41 @@ export default function MobileStartPage() {
                 <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
                   {gridPanels.map((panel) => {
                     const Icon = panel.icon ?? PanelsTopLeft;
-                    return (
-                      <button
-                        key={panel.id}
-                        className="group flex h-32 flex-col justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:-translate-y-0.5 hover:border-sky-400/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                        onClick={() => handleTilePress(panel.id)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-200 shadow-inner shadow-sky-900/50">
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            {panel.heavy && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold text-rose-100">
-                                Heavy
-                              </span>
-                            )}
-                          </div>
+                  return (
+                    <button
+                      key={panel.id}
+                      className={`${tileButtonClass} h-32`}
+                      onClick={() => handleTilePress(panel.id)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className={`${tileIconClass} h-12 w-12`}>
+                          <Icon className="h-5 w-5" />
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-white line-clamp-2">{panel.title}</p>
-                          {panel.keywords && panel.keywords.length > 0 && (
-                            <p className="text-[11px] text-slate-400 line-clamp-1">
-                              {panel.keywords.slice(0, 2).join(" / ")}
-                            </p>
+                        <div className="flex flex-col items-end gap-1">
+                          {panel.heavy && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/45 bg-primary/18 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                              Heavy
+                            </span>
                           )}
                         </div>
-                      </button>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="line-clamp-2 text-sm font-semibold text-foreground">{panel.title}</p>
+                        {panel.keywords && panel.keywords.length > 0 && (
+                          <p className="line-clamp-1 text-[11px] text-muted-foreground/80">
+                            {panel.keywords.slice(0, 2).join(" / ")}
+                          </p>
+                        )}
+                      </div>
+                    </button>
                     );
                   })}
                 </div>
               </section>
 
               {!stack.length && (
-                <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <p className="text-sm text-slate-300/90">
+                <section className={sectionCardClass}>
+                  <p className="text-sm text-muted-foreground/90">
                     No panels are open yet. Tap any tile above to launch it. Short-tap Home to return here; hold Home to
                     open the task switcher.
                   </p>
@@ -308,25 +338,25 @@ export default function MobileStartPage() {
               )}
 
               {stack.length > 0 && (
-                <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <section className={sectionCardClass}>
                   <div className="flex items-center gap-2">
-                    <Clock3 className="h-4 w-4 text-slate-300" />
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Recent</p>
+                    <Clock3 className="h-4 w-4 text-primary" />
+                    <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground/80">Recent</p>
                   </div>
                   <div className="mt-3 space-y-3">
                     {recents.map((entry) => (
                       <button
                         key={entry.panelId}
-                        className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-sky-400/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 min-h-[48px]"
+                        className={recentButtonClass}
                         onClick={() => handleTilePress(entry.panelId)}
                       >
                         <div>
-                          <p className="text-sm font-semibold text-white">{entry.title}</p>
-                          <p className="text-[11px] text-slate-400">
+                          <p className="text-sm font-semibold text-foreground">{entry.title}</p>
+                          <p className="text-[11px] text-muted-foreground/80">
                             Opened {new Date(entry.openedAt).toLocaleTimeString()}
                           </p>
                         </div>
-                        <PanelsTopLeft className="h-4 w-4 text-slate-400" />
+                        <PanelsTopLeft className="h-4 w-4 text-muted-foreground/80" />
                       </button>
                     ))}
                   </div>
@@ -356,7 +386,7 @@ export default function MobileStartPage() {
 
       {!appViewerOpen && (
         <button
-          className="pointer-events-auto fixed bottom-6 left-5 z-20 flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-100 shadow-lg shadow-slate-900/40 transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 min-h-[48px]"
+          className="pointer-events-auto fixed bottom-6 left-5 z-20 flex min-h-[48px] items-center gap-2 rounded-full border border-primary/45 bg-primary/18 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary shadow-[0_0_26px_hsl(var(--primary)/0.32)] transition hover:bg-primary/26 active:scale-[0.99] active:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           onClick={openAppViewer}
           type="button"
         >
@@ -366,7 +396,7 @@ export default function MobileStartPage() {
       )}
 
       {appViewerOpen && showSwitcher && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm">
           <div
             className="mx-auto mt-12 w-full max-w-screen-md px-5"
             style={{
@@ -374,13 +404,13 @@ export default function MobileStartPage() {
               paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)"
             }}
           >
-            <div className="flex items-center justify-between rounded-2xl border border-white/15 bg-slate-900/90 px-4 py-3">
+            <div className="flex items-center justify-between rounded-2xl border border-primary/35 bg-card/86 px-4 py-3 text-foreground shadow-[0_30px_90px_hsl(var(--primary)/0.2)]">
               <div className="flex items-center gap-2">
-                <PanelsTopLeft className="h-4 w-4 text-sky-300" />
-                <p className="text-sm font-semibold text-white">Task switcher</p>
+                <PanelsTopLeft className="h-4 w-4 text-primary" />
+                <p className="text-sm font-semibold text-foreground">Task switcher</p>
               </div>
               <button
-                className="rounded-full p-1 text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                className="rounded-full p-1 text-foreground/85 transition hover:bg-primary/18 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 onClick={() => setShowSwitcher(false)}
               >
                 <X className="h-4 w-4" />
@@ -389,7 +419,7 @@ export default function MobileStartPage() {
 
             <div className="mt-4 space-y-3">
               {stack.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+                <div className="rounded-xl border border-primary/25 bg-card/74 px-4 py-3 text-sm text-muted-foreground/85 shadow-[inset_0_0_24px_hsl(var(--primary)/0.08)]">
                   No panels open. Tap a tile to launch one.
                 </div>
               )}
@@ -401,22 +431,22 @@ export default function MobileStartPage() {
                 return (
                   <div
                     key={entry.panelId}
-                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+                    className="flex items-center gap-3 rounded-xl border border-primary/25 bg-card/74 px-4 py-3 text-foreground shadow-[0_24px_80px_hsl(var(--primary)/0.18)]"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-500/15 text-sky-200">
+                    <div className={`${tileIconClass} h-10 w-10`}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-white line-clamp-1">{entry.title}</p>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="line-clamp-1 text-sm font-semibold text-foreground">{entry.title}</p>
+                      <p className="text-[11px] text-muted-foreground/80">
                         Opened {new Date(entry.openedAt).toLocaleTimeString()}
                       </p>
                     </div>
                     <button
-                      className={`rounded-lg px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 min-h-[44px] ${
+                      className={`min-h-[44px] rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] ${
                         isActive
-                          ? "bg-sky-500/80 text-white"
-                          : "border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
+                          ? "border border-primary/60 bg-primary/88 text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.32)]"
+                          : "border border-primary/35 bg-card/74 text-foreground hover:border-primary/60 hover:bg-card/86 hover:text-primary active:border-primary/65 active:bg-primary/18"
                       }`}
                       onClick={() => {
                         activate(entry.panelId);
@@ -426,7 +456,7 @@ export default function MobileStartPage() {
                       {isActive ? "Active" : "Activate"}
                     </button>
                     <button
-                      className="rounded-full p-2 text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60 min-h-[44px]"
+                      className="min-h-[44px] rounded-full p-2 text-foreground/85 transition hover:bg-primary/18 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       onClick={() => {
                         recordPanelActivity(entry.panelId, "closeMobile");
                         close(entry.panelId);
@@ -442,7 +472,7 @@ export default function MobileStartPage() {
             {stack.length > 0 && (
               <div className="mt-5 flex items-center justify-between gap-3">
                 <button
-                  className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 min-h-[44px]"
+                  className="min-h-[44px] rounded-lg border border-primary/35 bg-card/74 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/55 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onClick={() => {
                     recordPanelActivity("mobile-shell", "close-all");
                     closeAll();
@@ -453,7 +483,7 @@ export default function MobileStartPage() {
                   Close all
                 </button>
                 <button
-                  className="rounded-lg bg-sky-500/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/25 transition hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/80 min-h-[44px]"
+                  className="min-h-[44px] rounded-lg border border-primary/60 bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition hover:bg-primary active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onClick={() => setShowSwitcher(false)}
                 >
                   Done

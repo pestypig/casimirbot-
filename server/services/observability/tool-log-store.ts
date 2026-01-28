@@ -141,14 +141,24 @@ type GetToolLogOptions = {
   limit?: number;
   tool?: string;
   tenantId?: string;
+  sessionId?: string;
+  traceId?: string;
 };
 
-export function getToolLogs(options?: GetToolLogOptions): ToolLogRecord[] {     
+export function getToolLogs(options?: GetToolLogOptions): ToolLogRecord[] {
   const limit = clampLimit(options?.limit);
   const tenantId = normalizeTenantId(options?.tenantId);
+  const sessionId = options?.sessionId;
+  const traceId = options?.traceId;
   const haystack = toolLogBuffer.filter((entry) => {
     if (options?.tool && entry.tool !== options.tool) return false;
     if (tenantId && !matchesTenant(entry, tenantId)) {
+      return false;
+    }
+    if (sessionId && entry.sessionId !== sessionId) {
+      return false;
+    }
+    if (traceId && entry.traceId !== traceId) {
       return false;
     }
     return true;
@@ -166,9 +176,17 @@ export function getToolLogsSince(lastId: string, options?: GetToolLogOptions): T
     return [];
   }
   const tenantId = normalizeTenantId(options?.tenantId);
+  const sessionId = options?.sessionId;
+  const traceId = options?.traceId;
   const haystack = toolLogBuffer.filter((entry) => {
     if (options?.tool && entry.tool !== options.tool) return false;
     if (tenantId && !matchesTenant(entry, tenantId)) {
+      return false;
+    }
+    if (sessionId && entry.sessionId !== sessionId) {
+      return false;
+    }
+    if (traceId && entry.traceId !== traceId) {
       return false;
     }
     return true;

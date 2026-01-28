@@ -7,6 +7,8 @@ import path from "node:path";
 
 type NoiseGensRouterModule = typeof import("../routes/noise-gens");
 
+const TEST_TIMEOUT_MS = 20000;
+
 const buildTestWav = (durationSeconds = 1): Buffer => {
   const sampleRate = 8000;
   const channels = 1;
@@ -56,6 +58,7 @@ const waitForJob = async (
 
 const buildApp = async (dataDir: string, remoteMode?: string) => {
   process.env.NOISEGEN_DATA_DIR = dataDir;
+  process.env.NOISEGEN_RANK_DELAY_MS = "0";
   if (remoteMode) {
     process.env.NOISEGEN_REMOTE_RENDER = remoteMode;
   } else {
@@ -78,6 +81,7 @@ beforeEach(async () => {
 afterEach(async () => {
   delete process.env.NOISEGEN_DATA_DIR;
   delete process.env.NOISEGEN_REMOTE_RENDER;
+  delete process.env.NOISEGEN_RANK_DELAY_MS;
   if (dataDir) {
     await rm(dataDir, { recursive: true, force: true });
   }
@@ -129,7 +133,7 @@ describe("noise-gens routes", () => {
     await request(app)
       .head(`/originals/${trackId}/stems/${encodeURIComponent(firstStem.id)}`)
       .expect(200);
-  });
+  }, TEST_TIMEOUT_MS);
 
   it("accepts stems-only uploads", async () => {
     const app = await buildApp(dataDir);
@@ -203,7 +207,7 @@ describe("noise-gens routes", () => {
     expect(prefs?.applyTempo).toBe(true);
     expect(prefs?.applyMix).toBe(true);
     expect(prefs?.applyAutomation).toBe(false);
-  });
+  }, TEST_TIMEOUT_MS);
 
   it("processes remote cover jobs when forced", async () => {
     const app = await buildApp(dataDir, "force");

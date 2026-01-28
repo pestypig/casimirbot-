@@ -1,0 +1,83 @@
+{
+  "cases": [
+    {
+      "label": "general definition",
+      "question": "What is epistemology?",
+      "expect": {
+        "intent_domain": "general",
+        "format": "compare",
+        "citations": "forbid"
+      }
+    },
+    {
+      "label": "general math",
+      "question": "Solve for x: 2x + 5 = 17. Explain briefly.",
+      "expect": {
+        "intent_domain": "general",
+        "format": "compare",
+        "citations": "forbid"
+      }
+    },
+    {
+      "label": "hybrid scientific method",
+      "question": "What is the scientific method, and how does this system use it for verification? Two short paragraphs; second must cite repo files.",
+      "expect": {
+        "intent_domain": "hybrid",
+        "format": "compare",
+        "citations": "require"
+      }
+    },
+    {
+      "label": "repo pipeline",
+      "question": "How does the Helix Ask pipeline work in this repo? Cite file paths for each stage.",
+      "expect": {
+        "intent_domain": "repo",
+        "format": "steps",
+        "citations": "require",
+        "must_include": [
+          "server/routes/agi.plan.ts",
+          "client/src/components/helix/HelixAskPill.tsx"
+        ]
+      }
+    },
+    {
+      "label": "repo ideology",
+      "question": "Using ideology.json, what does \"tend the Sun ledger\" mean here?",
+      "expect": {
+        "intent_domain": "repo",
+        "format": "compare",
+        "citations": "require",
+        "must_include": [
+          "docs/ethos/ideology.json"
+        ]
+      }
+    },
+    {
+      "label": "falsifiable viability gate",
+      "question": "Trace GR viability gate flow from solver to constraint policy to certificate to UI surface. Cite files.",
+      "expect": {
+        "intent_domain": "falsifiable",
+        "citations": "require"
+      }
+    },
+    {
+      "label": "hybrid warp future",
+      "question": "Is warp bubble the future for humanity? Two short paragraphs; second must cite repo files.",
+      "expect": {
+        "intent_domain": "hybrid",
+        "format": "compare",
+        "citations": "require"
+      }
+    },
+    {
+      "label": "composite synthesis",
+      "question": "Using the repo, synthesize how the save-the-Sun plan, warp-bubble viability, ideology/ledger gates, and the wavefunction/uncertainty business model fit together. Two short paragraphs; second must cite repo files.",
+      "expect": {
+        "intent_domain": "hybrid",
+        "format": "compare",
+        "citations": "require",
+        "allow_clarify": true
+      }
+    }
+  ]
+}

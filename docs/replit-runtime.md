@@ -94,6 +94,34 @@ curl -sS --max-time 180 \
   http://127.0.0.1:$PORT/api/agi/ask
 ```
 
+## Codex-like Behavior Checks
+
+Closest to Codex-like behavior means **full LLM runs with the micro-pass pipeline**
+(routing → evidence → synthesis), because the model is actually generating the answer
+under the same constraints. A **dry-run** only validates routing/format/debug metadata.
+
+Recommended Replit checks:
+
+1) **Always run the dry-run regression** (fast, no LLM dependency).
+2) **Optionally run the full LLM regression** after the runtime is stable.
+
+Dry-run regression (routing/format only):
+
+```
+HELIX_ASK_BASE_URL=http://127.0.0.1:$PORT \
+HELIX_ASK_REGRESSION_DRY_RUN=1 \
+HELIX_ASK_REGRESSION_TIMEOUT_MS=30000 \
+npm run helix:ask:regression
+```
+
+Full LLM regression (Codex-like end-to-end):
+
+```
+HELIX_ASK_BASE_URL=http://127.0.0.1:$PORT \
+HELIX_ASK_REGRESSION_TIMEOUT_MS=180000 \
+npm run helix:ask:regression
+```
+
 ## Common Failures
 
 **`api_not_found`**

@@ -73,7 +73,8 @@ describe("Chat B planner", () => {
     expect(finalStep.ok).toBe(true);
     expect(finalStep).toMatchObject({ kind: "tool.call" });
     expect((finalStep.ok && (finalStep.output as any)?.text) ?? "").toBe("llm.local stub result");
-    expect(results[0].citations).toContain(baseRecord.id);
+    const expectedCitation = `memory:${baseRecord.id}`;
+    expect(results[0].citations).toContain(expectedCitation);
     expect(results[1].citations).toEqual(results[0].citations);
     expect(results[2].citations).toEqual(results[1].citations);
   });

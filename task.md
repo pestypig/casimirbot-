@@ -14,6 +14,99 @@ acts as planner + code generator + debugger, not as the source of truth.
 ---
 
 ## Fixed Decisions (v1)
+### D7) Hybrid answer quality + prompt-contract enforcement (last-mile)
+- Goal: stop ìcitation-shaped but meaning-wrongî hybrid answers and enforce user-facing formatting contracts.
+- Why: current hybrid answers can satisfy evidence gating yet map concepts to unrelated subsystems; details/proof blocks leak into the main answer.
+- Fixes:
+  - Add ìverification anchor clusterî requirement for hybrid concept+system prompts.
+    - Require at least one anchor file before mapping ìscientific method / verificationî to the system.
+    - Suggested anchors:
+      - server/routes/agi.plan.ts
+      - server/services/helix-ask/platonic-gates.ts
+      - server/services/observability/training-trace-store.ts
+      - server/gr/gr-evaluation.ts (only if F3/certificates mentioned)
+  - Promote clarify mode when repo expected but anchors fail (do not downgrade silently to general).
+  - Add concept skeleton micro-pass for hybrid prompts (hypothesis -> test/gate -> evidence -> revision) and generate retrieval queries from these slots.
+  - Enforce prompt contract in the main answer:
+    - ìtwo short paragraphsî means no ìDetails/Key files/Sourcesî in the main response.
+    - Move Key files / Sources / Proof to the proof drawer only.
+  - Add lightweight F0 ìphysics lintî rules for common misconceptions (e.g., smoke rises due to hot air buoyancy, not because soot is lighter than air).
+- Acceptance:
+  - Hybrid ìscientific methodî prompt maps to verification gates and traces (not random physics modules).
+  - Two-paragraph prompts return exactly two paragraphs in the main answer.
+  - Debug/Proof remains rich but is not injected into the main answer.
+
+### D8) Obligation-driven routing + repo-native concepts + live events fidelity
+- Goal: prevent silent F0 fallbacks when repo grounding is required; make generic vs hybrid deterministic.
+- Why: prompts like ìaccording to the codebase Öî were routed to general; repo-native concepts were treated as generic.
+- Fixes:
+  - Obligation extraction (hard gate) before routing:
+    - requiresRepoEvidence = true for phrases like:
+      - ìaccording to the codebase / repo / codeî
+      - ìin this repo / in this systemî
+      - ìcite file paths / where in the code / which moduleî
+      - explicit file paths or logs.
+    - If requiresRepoEvidence=true, general output is forbidden (repo_grounded | hybrid | clarify only).
+  - Repo expectation score (soft gate):
+    - High: explicit repo obligations -> force retrieval + arbiter.
+    - Medium: repo-native concepts -> attempt hybrid, allow clarify if evidence weak.
+    - Low: generic questions -> allow F0.
+    - Initial repo-native concepts:
+      - save-the-sun / solar restoration / stellar ledger
+      - ideology / ethos / mission ethos
+      - ledger / stewardship ledger / warp ledger
+      - warp viability / certificate / integrity_ok
+      - helix ask pipeline / gates / refinery / holdout / trace
+  - Arbiter v2:
+    - repo_grounded if strong evidence + must-include ok.
+    - hybrid if partial evidence.
+    - clarify if repo expected but anchors missing.
+    - general only when repo not expected.
+  - Hidden plan pass (trace-only):
+    - generate search terms, must-include anchors, answer contract, and clarify fallback.
+    - run only for medium/high repo expectation.
+  - Verification anchor requirement for ìscientific method / verification / falsifiabilityî hybrid prompts:
+    - must include at least one of:
+      - server/routes/agi.plan.ts
+      - server/services/helix-ask/platonic-gates.ts
+      - server/services/observability/training-trace-store.ts
+      - server/services/agi/refinery-gates.ts
+      - server/services/agi/refinery-policy.ts
+      - server/services/agi/refinery-trajectory.ts
+  - Final obligation gate:
+    - if requiresRepoEvidence=true and no citations in final answer -> replace with clarify prompt.
+  - Live events + debug fidelity:
+    - log obligation extraction, repo expectation score, plan pass start/end, retrieval retry, arbiter decision, clarify trigger.
+    - debug fields: requires_repo_evidence, repo_expectation_score, plan_pass_used, clarify_triggered, obligation_violation.
+- Regression prompts (must pass):
+  - ìAccording to the codebase, how is saving the sun a manifestation of ideals?î
+  - ìWhat is the scientific method, and how does this system use it for verification? Two short paragraphs; second must cite repo files.î
+  - ìWhat is epistemology?î
+  - ìHow does the Helix Ask pipeline work in this repo? Cite file paths for each stage.î
+  - ìUsing the repo, synthesize how save-the-Sun, warp viability, ideology/ledger gates, wavefunction model fit together. Two short paragraphs; second must cite repo files.î
+### D9) Falsifiable-by-default answer pipeline (full fix)
+- Goal: every answer is either grounded in verifiable evidence or explicitly clarified; no silent downgrades.
+- Core contract:
+  - If requiresRepoEvidence=true, general answers are forbidden (repo_grounded | hybrid | clarify only).
+  - If citations are required, uncited output must be replaced with clarify.
+- Steps:
+  1) Obligation extraction (hard gate): detect repo-required cues and set requiresRepoEvidence/requiresCitations.
+  2) Plan pass (trace-only): emit answer contract, query hints, must-include anchors, clarify fallback.
+  3) Retrieval + must-include anchors: require topic-correct anchors; retry once if missing.
+  4) Evidence eligibility + claim support: enforce topic match and minimal claim->evidence coverage.
+  5) Arbiter v2: repo_grounded | hybrid | clarify | general (general only if repo not expected).
+  6) Output contract enforcement: render exact prompt format; move Details/Sources/Proof to drawers.
+  7) Final obligation gate: if repo required and no citations -> replace with clarify.
+  8) F0 lint rules: lightweight correctness fixes for common misconceptions.
+- Guarantees:
+  - No decorative citations.
+  - No repo-required answers without repo evidence.
+  - Clarify instead of guess when evidence is missing.
+- Acceptance:
+  - Repo-required prompts never return general.
+  - Two-paragraph prompts return exactly two paragraphs in main answer.
+  - Live events include obligation extraction, plan pass, retrieval retry, arbiter decision, clarify trigger.
+
 ### CAS / Math backend
 - Primary: Python stack: SymPy + EinsteinPy.
 - Optional (v2): Cadabra adapter for advanced canonicalization/symmetry handling.
@@ -1299,7 +1392,7 @@ Prompt NG52 (Catalog snapshot in object storage) - Status: complete
 
 Prompt NG53 (Upload session records + resume) - Status: pending
 - Goal: make large uploads resilient to crashes or tab closes.
-- Do: persist per-track upload session records with stage states (received ‚Üí assembled ‚Üí analyzed ‚Üí playback ready).
+- Do: persist per-track upload session records with stage states (received -> assembled -> analyzed -> playback ready).
 - Do: allow resuming or reconciling partial uploads on next upload attempt.
 - Do not: require manual cleanup to retry a failed upload.
 - Acceptance: interrupted uploads can resume or safely restart without duplicate entries.
@@ -3151,3 +3244,559 @@ Expected output:
   - Evidence drawer: grouped evidence list with paths + excerpts.
   - Replay controls: "Replay run" with pass/fail delta and run timestamp.
   - Safety handling: show safety kind/stage when refusal/redaction is present.
+
+## Helix Ask Long Prompt Ingest - Status: pending
+- Goal: accept prompts longer than the local context window by chunking, indexing,
+  and retrieving prompt slices for grounded answers with citations.
+- Why: local GGUF context is memory-limited; avoid silent truncation or hard
+  failures when prompts are large.
+- Do:
+  - LP0 overflow check: estimate tokens (prompt + system + evidence + output);
+    if overflow, route into long-prompt ingest mode.
+  - LP1 chunking: split by headings, blank lines, and code fences; enforce max
+    chunk tokens with overlap; store chunk IDs + section titles.
+  - LP2 index: build lexical + vector retrieval; fuse with RRF; diversify with
+    MMR; select top-M chunks.
+  - LP3 context cards: summarize selected chunks into evidence cards with
+    provenance IDs (promptChunkId, section).
+  - LP4 synthesis: answer using prompt cards (and repo evidence if relevant)
+    with format router + citation constraints.
+  - LP5 citation repair: run a small repair pass if citations are missing.
+- UX:
+  - If prompt ingested, show a "prompt ingested" status plus optional
+    "context points" list (5-12 bullets) with chunk IDs.
+  - Debug toggle can show a "used sections" list.
+- Config knobs:
+  - HELIX_ASK_LONGPROMPT_CHUNK_TOKENS
+  - HELIX_ASK_LONGPROMPT_CHUNK_OVERLAP
+  - HELIX_ASK_LONGPROMPT_TOPK_CANDIDATES
+  - HELIX_ASK_LONGPROMPT_TOPM_SELECTED
+  - HELIX_ASK_LONGPROMPT_CARD_TOKENS
+  - HELIX_ASK_LONGPROMPT_MAX_CARDS
+  - HELIX_ASK_LONGPROMPT_USE_HIERARCHICAL (optional 2-level summaries)
+- Overflow policy:
+  - HELIX_ASK_OVERFLOW_RETRY=1
+  - HELIX_ASK_OVERFLOW_RETRY_POLICY=drop_context_then_drop_output_then_retry
+  - Always return truncated/ingested status to the UI.
+- Metrics:
+  - promptCandidateRecall@K
+  - promptSelectedRecall@M
+  - promptCitationRecall
+  - overflowRetries
+  - promptIngested
+- Acceptance:
+  - Long prompts do not error or truncate silently.
+  - Responses cite prompt chunk IDs when prompt ingestion is used.
+  - Context window stays within 2k-4k caps for local runtime.
+
+## Helix Ask Robust Prompt Handling (Domain + Evidence + Format) - Status: in progress
+- Goal: treat all prompts consistently by routing to repo/general/hybrid, enforcing evidence
+  relevance, and matching format to intent.
+- Core rule: every prompt goes through the same decision checkpoints in order:
+  1) Domain router (repo | general | hybrid)
+  2) Evidence eligibility gate (citable evidence only)
+  3) Format router (steps | compare | brief)
+- Domain router:
+  - Repo: question references system behavior or file paths and evidence supports it.
+  - General: conceptual or external questions with no repo support.
+  - Hybrid: conceptual framing plus explicit "how does this system" ask.
+  - If key terms are not present in repo evidence, downgrade to general or hybrid.
+- Evidence eligibility gate:
+  - Extract top claims from the draft or scaffold (3-6).
+  - A claim is citable only if at least one evidence chunk passes a minimal
+    entailment heuristic (keyword overlap or semantic match).
+  - If no evidence passes, drop citations and ask a clarification question.
+- Ambiguous term policy:
+  - If a key term is not in the repo and not in the glossary, ask for definition
+    or explicitly state an interpretation before answering.
+- Hybrid answer template:
+  - Paragraph 1: general definition/explanation (no repo citations).
+  - Paragraph 2: how the system maps to the concept (with repo citations).
+- Format constraints:
+  - Steps only when user asks for steps/process/how-to.
+  - Compare/why/what -> short paragraphs + optional bullets, no numbered steps.
+- Composite synthesis (multi-topic prompts):
+  - If the question asks to synthesize/fit together and has 2+ topic tags,
+    route to a hybrid composite strategy even if a single F3 constraint matcher fires.
+  - Run constraint evidence as a sub-pass (gate/certificate snapshot) and append it
+    to the hybrid evidence bundle without overwriting the main answer.
+  - Set secondary tier to F3 so the proof drawer can render gate/certificate proof
+    while keeping the main response in F1 hybrid form.
+  - If constraint evidence is missing, keep the answer in hybrid mode and ask for
+    the relevant files or gate outputs instead of falling back to F3-only.
+- Retrieval controls:
+  - Boost Helix Ask pipeline files only when the question is explicitly system-related.
+  - De-boost roadmap or generic docs unless directly referenced by query terms.
+- Regression prompts (must pass):
+  - Conceptual philosophy (e.g., platonic reasoning).
+  - General knowledge (e.g., why smoke rises).
+  - Repo-specific (how ask pipeline works).
+  - Hybrid (concept + "how does this system").
+  - Debugging/error question.
+  - Composite synthesis (save-the-Sun + warp viability + ideology + uncertainty).
+- Metrics:
+  - citationEligibilityRate
+  - evidenceMatchRate
+  - domainRouteShare (repo/general/hybrid)
+  - promptLeakRate
+- Acceptance:
+  - Conceptual prompts do not cite unrelated repo files.
+  - Hybrid prompts separate general explanation from repo mapping.
+  - Composite prompts with multiple topics produce a synthesis paragraph plus a system
+    mapping paragraph that can cite both repo files and gate/certificate ids.
+  - Step lists appear only when explicitly requested.
+  - Clarification triggered for ambiguous terms with no repo evidence.
+
+## Helix Ask Falsifiability Directory (Intent -> Tier -> Strategy) - Status: in progress
+- Goal: align Helix Ask intent handling with the falsifiable framework by routing
+  every prompt through a single directory that defines tier, evidence rules, gates,
+  and format.
+- Core directory:
+  - F0 Narrative (general concepts): no repo citations unless directly relevant.
+  - F1 Repo-grounded: cite repo evidence only.
+  - F2 Build/Test-grounded: require executable verifier artifacts when asked to prove.
+  - F3 Solver/Constraint-grounded: require residuals/certificates; narration only.
+- Directory layout (intent profiles):
+  - general/conceptual_define_compare (F0)
+  - general/general_how_to_process (F0)
+  - hybrid/concept_plus_system_mapping (F0+F1)
+  - repo/system_pipeline_explain (F1)
+  - repo/repo_api_lookup (F1)
+  - repo/repo_debugging_root_cause (F1 -> F2 optional)
+  - repo/repo_change_request (F2)
+  - falsifiable/constraints/gr_viability_certificate (F3)
+  - falsifiable/constraints/analysis_noise_field (F3)
+  - falsifiable/constraints/analysis_diffusion_field (F3)
+  - falsifiable/constraints/belief_graph_consistency (F3)
+- Each intent profile defines:
+  - intent_id, matchers, domain, falsifiability_tier
+  - strategy (general_explain | repo_rag | repo_build_verify | constraint_report)
+  - evidence_policy (allowed kinds + required citations)
+  - gates_required (tests, constraint gate, certificates)
+  - format_policy (steps | compare | brief)
+  - ambiguity_policy (clarify vs assume)
+  - fallback_policy (downgrade tier, ask question)
+- Router checkpoints (always in order):
+  1) Domain router -> intent + tier
+  2) Evidence eligibility gate -> citable evidence only
+  3) Format router -> final output shape
+- Evidence eligibility gate:
+  - Claims must be supported by evidence chunks (identifier overlap or semantic match).
+  - If no citable evidence: downgrade to hybrid/general or ask for clarification.
+- F3 strategy (constraint-driven):
+  - Run solver/loop first (constraint-loop pattern).
+  - Package residuals + certificates as evidence.
+  - Synthesis can only narrate those artifacts (no deciding viability).
+- Hybrid response template:
+  - Paragraph 1: general explanation (no repo citations).
+  - Paragraph 2: system mapping (repo citations only).
+- Metrics:
+  - tierShare[F0..F3], tierPassRate[F1..F3]
+  - citationEligibilityRate, evidenceMatchRate, promptLeakRate
+- Acceptance:
+  - Conceptual prompts never cite unrelated repo files.
+  - Hybrid prompts split general vs system mapping.
+  - F2/F3 answers include verifier artifacts when required.
+  - Ambiguous terms trigger clarification or explicit interpretation.
+
+## Helix Ask Topic Router + Concept Registry - Status: complete
+- Goal: prevent topic drift inside repo mode and provide stable, "platonic" definitions
+  without building bespoke pipelines for every term.
+- Topic router (orthogonal to domain router):
+  - topic_tags (helix_ask, warp, energy_pipeline, constraints, general_concept, ...).
+  - Deterministic keyword-based tagging with explicit allowlists.
+- Topic-aware retrieval:
+  - Tier 1 allowlist for helix_ask: agi.plan.ts, HelixAskPill.tsx, desktop.tsx,
+    docs/helix-ask-flow.md (boost hard).
+  - Tier 2 widen to ask/trace/essence docs.
+  - Tier 3 global repo search only if Tier 1/2 insufficient.
+  - De-boost warp/energy pipeline paths unless topic_tags include them.
+- Must-include evidence rule:
+  - For repo.system_pipeline_explain + topic=helix_ask, require at least one Helix Ask core file.
+  - If missing, re-run retrieval with widened scope or fallback to hybrid with a "file needed" ask.
+- Concept registry:
+  - Add docs/knowledge/ or docs/concepts/ with definition cards (YAML frontmatter).
+  - 10-30 starter concepts (scientific method, falsifiability, epistemology, pipeline, etc.).
+  - Track aliases + disambiguation + source provenance (license-safe).
+- Definition draft mode (LLM-assisted, guarded):
+  - If no concept card exists, allow a 2-3 sentence definition.
+  - Ambiguity must be declared (pick a sense or ask a clarification).
+  - No repo citations in the definition paragraph.
+- Evidence eligibility upgrades:
+  - Topic match check (evidence must match topic_tags to be citable).
+  - Light claim-to-evidence match (identifier or strong semantic overlap).
+- Output shaping for repo pipeline explanations:
+  - 1-2 line overview, 4-8 bullets for actual Helix Ask pipeline stages.
+  - No unrelated subsystem citations (warp/energy).
+- Regression prompt additions:
+  - "How does the Helix Ask pipeline work in this system?"
+  - "What is epistemology?"
+  - "How does this system use the scientific method for verification?"
+- Metrics:
+  - topicTagMatchRate
+  - mustIncludeSatisfiedRate
+  - retrievalTierEscalations
+- Acceptance:
+  - Helix Ask pipeline answers cite Helix Ask core files only.
+  - No warp/energy pipeline citations unless explicitly requested.
+  - Concept definitions stay 2-3 sentences and disambiguate when needed.
+
+Progress notes:
+- Implemented topic tags + tiered allowlists + must-include gate in `server/routes/agi.plan.ts`.
+- Added topic router helpers in `server/services/helix-ask/topic.ts` with tests.
+- Added concept registry ingestion in `server/services/helix-ask/concepts.ts`.
+- Added starter concept cards in `docs/knowledge/` and wired scaffolds into Helix Ask micro-pass.
+- Added repo-relevance force gate for ‚Äúcite files / where in code‚Äù prompts to ensure repo routing.
+
+## Helix Ask Pro-Style Sections (Response Envelope) - Status: ready for test
+- Goal: make responses feel "sectioned" and skim-friendly without increasing hallucination risk or UI clutter.
+- Principle: separate answer into layered sections, with only the top layer visible by default.
+- Layers:
+  - Layer 1: Answer (1-3 sentences, no debug)
+  - Layer 2: Why/Details (short sections with citations)
+  - Layer 3: Proof (gate snapshot, evidence list, trace ids; collapsible)
+- Tier templates (deterministic selection):
+  - F0 general: Answer + optional "In practice" (no repo citations).
+  - F1 repo: Answer + "How it works in this repo" (3-6 bullets with citations) + "Key files".
+  - F2 build/test: Answer + "Verification" + "How to reproduce" + "Evidence used".
+  - F3 constraints: Gate snapshot + "When certificate is issued" + "Integrity enforcement" + "Where surfaced" + Proof drawer.
+- Implementation strategy:
+  - Add `mode: brief|standard|extended` across tiers (reuse F3 verbosity logic).
+  - Introduce a ResponseEnvelope schema (server renders; UI displays sections).
+  - Keep `ANSWER_START/ANSWER_END` for backward compatibility.
+  - Enforce section-local citations and reject decorative citations.
+- Minimal UI:
+  - Default: Answer only.
+  - Toggle to open Details and Proof drawers (no extra headings unless opened).
+- Acceptance:
+  - Responses are structured into sections without showing scaffolds.
+  - Extended mode adds trace details without changing top-level answer.
+  - F3 remains deterministic and evidence-bound.
+
+Progress notes:
+- Added ResponseEnvelope schema in `shared/helix-ask-envelope.ts`.
+- Server now builds envelopes in `server/services/helix-ask/envelope.ts` and attaches them to `/api/agi/ask` responses.
+- UI renders Answer + Details/Proof drawers in `client/src/components/helix/HelixAskPill.tsx` and `client/src/pages/desktop.tsx`.
+
+## Helix Ask Deterministic Math Solver (JS primary; Python fallback deferred) - Status: in progress
+- Goal: make math answers falsifiable by solver verification, and scale toward repo-style symbolic equations (not just school algebra).
+- Truth model: the solver is the judge; the LLM is narration. When the solver succeeds, Helix Ask skips micro-pass and bypasses LLM scaffolds.
+- Implementation (current):
+  - Primary local solver: Nerdamer (JS) wired in `server/services/helix-ask/math.ts`.
+  - Python/SymPy fallback exists but is deferred for now due to local install instability; keep it disabled (`ENABLE_PY_CHECKERS=0`) while we harden the JS truth gates.
+  - Math-solver success now disables micro-pass and forces a deterministic answer path in `server/routes/agi.plan.ts`.
+  - Solver debug fields include outcome and the solved variable (`math_solver_*`, plus `math_solver_variable`).
+  - Types added for Nerdamer in `types/nerdamer.d.ts`.
+  - Tests added in `tests/helix-ask-math.spec.ts`.
+- Acceptance (current floor):
+  - Linear solves with implicit multiplication (for example `2x + 5 = 17`) are deterministic.
+  - Non-`x` derivatives (for example `d/dt`) are deterministic.
+  - Small systems (for example two equations, two unknowns) are deterministic.
+  - Symbolic equalities without numeric literals (repo-style equations) trigger the JS solver path without requiring Python.
+- Next steps: codebase equation verification track (most leverage):
+  - M1) Mine equations from the repo:
+    - Extract representative equations from warp/GR and pipeline math modules (for example `modules/warp/*.ts`, GR gates, proof pack math).
+    - Curate a small "equation registry" fixture with: expression, target variable, expected domain constraints, and a residual check.
+  - M2) Add solver residual verification:
+    - After solving, substitute the solution back into the equation(s) and compute a residual.
+    - Gate deterministic answers on `residual <= tolerance`; otherwise fall back to narration with explicit uncertainty.
+  - M3) Add domain-aware root selection:
+    - Support constraints like `gammaGeo >= 1`, positive lengths, or real-only solutions.
+    - Prefer admissible roots and surface root filters in debug data.
+  - M4) Extend solver routing for "solve for <var>" and symbolic targets:
+    - Improve variable inference for multi-symbol equations and longer identifiers (for example `gammaGeo`, `thetaScaleCore`).
+    - Add coverage for power/exponential/log patterns common in the repo.
+  - M5) Gate-level math maturity reporting:
+    - Tag solver answers with a math-maturity stage (exploratory vs diagnostic vs certified) based on residual strength and constraint coverage.
+- Truth gate requirements (promotion blockers; prevents "LLM does 90%"):
+  - G1) Residual gate: always substitute the chosen solution back into the source equation(s) and require a small residual before claiming a deterministic math answer.
+  - G2) Equation registry gate: solve and residual-check a curated registry mined from the repo; treat registry pass rate as the primary math-quality signal.
+  - G3) Domain/root gate: apply domain constraints (real-only, positivity, bounds such as `gammaGeo >= 1`) before residual verification and only narrate admissible roots.
+- Metrics:
+  - mathSolverRouteRate: fraction of math prompts routed to solver.
+  - mathRegistryPassRate: fraction of registry equations that pass domain filters plus residual gates.
+  - mathResidualPassRate: fraction of solver answers that pass the substitution residual check.
+  - mathRootFilterRate: fraction of solves that require domain filtering.
+  - mathFallbackRate: fraction of math prompts that fall back to narration.
+- Acceptance (promotion target):
+  - A curated set of repo-style symbolic equations solves with residuals below tolerance and admissible roots.
+  - Solver-rooted answers stay short, correct, and do not regress Helix Ask routing or formatting gates.
+
+## Helix Ask Platonic Layer / Belief-State Gates - Status: planned
+- Goal: operationalize "constraints-first narration" for concepts/definitions by treating meanings as state with residuals, not as free-form LLM text.
+- F0 platonic constraints (generic answers should still be structured):
+  - Always attempt concept-card lookup first; if found, use the card directly.
+  - If no concept card, allow a short (1-3 sentence) definition draft with disambiguation.
+  - No repo citations or verification claims in F0 answers.
+  - Apply definition lint + rattling checks so generic answers remain stable and scoped.
+- Placement contract (fixed order; prevents drift):
+  - route intent/tier/topic -> retrieval -> evidence eligibility -> concept/belief gates -> synthesis -> citation repair -> gates -> response envelope.
+  - Concept/belief gates run before synthesis and may downgrade the tier or force a clarification question.
+- P0) Concept gate (definition lint; cheap, high leverage):
+  - Definition constraints:
+    - 1-3 sentences for F0 definitions by default.
+    - Disambiguate when multiple senses are plausible ("I will use X meaning").
+    - No repo citations in the general-definition paragraph.
+    - No certification/verification claims in F0 answers.
+    - No system-mapping claims unless the intent is hybrid or repo.
+  - Fallback policy:
+    - If lint fails or the term is ambiguous and unsupported, ask a clarification question or downgrade to a scoped definition.
+- P1) Belief graph as state (lightweight, auditable):
+  - Graph schema (per answer):
+    - Node types: claim, definition, evidence_ref, constraint, conclusion.
+    - Edge types: supports, contradicts, depends_on, maps_to.
+  - Graph gates:
+    - Contradictions must be resolved, surfaced, or the contradicted claims must be removed.
+    - Unsupported claims must be removed or marked as speculative.
+    - Missing evidence for repo-tier claims triggers a clarification or downgrade.
+  - Trace contract:
+    - Persist a compact belief-graph summary in trajectory/training-trace meta (ids + counts + failures).
+- P2) Rattling gate (stability under perturbation):
+  - Rattling definition:
+    - Rattling measures how much the answer's claim set changes under small, controlled perturbations.
+  - Perturbation harness:
+    - Prompt paraphrase(s) (small edits) and near-neighbor evidence swaps (same topic cluster).
+  - Gate rule:
+    - Compute claim-set overlap across perturbations; low overlap (high rattling) triggers shorter answers, clarification, or tier downgrade.
+- P3) Noise-driven variants with constraints (selection, not vibes):
+  - Variant policy:
+    - Propose small answer variants (noise), but accept only those that reduce residuals and pass gates.
+  - Acceptance signal:
+    - Residual improvement + belief-graph gate pass + evidence eligibility pass.
+- Metrics (make it falsifiable as a product):
+  - conceptGatePassRate
+  - beliefContradictionRate
+  - unsupportedClaimRate
+  - rattlingScoreP95
+  - rattlingGateEscalations
+- Regression prompts (directory-style assertions):
+  - Concept-only definition (F0) with ambiguity.
+  - Hybrid definition + system mapping (F0+F1).
+  - Repo explanation with missing core evidence (forces clarification/downgrade).
+  - Prompt perturbation pair (rattling harness) with expected stability bounds.
+- Acceptance:
+  - Concept answers stay short, disambiguated, and free of decorative repo citations.
+  - Belief-graph gates prevent contradictions and unsupported repo claims from surviving to the final answer.
+  - High-rattling cases degrade gracefully (clarification or tier downgrade) rather than over-claiming.
+
+## Helix Ask Evidence Coverage + Routing Sweep (UI Concept Anchors) - Status: planned
+- Goal: close the gap where UI vocabulary exists in code/docs but is missing from the concept registry and routing anchors, causing "bag-of-words" drift or weak grounding.
+- Sweep sources (treat these as the concept ground truth map):
+  - Helix panel ids + keywords: `client/src/pages/helix-core.panels.ts`
+  - Ideology tree + mission language: `docs/ethos/ideology.json`, `docs/ethos/why.md`
+  - Ledger + proxy math: `shared/curvature-proxy.ts`, `server/helix-proof-pack.ts`, `client/src/physics/curvature.ts`
+  - Star/solar panels + math: `client/src/pages/star-hydrostatic-panel.tsx`, `client/src/physics/polytrope.ts`, `client/src/physics/gamow.ts`, `docs/curvature-unit-solar-notes.md`
+  - Warp/ledger narratives: `docs/casimir-tile-mechanism.md`, `docs/time-dilation-lattice-panel.md`, `warp-web/km-scale-warp-ledger.html`
+- Concept coverage gaps observed from the sweep:
+  - Mission language exists (for example "tend the Sun ledger") but is anchored in ideology docs, not the concept registry.
+  - Ledger/kappa/proxy terms are spread across math modules and narrative docs but lack short concept cards.
+  - Star/solar terms (polytrope, Gamow window, stellar ledger) exist in panels/docs but are not routable concepts.
+  - Some conceptual terms used in prompts (for example morphospace attractors, red giant restoration) need explicit "general/hybrid" handling and a safe fallback.
+- C0) Evidence coverage audit (deterministic pass before adding docs):
+  - Extract panel concept candidates from `client/src/pages/helix-core.panels.ts` (ids + keywords).
+  - Extract ideology node ids/slugs/titles from `docs/ethos/ideology.json`.
+  - Diff against `docs/knowledge/*.md` ids/aliases and emit a "missing concept anchors" report artifact.
+  - Planned audit script + report contract:
+    - Script: `scripts/helix-ask-concept-audit.ts`
+    - Command: `tsx scripts/helix-ask-concept-audit.ts`
+    - Outputs:
+      - `reports/helix-ask-concept-audit.json` (machine-readable)
+      - `reports/helix-ask-concept-audit.md` (human summary)
+    - Report fields:
+      - panelConcepts, ideologyNodes, knowledgeConcepts
+      - missingConceptIds, missingAliases, routingGaps
+      - suggestedConceptCards (id + aliases + anchor files)
+- C1) Add concept cards for the most reused UI vocabulary (short, anchored, citable):
+  - Mission + ideology anchors:
+    - `docs/knowledge/mission-ethos.md`
+    - `docs/knowledge/stewardship-ledger.md`
+    - `docs/knowledge/sun-ledger.md`
+  - Ledger + proxy math anchors:
+    - `docs/knowledge/warp-ledger.md`
+    - `docs/knowledge/curvature-ledger.md`
+    - `docs/knowledge/kappa-proxy.md`
+    - `docs/knowledge/potato-threshold.md`
+    - `docs/knowledge/qi-bounds.md`
+  - Star/solar anchors:
+    - `docs/knowledge/star-hydrostatic.md`
+    - `docs/knowledge/stellar-ledger.md`
+    - `docs/knowledge/solar-restoration.md`
+  - Systems/analysis anchors:
+    - `docs/knowledge/analysis-loops.md`
+    - `docs/knowledge/halobank.md`
+    - `docs/knowledge/casimir-tiles.md`
+  - Conceptual-safe fallbacks (explicitly general/hybrid):
+    - `docs/knowledge/morphospace-attractors.md`
+    - `docs/knowledge/red-giant-phase.md`
+- C1-priority) Top 5 concept cards to land first (highest leverage on current failures):
+  - `docs/knowledge/sun-ledger.md`
+  - `docs/knowledge/stewardship-ledger.md`
+  - `docs/knowledge/kappa-proxy.md`
+  - `docs/knowledge/star-hydrostatic.md`
+  - `docs/knowledge/warp-ledger.md`
+- C1.5) Refresh retrieval/index artifacts after doc changes:
+  - Rebuild lattice/index: `npm run build:code-lattice`
+  - Expect updates under `server/_generated/code-lattice.json`
+  - Run the concept audit again after index rebuild to confirm coverage closes.
+- Concept card contract (keeps cards small and routing-friendly):
+  - Frontmatter:
+    - `id`, `aliases`, `scope`, `intentHints`, `topicTags`, `mustIncludeFiles`
+  - Body:
+    - 2-5 bullets max.
+    - Include anchor file paths in the bullets when the concept is repo-groundable.
+    - No external citations; use repo anchors only.
+- C2) Route by concept, not just domain:
+  - Extend topic tagging in `server/services/helix-ask/topic.ts` for:
+    - ideology/mission language (mission ethos, stewardship ledger, sun/stars)
+    - ledger/proxy math (kappa, curvature ledger, warp ledger, QI bounds)
+    - star/solar math (polytrope, Gamow window, stellar ledger)
+  - Add `mustIncludeFiles` per topic cluster so ideology/kappa/star concepts always inject the core anchors even when retrieval misses them.
+- C2-routing checklist) Integration checklist (prevents partial routing updates):
+  - Concept registry:
+    - Add concept cards in `docs/knowledge/*.md` with id + aliases aligned to UI keywords.
+  - Topic routing:
+    - Map concept ids/aliases to topic tags in `server/services/helix-ask/topic.ts`.
+    - Ensure topic tags set `mustIncludeFiles` to the correct core anchors.
+  - Concept matching:
+    - Confirm the new concept ids/aliases are discoverable by the concept matcher in `server/services/helix-ask/concepts.ts`.
+  - Retrieval/index:
+    - Rebuild the code lattice: `npm run build:code-lattice`.
+  - Validation:
+    - Run Helix Ask regression: `npm run helix:ask:regression`.
+    - Run targeted vitest suite for Helix Ask routing/format/gates.
+    - Run Casimir verification gate: `npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl`.
+- C3) Tighten evidence eligibility to ignore instruction noise:
+  - Treat meta-instructions (for example "two short paragraphs", "second must cite") as non-signal tokens in evidence coverage gates.
+  - Prefer topic-signal tokens derived from concept cards + topic tags.
+- C4) Regression suites by concept cluster (prevents future drift):
+  - Ideology:
+    - "Using `docs/ethos/ideology.json`, what does 'tend the Sun ledger' mean here?"
+  - Ledger/kappa:
+    - "What is `kappa_drive` vs `kappa_body` in this repo? Cite the source math."
+  - Star/solar:
+    - "How does the star hydrostatic panel compute the stellar ledger? Cite files."
+  - General/hybrid concept:
+    - "What is a morphospace attractor, and how (if at all) does this repo use that idea?"
+  - Instruction-noise filtering:
+    - "What is the scientific method, and how does this system use it for verification? Two short paragraphs; second must cite repo files."
+    - Expectation: meta-instructions do not appear in coverage-missing term lists or trigger evidence gate failures.
+- Metrics (make evidence coverage falsifiable):
+  - conceptAnchorCoverage = fraction of panel/ideology concepts that map to a concept card.
+  - conceptRoutedRate = fraction of asks that resolve to a concept card or topic-tagged anchor set.
+  - mustIncludeInjectionRate = fraction of routed asks where must-include anchors were injected.
+  - evidenceSignalRatio = topic-signal tokens / total coverage tokens after meta-instruction filtering.
+- Acceptance:
+  - UI-language prompts (ledger/kappa/star/mission ethos) ground to repo files instead of drifting to unrelated pipelines.
+  - Ideology prompts reliably anchor to `docs/ethos/ideology.json` (and related ethos docs) without decorative citations.
+  - Conceptual prompts that are not repo-grounded degrade gracefully with explicit general/hybrid framing.
+
+## D) Hybrid Arbiter (repo-hint aware, evidence-relevance gated)
+- Goal: when repo hints fire, still allow a *general* answer if retrieved evidence is weak or irrelevant.
+- Placement: after retrieval + evidence selection, before synthesis prompt assembly.
+- Inputs (already available):
+  - `topicTags` + `topicMustIncludeOk`
+  - `evidenceMatchRatio`, `evidenceMatchCount`, `evidenceTokenCount`
+  - `conceptMatch` (concept registry)
+  - `intentProfile.domain`, `intentProfile.strategy`
+  - `hasRepoHints`, `hasFilePathHints`
+- Outputs:
+  - `answerMode`: `repo_grounded` | `hybrid` | `general`
+  - `requireCitations`: boolean
+  - `includeRepoScaffold`: boolean
+  - `fallbackNote`: optional message for paragraph 2 (only when repo evidence is weak)
+- Deterministic rule sketch (tune thresholds in env):
+  - If `topicMustIncludeOk` && `evidenceMatchRatio >= 0.45` ‚Üí `repo_grounded`
+  - Else if `evidenceMatchRatio >= 0.25` OR `conceptMatch` ‚Üí `hybrid`
+  - Else ‚Üí `general`
+- Behavior by mode:
+  - `repo_grounded`: require citations, repo-only if F1/F2; no general paragraph unless hybrid requested.
+  - `hybrid`: paragraph 1 general, paragraph 2 repo mapping (citations required if evidence present).
+  - `general`: ignore repo scaffold; no citations; do not mention missing repo evidence unless user asked.
+- Failure guards:
+  - If repo hints present but evidence weak, do **not** return a citation list (avoid decorative citations).
+  - If evidence is strong but question is purely general, use `hybrid` (not repo-only) so user still gets general framing.
+- Metrics to log:
+  - `arbiter_mode`, `arbiter_reason`, `arbiter_ratio`, `arbiter_topic_ok`, `arbiter_concept_match`.
+- Tests to add:
+  - Repo-hint + low evidence ‚Üí `general` mode (no citations).
+  - Repo-hint + strong evidence ‚Üí `hybrid` or `repo_grounded` with citations.
+  - Pure general question ‚Üí `general` (no repo scaffold).
+
+### D1) Why this arbiter is a best-practice pattern (grounding references)
+- Indiscriminate retrieval can harm answer quality; adaptive retrieval is recommended so systems only retrieve when it helps (Self-RAG).  
+  Reference: https://selfrag.github.io/ (paper overview) and https://arxiv.org/abs/2310.11511
+- RAG evaluation commonly decomposes into context relevance, groundedness, and answer relevance; the arbiter is a deterministic pre-generation relevance gate aligned to that triad.  
+  Reference: https://www.trulens.org/getting_started/core_concepts/rag_triad/
+- Faithfulness is defined as ‚Äúclaims supported by retrieved context,‚Äù which mirrors the arbiter‚Äôs role in deciding when to require citations.  
+  Reference: https://docs.ragas.io/en/v0.1.21/concepts/metrics/faithfulness.html
+
+### D2) Arbiter v2 upgrades (stronger intent + user-expectation handling)
+- Add `answerMode: clarify` when repo expectation is strong but evidence is weak. This avoids returning a generic answer that dodges a repo-specific question.
+- Add derived flags:
+  - `userExpectsRepo` if intent is repo/falsifiable or prompt uses ‚Äúthis system / in this repo / Helix Ask / where is X enforced‚Äù.
+  - `hasHighStakesConstraints` if F3 or constraint_report is in play.
+- Suggested deterministic decision order:
+  1. If `hasHighStakesConstraints` ‚Üí `repo_grounded` (or deterministic F3 renderer).
+  2. If `topicMustIncludeOk && evidenceMatchRatio >= T_repo` ‚Üí `repo_grounded`.
+  3. Else if `evidenceMatchRatio >= T_hybrid && (conceptMatch || hasRepoHints)` ‚Üí `hybrid`.
+  4. Else if `userExpectsRepo` ‚Üí `clarify`.
+  5. Else ‚Üí `general`.
+
+### D3) Retrieval retry loop (only when repo hints fire but evidence is weak)
+- If `hasRepoHints && evidenceMatchRatio < T_hybrid`:
+  - Generate 1 extra query hint, widen K slightly, re-run fusion, then re-evaluate the arbiter.
+- Justification: multi-query fusion improves retrieval robustness but can drift if relevance is weak.  
+  References:
+  - https://www.microsoft.com/en-us/microsoft-cloud/blog/2025/02/04/common-retrieval-augmented-generation-rag-techniques-explained/
+  - https://arxiv.org/abs/2402.03367 (RAG-Fusion)
+
+### D4) Optional evidence-critic micro-pass (off by default)
+- Add `HELIX_ASK_EVIDENCE_CRITIC=0|1` with small-token critique to score chunk relevance/support.
+- Mirrors Self-RAG‚Äôs relevance/support critique tokens at a lighter-weight, deterministic layer.  
+  Reference: https://arxiv.org/abs/2310.11511
+
+### D5) Intent-specific must-include anchors + strictness presets
+- For `repo.system_pipeline_explain`, require anchors like:
+  - `server/routes/agi.plan.ts`, `client/src/components/helix/HelixAskPill.tsx`, `docs/helix-ask-flow.md`
+  - If missing, choose `clarify` rather than downgrade to `general`.
+- Strictness presets:
+  - `general.conceptual_define_compare` ‚Üí strictness low (default general).
+  - `repo.*` intents ‚Üí strictness medium/high (prefer `clarify` when evidence weak).
+  - `falsifiable.*` intents ‚Üí strictness max (deterministic or constrained narrative).
+
+### D6) Parameter tuning sweep (Codex-style control of reasoning + verbosity) - Status: complete
+- Goal: calibrate arbiter thresholds and fluency knobs empirically, rather than guessing.
+- Why: GPT-5 family exposes reasoning_effort and verbosity controls; explicit instructions override verbosity. We can mirror the pattern with local knobs (micro-pass, scaffold budgets, format enforcement) to balance speed vs quality.
+  References:
+  - https://openai.com/index/introducing-gpt-5-for-developers
+  - https://platform.openai.com/docs/guides/gpt-5
+- Knobs to sweep (map to local controls):
+  - T_repo, T_hybrid
+  - HELIX_ASK_RETRIEVAL_RETRY_TOPK_BONUS
+  - HELIX_ASK_SCAFFOLD_TOKENS, HELIX_ASK_EVIDENCE_TOKENS, HELIX_ASK_REPAIR_TOKENS
+  - format enforcement level for hybrid (strict vs relaxed)
+  - soft expansion budget (0-2 extra sentences when evidence is strong)
+- Evaluation pack (fixed prompts, scored by properties):
+  - expected domain route (general/hybrid/repo/clarify)
+  - citations required/forbidden
+  - format allowance (steps vs compare)
+  - must-include anchors
+  - max latency / token budget
+- Metrics:
+  - hard: no decorative citations, no prompt leakage, tier compliance
+  - soft: answer relevance, groundedness, readability, clarify rate
+- Procedure:
+  1. Build a prompt pack stratified by intent (general, hybrid, repo, falsifiable).
+  2. Sweep knobs (grid or small random search).
+  3. Reject any set that violates hard constraints.
+  4. Pick Pareto-optimal settings and set defaults by intent family.
+- Implementation:
+  - Runner: scripts/helix-ask-sweep.ts
+  - Prompt pack: scripts/helix-ask-sweep-pack.json
+  - Run: npm run helix:ask:sweep
+  - To enable per-request tuning overrides: HELIX_ASK_SWEEP_OVERRIDES=1
+
+
+
+
+

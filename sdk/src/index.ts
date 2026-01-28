@@ -1,5 +1,5 @@
-export { CasimirClient, CasimirError, createCasimirClient } from "./client";
-export { RuntimeTelemetry, createRuntimeTelemetry } from "./runtime";
+export { CasimirClient, CasimirError, createCasimirClient } from "./client.js";
+export { RuntimeTelemetry, createRuntimeTelemetry } from "./runtime.js";
 export type {
   AdapterAction,
   AdapterArtifactRef,
@@ -30,12 +30,12 @@ export type {
   TrainingTraceRecord,
   TrainingTraceSignal,
   TrainingTraceSource,
-} from "./types";
+} from "./types.js";
 export type {
   CasimirClientOptions,
   CasimirRequestOptions,
   FetchLike,
-} from "./client";
+} from "./client.js";
 export type {
   LlmCallOptions,
   ModelPricing,
@@ -49,4 +49,4 @@ export type {
   RuntimeToolEvent,
   ToolCallOptions,
   ToolUseBudgetTelemetry,
-} from "./runtime";
+} from "./runtime.js";
