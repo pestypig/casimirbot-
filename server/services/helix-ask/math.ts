@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import nerdamer from "nerdamer";
-import "nerdamer/Solve";
-import "nerdamer/Calculus";
+import "nerdamer/Solve.js";
+import "nerdamer/Calculus.js";
 
 const scriptPath = fileURLToPath(new URL("../../../scripts/py/math_solve.py", import.meta.url));
 
