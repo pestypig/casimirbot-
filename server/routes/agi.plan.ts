@@ -9037,7 +9037,10 @@ planRouter.post("/ask", async (req, res) => {
       }
       let endpointGuardApplied = false;
       let endpointGuardMessage: string | null = null;
-      if (HELIX_ASK_ENDPOINT_GUARD && intentDomain === "repo") {
+      if (
+        HELIX_ASK_ENDPOINT_GUARD &&
+        (intentDomain === "repo" || intentDomain === "hybrid")
+      ) {
         const endpointHints = extractEndpointHints(baseQuestion);
         if (endpointHints.length > 0) {
           const anchorPaths = extractEndpointAnchorPaths(evidenceText, endpointHints);
