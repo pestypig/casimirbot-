@@ -2753,6 +2753,9 @@ const HELIX_ASK_REPO_EXPECTS =
   /\b(in this system|in this repo|this repo|this system|helix ask|ask pipeline|ask system|codebase|repository|where in the code|which file|which files|file paths?|cite files?|according to the codebase|according to the repo|according to the code|per the codebase|per the repo|from the codebase|from the repo|from the code)\b/i;
 const HELIX_ASK_REPO_HINT =
   /(helix|helix ask|ask system|ask pipeline|ask mode|this system|this repo|repository|repo\b|code|codebase|file|path|component|module|endpoint|api|server|client|ui|panel|pipeline|trace|essence|casimir|warp|alcubierre|resonance|code lattice|lattice|ideology|ethos|mission ethos|ideology tree|smoke test|smoke\.md|bug|error|crash|config|env|settings|docs\/)/i;
+const HELIX_ASK_ENDPOINT_HINT_RE = /\/api\/[a-z0-9/_-]+/gi;
+const HELIX_ASK_ENDPOINT_GUARD =
+  String(process.env.HELIX_ASK_ENDPOINT_GUARD ?? "1").trim() !== "0";
 const HELIX_ASK_VIABILITY_FOCUS =
   /\b(viability|certificate|constraint gate|constraint gates|admissible|warp viability)\b/i;
 const HELIX_ASK_VIABILITY_PATHS =
@@ -2959,6 +2962,46 @@ function isHelixAskRepoQuestion(question: string): boolean {
   if (HELIX_ASK_REPO_FORCE.test(trimmed)) return true;
   if (HELIX_ASK_FILE_HINT.test(trimmed)) return true;
   return HELIX_ASK_REPO_HINT.test(trimmed);
+}
+
+function extractEndpointHints(question: string): string[] {
+  const matches = question.match(HELIX_ASK_ENDPOINT_HINT_RE) ?? [];
+  if (matches.length === 0) return [];
+  const hints = new Set<string>();
+  for (const match of matches) {
+    const trimmed = match.trim();
+    if (!trimmed) continue;
+    hints.add(trimmed);
+    const parts = trimmed.split("/").filter(Boolean);
+    if (parts.length >= 2) {
+      hints.add(`/${parts.slice(0, 2).join("/")}`);
+    }
+    if (parts.length >= 3) {
+      hints.add(`/${parts[parts.length - 1]}`);
+    }
+  }
+  return Array.from(hints);
+}
+
+function extractEndpointAnchorPaths(evidenceText: string, hints: string[]): string[] {
+  if (!evidenceText || hints.length === 0) return [];
+  const hintSet = hints.map((hint) => hint.toLowerCase());
+  const blocks = evidenceText.split(/\n{2,}/);
+  const anchors = new Set<string>();
+  for (const block of blocks) {
+    const blockLower = block.toLowerCase();
+    if (!hintSet.some((hint) => blockLower.includes(hint))) {
+      continue;
+    }
+    const firstLine = block.split(/\r?\n/)[0]?.trim() ?? "";
+    const fromHeader = extractFilePathsFromText(firstLine)[0];
+    const fromBlock = extractFilePathsFromText(block)[0];
+    const filePath = fromHeader || fromBlock;
+    if (filePath) {
+      anchors.add(filePath);
+    }
+  }
+  return Array.from(anchors);
 }
 
 function hashHelixAskProgress(value: string): string {
@@ -8992,6 +9035,38 @@ planRouter.post("/ask", async (req, res) => {
           formatFileList(extractFilePathsFromText(evidenceText)),
         );
       }
+      let endpointGuardApplied = false;
+      let endpointGuardMessage: string | null = null;
+      if (HELIX_ASK_ENDPOINT_GUARD && intentDomain === "repo") {
+        const endpointHints = extractEndpointHints(baseQuestion);
+        if (endpointHints.length > 0) {
+          const anchorPaths = extractEndpointAnchorPaths(evidenceText, endpointHints);
+          const answerPaths = extractFilePathsFromText(cleaned);
+          const answerPathSet = new Set(answerPaths.map((entry) => entry.toLowerCase()));
+          const anchorSet = new Set(anchorPaths.map((entry) => entry.toLowerCase()));
+          const hasAnchorCitation = Array.from(anchorSet).some((entry) => answerPathSet.has(entry));
+          if (anchorPaths.length === 0) {
+            endpointGuardMessage =
+              "Repo evidence did not include the endpoint path requested. Please point to the relevant files or paste the route snippet.";
+            cleaned = endpointGuardMessage;
+            endpointGuardApplied = true;
+            logProgress("Endpoint anchor", "missing");
+            logEvent("Endpoint anchor", "missing", endpointHints.join(", "));
+          } else if (!hasAnchorCitation) {
+            endpointGuardMessage =
+              "Repo evidence referenced the requested endpoint but the answer did not cite those files. Please point to the relevant files or narrow the request.";
+            cleaned = endpointGuardMessage;
+            endpointGuardApplied = true;
+            logProgress("Endpoint anchor", "mismatch");
+            logEvent("Endpoint anchor", "mismatch", formatFileList(anchorPaths));
+          }
+          if (debugPayload) {
+            debugPayload.endpoint_hints = endpointHints;
+            debugPayload.endpoint_anchor_paths = anchorPaths;
+            debugPayload.endpoint_anchor_violation = anchorPaths.length === 0 || !hasAnchorCitation;
+          }
+        }
+      }
       const platonicDomain: HelixAskDomain =
         intentDomain === "repo" || intentDomain === "hybrid"
           ? intentDomain
@@ -9035,6 +9110,10 @@ planRouter.post("/ask", async (req, res) => {
         ].join(" | "),
       );
       cleaned = platonicResult.answer;
+      if (endpointGuardApplied && endpointGuardMessage) {
+        cleaned = endpointGuardMessage;
+        answerPath.push("endpointGuard:applied");
+      }
       if (allowHybridFallback && intentStrategy === "hybrid_explain" && repoScaffold.trim()) {
         const guarded =
           /please point to the relevant files|available evidence was weakly reflected|repo evidence did not cover/i.test(
