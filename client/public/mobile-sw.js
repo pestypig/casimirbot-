@@ -1,4 +1,4 @@
-const CACHE_NAME = "helix-mobile-shell-v1";
+const CACHE_NAME = "helix-mobile-shell-v2";
 const OFFLINE_ASSETS = [
   "/",
   "/mobile",
