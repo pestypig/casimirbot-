@@ -192,16 +192,6 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
   );
   console.log(`[runtime] cwd=${process.cwd()}`);
 
-  const modelKey = normalizeObjectKey(process.env.LLM_LOCAL_MODEL_OBJECT_KEY);
-  if (modelKey) {
-    artifacts.push({
-      label: "model",
-      objectKey: modelKey,
-      sha256: process.env.LLM_LOCAL_MODEL_SHA256 ?? "",
-      targetPath: process.env.LLM_LOCAL_MODEL_PATH ?? process.env.LLM_LOCAL_MODEL ?? "./models/model.gguf",
-    });
-  }
-
   const cmdKey = normalizeObjectKey(process.env.LLM_LOCAL_CMD_OBJECT_KEY);
   if (cmdKey) {
     const cmdPath =
@@ -246,6 +236,16 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
       objectKey: loraKey,
       sha256: process.env.LLM_LOCAL_LORA_SHA256 ?? "",
       targetPath: loraPath,
+    });
+  }
+
+  const modelKey = normalizeObjectKey(process.env.LLM_LOCAL_MODEL_OBJECT_KEY);
+  if (modelKey) {
+    artifacts.push({
+      label: "model",
+      objectKey: modelKey,
+      sha256: process.env.LLM_LOCAL_MODEL_SHA256 ?? "",
+      targetPath: process.env.LLM_LOCAL_MODEL_PATH ?? process.env.LLM_LOCAL_MODEL ?? "./models/model.gguf",
     });
   }
 
