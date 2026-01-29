@@ -1,0 +1,1 @@
+{"error":"bad_request","details":[{"code":"invalid_type","expected":"string","received":"undefined","path":["text"],"message":"Required"}]}
