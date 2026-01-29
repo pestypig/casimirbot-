@@ -205,6 +205,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   };
 
   let lastSpawnError: unknown;
+  let spawnDiagLogged = false;
   const attempt = async (spawnArgs: string[]): Promise<boolean> => {
     try {
       timedOut = false;
@@ -214,6 +215,10 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       return true;
     } catch (error) {
       lastSpawnError = error;
+      if (!spawnDiagLogged) {
+        spawnDiagLogged = true;
+        logSpawnFailureDiagnostics(error, cmd);
+      }
       return false;
     }
   };
@@ -959,6 +964,35 @@ const serializeError = (err: unknown): string => {
     return JSON.stringify(err);
   } catch {
     return String(err);
+  }
+};
+
+const logSpawnFailureDiagnostics = (error: unknown, cmd: string): void => {
+  try {
+    const resolved = resolve(cmd);
+    const cwd = process.cwd();
+    const exists = existsSync(resolved);
+    let statInfo = "stat=missing";
+    if (exists) {
+      const stat = statSync(resolved);
+      const mode = (stat.mode & 0o777).toString(8).padStart(3, "0");
+      statInfo = `size=${stat.size} mode=${mode}`;
+    }
+    const parent = dirname(resolved);
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(parent);
+    } catch {
+      entries = [];
+    }
+    const entrySample = entries.slice(0, 8).join(", ");
+    const errMessage = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[llm.local.spawn] spawn diagnostics err=${errMessage} cwd=${cwd} cmd=${cmd} resolved=${resolved} exists=${exists} ${statInfo} parent=${parent} entries=${entrySample}`,
+    );
+  } catch (logError) {
+    const message = logError instanceof Error ? logError.message : String(logError);
+    console.warn(`[llm.local.spawn] spawn diagnostics failed: ${message}`);
   }
 };
 

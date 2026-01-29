@@ -73,6 +73,20 @@ const hashFile = async (filePath: string): Promise<string> => {
   });
 };
 
+const logArtifactState = async (label: string, targetPath: string): Promise<void> => {
+  const resolved = resolveTargetPath(targetPath);
+  try {
+    const stat = await fs.stat(resolved);
+    const mode = (stat.mode & 0o777).toString(8).padStart(3, "0");
+    console.log(
+      `[runtime] ${label} state path=${resolved} size=${stat.size} mode=${mode}`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[runtime] ${label} state unavailable (${message}) path=${resolved}`);
+  }
+};
+
 const validateLocalArtifact = async (
   label: string,
   targetPath: string,
@@ -86,6 +100,7 @@ const validateLocalArtifact = async (
   const expected = normalizeSha256(expectedSha);
   if (!expected) {
     console.log(`[runtime] ${label} present (${resolved})`);
+    await logArtifactState(label, resolved);
     return;
   }
   const existingHash = await hashFile(resolved);
@@ -95,6 +110,7 @@ const validateLocalArtifact = async (
     );
   }
   console.log(`[runtime] ${label} verified (${resolved})`);
+  await logArtifactState(label, resolved);
 };
 
 const downloadObject = async (key: string, targetPath: string): Promise<string> => {
@@ -117,6 +133,7 @@ const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
     const existingHash = await hashFile(target);
     if (existingHash === expected) {
       console.log(`[runtime] ${spec.label} already hydrated (${target})`);
+      await logArtifactState(spec.label, target);
       return;
     }
     console.warn(`[runtime] ${spec.label} hash mismatch; rehydrating (${target})`);
@@ -145,6 +162,7 @@ const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
       }
     }
     console.log(`[runtime] ${spec.label} hydrated (${target})`);
+    await logArtifactState(spec.label, target);
   } catch (error) {
     await fs.unlink(tmpPath).catch(() => undefined);
     throw error;
