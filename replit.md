@@ -49,6 +49,15 @@ Notes:
 - `SKIP_MODULE_INIT=1` is OK if you want faster boot and can skip heavy physics init.
 - Replit forces port **5000**; if already in use, the server will exit with a clear error.
 
+### Runtime Artifacts (LLM Hydration)
+The deployment pulls model/index/llama-cli from Replit Object Storage at boot. Run this **only when artifacts change**
+(model, LoRA, code-lattice.json, llama-cli) or if object storage is wiped:
+```
+npx tsx scripts/upload-runtime-artifacts.ts
+```
+Then copy the printed `LLM_LOCAL_*` entries into **Publishing** environment variables and republish.
+If Helix Ask throws `spawn ... llama-cli ENOENT`, the deployment did not receive these envs.
+
 ### Local Prod-Like Verification
 Run locally and confirm SPA fallback:
 ```
