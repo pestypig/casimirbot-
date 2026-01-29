@@ -12,7 +12,6 @@ const ROOTS = [
   "test-results",
 ];
 
-const INDEX_PATH = path.join("server", "_generated", "code-lattice.json");
 
 function removePath(target) {
   if (!fs.existsSync(target)) {
@@ -37,6 +36,5 @@ for (const entry of ROOTS) {
   removePath(entry);
 }
 
-if (process.env.LLM_LOCAL_INDEX_OBJECT_KEY && process.env.KEEP_LOCAL_INDEX !== "1") {
-  removePath(INDEX_PATH);
-}
+// Keep code-lattice.json in deploy images; removing it can break boot if
+// object-storage hydration is unavailable during startup.
