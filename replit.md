@@ -28,6 +28,48 @@ Preferred communication style: Simple, everyday language.
 - **Production**: Drizzle ORM configured for PostgreSQL, with PostgreSQL session store.
 - **Shared Schemas**: Zod for type safety.
 
+## Replit Deployment Notes (Local vs Deploy)
+Use this section to keep deploy behavior aligned with local testing.
+
+### Why "Cannot GET /desktop" Happens
+- The SPA fallback (`dist/public/index.html`) is mounted inside **bootstrap** (after validation + route registration).
+- If bootstrap **fails** or is **deferred**, Express has no static handler yet → `Cannot GET /desktop`.
+
+### Deploy Command (Known-Good)
+Use build + dist server with static assets:
+```
+npm run build
+env REPLIT_DEPLOYMENT=1 NODE_ENV=production PORT=5000 HOST=0.0.0.0 \
+NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
+SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
+node dist/index.js
+```
+Notes:
+- **Avoid** `DEFER_ROUTE_BOOT=1` in deploy; it can serve requests before bootstrap, causing 404s.
+- `SKIP_MODULE_INIT=1` is OK if you want faster boot and can skip heavy physics init.
+- Replit forces port **5000**; if already in use, the server will exit with a clear error.
+
+### Local Prod-Like Verification
+Run locally and confirm SPA fallback:
+```
+REPLIT_DEPLOYMENT=1 NODE_ENV=production SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=0 node dist/index.js
+curl -i http://127.0.0.1:5000/desktop
+curl -i http://127.0.0.1:5000/does-not-exist
+```
+Expected: both return `200` with `index.html`.
+
+### If Deploy Still 404s
+Check deploy logs for:
+- `[server] bootstrap failed`
+- `ideology-verifiers validation failed`
+- `Could not find the build directory`
+
+Verify these exist in the deploy bundle:
+- `dist/public/index.html`
+- `docs/ethos/ideology.json`
+- `configs/ideology-verifiers.json`
+- `server/_generated/code-lattice.json`
+
 ### Key Features & Design Decisions
 - **SCUFF-EM Integration**: Service layer for generating `.scuffgeo` files and executing simulations, including mesh management.
 - **Real-time Feedback**: WebSocket-based progress and status updates during simulations.
