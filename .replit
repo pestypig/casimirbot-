@@ -8,7 +8,7 @@ packages = ["gmsh", "emscripten", "jq", "ffmpeg", "cmake", "lsof"]
 
 [deployment]
 deploymentTarget = "cloudrun"
-build = ["sh", "-c", "KEEP_LOCAL_INDEX=1 LLM_LOCAL_INDEX_OBJECT_KEY= LLM_LOCAL_MODEL_OBJECT_KEY= LLM_LOCAL_LORA_OBJECT_KEY= LLM_LOCAL_CMD_OBJECT_KEY= npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"]
+build = ["sh", "-c", "npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"]
 run = [
   "env",
   "NODE_ENV=production",
@@ -20,11 +20,6 @@ run = [
   "SKIP_MODULE_INIT=1",
   "DEFER_ROUTE_BOOT=0",
   "HEALTH_READY_ON_LISTEN=0",
-  "KEEP_LOCAL_INDEX=1",
-  "LLM_LOCAL_MODEL_OBJECT_KEY=",
-  "LLM_LOCAL_LORA_OBJECT_KEY=",
-  "LLM_LOCAL_INDEX_OBJECT_KEY=",
-  "LLM_LOCAL_CMD_OBJECT_KEY=",
   "node",
   "dist/index.js"
 ]
