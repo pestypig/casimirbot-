@@ -151,8 +151,28 @@ const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
   }
 };
 
+const describeEnv = (value?: string | null, max = 12): string => {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return "(empty)";
+  }
+  const safe = trimmed.length > max ? `${trimmed.slice(0, max)}...` : trimmed;
+  return `${safe} (len ${trimmed.length})`;
+};
+
 export const hydrateRuntimeArtifacts = async (): Promise<void> => {
   const artifacts: ArtifactSpec[] = [];
+  console.log(
+    `[runtime] env LLM_LOCAL_CMD_OBJECT_KEY=${describeEnv(process.env.LLM_LOCAL_CMD_OBJECT_KEY)} ` +
+      `LLM_LOCAL_CMD_SHA256=${describeEnv(process.env.LLM_LOCAL_CMD_SHA256, 16)} ` +
+      `LLM_LOCAL_CMD=${describeEnv(process.env.LLM_LOCAL_CMD, 48)}`,
+  );
+  console.log(
+    `[runtime] env LLM_LOCAL_MODEL_OBJECT_KEY=${describeEnv(process.env.LLM_LOCAL_MODEL_OBJECT_KEY)} ` +
+      `LLM_LOCAL_LORA_OBJECT_KEY=${describeEnv(process.env.LLM_LOCAL_LORA_OBJECT_KEY)} ` +
+      `LLM_LOCAL_INDEX_OBJECT_KEY=${describeEnv(process.env.LLM_LOCAL_INDEX_OBJECT_KEY)}`,
+  );
+  console.log(`[runtime] cwd=${process.cwd()}`);
 
   const modelKey = normalizeObjectKey(process.env.LLM_LOCAL_MODEL_OBJECT_KEY);
   if (modelKey) {
@@ -172,6 +192,7 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
     if (!process.env.LLM_LOCAL_CMD) {
       process.env.LLM_LOCAL_CMD = cmdPath;
     }
+    console.log(`[runtime] llama-cli target=${resolveTargetPath(cmdPath)}`);
     artifacts.push({
       label: "llama-cli",
       objectKey: cmdKey,
@@ -214,6 +235,9 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
     return;
   }
 
+  console.log(
+    `[runtime] artifact labels=${artifacts.map((artifact) => artifact.label).join(", ")}`,
+  );
   console.log(`[runtime] hydrating ${artifacts.length} artifact(s)`);
   for (const artifact of artifacts) {
     await hydrateArtifact(artifact);
