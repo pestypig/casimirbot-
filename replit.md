@@ -62,6 +62,7 @@ If Helix Ask throws `spawn ... llama-cli ENOENT`, the deployment did not receive
 - Root issue was intermittent `spawn ... llama-cli ENOENT` in deploy logs; local runs worked.
 - We reordered hydration so `llama-cli` is fetched before model/lora/index.
 - Added runtime artifact diagnostics (path/size/mode) and spawn diagnostics on error.
+- Discovered `llama-cli` build does not accept `--stop`; added fallback to `--reverse-prompt` for stop sequences (optional override via `LLM_LOCAL_STOP_FLAG`).
 - Expected deploy log signals now:
   - `[runtime] downloading llama-cli from object storage`
   - `[runtime] llama-cli state path=... size=... mode=755`

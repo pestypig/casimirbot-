@@ -25,6 +25,7 @@ const DEFAULT_TEMPERATURE = toNumber(process.env.LLM_LOCAL_TEMP, 0.2);
 const DEFAULT_SEED = toPositiveInt(process.env.LLM_LOCAL_SEED, 42);
 const DEFAULT_TIMEOUT_MS = toPositiveInt(process.env.LLM_LOCAL_SPAWN_TIMEOUT_MS, 60_000);
 const DEFAULT_CONCURRENCY = Math.max(1, Number(process.env.LLM_LOCAL_CONCURRENCY ?? 1));
+const DEFAULT_STOP_FLAG = process.env.LLM_LOCAL_STOP_FLAG?.trim() || "--stop";
 const TOOL_NAME = "llm.local.spawn.generate";
 const TOOL_VERSION = process.env.LLM_LOCAL_SPAWN_VERSION?.trim() || "1.0.0";
 const TEXT_MIME = "text/plain";
@@ -146,6 +147,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   const startedAt = new Date(started).toISOString();
   const release = beginLlMJob();
   let releaseSpawn: (() => void) | null = null;
+  let stopFlag = DEFAULT_STOP_FLAG;
   const cleanupPromptFile = () => {
     if (!promptFilePath) return;
     try {
@@ -165,6 +167,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       temperature,
       seed,
       stop: parsed.stop,
+      stopFlag,
       loraPath: override?.loraPath ?? loraPath,
       loraScale: override?.loraScale ?? loraScale,
     });
@@ -216,6 +219,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
 
   let lastSpawnError: unknown;
   let spawnDiagLogged = false;
+  let triedStopFlagFallback = false;
   const attempt = async (spawnArgs: string[]): Promise<boolean> => {
     try {
       timedOut = false;
@@ -259,6 +263,21 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     const error = lastSpawnError ?? new Error("llm spawn failed");
     lastError = error;
     const message = error instanceof Error ? error.message : String(error);
+    const stopFlagFallback =
+      stopFlag === "--stop" ? "--reverse-prompt" : "--stop";
+    const stopFlagInvalid =
+      parsed.stop &&
+      !triedStopFlagFallback &&
+      /invalid argument|unknown argument|unrecognized option/i.test(message) &&
+      message.includes(stopFlag);
+    if (stopFlagInvalid) {
+      triedStopFlagFallback = true;
+      stopFlag = stopFlagFallback;
+      const retryArgs = buildSpawnArgs({ loraPath: loraPath, loraScale });
+      if (await attempt(retryArgs)) {
+        return await finalizeSuccess();
+      }
+    }
     const isAccessViolation = /3221225477|0xC0000005/i.test(message);
     const isMissingDll =
       /3221225781|0xC0000135|module could not be found/i.test(message);
@@ -757,6 +776,7 @@ function buildArgs(
     temperature: number;
     seed: number;
     stop?: unknown;
+    stopFlag?: string;
     loraPath?: string;
     loraScale?: number;
   },
@@ -792,12 +812,13 @@ function buildArgs(
       args.push("--lora-scale", String(opts.loraScale));
     }
   }
+  const stopFlag = opts.stopFlag?.trim() || "--stop";
   if (Array.isArray(opts.stop)) {
     opts.stop.filter(Boolean).forEach((stop) => {
-      args.push("--stop", String(stop));
+      args.push(stopFlag, String(stop));
     });
   } else if (typeof opts.stop === "string" && opts.stop) {
-    args.push("--stop", opts.stop);
+    args.push(stopFlag, opts.stop);
   }
   return args;
 }
