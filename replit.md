@@ -58,6 +58,18 @@ npx tsx scripts/upload-runtime-artifacts.ts
 Then copy the printed `LLM_LOCAL_*` entries into **Publishing** environment variables and republish.
 If Helix Ask throws `spawn ... llama-cli ENOENT`, the deployment did not receive these envs.
 
+### 2026-01-29 Session Notes (LLM Hydration Debug)
+- Root issue was intermittent `spawn ... llama-cli ENOENT` in deploy logs; local runs worked.
+- We reordered hydration so `llama-cli` is fetched before model/lora/index.
+- Added runtime artifact diagnostics (path/size/mode) and spawn diagnostics on error.
+- Expected deploy log signals now:
+  - `[runtime] downloading llama-cli from object storage`
+  - `[runtime] llama-cli state path=... size=... mode=755`
+  - `[runtime] llama-cli hydrated (...)`
+  - `[runtime] artifact labels=llama-cli, index, lora, model`
+  - `[runtime] index already hydrated (...)` can appear when cached.
+- If ENOENT returns, grab lines starting with `[llm.local.spawn]` and the artifact state lines above.
+
 ### Local Prod-Like Verification
 Run locally and confirm SPA fallback:
 ```

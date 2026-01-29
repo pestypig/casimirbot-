@@ -33,6 +33,14 @@ const PROMPT_FILE_DIR = resolve(process.env.LLM_LOCAL_PROMPT_DIR?.trim() || "tmp
 let activeSpawns = 0;
 const spawnWaiters: Array<() => void> = [];
 
+const resolveExecutable = (value: string): string => {
+  if (!value) return value;
+  if (value.startsWith(".") || value.includes("/") || value.includes("\\")) {
+    return resolve(value);
+  }
+  return value;
+};
+
 const acquireSpawnSlot = async (): Promise<() => void> => {
   if (activeSpawns < DEFAULT_CONCURRENCY) {
     activeSpawns += 1;
@@ -105,7 +113,9 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   const traceId = (ctx?.traceId as string) || undefined;
   const prompt = parsed.prompt;
   let promptFilePath: string | null = null;
-  const cmd = process.env.LLM_LOCAL_CMD?.trim() || DEFAULT_CMD;
+  const { ensureRuntimeArtifactsHydrated } = await import("../services/llm/runtime-artifacts");
+  await ensureRuntimeArtifactsHydrated();
+  const cmd = resolveExecutable(process.env.LLM_LOCAL_CMD?.trim() || DEFAULT_CMD);
   const model =
     process.env.LLM_LOCAL_MODEL_PATH?.trim() ||
     process.env.LLM_LOCAL_MODEL?.trim() ||

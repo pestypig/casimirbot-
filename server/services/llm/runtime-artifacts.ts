@@ -14,6 +14,7 @@ type ArtifactSpec = {
 };
 
 let replitClient: ReplitStorageClient | null = null;
+let hydrationPromise: Promise<void> | null = null;
 
 const getReplitClient = async (): Promise<ReplitStorageClient> => {
   if (!replitClient) {
@@ -197,15 +198,14 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
     const cmdPath =
       process.env.LLM_LOCAL_CMD?.trim() ??
       ".cache/llm/llama-build/bin/llama-cli";
-    if (!process.env.LLM_LOCAL_CMD) {
-      process.env.LLM_LOCAL_CMD = cmdPath;
-    }
-    console.log(`[runtime] llama-cli target=${resolveTargetPath(cmdPath)}`);
+    const resolvedCmdPath = resolveTargetPath(cmdPath);
+    process.env.LLM_LOCAL_CMD = resolvedCmdPath;
+    console.log(`[runtime] llama-cli target=${resolvedCmdPath}`);
     artifacts.push({
       label: "llama-cli",
       objectKey: cmdKey,
       sha256: process.env.LLM_LOCAL_CMD_SHA256 ?? "",
-      targetPath: cmdPath,
+      targetPath: resolvedCmdPath,
       executable: true,
     });
   }
@@ -260,4 +260,14 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
   for (const artifact of artifacts) {
     await hydrateArtifact(artifact);
   }
+};
+
+export const ensureRuntimeArtifactsHydrated = (): Promise<void> => {
+  if (!hydrationPromise) {
+    hydrationPromise = hydrateRuntimeArtifacts().catch((error) => {
+      hydrationPromise = null;
+      throw error;
+    });
+  }
+  return hydrationPromise;
 };
