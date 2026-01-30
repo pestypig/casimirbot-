@@ -2501,6 +2501,13 @@ const HELIX_ASK_CONTEXT_CHARS = clampNumber(
   120,
   2400,
 );
+const HELIX_ASK_HTTP_KEEPALIVE =
+  String(process.env.HELIX_ASK_HTTP_KEEPALIVE ?? "1").trim() !== "0";
+const HELIX_ASK_HTTP_KEEPALIVE_MS = clampNumber(
+  readNumber(process.env.HELIX_ASK_HTTP_KEEPALIVE_MS, 15000),
+  2000,
+  60000,
+);
 const HELIX_ASK_LOCAL_CONTEXT_TOKENS = resolveLocalContextTokens();
 const HELIX_ASK_SCAFFOLD_CONTEXT_CHARS = Math.max(
   800,
@@ -3136,6 +3143,87 @@ function createHelixAskStreamEmitter({
   };
 
   return { onToken, flush, finalize };
+}
+
+type HelixAskJsonKeepAlive = {
+  send: (status: number, payload: unknown) => void;
+  stop: () => void;
+  isStreaming: () => boolean;
+};
+
+function createHelixAskJsonKeepAlive(
+  res: Response,
+  options: { enabled: boolean; intervalMs: number },
+): HelixAskJsonKeepAlive {
+  let timer: NodeJS.Timeout | null = null;
+  let streaming = false;
+  let stopped = false;
+
+  const startStreaming = (): void => {
+    if (streaming || stopped || res.writableEnded) return;
+    streaming = true;
+    res.status(200);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof res.flushHeaders === "function") {
+      res.flushHeaders();
+    }
+    try {
+      res.write(" \n");
+    } catch {
+      // Ignore write failures; caller will finalize.
+    }
+  };
+
+  const tick = (): void => {
+    if (stopped || res.writableEnded) {
+      stop();
+      return;
+    }
+    if (!streaming) {
+      startStreaming();
+      return;
+    }
+    try {
+      res.write(" \n");
+    } catch {
+      stop();
+    }
+  };
+
+  if (options.enabled) {
+    timer = setInterval(tick, options.intervalMs);
+  }
+
+  const stop = (): void => {
+    if (stopped) return;
+    stopped = true;
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  };
+
+  const send = (status: number, payload: unknown): void => {
+    if (res.writableEnded) {
+      stop();
+      return;
+    }
+    if (!options.enabled || !streaming) {
+      stop();
+      res.status(status).json(payload);
+      return;
+    }
+    stop();
+    try {
+      res.end(JSON.stringify(payload));
+    } catch {
+      // Ignore write failures on shutdown.
+    }
+  };
+
+  return { send, stop, isStreaming: () => streaming };
 }
 
 function stripStageTags(value: string): string {
@@ -7118,6 +7206,10 @@ planRouter.post("/ask", async (req, res) => {
     });
   };
   const streamEmitter = createHelixAskStreamEmitter({ sessionId: askSessionId, traceId: askTraceId });
+  const keepAlive = createHelixAskJsonKeepAlive(res, {
+    enabled: HELIX_ASK_HTTP_KEEPALIVE && !dryRun,
+    intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
+  });
   try {
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
@@ -7785,7 +7877,11 @@ planRouter.post("/ask", async (req, res) => {
       prompt = ensureFinalMarker(basePrompt);
     }
     if (!prompt) {
-      return res.status(400).json({ error: "bad_request", details: [{ path: ["prompt"], message: "prompt required" }] });
+      keepAlive.send(400, {
+        error: "bad_request",
+        details: [{ path: ["prompt"], message: "prompt required" }],
+      });
+      return;
     }
 
     const forcePlanPass = repoExpectationLevel !== "low" || requiresRepoEvidence;
@@ -8962,8 +9058,11 @@ planRouter.post("/ask", async (req, res) => {
           dryPayload.prompt_ingest_reason = promptIngestReason;
         }
       }
-      const responsePayload = debugPayload ? { ...dryPayload, debug: debugPayload, dry_run: true } : { ...dryPayload, dry_run: true };
-      return res.json(responsePayload);
+      const responsePayload = debugPayload
+        ? { ...dryPayload, debug: debugPayload, dry_run: true }
+        : { ...dryPayload, dry_run: true };
+      keepAlive.send(200, responsePayload);
+      return;
     }
 
     if (planPassStart !== null) {
@@ -9339,12 +9438,14 @@ planRouter.post("/ask", async (req, res) => {
       debugPayload.live_events = liveEventHistory.slice();
     }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
-    return res.json(responsePayload);
+    keepAlive.send(200, responsePayload);
+    return;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     streamEmitter.finalize();
     logProgress("Failed", "llm_local_failed", undefined, false);
-    return res.status(500).json({ error: "llm_local_failed", message });
+    keepAlive.send(500, { ok: false, error: "llm_local_failed", message, status: 500 });
+    return;
   }
 });
 
