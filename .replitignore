@@ -6,7 +6,6 @@
 .idea/
 
 # Dependencies/build outputs
-node_modules/
 server/public
 *.tsbuildinfo
 
