@@ -102,6 +102,8 @@ export function QiAutoTunerPanel() {
   const autoTickRef = useRef(0);
 
   const controllerQuery = useQiControllerState();
+  const controllerUnavailable =
+    controllerQuery.isError || (controllerQuery.isFetched && !controllerQuery.data);
 
   const suggestionMutation = useMutation({
     mutationFn: async (payload: QiSetpointSuggestion) => {
@@ -253,7 +255,7 @@ export function QiAutoTunerPanel() {
       </CardHeader>
 
       <CardContent className="space-y-5 text-sm">
-        {controllerQuery.isError && (
+        {controllerUnavailable && (
           <p className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
             Controller API unreachable; falling back to legacy client heuristics until the server recovers.
           </p>

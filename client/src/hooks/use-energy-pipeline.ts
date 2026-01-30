@@ -1299,9 +1299,11 @@ export function useEnergyPipeline(options?: {
           aggressiveness: 0.7,
         });
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const isNotFound = message.includes("404") || message.toLowerCase().includes("api_not_found");
         console.warn("[HELIX] Failed to issue initial QI margin intent:", err);
         if (!cancelled) {
-          issuedInitialMarginIntent = false;
+          issuedInitialMarginIntent = isNotFound;
         }
       }
     })();
