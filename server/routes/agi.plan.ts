@@ -9522,7 +9522,7 @@ const runHelixAskJob = async (
   request: z.infer<typeof LocalAskRequest>,
   personaId: string,
 ): Promise<void> => {
-  if (!markHelixAskJobRunning(jobId)) return;
+  if (!(await markHelixAskJobRunning(jobId))) return;
   let settled = false;
   const responder: HelixAskResponder = {
     send: (status, payload) => {
@@ -9530,10 +9530,10 @@ const runHelixAskJob = async (
       settled = true;
       if (status >= 400) {
         const message = describeHelixAskJobError(payload, status);
-        failHelixAskJob(jobId, message);
+        void failHelixAskJob(jobId, message);
         return;
       }
-      completeHelixAskJob(jobId, payload as Record<string, unknown>);
+      void completeHelixAskJob(jobId, payload as Record<string, unknown>);
     },
   };
   try {
@@ -9544,12 +9544,12 @@ const runHelixAskJob = async (
       streamChunk: (chunk) => appendHelixAskJobPartial(jobId, chunk),
     });
     if (!settled) {
-      failHelixAskJob(jobId, "helix_ask_no_response");
+      await failHelixAskJob(jobId, "helix_ask_no_response");
     }
   } catch (error) {
     if (settled) return;
     const message = error instanceof Error ? error.message : String(error);
-    failHelixAskJob(jobId, message || "helix_ask_failed");
+    await failHelixAskJob(jobId, message || "helix_ask_failed");
   }
 };
 
@@ -9568,11 +9568,17 @@ planRouter.post("/ask/jobs", async (req, res) => {
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
   const request = { ...parsed.data, traceId: askTraceId };
   const question = (request.question ?? request.prompt ?? "").trim();
-  const job = createHelixAskJob({
-    sessionId: request.sessionId,
-    traceId: askTraceId,
-    question: question ? question.slice(0, 480) : undefined,
-  });
+  let job: HelixAskJobRecord;
+  try {
+    job = await createHelixAskJob({
+      sessionId: request.sessionId,
+      traceId: askTraceId,
+      question: question ? question.slice(0, 480) : undefined,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(503).json({ error: "job_store_unavailable", message });
+  }
   res.status(202).json({
     jobId: job.id,
     status: job.status,
@@ -9582,12 +9588,12 @@ planRouter.post("/ask/jobs", async (req, res) => {
   void runHelixAskJob(job.id, request, personaId);
 });
 
-planRouter.get("/ask/jobs/:jobId", (req, res) => {
+planRouter.get("/ask/jobs/:jobId", async (req, res) => {
   const jobId = req.params.jobId?.trim();
   if (!jobId) {
     return res.status(400).json({ error: "bad_request", details: [{ message: "jobId required" }] });
   }
-  const job = getHelixAskJob(jobId);
+  const job = await getHelixAskJob(jobId);
   if (!job) {
     return res.status(404).json({ error: "not_found" });
   }
