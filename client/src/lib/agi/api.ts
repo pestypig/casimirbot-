@@ -523,7 +523,12 @@ const getAskJob = async (
 ): Promise<HelixAskJobResponse> =>
   asJson(
     await fetch(`/api/agi/ask/jobs/${encodeURIComponent(jobId)}`, {
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+      },
+      cache: "no-store",
       signal,
     }),
   );

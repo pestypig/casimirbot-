@@ -9591,6 +9591,11 @@ planRouter.get("/ask/jobs/:jobId", (req, res) => {
   if (!job) {
     return res.status(404).json({ error: "not_found" });
   }
+  res.set({
+    "Cache-Control": "no-store",
+    Pragma: "no-cache",
+    Expires: "0",
+  });
   res.json(buildHelixAskJobResponse(job));
 });
 
