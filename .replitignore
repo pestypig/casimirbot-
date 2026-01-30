@@ -7,7 +7,6 @@
 
 # Dependencies/build outputs
 node_modules/
-dist/
 server/public
 *.tsbuildinfo
 
