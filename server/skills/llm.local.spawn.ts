@@ -258,6 +258,13 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       );
     }
     if (await attempt(args)) {
+      const outputEmpty = stripCliNoise(outputText).trim().length === 0;
+      if (outputEmpty && args.includes("--log-disable")) {
+        const retryArgs = args.filter((arg) => arg !== "--log-disable");
+        if (await attempt(retryArgs)) {
+          return await finalizeSuccess();
+        }
+      }
       return await finalizeSuccess();
     }
     const error = lastSpawnError ?? new Error("llm spawn failed");
