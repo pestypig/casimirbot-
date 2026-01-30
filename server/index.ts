@@ -471,8 +471,9 @@ const rootHandler = (req: Request, res: Response) => {
     return;
   }
   if (wantsHtml) {
+    // Return 200 so default platform health checks pass even with Accept: */*.
     res
-      .status(302)
+      .status(200)
       .set("Location", redirectTarget)
       .set("Cache-Control", "no-store")
       .type("html")
