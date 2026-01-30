@@ -57,12 +57,22 @@ npx tsx scripts/upload-runtime-artifacts.ts
 ```
 Then copy the printed `LLM_LOCAL_*` entries into **Publishing** environment variables and republish.
 If Helix Ask throws `spawn ... llama-cli ENOENT`, the deployment did not receive these envs.
+If logs show `spawn ... llama-cli ENOENT` **but** the file exists, the binary is likely dynamically linked against
+`/nix/store/.../ld-linux...` (missing in deploy). Fix by uploading a **statically linked** llama CLI:
+- Build in Replit nix shell with musl + static + OpenMP disabled, then copy `build-musl/bin/llama-completion` to
+  `.cache/llm/llama-build/bin/llama-cli` and re-upload.
+- Keep `LLM_LOCAL_CMD_OBJECT_KEY=llama-cli`, update `LLM_LOCAL_CMD_SHA256` to the new hash from the upload script.
+- If deploy logs show `llama-cli sha256 mismatch`, the artifact uploaded but Publishing secrets still hold the old
+  `LLM_LOCAL_CMD_SHA256`. Update it to the new value and republish.
 
 ### 2026-01-29 Session Notes (LLM Hydration Debug)
 - Root issue was intermittent `spawn ... llama-cli ENOENT` in deploy logs; local runs worked.
 - We reordered hydration so `llama-cli` is fetched before model/lora/index.
 - Added runtime artifact diagnostics (path/size/mode) and spawn diagnostics on error.
 - Discovered `llama-cli` build does not accept `--stop`; added fallback to `--reverse-prompt` for stop sequences (optional override via `LLM_LOCAL_STOP_FLAG`).
+- Publishing secret now set: `LLM_LOCAL_STOP_FLAG=--reverse-prompt`.
+- Publishing secret `LLM_LOCAL_CMD` should be absolute: `/home/runner/workspace/.cache/llm/llama-build/bin/llama-cli`.
+- `LLM_LOCAL_ARGS_BASE` is not set.
 - Expected deploy log signals now:
   - `[runtime] downloading llama-cli from object storage`
   - `[runtime] llama-cli state path=... size=... mode=755`

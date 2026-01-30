@@ -33,6 +33,8 @@ env NODE_ENV=production PORT=$PORT HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit 
 Key points:
 - Use `PORT=$PORT` (do not hardcode 5000 on Replit).
 - Always build before starting the production server.
+- Do not inline `LLM_LOCAL_*` values here if they already exist in Publishing
+  secrets; inline values override secrets and can go stale.
 
 ## Secrets / Env Vars
 
@@ -123,6 +125,18 @@ npm run helix:ask:regression
 ```
 
 ## Common Failures
+
+**`llama-cli sha256 mismatch` during hydrate**
+- Root cause: Publish/Deploy run command is still injecting an old SHA, overriding
+  updated secrets.
+- Fix: update `LLM_LOCAL_CMD_SHA256` in the Publishing run command (or remove the
+  inline `LLM_LOCAL_*` overrides entirely) and republish.
+
+**`spawn ... llama-cli ENOENT`**
+- The `llama-cli` binary is dynamically linked against a Nix loader that is not
+  present in the deploy container.
+- Fix: upload a statically linked `llama-cli` (musl build) and set
+  `LLM_LOCAL_CMD_SHA256` to the new object hash.
 
 **`api_not_found`**
 - Preview running an old build or missing route registration
