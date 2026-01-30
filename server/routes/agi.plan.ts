@@ -9049,6 +9049,13 @@ planRouter.post("/ask", async (req, res) => {
       } else {
         answerPath.push("citationRepair:skipped(intent)");
       }
+      if (extractFilePathsFromText(cleaned).length === 0) {
+        const evidencePaths = extractFilePathsFromText(evidenceText).slice(0, 6);
+        if (evidencePaths.length) {
+          cleaned = `${cleaned}\n\nSources: ${evidencePaths.join(", ")}`;
+          answerPath.push("citationFallback:sources");
+        }
+      }
       const hasRepoEvidence = intentStrategy === "hybrid_explain" && Boolean(repoScaffold.trim());
       const allowHybridFallback = formatEnforcementLevel === "strict";
       const hasRepoCitations = extractFilePathsFromText(cleaned).length > 0;
