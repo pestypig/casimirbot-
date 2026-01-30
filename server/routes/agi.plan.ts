@@ -5309,14 +5309,37 @@ function normalizeScaffoldText(value: string): string {
   return trimmed.join("\n");
 }
 
-function appendEvidenceSources(evidence: string, contextFiles: string[], limit = 6): string {
+function resolveEvidencePaths(
+  evidence: string,
+  contextFiles: string[],
+  contextText?: string,
+  limit = 6,
+): string[] {
+  const evidencePaths = extractFilePathsFromText(evidence);
+  if (evidencePaths.length > 0) {
+    return Array.from(new Set(evidencePaths)).slice(0, limit);
+  }
+  const contextPaths = [
+    ...contextFiles.filter(Boolean),
+    ...(contextText ? extractFilePathsFromText(contextText) : []),
+  ];
+  if (contextPaths.length === 0) return [];
+  return Array.from(new Set(contextPaths)).slice(0, limit);
+}
+
+function appendEvidenceSources(
+  evidence: string,
+  contextFiles: string[],
+  limit = 6,
+  contextText?: string,
+): string {
   const trimmed = evidence?.trim() ?? "";
-  const sources = contextFiles.filter(Boolean).slice(0, limit);
+  if (extractFilePathsFromText(trimmed).length > 0) return evidence;
+  const sources = resolveEvidencePaths(trimmed, contextFiles, contextText, limit);
   if (sources.length === 0) return evidence;
   if (!trimmed) {
     return `Sources: ${sources.join(", ")}`;
   }
-  if (extractFilePathsFromText(trimmed).length > 0) return evidence;
   return `${trimmed}\n\nSources: ${sources.join(", ")}`;
 }
 
@@ -8606,7 +8629,7 @@ planRouter.post("/ask", async (req, res) => {
             repoScaffold = stripStageTags(repoScaffold);
           }
           if (repoScaffold) {
-            repoScaffold = appendEvidenceSources(repoScaffold, contextFiles);
+            repoScaffold = appendEvidenceSources(repoScaffold, contextFiles, 6, contextText);
           }
           if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
             const missing = compositeRequiredFiles.filter(
@@ -9004,7 +9027,7 @@ planRouter.post("/ask", async (req, res) => {
         (microPassEnabled || intentStrategy === "constraint_report") &&
         intentProfile.id !== "repo.ideology_reference";
       if (allowCitationRepair) {
-        const evidenceForRepair = appendEvidenceSources(evidenceText, contextFiles);
+        const evidenceForRepair = appendEvidenceSources(evidenceText, contextFiles, 6, contextText);
         if (evidenceForRepair !== evidenceText) {
           evidenceText = evidenceForRepair;
         }
@@ -9093,10 +9116,10 @@ planRouter.post("/ask", async (req, res) => {
       if (!formatSpec.stageTags) {
         cleaned = stripStageTags(cleaned);
       }
+      const repoEvidencePaths = resolveEvidencePaths(evidenceText, contextFiles, contextText, 6);
       if (requiresRepoEvidence && !hasRepoCitations()) {
-        const evidencePaths = extractFilePathsFromText(evidenceText).slice(0, 6);
-        if (evidencePaths.length) {
-          cleaned = `${cleaned}\n\nSources: ${evidencePaths.join(", ")}`;
+        if (repoEvidencePaths.length) {
+          cleaned = `${cleaned}\n\nSources: ${repoEvidencePaths.join(", ")}`;
           answerPath.push("citationFallback:sources");
         } else {
           const generalEvidence = promptScaffold || generalScaffold;
@@ -9125,17 +9148,19 @@ planRouter.post("/ask", async (req, res) => {
       }
       if (
         intentDomain === "repo" &&
-        extractFilePathsFromText(evidenceText).length > 0 &&
         !hasRepoCitations()
       ) {
-        cleaned =
-          "Repo evidence was available but the answer could not be grounded with file citations. Please point to the relevant files or narrow the request.";
-        logProgress("Citation missing", "fallback");
-        logEvent(
-          "Citation missing",
-          "fallback",
-          formatFileList(extractFilePathsFromText(evidenceText)),
-        );
+        if (repoEvidencePaths.length) {
+          cleaned = `${cleaned}\n\nSources: ${repoEvidencePaths.join(", ")}`;
+          answerPath.push("citationFallback:sources");
+          logProgress("Citation missing", "repaired");
+          logEvent("Citation missing", "repaired", formatFileList(repoEvidencePaths));
+        } else {
+          cleaned =
+            "Repo evidence was available but the answer could not be grounded with file citations. Please point to the relevant files or narrow the request.";
+          logProgress("Citation missing", "fallback");
+          logEvent("Citation missing", "fallback", formatFileList(repoEvidencePaths));
+        }
       }
       let endpointGuardApplied = false;
       let endpointGuardMessage: string | null = null;
