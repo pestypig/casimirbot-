@@ -4146,8 +4146,10 @@ function buildHelixAskQueryPrompt(
     "Inside the block: emit optional directives (one per line), then a QUERIES_START line, then query hints.",
     "Directive format:",
     "preferred_surfaces: docs, ethos, knowledge, tests, code",
+    "Only use preferred_surfaces/avoid_surfaces from the allowed list above.",
     "avoid_surfaces: tokamak, qi",
     "must_include_globs: docs/ethos/**, docs/knowledge/**",
+    "Only emit must_include_globs if you can name real repo paths (docs/, server/, client/, modules/, shared/, apps/, tools/, scripts/, cli/, packages/, warp-web/, .github/).",
     "required_slots: definition, repo_mapping, verification, failure_path",
     "clarify: <one short question if evidence is likely missing>",
     "Use one line per query. Prefer module names, symbols, or paths.",
@@ -4310,6 +4312,42 @@ function normalizePlanValue(value: string): string {
   return value.trim().replace(/^[-\s]+/, "");
 }
 
+const PLAN_SURFACE_ALLOWLIST = new Set(["docs", "ethos", "knowledge", "tests", "code"]);
+const PLAN_REPO_PATH_PREFIXES = [
+  "docs/",
+  "server/",
+  "client/",
+  "modules/",
+  "shared/",
+  "apps/",
+  "tools/",
+  "scripts/",
+  "cli/",
+  "packages/",
+  "warp-web/",
+  ".github/",
+];
+
+function normalizePlanDirectiveEntry(value: string): string {
+  return value.trim().replace(/^["']+|["']+$/g, "").replace(/\\/g, "/");
+}
+
+function stripLeadingGlob(value: string): string {
+  return value.replace(/^(\*\*\/|\*\/)+/g, "");
+}
+
+function looksLikeRepoPath(value: string): boolean {
+  const normalized = normalizePlanDirectiveEntry(value);
+  if (!normalized) return false;
+  let trimmed = normalized.replace(/^\.\/+/, "");
+  trimmed = stripLeadingGlob(trimmed);
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  if (PLAN_REPO_PATH_PREFIXES.some((prefix) => lower.startsWith(prefix))) return true;
+  if (/\.[a-z0-9]{1,6}$/i.test(lower) && lower.includes("/")) return true;
+  return false;
+}
+
 function parsePlanList(value: string): string[] {
   return value
     .split(/[,\|]/)
@@ -4403,11 +4441,29 @@ function parsePlanDirectives(text: string): { directives: HelixAskPlanDirectives
       normalized.startsWith("preferred_surfaces") ||
       normalized.startsWith("preferred")
     ) {
-      directives.preferredSurfaces.push(...parsePlanList(splitDirectiveValue(cleaned)));
+      const entries = parsePlanList(splitDirectiveValue(cleaned))
+        .map(normalizePlanDirectiveEntry)
+        .filter(Boolean);
+      for (const entry of entries) {
+        const lower = entry.toLowerCase();
+        if (PLAN_SURFACE_ALLOWLIST.has(lower)) {
+          directives.preferredSurfaces.push(lower);
+        } else if (looksLikeRepoPath(entry)) {
+          hintLines.push(entry);
+        }
+      }
       continue;
     }
     if (normalized.startsWith("avoid_surfaces") || normalized.startsWith("avoid")) {
-      directives.avoidSurfaces.push(...parsePlanList(splitDirectiveValue(cleaned)));
+      const entries = parsePlanList(splitDirectiveValue(cleaned))
+        .map(normalizePlanDirectiveEntry)
+        .filter(Boolean);
+      for (const entry of entries) {
+        const lower = entry.toLowerCase();
+        if (PLAN_SURFACE_ALLOWLIST.has(lower)) {
+          directives.avoidSurfaces.push(lower);
+        }
+      }
       continue;
     }
     if (
@@ -4415,7 +4471,16 @@ function parsePlanDirectives(text: string): { directives: HelixAskPlanDirectives
       normalized.startsWith("must_include") ||
       normalized.startsWith("must_include_paths")
     ) {
-      directives.mustIncludeGlobs.push(...parsePlanList(splitDirectiveValue(cleaned)));
+      const entries = parsePlanList(splitDirectiveValue(cleaned))
+        .map(normalizePlanDirectiveEntry)
+        .filter(Boolean);
+      for (const entry of entries) {
+        if (looksLikeRepoPath(entry)) {
+          directives.mustIncludeGlobs.push(entry);
+        } else {
+          hintLines.push(entry);
+        }
+      }
       continue;
     }
     if (normalized.startsWith("required_slots") || normalized.startsWith("slots")) {
