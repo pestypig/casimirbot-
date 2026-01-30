@@ -58,6 +58,8 @@ export function serveStatic(app: Express) {
   });
 
   app.use("*", (_req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

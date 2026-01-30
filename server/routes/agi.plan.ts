@@ -2876,6 +2876,14 @@ const HELIX_ASK_STREAM_MAX_EVENTS = clampNumber(
   8,
   300,
 );
+const HELIX_ASK_JOB_TIMEOUT_MS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_JOB_TIMEOUT_MS ?? process.env.VITE_HELIX_ASK_JOB_TIMEOUT_MS,
+    180_000,
+  ),
+  30_000,
+  30 * 60_000,
+);
 
 function ensureFinalMarker(value: string): string {
   if (!value.trim()) return `${HELIX_ASK_ANSWER_START}\n${HELIX_ASK_ANSWER_END}`;
@@ -3141,8 +3149,15 @@ function createHelixAskStreamEmitter({
       flush();
       return;
     }
-    pushText(pending);
-    pending = "";
+    const endLen = HELIX_ASK_ANSWER_END.length;
+    if (pending.length >= endLen) {
+      const emitLen = pending.length - (endLen - 1);
+      const emitText = pending.slice(0, emitLen);
+      if (emitText) {
+        pushText(emitText);
+      }
+      pending = pending.slice(emitLen);
+    }
   };
 
   const finalize = (fallback?: string): void => {
@@ -9524,6 +9539,17 @@ const runHelixAskJob = async (
 ): Promise<void> => {
   if (!(await markHelixAskJobRunning(jobId))) return;
   let settled = false;
+  let timeoutHandle: NodeJS.Timeout | null = null;
+  const timeoutMs = HELIX_ASK_JOB_TIMEOUT_MS;
+  const timeoutPromise =
+    timeoutMs > 0
+      ? new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            reject(new Error("helix_ask_timeout"));
+          }, timeoutMs);
+          timeoutHandle.unref?.();
+        })
+      : null;
   const responder: HelixAskResponder = {
     send: (status, payload) => {
       if (settled) return;
@@ -9537,19 +9563,34 @@ const runHelixAskJob = async (
     },
   };
   try {
-    await executeHelixAsk({
+    const executePromise = executeHelixAsk({
       request,
       personaId,
       responder,
       streamChunk: (chunk) => appendHelixAskJobPartial(jobId, chunk),
     });
+    if (timeoutPromise) {
+      await Promise.race([executePromise, timeoutPromise]);
+    } else {
+      await executePromise;
+    }
     if (!settled) {
+      settled = true;
       await failHelixAskJob(jobId, "helix_ask_no_response");
     }
   } catch (error) {
     if (settled) return;
+    settled = true;
     const message = error instanceof Error ? error.message : String(error);
-    await failHelixAskJob(jobId, message || "helix_ask_failed");
+    const normalized = message.includes("helix_ask_timeout")
+      ? "helix_ask_timeout"
+      : message || "helix_ask_failed";
+    await failHelixAskJob(jobId, normalized);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+      timeoutHandle = null;
+    }
   }
 };
 

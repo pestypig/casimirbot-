@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import "./index.css";
 
 const buildStamp = import.meta.env.DEV
@@ -11,7 +12,64 @@ const buildStamp = import.meta.env.DEV
 // Stamp build token at app boot
 (window as any).__APP_WARP_BUILD = buildStamp;
 
-createRoot(document.getElementById("root")!).render(<App />);
+const CHUNK_ERROR_PATTERNS = [
+  /ChunkLoadError/i,
+  /Loading chunk \d+ failed/i,
+  /Failed to fetch dynamically imported module/i,
+  /Importing a module script failed/i,
+];
+
+const extractErrorMessage = (value: unknown): string => {
+  if (!value) return "";
+  if (value instanceof Error) return value.message;
+  if (typeof value === "string") return value;
+  if (typeof (value as { message?: unknown }).message === "string") {
+    return String((value as { message?: unknown }).message);
+  }
+  return "";
+};
+
+const scheduleReloadOnce = () => {
+  if (typeof window === "undefined") return;
+  const reloadKey = `__helix_reload_${buildStamp}`;
+  try {
+    if (window.sessionStorage.getItem(reloadKey) === "1") return;
+    window.sessionStorage.setItem(reloadKey, "1");
+  } catch {
+    // ignore session storage errors
+  }
+  window.location.reload();
+};
+
+const shouldAutoReload = (value: unknown): boolean => {
+  if (import.meta.env?.DEV) return false;
+  const message = extractErrorMessage(value);
+  if (!message) return false;
+  return CHUNK_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+};
+
+if (typeof window !== "undefined") {
+  window.addEventListener("error", (event) => {
+    const errEvent = event as ErrorEvent;
+    const candidate = errEvent?.error ?? errEvent?.message ?? event;
+    if (shouldAutoReload(candidate)) {
+      scheduleReloadOnce();
+    }
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    const rejection = event as PromiseRejectionEvent;
+    const candidate = rejection?.reason ?? event;
+    if (shouldAutoReload(candidate)) {
+      scheduleReloadOnce();
+    }
+  });
+}
+
+createRoot(document.getElementById("root")!).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>,
+);
 
 if (typeof window !== "undefined" && Boolean(import.meta.env?.DEV)) {
   // Ensure dev doesn't get stuck on a stale service worker or cached shell.

@@ -485,6 +485,21 @@ export async function execute(traceId: string): Promise<ExecuteResponse> {
 
 const HELIX_ASK_JOB_POLL_INTERVAL_MS = 1000;
 const HELIX_ASK_JOB_MAX_CONSECUTIVE_ERRORS = 6;
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+const readNumberEnv = (value: unknown, fallback: number) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+};
+const HELIX_ASK_JOB_TIMEOUT_MS = clampNumber(
+  readNumberEnv((import.meta as any)?.env?.VITE_HELIX_ASK_JOB_TIMEOUT_MS, 180_000),
+  30_000,
+  30 * 60_000,
+);
 
 const isHelixAskJobUnsupported = (error: unknown): boolean =>
   Boolean(
@@ -573,7 +588,8 @@ const pollAskJob = async (
   options?: { signal?: AbortSignal; pollIntervalMs?: number; timeoutMs?: number },
 ): Promise<LocalAskResponse> => {
   const pollInterval = Math.max(250, options?.pollIntervalMs ?? HELIX_ASK_JOB_POLL_INTERVAL_MS);
-  const timeoutMs = options?.timeoutMs ?? 0;
+  const timeoutMs =
+    typeof options?.timeoutMs === "number" ? options.timeoutMs : HELIX_ASK_JOB_TIMEOUT_MS;
   const startedAt = Date.now();
   let lastPartialText = "";
   let consecutiveErrors = 0;
@@ -619,6 +635,10 @@ const pollAskJob = async (
     }
     if (job.status === "failed" || job.status === "cancelled") {
       const message = job.error?.trim() || "Helix Ask job failed.";
+      if (message.includes("helix_ask_timeout")) {
+        const fallback = lastPartialText || "Request timed out.";
+        return { text: fallback } as LocalAskResponse;
+      }
       throw new Error(message);
     }
     if (timeoutMs > 0 && Date.now() - startedAt > timeoutMs) {
