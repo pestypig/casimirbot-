@@ -81,6 +81,12 @@ If logs show `spawn ... llama-cli ENOENT` **but** the file exists, the binary is
   - `[runtime] index already hydrated (...)` can appear when cached.
 - If ENOENT returns, grab lines starting with `[llm.local.spawn]` and the artifact state lines above.
 
+### 2026-01-30 Session Notes (LLM Empty Output)
+- `llama-cli` in this runtime is built **without `--jinja`**, so `--chat-template qwen2` fails.
+- `--log-disable` causes **zero-byte stdout/stderr** even when the process exits 0.
+- `-no-cnv` is required to avoid interactive conversation mode waiting on stdin.
+- Fix: avoid `--chat-template qwen2`; set `LLM_LOCAL_LOG_DISABLE=0` or rely on the retry fallback that drops `--log-disable` on empty output.
+
 ### Local Prod-Like Verification
 Run locally and confirm SPA fallback:
 ```
