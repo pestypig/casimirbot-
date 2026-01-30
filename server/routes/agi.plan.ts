@@ -7124,6 +7124,20 @@ const executeHelixAsk = async ({
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
   const dryRun = parsed.data.dryRun === true;
   const debugEnabled = parsed.data.debug === true;
+  const debugLogsEnabled = process.env.HELIX_ASK_DEBUG === "1";
+  const logDebug = (message: string, detail?: Record<string, unknown>): void => {
+    if (!debugLogsEnabled) return;
+    const tag = `[HELIX_ASK_DEBUG:${Date.now()}]`;
+    if (detail) {
+      try {
+        console.log(tag, message, JSON.stringify(detail));
+      } catch {
+        console.log(tag, message);
+      }
+      return;
+    }
+    console.log(tag, message);
+  };
   const HELIX_ASK_EVENT_HISTORY_LIMIT = clampNumber(
     readNumber(process.env.HELIX_ASK_EVENT_HISTORY_LIMIT, 90),
     20,
@@ -7241,6 +7255,10 @@ const executeHelixAsk = async ({
   };
   const streamEmitter = createHelixAskStreamEmitter({ sessionId: askSessionId, traceId: askTraceId, onChunk: streamChunk });
   try {
+    logDebug("executeHelixAsk START", {
+      traceId: askTraceId,
+      sessionId: askSessionId ?? null,
+    });
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
     let questionValue = question;
@@ -9110,6 +9128,10 @@ const executeHelixAsk = async ({
       logProgress("Answer ready", "concept", answerStart);
       answerPath.push("answer:forced");
     } else {
+      logDebug("llmLocalHandler MAIN start", {
+        maxTokens: parsed.data.max_tokens ?? null,
+        temperature: parsed.data.temperature ?? null,
+      });
       result = (await llmLocalHandler(
         {
           prompt,
@@ -9125,6 +9147,9 @@ const executeHelixAsk = async ({
           onToken: streamEmitter.onToken,
         },
       )) as LocalAskResult;
+      logDebug("llmLocalHandler MAIN complete", {
+        textLength: typeof result.text === "string" ? result.text.length : 0,
+      });
       logProgress("Answer ready", undefined, answerStart);
       answerPath.push("answer:llm");
     }
@@ -9164,6 +9189,10 @@ const executeHelixAsk = async ({
         const hasAnswerPaths = extractFilePathsFromText(cleaned).length > 0;
         if (hasEvidencePaths && !hasAnswerPaths) {
           const repairStart = Date.now();
+          logDebug("llmLocalHandler CITATION_REPAIR start", {
+            maxTokens: repairTokens,
+            temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+          });
           const repairPrompt = buildHelixAskCitationRepairPrompt(
             baseQuestion,
             cleaned,
@@ -9185,6 +9214,9 @@ const executeHelixAsk = async ({
               traceId: askTraceId,
             },
           )) as LocalAskResult;
+          logDebug("llmLocalHandler CITATION_REPAIR complete", {
+            textLength: typeof repairResult.text === "string" ? repairResult.text.length : 0,
+          });
           const repaired = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
           if (repaired.trim()) {
             cleaned = repaired;
@@ -9454,7 +9486,11 @@ const executeHelixAsk = async ({
         traceId: askTraceId,
       });
     }
+    logDebug("streamEmitter.finalize start", {
+      cleanedLength: typeof cleanedText === "string" ? cleanedText.length : 0,
+    });
     streamEmitter.finalize(cleanedText);
+    logDebug("streamEmitter.finalize complete");
     result.prompt_ingested = promptIngested;
     if (promptIngested) {
       if (promptIngestSource) {
@@ -9468,14 +9504,22 @@ const executeHelixAsk = async ({
       debugPayload.live_events = liveEventHistory.slice();
     }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
+    logDebug("responder.send(200) start", {
+      hasDebug: Boolean(debugPayload),
+      hasEnvelope: Boolean(result.envelope),
+    });
     responder.send(200, responsePayload);
+    logDebug("responder.send(200) complete");
     return;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    logDebug("executeHelixAsk ERROR", { message });
     streamEmitter.finalize();
     logProgress("Failed", "llm_local_failed", undefined, false);
     responder.send(500, { ok: false, error: "llm_local_failed", message, status: 500 });
     return;
+  } finally {
+    logDebug("executeHelixAsk FINALLY");
   }
 };
 
