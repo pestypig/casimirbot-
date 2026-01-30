@@ -7,27 +7,9 @@ channel = "stable-24_05"
 packages = ["gmsh", "emscripten", "jq", "ffmpeg", "cmake", "lsof"]
 
 [deployment]
-deploymentTarget = "cloudrun"
-build = ["sh", "-c", "npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"]
-run = [
-  "env",
-  "NODE_ENV=production",
-  "PORT=5000",
-  "HOST=0.0.0.0",
-  "NOISEGEN_STORAGE_BACKEND=replit",
-  "FAST_BOOT=0",
-  "REMOVE_BG_PYTHON_BIN=python",
-  "SKIP_MODULE_INIT=1",
-  "DEFER_ROUTE_BOOT=0",
-  "HEALTH_READY_ON_LISTEN=0",
-  "VITE_HELIX_ASK_MAX_TOKENS=4096",
-  "VITE_HELIX_ASK_CONTEXT_TOKENS=4096",
-  "LLM_LOCAL_CONTEXT_TOKENS=4096",
-  "LLM_LOCAL_MAX_TOKENS=2048",
-  "LLM_LOCAL_SPAWN_TIMEOUT_MS=300000",
-  "node",
-  "dist/index.js"
-]
+deploymentTarget = "vm"
+build = ["npm", "run", "build"]
+run = ["node", "dist/index.js"]
 
 [[ports]]
 localPort = 5000
@@ -43,7 +25,6 @@ externalPort = 5173
 
 [[ports]]
 localPort = 24678
-externalPort = 3000
 
 [env]
 REPLIT_KEEP_PACKAGE_DEV_DEPENDENCIES = "1"
