@@ -400,6 +400,17 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
 
   async function finalizeSuccess(): Promise<LocalSpawnOutput> {
     const trimmedOutput = stripCliNoise(outputText);
+    const outputBytes = Buffer.byteLength(outputText ?? "", "utf8");
+    const stderrText = stderr.join("").trim();
+    const stderrBytes = Buffer.byteLength(stderrText, "utf8");
+    const stderrPreview = sanitizeLogPreview(stderrText, 220);
+    const argsPreview = sanitizeLogPreview(usedArgs.join(" "), 260);
+    const isEmptyOutput = trimmedOutput.trim().length === 0;
+    if (isEmptyOutput) {
+      console.warn(
+        `[llm.local.spawn] empty output stdoutBytes=${outputBytes} stderrBytes=${stderrBytes} cmd=${cmd} args=${argsPreview || "none"} stderr=${stderrPreview || "none"}`,
+      );
+    }
     const completionTokens = countTokens(trimmedOutput);
     const totalTokens = promptTokens + completionTokens;
     const memory = process.memoryUsage();
@@ -508,13 +519,24 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
       ok: true,
       essenceId,
       seed,
-      text: formatLogText({
-        model,
-        maxTokens,
-        contextTokens,
-        loraPath: activeLoraPath,
-        memoryRssBytes: memory.rss,
-      }),
+      text: isEmptyOutput
+        ? formatEmptyLogText({
+            model,
+            maxTokens,
+            contextTokens,
+            loraPath: activeLoraPath,
+            memoryRssBytes: memory.rss,
+            stdoutBytes: outputBytes,
+            stderrBytes,
+            stderrPreview,
+          })
+        : formatLogText({
+            model,
+            maxTokens,
+            contextTokens,
+            loraPath: activeLoraPath,
+            memoryRssBytes: memory.rss,
+          }),
     });
 
     return GenerateOutput.parse({
@@ -727,6 +749,17 @@ function stripCliNoise(output: string): string {
     .join("\n")
     .trim();
   return cleaned || raw;
+}
+
+function sanitizeLogPreview(value: string, limit: number): string {
+  if (!value) {
+    return "";
+  }
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (compact.length <= limit) {
+    return compact;
+  }
+  return `${compact.slice(0, Math.max(0, limit - 3))}...`;
 }
 
 function isCliBannerLine(line: string): boolean {
@@ -975,6 +1008,34 @@ const formatLogText = (input: {
   ];
   if (input.loraPath) {
     parts.push(`lora=${input.loraPath}`);
+  }
+  return parts.join(" ");
+};
+
+const formatEmptyLogText = (input: {
+  model: string;
+  maxTokens: number;
+  contextTokens: number;
+  loraPath?: string;
+  memoryRssBytes: number;
+  stdoutBytes: number;
+  stderrBytes: number;
+  stderrPreview: string;
+}): string => {
+  const parts = [
+    "empty_output",
+    `model=${input.model}`,
+    `ctx=${input.contextTokens}`,
+    `tok<=${input.maxTokens}`,
+    `rss=${formatBytes(input.memoryRssBytes)}`,
+    `stdout=${input.stdoutBytes}b`,
+    `stderr=${input.stderrBytes}b`,
+  ];
+  if (input.loraPath) {
+    parts.push(`lora=${input.loraPath}`);
+  }
+  if (input.stderrPreview) {
+    parts.push(`stderr_preview=${input.stderrPreview}`);
   }
   return parts.join(" ");
 };
