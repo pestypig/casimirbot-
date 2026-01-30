@@ -1,0 +1,68 @@
+# Repo metadata
+.git/
+.github/
+.githooks/
+.vscode/
+.idea/
+
+# Dependencies/build outputs
+node_modules/
+dist/
+server/public
+*.tsbuildinfo
+
+# Local caches / venvs
+.cache/
+.local/
+.cal/
+.venv/
+tmp/
+.pythonlibs/
+
+# Environment files (keep template tracked)
+.env
+.env.*
+!.env.example
+
+# Large artifacts and datasets
+artifacts/
+models/
+datasets/
+external/
+reports/
+coverage/
+.nyc_output/
+training-trace*.jsonl
+attached_assets/
+simulations/
+
+# Data dir (keep minimal noisegen seed)
+data/
+!data/noisegen/
+data/noisegen/*
+!data/noisegen/store.json
+!data/noisegen/originals/
+data/noisegen/originals/*
+!data/noisegen/originals/**
+
+# Noisegen bundled audio (keep only the tiny default)
+client/public/originals/*
+!client/public/originals/default/
+!client/public/originals/default/**
+!client/public/originals/manifest.json
+
+# Large model/data files
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+
+# Logs
+*.log
