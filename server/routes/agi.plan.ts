@@ -3522,6 +3522,11 @@ function normalizeNumberedListLines(value: string): string {
   return normalized.join("\n");
 }
 
+function hasSourcesLine(value: string): boolean {
+  if (!value) return false;
+  return /(?:^|\n)sources?\s*:\s*\S/i.test(value);
+}
+
 function repairAnswerFilePathFragments(
   answer: string,
   contextFiles: string[],
@@ -9058,10 +9063,11 @@ planRouter.post("/ask", async (req, res) => {
       }
       const hasRepoEvidence = intentStrategy === "hybrid_explain" && Boolean(repoScaffold.trim());
       const allowHybridFallback = formatEnforcementLevel === "strict";
-      const hasRepoCitations = extractFilePathsFromText(cleaned).length > 0;
+      const hasRepoCitations = () =>
+        extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
       const hasHybridPlaceholder =
         /(map to this system|repo evidence bullets|paragraph\s*2|paragraph\s*1)/i.test(cleaned);
-      if (allowHybridFallback && hasRepoEvidence && (!hasRepoCitations || hasHybridPlaceholder)) {
+      if (allowHybridFallback && hasRepoEvidence && (!hasRepoCitations() || hasHybridPlaceholder)) {
         const generalEvidence = promptScaffold || generalScaffold;
         let paragraph1 = "";
         if (generalEvidence) {
@@ -9087,7 +9093,7 @@ planRouter.post("/ask", async (req, res) => {
       if (!formatSpec.stageTags) {
         cleaned = stripStageTags(cleaned);
       }
-      if (requiresRepoEvidence && extractFilePathsFromText(cleaned).length === 0) {
+      if (requiresRepoEvidence && !hasRepoCitations()) {
         const evidencePaths = extractFilePathsFromText(evidenceText).slice(0, 6);
         if (evidencePaths.length) {
           cleaned = `${cleaned}\n\nSources: ${evidencePaths.join(", ")}`;
@@ -9120,7 +9126,7 @@ planRouter.post("/ask", async (req, res) => {
       if (
         intentDomain === "repo" &&
         extractFilePathsFromText(evidenceText).length > 0 &&
-        extractFilePathsFromText(cleaned).length === 0
+        !hasRepoCitations()
       ) {
         cleaned =
           "Repo evidence was available but the answer could not be grounded with file citations. Please point to the relevant files or narrow the request.";
@@ -9220,7 +9226,8 @@ planRouter.post("/ask", async (req, res) => {
           );
         if (!guarded) {
           const paragraphs = cleaned.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
-          const hasRepoCitations = extractFilePathsFromText(cleaned).length > 0;
+          const hasRepoCitations =
+            extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
           if (paragraphs.length < 2 || !hasRepoCitations) {
             const generalEvidence = promptScaffold || generalScaffold;
             let paragraph1 = "";
