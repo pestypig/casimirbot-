@@ -5304,6 +5304,17 @@ function normalizeScaffoldText(value: string): string {
   return trimmed.join("\n");
 }
 
+function appendEvidenceSources(evidence: string, contextFiles: string[], limit = 6): string {
+  const trimmed = evidence?.trim() ?? "";
+  const sources = contextFiles.filter(Boolean).slice(0, limit);
+  if (sources.length === 0) return evidence;
+  if (!trimmed) {
+    return `Sources: ${sources.join(", ")}`;
+  }
+  if (extractFilePathsFromText(trimmed).length > 0) return evidence;
+  return `${trimmed}\n\nSources: ${sources.join(", ")}`;
+}
+
 function buildHelixAskScaffoldPrompt(
   question: string,
   context: string,
@@ -8589,6 +8600,9 @@ planRouter.post("/ask", async (req, res) => {
           if (repoScaffold && !formatSpec.stageTags) {
             repoScaffold = stripStageTags(repoScaffold);
           }
+          if (repoScaffold) {
+            repoScaffold = appendEvidenceSources(repoScaffold, contextFiles);
+          }
           if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
             const missing = compositeRequiredFiles.filter(
               (entry) => entry && !repoScaffold.toLowerCase().includes(entry.toLowerCase()),
@@ -8985,6 +8999,10 @@ planRouter.post("/ask", async (req, res) => {
         (microPassEnabled || intentStrategy === "constraint_report") &&
         intentProfile.id !== "repo.ideology_reference";
       if (allowCitationRepair) {
+        const evidenceForRepair = appendEvidenceSources(evidenceText, contextFiles);
+        if (evidenceForRepair !== evidenceText) {
+          evidenceText = evidenceForRepair;
+        }
         const hasEvidencePaths = extractFilePathsFromText(evidenceText).length > 0;
         const hasAnswerPaths = extractFilePathsFromText(cleaned).length > 0;
         if (hasEvidencePaths && !hasAnswerPaths) {
@@ -9063,27 +9081,33 @@ planRouter.post("/ask", async (req, res) => {
         cleaned = stripStageTags(cleaned);
       }
       if (requiresRepoEvidence && extractFilePathsFromText(cleaned).length === 0) {
-        const generalEvidence = promptScaffold || generalScaffold;
-        let paragraph1 = "";
-        if (generalEvidence) {
-          const collapsed = collapseEvidenceBullets(generalEvidence);
-          const stripped = stripPromptEchoFromAnswer(generalEvidence, baseQuestion)
-            .replace(/^question:\s*/i, "")
-            .trim();
-          paragraph1 = clipAskText(collapsed || stripped, 420);
-        }
-        const planClarify = planDirectives?.clarifyQuestion?.trim() ?? "";
-        const clarifyLine =
-          planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)
-            ? planClarify
-            : "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
-        const paragraph2 = clarifyLine;
-        const clarified = [paragraph1, paragraph2].filter(Boolean).join("\n\n").trim();
-        cleaned = clarified || paragraph2;
-        answerPath.push("obligation:missing_repo_evidence");
-        logEvent("Obligation", "missing_repo_evidence", baseQuestion);
-        if (debugPayload) {
-          debugPayload.obligation_violation = true;
+        const evidencePaths = extractFilePathsFromText(evidenceText).slice(0, 6);
+        if (evidencePaths.length) {
+          cleaned = `${cleaned}\n\nSources: ${evidencePaths.join(", ")}`;
+          answerPath.push("citationFallback:sources");
+        } else {
+          const generalEvidence = promptScaffold || generalScaffold;
+          let paragraph1 = "";
+          if (generalEvidence) {
+            const collapsed = collapseEvidenceBullets(generalEvidence);
+            const stripped = stripPromptEchoFromAnswer(generalEvidence, baseQuestion)
+              .replace(/^question:\s*/i, "")
+              .trim();
+            paragraph1 = clipAskText(collapsed || stripped, 420);
+          }
+          const planClarify = planDirectives?.clarifyQuestion?.trim() ?? "";
+          const clarifyLine =
+            planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)
+              ? planClarify
+              : "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
+          const paragraph2 = clarifyLine;
+          const clarified = [paragraph1, paragraph2].filter(Boolean).join("\n\n").trim();
+          cleaned = clarified || paragraph2;
+          answerPath.push("obligation:missing_repo_evidence");
+          logEvent("Obligation", "missing_repo_evidence", baseQuestion);
+          if (debugPayload) {
+            debugPayload.obligation_violation = true;
+          }
         }
       }
       if (
