@@ -484,6 +484,7 @@ export async function execute(traceId: string): Promise<ExecuteResponse> {
 }
 
 const HELIX_ASK_JOB_POLL_INTERVAL_MS = 1000;
+const HELIX_ASK_JOB_MAX_CONSECUTIVE_ERRORS = 6;
 
 const isHelixAskJobUnsupported = (error: unknown): boolean =>
   Boolean(
@@ -498,6 +499,40 @@ const buildAbortError = (): Error => {
   (error as { name?: string }).name = "AbortError";
   return error;
 };
+
+const isJobPollTransientError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("failed to parse json") ||
+    message.includes("non-json response") ||
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("gateway") ||
+    message.includes("service unavailable") ||
+    message.includes("503") ||
+    message.includes("502")
+  );
+};
+
+const isJobMissingError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes("not_found") || message.includes("404");
+};
+
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    if (!signal) return;
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      reject(buildAbortError());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 
 const createAskJob = async (
   payload: Record<string, unknown>,
@@ -540,25 +575,57 @@ const pollAskJob = async (
   const pollInterval = Math.max(250, options?.pollIntervalMs ?? HELIX_ASK_JOB_POLL_INTERVAL_MS);
   const timeoutMs = options?.timeoutMs ?? 0;
   const startedAt = Date.now();
+  let lastPartialText = "";
+  let consecutiveErrors = 0;
 
   while (true) {
     if (options?.signal?.aborted) {
       throw buildAbortError();
     }
-    const job = await getAskJob(jobId, options?.signal);
+    let job: HelixAskJobResponse | null = null;
+    try {
+      job = await getAskJob(jobId, options?.signal);
+      consecutiveErrors = 0;
+    } catch (error) {
+      if (options?.signal?.aborted) {
+        throw buildAbortError();
+      }
+      if (isJobMissingError(error)) {
+        const fallback = lastPartialText || "Request interrupted. Please try again.";
+        return { text: fallback } as LocalAskResponse;
+      }
+      if (!isJobPollTransientError(error)) {
+        throw error;
+      }
+      consecutiveErrors += 1;
+      if (timeoutMs > 0 && Date.now() - startedAt > timeoutMs) {
+        const fallback = lastPartialText || "Request timed out.";
+        return { text: fallback } as LocalAskResponse;
+      }
+      if (consecutiveErrors >= HELIX_ASK_JOB_MAX_CONSECUTIVE_ERRORS) {
+        const fallback = lastPartialText || "Request failed. Please try again.";
+        return { text: fallback } as LocalAskResponse;
+      }
+      const backoff = Math.min(8000, pollInterval * Math.pow(2, Math.min(consecutiveErrors, 4)));
+      await sleep(backoff, options?.signal);
+      continue;
+    }
+    if (job.partialText) {
+      lastPartialText = job.partialText.trim();
+    }
     if (job.status === "completed") {
       if (job.result) return job.result;
-      const fallback = (job.partialText ?? "").trim();
-      return { text: fallback } as LocalAskResponse;
+      return { text: lastPartialText } as LocalAskResponse;
     }
     if (job.status === "failed" || job.status === "cancelled") {
       const message = job.error?.trim() || "Helix Ask job failed.";
       throw new Error(message);
     }
     if (timeoutMs > 0 && Date.now() - startedAt > timeoutMs) {
-      throw new Error("Helix Ask job timed out.");
+      const fallback = lastPartialText || "Request timed out.";
+      return { text: fallback } as LocalAskResponse;
     }
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    await sleep(pollInterval, options?.signal);
   }
 };
 
