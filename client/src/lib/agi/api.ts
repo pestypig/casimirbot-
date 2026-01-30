@@ -142,6 +142,28 @@ export type LocalAskResponse = {
   };
 };
 
+export type HelixAskJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export type HelixAskJobCreateResponse = {
+  jobId: string;
+  status: HelixAskJobStatus;
+  sessionId?: string | null;
+  traceId?: string | null;
+};
+
+export type HelixAskJobResponse = {
+  jobId: string;
+  status: HelixAskJobStatus;
+  createdAt?: number;
+  updatedAt?: number;
+  expiresAt?: number;
+  sessionId?: string | null;
+  traceId?: string | null;
+  partialText?: string | null;
+  error?: string | null;
+  result?: LocalAskResponse | null;
+};
+
 export type MoodHintResponse = {
   mood: LumaMood | null;
   confidence: number;
@@ -461,6 +483,80 @@ export async function execute(traceId: string): Promise<ExecuteResponse> {
   );
 }
 
+const HELIX_ASK_JOB_POLL_INTERVAL_MS = 1000;
+
+const isHelixAskJobUnsupported = (error: unknown): boolean =>
+  Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: string }).code === "helix_ask_jobs_unsupported",
+  );
+
+const buildAbortError = (): Error => {
+  const error = new Error("Aborted");
+  (error as { name?: string }).name = "AbortError";
+  return error;
+};
+
+const createAskJob = async (
+  payload: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<HelixAskJobCreateResponse> => {
+  const response = await fetch("/api/agi/ask/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (response.status === 404 || response.status === 405) {
+    const error = new Error("Helix Ask job endpoint unavailable");
+    (error as { code?: string }).code = "helix_ask_jobs_unsupported";
+    throw error;
+  }
+  return asJson(response);
+};
+
+const getAskJob = async (
+  jobId: string,
+  signal?: AbortSignal,
+): Promise<HelixAskJobResponse> =>
+  asJson(
+    await fetch(`/api/agi/ask/jobs/${encodeURIComponent(jobId)}`, {
+      headers: { Accept: "application/json" },
+      signal,
+    }),
+  );
+
+const pollAskJob = async (
+  jobId: string,
+  options?: { signal?: AbortSignal; pollIntervalMs?: number; timeoutMs?: number },
+): Promise<LocalAskResponse> => {
+  const pollInterval = Math.max(250, options?.pollIntervalMs ?? HELIX_ASK_JOB_POLL_INTERVAL_MS);
+  const timeoutMs = options?.timeoutMs ?? 0;
+  const startedAt = Date.now();
+
+  while (true) {
+    if (options?.signal?.aborted) {
+      throw buildAbortError();
+    }
+    const job = await getAskJob(jobId, options?.signal);
+    if (job.status === "completed") {
+      if (job.result) return job.result;
+      const fallback = (job.partialText ?? "").trim();
+      return { text: fallback } as LocalAskResponse;
+    }
+    if (job.status === "failed" || job.status === "cancelled") {
+      const message = job.error?.trim() || "Helix Ask job failed.";
+      throw new Error(message);
+    }
+    if (timeoutMs > 0 && Date.now() - startedAt > timeoutMs) {
+      throw new Error("Helix Ask job timed out.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+  }
+};
+
 export async function askLocal(
   prompt?: string,
   options?: {
@@ -502,12 +598,22 @@ export async function askLocal(
   if (typeof options?.context === "string" && options.context.trim()) {
     body.context = options.context;
   }
+  const signal = options?.signal;
+  try {
+    const job = await createAskJob(body, signal);
+    const result = await pollAskJob(job.jobId, { signal });
+    return result;
+  } catch (error) {
+    if (!isHelixAskJobUnsupported(error)) {
+      throw error;
+    }
+  }
   return asJson(
     await fetch("/api/agi/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: options?.signal,
+      signal,
     }),
   );
 }

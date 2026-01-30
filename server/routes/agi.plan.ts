@@ -151,6 +151,15 @@ import {
   type HelixAskTopicTag,
   type HelixAskTopicProfile,
 } from "../services/helix-ask/topic";
+import {
+  appendHelixAskJobPartial,
+  completeHelixAskJob,
+  createHelixAskJob,
+  failHelixAskJob,
+  getHelixAskJob,
+  markHelixAskJobRunning,
+  type HelixAskJobRecord,
+} from "../services/helix-ask/job-store";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
@@ -3056,9 +3065,11 @@ type HelixAskStreamEmitter = {
 function createHelixAskStreamEmitter({
   sessionId,
   traceId,
+  onChunk,
 }: {
   sessionId?: string;
   traceId?: string;
+  onChunk?: (chunk: string) => void;
 }): HelixAskStreamEmitter {
   let buffer = "";
   let pending = "";
@@ -3085,6 +3096,7 @@ function createHelixAskStreamEmitter({
   const flush = (): void => {
     if (stopped || !buffer.trim()) return;
     pushLog(buffer);
+    onChunk?.(buffer);
     buffer = "";
     lastFlush = Date.now();
     eventCount += 1;
@@ -7074,18 +7086,25 @@ planRouter.post("/mood-hint", async (req, res) => {
   }
 });
 
-planRouter.post("/ask", async (req, res) => {
-  const parsed = LocalAskRequest.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
-  }
-  let personaId = parsed.data.personaId ?? "default";
-  if (personaPolicy.shouldRestrictRequest(req.auth) && (!personaId || personaId === "default") && req.auth?.sub) {
-    personaId = req.auth.sub;
-  }
-  if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
-    return res.status(403).json({ error: "forbidden" });
-  }
+
+type HelixAskResponder = {
+  send: (status: number, payload: unknown) => void;
+};
+
+type HelixAskExecutionArgs = {
+  request: z.infer<typeof LocalAskRequest>;
+  personaId: string;
+  responder: HelixAskResponder;
+  streamChunk?: (chunk: string) => void;
+};
+
+const executeHelixAsk = async ({
+  request,
+  personaId,
+  responder,
+  streamChunk,
+}: HelixAskExecutionArgs): Promise<void> => {
+  const parsed = { data: request };
   const askSessionId = parsed.data.sessionId;
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
   const dryRun = parsed.data.dryRun === true;
@@ -7205,11 +7224,7 @@ planRouter.post("/ask", async (req, res) => {
       text: body ? `${header}\n${body}` : header,
     });
   };
-  const streamEmitter = createHelixAskStreamEmitter({ sessionId: askSessionId, traceId: askTraceId });
-  const keepAlive = createHelixAskJsonKeepAlive(res, {
-    enabled: HELIX_ASK_HTTP_KEEPALIVE && !dryRun,
-    intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
-  });
+  const streamEmitter = createHelixAskStreamEmitter({ sessionId: askSessionId, traceId: askTraceId, onChunk: streamChunk });
   try {
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
@@ -7877,7 +7892,7 @@ planRouter.post("/ask", async (req, res) => {
       prompt = ensureFinalMarker(basePrompt);
     }
     if (!prompt) {
-      keepAlive.send(400, {
+      responder.send(400, {
         error: "bad_request",
         details: [{ path: ["prompt"], message: "prompt required" }],
       });
@@ -9061,7 +9076,7 @@ planRouter.post("/ask", async (req, res) => {
       const responsePayload = debugPayload
         ? { ...dryPayload, debug: debugPayload, dry_run: true }
         : { ...dryPayload, dry_run: true };
-      keepAlive.send(200, responsePayload);
+      responder.send(200, responsePayload);
       return;
     }
 
@@ -9438,15 +9453,145 @@ planRouter.post("/ask", async (req, res) => {
       debugPayload.live_events = liveEventHistory.slice();
     }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
-    keepAlive.send(200, responsePayload);
+    responder.send(200, responsePayload);
     return;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     streamEmitter.finalize();
     logProgress("Failed", "llm_local_failed", undefined, false);
-    keepAlive.send(500, { ok: false, error: "llm_local_failed", message, status: 500 });
+    responder.send(500, { ok: false, error: "llm_local_failed", message, status: 500 });
     return;
   }
+};
+
+planRouter.post("/ask", async (req, res) => {
+  const parsed = LocalAskRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  let personaId = parsed.data.personaId ?? "default";
+  if (personaPolicy.shouldRestrictRequest(req.auth) && (!personaId || personaId === "default") && req.auth?.sub) {
+    personaId = req.auth.sub;
+  }
+  if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const keepAlive = createHelixAskJsonKeepAlive(res, {
+    enabled: HELIX_ASK_HTTP_KEEPALIVE && parsed.data.dryRun !== true,
+    intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
+  });
+  await executeHelixAsk({
+    request: parsed.data,
+    personaId,
+    responder: { send: keepAlive.send },
+  });
+});
+
+const describeHelixAskJobError = (payload: unknown, status: number): string => {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload.trim();
+  }
+  if (payload && typeof payload === "object") {
+    const message = (payload as { message?: string }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message.trim();
+    }
+    const error = (payload as { error?: string }).error;
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+  }
+  return `helix_ask_failed_${status}`;
+};
+
+const buildHelixAskJobResponse = (job: HelixAskJobRecord) => ({
+  jobId: job.id,
+  status: job.status,
+  createdAt: job.createdAt,
+  updatedAt: job.updatedAt,
+  expiresAt: job.expiresAt,
+  sessionId: job.sessionId ?? null,
+  traceId: job.traceId ?? null,
+  partialText: job.partialText ?? null,
+  error: job.error ?? null,
+  result: job.result ?? null,
+});
+
+const runHelixAskJob = async (
+  jobId: string,
+  request: z.infer<typeof LocalAskRequest>,
+  personaId: string,
+): Promise<void> => {
+  if (!markHelixAskJobRunning(jobId)) return;
+  let settled = false;
+  const responder: HelixAskResponder = {
+    send: (status, payload) => {
+      if (settled) return;
+      settled = true;
+      if (status >= 400) {
+        const message = describeHelixAskJobError(payload, status);
+        failHelixAskJob(jobId, message);
+        return;
+      }
+      completeHelixAskJob(jobId, payload as Record<string, unknown>);
+    },
+  };
+  try {
+    await executeHelixAsk({
+      request,
+      personaId,
+      responder,
+      streamChunk: (chunk) => appendHelixAskJobPartial(jobId, chunk),
+    });
+    if (!settled) {
+      failHelixAskJob(jobId, "helix_ask_no_response");
+    }
+  } catch (error) {
+    if (settled) return;
+    const message = error instanceof Error ? error.message : String(error);
+    failHelixAskJob(jobId, message || "helix_ask_failed");
+  }
+};
+
+planRouter.post("/ask/jobs", async (req, res) => {
+  const parsed = LocalAskRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  let personaId = parsed.data.personaId ?? "default";
+  if (personaPolicy.shouldRestrictRequest(req.auth) && (!personaId || personaId === "default") && req.auth?.sub) {
+    personaId = req.auth.sub;
+  }
+  if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
+  const request = { ...parsed.data, traceId: askTraceId };
+  const question = (request.question ?? request.prompt ?? "").trim();
+  const job = createHelixAskJob({
+    sessionId: request.sessionId,
+    traceId: askTraceId,
+    question: question ? question.slice(0, 480) : undefined,
+  });
+  res.status(202).json({
+    jobId: job.id,
+    status: job.status,
+    sessionId: request.sessionId ?? null,
+    traceId: askTraceId,
+  });
+  void runHelixAskJob(job.id, request, personaId);
+});
+
+planRouter.get("/ask/jobs/:jobId", (req, res) => {
+  const jobId = req.params.jobId?.trim();
+  if (!jobId) {
+    return res.status(400).json({ error: "bad_request", details: [{ message: "jobId required" }] });
+  }
+  const job = getHelixAskJob(jobId);
+  if (!job) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  res.json(buildHelixAskJobResponse(job));
 });
 
 planRouter.post("/plan", async (req, res) => {
