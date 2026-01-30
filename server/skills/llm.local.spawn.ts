@@ -830,8 +830,17 @@ function buildArgs(
   const disableLogs = (process.env.LLM_LOCAL_LOG_DISABLE ?? "1") !== "0";
   const displayPrompt = process.env.LLM_LOCAL_DISPLAY_PROMPT === "1";
   const simpleIoEnabled = (process.env.LLM_LOCAL_SIMPLE_IO ?? "1") !== "0";
+  const disableConversation = (process.env.LLM_LOCAL_DISABLE_CONVERSATION ?? "1") !== "0";
+  const hasConversationFlag =
+    args.includes("-no-cnv") ||
+    args.includes("--no-cnv") ||
+    args.includes("-cnv") ||
+    args.includes("--cnv");
   if (simpleIoEnabled && !args.includes("--simple-io")) {
     args.push("--simple-io");
+  }
+  if (disableConversation && !hasConversationFlag) {
+    args.push("-no-cnv");
   }
   if (!hasLogFlag && disableLogs) {
     args.push("--log-disable");
