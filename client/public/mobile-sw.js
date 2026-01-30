@@ -30,12 +30,23 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   const isSameOrigin = url.origin === self.location.origin;
+  const bypassCache =
+    isSameOrigin &&
+    (url.pathname === "/healthz" ||
+      url.pathname === "/health" ||
+      url.pathname === "/version" ||
+      url.pathname.startsWith("/api/"));
 
   // Network-first for navigation; fall back to cached shell for offline.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(() => caches.match("/index.html", { cacheName: CACHE_NAME }))
     );
+    return;
+  }
+
+  if (bypassCache) {
+    event.respondWith(fetch(request));
     return;
   }
 
