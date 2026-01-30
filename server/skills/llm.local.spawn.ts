@@ -829,7 +829,10 @@ function buildArgs(
   const hasDisplayPromptFlag = args.includes("--display-prompt") || args.includes("--no-display-prompt");
   const disableLogs = (process.env.LLM_LOCAL_LOG_DISABLE ?? "1") !== "0";
   const displayPrompt = process.env.LLM_LOCAL_DISPLAY_PROMPT === "1";
-  args.push("--simple-io");
+  const simpleIoEnabled = (process.env.LLM_LOCAL_SIMPLE_IO ?? "1") !== "0";
+  if (simpleIoEnabled && !args.includes("--simple-io")) {
+    args.push("--simple-io");
+  }
   if (!hasLogFlag && disableLogs) {
     args.push("--log-disable");
   }
