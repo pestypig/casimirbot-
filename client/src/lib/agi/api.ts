@@ -650,6 +650,10 @@ export async function askLocal(
 ): Promise<LocalAskResponse> {
   const body: Record<string, unknown> = {};
   const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
+  const promptQuestionMatch =
+    typeof prompt === "string"
+      ? prompt.match(/(?:^|\n)Question:\s*([^\n]+)/i)?.[1]?.trim()
+      : "";
   if (trimmedPrompt) {
     body.prompt = prompt;
   }
@@ -661,6 +665,8 @@ export async function askLocal(
   if (options?.traceId) body.traceId = options.traceId;
   if (options?.personaId) body.personaId = options.personaId;
   if (options?.question) body.question = options.question;
+  else if (promptQuestionMatch) body.question = promptQuestionMatch;
+  else if (trimmedPrompt) body.question = trimmedPrompt;
   if (typeof options?.debug === "boolean") body.debug = options.debug;
   if (options?.verbosity) body.verbosity = options.verbosity;
   if (typeof options?.searchQuery === "string" && options.searchQuery.trim()) {
