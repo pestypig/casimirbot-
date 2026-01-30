@@ -1298,6 +1298,7 @@ export default function DesktopPage() {
   const [askLiveTraceId, setAskLiveTraceId] = useState<string | null>(null);
   const [askElapsedMs, setAskElapsedMs] = useState<number | null>(null);
   const [askLiveDraft, setAskLiveDraft] = useState<string>("");
+  const askLiveDraftRef = useRef("");
   const [askQueue, setAskQueue] = useState<string[]>([]);
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
@@ -1913,7 +1914,9 @@ export default function DesktopPage() {
         if (!chunk.trim()) return;
         setAskLiveDraft((prev) => {
           const next = `${prev}${chunk}`;
-          return next.length > 4000 ? next.slice(-4000) : next;
+          const clipped = next.length > 4000 ? next.slice(-4000) : next;
+          askLiveDraftRef.current = clipped;
+          return clipped;
         });
         return;
       }
@@ -1988,6 +1991,7 @@ export default function DesktopPage() {
       setAskError(null);
       setAskLiveEvents([]);
       setAskLiveDraft("");
+      askLiveDraftRef.current = "";
       askStartRef.current = Date.now();
       setAskElapsedMs(0);
       setAskActiveQuestion(trimmed);
@@ -2223,9 +2227,31 @@ export default function DesktopPage() {
           setAskStatus("Generation stopped.");
         } else {
           const message = error instanceof Error ? error.message : "Request failed";
-          setAskError(message);
-          if (sessionId) {
-            addMessage(sessionId, { role: "assistant", content: `Error: ${message}` });
+          const streamedFallback = askLiveDraftRef.current.trim();
+          if (streamedFallback) {
+            updateMoodFromText(streamedFallback);
+            requestMoodHint(streamedFallback, { force: true });
+            const replyId = crypto.randomUUID();
+            setAskReplies((prev) =>
+              [
+                {
+                  id: replyId,
+                  content: streamedFallback,
+                  question: trimmed,
+                  traceId: askTraceId,
+                  sources: [],
+                },
+                ...prev,
+              ].slice(0, 3),
+            );
+            if (sessionId) {
+              addMessage(sessionId, { role: "assistant", content: streamedFallback });
+            }
+          } else {
+            setAskError(message);
+            if (sessionId) {
+              addMessage(sessionId, { role: "assistant", content: `Error: ${message}` });
+            }
           }
         }
       } finally {
@@ -2235,6 +2261,7 @@ export default function DesktopPage() {
           setAskLiveSessionId(null);
           setAskLiveTraceId(null);
           setAskLiveDraft("");
+          askLiveDraftRef.current = "";
           setAskActiveQuestion(null);
         }
         if (askAbortRef.current === controller) {

@@ -842,6 +842,7 @@ export function HelixAskPill({
   const [askLiveTraceId, setAskLiveTraceId] = useState<string | null>(null);
   const [askElapsedMs, setAskElapsedMs] = useState<number | null>(null);
   const [askLiveDraft, setAskLiveDraft] = useState<string>("");
+  const askLiveDraftRef = useRef("");
   const [askQueue, setAskQueue] = useState<string[]>([]);
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
@@ -1207,7 +1208,9 @@ export function HelixAskPill({
         if (!chunk.trim()) return;
         setAskLiveDraft((prev) => {
           const next = `${prev}${chunk}`;
-          return next.length > 4000 ? next.slice(-4000) : next;
+          const clipped = next.length > 4000 ? next.slice(-4000) : next;
+          askLiveDraftRef.current = clipped;
+          return clipped;
         });
         return;
       }
@@ -1273,6 +1276,7 @@ export function HelixAskPill({
       setAskError(null);
       setAskLiveEvents([]);
       setAskLiveDraft("");
+      askLiveDraftRef.current = "";
       askStartRef.current = Date.now();
       setAskElapsedMs(0);
       setAskActiveQuestion(trimmed);
@@ -1329,7 +1333,8 @@ export function HelixAskPill({
             setAskStatus("Generation stopped.");
           } else {
             const message = error instanceof Error ? error.message : String(error);
-            responseText = message || "Request failed.";
+            const streamedFallback = askLiveDraftRef.current.trim();
+            responseText = streamedFallback || message || "Request failed.";
           }
         }
         if (!skipReply) {
@@ -1364,6 +1369,7 @@ export function HelixAskPill({
           setAskLiveSessionId(null);
           setAskLiveTraceId(null);
           setAskLiveDraft("");
+          askLiveDraftRef.current = "";
           setAskActiveQuestion(null);
         }
         if (askAbortRef.current === controller) {
