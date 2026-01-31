@@ -68,6 +68,15 @@ SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
 node dist/index.js
 ```
 
+### Known-Good Checklist (Preview/Deploy)
+- Build completes and `dist/index.js` exists.
+- Bundle contains the baked timeout:
+  - `rg -n "180000|600000|1200000" dist/public/assets/*.js`
+- `/` responds `200` quickly (health check passes).
+- Helix Ask completes a long question (< 10 minutes) with `HELIX_ASK_JOB_TIMEOUT_MS=600000`.
+- If UI times out, confirm job status with:
+  - `curl -s http://localhost:5000/api/agi/ask/jobs/<JOB_ID> | jq .`
+
 ### Helix Ask Job Persistence Notes
 - The client first uses `/api/agi/ask/jobs` and polls `/api/agi/ask/jobs/:jobId`. If the job API returns 404/405, it falls back to synchronous `/api/agi/ask`.
 - Jobs persist in Postgres when `DATABASE_URL` is set; otherwise they use an in-memory store (lost on restart).
