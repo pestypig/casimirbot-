@@ -158,6 +158,10 @@ const IDEOLOGY_EXPANDED_PATHS: RegExp[] = [
   /client\/src\/lib\/ideology/i,
 ];
 
+const IDEOLOGY_KNOWLEDGE_PATHS: RegExp[] = [
+  /docs\/knowledge\/ethos\//i,
+];
+
 const LEDGER_CORE_PATHS: RegExp[] = [
   /docs\/ethos\/ideology\.json/i,
   /docs\/ethos\/why\.md/i,
@@ -284,9 +288,13 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
 
   if (tags.includes("ideology")) {
     allowlistTiers.push(IDEOLOGY_CORE_PATHS);
-    allowlistTiers.push([...IDEOLOGY_CORE_PATHS, ...IDEOLOGY_EXPANDED_PATHS]);
+    allowlistTiers.push([
+      ...IDEOLOGY_CORE_PATHS,
+      ...IDEOLOGY_EXPANDED_PATHS,
+      ...IDEOLOGY_KNOWLEDGE_PATHS,
+    ]);
     allowlistTiers.push([]);
-    boostPaths.push(...IDEOLOGY_CORE_PATHS, ...IDEOLOGY_EXPANDED_PATHS);
+    boostPaths.push(...IDEOLOGY_CORE_PATHS, ...IDEOLOGY_EXPANDED_PATHS, ...IDEOLOGY_KNOWLEDGE_PATHS);
     mustIncludePaths.push(/docs\/ethos\/ideology\.json/i);
     mustIncludeFiles.push(...IDEOLOGY_CORE_FILES);
     // Avoid warp/energy drift when the user is asking for ideology guidance.
