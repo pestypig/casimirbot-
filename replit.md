@@ -67,6 +67,16 @@ NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
 SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
 node dist/index.js
 ```
+
+### Helix Ask Job Persistence Notes
+- The client first uses `/api/agi/ask/jobs` and polls `/api/agi/ask/jobs/:jobId`. If the job API returns 404/405, it falls back to synchronous `/api/agi/ask`.
+- Jobs persist in Postgres when `DATABASE_URL` is set; otherwise they use an in-memory store (lost on restart).
+- Orphaned jobs (server restart mid-run) are now reaped automatically. Control the window with:
+  - `HELIX_ASK_JOB_STALE_MS` (defaults to `HELIX_ASK_JOB_TIMEOUT_MS`)
+- The poller now extends its deadline to the job `expiresAt` (TTL), so long jobs can complete even if they exceed the client default.
+- If UI times out but the server finished, check:
+  - `curl -s http://localhost:5000/api/agi/ask/jobs/<JOB_ID>`
+  - If status is `completed`, the UI likely stopped polling (stale bundle or poller errors).
 Notes:
 - **Avoid** `DEFER_ROUTE_BOOT=1` in deploy; it can serve requests before bootstrap, causing 404s.
 - `SKIP_MODULE_INIT=1` is OK if you want faster boot and can skip heavy physics init.
