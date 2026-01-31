@@ -4655,7 +4655,6 @@ function buildPlanScope({
     HELIX_ASK_CONCEPTUAL_FOCUS.test(question) &&
     topicTags.some((tag) => tag === "warp" || tag === "concepts");
   const docsFirst =
-    requiresRepoEvidence &&
     repoExpectationLevel !== "low" &&
     (wantsDocsFirst || topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star"));
   if (docsFirst) {
