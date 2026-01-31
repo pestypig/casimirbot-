@@ -7344,6 +7344,12 @@ const executeHelixAsk = async ({
       prompt_selected?: number;
       prompt_context_files?: string[];
       topic_tags?: string[];
+      topic_allowlist_tiers?: number;
+      topic_must_include_files?: string[];
+      docs_first_enabled?: boolean;
+      plan_scope_allowlist_tiers?: number;
+      plan_scope_avoidlist?: number;
+      plan_scope_must_include?: number;
       composite_synthesis?: boolean;
       composite_topics?: string[];
       topic_tier?: number;
@@ -7482,6 +7488,11 @@ const executeHelixAsk = async ({
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
       HELIX_ASK_REPO_EXPECTS.test(baseQuestion);
     const topicTags = inferHelixAskTopicTags(baseQuestion, parsed.data.searchQuery);
+    logEvent(
+      "Topic tags",
+      topicTags.length ? "ok" : "none",
+      topicTags.length ? topicTags.join(", ") : "none",
+    );
     const repoNativeTags = new Set([
       "helix_ask",
       "warp",
@@ -7537,6 +7548,24 @@ const executeHelixAsk = async ({
       );
     }
     const topicProfile = buildHelixAskTopicProfile(topicTags);
+    if (topicProfile) {
+      logEvent(
+        "Topic profile",
+        "ok",
+        [
+          `allowlistTiers=${topicProfile.allowlistTiers.length}`,
+          `mustIncludeFiles=${topicProfile.mustIncludeFiles?.length ?? 0}`,
+          `boosts=${topicProfile.boostPaths.length}`,
+          `deboosts=${topicProfile.deboostPaths.length}`,
+        ].join(" | "),
+      );
+      if (debugPayload) {
+        debugPayload.topic_allowlist_tiers = topicProfile.allowlistTiers.length;
+        debugPayload.topic_must_include_files = topicProfile.mustIncludeFiles?.slice();
+      }
+    } else {
+      logEvent("Topic profile", "none", "no profile");
+    }
     const intentMatch = matchHelixAskIntent({
       question: baseQuestion,
       hasRepoHints,
@@ -8122,6 +8151,12 @@ const executeHelixAsk = async ({
             repoExpectationLevel,
             question: baseQuestion,
           });
+          if (debugPayload) {
+            debugPayload.docs_first_enabled = planScope.docsFirst ?? false;
+            debugPayload.plan_scope_allowlist_tiers = planScope.allowlistTiers?.length ?? 0;
+            debugPayload.plan_scope_avoidlist = planScope.avoidlist?.length ?? 0;
+            debugPayload.plan_scope_must_include = planScope.mustIncludeGlobs?.length ?? 0;
+          }
           if (planScope.allowlistTiers?.length || planScope.avoidlist?.length) {
             logEvent(
               "Retrieval scope",
@@ -8130,10 +8165,13 @@ const executeHelixAsk = async ({
                 planScope.allowlistTiers?.length ? `allowlistTiers=${planScope.allowlistTiers.length}` : "",
                 planScope.avoidlist?.length ? `avoidlist=${planScope.avoidlist.length}` : "",
                 planScope.mustIncludeGlobs?.length ? `mustIncludeGlobs=${planScope.mustIncludeGlobs.length}` : "",
+                `docsFirst=${planScope.docsFirst ? "yes" : "no"}`,
               ]
                 .filter(Boolean)
                 .join(" | "),
             );
+          } else if (planScope.docsFirst) {
+            logEvent("Retrieval scope", "ok", "docsFirst=yes");
           }
         }
         if (!requiredSlots.length) {
@@ -8302,6 +8340,18 @@ const executeHelixAsk = async ({
             formatFileList(contextResult.files),
             contextStart,
           );
+          if (topicProfile) {
+            if (contextResult.topicTier) {
+              logEvent(
+                "Allowlist tier",
+                `tier=${contextResult.topicTier}`,
+                `mustInclude=${contextResult.topicMustIncludeOk ? "ok" : "missing"}`,
+                contextStart,
+              );
+            } else {
+              logEvent("Allowlist tier", "none", "no topic tier selected", contextStart);
+            }
+          }
           if (debugPayload && contextResult.files.length > 0) {
             debugPayload.context_files = contextResult.files;
           }
@@ -9412,6 +9462,30 @@ const executeHelixAsk = async ({
           `rattling=${platonicResult.rattlingScore.toFixed(2)}`,
         ].join(" | "),
       );
+      logEvent(
+        "Coverage gate",
+        platonicResult.coverageGateApplied ? "applied" : "pass",
+        [
+          `ratio=${platonicResult.coverageSummary.coverageRatio.toFixed(2)}`,
+          platonicResult.coverageSummary.missingKeys.length
+            ? `missing=${platonicResult.coverageSummary.missingKeys.join(",")}`
+            : "missing=none",
+        ].join(" | "),
+      );
+      logEvent(
+        "Belief gate",
+        platonicResult.beliefGateApplied ? "applied" : "pass",
+        [
+          `unsupported=${platonicResult.beliefSummary.unsupportedRate.toFixed(2)}`,
+          `claims=${platonicResult.beliefSummary.claimCount}`,
+          `contradictions=${platonicResult.beliefSummary.contradictionCount}`,
+        ].join(" | "),
+      );
+      logEvent(
+        "Rattling gate",
+        platonicResult.rattlingGateApplied ? "applied" : "pass",
+        `score=${platonicResult.rattlingScore.toFixed(2)}`,
+      );
       cleaned = platonicResult.answer;
       if (endpointGuardApplied && endpointGuardMessage) {
         cleaned = endpointGuardMessage;
@@ -9454,6 +9528,13 @@ const executeHelixAsk = async ({
       cleaned = normalizeNumberedListLines(cleaned);
       cleaned = repairAnswerFilePathFragments(cleaned, contextFiles, evidenceText);
       cleaned = enforceHelixAskPromptContract(cleaned, baseQuestion);
+      const citedPaths = extractFilePathsFromText(cleaned);
+      const hasCitations = citedPaths.length > 0 || hasSourcesLine(cleaned);
+      logEvent(
+        "Citations",
+        intentProfile.evidencePolicy.requireCitations ? "required" : "optional",
+        `present=${hasCitations ? "yes" : "no"} | files=${citedPaths.length}`,
+      );
       const cleanedPreview = clipAskText(cleaned.replace(/\s+/g, " ").trim(), 240);
       if (cleanedPreview) {
         logEvent("Answer cleaned preview", "final", cleanedPreview, answerStart);
