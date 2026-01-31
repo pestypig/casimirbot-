@@ -149,6 +149,26 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
     priority: 25,
   },
   {
+    id: "repo.warp_definition_docs_first",
+    label: "Warp definition (docs-first)",
+    domain: "repo",
+    tier: "F1",
+    strategy: "repo_rag",
+    formatPolicy: "brief",
+    stageTags: "never",
+    evidencePolicy: {
+      allowRepoCitations: true,
+      requireCitations: true,
+      allowedEvidenceKinds: ["repo_chunk"],
+    },
+    matchers: [
+      /\b(what is|what's|define|definition|meaning|explain)\b/i,
+      /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i,
+    ],
+    requiresAllMatchers: true,
+    priority: 65,
+  },
+  {
     id: "repo.helix_ask_pipeline_explain",
     label: "Helix Ask pipeline explain",
     domain: "repo",

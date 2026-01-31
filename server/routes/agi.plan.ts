@@ -4639,20 +4639,25 @@ function buildPlanScope({
   topicTags,
   requiresRepoEvidence,
   repoExpectationLevel,
+  question,
 }: {
   directives?: HelixAskPlanDirectives | null;
   topicTags: HelixAskTopicTag[];
   requiresRepoEvidence: boolean;
   repoExpectationLevel: "low" | "medium" | "high";
+  question: string;
 }): HelixAskPlanScope {
   const scope: HelixAskPlanScope = {};
   const preferredSurfaces = new Set<string>(directives?.preferredSurfaces ?? []);
   const mustIncludeGlobs = new Set<string>(directives?.mustIncludeGlobs ?? []);
   const avoidSurfaces = new Set<string>(directives?.avoidSurfaces ?? []);
+  const wantsDocsFirst =
+    HELIX_ASK_CONCEPTUAL_FOCUS.test(question) &&
+    topicTags.some((tag) => tag === "warp" || tag === "concepts");
   const docsFirst =
     requiresRepoEvidence &&
     repoExpectationLevel !== "low" &&
-    topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star");
+    (wantsDocsFirst || topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star"));
   if (docsFirst) {
     preferredSurfaces.add("docs");
     preferredSurfaces.add("ethos");
@@ -8116,6 +8121,7 @@ const executeHelixAsk = async ({
             topicTags,
             requiresRepoEvidence,
             repoExpectationLevel,
+            question: baseQuestion,
           });
           if (planScope.allowlistTiers?.length || planScope.avoidlist?.length) {
             logEvent(
