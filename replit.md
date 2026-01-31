@@ -46,7 +46,7 @@ bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=600000 npm run build && node scripts/dep
 **Run command (Replit deploy/preview):**
 ```
 env NODE_ENV=production PORT=5000 HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
-SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
+SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=1 \
 VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 \
 LLM_LOCAL_CONTEXT_TOKENS=4096 LLM_LOCAL_MAX_TOKENS=2048 \
 HELIX_ASK_JOB_TIMEOUT_MS=600000 LLM_LOCAL_SPAWN_TIMEOUT_MS=600000 \
@@ -60,6 +60,7 @@ Notes:
 - `HELIX_ASK_BELIEF_UNSUPPORTED_MAX=0.95` relaxes the belief gate for general questions (prevents the “weakly reflected” fallback).
 - Set `HELIX_ASK_BELIEF_GATE=0` only for short-term debugging.
 - `SKIP_MODULE_INIT=0` keeps physics modules initialized (recommended for the warp pipeline).
+- `HEALTH_READY_ON_LISTEN=1` lets health checks pass while bootstrap finishes; users may briefly see "Starting up...".
 
 ### Helix Ask Timeouts (Build vs Runtime)
 These are three separate controls and all must be aligned:
@@ -75,7 +76,7 @@ Legacy (local) command:
 npm run build
 env REPLIT_DEPLOYMENT=1 NODE_ENV=production PORT=5000 HOST=0.0.0.0 \
 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
-SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
+SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=1 \
 node dist/index.js
 ```
 
