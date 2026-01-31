@@ -71,6 +71,8 @@ const HELIX_ASK_NOISE_PATHS: RegExp[] = [
 
 const WARP_PATHS: RegExp[] = [
   /modules\/warp\//i,
+  /docs\/warp/i,
+  /docs\/warp-/i,
   /warp-?module/i,
   /warp-?theta/i,
   /warp bubble/i,

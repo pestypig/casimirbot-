@@ -46,12 +46,12 @@ bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=600000 npm run build && node scripts/dep
 **Run command (Replit deploy/preview):**
 ```
 env NODE_ENV=production PORT=5000 HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
-SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
+SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
 VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 \
 LLM_LOCAL_CONTEXT_TOKENS=4096 LLM_LOCAL_MAX_TOKENS=2048 \
 HELIX_ASK_JOB_TIMEOUT_MS=600000 LLM_LOCAL_SPAWN_TIMEOUT_MS=600000 \
 HELIX_ASK_BELIEF_UNSUPPORTED_MAX=0.95 HELIX_ASK_JOB_STALE_MS=1200000 \
-ROOT_LIVENESS_ALWAYS=1 ENABLE_ESSENCE_PROPOSALS=0 ENABLE_ESSENCE_JOBS=0 \
+ENABLE_ESSENCE_PROPOSALS=0 ENABLE_ESSENCE_JOBS=0 \
 node dist/index.js
 ```
 
@@ -59,13 +59,23 @@ Notes:
 - `VITE_HELIX_ASK_JOB_TIMEOUT_MS` is **build-time** only; it is now inlined via Vite `define`. Rebuild to change it.
 - `HELIX_ASK_BELIEF_UNSUPPORTED_MAX=0.95` relaxes the belief gate for general questions (prevents the “weakly reflected” fallback).
 - Set `HELIX_ASK_BELIEF_GATE=0` only for short-term debugging.
+- `SKIP_MODULE_INIT=0` keeps physics modules initialized (recommended for the warp pipeline).
+
+### Helix Ask Timeouts (Build vs Runtime)
+These are three separate controls and all must be aligned:
+- **Client UI timeout (build-time):** `VITE_HELIX_ASK_JOB_TIMEOUT_MS` in the build command. This controls when the browser shows “Request timed out.”
+- **Server job timeout (runtime):** `HELIX_ASK_JOB_TIMEOUT_MS` in the run command. This controls when the server marks a job as failed.
+- **LLM spawn timeout (runtime):** `LLM_LOCAL_SPAWN_TIMEOUT_MS` in the run command. This controls how long the model process can take.
+
+Optional:
+- **Job reaper window (runtime):** `HELIX_ASK_JOB_STALE_MS` to clean up orphaned jobs after restarts.
 
 Legacy (local) command:
 ```
 npm run build
 env REPLIT_DEPLOYMENT=1 NODE_ENV=production PORT=5000 HOST=0.0.0.0 \
 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
-SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
+SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
 node dist/index.js
 ```
 
@@ -78,7 +88,7 @@ node dist/index.js
 - If UI times out, confirm job status with:
   - `curl -s http://localhost:5000/api/agi/ask/jobs/<JOB_ID> | jq .`
 - If deploy health checks fail on `/` during heavy startup (model hydration), re-run the deploy.
-  - If it persists, add `ROOT_LIVENESS_ALWAYS=1` to force a fast 200 on `/`.
+  - If it persists, you can temporarily add `ROOT_LIVENESS_ALWAYS=1` to force a fast 200 on `/` (but it disables the root redirect).
 
 ### Helix Ask Job Persistence Notes
 - The client first uses `/api/agi/ask/jobs` and polls `/api/agi/ask/jobs/:jobId`. If the job API returns 404/405, it falls back to synchronous `/api/agi/ask`.
@@ -91,7 +101,7 @@ node dist/index.js
   - If status is `completed`, the UI likely stopped polling (stale bundle or poller errors).
 Notes:
 - **Avoid** `DEFER_ROUTE_BOOT=1` in deploy; it can serve requests before bootstrap, causing 404s.
-- `SKIP_MODULE_INIT=1` is OK if you want faster boot and can skip heavy physics init.
+- `SKIP_MODULE_INIT=0` is recommended for full physics initialization.
 - Replit forces port **5000**; if already in use, the server will exit with a clear error.
 
 ### Runtime Artifacts (LLM Hydration)
@@ -135,7 +145,7 @@ If logs show `spawn ... llama-cli ENOENT` **but** the file exists, the binary is
 ### Local Prod-Like Verification
 Run locally and confirm SPA fallback:
 ```
-REPLIT_DEPLOYMENT=1 NODE_ENV=production SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=0 node dist/index.js
+REPLIT_DEPLOYMENT=1 NODE_ENV=production SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 node dist/index.js
 curl -i http://127.0.0.1:5000/desktop
 curl -i http://127.0.0.1:5000/does-not-exist
 ```

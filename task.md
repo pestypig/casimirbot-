@@ -3007,6 +3007,7 @@ G) SunPy helioseismology anchors
 - Helix Ask search fallback: if resonance patch is weak, call `/api/code-lattice/search` to inject top file snippets into the grounded prompt (`VITE_HELIX_ASK_SEARCH_FALLBACK=1`).
 - Helix Ask query expansion: issue multiple search queries (warp/solver/pipeline variants) and merge snippets before grounding.
 - Helix Ask status line: show a one-line "current action" under the pill (planning, searching, building context, generating).
+- Helix Ask scale path: replace 1s polling with SSE/WebSocket push + client backoff/jitter (honor Retry-After) and move rate limiting to per-user/tenant (not just IP).
 - Release note: mark M1 as DONE with artifacts + hashes in task.md.
 - Optional: index coverage stretch >= 0.80 or finalized exclusions policy; base-model A/B benchmark if latency/quality tradeoff unclear.
 

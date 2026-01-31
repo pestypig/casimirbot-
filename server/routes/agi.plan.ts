@@ -2758,6 +2758,9 @@ const HELIX_ASK_TWO_PASS_TRIGGER =
 const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
 const HELIX_ASK_WARP_PATH_BOOST =
   /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline)/i;
+const HELIX_ASK_CONCEPTUAL_FOCUS = /\b(what is|what's|define|definition|meaning|concept|theory)\b/i;
+const HELIX_ASK_DOCS_PATH_BOOST = /^docs\//i;
+const HELIX_ASK_TEST_PATH_NOISE = /(^|\/)(__tests__|tests?)(\/|$)/i;
 const HELIX_ASK_CORE_FOCUS = /(helix ask|helix|ask system|ask pipeline|ask mode)/i;
 const HELIX_ASK_CORE_PATH_BOOST =
   /(docs\/helix-ask-flow\.md|client\/src\/components\/helix\/HelixAskPill\.tsx|client\/src\/pages\/desktop\.tsx|server\/routes\/agi\.plan\.ts|server\/skills\/llm\.local|asklocal)/i;
@@ -4368,6 +4371,10 @@ function applyAskNodeBoosts(
   }
   if (HELIX_ASK_WARP_FOCUS.test(question) && HELIX_ASK_WARP_PATH_BOOST.test(filePath)) {
     boosted += 8;
+  }
+  if (HELIX_ASK_CONCEPTUAL_FOCUS.test(question)) {
+    if (HELIX_ASK_DOCS_PATH_BOOST.test(filePath)) boosted += 8;
+    if (HELIX_ASK_TEST_PATH_NOISE.test(filePath)) boosted -= 10;
   }
   if (topicProfile) {
     boosted += scoreHelixAskTopicPath(filePath, topicProfile);
