@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildHelixAskTopicProfile,
   inferHelixAskTopicTags,
+  pathMatchesAny,
   topicMustIncludeSatisfied,
 } from "../server/services/helix-ask/topic";
 
@@ -78,6 +79,14 @@ describe("Helix Ask topic routing", () => {
       topicMustIncludeSatisfied(["client/src/pages/star-hydrostatic-panel.tsx"], profile),
     ).toBe(true);
     expect(topicMustIncludeSatisfied(["modules/warp/warp-core.ts"], profile)).toBe(false);
+  });
+
+  it("boosts warp docs for warp prompts", () => {
+    const profile = buildHelixAskTopicProfile(["warp"]);
+    expect(profile).not.toBeNull();
+    expect(
+      pathMatchesAny("docs/warp-console-architecture.md", profile?.boostPaths),
+    ).toBe(true);
   });
 
   it("tags save-the-sun prompts as star", () => {

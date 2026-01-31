@@ -46,6 +46,22 @@ describe("helix ask platonic gates", () => {
     expect(result.answer).toMatch(/repo-backed claims|weakly reflected/i);
   });
 
+  it("blocks warp bubble answers that drift into FTL lore", () => {
+    const result = applyHelixAskPlatonicGates({
+      question: "what is a warp bubble?",
+      answer:
+        "In practice, a warp bubble enables faster-than-light travel by manipulating space-time. It moves matter through space at speeds exceeding light.",
+      domain: "repo",
+      tier: "F1",
+      intentId: "repo.warp_conceptual_explain",
+      format: "compare",
+      evidenceText:
+        "Warp Bubble Casimir Module integrates Natario zero-expansion warp bubble calculations with the module system.",
+    });
+    expect(result.beliefGateApplied || result.rattlingGateApplied).toBe(true);
+    expect(result.answer).toMatch(/weakly reflected|drifted too far/i);
+  });
+
   it("guards repo answers when key query terms are missing from evidence", () => {
     const result = applyHelixAskPlatonicGates({
       question: "How does the Helix Ask pipeline use morphospace attractors?",
@@ -124,7 +140,11 @@ describe("helix ask platonic gates", () => {
     const result = applyHelixAskPlatonicGates({
       question: "How does the Helix Ask pipeline work?",
       answer:
-        "Helix Ask pipeline stage is mentioned, but the rest describes astrophysics, cicadas, and plasma noise shaping.",
+        "The Helix Ask pipeline uses the intent directory, evidence gate, and format step before building the envelope. " +
+        "Astrophysics and cicadas dominate the rest of the discussion. " +
+        "Plasma storms and sand dunes are unrelated digressions. " +
+        "The narrative then jumps to ancient calendars and mythic rivers. " +
+        "These topics are unrelated to the prompt.",
       domain: "repo",
       tier: "F1",
       intentId: "repo.helix_ask_pipeline_explain",
@@ -135,6 +155,7 @@ describe("helix ask platonic gates", () => {
     expect(result.beliefGateApplied).toBe(false);
     expect(result.rattlingScore).toBeGreaterThanOrEqual(0.8);
     expect(result.rattlingGateApplied).toBe(true);
+    expect(result.answer).toMatch(/drifted too far/i);
   });
 
   it("removes prompt leakage fragments before other gates", () => {

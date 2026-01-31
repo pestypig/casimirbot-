@@ -62,6 +62,7 @@ const BELIEF_GATE_ENABLED = String(process.env.HELIX_ASK_BELIEF_GATE ?? "1").tri
 const RATTLING_GATE_ENABLED = String(process.env.HELIX_ASK_RATTLING_GATE ?? "1").trim() !== "0";
 const COVERAGE_MIN_RATIO = Number(process.env.HELIX_ASK_COVERAGE_MIN_RATIO ?? 0.35);
 const BELIEF_UNSUPPORTED_MAX = Number(process.env.HELIX_ASK_BELIEF_UNSUPPORTED_MAX ?? 0.85);
+const BELIEF_NOVEL_MIN_RATIO = Number(process.env.HELIX_ASK_BELIEF_NOVEL_MIN_RATIO ?? 0.25);
 const RATTLING_MAX = Number(process.env.HELIX_ASK_RATTLING_MAX ?? 0.8);
 const CONCEPT_MAX_SENTENCES = 3;
 
@@ -563,6 +564,7 @@ function computeBeliefSummary(input: HelixAskPlatonicInput): HelixAskBeliefSumma
     .filter(Boolean)
     .join("\n\n");
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
+  const questionTokens = toTokenSet(input.question);
   let supportedCount = 0;
   let unsupportedCount = 0;
   for (const claim of claims) {
@@ -575,8 +577,23 @@ function computeBeliefSummary(input: HelixAskPlatonicInput): HelixAskBeliefSumma
       continue;
     }
     const claimTokens = toTokenSet(claim);
-    const overlap = Array.from(claimTokens).some((token) => evidenceTokens.has(token));
-    if (overlap) {
+    if (claimTokens.size === 0) {
+      unsupportedCount += 1;
+      continue;
+    }
+    const novelTokens = Array.from(claimTokens).filter((token) => !questionTokens.has(token));
+    if (novelTokens.length === 0) {
+      supportedCount += 1;
+      continue;
+    }
+    let novelOverlap = 0;
+    for (const token of novelTokens) {
+      if (evidenceTokens.has(token)) {
+        novelOverlap += 1;
+      }
+    }
+    const novelRatio = novelOverlap / novelTokens.length;
+    if (novelRatio >= BELIEF_NOVEL_MIN_RATIO) {
       supportedCount += 1;
     } else {
       unsupportedCount += 1;
@@ -691,12 +708,25 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
   const coverageGate = applyCoverageGate(physicsInput, coverageSummary);
   const coverageInput: HelixAskPlatonicInput = { ...physicsInput, answer: coverageGate.answer };
   const beliefSummary = computeBeliefSummary(coverageInput);
-  const beliefGate = applyBeliefGate(coverageInput, beliefSummary);
+  const beliefGate = coverageGate.applied
+    ? { answer: coverageInput.answer, applied: false as const }
+    : applyBeliefGate(coverageInput, beliefSummary);
   const gatedInput: HelixAskPlatonicInput = { ...coverageInput, answer: beliefGate.answer };
   const rattlingScore = computeRattlingScore(gatedInput);
-  const rattlingGateApplied = applyRattlingGate(gatedInput, rattlingScore);
+  const rattlingGateApplied =
+    !coverageGate.applied &&
+    !beliefGate.applied &&
+    applyRattlingGate(gatedInput, rattlingScore);
+  let answer = gatedInput.answer;
+  if (
+    rattlingGateApplied &&
+    (gatedInput.domain === "repo" || gatedInput.domain === "falsifiable")
+  ) {
+    answer =
+      "Answer drifted too far from the provided evidence. Please narrow the request or specify the relevant files.";
+  }
   return {
-    answer: gatedInput.answer,
+    answer,
     junkCleanApplied: junkClean.applied,
     junkCleanReasons: ideologyOverride.applied
       ? [...junkClean.reasons, ideologyOverride.reason ?? "ideology_override"]
