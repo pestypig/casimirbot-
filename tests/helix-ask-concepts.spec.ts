@@ -23,4 +23,16 @@ describe("Helix Ask concept registry", () => {
     expect(answer).toContain("In practice");
     expect(answer).not.toContain("questions like:");
   });
+
+  it("matches casimir effect from subdirectories", () => {
+    const match = findConceptMatch("What is the Casimir effect?");
+    expect(match).not.toBeNull();
+    expect(match?.card.id).toBe("casimir-force-energy");
+  });
+
+  it("matches warp bubble from subdirectories", () => {
+    const match = findConceptMatch("What is a warp bubble?");
+    expect(match).not.toBeNull();
+    expect(match?.card.id).toBe("warp-bubble");
+  });
 });

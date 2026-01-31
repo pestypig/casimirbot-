@@ -106,4 +106,9 @@ describe("Helix Ask topic routing", () => {
     );
     expect(tags).toContain("star");
   });
+
+  it("tags casimir prompts as physics", () => {
+    const tags = inferHelixAskTopicTags("What is the Casimir effect?");
+    expect(tags).toContain("physics");
+  });
 });

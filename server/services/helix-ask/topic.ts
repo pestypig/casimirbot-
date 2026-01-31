@@ -1,6 +1,7 @@
 export type HelixAskTopicTag =
   | "helix_ask"
   | "warp"
+  | "physics"
   | "energy_pipeline"
   | "trace"
   | "resonance"
@@ -23,6 +24,8 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
   helix_ask:
     /\b(helix ask|helixask|ask pipeline|ask system|ask mode|agi ask|\/api\/agi\/ask|helix ask pill|intent routing|route intent|topic tags?|format router|format policy|evidence gate|coverage gate|belief gate|rattling gate|citation repair|cite repair|repair citations|answer path)\b/i,
   warp: /\b(warp|alcubierre|natario|warp bubble|warp drive)\b/i,
+  physics:
+    /\b(casimir|quantum inequality|ford-roman|energy condition|stress[-\s]?energy|spacetime|metric|riemann|ricci|einstein tensor|general relativity|gr\b|adm\b|york time)\b/i,
   energy_pipeline:
     /\b(energy pipeline|energy-pipeline|energypipeline|energy\s+pipeline|calculateenergy|drivewarpfrompipeline)\b/i,
   trace: /\b(trace|task trace|tasktrace|trajectory|essence|casimir)\b/i,
@@ -84,6 +87,19 @@ const WARP_CORE_PATHS: RegExp[] = [
   /docs\/warp-console-architecture\.md/i,
 ];
 
+const PHYSICS_PATHS: RegExp[] = [
+  /docs\/knowledge\/physics\//i,
+  /docs\/knowledge\/warp\//i,
+];
+
+const PHYSICS_NOISE_PATHS: RegExp[] = [
+  /\.test\.ts$/i,
+  /\.spec\.ts$/i,
+  /-adapter\.ts$/i,
+  /use-.*-pipeline\.ts$/i,
+  /energy-pipeline\.ts$/i,
+];
+
 const WARP_ALLOWLIST_PATHS: RegExp[] = [
   /modules\/warp\/(?!.*\.(test|spec)\.ts)/i,
   /docs\/warp/i,
@@ -140,6 +156,10 @@ const IDEOLOGY_EXPANDED_PATHS: RegExp[] = [
   /client\/src\/components\/MissionEthosSourcePanel\.tsx/i,
   /client\/src\/hooks\/use-ideology/i,
   /client\/src\/lib\/ideology/i,
+];
+
+const IDEOLOGY_KNOWLEDGE_PATHS: RegExp[] = [
+  /docs\/knowledge\/ethos\//i,
 ];
 
 const LEDGER_CORE_PATHS: RegExp[] = [
@@ -268,9 +288,13 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
 
   if (tags.includes("ideology")) {
     allowlistTiers.push(IDEOLOGY_CORE_PATHS);
-    allowlistTiers.push([...IDEOLOGY_CORE_PATHS, ...IDEOLOGY_EXPANDED_PATHS]);
+    allowlistTiers.push([
+      ...IDEOLOGY_CORE_PATHS,
+      ...IDEOLOGY_EXPANDED_PATHS,
+      ...IDEOLOGY_KNOWLEDGE_PATHS,
+    ]);
     allowlistTiers.push([]);
-    boostPaths.push(...IDEOLOGY_CORE_PATHS, ...IDEOLOGY_EXPANDED_PATHS);
+    boostPaths.push(...IDEOLOGY_CORE_PATHS, ...IDEOLOGY_EXPANDED_PATHS, ...IDEOLOGY_KNOWLEDGE_PATHS);
     mustIncludePaths.push(/docs\/ethos\/ideology\.json/i);
     mustIncludeFiles.push(...IDEOLOGY_CORE_FILES);
     // Avoid warp/energy drift when the user is asking for ideology guidance.
@@ -312,6 +336,15 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
       "modules/warp/natario-warp.ts",
       "docs/warp-console-architecture.md",
     );
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("physics")) {
+    allowlistTiers.push(PHYSICS_PATHS);
+    allowlistTiers.push([]);
+    boostPaths.push(...PHYSICS_PATHS);
+    deboostPaths.push(...PHYSICS_NOISE_PATHS);
+    mustIncludePaths.push(...PHYSICS_PATHS);
     minTierCandidates = Math.max(minTierCandidates, 2);
   }
 

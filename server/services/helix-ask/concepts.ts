@@ -105,6 +105,34 @@ const parseConceptBody = (body: string): { definition: string; keyQuestions?: st
   return { definition: definition.trim(), keyQuestions: keyQuestions || undefined, notes: notes || undefined };
 };
 
+const collectConceptFiles = (root: string): string[] => {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const nextPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules") continue;
+        walk(nextPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (!entry.name.toLowerCase().endsWith(".md")) continue;
+      files.push(nextPath);
+    }
+  };
+  if (fs.existsSync(root)) {
+    walk(root);
+  }
+  return files.sort();
+};
+
 const loadConceptCards = (): HelixAskConceptCard[] => {
   if (conceptLoadFailed) return [];
   if (conceptCache) return conceptCache;
@@ -113,16 +141,13 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
       conceptCache = [];
       return conceptCache;
     }
-    const entries = fs.readdirSync(CONCEPT_DIR, { withFileTypes: true });
+    const files = collectConceptFiles(CONCEPT_DIR);
     const cards: HelixAskConceptCard[] = [];
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      if (!entry.name.toLowerCase().endsWith(".md")) continue;
-      const filePath = path.join(CONCEPT_DIR, entry.name);
+    for (const filePath of files) {
       const raw = fs.readFileSync(filePath, "utf8");
       if (!raw.trim()) continue;
       const { frontmatter, body } = parseFrontmatter(raw);
-      const id = normalizeValue(frontmatter.id ?? path.basename(entry.name, ".md"));
+      const id = normalizeValue(frontmatter.id ?? path.basename(filePath, ".md"));
       if (!id) continue;
       const label = frontmatter.label ? normalizeValue(frontmatter.label) : undefined;
       const aliases = frontmatter.aliases ? parseAliases(frontmatter.aliases) : [];
@@ -137,9 +162,7 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
         definition: parsedBody.definition,
         keyQuestions: parsedBody.keyQuestions,
         notes: parsedBody.notes,
-        sourcePath: path
-          .relative(process.cwd(), filePath)
-          .replace(/\\/g, "/"),
+        sourcePath: path.relative(process.cwd(), filePath).replace(/\\/g, "/"),
       });
     }
     conceptCache = cards;

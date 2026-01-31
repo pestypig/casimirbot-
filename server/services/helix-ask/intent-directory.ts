@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 export type FalsifiabilityTier = "F0" | "F1" | "F2" | "F3";
 export type HelixAskDomain = "general" | "repo" | "hybrid" | "falsifiable";
 export type HelixAskStrategy =
@@ -51,6 +54,72 @@ export type HelixAskIntentMatchInput = {
   hasRepoHints: boolean;
   hasFilePathHints: boolean;
 };
+
+type IdeologyNodeRecord = {
+  id?: string;
+  slug?: string;
+  title?: string;
+};
+
+type IdeologyTreeRecord = {
+  nodes?: IdeologyNodeRecord[];
+};
+
+const IDEOLOGY_BASE_MATCHERS: RegExp[] = [
+  /\b(ideology|ethos|mission ethos|ideology tree|ethos tree|two-key approval|stewardship ledger|citizens arc|verification checklist)\b/i,
+];
+
+const normalizeIdeologyTerm = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const shouldIncludeIdeologyTerm = (term: string): boolean => {
+  if (!term) return false;
+  if (term.length < 6) return false;
+  const words = term.split(" ").filter(Boolean);
+  if (words.length >= 2) return true;
+  return term.length >= 12;
+};
+
+const buildPhraseRegex = (term: string): RegExp => {
+  const escaped = term
+    .split(" ")
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .filter(Boolean)
+    .join("\\s+");
+  return new RegExp(`\\b${escaped}\\b`, "i");
+};
+
+const buildIdeologyNodeMatchers = (): RegExp[] => {
+  try {
+    const filePath = path.resolve(process.cwd(), "docs", "ethos", "ideology.json");
+    if (!fs.existsSync(filePath)) return [];
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(raw) as IdeologyTreeRecord;
+    const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+    const terms = new Set<string>();
+    for (const node of nodes) {
+      if (!node) continue;
+      const title = node.title ? normalizeIdeologyTerm(node.title) : "";
+      const slug = node.slug ? normalizeIdeologyTerm(node.slug.replace(/-/g, " ")) : "";
+      const id = node.id ? normalizeIdeologyTerm(node.id.replace(/-/g, " ")) : "";
+      for (const term of [title, slug, id]) {
+        if (!shouldIncludeIdeologyTerm(term)) continue;
+        terms.add(term);
+      }
+    }
+    return Array.from(terms).map((term) => buildPhraseRegex(term));
+  } catch {
+    return [];
+  }
+};
+
+const IDEOLOGY_NODE_MATCHERS = buildIdeologyNodeMatchers();
 
 const INTENT_PROFILES: HelixAskIntentProfile[] = [
   {
@@ -293,9 +362,7 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
       requireCitations: true,
       allowedEvidenceKinds: ["repo_chunk"],
     },
-    matchers: [
-      /\b(ideology|ethos|mission ethos|ideology tree|ethos tree|two-key approval|stewardship ledger|citizens arc|verification checklist)\b/i,
-    ],
+    matchers: [...IDEOLOGY_BASE_MATCHERS, ...IDEOLOGY_NODE_MATCHERS],
     priority: 55,
   },
   {
