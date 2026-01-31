@@ -36,7 +36,30 @@ Use this section to keep deploy behavior aligned with local testing.
 - If bootstrap **fails** or is **deferred**, Express has no static handler yet → `Cannot GET /desktop`.
 
 ### Deploy Command (Known-Good)
-Use build + dist server with static assets:
+Use build + dist server with static assets.
+
+**Build command (Replit deploy/preview):**
+```
+bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=600000 npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"
+```
+
+**Run command (Replit deploy/preview):**
+```
+env NODE_ENV=production PORT=5000 HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
+SKIP_MODULE_INIT=1 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=0 \
+VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 \
+LLM_LOCAL_CONTEXT_TOKENS=4096 LLM_LOCAL_MAX_TOKENS=2048 \
+HELIX_ASK_JOB_TIMEOUT_MS=600000 LLM_LOCAL_SPAWN_TIMEOUT_MS=600000 \
+HELIX_ASK_BELIEF_UNSUPPORTED_MAX=0.95 \
+node dist/index.js
+```
+
+Notes:
+- `VITE_HELIX_ASK_JOB_TIMEOUT_MS` is **build-time** only; it is now inlined via Vite `define`. Rebuild to change it.
+- `HELIX_ASK_BELIEF_UNSUPPORTED_MAX=0.95` relaxes the belief gate for general questions (prevents the “weakly reflected” fallback).
+- Set `HELIX_ASK_BELIEF_GATE=0` only for short-term debugging.
+
+Legacy (local) command:
 ```
 npm run build
 env REPLIT_DEPLOYMENT=1 NODE_ENV=production PORT=5000 HOST=0.0.0.0 \
