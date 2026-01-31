@@ -25,6 +25,7 @@ type HelixAskJobStore = {
   fail: (jobId: string, error: string) => Promise<HelixAskJobRecord | null>;
   appendPartial: (jobId: string, chunk: string) => Promise<void>;
   cleanupExpired: () => Promise<void>;
+  reapStale: (cutoffMs: number, reason: string) => Promise<void>;
 };
 
 type HelixAskJobCreateParams = {
@@ -72,6 +73,15 @@ const HELIX_ASK_JOB_CLEANUP_MS = clampNumber(
   10_000,
   10 * 60_000,
 );
+const HELIX_ASK_JOB_STALE_MS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_JOB_STALE_MS ?? process.env.HELIX_ASK_JOB_TIMEOUT_MS,
+    10 * 60 * 1000,
+  ),
+  60_000,
+  6 * 60 * 60 * 1000,
+);
+const HELIX_ASK_JOB_STALE_REASON = "helix_ask_orphaned";
 
 const memoryJobs = new Map<string, HelixAskJobRecord>();
 
@@ -179,6 +189,13 @@ const memoryStore: HelixAskJobStore = {
   cleanupExpired: async () => {
     pruneMemoryExpired();
   },
+  reapStale: async (cutoffMs, reason) => {
+    for (const job of memoryJobs.values()) {
+      if ((job.status === "running" || job.status === "queued") && job.updatedAt < cutoffMs) {
+        Object.assign(job, { status: "failed", error: reason, result: undefined, updatedAt: Date.now() });
+      }
+    }
+  },
 };
 
 const getDbPool = async () => {
@@ -276,6 +293,16 @@ const dbStore: HelixAskJobStore = {
     const pool = await getDbPool();
     await pool.query(`DELETE FROM helix_ask_jobs WHERE expires_at <= now()`);
   },
+  reapStale: async (cutoffMs, reason) => {
+    const pool = await getDbPool();
+    const cutoff = new Date(cutoffMs);
+    await pool.query(
+      `UPDATE helix_ask_jobs
+       SET status = $2, error = $3, result_json = NULL, updated_at = now()
+       WHERE status IN ('queued', 'running') AND updated_at < $1`,
+      [cutoff, "failed", reason],
+    );
+  },
 };
 
 const shouldUseMemoryStore = (): boolean => {
@@ -327,8 +354,9 @@ const safeRun = async <T>(fn: () => Promise<T>, fallback: T): Promise<T> => {
 };
 
 const cleanupTimer = setInterval(() => {
+  const cutoff = Date.now() - HELIX_ASK_JOB_STALE_MS;
   void resolveStore()
-    .then((store) => store.cleanupExpired())
+    .then((store) => Promise.all([store.cleanupExpired(), store.reapStale(cutoff, HELIX_ASK_JOB_STALE_REASON)]))
     .catch(() => undefined);
 }, HELIX_ASK_JOB_CLEANUP_MS);
 cleanupTimer.unref?.();

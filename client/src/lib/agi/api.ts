@@ -588,9 +588,13 @@ const pollAskJob = async (
   options?: { signal?: AbortSignal; pollIntervalMs?: number; timeoutMs?: number },
 ): Promise<LocalAskResponse> => {
   const pollInterval = Math.max(250, options?.pollIntervalMs ?? HELIX_ASK_JOB_POLL_INTERVAL_MS);
-  const timeoutMs =
-    typeof options?.timeoutMs === "number" ? options.timeoutMs : HELIX_ASK_JOB_TIMEOUT_MS;
   const startedAt = Date.now();
+  let timeoutDeadline =
+    typeof options?.timeoutMs === "number"
+      ? startedAt + Math.max(0, options.timeoutMs)
+      : HELIX_ASK_JOB_TIMEOUT_MS > 0
+        ? startedAt + HELIX_ASK_JOB_TIMEOUT_MS
+        : Number.POSITIVE_INFINITY;
   let lastPartialText = "";
   let consecutiveErrors = 0;
 
@@ -602,6 +606,9 @@ const pollAskJob = async (
     try {
       job = await getAskJob(jobId, options?.signal);
       consecutiveErrors = 0;
+      if (job.expiresAt && Number.isFinite(job.expiresAt)) {
+        timeoutDeadline = Math.max(timeoutDeadline, job.expiresAt);
+      }
     } catch (error) {
       if (options?.signal?.aborted) {
         throw buildAbortError();
@@ -614,7 +621,7 @@ const pollAskJob = async (
         throw error;
       }
       consecutiveErrors += 1;
-      if (timeoutMs > 0 && Date.now() - startedAt > timeoutMs) {
+      if (Date.now() > timeoutDeadline) {
         const fallback = lastPartialText || "Request timed out.";
         return { text: fallback } as LocalAskResponse;
       }
@@ -641,7 +648,7 @@ const pollAskJob = async (
       }
       throw new Error(message);
     }
-    if (timeoutMs > 0 && Date.now() - startedAt > timeoutMs) {
+    if (Date.now() > timeoutDeadline) {
       const fallback = lastPartialText || "Request timed out.";
       return { text: fallback } as LocalAskResponse;
     }
