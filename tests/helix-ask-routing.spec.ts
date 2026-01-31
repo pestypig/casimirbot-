@@ -122,6 +122,31 @@ const cases: IntentCase[] = [
     expectedFormat: "brief",
     expectStageTags: false,
   },
+  {
+    question: "What is the Casimir effect?",
+    hasRepoHints: false,
+    hasFilePathHints: false,
+    expectedId: "general.conceptual_define_compare",
+    expectedDomain: "general",
+    expectedFormat: "compare",
+  },
+  {
+    question: "Define the Ford-Roman quantum inequality.",
+    hasRepoHints: false,
+    hasFilePathHints: false,
+    expectedId: "general.conceptual_define_compare",
+    expectedDomain: "general",
+    expectedFormat: "compare",
+  },
+  {
+    question: "Explain the Natario zero-expansion warp bubble.",
+    hasRepoHints: false,
+    hasFilePathHints: false,
+    expectedId: "repo.warp_definition_docs_first",
+    expectedDomain: "repo",
+    expectedFormat: "brief",
+    expectStageTags: false,
+  },
 ];
 
 describe("Helix Ask intent routing", () => {
