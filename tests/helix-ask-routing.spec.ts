@@ -113,6 +113,15 @@ const cases: IntentCase[] = [
     expectedFormat: "brief",
     expectStageTags: false,
   },
+  {
+    question: "What's a warp bubble?",
+    hasRepoHints: false,
+    hasFilePathHints: false,
+    expectedId: "repo.warp_definition_docs_first",
+    expectedDomain: "repo",
+    expectedFormat: "brief",
+    expectStageTags: false,
+  },
 ];
 
 describe("Helix Ask intent routing", () => {

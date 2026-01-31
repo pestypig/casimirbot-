@@ -78,6 +78,15 @@ const WARP_PATHS: RegExp[] = [
   /warp bubble/i,
 ];
 
+const WARP_NOISE_PATHS: RegExp[] = [
+  /\.test\.ts$/i,
+  /\.spec\.ts$/i,
+  /-adapter\.ts$/i,
+  /use-.*-pipeline\.ts$/i,
+  /components\/.*Pipeline\.tsx$/i,
+  /energy-pipeline\.ts$/i,
+];
+
 const ENERGY_PATHS: RegExp[] = [
   /energy-pipeline/i,
   /EnergyPipeline\.tsx/i,
@@ -280,6 +289,14 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
 
   if (tags.includes("warp")) {
     boostPaths.push(...WARP_PATHS);
+    deboostPaths.push(...WARP_NOISE_PATHS);
+    mustIncludePaths.push(...WARP_PATHS);
+    mustIncludeFiles.push(
+      "modules/warp/warp-module.ts",
+      "modules/warp/natario-warp.ts",
+      "docs/warp-console-architecture.md",
+    );
+    minTierCandidates = Math.max(minTierCandidates, 2);
   }
 
   if (tags.includes("energy_pipeline")) {
