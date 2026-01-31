@@ -28,6 +28,7 @@ const buildStamp =
   process.env.GIT_COMMIT ??
   process.env.GIT_SHA ??
   new Date().toISOString();
+const helixAskJobTimeout = process.env.VITE_HELIX_ASK_JOB_TIMEOUT_MS;
 
 const toPosix = (value: string) => value.split(path.sep).join(path.posix.sep);
 
@@ -94,6 +95,9 @@ export default defineConfig({
   envPrefix: ["VITE_", "ENABLE_", "KNOWLEDGE_"],
   define: {
     __APP_BUILD__: JSON.stringify(buildStamp),
+    __HELIX_ASK_JOB_TIMEOUT_MS__: helixAskJobTimeout
+      ? JSON.stringify(helixAskJobTimeout)
+      : "undefined",
   },
   plugins: [
     react(),

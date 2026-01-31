@@ -496,7 +496,7 @@ const readNumberEnv = (value: unknown, fallback: number) => {
   return fallback;
 };
 const HELIX_ASK_JOB_TIMEOUT_MS = clampNumber(
-  readNumberEnv((import.meta as any)?.env?.VITE_HELIX_ASK_JOB_TIMEOUT_MS, 180_000),
+  readNumberEnv(__HELIX_ASK_JOB_TIMEOUT_MS__, 180_000),
   30_000,
   30 * 60_000,
 );
