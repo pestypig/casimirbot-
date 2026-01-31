@@ -89,6 +89,17 @@ describe("Helix Ask topic routing", () => {
     ).toBe(true);
   });
 
+  it("does not satisfy warp must-include with test files", () => {
+    const profile = buildHelixAskTopicProfile(["warp"]);
+    expect(profile).not.toBeNull();
+    expect(
+      topicMustIncludeSatisfied(["modules/warp/warp-module.test.ts"], profile),
+    ).toBe(false);
+    expect(
+      topicMustIncludeSatisfied(["modules/warp/warp-module.ts"], profile),
+    ).toBe(true);
+  });
+
   it("tags save-the-sun prompts as star", () => {
     const tags = inferHelixAskTopicTags(
       "Give a staged plan to save the Sun during the red giant phase.",

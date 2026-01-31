@@ -78,9 +78,22 @@ const WARP_PATHS: RegExp[] = [
   /warp bubble/i,
 ];
 
+const WARP_CORE_PATHS: RegExp[] = [
+  /modules\/warp\/warp-module\.ts/i,
+  /modules\/warp\/natario-warp\.ts/i,
+  /docs\/warp-console-architecture\.md/i,
+];
+
+const WARP_ALLOWLIST_PATHS: RegExp[] = [
+  /modules\/warp\/(?!.*\.(test|spec)\.ts)/i,
+  /docs\/warp/i,
+  /docs\/warp-/i,
+];
+
 const WARP_NOISE_PATHS: RegExp[] = [
   /\.test\.ts$/i,
   /\.spec\.ts$/i,
+  /modules\/warp\/.*\.(test|spec)\.ts$/i,
   /-adapter\.ts$/i,
   /use-.*-pipeline\.ts$/i,
   /components\/.*Pipeline\.tsx$/i,
@@ -288,9 +301,12 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
   }
 
   if (tags.includes("warp")) {
-    boostPaths.push(...WARP_PATHS);
+    allowlistTiers.push(WARP_ALLOWLIST_PATHS);
+    allowlistTiers.push([...WARP_ALLOWLIST_PATHS, ...WARP_PATHS]);
+    allowlistTiers.push([]);
+    boostPaths.push(...WARP_PATHS, ...WARP_CORE_PATHS);
     deboostPaths.push(...WARP_NOISE_PATHS);
-    mustIncludePaths.push(...WARP_PATHS);
+    mustIncludePaths.push(...WARP_CORE_PATHS);
     mustIncludeFiles.push(
       "modules/warp/warp-module.ts",
       "modules/warp/natario-warp.ts",
