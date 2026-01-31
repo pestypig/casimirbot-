@@ -18,20 +18,20 @@ Guidelines for each subject doc:
 - [ ] Concept cards + aliases: add concept cards with `id` + `aliases` and wire concept matching in `server/services/helix-ask/concepts.ts`.
 - [ ] Index/retrieval rebuilds: run `npm run build:code-lattice` after docs land.
 - [ ] Regression tests + gates: add routing tests for 3-5 definition prompts and run `npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl`.
-- [ ] Reasoning visibility audit: confirm every ladder stage emits live debug events and trace fields (see below).
+- [x] Reasoning visibility audit: confirm every ladder stage emits live debug events and trace fields (see below).
 
 ---
 
 ## Reasoning ladder visibility (required for new runtime features)
-- [ ] Inventory ladder stages (intent → topic → plan pass → retrieval → evidence gates → arbiter → synthesis → citation repair → final envelope).
-- [ ] Map each stage to a live event + debug payload field (e.g., `logEvent` + `debugPayload.*`).
-- [ ] Add missing events for:
-  - [ ] intent match + reason
-  - [ ] topic tags + must-include status
-  - [ ] allowlist tier chosen + docs-first outcome
-  - [ ] coverage/belief/rattling gate decisions
-  - [ ] arbiter mode + reason
-  - [ ] final answer mode + citations required/used
+- [x] Inventory ladder stages (intent → topic → plan pass → retrieval → evidence gates → arbiter → synthesis → citation repair → final envelope).
+- [x] Map each stage to a live event + debug payload field (e.g., `logEvent` + `debugPayload.*`).
+- [x] Add missing events for:
+  - [x] intent match + reason
+  - [x] topic tags + must-include status
+  - [x] allowlist tier chosen + docs-first outcome
+  - [x] coverage/belief/rattling gate decisions
+  - [x] arbiter mode + reason
+  - [x] final answer mode + citations required/used
 - [ ] Add a regression check that asserts all stages emit a trace event for a sample Helix Ask request.
 
 ---
