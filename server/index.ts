@@ -882,13 +882,6 @@ app.use((req, res, next) => {
       appReady = true;
       log("app ready (fast boot)");
     } else {
-      if (skipModuleInit) {
-        log("SKIP_MODULE_INIT=1: skipping physics module initialization");
-      } else {
-        const { initializeModules } = await import("./modules/module-loader.js");
-        await initializeModules();
-      }
-
       const { registerRoutes } = await import("./routes");
       await registerRoutes(app, server);
 
@@ -942,6 +935,32 @@ app.use((req, res, next) => {
     appReady = true;
     healthReady = true;
     log("app ready");
+
+    if (!fastBoot) {
+      if (skipModuleInit) {
+        log("SKIP_MODULE_INIT=1: skipping physics module initialization");
+      } else {
+        const moduleInitStart = Date.now();
+        const moduleInitTimeoutMs = Number(process.env.MODULE_INIT_TIMEOUT_MS ?? "20000");
+        const { initializeModules } = await import("./modules/module-loader.js");
+        const timeout = setTimeout(() => {
+          log(
+            `physics module init still running after ${moduleInitTimeoutMs}ms (continuing in background)`,
+          );
+        }, moduleInitTimeoutMs);
+        timeout.unref?.();
+        Promise.resolve()
+          .then(() => initializeModules())
+          .then(() => {
+            clearTimeout(timeout);
+            log(`physics modules initialized in ${Date.now() - moduleInitStart}ms`);
+          })
+          .catch((error) => {
+            clearTimeout(timeout);
+            console.error("[modules] initialization failed:", error);
+          });
+      }
+    }
   };
 
   // Start listening early so health checks succeed while routes finish initializing.
