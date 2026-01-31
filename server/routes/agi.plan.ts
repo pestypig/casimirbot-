@@ -134,6 +134,12 @@ import {
   type HelixAskConceptMatch,
 } from "../services/helix-ask/concepts";
 import {
+  buildRepoSearchPlan,
+  formatRepoSearchEvidence,
+  runRepoSearch,
+  type RepoSearchResult,
+} from "../services/helix-ask/repo-search";
+import {
   buildHelixAskMathAnswer,
   solveHelixAskMathQuestion,
   type HelixAskMathSolveResult,
@@ -7422,6 +7428,13 @@ const executeHelixAsk = async ({
       slot_coverage_missing?: string[];
       slot_coverage_ratio?: number;
       slot_coverage_ok?: boolean;
+      repo_search_terms?: string[];
+      repo_search_paths?: string[];
+      repo_search_reason?: string;
+      repo_search_explicit?: boolean;
+      repo_search_hits?: number;
+      repo_search_truncated?: boolean;
+      repo_search_error?: string;
       plan_must_include_ok?: boolean;
       constraint_evidence?: string;
       citation_repair?: boolean;
@@ -8406,6 +8419,59 @@ const executeHelixAsk = async ({
         if (requiredSlots.length && !slotCoverageOk) {
           mustIncludeOk = false;
           evidenceGate = { ...evidenceGate, ok: false };
+        }
+        const repoSearchPlan = buildRepoSearchPlan({
+          question: baseQuestion,
+          topicTags,
+          conceptMatch,
+          intentDomain,
+          evidenceGateOk: evidenceGate.ok,
+          promptIngested,
+          topicProfile,
+        });
+        if (repoSearchPlan) {
+          const searchStart = Date.now();
+          logEvent(
+            "Repo search",
+            "start",
+            `terms=${repoSearchPlan.terms.join(",")}`,
+            searchStart,
+          );
+          const repoSearchResult: RepoSearchResult = await runRepoSearch(repoSearchPlan);
+          if (repoSearchResult.hits.length > 0) {
+            const formatted = formatRepoSearchEvidence(repoSearchResult);
+            contextText = [contextText, formatted.evidenceText].filter(Boolean).join("\n\n");
+            if (formatted.filePaths.length > 0) {
+              contextFiles = Array.from(new Set([...contextFiles, ...formatted.filePaths]));
+            }
+            evidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+              minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+              minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+            });
+            mustIncludeOk = topicProfile
+              ? topicMustIncludeSatisfied(extractFilePathsFromText(contextText), topicProfile)
+              : mustIncludeOk;
+            logEvent(
+              "Repo search",
+              repoSearchResult.truncated ? "truncated" : "ok",
+              `hits=${repoSearchResult.hits.length}`,
+              searchStart,
+            );
+          } else {
+            const note = repoSearchResult.error ?? "no_hits";
+            logEvent("Repo search", "empty", note, searchStart);
+          }
+          if (debugPayload) {
+            debugPayload.repo_search_terms = repoSearchPlan.terms;
+            debugPayload.repo_search_paths = repoSearchPlan.paths;
+            debugPayload.repo_search_reason = repoSearchPlan.reason;
+            debugPayload.repo_search_explicit = repoSearchPlan.explicit;
+            debugPayload.repo_search_hits = repoSearchResult.hits.length;
+            debugPayload.repo_search_truncated = repoSearchResult.truncated;
+            if (repoSearchResult.error) {
+              debugPayload.repo_search_error = repoSearchResult.error;
+            }
+          }
         }
         const queryHitCount = contextMeta.queryHitCount ?? 0;
         const topScore = contextMeta.topScore ?? 0;
