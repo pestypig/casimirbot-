@@ -76,6 +76,8 @@ node dist/index.js
 - Helix Ask completes a long question (< 10 minutes) with `HELIX_ASK_JOB_TIMEOUT_MS=600000`.
 - If UI times out, confirm job status with:
   - `curl -s http://localhost:5000/api/agi/ask/jobs/<JOB_ID> | jq .`
+- If deploy health checks fail on `/` during heavy startup (model hydration), re-run the deploy.
+  - If it persists, add `ROOT_LIVENESS_ALWAYS=1` to force a fast 200 on `/`.
 
 ### Helix Ask Job Persistence Notes
 - The client first uses `/api/agi/ask/jobs` and polls `/api/agi/ask/jobs/:jobId`. If the job API returns 404/405, it falls back to synchronous `/api/agi/ask`.
