@@ -7517,6 +7517,69 @@ const executeHelixAsk = async ({
       variant_selection_reason?: string;
       variant_selection_label?: string;
       variant_selection_candidate_count?: number;
+      gates?: {
+        evidence?: {
+          ok?: boolean;
+          matchCount?: number;
+          tokenCount?: number;
+          matchRatio?: number;
+          criticApplied?: boolean;
+          criticOk?: boolean;
+          criticRatio?: number;
+          criticCount?: number;
+          criticTokens?: number;
+        };
+        coverage?: {
+          applied?: boolean;
+          reason?: string;
+          ratio?: number;
+          tokenCount?: number;
+          keyCount?: number;
+          missingKeyCount?: number;
+          missingKeys?: string[];
+        };
+        belief?: {
+          applied?: boolean;
+          reason?: string;
+          unsupportedRate?: number;
+          unsupportedCount?: number;
+          supportedCount?: number;
+          claimCount?: number;
+          contradictions?: number;
+        };
+        beliefGraph?: {
+          nodeCount?: number;
+          edgeCount?: number;
+          claimCount?: number;
+          definitionCount?: number;
+          conclusionCount?: number;
+          evidenceRefCount?: number;
+          constraintCount?: number;
+          supports?: number;
+          contradicts?: number;
+          dependsOn?: number;
+          mapsTo?: number;
+        };
+        rattling?: {
+          applied?: boolean;
+          score?: number;
+          baseDistance?: number;
+          perturbationDistance?: number;
+          claimSetCount?: number;
+        };
+        lint?: {
+          conceptApplied?: boolean;
+          conceptReasons?: string[];
+          physicsApplied?: boolean;
+          physicsReasons?: string[];
+        };
+        variant?: {
+          applied?: boolean;
+          reason?: string;
+          label?: string;
+          candidateCount?: number;
+        };
+      };
       answer_path?: string[];
       live_events?: Array<{
         ts: string;
@@ -10018,6 +10081,69 @@ const executeHelixAsk = async ({
           debugPayload.variant_selection_candidate_count =
             platonicResult.variantSummary.candidateCount;
         }
+        debugPayload.gates = {
+          evidence: {
+            ok: debugPayload.evidence_gate_ok,
+            matchCount: debugPayload.evidence_match_count,
+            tokenCount: debugPayload.evidence_token_count,
+            matchRatio: debugPayload.evidence_match_ratio,
+            criticApplied: debugPayload.evidence_critic_applied,
+            criticOk: debugPayload.evidence_critic_ok,
+            criticRatio: debugPayload.evidence_critic_ratio,
+            criticCount: debugPayload.evidence_critic_count,
+            criticTokens: debugPayload.evidence_critic_tokens,
+          },
+          coverage: {
+            applied: debugPayload.coverage_gate_applied,
+            reason: debugPayload.coverage_gate_reason,
+            ratio: debugPayload.coverage_ratio,
+            tokenCount: debugPayload.coverage_token_count,
+            keyCount: debugPayload.coverage_key_count,
+            missingKeyCount: debugPayload.coverage_missing_key_count,
+            missingKeys: debugPayload.coverage_missing_keys,
+          },
+          belief: {
+            applied: debugPayload.belief_gate_applied,
+            reason: debugPayload.belief_gate_reason,
+            unsupportedRate: debugPayload.belief_unsupported_rate,
+            unsupportedCount: debugPayload.belief_unsupported_count,
+            supportedCount: debugPayload.belief_supported_count,
+            claimCount: debugPayload.belief_claim_count,
+            contradictions: debugPayload.belief_contradictions,
+          },
+          beliefGraph: {
+            nodeCount: debugPayload.belief_graph_node_count,
+            edgeCount: debugPayload.belief_graph_edge_count,
+            claimCount: debugPayload.belief_graph_claim_count,
+            definitionCount: debugPayload.belief_graph_definition_count,
+            conclusionCount: debugPayload.belief_graph_conclusion_count,
+            evidenceRefCount: debugPayload.belief_graph_evidence_ref_count,
+            constraintCount: debugPayload.belief_graph_constraint_count,
+            supports: debugPayload.belief_graph_supports,
+            contradicts: debugPayload.belief_graph_contradicts,
+            dependsOn: debugPayload.belief_graph_depends_on,
+            mapsTo: debugPayload.belief_graph_maps_to,
+          },
+          rattling: {
+            applied: debugPayload.rattling_gate_applied,
+            score: debugPayload.rattling_score,
+            baseDistance: debugPayload.rattling_base_distance,
+            perturbationDistance: debugPayload.rattling_perturbation_distance,
+            claimSetCount: debugPayload.rattling_claim_set_count,
+          },
+          lint: {
+            conceptApplied: debugPayload.concept_lint_applied,
+            conceptReasons: debugPayload.concept_lint_reasons,
+            physicsApplied: debugPayload.physics_lint_applied,
+            physicsReasons: debugPayload.physics_lint_reasons,
+          },
+          variant: {
+            applied: debugPayload.variant_selection_applied,
+            reason: debugPayload.variant_selection_reason,
+            label: debugPayload.variant_selection_label,
+            candidateCount: debugPayload.variant_selection_candidate_count,
+          },
+        };
         debugPayload.answer_path = answerPath;
       }
       cleanedText = cleaned;
