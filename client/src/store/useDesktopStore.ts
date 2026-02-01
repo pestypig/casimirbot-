@@ -42,7 +42,10 @@ type DesktopState = {
   clickBehavior: DesktopClickBehavior;
   zCounter: number;
   topZCounter: number;
-  registerFromManifest: (defs: PanelDefinition[]) => void;
+  registerFromManifest: (
+    defs: PanelDefinition[],
+    options?: { allowDefaultOpen?: boolean },
+  ) => void;
   open: (id: string) => void;
   close: (id: string) => void;
   minimize: (id: string) => void;
@@ -117,8 +120,9 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
       zCounter: 10,
       topZCounter: TOP_Z_BASE,
 
-      registerFromManifest: (defs) =>
+      registerFromManifest: (defs, options) =>
         set((state) => {
+          const allowDefaultOpen = options?.allowDefaultOpen ?? true;
           const windows = { ...state.windows };
           const pinned = { ...state.pinned };
           let zCounter = ensureZCounter(state.zCounter);
@@ -127,7 +131,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
           defs.forEach((def) => {
             const alwaysOnTop = Boolean(def.alwaysOnTop);
             const noMinimize = Boolean(def.noMinimize);
-            const defaultOpen = Boolean(def.defaultOpen);
+            const defaultOpen = allowDefaultOpen && Boolean(def.defaultOpen);
             if (!windows[def.id]) {
               if (alwaysOnTop) {
                 topZCounter += 1;

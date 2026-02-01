@@ -98,6 +98,9 @@ export type LocalAskResponse = {
     arbiter_user_expects_repo?: boolean;
     arbiter_repo_ok?: boolean;
     arbiter_hybrid_ok?: boolean;
+    arbiter_ratio?: number;
+    arbiter_topic_ok?: boolean;
+    arbiter_concept_match?: boolean;
     math_solver_ok?: boolean;
     math_solver_kind?: string;
     math_solver_final?: string;
@@ -115,6 +118,11 @@ export type LocalAskResponse = {
     evidence_match_ratio?: number;
     evidence_match_count?: number;
     evidence_token_count?: number;
+    evidence_critic_applied?: boolean;
+    evidence_critic_ok?: boolean;
+    evidence_critic_ratio?: number;
+    evidence_critic_count?: number;
+    evidence_critic_tokens?: number;
     citation_repair?: boolean;
     format?: "steps" | "compare" | "brief";
     stage_tags?: boolean;

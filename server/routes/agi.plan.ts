@@ -124,9 +124,11 @@ import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
 import { extractFilePathsFromText } from "../services/helix-ask/paths";
 import {
   evaluateEvidenceEligibility,
+  evaluateEvidenceCritic,
   filterSignalTokens,
   tokenizeAskQuery,
 } from "../services/helix-ask/query";
+import { resolveHelixAskArbiter } from "../services/helix-ask/arbiter";
 import {
   buildConceptScaffold,
   findConceptMatch,
@@ -2697,6 +2699,9 @@ const HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS = clampNumber(
   1,
   8,
 );
+const HELIX_ASK_EVIDENCE_CRITIC =
+  String(process.env.HELIX_ASK_EVIDENCE_CRITIC ?? process.env.VITE_HELIX_ASK_EVIDENCE_CRITIC ?? "0")
+    .trim() === "1";
 const HELIX_ASK_RETRIEVAL_RETRY_ENABLED =
   clampNumber(
     readNumber(
@@ -7419,6 +7424,9 @@ const executeHelixAsk = async ({
       repo_expectation_score?: number;
       repo_expectation_level?: "low" | "medium" | "high";
       repo_expectation_signals?: string[];
+      arbiter_ratio?: number;
+      arbiter_topic_ok?: boolean;
+      arbiter_concept_match?: boolean;
       plan_pass_used?: boolean;
       plan_pass_forced?: boolean;
       plan_directives?: HelixAskPlanDirectives;
@@ -7429,6 +7437,11 @@ const executeHelixAsk = async ({
       arbiter_hybrid_ok?: boolean;
       verification_anchor_required?: boolean;
       verification_anchor_ok?: boolean;
+      evidence_critic_applied?: boolean;
+      evidence_critic_ok?: boolean;
+      evidence_critic_ratio?: number;
+      evidence_critic_count?: number;
+      evidence_critic_tokens?: number;
       evidence_gate_ok?: boolean;
       evidence_match_ratio?: number;
       evidence_match_count?: number;
@@ -8449,10 +8462,30 @@ const executeHelixAsk = async ({
           }
         }
 
-        let evidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+        const baseEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
           minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
           minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
         });
+        let evidenceGate = baseEvidenceGate;
+        const evidenceCritic =
+          HELIX_ASK_EVIDENCE_CRITIC
+            ? evaluateEvidenceCritic(baseQuestion, contextText, {
+                minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+                minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+              })
+            : null;
+        if (evidenceCritic && evidenceCritic.tokenCount > 0) {
+          evidenceGate = evidenceCritic;
+        }
+        if (debugPayload && HELIX_ASK_EVIDENCE_CRITIC) {
+          debugPayload.evidence_critic_applied = true;
+          if (evidenceCritic) {
+            debugPayload.evidence_critic_ok = evidenceCritic.ok;
+            debugPayload.evidence_critic_ratio = evidenceCritic.matchRatio;
+            debugPayload.evidence_critic_count = evidenceCritic.matchCount;
+            debugPayload.evidence_critic_tokens = evidenceCritic.tokenCount;
+          }
+        }
         const viabilityFocus = HELIX_ASK_VIABILITY_FOCUS.test(baseQuestion);
         const viabilityMustIncludeOk =
           !viabilityFocus ||
@@ -8515,10 +8548,27 @@ const executeHelixAsk = async ({
             if (formatted.filePaths.length > 0) {
               contextFiles = Array.from(new Set([...contextFiles, ...formatted.filePaths]));
             }
-            evidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+            const repoEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
               minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
               minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
             });
+            evidenceGate = repoEvidenceGate;
+            if (HELIX_ASK_EVIDENCE_CRITIC) {
+              const repoCritic = evaluateEvidenceCritic(baseQuestion, contextText, {
+                minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+                minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+              });
+              if (repoCritic.tokenCount > 0) {
+                evidenceGate = repoCritic;
+              }
+              if (debugPayload) {
+                debugPayload.evidence_critic_applied = true;
+                debugPayload.evidence_critic_ok = repoCritic.ok;
+                debugPayload.evidence_critic_ratio = repoCritic.matchRatio;
+                debugPayload.evidence_critic_count = repoCritic.matchCount;
+                debugPayload.evidence_critic_tokens = repoCritic.tokenCount;
+              }
+            }
             mustIncludeOk = topicProfile
               ? topicMustIncludeSatisfied(extractFilePathsFromText(contextText), topicProfile)
               : mustIncludeOk;
@@ -8633,11 +8683,12 @@ const executeHelixAsk = async ({
             )},fuz:${channelTopScores.fuzzy.toFixed(2)}`,
           ].join(" | "),
         );
+        const arbiterHybridThreshold = Math.min(arbiterRepoRatio, arbiterHybridRatio);
         const shouldRetryRetrieval =
           HELIX_ASK_RETRIEVAL_RETRY_ENABLED &&
           !promptIngested &&
           hasRepoHints &&
-          retrievalConfidence < arbiterHybridRatio;
+          retrievalConfidence < arbiterHybridThreshold;
         if (shouldRetryRetrieval) {
           const retryStart = Date.now();
           const retryHints = [
@@ -8665,10 +8716,27 @@ const executeHelixAsk = async ({
             contextText = retryResult.context;
             contextFiles = retryResult.files.slice();
             topicMustIncludeOk = retryResult.topicMustIncludeOk;
-            evidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+            const retryEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
               minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
               minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
             });
+            evidenceGate = retryEvidenceGate;
+            if (HELIX_ASK_EVIDENCE_CRITIC) {
+              const retryCritic = evaluateEvidenceCritic(baseQuestion, contextText, {
+                minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+                minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+              });
+              if (retryCritic.tokenCount > 0) {
+                evidenceGate = retryCritic;
+              }
+              if (debugPayload) {
+                debugPayload.evidence_critic_applied = true;
+                debugPayload.evidence_critic_ok = retryCritic.ok;
+                debugPayload.evidence_critic_ratio = retryCritic.matchRatio;
+                debugPayload.evidence_critic_count = retryCritic.matchCount;
+                debugPayload.evidence_critic_tokens = retryCritic.tokenCount;
+              }
+            }
             mustIncludeOk =
               typeof topicMustIncludeOk === "boolean"
                 ? topicMustIncludeOk
@@ -8794,37 +8862,28 @@ const executeHelixAsk = async ({
           intentTier === "F3" ||
           intentStrategy === "constraint_report" ||
           compositeConstraintRequested;
-        const arbiterRepoOk =
-          retrievalConfidence >= 0.6 && mustIncludeOk && viabilityMustIncludeOk;
-        const arbiterHybridOk =
-          retrievalConfidence >= 0.35 &&
-          (conceptMatch || hasRepoHints || topicTags.length > 0) &&
-          (!verificationAnchorRequired || verificationAnchorOk);
-        const arbiterStrictness = hasHighStakesConstraints
-          ? "high"
-          : explicitRepoExpectation
-            ? "high"
-            : intentDomain === "general"
-              ? "low"
-              : "med";
-        let arbiterMode: "repo_grounded" | "hybrid" | "general" | "clarify" = "general";
-        let arbiterReason = "no_repo_expectation";
-        if (hasHighStakesConstraints) {
-          arbiterMode = "repo_grounded";
-          arbiterReason = "high_stakes";
-        } else if (arbiterRepoOk) {
-          arbiterMode = "repo_grounded";
-          arbiterReason = "repo_ratio";
-        } else if (arbiterHybridOk) {
-          arbiterMode = "hybrid";
-          arbiterReason = "hybrid_ratio";
-        } else if (userExpectsRepo) {
-          arbiterMode = "clarify";
-          arbiterReason = "expect_repo_weak_evidence";
-        } else {
-          arbiterMode = "general";
-          arbiterReason = "no_repo_expectation";
-        }
+        const arbiterDecision = resolveHelixAskArbiter({
+          retrievalConfidence,
+          repoThreshold: arbiterRepoRatio,
+          hybridThreshold: arbiterHybridRatio,
+          mustIncludeOk,
+          viabilityMustIncludeOk,
+          topicMustIncludeOk,
+          conceptMatch,
+          hasRepoHints,
+          topicTags,
+          verificationAnchorRequired,
+          verificationAnchorOk,
+          userExpectsRepo,
+          hasHighStakesConstraints,
+          explicitRepoExpectation,
+          intentDomain,
+        });
+        const arbiterMode = arbiterDecision.mode;
+        const arbiterReason = arbiterDecision.reason;
+        const arbiterStrictness = arbiterDecision.strictness;
+        const arbiterRepoOk = arbiterDecision.repoOk;
+        const arbiterHybridOk = arbiterDecision.hybridOk;
         logEvent(
           "Arbiter",
           arbiterMode,
@@ -8842,6 +8901,9 @@ const executeHelixAsk = async ({
           debugPayload.requires_repo_evidence = requiresRepoEvidence;
           debugPayload.arbiter_repo_ok = arbiterRepoOk;
           debugPayload.arbiter_hybrid_ok = arbiterHybridOk;
+          debugPayload.arbiter_ratio = arbiterDecision.ratio;
+          debugPayload.arbiter_topic_ok = arbiterDecision.topicOk;
+          debugPayload.arbiter_concept_match = arbiterDecision.conceptMatch;
         }
         const softExpansionAllowed =
           softExpansionBudget > 0 &&

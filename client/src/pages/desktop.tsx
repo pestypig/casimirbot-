@@ -1368,17 +1368,10 @@ export default function DesktopPage() {
       }),
     [],
   );
-  const allowAutoOpen = useMemo(() => {
-    if (typeof window === "undefined") return true;
-    try {
-      return Boolean(window.localStorage.getItem(PROFILE_STORAGE_KEY));
-    } catch {
-      return false;
-    }
-  }, []);
+  const allowAutoOpen = false;
 
   useEffect(() => {
-    registerFromManifest(panelRegistry);
+    registerFromManifest(panelRegistry, { allowDefaultOpen: false });
   }, [registerFromManifest]);
 
   useEffect(() => {

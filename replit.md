@@ -38,21 +38,25 @@ Use this section to keep deploy behavior aligned with local testing.
 ### Deploy Command (Known-Good)
 Use build + dist server with static assets.
 
-**Build command (Replit deploy/preview):**
+**Build command (Replit deploy/preview, tested):**
 ```
-bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=600000 npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"
+bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=600000 VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"
 ```
 
-**Run command (Replit deploy/preview):**
+**Run command (Replit deploy/preview, tested baseline):**
 ```
 env NODE_ENV=production PORT=5000 HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
 SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=1 \
-VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 \
 LLM_LOCAL_CONTEXT_TOKENS=4096 LLM_LOCAL_MAX_TOKENS=2048 \
 HELIX_ASK_JOB_TIMEOUT_MS=600000 LLM_LOCAL_SPAWN_TIMEOUT_MS=600000 \
 HELIX_ASK_BELIEF_UNSUPPORTED_MAX=0.95 HELIX_ASK_JOB_STALE_MS=1200000 \
 ENABLE_ESSENCE_PROPOSALS=0 ENABLE_ESSENCE_JOBS=0 \
 node dist/index.js
+```
+
+**Optional (enable evidence critic):**
+```
+env ... HELIX_ASK_EVIDENCE_CRITIC=1 node dist/index.js
 ```
 
 Notes:
@@ -61,6 +65,42 @@ Notes:
 - Set `HELIX_ASK_BELIEF_GATE=0` only for short-term debugging.
 - `SKIP_MODULE_INIT=0` keeps physics modules initialized (recommended for the warp pipeline).
 - `HEALTH_READY_ON_LISTEN=1` lets health checks pass while bootstrap finishes; users may briefly see "Starting up...".
+
+### Helix Ask Reasoning Update (2026-02-01)
+We are improving Helix Ask grounding + routing quality.
+- Added a dedicated arbiter resolver that uses `HELIX_ASK_ARBITER_REPO_RATIO` / `HELIX_ASK_ARBITER_HYBRID_RATIO` for decisions and emits missing debug metrics.
+- Added an optional evidence-critic pass (meta-instruction filtering) behind `HELIX_ASK_EVIDENCE_CRITIC`.
+- Exposed new arbiter/critic debug fields to the client types.
+- Added unit coverage for arbiter outcomes (`helix-ask-arbiter.spec.ts`).
+- Updated `.env.example` to document the new env flag.
+
+Last regression (deploy build): dry runs 6/6 passed, composite 1/1 passed, spot checks instant with concept_fast_path=true.
+
+### Replit Agent Prompt (Helix Ask Verification)
+```
+Run Helix Ask regression twice to compare quality with the new arbiter + evidence critic.
+
+1) HELIX_ASK_EVIDENCE_CRITIC=0 npm run helix:ask:regression
+2) HELIX_ASK_EVIDENCE_CRITIC=1 npm run helix:ask:regression
+
+Then:
+- Compare pass rate, concept_fast_path rate, and any arbiter decision flips.
+- Confirm arbiter/critic debug fields are present in the client payload.
+- Report a short summary of deltas and whether the critic improves outcomes.
+```
+
+### Helix Ask Evaluation Env Checklist
+Keep these fixed for A/B runs (toggle only `HELIX_ASK_EVIDENCE_CRITIC`):
+- `HELIX_ASK_ARBITER_REPO_RATIO`
+- `HELIX_ASK_ARBITER_HYBRID_RATIO`
+- `HELIX_ASK_BELIEF_UNSUPPORTED_MAX` (avoid changing `HELIX_ASK_BELIEF_GATE` unless explicitly testing it)
+- `HELIX_ASK_JOB_TIMEOUT_MS`
+- `LLM_LOCAL_SPAWN_TIMEOUT_MS`
+
+Build-time caps (require rebuild to change):
+- `VITE_HELIX_ASK_MAX_TOKENS`
+- `VITE_HELIX_ASK_CONTEXT_TOKENS`
+- `VITE_HELIX_ASK_JOB_TIMEOUT_MS`
 
 ### Helix Ask Timeouts (Build vs Runtime)
 These are three separate controls and all must be aligned:
