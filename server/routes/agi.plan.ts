@@ -2702,6 +2702,8 @@ const HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS = clampNumber(
 const HELIX_ASK_EVIDENCE_CRITIC =
   String(process.env.HELIX_ASK_EVIDENCE_CRITIC ?? process.env.VITE_HELIX_ASK_EVIDENCE_CRITIC ?? "0")
     .trim() === "1";
+const HELIX_ASK_TRAINING_TRACE =
+  String(process.env.HELIX_ASK_TRAINING_TRACE ?? "1").trim() !== "0";
 const HELIX_ASK_RETRIEVAL_RETRY_ENABLED =
   clampNumber(
     readNumber(
@@ -7492,8 +7494,29 @@ const executeHelixAsk = async ({
       belief_contradictions?: number;
       belief_gate_applied?: boolean;
       belief_gate_reason?: string;
+      belief_graph_node_count?: number;
+      belief_graph_edge_count?: number;
+      belief_graph_claim_count?: number;
+      belief_graph_definition_count?: number;
+      belief_graph_conclusion_count?: number;
+      belief_graph_evidence_ref_count?: number;
+      belief_graph_constraint_count?: number;
+      belief_graph_supports?: number;
+      belief_graph_contradicts?: number;
+      belief_graph_depends_on?: number;
+      belief_graph_maps_to?: number;
+      belief_graph_claim_ids?: string[];
+      belief_graph_unsupported_claim_ids?: string[];
+      belief_graph_contradiction_ids?: string[];
       rattling_score?: number;
+      rattling_base_distance?: number;
+      rattling_perturbation_distance?: number;
+      rattling_claim_set_count?: number;
       rattling_gate_applied?: boolean;
+      variant_selection_applied?: boolean;
+      variant_selection_reason?: string;
+      variant_selection_label?: string;
+      variant_selection_candidate_count?: number;
       answer_path?: string[];
       live_events?: Array<{
         ts: string;
@@ -9703,6 +9726,82 @@ const executeHelixAsk = async ({
         platonicResult.rattlingGateApplied ? "applied" : "pass",
         `score=${platonicResult.rattlingScore.toFixed(2)}`,
       );
+      if (HELIX_ASK_TRAINING_TRACE) {
+        try {
+          const notes: string[] = [];
+          if (platonicResult.coverageGateApplied) {
+            notes.push(`coverage_gate:${platonicResult.coverageGateReason ?? "applied"}`);
+          }
+          if (platonicResult.beliefGateApplied) {
+            notes.push(`belief_gate:${platonicResult.beliefGateReason ?? "applied"}`);
+          }
+          if (platonicResult.rattlingGateApplied) {
+            notes.push("rattling_gate:applied");
+          }
+          if (platonicResult.variantSummary?.selectedLabel) {
+            notes.push(`variant:${platonicResult.variantSummary.selectedLabel}`);
+          }
+          if (platonicResult.beliefGraphSummary.claimIds.length) {
+            notes.push(`claim_ids=${platonicResult.beliefGraphSummary.claimIds.join(",")}`);
+          }
+          if (platonicResult.beliefGraphSummary.unsupportedClaimIds.length) {
+            notes.push(
+              `unsupported_claims=${platonicResult.beliefGraphSummary.unsupportedClaimIds.join(",")}`,
+            );
+          }
+          if (platonicResult.beliefGraphSummary.contradictionIds.length) {
+            notes.push(
+              `contradictions=${platonicResult.beliefGraphSummary.contradictionIds.join(",")}`,
+            );
+          }
+          recordTrainingTrace({
+            traceId: askTraceId,
+            pass:
+              !platonicResult.coverageGateApplied &&
+              !platonicResult.beliefGateApplied &&
+              !platonicResult.rattlingGateApplied,
+            deltas: [],
+            metrics: {
+              intent_id: intentProfile.id,
+              domain: platonicDomain,
+              tier: intentTier ?? null,
+              coverage_ratio: platonicResult.coverageSummary.coverageRatio,
+              coverage_missing_key_count: platonicResult.coverageSummary.missingKeyCount,
+              belief_claim_count: platonicResult.beliefSummary.claimCount,
+              belief_unsupported_rate: platonicResult.beliefSummary.unsupportedRate,
+              belief_contradictions: platonicResult.beliefSummary.contradictionCount,
+              belief_graph_nodes: platonicResult.beliefGraphSummary.nodeCount,
+              belief_graph_edges: platonicResult.beliefGraphSummary.edgeCount,
+              belief_graph_supports: platonicResult.beliefGraphSummary.edgeCounts.supports,
+              belief_graph_contradicts: platonicResult.beliefGraphSummary.edgeCounts.contradicts,
+              belief_graph_depends_on: platonicResult.beliefGraphSummary.edgeCounts.depends_on,
+              belief_graph_maps_to: platonicResult.beliefGraphSummary.edgeCounts.maps_to,
+              belief_graph_definitions: platonicResult.beliefGraphSummary.definitionCount,
+              belief_graph_conclusions: platonicResult.beliefGraphSummary.conclusionCount,
+              belief_graph_evidence_refs: platonicResult.beliefGraphSummary.evidenceRefCount,
+              belief_graph_constraints: platonicResult.beliefGraphSummary.constraintCount,
+              rattling_score: platonicResult.rattlingScore,
+              rattling_base_distance: platonicResult.rattlingDetail?.baseDistance ?? null,
+              rattling_perturbation_distance:
+                platonicResult.rattlingDetail?.perturbationDistance ?? null,
+              rattling_claim_set_count: platonicResult.rattlingDetail?.claimSetCount ?? null,
+              coverage_gate_applied: platonicResult.coverageGateApplied,
+              belief_gate_applied: platonicResult.beliefGateApplied,
+              rattling_gate_applied: platonicResult.rattlingGateApplied,
+              variant_applied: platonicResult.variantSummary?.applied ?? false,
+              variant_candidates: platonicResult.variantSummary?.candidateCount ?? null,
+            },
+            source: {
+              system: "helix-ask",
+              component: "platonic-gates",
+              tool: "belief_state",
+            },
+            notes: notes.length ? notes : undefined,
+          });
+        } catch (error) {
+          console.warn("[helix-ask] training trace emit failed", error);
+        }
+      }
       cleaned = platonicResult.answer;
       if (endpointGuardApplied && endpointGuardMessage) {
         cleaned = endpointGuardMessage;
@@ -9778,8 +9877,43 @@ const executeHelixAsk = async ({
         debugPayload.belief_contradictions = platonicResult.beliefSummary.contradictionCount;
         debugPayload.belief_gate_applied = platonicResult.beliefGateApplied;
         debugPayload.belief_gate_reason = platonicResult.beliefGateReason;
+        debugPayload.belief_graph_node_count = platonicResult.beliefGraphSummary.nodeCount;
+        debugPayload.belief_graph_edge_count = platonicResult.beliefGraphSummary.edgeCount;
+        debugPayload.belief_graph_claim_count = platonicResult.beliefGraphSummary.claimCount;
+        debugPayload.belief_graph_definition_count =
+          platonicResult.beliefGraphSummary.definitionCount;
+        debugPayload.belief_graph_conclusion_count =
+          platonicResult.beliefGraphSummary.conclusionCount;
+        debugPayload.belief_graph_evidence_ref_count =
+          platonicResult.beliefGraphSummary.evidenceRefCount;
+        debugPayload.belief_graph_constraint_count =
+          platonicResult.beliefGraphSummary.constraintCount;
+        debugPayload.belief_graph_supports = platonicResult.beliefGraphSummary.edgeCounts.supports;
+        debugPayload.belief_graph_contradicts =
+          platonicResult.beliefGraphSummary.edgeCounts.contradicts;
+        debugPayload.belief_graph_depends_on =
+          platonicResult.beliefGraphSummary.edgeCounts.depends_on;
+        debugPayload.belief_graph_maps_to = platonicResult.beliefGraphSummary.edgeCounts.maps_to;
+        debugPayload.belief_graph_claim_ids = platonicResult.beliefGraphSummary.claimIds;
+        debugPayload.belief_graph_unsupported_claim_ids =
+          platonicResult.beliefGraphSummary.unsupportedClaimIds;
+        debugPayload.belief_graph_contradiction_ids =
+          platonicResult.beliefGraphSummary.contradictionIds;
         debugPayload.rattling_score = platonicResult.rattlingScore;
         debugPayload.rattling_gate_applied = platonicResult.rattlingGateApplied;
+        if (platonicResult.rattlingDetail) {
+          debugPayload.rattling_base_distance = platonicResult.rattlingDetail.baseDistance;
+          debugPayload.rattling_perturbation_distance =
+            platonicResult.rattlingDetail.perturbationDistance;
+          debugPayload.rattling_claim_set_count = platonicResult.rattlingDetail.claimSetCount;
+        }
+        if (platonicResult.variantSummary) {
+          debugPayload.variant_selection_applied = platonicResult.variantSummary.applied;
+          debugPayload.variant_selection_reason = platonicResult.variantSummary.reason;
+          debugPayload.variant_selection_label = platonicResult.variantSummary.selectedLabel;
+          debugPayload.variant_selection_candidate_count =
+            platonicResult.variantSummary.candidateCount;
+        }
         debugPayload.answer_path = answerPath;
       }
       cleanedText = cleaned;
