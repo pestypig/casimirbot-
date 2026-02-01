@@ -73,6 +73,43 @@ type HelixAskReply = {
     evidence_critic_tokens?: number;
     physics_lint_applied?: boolean;
     physics_lint_reasons?: string[];
+    coverage_token_count?: number;
+    coverage_key_count?: number;
+    coverage_missing_key_count?: number;
+    coverage_ratio?: number;
+    coverage_missing_keys?: string[];
+    coverage_gate_applied?: boolean;
+    coverage_gate_reason?: string;
+    belief_claim_count?: number;
+    belief_supported_count?: number;
+    belief_unsupported_count?: number;
+    belief_unsupported_rate?: number;
+    belief_contradictions?: number;
+    belief_gate_applied?: boolean;
+    belief_gate_reason?: string;
+    belief_graph_node_count?: number;
+    belief_graph_edge_count?: number;
+    belief_graph_claim_count?: number;
+    belief_graph_definition_count?: number;
+    belief_graph_conclusion_count?: number;
+    belief_graph_evidence_ref_count?: number;
+    belief_graph_constraint_count?: number;
+    belief_graph_supports?: number;
+    belief_graph_contradicts?: number;
+    belief_graph_depends_on?: number;
+    belief_graph_maps_to?: number;
+    belief_graph_claim_ids?: string[];
+    belief_graph_unsupported_claim_ids?: string[];
+    belief_graph_contradiction_ids?: string[];
+    rattling_score?: number;
+    rattling_base_distance?: number;
+    rattling_perturbation_distance?: number;
+    rattling_claim_set_count?: number;
+    rattling_gate_applied?: boolean;
+    variant_selection_applied?: boolean;
+    variant_selection_reason?: string;
+    variant_selection_label?: string;
+    variant_selection_candidate_count?: number;
     citation_repair?: boolean;
     live_events?: Array<{
       ts: string;
@@ -1737,6 +1774,49 @@ export function HelixAskPill({
                               ? `, ${reply.debug.evidence_match_ratio.toFixed(2)}`
                               : ""
                           })`
+                        : ""}
+                    </p>
+                  ) : null}
+                  {typeof reply.debug.coverage_ratio === "number" ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Coverage gate:{" "}
+                      {reply.debug.coverage_gate_applied ? "applied" : "pass"}
+                      {typeof reply.debug.coverage_ratio === "number"
+                        ? ` (${reply.debug.coverage_ratio.toFixed(2)}`
+                        : ""}
+                      {typeof reply.debug.coverage_missing_key_count === "number"
+                        ? `, missing ${reply.debug.coverage_missing_key_count}`
+                        : ""}
+                      {typeof reply.debug.coverage_ratio === "number" ? ")" : ""}
+                    </p>
+                  ) : null}
+                  {typeof reply.debug.belief_unsupported_rate === "number" ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Belief gate:{" "}
+                      {reply.debug.belief_gate_applied ? "applied" : "pass"}
+                      {typeof reply.debug.belief_unsupported_rate === "number"
+                        ? ` (unsupported ${reply.debug.belief_unsupported_rate.toFixed(2)}`
+                        : ""}
+                      {typeof reply.debug.belief_contradictions === "number"
+                        ? `, contradictions ${reply.debug.belief_contradictions}`
+                        : ""}
+                      {typeof reply.debug.belief_unsupported_rate === "number" ? ")" : ""}
+                    </p>
+                  ) : null}
+                  {typeof reply.debug.rattling_score === "number" ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Rattling: {reply.debug.rattling_score.toFixed(2)}
+                      {typeof reply.debug.rattling_gate_applied === "boolean"
+                        ? ` (gate ${reply.debug.rattling_gate_applied ? "applied" : "pass"})`
+                        : ""}
+                    </p>
+                  ) : null}
+                  {typeof reply.debug.variant_selection_applied === "boolean" ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Variant selection:{" "}
+                      {reply.debug.variant_selection_applied ? "applied" : "off"}
+                      {reply.debug.variant_selection_label
+                        ? ` · ${reply.debug.variant_selection_label}`
                         : ""}
                     </p>
                   ) : null}
