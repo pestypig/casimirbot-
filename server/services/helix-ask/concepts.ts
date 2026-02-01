@@ -272,6 +272,30 @@ export function renderConceptAnswer(match: HelixAskConceptMatch | null): string 
   return [paragraph1, paragraph2, inPractice].filter(Boolean).join("\n\n");
 }
 
+export function renderConceptDefinition(match: HelixAskConceptMatch | null): string {
+  if (!match) return "";
+  const { card } = match;
+  const core: string[] = [];
+  if (card.definition) {
+    core.push(ensureSentence(card.definition));
+  }
+  if (card.keyQuestions) {
+    core.push(ensureSentence(`Key questions include: ${card.keyQuestions}`));
+  }
+  const paragraph1 = core.join(" ").trim();
+
+  const details: string[] = [];
+  if (card.notes) {
+    details.push(ensureSentence(card.notes));
+  }
+  if (card.scope) {
+    details.push(ensureSentence(`Scope: ${card.scope}`));
+  }
+  const paragraph2 = details.join(" ").trim();
+
+  return [paragraph1, paragraph2].filter(Boolean).join("\n\n");
+}
+
 export function listConceptCards(): HelixAskConceptCard[] {
   return loadConceptCards().slice();
 }

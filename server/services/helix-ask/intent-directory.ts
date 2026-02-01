@@ -291,7 +291,7 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
       allowedEvidenceKinds: ["repo_chunk"],
     },
     matchers: [
-      /\b(evidence gate|coverage gate|belief gate|rattling gate|citation repair|cite repair|repair citations|evidence threshold|coverage threshold)\b/i,
+      /\b(evidence gates?|coverage gates?|belief gates?|rattling gates?|citation repair|cite repair|repair citations|evidence threshold|coverage threshold)\b/i,
     ],
     priority: 48,
   },

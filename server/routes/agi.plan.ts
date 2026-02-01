@@ -131,6 +131,7 @@ import {
   buildConceptScaffold,
   findConceptMatch,
   renderConceptAnswer,
+  renderConceptDefinition,
   type HelixAskConceptMatch,
 } from "../services/helix-ask/concepts";
 import {
@@ -2765,6 +2766,11 @@ const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
 const HELIX_ASK_WARP_PATH_BOOST =
   /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline|docs\/knowledge\/warp)/i;
 const HELIX_ASK_CONCEPTUAL_FOCUS = /\b(what is|what's|define|definition|meaning|concept|theory)\b/i;
+const HELIX_ASK_CONCEPT_FAST_PATH_INTENTS = new Set([
+  "repo.warp_definition_docs_first",
+  "repo.warp_conceptual_explain",
+  "repo.ideology_reference",
+]);
 const HELIX_ASK_DOCS_PATH_BOOST = /^docs\//i;
 const HELIX_ASK_TEST_PATH_NOISE = /(^|\/)(__tests__|tests?)(\/|$)/i;
 const HELIX_ASK_CORE_FOCUS = /(helix ask|helix|ask system|ask pipeline|ask mode)/i;
@@ -7373,6 +7379,9 @@ const executeHelixAsk = async ({
       concept_id?: string;
       concept_label?: string;
       concept_source?: string;
+      concept_fast_path?: boolean;
+      concept_fast_path_reason?: string;
+      concept_fast_path_source?: string;
       math_solver_ok?: boolean;
       math_solver_kind?: string;
       math_solver_final?: string;
@@ -7769,10 +7778,12 @@ const executeHelixAsk = async ({
     let mathSolveResult: HelixAskMathSolveResult | null = null;
     let verificationAnchorRequired = false;
     let verificationAnchorHints: string[] = [];
+    const conceptualFocus = HELIX_ASK_CONCEPTUAL_FOCUS.test(baseQuestion);
     const wantsConceptMatch =
       intentDomain === "general" ||
       intentDomain === "hybrid" ||
-      intentProfile.id === "repo.ideology_reference";
+      intentProfile.id === "repo.ideology_reference" ||
+      (intentDomain === "repo" && conceptualFocus);
     if (!promptIngested && wantsConceptMatch) {
       conceptMatch = findConceptMatch(baseQuestion);
       if (conceptMatch && debugPayload) {
@@ -7783,6 +7794,29 @@ const executeHelixAsk = async ({
       if (conceptMatch) {
         answerPath.push(`concept:${conceptMatch.card.id}`);
       }
+    }
+    const conceptFastPath =
+      Boolean(conceptMatch) &&
+      conceptualFocus &&
+      intentDomain === "repo" &&
+      HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id);
+    if (conceptFastPath) {
+      if (debugPayload) {
+        debugPayload.concept_fast_path = true;
+        debugPayload.concept_fast_path_reason = intentProfile.id;
+        debugPayload.concept_fast_path_source = conceptMatch?.card.sourcePath;
+      }
+      answerPath.push("concept_fast_path");
+      logEvent(
+        "Concept fast path",
+        "enabled",
+        [
+          `intent=${intentProfile.id}`,
+          conceptMatch?.card.sourcePath ? `source=${conceptMatch.card.sourcePath}` : "",
+        ]
+          .filter(Boolean)
+          .join(" | "),
+      );
     }
     verificationAnchorRequired = shouldRequireVerificationAnchors(
       intentProfile,
@@ -7824,6 +7858,20 @@ const executeHelixAsk = async ({
     if (mathSolveResult && mathSolveResult.ok) {
       forcedAnswer = buildHelixAskMathAnswer(mathSolveResult);
       answerPath.push("forcedAnswer:math_solver");
+    }
+    if (conceptFastPath && conceptMatch && !forcedAnswer) {
+      const conceptAnswer =
+        intentProfile.id === "repo.ideology_reference"
+          ? buildHelixAskIdeologyAnswer(conceptMatch)
+          : renderConceptDefinition(conceptMatch);
+      if (conceptAnswer) {
+        forcedAnswer = conceptAnswer;
+        answerPath.push(
+          intentProfile.id === "repo.ideology_reference"
+            ? "forcedAnswer:ideology"
+            : "forcedAnswer:concept",
+        );
+      }
     }
     const shouldRunConstraintLoop =
       intentStrategy === "constraint_report" || compositeConstraintRequested;
@@ -7994,7 +8042,8 @@ const executeHelixAsk = async ({
       return;
     }
 
-    const forcePlanPass = repoExpectationLevel !== "low" || requiresRepoEvidence;
+    const forcePlanPass =
+      repoExpectationLevel !== "low" || requiresRepoEvidence || conceptFastPath;
     const microPassDecision = decideHelixAskMicroPass(baseQuestion, formatSpec);
     const skipMicroPass = intentStrategy === "constraint_report" || mathSolverOk;
     const microPassEnabled =
@@ -8021,6 +8070,7 @@ const executeHelixAsk = async ({
         `format=${formatSpec.format}`,
         `verbosity=${verbosity}`,
         `microPass=${microPassEnabled ? microPassReason : "off"}`,
+        `conceptFastPath=${conceptFastPath ? "yes" : "no"}`,
       ].join(" | "),
     );
     let result: LocalAskResult;
@@ -8060,11 +8110,13 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         debugPayload.micro_pass = true;
         debugPayload.micro_pass_auto = microPassDecision.auto;
-        debugPayload.micro_pass_reason = isRepoQuestion
-          ? microPassReason
-          : promptIngested
-            ? "prompt_ingest"
-            : "general";
+        debugPayload.micro_pass_reason = conceptFastPath
+          ? "concept_fast_path"
+          : isRepoQuestion
+            ? microPassReason
+            : promptIngested
+              ? "prompt_ingest"
+              : "general";
       }
       const conceptScaffold = conceptMatch ? buildConceptScaffold(conceptMatch) : "";
       const hasConceptScaffold = Boolean(conceptScaffold);
@@ -8082,67 +8134,71 @@ const executeHelixAsk = async ({
       if (isRepoQuestion) {
         let queryHints: string[] = [];
         if (!dryRun) {
-          try {
-            const queryStart = Date.now();
-            const conceptSkeleton =
-              intentProfile.id === "hybrid.concept_plus_system_mapping"
-                ? buildHybridConceptSkeleton(baseQuestion, conceptMatch)
-                : [];
-            const queryPrompt = buildHelixAskQueryPrompt(baseQuestion, {
-              conceptSkeleton,
-              anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
-            });
-            const queryResult = (await llmLocalHandler(
-              {
-                prompt: queryPrompt,
-                max_tokens: HELIX_ASK_QUERY_TOKENS,
-                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                seed: parsed.data.seed,
-                stop: parsed.data.stop,
-              },
-              {
-                personaId,
-                sessionId: parsed.data.sessionId,
-                traceId: askTraceId,
-              },
-            )) as LocalAskResult;
-            const planParse = parsePlanDirectives(queryResult.text ?? "");
-            planDirectives = planParse.directives;
-            queryHints = planParse.queryHints;
-            if (verificationAnchorHints.length > 0) {
-              queryHints = mergeHelixAskQueries(
-                queryHints,
-                verificationAnchorHints,
-                HELIX_ASK_QUERY_HINTS_MAX,
+          if (conceptFastPath) {
+            logEvent("Query hints ready", "skipped", "concept_fast_path");
+          } else {
+            try {
+              const queryStart = Date.now();
+              const conceptSkeleton =
+                intentProfile.id === "hybrid.concept_plus_system_mapping"
+                  ? buildHybridConceptSkeleton(baseQuestion, conceptMatch)
+                  : [];
+              const queryPrompt = buildHelixAskQueryPrompt(baseQuestion, {
+                conceptSkeleton,
+                anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
+              });
+              const queryResult = (await llmLocalHandler(
+                {
+                  prompt: queryPrompt,
+                  max_tokens: HELIX_ASK_QUERY_TOKENS,
+                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                  seed: parsed.data.seed,
+                  stop: parsed.data.stop,
+                },
+                {
+                  personaId,
+                  sessionId: parsed.data.sessionId,
+                  traceId: askTraceId,
+                },
+              )) as LocalAskResult;
+              const planParse = parsePlanDirectives(queryResult.text ?? "");
+              planDirectives = planParse.directives;
+              queryHints = planParse.queryHints;
+              if (verificationAnchorHints.length > 0) {
+                queryHints = mergeHelixAskQueries(
+                  queryHints,
+                  verificationAnchorHints,
+                  HELIX_ASK_QUERY_HINTS_MAX,
+                );
+              }
+              logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
+              logEvent(
+                "Query hints ready",
+                `${queryHints.length} hints`,
+                queryHints.length ? queryHints.map((hint) => `- ${hint}`).join("\n") : undefined,
+                queryStart,
               );
+              if (planDirectives) {
+                const directiveSummary = [
+                  planDirectives.preferredSurfaces.length
+                    ? `preferred=${planDirectives.preferredSurfaces.join(",")}`
+                    : "",
+                  planDirectives.avoidSurfaces.length ? `avoid=${planDirectives.avoidSurfaces.join(",")}` : "",
+                  planDirectives.mustIncludeGlobs.length
+                    ? `must=${planDirectives.mustIncludeGlobs.join(",")}`
+                    : "",
+                  planDirectives.requiredSlots.length
+                    ? `slots=${planDirectives.requiredSlots.join(",")}`
+                    : "",
+                  planDirectives.clarifyQuestion ? "clarify=provided" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" | ");
+                logEvent("Plan directives", "ok", directiveSummary || "none", queryStart);
+              }
+            } catch {
+              queryHints = [];
             }
-            logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
-            logEvent(
-              "Query hints ready",
-              `${queryHints.length} hints`,
-              queryHints.length ? queryHints.map((hint) => `- ${hint}`).join("\n") : undefined,
-              queryStart,
-            );
-            if (planDirectives) {
-              const directiveSummary = [
-                planDirectives.preferredSurfaces.length
-                  ? `preferred=${planDirectives.preferredSurfaces.join(",")}`
-                  : "",
-                planDirectives.avoidSurfaces.length ? `avoid=${planDirectives.avoidSurfaces.join(",")}` : "",
-                planDirectives.mustIncludeGlobs.length
-                  ? `must=${planDirectives.mustIncludeGlobs.join(",")}`
-                  : "",
-                planDirectives.requiredSlots.length
-                  ? `slots=${planDirectives.requiredSlots.join(",")}`
-                  : "",
-                planDirectives.clarifyQuestion ? "clarify=provided" : "",
-              ]
-                .filter(Boolean)
-                .join(" | ");
-              logEvent("Plan directives", "ok", directiveSummary || "none", queryStart);
-            }
-          } catch {
-            queryHints = [];
           }
         }
         if (debugPayload && queryHints.length > 0) {
@@ -8154,6 +8210,9 @@ const executeHelixAsk = async ({
 
         const searchSeed = parsed.data.searchQuery?.trim() || baseQuestion;
         const baseQueries = buildHelixAskSearchQueries(searchSeed, topicTags);
+        if (conceptMatch?.card.sourcePath) {
+          baseQueries.push(conceptMatch.card.sourcePath);
+        }
         const queries = mergeHelixAskQueries(baseQueries, queryHints, HELIX_ASK_QUERY_MERGE_MAX);
         if (debugPayload && queries.length > 0) {
           debugPayload.queries = queries;
@@ -8879,7 +8938,25 @@ const executeHelixAsk = async ({
           ? contextText
           : [promptContextText, contextText].filter(Boolean).join("\n\n");
         const evidenceContext = clipAskText(combinedContext, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
-        if (evidenceContext) {
+        if (conceptFastPath && conceptMatch) {
+          const evidenceStart = Date.now();
+          const conceptScaffold = buildConceptScaffold(conceptMatch);
+          const conceptSources = conceptMatch.card.sourcePath ? [conceptMatch.card.sourcePath] : [];
+          if (conceptSources.length > 0) {
+            contextFiles = Array.from(new Set([...contextFiles, ...conceptSources]));
+            if (debugPayload) {
+              debugPayload.context_files = contextFiles.slice();
+            }
+          }
+          repoScaffold = appendEvidenceSources(conceptScaffold, contextFiles, 6, contextText);
+          logProgress("Evidence cards ready", repoScaffold ? "concept" : "empty", evidenceStart);
+          logEvent(
+            "Evidence cards ready",
+            repoScaffold ? "concept" : "empty",
+            repoScaffold,
+            evidenceStart,
+          );
+        } else if (evidenceContext) {
           const evidenceStart = Date.now();
           const evidencePrompt = buildHelixAskEvidencePrompt(
             baseQuestion,
@@ -9106,7 +9183,7 @@ const executeHelixAsk = async ({
           ].join(" | "),
         );
       } else if (isRepoQuestion && repoScaffold) {
-        if (intentProfile.id === "repo.ideology_reference" && conceptMatch) {
+        if (intentProfile.id === "repo.ideology_reference" && conceptMatch && !forcedAnswer) {
           forcedAnswer = buildHelixAskIdeologyAnswer(conceptMatch);
           answerPath.push("forcedAnswer:ideology");
         }
