@@ -3327,6 +3327,19 @@ Expected output:
     the relevant files or gate outputs instead of falling back to F3-only.
 - Retrieval controls:
   - Boost Helix Ask pipeline files only when the question is explicitly system-related.
+
+## Helix Ask Continual Learning Loop (Trace -> Refinery -> Adapter A/B) - Status: planned
+- Goal: keep Helix Ask reasoning aligned with the evolving repo while preserving a stable, known-good baseline.
+- Do:
+  - Tag Helix Ask traces with lattice version + repo commit so training data is recency-aware.
+  - Export refinery SFT/DPO on a cadence using training traces; keep a pinned baseline export.
+  - Add alternating training settings (alpha target, surface quotas, variant reservoir) and track them in export metadata.
+  - Define an A/B adapter switch path using AGI_ANSWERER_ADAPTER / AGI_ROUTER_ADAPTER with holdout gates.
+  - Add a lightweight regression set focused on Helix Ask pipeline questions and evidence/citation rules.
+- Acceptance:
+  - New exports can be generated without overwriting the baseline artifacts.
+  - A/B run produces separate gate metrics and a clear promote/rollback decision.
+  - Helix Ask responses remain repo-grounded when the code lattice is stale.
   - De-boost roadmap or generic docs unless directly referenced by query terms.
 - Regression prompts (must pass):
   - Conceptual philosophy (e.g., platonic reasoning).
