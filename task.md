@@ -3448,6 +3448,8 @@ Progress notes:
 - Added concept registry ingestion in `server/services/helix-ask/concepts.ts`.
 - Added starter concept cards in `docs/knowledge/` and wired scaffolds into Helix Ask micro-pass.
 - Added repo-relevance force gate for “cite files / where in code” prompts to ensure repo routing.
+- Added a concept fast-path for repo definition intents (warp/ideology) to answer directly from concept cards and skip LLM scaffolding.
+- Expanded Helix Ask gate intent matching to recognize plural gate phrasing (evidence/coverage/belief/rattling gates).
 
 ## Helix Ask Pro-Style Sections (Response Envelope) - Status: ready for test
 - Goal: make responses feel "sectioned" and skim-friendly without increasing hallucination risk or UI clutter.

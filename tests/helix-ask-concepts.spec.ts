@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildConceptScaffold, findConceptMatch, renderConceptAnswer } from "../server/services/helix-ask/concepts";
+import {
+  buildConceptScaffold,
+  findConceptMatch,
+  renderConceptAnswer,
+  renderConceptDefinition,
+} from "../server/services/helix-ask/concepts";
 
 describe("Helix Ask concept registry", () => {
   it("matches epistemology definitions", () => {
@@ -22,6 +27,13 @@ describe("Helix Ask concept registry", () => {
     expect(answer).toContain("Epistemology");
     expect(answer).toContain("In practice");
     expect(answer).not.toContain("questions like:");
+  });
+
+  it("renders a definition-focused concept answer", () => {
+    const match = findConceptMatch("What is epistemology?");
+    const answer = renderConceptDefinition(match);
+    expect(answer).toContain("Epistemology");
+    expect(answer).not.toContain("In practice");
   });
 
   it("matches casimir effect from subdirectories", () => {
