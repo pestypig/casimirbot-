@@ -53,6 +53,9 @@ type HelixAskReply = {
     arbiter_user_expects_repo?: boolean;
     arbiter_repo_ok?: boolean;
     arbiter_hybrid_ok?: boolean;
+    arbiter_ratio?: number;
+    arbiter_topic_ok?: boolean;
+    arbiter_concept_match?: boolean;
     verification_anchor_required?: boolean;
     verification_anchor_ok?: boolean;
     math_solver_ok?: boolean;
@@ -63,6 +66,11 @@ type HelixAskReply = {
     evidence_match_ratio?: number;
     evidence_match_count?: number;
     evidence_token_count?: number;
+    evidence_critic_applied?: boolean;
+    evidence_critic_ok?: boolean;
+    evidence_critic_ratio?: number;
+    evidence_critic_count?: number;
+    evidence_critic_tokens?: number;
     physics_lint_applied?: boolean;
     physics_lint_reasons?: string[];
     citation_repair?: boolean;

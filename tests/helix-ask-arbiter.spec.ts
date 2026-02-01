@@ -1,0 +1,78 @@
+import { describe, it, expect } from "vitest";
+import { resolveHelixAskArbiter } from "../server/services/helix-ask/arbiter";
+
+const baseInput = {
+  retrievalConfidence: 0,
+  repoThreshold: 0.6,
+  hybridThreshold: 0.35,
+  mustIncludeOk: false,
+  viabilityMustIncludeOk: true,
+  topicMustIncludeOk: false,
+  conceptMatch: false,
+  hasRepoHints: false,
+  topicTags: [],
+  verificationAnchorRequired: false,
+  verificationAnchorOk: true,
+  userExpectsRepo: false,
+  hasHighStakesConstraints: false,
+  explicitRepoExpectation: false,
+  intentDomain: "general" as const,
+};
+
+describe("Helix Ask arbiter", () => {
+  it("routes repo-hint + low evidence to general when repo not expected", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.1,
+      hasRepoHints: true,
+      intentDomain: "hybrid",
+    });
+    expect(result.mode).toBe("general");
+  });
+
+  it("routes repo-hint + strong evidence to hybrid", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.45,
+      hasRepoHints: true,
+      conceptMatch: true,
+      intentDomain: "hybrid",
+    });
+    expect(result.mode).toBe("hybrid");
+    expect(result.ratio).toBeCloseTo(0.45);
+  });
+
+  it("routes strong evidence + must include to repo_grounded", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.72,
+      hasRepoHints: true,
+      mustIncludeOk: true,
+      viabilityMustIncludeOk: true,
+      intentDomain: "repo",
+    });
+    expect(result.mode).toBe("repo_grounded");
+  });
+
+  it("clarifies when repo is expected but evidence is weak", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.1,
+      hasRepoHints: true,
+      userExpectsRepo: true,
+      intentDomain: "repo",
+    });
+    expect(result.mode).toBe("clarify");
+  });
+
+  it("forces repo_grounded for high-stakes constraints", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.05,
+      hasHighStakesConstraints: true,
+      intentDomain: "falsifiable",
+    });
+    expect(result.mode).toBe("repo_grounded");
+    expect(result.reason).toBe("high_stakes");
+  });
+});
