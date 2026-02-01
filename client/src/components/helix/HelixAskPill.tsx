@@ -110,6 +110,69 @@ type HelixAskReply = {
     variant_selection_reason?: string;
     variant_selection_label?: string;
     variant_selection_candidate_count?: number;
+    gates?: {
+      evidence?: {
+        ok?: boolean;
+        matchCount?: number;
+        tokenCount?: number;
+        matchRatio?: number;
+        criticApplied?: boolean;
+        criticOk?: boolean;
+        criticRatio?: number;
+        criticCount?: number;
+        criticTokens?: number;
+      };
+      coverage?: {
+        applied?: boolean;
+        reason?: string;
+        ratio?: number;
+        tokenCount?: number;
+        keyCount?: number;
+        missingKeyCount?: number;
+        missingKeys?: string[];
+      };
+      belief?: {
+        applied?: boolean;
+        reason?: string;
+        unsupportedRate?: number;
+        unsupportedCount?: number;
+        supportedCount?: number;
+        claimCount?: number;
+        contradictions?: number;
+      };
+      beliefGraph?: {
+        nodeCount?: number;
+        edgeCount?: number;
+        claimCount?: number;
+        definitionCount?: number;
+        conclusionCount?: number;
+        evidenceRefCount?: number;
+        constraintCount?: number;
+        supports?: number;
+        contradicts?: number;
+        dependsOn?: number;
+        mapsTo?: number;
+      };
+      rattling?: {
+        applied?: boolean;
+        score?: number;
+        baseDistance?: number;
+        perturbationDistance?: number;
+        claimSetCount?: number;
+      };
+      lint?: {
+        conceptApplied?: boolean;
+        conceptReasons?: string[];
+        physicsApplied?: boolean;
+        physicsReasons?: string[];
+      };
+      variant?: {
+        applied?: boolean;
+        reason?: string;
+        label?: string;
+        candidateCount?: number;
+      };
+    };
     citation_repair?: boolean;
     live_events?: Array<{
       ts: string;
@@ -1819,6 +1882,16 @@ export function HelixAskPill({
                         ? ` · ${reply.debug.variant_selection_label}`
                         : ""}
                     </p>
+                  ) : null}
+                  {reply.debug.gates ? (
+                    <div className="mt-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-slate-400">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                        Gate summary
+                      </p>
+                      <pre className="mt-1 whitespace-pre-wrap">
+                        {JSON.stringify(reply.debug.gates, null, 2)}
+                      </pre>
+                    </div>
                   ) : null}
                   {typeof reply.promptIngested === "boolean" ? (
                     <p className="mt-1 text-[11px] text-slate-400">
