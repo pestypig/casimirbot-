@@ -38,21 +38,25 @@ Use this section to keep deploy behavior aligned with local testing.
 ### Deploy Command (Known-Good)
 Use build + dist server with static assets.
 
-**Build command (Replit deploy/preview):**
+**Build command (Replit deploy/preview, tested):**
 ```
-bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=600000 npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"
+bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=600000 VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"
 ```
 
-**Run command (Replit deploy/preview):**
+**Run command (Replit deploy/preview, tested baseline):**
 ```
 env NODE_ENV=production PORT=5000 HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit FAST_BOOT=0 REMOVE_BG_PYTHON_BIN=python \
 SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=1 \
-VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 \
 LLM_LOCAL_CONTEXT_TOKENS=4096 LLM_LOCAL_MAX_TOKENS=2048 \
 HELIX_ASK_JOB_TIMEOUT_MS=600000 LLM_LOCAL_SPAWN_TIMEOUT_MS=600000 \
 HELIX_ASK_BELIEF_UNSUPPORTED_MAX=0.95 HELIX_ASK_JOB_STALE_MS=1200000 \
 ENABLE_ESSENCE_PROPOSALS=0 ENABLE_ESSENCE_JOBS=0 \
 node dist/index.js
+```
+
+**Optional (enable evidence critic):**
+```
+env ... HELIX_ASK_EVIDENCE_CRITIC=1 node dist/index.js
 ```
 
 Notes:
