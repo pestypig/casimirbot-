@@ -1,0 +1,66 @@
+est the platonic layer (after current pro ask tests) 
+
+
+
+Platonic layer now emits a compact belief‑graph summary (nodes/edges + ids), uses perturbation‑based rattling, and can select a safer variant when it improves unsupported/contradiction/rattling scores.
+New debug fields show coverage/belief/rattling/variant metrics in the Helix Ask UI.
+A training‑trace record is emitted per ask (source: helix-ask/platonic-gates) so you can track metrics by trace.
+Test Ladder Suite (prompts + expected behavior)
+
+F0 general definition (concept lint, no repo claims)
+Prompt: “What is epistemology? Keep it 2–3 sentences.”
+Expect: short definition, no repo citations, concept lint applied if needed.
+
+F0 ambiguity (disambiguate)
+Prompt: “Define ‘lattice’ in physics; note ambiguity if relevant.”
+Expect: brief definition + disambiguation note.
+
+Hybrid mapping (concept + repo)
+Prompt: “What is the scientific method, and how does this system apply it for verification? Two short paragraphs; second must cite repo files.”
+Expect: concept paragraph + repo paragraph with citations; coverage gate should not be tripped by instruction tokens.
+
+Repo pipeline explanation (core files only)
+Prompt: “How does the Helix Ask pipeline work in this system? 4–6 bullets, cite files.”
+Expect: repo‑grounded answer; coverage/belief gates pass; low rattling.
+
+Missing‑evidence guard (coverage gate)
+Prompt: “How does the Helix Ask pipeline use morphospace attractors?”
+Expect: coverage gate applied; asks for relevant files.
+
+Rattling probe (stability)
+Prompt A: “How does the Helix Ask pipeline work?”
+Prompt B: “How does the Helix Ask pipeline operate, step by step?”
+Expect: similar claim set; rattling score stays low; no gate.
+
+Per‑trace report template (fill for each prompt)
+
+traceId:
+prompt:
+intent_id / domain / tier:
+coverage_ratio / missing_key_count:
+belief_unsupported_rate / contradictions:
+belief_graph: nodes / edges / supports / contradicts / depends / maps_to
+rattling_score (base / perturb / claim_sets):
+variant_selection (applied / label / candidates):
+gates applied (coverage / belief / rattling):
+final answer snippet:
+How to capture a report per trace
+
+UI path: turn on Helix Ask Debug → run each prompt → copy the gate metrics shown in the debug panel into the report template.
+API path (recommended for clean trace IDs):
+# 1) Create a trace‑tagged ask (set your own traceId per prompt)
+curl -s -X POST http://localhost:5000/api/agi/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "How does the Helix Ask pipeline work in this system? 4–6 bullets, cite files.",
+    "debug": true,
+    "traceId": "ask:ladder-repo-helix-pipeline"
+  }'
+
+# 2) Export training traces and filter for the traceId
+curl -s http://localhost:5000/api/agi/training-trace/export?limit=200 | rg "ask:ladder-repo-helix-pipeline"
+If you want an A/B improvement check, run the same suite twice:
+
+HELIX_ASK_VARIANT_SELECTION=0 (baseline)
+HELIX_ASK_VARIANT_SELECTION=1 (new behavior)
+Compare per‑trace: unsupported rate ↓, contradictions ↓, rattling ↓, fewer gates applied.
