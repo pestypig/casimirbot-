@@ -52,7 +52,7 @@ const cases: RegressionCase[] = [
     expect: {
       intent_id: "hybrid.concept_plus_system_mapping",
       intent_domain: "hybrid",
-      format: "steps",
+      format: "compare",
       stage_tags: true,
     },
   },
