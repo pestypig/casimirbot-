@@ -65,6 +65,9 @@ describe("Helix Ask topic routing", () => {
     const profile = buildHelixAskTopicProfile(["ledger"]);
     expect(profile).not.toBeNull();
     expect(topicMustIncludeSatisfied(["docs/ethos/ideology.json"], profile)).toBe(true);
+    expect(
+      topicMustIncludeSatisfied(["client/src/components/CurvatureLedgerPanel.tsx"], profile),
+    ).toBe(true);
     expect(topicMustIncludeSatisfied(["server/energy-pipeline.ts"], profile)).toBe(false);
   });
 
@@ -78,7 +81,24 @@ describe("Helix Ask topic routing", () => {
     expect(
       topicMustIncludeSatisfied(["client/src/pages/star-hydrostatic-panel.tsx"], profile),
     ).toBe(true);
+    expect(
+      topicMustIncludeSatisfied(["client/src/pages/potato-threshold-lab.tsx"], profile),
+    ).toBe(true);
     expect(topicMustIncludeSatisfied(["modules/warp/warp-core.ts"], profile)).toBe(false);
+  });
+
+  it("tags kappa proxy prompts as ledger", () => {
+    const tags = inferHelixAskTopicTags(
+      "Compare kappa_drive vs kappa_body in the curvature ledger.",
+    );
+    expect(tags).toContain("ledger");
+  });
+
+  it("tags potato threshold prompts as star", () => {
+    const tags = inferHelixAskTopicTags(
+      "Explain the potato threshold in the star hydrostatic panel.",
+    );
+    expect(tags).toContain("star");
   });
 
   it("boosts warp docs for warp prompts", () => {

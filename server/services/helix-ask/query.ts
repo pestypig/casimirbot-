@@ -5,6 +5,12 @@ export type EvidenceEligibility = {
   matchRatio: number;
 };
 
+export type EvidenceEligibilityOptions = {
+  minTokens: number;
+  minRatio: number;
+  signalTokens?: string[];
+};
+
 const HELIX_ASK_STOP_TOKENS = new Set([
   "the",
   "a",
@@ -103,6 +109,19 @@ export const filterSignalTokens = (tokens: string[]): string[] =>
 export const filterCriticTokens = (tokens: string[]): string[] =>
   filterSignalTokens(tokens).filter((token) => !HELIX_ASK_META_TOKENS.has(token));
 
+const uniqueTokens = (tokens: string[]): string[] => Array.from(new Set(tokens));
+
+const buildEligibilityTokens = (question: string, signalTokens?: string[]): string[] => {
+  const baseTokens = filterCriticTokens(tokenizeAskQuery(question));
+  if (!signalTokens || signalTokens.length === 0) {
+    return baseTokens;
+  }
+  const extraTokens = signalTokens
+    .flatMap((token) => tokenizeAskQuery(token))
+    .flatMap((token) => filterCriticTokens([token]));
+  return uniqueTokens([...baseTokens, ...extraTokens]);
+};
+
 const countTokenMatches = (tokens: string[], haystack: string): number => {
   if (!tokens.length) return 0;
   const lower = haystack.toLowerCase();
@@ -118,9 +137,9 @@ const countTokenMatches = (tokens: string[], haystack: string): number => {
 export function evaluateEvidenceEligibility(
   question: string,
   contextText: string,
-  options: { minTokens: number; minRatio: number },
+  options: EvidenceEligibilityOptions,
 ): EvidenceEligibility {
-  const tokens = filterSignalTokens(tokenizeAskQuery(question));
+  const tokens = buildEligibilityTokens(question, options.signalTokens);
   const tokenCount = tokens.length;
   if (!contextText || tokenCount === 0) {
     return { ok: false, matchCount: 0, tokenCount, matchRatio: 0 };
@@ -134,9 +153,9 @@ export function evaluateEvidenceEligibility(
 export function evaluateEvidenceCritic(
   question: string,
   contextText: string,
-  options: { minTokens: number; minRatio: number },
+  options: EvidenceEligibilityOptions,
 ): EvidenceEligibility {
-  const tokens = filterCriticTokens(tokenizeAskQuery(question));
+  const tokens = buildEligibilityTokens(question, options.signalTokens);
   const tokenCount = tokens.length;
   if (!contextText || tokenCount === 0) {
     return { ok: false, matchCount: 0, tokenCount, matchRatio: 0 };

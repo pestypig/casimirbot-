@@ -6,6 +6,9 @@ export type HelixAskConceptCard = {
   label?: string;
   aliases: string[];
   scope?: string;
+  intentHints?: string[];
+  topicTags?: string[];
+  mustIncludeFiles?: string[];
   definition: string;
   keyQuestions?: string;
   notes?: string;
@@ -24,7 +27,8 @@ let conceptLoadFailed = false;
 
 const normalizeValue = (value: string): string => value.trim();
 
-const parseAliases = (value: string): string[] => {
+const parseAliases = (value?: string): string[] => {
+  if (!value) return [];
   const trimmed = value.trim();
   if (!trimmed) return [];
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
@@ -61,6 +65,8 @@ const parseFrontmatter = (content: string): { frontmatter: Record<string, string
   return { frontmatter, body };
 };
 
+const stripBullet = (value: string): string => value.replace(/^\s*[-*]\s+/, "");
+
 const parseConceptBody = (body: string): { definition: string; keyQuestions?: string; notes?: string } => {
   const lines = body.split(/\r?\n/);
   let definition = "";
@@ -71,11 +77,11 @@ const parseConceptBody = (body: string): { definition: string; keyQuestions?: st
       .split(/\n\s*\n/)
       .map((paragraph) => paragraph.trim())
       .filter(Boolean);
-    return paragraphs[0] ?? "";
+    return stripBullet(paragraphs[0] ?? "");
   };
 
   for (const line of lines) {
-    const trimmed = line.trim();
+    const trimmed = stripBullet(line.trim());
     if (!trimmed) continue;
     if (!definition) {
       const defMatch = trimmed.match(/^definition\s*:\s*(.+)$/i);
@@ -150,8 +156,13 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
       const id = normalizeValue(frontmatter.id ?? path.basename(filePath, ".md"));
       if (!id) continue;
       const label = frontmatter.label ? normalizeValue(frontmatter.label) : undefined;
-      const aliases = frontmatter.aliases ? parseAliases(frontmatter.aliases) : [];
+      const aliases = parseAliases(frontmatter.aliases);
       const scope = frontmatter.scope ? normalizeValue(frontmatter.scope) : undefined;
+      const intentHints = parseAliases(frontmatter.intentHints).map(normalizeValue).filter(Boolean);
+      const topicTags = parseAliases(frontmatter.topicTags).map(normalizeValue).filter(Boolean);
+      const mustIncludeFiles = parseAliases(frontmatter.mustIncludeFiles)
+        .map((value) => normalizeValue(value))
+        .filter(Boolean);
       const parsedBody = parseConceptBody(body);
       if (!parsedBody.definition) continue;
       cards.push({
@@ -159,6 +170,9 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
         label,
         aliases,
         scope,
+        intentHints: intentHints.length ? intentHints : undefined,
+        topicTags: topicTags.length ? topicTags : undefined,
+        mustIncludeFiles: mustIncludeFiles.length ? mustIncludeFiles : undefined,
         definition: parsedBody.definition,
         keyQuestions: parsedBody.keyQuestions,
         notes: parsedBody.notes,

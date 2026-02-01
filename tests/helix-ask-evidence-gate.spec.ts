@@ -21,4 +21,28 @@ describe("Helix Ask evidence eligibility gate", () => {
     expect(result.ok).toBe(true);
     expect(result.matchCount).toBeGreaterThanOrEqual(2);
   });
+
+  it("ignores instruction noise tokens", () => {
+    const result = evaluateEvidenceEligibility(
+      "What is the scientific method, and how does this system apply it for verification? Two short paragraphs; second must cite repo files.",
+      "scientific method verification system",
+      { minTokens: 3, minRatio: 0.5 },
+    );
+    expect(result.ok).toBe(true);
+    expect(result.matchCount).toBeGreaterThanOrEqual(3);
+  });
+
+  it("uses signal tokens when provided", () => {
+    const result = evaluateEvidenceEligibility(
+      "How does it work?",
+      "kappa_drive kappa_body curvature proxy",
+      {
+        minTokens: 2,
+        minRatio: 0.4,
+        signalTokens: ["kappa_drive", "kappa_body", "curvature proxy"],
+      },
+    );
+    expect(result.ok).toBe(true);
+    expect(result.matchCount).toBeGreaterThanOrEqual(2);
+  });
 });

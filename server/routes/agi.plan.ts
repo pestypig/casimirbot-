@@ -7554,7 +7554,7 @@ const executeHelixAsk = async ({
       hasFilePathHints ||
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
       HELIX_ASK_REPO_EXPECTS.test(baseQuestion);
-    const topicTags = inferHelixAskTopicTags(baseQuestion, parsed.data.searchQuery);
+    let topicTags = inferHelixAskTopicTags(baseQuestion, parsed.data.searchQuery);
     logEvent(
       "Topic tags",
       topicTags.length ? "ok" : "none",
@@ -7614,7 +7614,7 @@ const executeHelixAsk = async ({
         repoExpectationSignals.length ? repoExpectationSignals.join(", ") : undefined,
       );
     }
-    const topicProfile = buildHelixAskTopicProfile(topicTags);
+    let topicProfile = buildHelixAskTopicProfile(topicTags);
     if (topicProfile) {
       logEvent(
         "Topic profile",
@@ -7831,6 +7831,104 @@ const executeHelixAsk = async ({
         answerPath.push(`concept:${conceptMatch.card.id}`);
       }
     }
+    const normalizeConceptTags = (tags?: string[]): HelixAskTopicTag[] => {
+      if (!tags) return [];
+      const allowed = new Set<HelixAskTopicTag>([
+        "helix_ask",
+        "warp",
+        "physics",
+        "energy_pipeline",
+        "trace",
+        "resonance",
+        "ideology",
+        "ledger",
+        "star",
+        "concepts",
+      ]);
+      return tags
+        .map((tag) => tag.trim().toLowerCase())
+        .filter((tag): tag is HelixAskTopicTag => allowed.has(tag as HelixAskTopicTag));
+    };
+    const mergeTopicTags = (
+      base: HelixAskTopicTag[],
+      extra: HelixAskTopicTag[],
+    ): HelixAskTopicTag[] => Array.from(new Set([...base, ...extra]));
+    const mergeTopicProfileMustInclude = (
+      profile: HelixAskTopicProfile | null,
+      files: string[],
+    ): HelixAskTopicProfile | null => {
+      if (files.length === 0) return profile;
+      const escapeRegExp = (value: string): string =>
+        value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const normalizedFiles = files
+        .map((file) => file.replace(/\\/g, "/").trim())
+        .filter(Boolean);
+      if (normalizedFiles.length === 0) return profile;
+      const filePatterns = normalizedFiles.map(
+        (file) => new RegExp(escapeRegExp(file), "i"),
+      );
+      if (!profile) {
+        return {
+          tags: [],
+          allowlistTiers: [[]],
+          boostPaths: [],
+          deboostPaths: [],
+          mustIncludePaths: filePatterns,
+          mustIncludeFiles: normalizedFiles,
+          minTierCandidates: 0,
+        };
+      }
+      const mustIncludeFiles = Array.from(
+        new Set([...(profile.mustIncludeFiles ?? []), ...normalizedFiles]),
+      );
+      const mustIncludePaths = Array.from(new Set([...profile.mustIncludePaths, ...filePatterns]));
+      return {
+        ...profile,
+        mustIncludeFiles,
+        mustIncludePaths,
+      };
+    };
+    const conceptTopicTags = normalizeConceptTags(conceptMatch?.card.topicTags);
+    if (conceptTopicTags.length > 0) {
+      const merged = mergeTopicTags(topicTags, conceptTopicTags);
+      if (merged.length !== topicTags.length) {
+        topicTags = merged;
+        topicProfile = buildHelixAskTopicProfile(topicTags);
+        logEvent(
+          "Topic tags",
+          "concept",
+          conceptTopicTags.length ? conceptTopicTags.join(", ") : "none",
+        );
+        if (debugPayload) {
+          debugPayload.topic_tags = topicTags.slice();
+        }
+        if (topicProfile && debugPayload) {
+          debugPayload.topic_allowlist_tiers = topicProfile.allowlistTiers.length;
+          debugPayload.topic_must_include_files = topicProfile.mustIncludeFiles?.slice();
+        }
+      }
+    }
+    if (conceptMatch?.card.mustIncludeFiles?.length) {
+      topicProfile = mergeTopicProfileMustInclude(
+        topicProfile,
+        conceptMatch.card.mustIncludeFiles,
+      );
+      if (topicProfile && debugPayload) {
+        debugPayload.topic_must_include_files = topicProfile.mustIncludeFiles?.slice();
+      }
+    }
+    const evidenceSignalTokens = Array.from(
+      new Set(
+        [
+          ...topicTags.map((tag) => tag.replace(/_/g, " ")),
+          conceptMatch?.card.id ?? "",
+          conceptMatch?.card.label ?? "",
+          ...(conceptMatch?.card.aliases ?? []),
+        ]
+          .map((token) => token.trim())
+          .filter(Boolean),
+      ),
+    );
     const conceptFastPath =
       Boolean(conceptMatch) &&
       conceptualFocus &&
@@ -8488,6 +8586,7 @@ const executeHelixAsk = async ({
         const baseEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
           minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
           minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+          signalTokens: evidenceSignalTokens,
         });
         let evidenceGate = baseEvidenceGate;
         const evidenceCritic =
@@ -8495,6 +8594,7 @@ const executeHelixAsk = async ({
             ? evaluateEvidenceCritic(baseQuestion, contextText, {
                 minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
                 minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+                signalTokens: evidenceSignalTokens,
               })
             : null;
         if (evidenceCritic && evidenceCritic.tokenCount > 0) {
@@ -8574,12 +8674,14 @@ const executeHelixAsk = async ({
             const repoEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
               minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
               minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+              signalTokens: evidenceSignalTokens,
             });
             evidenceGate = repoEvidenceGate;
             if (HELIX_ASK_EVIDENCE_CRITIC) {
               const repoCritic = evaluateEvidenceCritic(baseQuestion, contextText, {
                 minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
                 minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+                signalTokens: evidenceSignalTokens,
               });
               if (repoCritic.tokenCount > 0) {
                 evidenceGate = repoCritic;
@@ -8742,12 +8844,14 @@ const executeHelixAsk = async ({
             const retryEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
               minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
               minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+              signalTokens: evidenceSignalTokens,
             });
             evidenceGate = retryEvidenceGate;
             if (HELIX_ASK_EVIDENCE_CRITIC) {
               const retryCritic = evaluateEvidenceCritic(baseQuestion, contextText, {
                 minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
                 minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+                signalTokens: evidenceSignalTokens,
               });
               if (retryCritic.tokenCount > 0) {
                 evidenceGate = retryCritic;

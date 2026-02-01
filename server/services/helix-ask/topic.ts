@@ -31,13 +31,13 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
   trace: /\b(trace|task trace|tasktrace|trajectory|essence|casimir)\b/i,
   resonance: /\b(resonance|code lattice|lattice)\b/i,
   ideology:
-    /\b(ideology|ethos|mission ethos|ideology tree|ethos tree|two-key approval|stewardship ledger|sun ledger|stellar ledger|tend the sun ledger|tend the stellar ledger|zen society)\b/i,
+    /\b(ideology|ethos|mission[-\s]?ethos|ideology tree|ethos tree|two-key approval|stewardship ledger|sun ledger|stellar ledger|tend the sun ledger|tend the stellar ledger|zen society)\b/i,
   concepts:
-    /\b(platonic reasoning|platonic method|concept registry|definition lint|belief gate|rattling gate|wavefunction|uncertainty|probability field|boltzmann|langevin|scientific method|verification|falsifiability|falsifiable)\b/i,
+    /\b(platonic reasoning|platonic method|concept registry|definition lint|belief gate|rattling gate|analysis loop|analysis loops|belief graph loop|morphospace attractors?|morphospace|wavefunction|uncertainty|probability field|boltzmann|langevin|scientific method|verification|falsifiability|falsifiable)\b/i,
   ledger:
-    /\b(ledger|sun ledger|stellar ledger|warp ledger|curvature ledger|kappa[_\s-]?drive|kappa[_\s-]?body|potato threshold|quantum inequality|ford-roman|qi bounds?)\b/i,
+    /\b(ledger|sun ledger|stellar ledger|warp ledger|curvature ledger|kappa[_\s-]?drive|kappa[_\s-]?body|kappa proxy|curvature proxy|kappa ledger|potato threshold|e[_\s-]?potato|qi bounds?|qi widget|qi auto[-\s]?tuner|quantum inequality|ford[-\s]?roman)\b/i,
   star:
-    /\b(star hydrostatic|stellar hydrostatic|polytrope|gamow window|stellar ledger|solar restoration|sun restoration|restore the sun|save the sun|save-the-sun|save‑the‑sun|saving the sun|saving-the-sun|savingthesun|red giant|stellar evolution)\b/i,
+    /\b(star hydrostatic|stellar hydrostatic|polytrope|gamow window|potato threshold|hr map|hr diagram|stellar ledger|solar restoration|sun restoration|restore the sun|save the sun|save-the-sun|saving the sun|saving-the-sun|savingthesun|red giant|red giant phase|stellar evolution)\b/i,
 };
 
 const HELIX_ASK_CORE_PATHS: RegExp[] = [
@@ -167,13 +167,17 @@ const IDEOLOGY_KNOWLEDGE_PATHS: RegExp[] = [
 const LEDGER_CORE_PATHS: RegExp[] = [
   /docs\/ethos\/ideology\.json/i,
   /docs\/ethos\/why\.md/i,
-  /docs\/knowledge\/(sun-ledger|stewardship-ledger|warp-ledger|curvature-ledger|kappa-proxy)\.md/i,
+  /docs\/knowledge\/(sun-ledger|stewardship-ledger|warp-ledger|curvature-ledger|kappa-proxy|potato-threshold|qi-bounds|stellar-ledger)\.md/i,
   /shared\/curvature-proxy\.ts/i,
   /server\/helix-proof-pack\.ts/i,
   /server\/helix-core\.ts/i,
   /client\/src\/physics\/curvature\.ts/i,
+  /client\/src\/pages\/potato-threshold-lab\.tsx/i,
+  /client\/src\/components\/CurvatureLedgerPanel\.tsx/i,
   /client\/src\/components\/DriveGuardsPanel\.tsx/i,
   /client\/src\/components\/WarpLedgerPanel\.tsx/i,
+  /client\/src\/components\/QiWidget\.tsx/i,
+  /client\/src\/components\/QiAutoTunerPanel\.tsx/i,
   /warp-web\/km-scale-warp-ledger\.html/i,
 ];
 
@@ -183,17 +187,27 @@ const LEDGER_CORE_FILES: string[] = [
   "docs/knowledge/sun-ledger.md",
   "docs/knowledge/stewardship-ledger.md",
   "docs/knowledge/warp-ledger.md",
+  "docs/knowledge/curvature-ledger.md",
+  "docs/knowledge/potato-threshold.md",
+  "docs/knowledge/qi-bounds.md",
+  "docs/knowledge/stellar-ledger.md",
   "docs/knowledge/kappa-proxy.md",
   "shared/curvature-proxy.ts",
   "server/helix-proof-pack.ts",
+  "client/src/components/CurvatureLedgerPanel.tsx",
   "client/src/components/DriveGuardsPanel.tsx",
   "client/src/components/WarpLedgerPanel.tsx",
+  "client/src/components/QiWidget.tsx",
+  "client/src/components/QiAutoTunerPanel.tsx",
+  "client/src/pages/potato-threshold-lab.tsx",
   "warp-web/km-scale-warp-ledger.html",
 ];
 
 const STAR_CORE_PATHS: RegExp[] = [
-  /docs\/knowledge\/(star-hydrostatic|stellar-ledger|solar-restoration)\.md/i,
+  /docs\/knowledge\/(star-hydrostatic|stellar-ledger|solar-restoration|potato-threshold|red-giant-phase)\.md/i,
   /client\/src\/pages\/star-hydrostatic-panel\.tsx/i,
+  /client\/src\/pages\/star-watcher-panel\.tsx/i,
+  /client\/src\/pages\/potato-threshold-lab\.tsx/i,
   /client\/src\/physics\/polytrope\.ts/i,
   /client\/src\/physics\/gamow\.ts/i,
   /docs\/curvature-unit-solar-notes\.md/i,
@@ -204,7 +218,11 @@ const STAR_CORE_FILES: string[] = [
   "docs/knowledge/star-hydrostatic.md",
   "docs/knowledge/stellar-ledger.md",
   "docs/knowledge/solar-restoration.md",
+  "docs/knowledge/potato-threshold.md",
+  "docs/knowledge/red-giant-phase.md",
   "client/src/pages/star-hydrostatic-panel.tsx",
+  "client/src/pages/star-watcher-panel.tsx",
+  "client/src/pages/potato-threshold-lab.tsx",
   "client/src/physics/polytrope.ts",
   "client/src/physics/gamow.ts",
   "docs/curvature-unit-solar-notes.md",

@@ -10,6 +10,7 @@ type KnowledgeConcept = {
 type PanelConceptAudit = {
   panelIds: string[];
   keywordKeys: string[];
+  keywordPhrases: string[];
   keywordTokens: string[];
 };
 
@@ -31,9 +32,11 @@ type ConceptAuditReport = {
   panelConcepts: {
     panelIdCount: number;
     keywordKeyCount: number;
+    keywordPhraseCount: number;
     keywordTokenCount: number;
     panelIds: string[];
     keywordKeys: string[];
+    keywordPhrases: string[];
   };
   ideologyNodes: {
     idCount: number;
@@ -151,23 +154,31 @@ function parseFrontmatter(content: string): { frontmatter: Record<string, string
 
 function loadKnowledgeConcepts(): KnowledgeConcept[] {
   if (!fs.existsSync(KNOWLEDGE_DIR)) return [];
-  const entries = fs.readdirSync(KNOWLEDGE_DIR, { withFileTypes: true });
   const concepts: KnowledgeConcept[] = [];
-  for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
-    const fullPath = path.join(KNOWLEDGE_DIR, entry.name);
-    const raw = fs.readFileSync(fullPath, "utf8");
-    if (!raw.trim()) continue;
-    const { frontmatter } = parseFrontmatter(raw);
-    const id = (frontmatter.id ?? path.basename(entry.name, ".md")).trim();
-    if (!id) continue;
-    const aliases = parseAliases(frontmatter.aliases);
-    concepts.push({
-      id,
-      aliases,
-      sourcePath: path.relative(ROOT, fullPath).replace(/\\/g, "/"),
-    });
-  }
+  const walk = (dir: string) => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
+      const raw = fs.readFileSync(fullPath, "utf8");
+      if (!raw.trim()) continue;
+      const { frontmatter } = parseFrontmatter(raw);
+      const id = (frontmatter.id ?? path.basename(entry.name, ".md")).trim();
+      if (!id) continue;
+      const aliases = parseAliases(frontmatter.aliases);
+      concepts.push({
+        id,
+        aliases,
+        sourcePath: path.relative(ROOT, fullPath).replace(/\\/g, "/"),
+      });
+    }
+  };
+  walk(KNOWLEDGE_DIR);
   return concepts;
 }
 
@@ -190,7 +201,7 @@ function tokenizeTerms(terms: string[]): string[] {
 
 function extractPanelConcepts(): PanelConceptAudit {
   if (!fs.existsSync(PANELS_PATH)) {
-    return { panelIds: [], keywordKeys: [], keywordTokens: [] };
+    return { panelIds: [], keywordKeys: [], keywordPhrases: [], keywordTokens: [] };
   }
   const raw = fs.readFileSync(PANELS_PATH, "utf8");
 
@@ -202,10 +213,11 @@ function extractPanelConcepts(): PanelConceptAudit {
   const mapSlice = mapStart >= 0 && mapEnd > mapStart ? raw.slice(mapStart, mapEnd) : raw;
 
   const keywordKeys = unique(Array.from(mapSlice.matchAll(/"([^"]+)"\s*:\s*\[/g), (m) => m[1]));
-  const keywordStrings = unique(Array.from(mapSlice.matchAll(/"([^"]+)"/g), (m) => m[1]));
-  const keywordTokens = tokenizeTerms(keywordStrings);
+  const keywordStrings = Array.from(mapSlice.matchAll(/"([^"]+)"/g), (m) => m[1]);
+  const keywordPhrases = unique(keywordStrings.filter((value) => !keywordKeys.includes(value)));
+  const keywordTokens = tokenizeTerms(keywordPhrases);
 
-  return { panelIds, keywordKeys, keywordTokens };
+  return { panelIds, keywordKeys, keywordPhrases, keywordTokens };
 }
 
 function extractIdeologyConcepts(): IdeologyAudit {
@@ -263,17 +275,24 @@ const LEDGER_ANCHORS = [
   "warp-ledger",
   "curvature-ledger",
   "kappa-proxy",
+  "potato-threshold",
+  "qi-bounds",
+  "stellar-ledger",
 ];
 
 const STAR_ANCHORS = [
   "star-hydrostatic",
   "stellar-ledger",
   "solar-restoration",
+  "potato-threshold",
+  "red-giant-phase",
 ];
 
 const IDEOLOGY_ANCHORS = [
   "mission-ethos",
   "ideology",
+  "sun-ledger",
+  "stewardship-ledger",
   "three-tenets-loop",
   "koan-governance",
   "interbeing-systems",
@@ -285,7 +304,7 @@ const SUGGESTED_CARDS: SuggestedConceptCard[] = [
     id: "sun-ledger",
     aliases: ["sun ledger", "stellar ledger", "tend the sun ledger"],
     anchors: ["docs/ethos/ideology.json", "docs/ethos/why.md"],
-    reason: "Mission language appears in ideology docs and whispers but lacked a concept card.",
+    reason: "Mission language appears in ideology docs and needs a concept anchor.",
   },
   {
     id: "stewardship-ledger",
@@ -297,7 +316,31 @@ const SUGGESTED_CARDS: SuggestedConceptCard[] = [
     id: "kappa-proxy",
     aliases: ["kappa_drive", "kappa_body", "curvature proxy"],
     anchors: ["shared/curvature-proxy.ts", "server/helix-proof-pack.ts"],
-    reason: "kappa terms are central to ledger prompts and are spread across math and proof-pack code.",
+    reason: "kappa terms are central to ledger prompts and spread across math and proof-pack code.",
+  },
+  {
+    id: "warp-ledger",
+    aliases: ["warp ledger", "km-scale warp ledger", "curvature ledger"],
+    anchors: ["warp-web/km-scale-warp-ledger.html", "client/src/components/WarpLedgerPanel.tsx"],
+    reason: "Operators ask about ledger bands and the microsite; this needs an explicit anchor.",
+  },
+  {
+    id: "curvature-ledger",
+    aliases: ["curvature ledger", "tensor ledger", "weyl bands"],
+    anchors: ["client/src/components/CurvatureLedgerPanel.tsx", "shared/curvature-proxy.ts"],
+    reason: "Curvature ledger UI vocabulary is common but lacks a dedicated concept card.",
+  },
+  {
+    id: "potato-threshold",
+    aliases: ["potato threshold", "potato to sphere", "e_potato"],
+    anchors: ["client/src/pages/potato-threshold-lab.tsx", "client/src/pages/star-hydrostatic-panel.tsx"],
+    reason: "Potato threshold prompts need a stable anchor in star/ledger tooling.",
+  },
+  {
+    id: "qi-bounds",
+    aliases: ["QI bounds", "quantum inequality bounds", "ford-roman bounds"],
+    anchors: ["client/src/components/QiWidget.tsx", "server/energy-pipeline.ts"],
+    reason: "QI guardrails show up in UI and pipeline math but are not routable concepts.",
   },
   {
     id: "star-hydrostatic",
@@ -306,10 +349,46 @@ const SUGGESTED_CARDS: SuggestedConceptCard[] = [
     reason: "Star/solar prompts should ground to the hydrostatic panel and its solvers.",
   },
   {
-    id: "warp-ledger",
-    aliases: ["warp ledger", "km-scale warp ledger", "curvature ledger"],
-    anchors: ["warp-web/km-scale-warp-ledger.html", "client/src/components/WarpLedgerPanel.tsx"],
-    reason: "Operators ask about the ledger bands and microsite; this needs an explicit anchor.",
+    id: "stellar-ledger",
+    aliases: ["stellar ledger", "star ledger"],
+    anchors: ["client/src/pages/star-hydrostatic-panel.tsx", "docs/curvature-unit-solar-notes.md"],
+    reason: "Stellar ledger wording appears in star panels but lacks a short concept card.",
+  },
+  {
+    id: "solar-restoration",
+    aliases: ["solar restoration", "save the sun", "restore the sun"],
+    anchors: ["docs/ethos/why.md", "client/src/pages/star-watcher-panel.tsx"],
+    reason: "Save-the-sun language should map to mission ethos and star telemetry panels.",
+  },
+  {
+    id: "analysis-loops",
+    aliases: ["analysis loop", "analysis loops", "belief graph loop"],
+    anchors: ["server/routes/analysis-loops.ts", "modules/analysis/README.md"],
+    reason: "Analysis loop routes and prototypes are referenced but not anchored as concepts.",
+  },
+  {
+    id: "halobank",
+    aliases: ["halobank", "halo ledger", "halobank timeline"],
+    anchors: ["client/src/components/HalobankPanel.tsx", "halobank.html"],
+    reason: "HaloBank UI vocabulary should have a concept card for routing and citations.",
+  },
+  {
+    id: "casimir-tiles",
+    aliases: ["casimir tiles", "casimir tile grid", "tile ledger"],
+    anchors: ["docs/casimir-tile-mechanism.md", "client/src/components/CasimirTileGridPanel.tsx"],
+    reason: "Casimir tile terminology spans docs and UI but needs a concept anchor.",
+  },
+  {
+    id: "morphospace-attractors",
+    aliases: ["morphospace attractor", "morphospace attractors", "morphospace"],
+    anchors: [],
+    reason: "Conceptual prompts require a general/hybrid fallback even without repo anchors.",
+  },
+  {
+    id: "red-giant-phase",
+    aliases: ["red giant phase", "red giant", "stellar evolution"],
+    anchors: ["client/src/pages/start.tsx"],
+    reason: "Star-evolution prompts should route to solar restoration context when present.",
   },
 ];
 
@@ -323,6 +402,7 @@ function writeMarkdown(report: ConceptAuditReport): void {
   lines.push("");
   lines.push(`- Panel ids: ${report.panelConcepts.panelIdCount}`);
   lines.push(`- Panel keyword keys: ${report.panelConcepts.keywordKeyCount}`);
+  lines.push(`- Panel keyword phrases: ${report.panelConcepts.keywordPhraseCount}`);
   lines.push(`- Knowledge concepts: ${report.knowledgeConcepts.conceptCount}`);
   lines.push(`- Ideology nodes: ${report.ideologyNodes.idCount}`);
   lines.push("");
@@ -344,6 +424,15 @@ function writeMarkdown(report: ConceptAuditReport): void {
   lines.push("## Missing keyword tokens (first 60)");
   lines.push("");
   lines.push(missingTokens.length ? missingTokens.map((id) => `- ${id}`).join("\n") : "- none");
+  lines.push("");
+
+  lines.push("## Missing alias phrases (first 60)");
+  lines.push("");
+  lines.push(
+    report.missingAliases.length
+      ? report.missingAliases.slice(0, 60).map((id) => `- ${id}`).join("\n")
+      : "- none",
+  );
   lines.push("");
 
   lines.push("## Routing gaps");
@@ -386,7 +475,12 @@ function main(): void {
   const keywordTokenMissing = missingFromIndex(panelAudit.keywordTokens, conceptIndex);
 
   const allAliases = unique(knowledgeConcepts.flatMap((concept) => concept.aliases));
-  const missingAliases = missingFromIndex(allAliases, conceptIndex);
+  const aliasCandidates = unique([
+    ...panelAudit.keywordPhrases,
+    ...ideologyAudit.titles,
+    ...ideologyAudit.slugs,
+  ]);
+  const missingAliases = missingFromIndex(aliasCandidates, conceptIndex);
 
   const missingLedgerAnchors = missingFromIndex(LEDGER_ANCHORS, conceptIndex);
   const missingStarAnchors = missingFromIndex(STAR_ANCHORS, conceptIndex);
@@ -396,9 +490,11 @@ function main(): void {
     panelConcepts: {
       panelIdCount: panelAudit.panelIds.length,
       keywordKeyCount: panelAudit.keywordKeys.length,
+      keywordPhraseCount: panelAudit.keywordPhrases.length,
       keywordTokenCount: panelAudit.keywordTokens.length,
       panelIds: panelAudit.panelIds,
       keywordKeys: panelAudit.keywordKeys,
+      keywordPhrases: panelAudit.keywordPhrases,
     },
     ideologyNodes: {
       idCount: ideologyAudit.ids.length,
@@ -423,7 +519,9 @@ function main(): void {
       missingStarAnchors,
       missingIdeologyAnchors,
     },
-    suggestedConceptCards: SUGGESTED_CARDS,
+    suggestedConceptCards: SUGGESTED_CARDS.filter(
+      (card) => !conceptIndex.has(normalize(card.id)),
+    ),
   };
 
   ensureReportDir();
