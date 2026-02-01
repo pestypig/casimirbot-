@@ -7874,7 +7874,10 @@ const executeHelixAsk = async ({
       }
     }
     const shouldRunConstraintLoop =
-      intentStrategy === "constraint_report" || compositeConstraintRequested;
+      !dryRun && (intentStrategy === "constraint_report" || compositeConstraintRequested);
+    if (!shouldRunConstraintLoop && (intentStrategy === "constraint_report" || compositeConstraintRequested)) {
+      logEvent("Constraint loop", "skipped", "dry_run");
+    }
     if (shouldRunConstraintLoop) {
       const constraintStart = Date.now();
       const constraintIntentId =

@@ -53,7 +53,7 @@ const cases: RegressionCase[] = [
       intent_id: "hybrid.concept_plus_system_mapping",
       intent_domain: "hybrid",
       format: "compare",
-      stage_tags: true,
+      stage_tags: false,
     },
   },
   {

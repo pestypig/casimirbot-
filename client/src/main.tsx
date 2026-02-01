@@ -9,6 +9,8 @@ const buildStamp = import.meta.env.DEV
     ? __APP_BUILD__
     : "prod";
 
+const BUILD_STORAGE_KEY = "__helix_build_stamp";
+
 // Stamp build token at app boot
 (window as any).__APP_WARP_BUILD = buildStamp;
 
@@ -41,6 +43,36 @@ const scheduleReloadOnce = () => {
   window.location.reload();
 };
 
+const clearRuntimeCaches = async () => {
+  if (typeof window === "undefined" || !("caches" in window)) return;
+  const keys = await caches.keys();
+  await Promise.all(keys.map((key) => caches.delete(key)));
+};
+
+const unregisterServiceWorkers = async () => {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  const regs = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(regs.map((reg) => reg.unregister()));
+};
+
+const syncBuildStamp = async () => {
+  if (typeof window === "undefined") return;
+  try {
+    const stored = window.localStorage.getItem(BUILD_STORAGE_KEY);
+    if (stored && stored !== buildStamp) {
+      await Promise.all([clearRuntimeCaches(), unregisterServiceWorkers()]);
+      window.localStorage.setItem(BUILD_STORAGE_KEY, buildStamp);
+      scheduleReloadOnce();
+      return;
+    }
+    if (!stored) {
+      window.localStorage.setItem(BUILD_STORAGE_KEY, buildStamp);
+    }
+  } catch {
+    // ignore storage/caching failures
+  }
+};
+
 const shouldAutoReload = (value: unknown): boolean => {
   if (import.meta.env?.DEV) return false;
   const message = extractErrorMessage(value);
@@ -63,6 +95,10 @@ if (typeof window !== "undefined") {
       scheduleReloadOnce();
     }
   });
+}
+
+if (typeof window !== "undefined" && import.meta.env?.PROD) {
+  void syncBuildStamp();
 }
 
 createRoot(document.getElementById("root")!).render(
@@ -105,7 +141,28 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
         .register(`/mobile-sw.js?v=${encodeURIComponent(buildStamp)}`, {
           updateViaCache: "none",
         })
-        .then((reg) => reg.update())
+        .then((reg) => {
+          const reloadOnUpdate = () => {
+            const waiting = reg.waiting;
+            if (waiting) {
+              waiting.postMessage({ type: "SKIP_WAITING" });
+            }
+          };
+          reg.addEventListener("updatefound", () => {
+            const installing = reg.installing;
+            if (!installing) return;
+            installing.addEventListener("statechange", () => {
+              if (installing.state === "installed" && navigator.serviceWorker.controller) {
+                reloadOnUpdate();
+              }
+            });
+          });
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            scheduleReloadOnce();
+          });
+          reloadOnUpdate();
+          return reg.update();
+        })
         .catch(() => {
           // no-op on failure
         });
