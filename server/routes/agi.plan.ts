@@ -2763,7 +2763,7 @@ const HELIX_ASK_TWO_PASS_TRIGGER =
   /(how does|how do|why|explain|system|pipeline|architecture|workflow|flow|method|scientific method|plan|execute|trace|ask|assistant|llm)/i;
 const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
 const HELIX_ASK_WARP_PATH_BOOST =
-  /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline)/i;
+  /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline|docs\/knowledge\/warp)/i;
 const HELIX_ASK_CONCEPTUAL_FOCUS = /\b(what is|what's|define|definition|meaning|concept|theory)\b/i;
 const HELIX_ASK_DOCS_PATH_BOOST = /^docs\//i;
 const HELIX_ASK_TEST_PATH_NOISE = /(^|\/)(__tests__|tests?)(\/|$)/i;
@@ -4181,6 +4181,9 @@ function buildHelixAskSearchQueries(
     push("warp bubble");
     push("modules/warp/warp-module.ts");
     push("calculateNatarioWarpBubble");
+    push("docs/knowledge/warp/warp-bubble.md");
+    push("docs/knowledge/warp/natario-zero-expansion.md");
+    push("docs/knowledge/warp/shift-vector-expansion-scalar.md");
     push("warp pipeline");
     push("energy-pipeline warp");
   }
@@ -4665,8 +4668,10 @@ function buildPlanScope({
     (wantsDocsFirst || topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star"));
   if (docsFirst) {
     preferredSurfaces.add("docs");
-    preferredSurfaces.add("ethos");
     preferredSurfaces.add("knowledge");
+    if (topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star")) {
+      preferredSurfaces.add("ethos");
+    }
   }
   const preferredRegexes = buildPlanSurfaceRegexes(Array.from(preferredSurfaces));
   const avoidRegexes = buildPlanSurfaceRegexes(Array.from(avoidSurfaces));
@@ -4690,7 +4695,11 @@ function buildPlanScope({
     scope.mustIncludeGlobs = mustRegexes;
   }
   if (docsFirst) {
-    const docsRegexes = buildPlanSurfaceRegexes(["docs", "ethos", "knowledge"]);
+    const docsSurfaces = ["docs", "knowledge"];
+    if (topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star")) {
+      docsSurfaces.push("ethos");
+    }
+    const docsRegexes = buildPlanSurfaceRegexes(docsSurfaces);
     const docsAllowlist: RegExp[][] = [];
     if (docsRegexes.length) docsAllowlist.push(docsRegexes);
     if (mustRegexes.length) docsAllowlist.push(mustRegexes);

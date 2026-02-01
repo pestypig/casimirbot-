@@ -87,6 +87,9 @@ describe("Helix Ask topic routing", () => {
     expect(
       pathMatchesAny("docs/warp-console-architecture.md", profile?.boostPaths),
     ).toBe(true);
+    expect(
+      pathMatchesAny("docs/knowledge/warp/warp-bubble.md", profile?.boostPaths),
+    ).toBe(true);
   });
 
   it("does not satisfy warp must-include with test files", () => {

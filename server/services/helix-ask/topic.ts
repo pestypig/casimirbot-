@@ -76,6 +76,7 @@ const WARP_PATHS: RegExp[] = [
   /modules\/warp\//i,
   /docs\/warp/i,
   /docs\/warp-/i,
+  /docs\/knowledge\/warp\//i,
   /warp-?module/i,
   /warp-?theta/i,
   /warp bubble/i,
@@ -104,6 +105,7 @@ const WARP_ALLOWLIST_PATHS: RegExp[] = [
   /modules\/warp\/(?!.*\.(test|spec)\.ts)/i,
   /docs\/warp/i,
   /docs\/warp-/i,
+  /docs\/knowledge\/warp\//i,
 ];
 
 const WARP_NOISE_PATHS: RegExp[] = [
