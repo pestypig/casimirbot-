@@ -74,6 +74,13 @@ type CollapseHudModel = {
   kappa_present_m2: number;
   lattice_generation_hash: string | null;
   source: "server" | "local";
+  dp?: {
+    deltaE_J: number;
+    ell_m: number;
+    overlap_fraction_min_mass: number;
+    method: "exact" | "downsampled";
+    tau_infinite: boolean;
+  };
 };
 
 export default function CollapseBenchmarkHUD({ pipeline, className }: Props) {
@@ -165,6 +172,15 @@ export default function CollapseBenchmarkHUD({ pipeline, className }: Props) {
         kappa_present_m2: serverResult.kappa_present_m2,
         lattice_generation_hash: serverResult.lattice_generation_hash ?? null,
         source: "server",
+        dp: serverResult.dp
+          ? {
+              deltaE_J: serverResult.dp.deltaE_J,
+              ell_m: serverResult.dp.ell_m,
+              overlap_fraction_min_mass: serverResult.dp.overlap_fraction_min_mass,
+              method: serverResult.dp.method,
+              tau_infinite: serverResult.dp.tau_infinite,
+            }
+          : undefined,
       }
     : localFallback;
 
@@ -209,6 +225,15 @@ export default function CollapseBenchmarkHUD({ pipeline, className }: Props) {
           <StatRow label="tau_ms" value={fmtUnit(model.tau_ms, "ms", 3)} />
           <StatRow label="L_present_m" value={fmtUnit(model.L_present_m, "m", 4)} />
           <StatRow label="kappa_present_m2" value={fmtUnit(model.kappa_present_m2, "m^-2", 4)} />
+          {model.dp ? (
+            <>
+              <StatRow label="dp_deltaE_J" value={fmtUnit(model.dp.deltaE_J, "J", 4)} />
+              <StatRow label="dp_ell_m" value={fmtUnit(model.dp.ell_m, "m", 4)} />
+              <StatRow label="dp_overlap" value={fmt(model.dp.overlap_fraction_min_mass, 3)} />
+              <StatRow label="dp_method" value={model.dp.method} />
+              {model.dp.tau_infinite ? <StatRow label="dp_tau" value="infinite" /> : null}
+            </>
+          ) : null}
           <StatRow
             label="lattice_generation_hash"
             value={
@@ -228,4 +253,3 @@ export default function CollapseBenchmarkHUD({ pipeline, className }: Props) {
     </Card>
   );
 }
-

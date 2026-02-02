@@ -20,9 +20,11 @@ import {
   type TCollapseTauSource,
   type TLatticeSummary,
 } from "@shared/collapse-benchmark";
+import { computeDpCollapse, type DpCollapseResult, type TDpCollapseInput } from "@shared/dp-collapse";
 import { type CardLatticeMetadata } from "@shared/schema";
 import { withDerivedArtifactInformationBoundary } from "@shared/information-boundary-derived";
 import { buildInformationBoundary } from "../utils/information-boundary";
+import { buildDpInputFromAdapter } from "./dp-adapters";
 
 const coerceQueryString = (v: unknown) => {
   if (typeof v === "string") return v;
@@ -52,6 +54,24 @@ export type CollapseResolveOptions = {
 };
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+const readDpConstraintsFromEnv = (): TDpCollapseInput["constraints"] | undefined => {
+  const toNum = (value: string | undefined): number | undefined => {
+    if (!value) return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const heating = toNum(process.env.DP_HEATING_W_KG_MAX);
+  const diffusion = toNum(process.env.DP_MOMENTUM_DIFFUSION_MAX);
+  const forceNoise = toNum(process.env.DP_FORCE_NOISE_MAX);
+  if (heating == null && diffusion == null && forceNoise == null) return undefined;
+  return {
+    heating_W_kg_max: heating,
+    momentum_diffusion_kg2_m2_s3_max: diffusion,
+    force_noise_N2_Hz_max: forceNoise,
+  };
+};
+
 
 export function latticeSummaryFromCardMetadata(meta: CardLatticeMetadata | null | undefined): TLatticeSummary | null {
   if (!meta?.frame?.dims || !meta.frame?.voxelSize_m) return null;
@@ -103,6 +123,8 @@ export type ResolvedCollapseParams = {
   rc_proxy?: DerivedRcFromLatticeSummary["rc_proxy"];
   lattice_summary?: TCollapseBenchmarkInput["lattice"];
   estimator?: (CollapseCurvatureHeuristicResult & { mode: "curvature_heuristic" }) | null;
+  dp_result?: DpCollapseResult | null;
+  dp_input?: TDpCollapseInput | null;
 };
 
 type CollapseInputLike = (TCollapseBenchmarkInput | TCollapseBenchmarkRunInput) & {
@@ -127,6 +149,18 @@ export function resolveCollapseParams(input: CollapseInputLike, opts: CollapseRe
 
   const derived = input.lattice ? deriveRcFromLatticeSummary(input.lattice) : undefined;
 
+  const dpConstraints = readDpConstraintsFromEnv();
+  const dpAdapterInput = input.dp_adapter ? buildDpInputFromAdapter(input.dp_adapter) : null;
+  const dpInputRaw = input.dp ?? dpAdapterInput;
+  const dpInput = dpInputRaw
+    ? dpConstraints && !dpInputRaw.constraints
+      ? { ...dpInputRaw, constraints: dpConstraints }
+      : dpInputRaw
+    : null;
+  const dpResult = dpInput ? computeDpCollapse(dpInput) : null;
+  const dpTauMs = dpResult?.tau_ms;
+  const dpRc = dpInput?.r_c_m ?? dpInput?.ell_m;
+
   const estimatorResult = input.tau_estimator
     ? estimateTauRcFromCurvature({
         ...input.tau_estimator,
@@ -140,17 +174,24 @@ export function resolveCollapseParams(input: CollapseInputLike, opts: CollapseRe
   const rc_from_estimator = estimatorResult?.r_c_m;
 
   const tau_override = opts.tau_ms_override;
-  const tau_ms = tau_override ?? input.tau_ms ?? tau_from_estimator;
+  const tau_ms = tau_override ?? input.tau_ms ?? dpTauMs ?? tau_from_estimator;
   let tau_source: TCollapseTauSource =
     opts.tau_source ??
-    (input.tau_ms == null && estimatorResult ? "field_estimator" : input.tau_ms != null ? "manual" : "manual");
+    (input.tau_ms != null
+      ? "manual"
+      : dpTauMs != null
+        ? "dp_deltaE"
+        : input.tau_ms == null && estimatorResult
+          ? "field_estimator"
+          : "manual");
   if (opts.tau_ms_override != null && opts.tau_source == null) {
     tau_source = "session_dp_tau";
   }
 
-  let r_c_m = input.r_c_m ?? derived?.r_c_m;
-  let r_c_source: TCollapseRcSource = input.r_c_m != null ? "manual" : derived?.r_c_source ?? "manual";
-  if (input.tau_estimator && input.r_c_m == null && rc_from_estimator != null) {
+  let r_c_m = input.r_c_m ?? dpRc ?? derived?.r_c_m;
+  let r_c_source: TCollapseRcSource =
+    input.r_c_m != null ? "manual" : dpRc != null ? "dp_smear" : derived?.r_c_source ?? "manual";
+  if (input.tau_estimator && input.r_c_m == null && dpRc == null && rc_from_estimator != null) {
     r_c_m = rc_from_estimator;
     r_c_source = "field_estimator";
   } else if (r_c_m == null && estimatorResult) {
@@ -176,6 +217,8 @@ export function resolveCollapseParams(input: CollapseInputLike, opts: CollapseRe
     rc_proxy: derived?.rc_proxy,
     lattice_summary: input.lattice,
     estimator: estimatorResult ? { ...estimatorResult, mode: "curvature_heuristic" } : null,
+    dp_result: dpResult,
+    dp_input: dpInput ?? null,
   };
 }
 
@@ -193,6 +236,7 @@ export function buildCollapseBenchmarkResult(
 
   const p_trigger = hazardProbability(resolved.dt_ms, resolved.tau_ms);
   const estimator = resolved.estimator ?? undefined;
+  const dpResult = resolved.dp_result ?? undefined;
 
   const rawArtifact = {
     schema_version: "collapse_benchmark/1" as const,
@@ -208,6 +252,7 @@ export function buildCollapseBenchmarkResult(
     L_present_m: diagnostics.L_present_m,
     kappa_present_m2: diagnostics.kappa_present_m2,
     diagnostics,
+    ...(dpResult ? { dp: dpResult } : {}),
     ...(estimator ? { tau_estimator: { ...estimator } } : {}),
   };
 
@@ -229,6 +274,7 @@ export function buildCollapseBenchmarkResult(
         ...(resolved.lattice_generation_hash ? { lattice_generation_hash: resolved.lattice_generation_hash } : {}),
         ...(resolved.rc_proxy ? { r_c_proxy: resolved.rc_proxy } : {}),
         ...(resolved.lattice_summary ? { lattice_summary: resolved.lattice_summary } : {}),
+        ...(dpResult ? { dp: dpResult } : {}),
         ...(estimator ? { estimator } : {}),
       },
     },
@@ -239,6 +285,7 @@ export function buildCollapseBenchmarkResult(
         p_trigger,
         L_present_m: diagnostics.L_present_m,
         kappa_present_m2: diagnostics.kappa_present_m2,
+        ...(dpResult ? { dp: dpResult } : {}),
         ...(estimator ? { estimator } : {}),
       },
     },
@@ -261,6 +308,7 @@ export function buildCollapseBenchmarkExplain(
   });
   const p_trigger = hazardProbability(resolved.dt_ms, resolved.tau_ms);
   const estimator = resolved.estimator ?? undefined;
+  const dpResult = resolved.dp_result ?? undefined;
 
   const informationBoundary = buildInformationBoundary({
     data_cutoff_iso,
@@ -288,6 +336,7 @@ export function buildCollapseBenchmarkExplain(
         L_present_m: diagnostics.L_present_m,
         kappa_present_m2: diagnostics.kappa_present_m2,
       },
+      ...(dpResult ? { dp: dpResult } : {}),
       ...(estimator ? { estimator } : {}),
     },
   });
@@ -311,6 +360,7 @@ export function buildCollapseBenchmarkExplain(
       L_present_m: diagnostics.L_present_m,
       kappa_present_m2: diagnostics.kappa_present_m2,
     },
+    ...(dpResult ? { dp: dpResult } : {}),
     ...(estimator ? { tau_estimator: estimator } : {}),
   };
 }
@@ -328,6 +378,7 @@ export function executeCollapseRun(
   const p_trigger = hazardProbability(input.dt_ms, resolved.tau_ms);
   const c_mps = resolved.c_mps ?? C;
   const estimator = resolved.estimator ?? undefined;
+  const dpResult = resolved.dp_result ?? undefined;
 
   const histogram_u_counts = Array.from({ length: bins }, () => 0);
   let trigger_count = 0;
@@ -381,6 +432,7 @@ export function executeCollapseRun(
       ...(resolved.lattice_generation_hash ? { lattice_generation_hash: resolved.lattice_generation_hash } : {}),
       ...(resolved.rc_proxy ? { r_c_proxy: resolved.rc_proxy } : {}),
       ...(resolved.lattice_summary ? { lattice_summary: resolved.lattice_summary } : {}),
+      ...(dpResult ? { dp: dpResult } : {}),
       ...(estimator ? { estimator } : {}),
     },
     features: {
@@ -396,6 +448,7 @@ export function executeCollapseRun(
         L_present_m: diagnostics.L_present_m,
         kappa_present_m2: diagnostics.kappa_present_m2,
       },
+      ...(dpResult ? { dp: dpResult } : {}),
       ...(estimator ? { estimator } : {}),
     },
   });
@@ -427,6 +480,7 @@ export function executeCollapseRun(
     inputs_hash: informationBoundary.inputs_hash,
     features_hash: informationBoundary.features_hash,
     information_boundary: informationBoundary,
+    ...(dpResult ? { dp: dpResult } : {}),
     ...(estimator ? { tau_estimator: estimator } : {}),
   };
 }

@@ -1,6 +1,13 @@
 import express from "express";
 import { z } from "zod";
-import { CollapseBenchmarkInput, CollapseBenchmarkRunInput, LatticeSummary, type TLatticeSummary } from "@shared/collapse-benchmark";
+import {
+  CollapseBenchmarkInput,
+  CollapseBenchmarkRunInput,
+  DpAdapterBuildInput,
+  LatticeSummary,
+  type TLatticeSummary,
+} from "@shared/collapse-benchmark";
+import { DpPlanInput } from "@shared/dp-planner";
 import {
   buildCollapseBenchmarkExplain,
   buildCollapseBenchmarkResult,
@@ -8,6 +15,8 @@ import {
   loadLatticeSummaryFromSidecar,
   resolveDataCutoffIso,
 } from "../services/collapse-benchmark";
+import { buildDpAdapterFromSources } from "../services/dp-adapter-build";
+import { buildDpPlanResult } from "../services/dp-planner";
 import { getTelemetrySnapshot } from "../services/star/service";
 
 export const collapseBenchmarksRouter = express.Router();
@@ -172,6 +181,43 @@ collapseBenchmarksRouter.post("/explain", (req, res) => {
         got: (err as any)?.got,
       });
     }
+    return res.status(status).json({ error: code, message });
+  }
+});
+
+collapseBenchmarksRouter.post("/dp-adapter", (req, res) => {
+  try {
+    const parsed = DpAdapterBuildInput.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: "invalid_request", details: parsed.error.flatten() });
+    }
+    const dataCutoffIso = resolveDataCutoffIso(req.query);
+    const result = buildDpAdapterFromSources(parsed.data, dataCutoffIso);
+    return res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status =
+      typeof (err as any)?.status === "number" && Number.isFinite((err as any).status) ? Number((err as any).status) : 400;
+    const code =
+      typeof (err as any)?.code === "string" ? String((err as any).code) : "dp_adapter_build_failed";
+    return res.status(status).json({ error: code, message });
+  }
+});
+
+collapseBenchmarksRouter.post("/dp-plan", (req, res) => {
+  try {
+    const parsed = DpPlanInput.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: "invalid_request", details: parsed.error.flatten() });
+    }
+    const dataCutoffIso = resolveDataCutoffIso(req.query);
+    const result = buildDpPlanResult(parsed.data, dataCutoffIso);
+    return res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status =
+      typeof (err as any)?.status === "number" && Number.isFinite((err as any).status) ? Number((err as any).status) : 400;
+    const code = typeof (err as any)?.code === "string" ? String((err as any).code) : "dp_plan_failed";
     return res.status(status).json({ error: code, message });
   }
 });

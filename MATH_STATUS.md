@@ -112,6 +112,16 @@ Stage 3 (Certified / Policy-gated)
 | --- | --- | --- | --- | --- |
 | NEURO | shared/neuro-config.ts | Stage 0 | Neuro coherence defaults (gamma band + equilibrium thresholds). | docs/stellar-consciousness-orch-or-review.md |
 
+## DP Collapse Modules
+
+| Tag | Module | Stage | Notes | Checks |
+| --- | --- | --- | --- | --- |
+| DP_COLLAPSE | shared/dp-collapse.ts | Stage 0 | Diosi-Penrose collapse estimator (DeltaE from mass-density difference). | tests/dp-collapse.spec.ts |
+| DP_COLLAPSE | server/services/dp-adapters.ts | Stage 0 | Stress-energy -> DP mass-density adapters (brick + GR fields). | tests/dp-adapters.spec.ts |
+| DP_COLLAPSE | server/services/dp-adapter-build.ts | Stage 0 | Build DP adapter inputs from stress-energy + GR evolve bricks. | tests/collapse-benchmark.phase2.routes.spec.ts |
+| DP_COLLAPSE | shared/dp-planner.ts | Stage 0 | DP planning calculator schema (visibility, detectability, tau). | tests/dp-planner.spec.ts |
+| DP_COLLAPSE | server/services/dp-planner.ts | Stage 0 | DP planning calculator (visibility decay, detectability ratio). | tests/dp-planner.spec.ts |
+
 ## Observability + Audit Modules (Tagged)
 
 | Tag | Module | Stage | Notes | Checks |

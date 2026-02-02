@@ -1,4 +1,5 @@
 import path from "node:path";
+import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -44,6 +45,199 @@ describe("collapse benchmark (Phase 3): HTTP API", () => {
       .post("/api/benchmarks/collapse")
       .send({ schema_version: "collapse_benchmark/1", dt_ms: 50, r_c_m: 0.25 })
       .expect(400);
+  });
+
+  it("POST /api/benchmarks/collapse accepts DP input and derives tau", async () => {
+    const app = createApp();
+    const body = {
+      schema_version: "collapse_benchmark/1",
+      dt_ms: 25,
+      dp: {
+        schema_version: "dp_collapse/1",
+        ell_m: 2e-10,
+        grid: {
+          dims: [18, 18, 18],
+          voxel_size_m: [1e-9, 1e-9, 1e-9],
+          origin_m: [0, 0, 0],
+        },
+        method: { kernel: "plummer", max_voxels: 1000 },
+        branch_a: {
+          kind: "analytic",
+          primitives: [
+            { kind: "gaussian", mass_kg: 6e-16, sigma_m: 1.4e-9, center_m: [-2e-9, 0, 0] },
+          ],
+        },
+        branch_b: {
+          kind: "analytic",
+          primitives: [
+            { kind: "gaussian", mass_kg: 6e-16, sigma_m: 1.4e-9, center_m: [2e-9, 0, 0] },
+          ],
+        },
+      },
+    };
+
+    const res = await request(app).post("/api/benchmarks/collapse").send(body).expect(200);
+    const parsed = CollapseBenchmarkResult.parse(res.body);
+    expect(parsed.tau_source).toBe("dp_deltaE");
+    expect(parsed.r_c_source).toBe("dp_smear");
+    expect(parsed.dp?.ell_m).toBeCloseTo(2e-10, 12);
+    expect(parsed.dp?.deltaE_J ?? 0).toBeGreaterThan(0);
+  });
+
+  it("POST /api/benchmarks/collapse accepts dp_adapter inputs and derives tau", async () => {
+    const app = createApp();
+    const dims = [4, 4, 4] as const;
+    const total = dims[0] * dims[1] * dims[2];
+    const energyA = new Float32Array(total);
+    const energyB = new Float32Array(total);
+    const energy = 1e3 * (299_792_458 * 299_792_458);
+    energyA[0] = energy;
+    energyB[total - 1] = energy;
+    const toPayload = (arr: Float32Array) => ({
+      encoding: "base64" as const,
+      dtype: "float32" as const,
+      endian: "little" as const,
+      order: "row-major" as const,
+      data_b64: Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength).toString("base64"),
+    });
+
+    const body = {
+      schema_version: "collapse_benchmark/1",
+      dt_ms: 25,
+      dp_adapter: {
+        schema_version: "dp_adapter/1",
+        ell_m: 2e-10,
+        branch_a: {
+          density: toPayload(energyA),
+          units: "energy_density_J_m3",
+          grid_bounds: {
+            dims,
+            bounds: { min: [0, 0, 0], max: [4e-9, 4e-9, 4e-9] },
+          },
+        },
+        branch_b: {
+          density: toPayload(energyB),
+          units: "energy_density_J_m3",
+          grid_bounds: {
+            dims,
+            bounds: { min: [0, 0, 0], max: [4e-9, 4e-9, 4e-9] },
+          },
+        },
+      },
+    };
+
+    const res = await request(app).post("/api/benchmarks/collapse").send(body).expect(200);
+    const parsed = CollapseBenchmarkResult.parse(res.body);
+    expect(parsed.tau_source).toBe("dp_deltaE");
+    expect(parsed.r_c_source).toBe("dp_smear");
+    expect(parsed.dp?.ell_m).toBeCloseTo(2e-10, 12);
+    expect(parsed.dp?.deltaE_J ?? 0).toBeGreaterThan(0);
+  });
+
+  it("POST /api/benchmarks/collapse/dp-plan returns planning metrics", async () => {
+    const app = createApp();
+    const asOf = "2025-01-01T00:00:00.000Z";
+    const body = {
+      schema_version: "dp_plan/1",
+      dp: {
+        schema_version: "dp_collapse/1",
+        ell_m: 2e-10,
+        grid: {
+          dims: [12, 12, 12],
+          voxel_size_m: [1e-9, 1e-9, 1e-9],
+          origin_m: [0, 0, 0],
+        },
+        branch_a: {
+          kind: "analytic",
+          primitives: [
+            { kind: "gaussian", mass_kg: 4e-16, sigma_m: 1.2e-9, center_m: [-1.5e-9, 0, 0] },
+          ],
+        },
+        branch_b: {
+          kind: "analytic",
+          primitives: [
+            { kind: "gaussian", mass_kg: 4e-16, sigma_m: 1.2e-9, center_m: [1.5e-9, 0, 0] },
+          ],
+        },
+      },
+      visibility: { v0: 1, times_s: [0, 0.5, 1] },
+      environment: { gamma_env_s: 1e-3, label: "env" },
+    };
+
+    const res = await request(app)
+      .post(`/api/benchmarks/collapse/dp-plan?asOf=${encodeURIComponent(asOf)}`)
+      .send(body)
+      .expect(200);
+
+    expect(res.body.ok).toBe(true);
+    expect(res.body.schema_version).toBe("dp_plan/1");
+    expect(res.body.data_cutoff_iso).toBe(asOf);
+    expect(res.body.dp?.deltaE_J ?? 0).toBeGreaterThan(0);
+    expect(res.body.gamma_dp_s).toBeGreaterThan(0);
+    expect(res.body.visibility?.curve?.length ?? 0).toBe(3);
+  });
+
+  it("POST /api/benchmarks/collapse/dp-adapter builds from stress_energy_brick", async () => {
+    const app = createApp();
+    const asOf = "2025-01-01T00:00:00.000Z";
+    const dims = [4, 4, 4] as const;
+    const body = {
+      schema_version: "dp_adapter_build/1",
+      source: "stress_energy_brick",
+      ell_m: 2e-10,
+      grid_bounds: {
+        dims,
+        bounds: { min: [-1e-6, -1e-6, -1e-6], max: [1e-6, 1e-6, 1e-6] },
+      },
+      branch_a: { label: "stress-a", sign_mode: "absolute" as const },
+      branch_b: { label: "stress-b", sign_mode: "absolute" as const },
+    };
+
+    const res = await request(app)
+      .post(`/api/benchmarks/collapse/dp-adapter?asOf=${encodeURIComponent(asOf)}`)
+      .send(body)
+      .expect(200);
+
+    expect(res.body.ok).toBe(true);
+    expect(res.body.schema_version).toBe("dp_adapter_build/1");
+    expect(res.body.data_cutoff_iso).toBe(asOf);
+    expect(res.body.dp_adapter.schema_version).toBe("dp_adapter/1");
+    expect(res.body.dp_adapter.branch_a.units).toBe("energy_density_J_m3");
+    expect(res.body.dp_adapter.branch_b.units).toBe("energy_density_J_m3");
+    expect(res.body.branches.a.units).toBe("energy_density_J_m3");
+    expect(res.body.branches.b.units).toBe("energy_density_J_m3");
+  });
+
+  it("POST /api/benchmarks/collapse/dp-adapter builds from gr_evolve_brick", async () => {
+    const app = createApp();
+    const asOf = "2025-01-01T00:00:00.000Z";
+    const dims = [4, 4, 4] as const;
+    const body = {
+      schema_version: "dp_adapter_build/1",
+      source: "gr_evolve_brick",
+      ell_m: 2e-10,
+      include_matter: true,
+      grid_bounds: {
+        dims,
+        bounds: { min: [-1e-6, -1e-6, -1e-6], max: [1e-6, 1e-6, 1e-6] },
+      },
+      branch_a: { params: { steps: 0, iterations: 0 }, label: "gr-a", sign_mode: "positive" as const },
+      branch_b: { params: { steps: 0, iterations: 0 }, label: "gr-b", sign_mode: "positive" as const },
+    };
+
+    const res = await request(app)
+      .post(`/api/benchmarks/collapse/dp-adapter?asOf=${encodeURIComponent(asOf)}`)
+      .send(body)
+      .expect(200);
+
+    expect(res.body.ok).toBe(true);
+    expect(res.body.schema_version).toBe("dp_adapter_build/1");
+    expect(res.body.data_cutoff_iso).toBe(asOf);
+    expect(res.body.dp_adapter.schema_version).toBe("dp_adapter/1");
+    expect(res.body.dp_adapter.branch_a.units).toBe("geom_stress");
+    expect(res.body.dp_adapter.branch_b.units).toBe("geom_stress");
+    expect(res.body.branches.a.units).toBe("geom_stress");
+    expect(res.body.branches.b.units).toBe("geom_stress");
   });
 
   it("POST /api/benchmarks/collapse can derive r_c_m from lattice summary and binds lattice_generation_hash", async () => {

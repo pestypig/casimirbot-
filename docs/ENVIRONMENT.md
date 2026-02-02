@@ -55,6 +55,11 @@ Notes:
   `CASIMIR_PROVENANCE_MISSING`, `CASIMIR_RUNTIME_MS`, `CASIMIR_TOOL_CALLS`,
   `CASIMIR_TOOL_TOTAL`, `CASIMIR_TOOL_METRICS_JSON`.
 
+## DP collapse diagnostics
+- `DP_HEATING_W_KG_MAX`: optional bound for DP-style heating rate (W/kg).
+- `DP_MOMENTUM_DIFFUSION_MAX`: optional bound for momentum diffusion (kg^2 m^2 s^-3).
+- `DP_FORCE_NOISE_MAX`: optional bound for force noise (N^2/Hz).
+
 ## AGI auth + tenant isolation
 - `ENABLE_AGI_AUTH`: set to `1` to require JWTs on `/api/agi/*` even if global auth is off.
 - `AGI_TENANT_REQUIRED`: set to `1` to require a tenant id; unset defaults to

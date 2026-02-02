@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { C, C2, HBAR, PI } from "./physics-const";
+import { DpCollapseInput, DpCollapseResultSchema, DpGridSpec, Float32VolumeB64 } from "./dp-collapse";
 import { kappa_body } from "./curvature-proxy";
 import { DerivedArtifactInformationBoundaryAudit } from "./information-boundary-derived";
+import { InformationBoundary } from "./information-boundary";
 
 /**
  * Collapse benchmark (relativity-safe diagnostic)
@@ -11,10 +13,10 @@ import { DerivedArtifactInformationBoundaryAudit } from "./information-boundary-
  * - It is NOT a claim of quantum signaling or faster-than-light messaging.
  */
 
-export const CollapseTauSource = z.enum(["manual", "session_dp_tau", "field_estimator"]);
+export const CollapseTauSource = z.enum(["manual", "session_dp_tau", "field_estimator", "dp_deltaE"]);
 export type TCollapseTauSource = z.infer<typeof CollapseTauSource>;
 
-export const CollapseRcSource = z.enum(["manual", "geometry", "lattice_corrlen", "field_estimator"]);
+export const CollapseRcSource = z.enum(["manual", "geometry", "lattice_corrlen", "field_estimator", "dp_smear"]);
 export type TCollapseRcSource = z.infer<typeof CollapseRcSource>;
 
 const latticeDimsSchema = z.tuple([
@@ -24,6 +26,7 @@ const latticeDimsSchema = z.tuple([
 ]);
 
 const latticeVec3Schema = z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]);
+const vec3Schema = z.tuple([z.number(), z.number(), z.number()]);
 
 /**
  * Minimal lattice/field summary for collapse benchmarking.
@@ -40,6 +43,139 @@ export const LatticeSummary = z.object({
 });
 
 export type TLatticeSummary = z.infer<typeof LatticeSummary>;
+
+const dpAdapterBoundsSchema = z.object({
+  min: vec3Schema,
+  max: vec3Schema,
+});
+
+export const DpAdapterGridSpec = z.object({
+  dims: latticeDimsSchema,
+  spacing_m: latticeVec3Schema,
+  bounds: dpAdapterBoundsSchema.optional(),
+});
+
+export const DpAdapterGridBounds = z.object({
+  dims: latticeDimsSchema,
+  bounds: dpAdapterBoundsSchema,
+  origin_m: vec3Schema.optional(),
+});
+
+export const DpAdapterBranchInput = z
+  .object({
+    density: Float32VolumeB64,
+    units: z.enum(["mass_density_kg_m3", "energy_density_J_m3", "geom_stress"]),
+    sign_mode: z.enum(["signed", "absolute", "positive"]).optional(),
+    scale: z.number().positive().optional(),
+    grid: DpGridSpec.optional(),
+    grid_spec: DpAdapterGridSpec.optional(),
+    grid_bounds: DpAdapterGridBounds.optional(),
+    label: z.string().optional(),
+    lattice_generation_hash: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasGrid = value.grid != null;
+    const hasSpec = value.grid_spec != null;
+    const hasBounds = value.grid_bounds != null;
+    if (!hasGrid && !hasSpec && !hasBounds) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["grid"],
+        message: "Provide grid, grid_spec, or grid_bounds",
+      });
+    }
+  });
+
+export type TDpAdapterBranchInput = z.infer<typeof DpAdapterBranchInput>;
+
+export const DpAdapterInput = z.object({
+  schema_version: z.literal("dp_adapter/1"),
+  ell_m: z.number().positive(),
+  r_c_m: z.number().positive().optional(),
+  method: DpCollapseInput.shape.method.optional(),
+  coarse_graining: DpCollapseInput.shape.coarse_graining.optional(),
+  side_effects: DpCollapseInput.shape.side_effects.optional(),
+  constraints: DpCollapseInput.shape.constraints.optional(),
+  branch_a: DpAdapterBranchInput,
+  branch_b: DpAdapterBranchInput,
+  seed: z.string().optional(),
+  notes: z.array(z.string()).optional(),
+});
+
+export type TDpAdapterInput = z.infer<typeof DpAdapterInput>;
+
+export const DpAdapterBuildSource = z.enum(["stress_energy_brick", "gr_evolve_brick"]);
+export type TDpAdapterBuildSource = z.infer<typeof DpAdapterBuildSource>;
+
+export const DpAdapterBuildBranch = z.object({
+  params: z.record(z.unknown()).optional(),
+  label: z.string().optional(),
+  sign_mode: z.enum(["signed", "absolute", "positive"]).optional(),
+});
+
+export const DpAdapterBuildInput = z
+  .object({
+    schema_version: z.literal("dp_adapter_build/1"),
+    source: DpAdapterBuildSource,
+    ell_m: z.number().positive(),
+    r_c_m: z.number().positive().optional(),
+    method: DpCollapseInput.shape.method.optional(),
+    coarse_graining: DpCollapseInput.shape.coarse_graining.optional(),
+    side_effects: DpCollapseInput.shape.side_effects.optional(),
+    constraints: DpCollapseInput.shape.constraints.optional(),
+    grid: DpGridSpec.optional(),
+    grid_spec: DpAdapterGridSpec.optional(),
+    grid_bounds: DpAdapterGridBounds.optional(),
+    branch_a: DpAdapterBuildBranch,
+    branch_b: DpAdapterBuildBranch,
+    include_matter: z.boolean().optional(),
+    seed: z.string().optional(),
+    notes: z.array(z.string()).optional(),
+  })
+  .superRefine((value, ctx) => {
+    const gridFlags = [value.grid != null, value.grid_spec != null, value.grid_bounds != null];
+    if (gridFlags.filter(Boolean).length > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["grid"],
+        message: "Provide at most one of grid, grid_spec, or grid_bounds",
+      });
+    }
+  });
+
+export type TDpAdapterBuildInput = z.infer<typeof DpAdapterBuildInput>;
+
+export const DpAdapterBranchDiagnostics = z.object({
+  source: DpAdapterBuildSource,
+  label: z.string().optional(),
+  sign_mode: z.enum(["signed", "absolute", "positive"]),
+  units: z.enum(["mass_density_kg_m3", "energy_density_J_m3", "geom_stress"]),
+  stats: z.object({
+    min: z.number(),
+    max: z.number(),
+    mean: z.number(),
+    abs_max: z.number(),
+    finite_fraction: z.number().min(0).max(1),
+  }),
+  notes: z.array(z.string()),
+});
+
+export const DpAdapterBuildResult = z.object({
+  ok: z.literal(true),
+  schema_version: z.literal("dp_adapter_build/1"),
+  dp_adapter: DpAdapterInput,
+  grid: DpGridSpec,
+  branches: z.object({
+    a: DpAdapterBranchDiagnostics,
+    b: DpAdapterBranchDiagnostics,
+  }),
+  data_cutoff_iso: z.string().datetime(),
+  inputs_hash: z.string(),
+  features_hash: z.string().optional(),
+  information_boundary: InformationBoundary,
+});
+
+export type TDpAdapterBuildResult = z.infer<typeof DpAdapterBuildResult>;
 
 export type DerivedRcFromLatticeSummary = {
   r_c_m: number;
@@ -224,6 +360,8 @@ export const CollapseBenchmarkInput = z.object({
   dt_ms: z.number().nonnegative(),
   tau_ms: z.number().positive().optional(),
   tau_estimator: CollapseCurvatureCouplingInputs.optional(),
+  dp: DpCollapseInput.optional(),
+  dp_adapter: DpAdapterInput.optional(),
   r_c_m: z.number().positive().optional(),
   lattice: LatticeSummary.optional(),
   expected_lattice_generation_hash: z.string().trim().min(1).optional(),
@@ -232,11 +370,20 @@ export const CollapseBenchmarkInput = z.object({
 }).superRefine((value, ctx) => {
   const hasTau = typeof value.tau_ms === "number" && Number.isFinite(value.tau_ms);
   const hasEstimator = value.tau_estimator != null;
-  if (!hasTau && !hasEstimator) {
+  const hasDp = value.dp != null || value.dp_adapter != null;
+  if (!hasTau && !hasEstimator && !hasDp) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["tau_ms"],
-      message: "Provide tau_ms or tau_estimator",
+      message: "Provide tau_ms, tau_estimator, dp, or dp_adapter",
+    });
+  }
+
+  if (value.dp && value.dp_adapter) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["dp_adapter"],
+      message: "Provide dp or dp_adapter, not both",
     });
   }
 
@@ -244,12 +391,16 @@ export const CollapseBenchmarkInput = z.object({
     value.r_c_m != null ||
     value.lattice != null ||
     value.tau_estimator?.r_c_hint_m != null ||
-    value.tau_estimator?.r_c_lattice_m != null;
+    value.tau_estimator?.r_c_lattice_m != null ||
+    value.dp?.r_c_m != null ||
+    value.dp?.ell_m != null ||
+    value.dp_adapter?.r_c_m != null ||
+    value.dp_adapter?.ell_m != null;
   if (!hasRc) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["r_c_m"],
-      message: "Provide r_c_m, lattice, or tau_estimator.r_c_hint_m",
+      message: "Provide r_c_m, lattice, tau_estimator.r_c_hint_m, or dp_adapter.ell_m",
     });
   }
   if (value.expected_lattice_generation_hash != null && value.lattice == null) {
@@ -292,6 +443,7 @@ export const CollapseBenchmarkResult = DerivedArtifactInformationBoundaryAudit.e
       kappa_collapse_m2: z.number().nonnegative(),
     })
     .optional(),
+  dp: DpCollapseResultSchema.optional(),
   tau_estimator: z
     .object({
       mode: z.literal("curvature_heuristic"),
@@ -315,6 +467,8 @@ export const CollapseBenchmarkRunInput = z
     dt_ms: z.number().nonnegative(),
     tau_ms: z.number().positive().optional(),
     tau_estimator: CollapseCurvatureCouplingInputs.optional(),
+    dp: DpCollapseInput.optional(),
+    dp_adapter: DpAdapterInput.optional(),
     r_c_m: z.number().positive().optional(),
     lattice: LatticeSummary.optional(),
     expected_lattice_generation_hash: z.string().trim().min(1).optional(),
@@ -325,23 +479,35 @@ export const CollapseBenchmarkRunInput = z
   .superRefine((value, ctx) => {
     const hasTau = typeof value.tau_ms === "number" && Number.isFinite(value.tau_ms);
     const hasEstimator = value.tau_estimator != null;
-    if (!hasTau && !hasEstimator) {
+    const hasDp = value.dp != null || value.dp_adapter != null;
+    if (!hasTau && !hasEstimator && !hasDp) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["tau_ms"],
-        message: "Provide tau_ms or tau_estimator",
+        message: "Provide tau_ms, tau_estimator, dp, or dp_adapter",
+      });
+    }
+    if (value.dp && value.dp_adapter) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["dp_adapter"],
+        message: "Provide dp or dp_adapter, not both",
       });
     }
     const hasRc =
       value.r_c_m != null ||
       value.lattice != null ||
       value.tau_estimator?.r_c_hint_m != null ||
-      value.tau_estimator?.r_c_lattice_m != null;
+      value.tau_estimator?.r_c_lattice_m != null ||
+      value.dp?.r_c_m != null ||
+      value.dp?.ell_m != null ||
+      value.dp_adapter?.r_c_m != null ||
+      value.dp_adapter?.ell_m != null;
     if (!hasRc) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["r_c_m"],
-        message: "Provide r_c_m, lattice, or tau_estimator.r_c_hint_m",
+        message: "Provide r_c_m, lattice, tau_estimator.r_c_hint_m, or dp_adapter.ell_m",
       });
     }
     if (value.expected_lattice_generation_hash != null && value.lattice == null) {
