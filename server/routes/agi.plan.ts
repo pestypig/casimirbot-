@@ -7195,6 +7195,13 @@ const buildReportBlocks = (question: string): HelixAskReportBlock[] => {
       pushCurrent();
       continue;
     }
+    if (REPORT_MODE_INTENT_RE.test(trimmed)) {
+      const intentTokens = filterCriticTokens(tokenizeAskQuery(trimmed));
+      if (intentTokens.length <= 2) {
+        pushCurrent();
+        continue;
+      }
+    }
     const headingMatch = trimmed.match(REPORT_MODE_HEADING_RE);
     if (headingMatch) {
       pushCurrent();
@@ -8766,6 +8773,11 @@ const executeHelixAsk = async ({
       const reportBlocks = buildReportBlocks(baseQuestion);
       const limitedBlocks = reportBlocks.slice(0, HELIX_ASK_REPORT_MAX_BLOCKS);
       const omittedCount = Math.max(0, reportBlocks.length - limitedBlocks.length);
+      const reportRepoContext =
+        HELIX_ASK_REPO_FORCE.test(rawQuestion) ||
+        HELIX_ASK_REPO_EXPECTS.test(rawQuestion) ||
+        HELIX_ASK_REPO_HINT.test(rawQuestion) ||
+        /helix ask|codebase|repository|repo|arbiter|evidence gate|constraint/i.test(rawQuestion);
       logEvent(
         "Report mode",
         "start",
@@ -8786,6 +8798,13 @@ const executeHelixAsk = async ({
         const block = limitedBlocks[index];
         const blockTraceId = `${askTraceId}:b${index + 1}`.slice(0, 128);
         const blockStart = Date.now();
+        const needsRepoPrefix =
+          reportRepoContext &&
+          !HELIX_ASK_REPO_FORCE.test(block.text) &&
+          !HELIX_ASK_REPO_EXPECTS.test(block.text) &&
+          !HELIX_ASK_REPO_HINT.test(block.text) &&
+          !HELIX_ASK_FILE_HINT.test(block.text);
+        const blockQuestion = needsRepoPrefix ? `In this repo, ${block.text}` : block.text;
         logEvent(
           "Report block",
           "start",
@@ -8796,10 +8815,11 @@ const executeHelixAsk = async ({
         await executeHelixAsk({
           request: {
             ...request,
-            question: block.text,
+            question: blockQuestion,
             prompt: undefined,
             traceId: blockTraceId,
             debug: debugEnabled,
+            searchQuery: rawQuestion || parsed.data.searchQuery,
           },
           personaId,
           responder: {
