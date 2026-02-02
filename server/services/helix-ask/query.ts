@@ -88,6 +88,8 @@ const HELIX_ASK_META_TOKENS = new Set([
   "citations",
   "clarify",
   "compare",
+  "define",
+  "defined",
   "definition",
   "detail",
   "details",
