@@ -8683,7 +8683,13 @@ const executeHelixAsk = async ({
       }
     }
     const baseQuestion = (questionValue ?? question ?? "").trim();
-    const reportDecision = resolveReportModeDecision(baseQuestion);
+    const rawQuestion = (request.question ?? request.prompt ?? "").trim();
+    const reportDecision = resolveReportModeDecision(rawQuestion || baseQuestion);
+    if (debugPayload) {
+      debugPayload.report_mode = reportDecision.enabled;
+      debugPayload.report_mode_reason = reportDecision.reason;
+      debugPayload.report_blocks_count = reportDecision.blockCount;
+    }
     if (reportDecision.enabled && !skipReportMode && baseQuestion) {
       const reportBlocks = buildReportBlocks(baseQuestion);
       const limitedBlocks = reportBlocks.slice(0, HELIX_ASK_REPORT_MAX_BLOCKS);
@@ -8694,8 +8700,6 @@ const executeHelixAsk = async ({
         reportDecision.reason ?? "enabled",
       );
       if (debugPayload) {
-        debugPayload.report_mode = true;
-        debugPayload.report_mode_reason = reportDecision.reason;
         debugPayload.report_blocks_count = limitedBlocks.length;
       }
       if (dryRun) {
