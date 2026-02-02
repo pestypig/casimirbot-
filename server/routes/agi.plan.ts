@@ -123,8 +123,11 @@ import {
 import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
 import { extractFilePathsFromText } from "../services/helix-ask/paths";
 import {
+  evaluateClaimCoverage,
   evaluateEvidenceEligibility,
   evaluateEvidenceCritic,
+  extractClaimCandidates,
+  filterCriticTokens,
   filterSignalTokens,
   tokenizeAskQuery,
 } from "../services/helix-ask/query";
@@ -2699,11 +2702,50 @@ const HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS = clampNumber(
   1,
   8,
 );
+const HELIX_ASK_EVIDENCE_CLAIM_GATE =
+  String(process.env.HELIX_ASK_EVIDENCE_CLAIM_GATE ?? "1").trim() !== "0";
+const HELIX_ASK_EVIDENCE_CLAIM_MAX = clampNumber(
+  readNumber(process.env.HELIX_ASK_EVIDENCE_CLAIM_MAX, 6),
+  2,
+  12,
+);
+const HELIX_ASK_EVIDENCE_CLAIM_MIN_RATIO = clampNumber(
+  readNumber(process.env.HELIX_ASK_EVIDENCE_CLAIM_MIN_RATIO, 0.2),
+  0.05,
+  0.9,
+);
+const HELIX_ASK_EVIDENCE_CLAIM_MIN_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_ASK_EVIDENCE_CLAIM_MIN_TOKENS, 1),
+  1,
+  8,
+);
+const HELIX_ASK_EVIDENCE_CLAIM_SUPPORT_RATIO = clampNumber(
+  readNumber(process.env.HELIX_ASK_EVIDENCE_CLAIM_SUPPORT_RATIO, 0.5),
+  0.1,
+  1,
+);
 const HELIX_ASK_EVIDENCE_CRITIC =
   String(process.env.HELIX_ASK_EVIDENCE_CRITIC ?? process.env.VITE_HELIX_ASK_EVIDENCE_CRITIC ?? "0")
     .trim() === "1";
 const HELIX_ASK_TRAINING_TRACE =
   String(process.env.HELIX_ASK_TRAINING_TRACE ?? "1").trim() !== "0";
+const HELIX_ASK_AMBIGUITY_GATE =
+  String(process.env.HELIX_ASK_AMBIGUITY_GATE ?? "1").trim() !== "0";
+const HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN, 5),
+  3,
+  12,
+);
+const HELIX_ASK_AMBIGUOUS_MAX_TERMS = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUOUS_MAX_TERMS, 2),
+  1,
+  6,
+);
+const HELIX_ASK_OVERFLOW_RETRY =
+  String(process.env.HELIX_ASK_OVERFLOW_RETRY ?? "1").trim() !== "0";
+const HELIX_ASK_OVERFLOW_RETRY_POLICY =
+  process.env.HELIX_ASK_OVERFLOW_RETRY_POLICY?.trim() ||
+  "drop_context_then_drop_output_then_retry";
 const HELIX_ASK_RETRIEVAL_RETRY_ENABLED =
   clampNumber(
     readNumber(
@@ -3784,6 +3826,12 @@ type PromptChunkCandidate = {
   rrfScore: number;
 };
 
+type PromptChunkSelection = {
+  id: string;
+  section: string;
+  preview: string;
+};
+
 const dedupeTokens = (tokens: string[]): string[] => Array.from(new Set(tokens));
 
 const estimateTokenCount = (text: string): number => {
@@ -4019,13 +4067,14 @@ const buildLongPromptContext = (
   files: string[];
   chunkCount: number;
   selectedCount: number;
+  selections: PromptChunkSelection[];
 } => {
   const chunks = buildPromptChunks(promptText, {
     chunkTokens: opts.chunkTokens,
     overlapTokens: opts.overlapTokens,
   });
   if (!chunks.length) {
-    return { context: "", files: [], chunkCount: 0, selectedCount: 0 };
+    return { context: "", files: [], chunkCount: 0, selectedCount: 0, selections: [] };
   }
   const queryTokens = tokenizePromptText(query);
   const queryVector = queryTokens.length ? hashEmbed(query, LONGPROMPT_EMBED_DIM) : null;
@@ -4073,17 +4122,24 @@ const buildLongPromptContext = (
   }
   const lines: string[] = [];
   const files: string[] = [];
+  const selections: PromptChunkSelection[] = [];
   for (const entry of selected) {
     const preview = clipAskText(entry.text, HELIX_ASK_CONTEXT_CHARS);
     if (!preview) continue;
     lines.push(`${entry.chunkId}\n${preview}`);
     files.push(entry.chunkId);
+    selections.push({
+      id: entry.chunkId,
+      section: entry.section,
+      preview,
+    });
   }
   return {
     context: lines.join("\n\n"),
     files,
     chunkCount: chunks.length,
     selectedCount: selected.length,
+    selections,
   };
 };
 
@@ -6321,6 +6377,253 @@ type LocalAskResult = {
   [key: string]: unknown;
 };
 
+type HelixAskOverflowMeta = {
+  applied: boolean;
+  steps: string[];
+  attempts: number;
+  promptTokens: number;
+  maxTokens: number;
+};
+
+type HelixAskOverflowOptions = {
+  allowContextDrop?: boolean;
+  fallbackMaxTokens?: number;
+  label?: string;
+};
+
+const OVERFLOW_CONTEXT_MARKERS = new Set(["context:", "prompt context:"]);
+const OVERFLOW_ERROR_RE =
+  /(context|ctx|token|prompt\s+too\s+long|max(?:imum)?\s+context|n_ctx|exceed)/i;
+
+const parseOverflowPolicy = (value: string): string[] =>
+  value
+    .split(/_then_|->/g)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry && entry !== "retry");
+
+const prunePromptContext = (prompt: string): { prompt: string; applied: boolean } => {
+  const lines = prompt.split(/\r?\n/);
+  const out: string[] = [];
+  let inContext = false;
+  let applied = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const lowered = trimmed.toLowerCase();
+    if (!inContext && OVERFLOW_CONTEXT_MARKERS.has(lowered)) {
+      inContext = true;
+      applied = true;
+      out.push(line);
+      out.push("Context omitted due to overflow.");
+      continue;
+    }
+    if (inContext) {
+      if (trimmed === HELIX_ASK_ANSWER_START || trimmed === HELIX_ASK_ANSWER_END) {
+        inContext = false;
+        out.push(line);
+      }
+      continue;
+    }
+    out.push(line);
+  }
+  return { prompt: out.join("\n"), applied };
+};
+
+const applyOverflowStep = (args: {
+  step: string;
+  prompt: string;
+  maxTokens: number | undefined;
+  fallbackMaxTokens: number;
+  allowContextDrop: boolean;
+}): { prompt: string; maxTokens: number | undefined; applied: boolean } => {
+  if (args.step === "drop_context" && args.allowContextDrop) {
+    const pruned = prunePromptContext(args.prompt);
+    if (pruned.applied) {
+      return { prompt: pruned.prompt, maxTokens: args.maxTokens, applied: true };
+    }
+    return { prompt: args.prompt, maxTokens: args.maxTokens, applied: false };
+  }
+  if (args.step === "drop_output") {
+    const budget = args.maxTokens ?? args.fallbackMaxTokens;
+    const promptTokens = estimateTokenCount(args.prompt);
+    const available = Math.max(1, HELIX_ASK_LOCAL_CONTEXT_TOKENS - promptTokens - 8);
+    const nextMaxTokens = Math.min(Math.max(1, Math.floor(budget)), available);
+    if (args.maxTokens === nextMaxTokens) {
+      return { prompt: args.prompt, maxTokens: args.maxTokens, applied: false };
+    }
+    return { prompt: args.prompt, maxTokens: nextMaxTokens, applied: true };
+  }
+  return { prompt: args.prompt, maxTokens: args.maxTokens, applied: false };
+};
+
+const isOverflowLikely = (prompt: string, maxTokens: number): boolean => {
+  const promptTokens = estimateTokenCount(prompt);
+  return promptTokens + maxTokens > HELIX_ASK_LOCAL_CONTEXT_TOKENS;
+};
+
+const runHelixAskLocalWithOverflowRetry = async (
+  input: {
+    prompt: string;
+    max_tokens?: number;
+    temperature?: number;
+    seed?: number;
+    stop?: string | string[];
+  },
+  ctx: {
+    personaId: string;
+    sessionId?: string;
+    traceId?: string;
+    onToken?: (chunk: string) => void;
+  },
+  options: HelixAskOverflowOptions = {},
+): Promise<{ result: LocalAskResult; overflow?: HelixAskOverflowMeta }> => {
+  const steps = parseOverflowPolicy(HELIX_ASK_OVERFLOW_RETRY_POLICY);
+  const fallbackMaxTokens = Math.max(1, Math.floor(options.fallbackMaxTokens ?? 256));
+  let prompt = input.prompt;
+  let maxTokens = input.max_tokens;
+  const appliedSteps: string[] = [];
+  let attempts = 0;
+
+  if (HELIX_ASK_OVERFLOW_RETRY && steps.length > 0) {
+    for (const step of steps) {
+      const budget = maxTokens ?? fallbackMaxTokens;
+      if (!isOverflowLikely(prompt, budget)) {
+        break;
+      }
+      const applied = applyOverflowStep({
+        step,
+        prompt,
+        maxTokens,
+        fallbackMaxTokens,
+        allowContextDrop: options.allowContextDrop !== false,
+      });
+      if (!applied.applied) {
+        continue;
+      }
+      prompt = applied.prompt;
+      maxTokens = applied.maxTokens;
+      appliedSteps.push(step);
+    }
+  }
+
+  while (true) {
+    attempts += 1;
+    try {
+      const result = (await llmLocalHandler(
+        {
+          prompt,
+          max_tokens: maxTokens ?? input.max_tokens,
+          temperature: input.temperature,
+          seed: input.seed,
+          stop: input.stop,
+        },
+        ctx,
+      )) as LocalAskResult;
+      const promptTokens = estimateTokenCount(prompt);
+      const overflow =
+        appliedSteps.length > 0
+          ? {
+              applied: true,
+              steps: appliedSteps.slice(),
+              attempts,
+              promptTokens,
+              maxTokens: maxTokens ?? fallbackMaxTokens,
+            }
+          : undefined;
+      return { result, overflow };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const overflowError = HELIX_ASK_OVERFLOW_RETRY && OVERFLOW_ERROR_RE.test(message);
+      if (!overflowError || steps.length === 0) {
+        throw error;
+      }
+      const nextStep = steps[appliedSteps.length];
+      if (!nextStep) {
+        throw error;
+      }
+      const applied = applyOverflowStep({
+        step: nextStep,
+        prompt,
+        maxTokens,
+        fallbackMaxTokens,
+        allowContextDrop: options.allowContextDrop !== false,
+      });
+      if (!applied.applied) {
+        throw error;
+      }
+      prompt = applied.prompt;
+      maxTokens = applied.maxTokens;
+      appliedSteps.push(nextStep);
+    }
+  }
+};
+
+const AMBIGUOUS_IGNORE_TOKENS = new Set([
+  "helix",
+  "ask",
+  "system",
+  "repo",
+  "codebase",
+  "pipeline",
+  "file",
+  "files",
+  "path",
+  "paths",
+  "citations",
+  "citation",
+  "module",
+  "modules",
+]);
+
+const collectConceptTokens = (conceptMatch: HelixAskConceptMatch | null): Set<string> => {
+  if (!conceptMatch) return new Set<string>();
+  const values = [
+    conceptMatch.card.id,
+    conceptMatch.card.label ?? "",
+    ...(conceptMatch.card.aliases ?? []),
+  ].filter(Boolean);
+  const tokens = values
+    .flatMap((value) => tokenizeAskQuery(value))
+    .flatMap((token) => filterCriticTokens([token]));
+  return new Set(tokens.map((token) => token.toLowerCase()));
+};
+
+const extractAmbiguousTerms = (
+  question: string,
+  referenceText: string,
+  conceptMatch: HelixAskConceptMatch | null,
+): string[] => {
+  if (!question.trim()) return [];
+  const conceptTokens = collectConceptTokens(conceptMatch);
+  const normalizedRef = referenceText.toLowerCase();
+  const tokens = filterCriticTokens(tokenizeAskQuery(question));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const token of tokens) {
+    const normalized = token.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    if (normalized.length < HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN) continue;
+    if (AMBIGUOUS_IGNORE_TOKENS.has(normalized)) continue;
+    if (conceptTokens.has(normalized)) continue;
+    if (/^\d+$/.test(normalized)) continue;
+    if (normalizedRef.includes(normalized)) continue;
+    out.push(normalized);
+    if (out.length >= HELIX_ASK_AMBIGUOUS_MAX_TERMS) break;
+  }
+  return out;
+};
+
+const buildAmbiguityClarifyLine = (terms: string[]): string => {
+  if (!terms.length) {
+    return "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
+  }
+  if (terms.length === 1) {
+    return `I do not see "${terms[0]}" in the repo evidence yet. What do you mean by it, or which file should I use?`;
+  }
+  const joined = terms.map((term) => `"${term}"`).join(" or ");
+  return `I do not see ${joined} in the repo evidence yet. Which files define those terms?`;
+};
+
 const ExecuteRequest = z.object({
   traceId: z.string().min(8, "traceId required"),
   debugSources: z.boolean().optional(),
@@ -7371,6 +7674,8 @@ const executeHelixAsk = async ({
       prompt_chunk_count?: number;
       prompt_selected?: number;
       prompt_context_files?: string[];
+      prompt_context_points?: string[];
+      prompt_used_sections?: string[];
       topic_tags?: string[];
       topic_allowlist_tiers?: number;
       topic_must_include_files?: string[];
@@ -7402,6 +7707,7 @@ const executeHelixAsk = async ({
       math_solver_registry_id?: string;
       math_solver_selected_solution?: string;
       math_solver_admissible_count?: number;
+      math_solver_maturity?: string;
       intent_id?: string;
       intent_domain?: string;
       intent_tier?: string;
@@ -7448,6 +7754,12 @@ const executeHelixAsk = async ({
       evidence_match_ratio?: number;
       evidence_match_count?: number;
       evidence_token_count?: number;
+      evidence_claim_count?: number;
+      evidence_claim_supported?: number;
+      evidence_claim_unsupported?: number;
+      evidence_claim_ratio?: number;
+      evidence_claim_gate_ok?: boolean;
+      evidence_claim_missing?: string[];
       retrieval_confidence?: number;
       retrieval_doc_share?: number;
       retrieval_doc_hits?: number;
@@ -7468,6 +7780,12 @@ const executeHelixAsk = async ({
       repo_search_hits?: number;
       repo_search_truncated?: boolean;
       repo_search_error?: string;
+      ambiguity_terms?: string[];
+      ambiguity_gate_applied?: boolean;
+      overflow_retry_applied?: boolean;
+      overflow_retry_steps?: string[];
+      overflow_retry_labels?: string[];
+      overflow_retry_attempts?: number;
       plan_must_include_ok?: boolean;
       constraint_evidence?: string;
       citation_repair?: boolean;
@@ -7593,6 +7911,16 @@ const executeHelixAsk = async ({
     } | undefined = debugEnabled
       ? { two_pass: false, micro_pass: false }
       : undefined;
+    const overflowHistory: Array<{ label: string; steps: string[]; attempts: number }> = [];
+    const recordOverflow = (label: string, overflow?: HelixAskOverflowMeta): void => {
+      if (!overflow?.applied) return;
+      overflowHistory.push({
+        label,
+        steps: overflow.steps.slice(),
+        attempts: overflow.attempts,
+      });
+      logEvent("Overflow retry", label, overflow.steps.join(" -> "));
+    };
     if (debugPayload) {
       debugPayload.tuning_enabled = Boolean(tuningOverrides);
       debugPayload.arbiter_repo_ratio = arbiterRepoRatio;
@@ -7825,6 +8153,8 @@ const executeHelixAsk = async ({
     let promptContextFiles: string[] = [];
     let promptChunkCount = 0;
     let promptSelectedCount = 0;
+    let promptContextPoints: string[] = [];
+    let promptUsedSections: string[] = [];
     if (longPromptCandidate) {
       const estimatedTokens = estimateTokenCount(longPromptCandidate.text);
       const estimatedTotal = estimatedTokens + answerTokenBudget + HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS;
@@ -7852,6 +8182,16 @@ const executeHelixAsk = async ({
         promptContextFiles = ingestResult.files;
         promptChunkCount = ingestResult.chunkCount;
         promptSelectedCount = ingestResult.selectedCount;
+        promptContextPoints = ingestResult.selections
+          .map((entry) => {
+            const section = entry.section ? ` (${entry.section})` : "";
+            const preview = entry.preview ? ` - ${entry.preview}` : "";
+            return `${entry.id}${section}${preview}`;
+          })
+          .slice(0, 12);
+        promptUsedSections = Array.from(
+          new Set(ingestResult.selections.map((entry) => entry.section).filter(Boolean)),
+        ).slice(0, 12);
         logProgress(
           "Prompt ingest ready",
           `${promptSelectedCount} chunks`,
@@ -7872,6 +8212,12 @@ const executeHelixAsk = async ({
       debugPayload.prompt_chunk_count = promptChunkCount;
       debugPayload.prompt_selected = promptSelectedCount;
       debugPayload.prompt_context_files = promptContextFiles;
+      if (promptContextPoints.length > 0) {
+        debugPayload.prompt_context_points = promptContextPoints.slice();
+      }
+      if (promptUsedSections.length > 0) {
+        debugPayload.prompt_used_sections = promptUsedSections.slice();
+      }
     }
     let conceptMatch: HelixAskConceptMatch | null = null;
     let mathSolveResult: HelixAskMathSolveResult | null = null;
@@ -8045,6 +8391,7 @@ const executeHelixAsk = async ({
         debugPayload.math_solver_registry_id = mathSolveResult.registryId;
         debugPayload.math_solver_selected_solution = mathSolveResult.selectedSolution;
         debugPayload.math_solver_admissible_count = mathSolveResult.admissibleSolutions?.length;
+        debugPayload.math_solver_maturity = mathSolveResult.maturityStage;
       }
     }
     let forcedAnswer: string | null = null;
@@ -8283,6 +8630,7 @@ const executeHelixAsk = async ({
     let planPassStart: number | null = null;
     let planDirectives: HelixAskPlanDirectives | null = null;
     let planScope: HelixAskPlanScope | null = null;
+    let clarifyOverride: string | undefined;
     let requiredSlots: string[] = [];
 
     if (debugPayload && skipMicroPass) {
@@ -8347,20 +8695,27 @@ const executeHelixAsk = async ({
                 conceptSkeleton,
                 anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
               });
-              const queryResult = (await llmLocalHandler(
-                {
-                  prompt: queryPrompt,
-                  max_tokens: HELIX_ASK_QUERY_TOKENS,
-                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                  seed: parsed.data.seed,
-                  stop: parsed.data.stop,
-                },
-                {
-                  personaId,
-                  sessionId: parsed.data.sessionId,
-                  traceId: askTraceId,
-                },
-              )) as LocalAskResult;
+              const { result: queryResult, overflow: queryOverflow } =
+                await runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt: queryPrompt,
+                    max_tokens: HELIX_ASK_QUERY_TOKENS,
+                    temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  },
+                  {
+                    fallbackMaxTokens: HELIX_ASK_QUERY_TOKENS,
+                    allowContextDrop: true,
+                    label: "query_hints",
+                  },
+                );
+              recordOverflow("query_hints", queryOverflow);
               const planParse = parsePlanDirectives(queryResult.text ?? "");
               planDirectives = planParse.directives;
               queryHints = planParse.queryHints;
@@ -9221,20 +9576,27 @@ const executeHelixAsk = async ({
             compositeRequest.enabled,
             verificationAnchorRequired ? verificationAnchorHints : [],
           );
-          const evidenceResult = (await llmLocalHandler(
-            {
-              prompt: evidencePrompt,
-              max_tokens: evidenceTokens,
-              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-              seed: parsed.data.seed,
-              stop: parsed.data.stop,
-            },
-            {
-              personaId,
-              sessionId: parsed.data.sessionId,
-              traceId: askTraceId,
-            },
-          )) as LocalAskResult;
+          const { result: evidenceResult, overflow: evidenceOverflow } =
+            await runHelixAskLocalWithOverflowRetry(
+              {
+                prompt: evidencePrompt,
+                max_tokens: evidenceTokens,
+                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+              },
+              {
+                fallbackMaxTokens: evidenceTokens,
+                allowContextDrop: true,
+                label: "repo_evidence",
+              },
+            );
+          recordOverflow("repo_evidence", evidenceOverflow);
           repoScaffold = normalizeScaffoldText(
             stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
           );
@@ -9278,20 +9640,27 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
-          const evidenceResult = (await llmLocalHandler(
-            {
-              prompt: evidencePrompt,
-              max_tokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
-              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-              seed: parsed.data.seed,
-              stop: parsed.data.stop,
-            },
-            {
-              personaId,
-              sessionId: parsed.data.sessionId,
-              traceId: askTraceId,
-            },
-          )) as LocalAskResult;
+          const { result: evidenceResult, overflow: promptOverflow } =
+            await runHelixAskLocalWithOverflowRetry(
+              {
+                prompt: evidencePrompt,
+                max_tokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+              },
+              {
+                fallbackMaxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+                allowContextDrop: true,
+                label: "prompt_evidence",
+              },
+            );
+          recordOverflow("prompt_evidence", promptOverflow);
           promptScaffold = normalizeScaffoldText(
             stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
           );
@@ -9330,20 +9699,27 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
-          const evidenceResult = (await llmLocalHandler(
-            {
-              prompt: evidencePrompt,
-              max_tokens: evidenceTokens,
-              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-              seed: parsed.data.seed,
-              stop: parsed.data.stop,
-            },
-            {
-              personaId,
-              sessionId: parsed.data.sessionId,
-              traceId: askTraceId,
-            },
-          )) as LocalAskResult;
+          const { result: evidenceResult, overflow: generalOverflow } =
+            await runHelixAskLocalWithOverflowRetry(
+              {
+                prompt: evidencePrompt,
+                max_tokens: evidenceTokens,
+                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+              },
+              {
+                fallbackMaxTokens: evidenceTokens,
+                allowContextDrop: true,
+                label: "general_evidence",
+              },
+            );
+          recordOverflow("general_evidence", generalOverflow);
           generalScaffold = normalizeScaffoldText(
             stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
           );
@@ -9362,6 +9738,63 @@ const executeHelixAsk = async ({
             evidenceStart,
           );
         }
+      }
+
+      let claimCoverage: ReturnType<typeof evaluateClaimCoverage> | null = null;
+      let claimGateFailed = false;
+      if (
+        HELIX_ASK_EVIDENCE_CLAIM_GATE &&
+        (repoScaffold || promptScaffold || generalScaffold)
+      ) {
+        const claimSource = repoScaffold || promptScaffold || generalScaffold;
+        const claimContext = promptIngested ? promptContextText : contextText;
+        const claims = extractClaimCandidates(claimSource, HELIX_ASK_EVIDENCE_CLAIM_MAX);
+        if (claims.length > 0 && claimContext) {
+          claimCoverage = evaluateClaimCoverage(claims, claimContext, {
+            minTokens: HELIX_ASK_EVIDENCE_CLAIM_MIN_TOKENS,
+            minRatio: HELIX_ASK_EVIDENCE_CLAIM_MIN_RATIO,
+            minSupportRatio: HELIX_ASK_EVIDENCE_CLAIM_SUPPORT_RATIO,
+            signalTokens: evidenceSignalTokens,
+          });
+          if (debugPayload) {
+            debugPayload.evidence_claim_count = claimCoverage.claimCount;
+            debugPayload.evidence_claim_supported = claimCoverage.supportedCount;
+            debugPayload.evidence_claim_unsupported = claimCoverage.unsupported.length;
+            debugPayload.evidence_claim_ratio = claimCoverage.supportRatio;
+            debugPayload.evidence_claim_gate_ok = claimCoverage.ok;
+            debugPayload.evidence_claim_missing = claimCoverage.unsupported.slice(0, 3);
+          }
+          claimGateFailed = !claimCoverage.ok;
+          if (!claimCoverage.ok && (intentDomain === "repo" || intentDomain === "hybrid")) {
+            forceHybridNoEvidence = true;
+          }
+        }
+      }
+
+      const ambiguityTerms = HELIX_ASK_AMBIGUITY_GATE
+        ? extractAmbiguousTerms(
+            baseQuestion,
+            [contextText, promptContextText].filter(Boolean).join("\n"),
+            conceptMatch,
+          )
+        : [];
+      if (debugPayload && ambiguityTerms.length > 0) {
+        debugPayload.ambiguity_terms = ambiguityTerms.slice();
+      }
+      if (ambiguityTerms.length > 0) {
+        clarifyOverride = buildAmbiguityClarifyLine(ambiguityTerms);
+        if (debugPayload) {
+          debugPayload.ambiguity_gate_applied = true;
+        }
+      }
+      const shouldClarifyNow =
+        !promptIngested &&
+        (intentDomain === "repo" || intentDomain === "hybrid") &&
+        requiresRepoEvidence &&
+        (claimGateFailed || (!evidenceGate.ok && ambiguityTerms.length > 0));
+      if (shouldClarifyNow && !forcedAnswer && intentStrategy !== "constraint_report") {
+        forcedAnswer = clarifyOverride ?? buildAmbiguityClarifyLine([]);
+        answerPath.push("clarify:ambiguity");
       }
 
       const generalEvidence = promptScaffold || generalScaffold;
@@ -9523,23 +9956,31 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
-          const scaffoldResult = (await llmLocalHandler(
-            {
-              prompt: scaffoldPrompt,
-              max_tokens: Math.min(
-                scaffoldTokens,
-                parsed.data.max_tokens ?? scaffoldTokens,
-              ),
-              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-              seed: parsed.data.seed,
-              stop: parsed.data.stop,
-            },
-            {
-              personaId,
-              sessionId: parsed.data.sessionId,
-              traceId: askTraceId,
-            },
-          )) as LocalAskResult;
+          const scaffoldMaxTokens = Math.min(
+            scaffoldTokens,
+            parsed.data.max_tokens ?? scaffoldTokens,
+          );
+          const { result: scaffoldResult, overflow: scaffoldOverflow } =
+            await runHelixAskLocalWithOverflowRetry(
+              {
+                prompt: scaffoldPrompt,
+                max_tokens: scaffoldMaxTokens,
+                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+              },
+              {
+                fallbackMaxTokens: scaffoldMaxTokens,
+                allowContextDrop: true,
+                label: "two_pass_scaffold",
+              },
+            );
+          recordOverflow("two_pass_scaffold", scaffoldOverflow);
           logProgress("Scaffold ready", "two-pass", scaffoldStart);
           let scaffoldText = normalizeScaffoldText(
             stripPromptEchoFromAnswer(scaffoldResult.text ?? "", questionValue ?? ""),
@@ -9601,21 +10042,30 @@ const executeHelixAsk = async ({
         maxTokens: parsed.data.max_tokens ?? null,
         temperature: parsed.data.temperature ?? null,
       });
-      result = (await llmLocalHandler(
-        {
-          prompt,
-          max_tokens: parsed.data.max_tokens,
-          temperature: parsed.data.temperature,
-          seed: parsed.data.seed,
-          stop: parsed.data.stop,
-        },
-        {
-          personaId,
-          sessionId: parsed.data.sessionId,
-          traceId: askTraceId,
-          onToken: streamEmitter.onToken,
-        },
-      )) as LocalAskResult;
+      const answerFallbackTokens = parsed.data.max_tokens ?? scaffoldTokens;
+      const { result: answerResult, overflow: answerOverflow } =
+        await runHelixAskLocalWithOverflowRetry(
+          {
+            prompt,
+            max_tokens: parsed.data.max_tokens,
+            temperature: parsed.data.temperature,
+            seed: parsed.data.seed,
+            stop: parsed.data.stop,
+          },
+          {
+            personaId,
+            sessionId: parsed.data.sessionId,
+            traceId: askTraceId,
+            onToken: streamEmitter.onToken,
+          },
+          {
+            fallbackMaxTokens: answerFallbackTokens,
+            allowContextDrop: true,
+            label: "answer",
+          },
+        );
+      recordOverflow("answer", answerOverflow);
+      result = answerResult as LocalAskResult;
       logDebug("llmLocalHandler MAIN complete", {
         textLength: typeof result.text === "string" ? result.text.length : 0,
       });
@@ -9669,20 +10119,27 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
-          const repairResult = (await llmLocalHandler(
-            {
-              prompt: repairPrompt,
-              max_tokens: repairTokens,
-              temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-              seed: parsed.data.seed,
-              stop: parsed.data.stop,
-            },
-            {
-              personaId,
-              sessionId: parsed.data.sessionId,
-              traceId: askTraceId,
-            },
-          )) as LocalAskResult;
+          const { result: repairResult, overflow: repairOverflow } =
+            await runHelixAskLocalWithOverflowRetry(
+              {
+                prompt: repairPrompt,
+                max_tokens: repairTokens,
+                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+              },
+              {
+                fallbackMaxTokens: repairTokens,
+                allowContextDrop: true,
+                label: "citation_repair",
+              },
+            );
+          recordOverflow("citation_repair", repairOverflow);
           logDebug("llmLocalHandler CITATION_REPAIR complete", {
             textLength: typeof repairResult.text === "string" ? repairResult.text.length : 0,
           });
@@ -9761,7 +10218,7 @@ const executeHelixAsk = async ({
               .trim();
             paragraph1 = clipAskText(collapsed || stripped, 420);
           }
-          const planClarify = planDirectives?.clarifyQuestion?.trim() ?? "";
+          const planClarify = (clarifyOverride ?? planDirectives?.clarifyQuestion ?? "").trim();
           const clarifyLine =
             planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)
               ? planClarify
@@ -9921,6 +10378,9 @@ const executeHelixAsk = async ({
               `contradictions=${platonicResult.beliefGraphSummary.contradictionIds.join(",")}`,
             );
           }
+          const latticeSnapshot = await loadCodeLattice();
+          const latticeVersion = latticeSnapshot?.latticeVersion ?? getLatticeVersion();
+          const latticeCommit = latticeSnapshot?.commit ?? null;
           recordTrainingTrace({
             traceId: askTraceId,
             pass:
@@ -9932,6 +10392,11 @@ const executeHelixAsk = async ({
               intent_id: intentProfile.id,
               domain: platonicDomain,
               tier: intentTier ?? null,
+              lattice_version: latticeVersion ?? null,
+              lattice_commit: latticeCommit ?? null,
+              prompt_ingested: promptIngested ? 1 : 0,
+              prompt_chunk_count: promptChunkCount || null,
+              prompt_selected_count: promptSelectedCount || null,
               coverage_ratio: platonicResult.coverageSummary.coverageRatio,
               coverage_missing_key_count: platonicResult.coverageSummary.missingKeyCount,
               belief_claim_count: platonicResult.beliefSummary.claimCount,
@@ -10176,6 +10641,16 @@ const executeHelixAsk = async ({
     }
     if (debugPayload && captureLiveHistory) {
       debugPayload.live_events = liveEventHistory.slice();
+    }
+    if (debugPayload && overflowHistory.length > 0) {
+      const steps = overflowHistory.flatMap((entry) => entry.steps);
+      debugPayload.overflow_retry_applied = true;
+      debugPayload.overflow_retry_steps = Array.from(new Set(steps));
+      debugPayload.overflow_retry_labels = overflowHistory.map((entry) => entry.label);
+      debugPayload.overflow_retry_attempts = overflowHistory.reduce(
+        (sum, entry) => sum + entry.attempts,
+        0,
+      );
     }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
     logDebug("responder.send(200) start", {

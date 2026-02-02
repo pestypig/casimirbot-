@@ -41,6 +41,8 @@ type HelixAskReply = {
     prompt_chunk_count?: number;
     prompt_selected?: number;
     prompt_context_files?: string[];
+    prompt_context_points?: string[];
+    prompt_used_sections?: string[];
     intent_id?: string;
     intent_domain?: string;
     intent_tier?: string;
@@ -62,15 +64,28 @@ type HelixAskReply = {
     math_solver_kind?: string;
     math_solver_final?: string;
     math_solver_reason?: string;
+    math_solver_maturity?: string;
     evidence_gate_ok?: boolean;
     evidence_match_ratio?: number;
     evidence_match_count?: number;
     evidence_token_count?: number;
+    evidence_claim_count?: number;
+    evidence_claim_supported?: number;
+    evidence_claim_unsupported?: number;
+    evidence_claim_ratio?: number;
+    evidence_claim_gate_ok?: boolean;
+    evidence_claim_missing?: string[];
     evidence_critic_applied?: boolean;
     evidence_critic_ok?: boolean;
     evidence_critic_ratio?: number;
     evidence_critic_count?: number;
     evidence_critic_tokens?: number;
+    ambiguity_terms?: string[];
+    ambiguity_gate_applied?: boolean;
+    overflow_retry_applied?: boolean;
+    overflow_retry_steps?: string[];
+    overflow_retry_labels?: string[];
+    overflow_retry_attempts?: number;
     physics_lint_applied?: boolean;
     physics_lint_reasons?: string[];
     coverage_token_count?: number;
@@ -1914,6 +1929,40 @@ export function HelixAskPill({
                       {typeof reply.debug.prompt_selected === "number"
                         ? ` (selected ${reply.debug.prompt_selected})`
                         : ""}
+                    </p>
+                  ) : null}
+                  {reply.debug.prompt_context_points &&
+                  reply.debug.prompt_context_points.length > 0 ? (
+                    <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-400">
+                      Prompt context points:
+                      {"\n"}
+                      {reply.debug.prompt_context_points.join("\n")}
+                    </div>
+                  ) : null}
+                  {reply.debug.prompt_used_sections &&
+                  reply.debug.prompt_used_sections.length > 0 ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Prompt sections: {reply.debug.prompt_used_sections.join(", ")}
+                    </p>
+                  ) : null}
+                  {typeof reply.debug.evidence_claim_count === "number" ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Claim gate: {reply.debug.evidence_claim_supported ?? 0}/
+                      {reply.debug.evidence_claim_count} supported
+                      {typeof reply.debug.evidence_claim_ratio === "number"
+                        ? ` (${reply.debug.evidence_claim_ratio.toFixed(2)})`
+                        : ""}
+                    </p>
+                  ) : null}
+                  {reply.debug.ambiguity_terms && reply.debug.ambiguity_terms.length > 0 ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Ambiguous terms: {reply.debug.ambiguity_terms.join(", ")}
+                    </p>
+                  ) : null}
+                  {reply.debug.overflow_retry_steps &&
+                  reply.debug.overflow_retry_steps.length > 0 ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Overflow retry: {reply.debug.overflow_retry_steps.join(" -> ")}
                     </p>
                   ) : null}
                   {reply.debug.format ? (

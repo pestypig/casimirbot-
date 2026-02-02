@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { evaluateEvidenceEligibility } from "../server/services/helix-ask/query";
+import {
+  evaluateEvidenceEligibility,
+  extractClaimCandidates,
+  evaluateClaimCoverage,
+} from "../server/services/helix-ask/query";
 
 describe("Helix Ask evidence eligibility gate", () => {
   it("fails when context misses key tokens", () => {
@@ -44,5 +48,38 @@ describe("Helix Ask evidence eligibility gate", () => {
     );
     expect(result.ok).toBe(true);
     expect(result.matchCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("extracts claim candidates from bullets and strips citations", () => {
+    const scaffold = [
+      "- The system uses a gate to validate results (server/routes/agi.plan.ts).",
+      "- Training traces are persisted for export (server/services/observability/training-trace-store.ts).",
+    ].join("\n");
+    const claims = extractClaimCandidates(scaffold, 4);
+    expect(claims.length).toBeGreaterThan(0);
+    expect(claims[0]).toMatch(/uses a gate/i);
+    expect(claims[0]).not.toMatch(/\.ts/);
+  });
+
+  it("evaluates claim coverage against context", () => {
+    const claims = [
+      "The system uses a gate to validate results.",
+      "Training traces are persisted for export.",
+    ];
+    const ok = evaluateClaimCoverage(claims, "The system uses a gate and persists training traces.", {
+      minTokens: 1,
+      minRatio: 0.2,
+      minSupportRatio: 0.5,
+    });
+    expect(ok.ok).toBe(true);
+    expect(ok.supportedCount).toBeGreaterThan(0);
+
+    const fail = evaluateClaimCoverage(claims, "Unrelated context only.", {
+      minTokens: 1,
+      minRatio: 0.4,
+      minSupportRatio: 0.5,
+    });
+    expect(fail.ok).toBe(false);
+    expect(fail.supportedCount).toBe(0);
   });
 });

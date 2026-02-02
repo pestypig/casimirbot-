@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import nerdamer from "nerdamer";
 import "nerdamer/Solve.js";
 import "nerdamer/Calculus.js";
+import type { MathStage } from "../../shared/math-stage.js";
 
 const scriptPath = fileURLToPath(new URL("../../../scripts/py/math_solve.py", import.meta.url));
 
@@ -25,6 +26,7 @@ export type HelixAskMathSolveResult = {
   registryId?: string;
   selectedSolution?: string;
   admissibleSolutions?: string[];
+  maturityStage?: MathStage;
 };
 
 const MATH_TRIGGER =
@@ -520,6 +522,27 @@ function applyMathTruthGates(question: string, result: HelixAskMathSolveResult):
   };
 }
 
+const resolveMathMaturityStage = (result: HelixAskMathSolveResult): MathStage => {
+  if (!result.ok) return "exploratory";
+  if (result.kind !== "solve") return "exploratory";
+  if (result.gatePass && result.residualPass && result.domainPass) {
+    if (result.registryId && typeof result.residualMax === "number") {
+      const threshold = Math.max(DEFAULT_RESIDUAL_TOLERANCE, 1e-8);
+      if (result.residualMax <= threshold * 0.1) {
+        return "certified";
+      }
+      return "diagnostic";
+    }
+    return "reduced-order";
+  }
+  return result.domainPass || result.residualPass ? "reduced-order" : "exploratory";
+};
+
+const attachMathMaturityStage = (result: HelixAskMathSolveResult): HelixAskMathSolveResult => ({
+  ...result,
+  maturityStage: resolveMathMaturityStage(result),
+});
+
 function solveWithNerdamer(question: string): HelixAskMathSolveResult | null {
   const normalizedQuestion = normalizeExpression(question);
   if (!normalizedQuestion) return null;
@@ -620,7 +643,7 @@ export async function solveHelixAskMathQuestion(
 ): Promise<HelixAskMathSolveResult | null> {
   if (!isHelixAskMathQuestion(question)) return null;
   const jsResult = solveWithNerdamer(question);
-  if (jsResult?.ok) return jsResult;
+  if (jsResult) return attachMathMaturityStage(jsResult);
   if (process.env.ENABLE_PY_CHECKERS !== "1") return null;
   const pythonBin = process.env.PYTHON_BIN || "python";
   const payload = JSON.stringify({ question });
@@ -645,7 +668,7 @@ export async function solveHelixAskMathQuestion(
       }
       try {
         const parsed = JSON.parse(stdout) as HelixAskMathSolveResult;
-        resolve(parsed);
+        resolve(attachMathMaturityStage(parsed));
       } catch (error) {
         resolve({ ok: false, reason: `parse_error:${(error as Error).message}` });
       }

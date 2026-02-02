@@ -3246,7 +3246,7 @@ Expected output:
   - Replay controls: "Replay run" with pass/fail delta and run timestamp.
   - Safety handling: show safety kind/stage when refusal/redaction is present.
 
-## Helix Ask Long Prompt Ingest - Status: pending
+## Helix Ask Long Prompt Ingest - Status: ready for test
 - Goal: accept prompts longer than the local context window by chunking, indexing,
   and retrieving prompt slices for grounded answers with citations.
 - Why: local GGUF context is memory-limited; avoid silent truncation or hard
@@ -3290,7 +3290,12 @@ Expected output:
   - Responses cite prompt chunk IDs when prompt ingestion is used.
   - Context window stays within 2k-4k caps for local runtime.
 
-## Helix Ask Robust Prompt Handling (Domain + Evidence + Format) - Status: in progress
+Progress notes:
+- Added prompt ingest overflow routing, chunk retrieval, and prompt context cards with chunk IDs.
+- UI debug now exposes prompt context points/used sections plus prompt ingest metadata.
+- Overflow retry policy added for local calls to keep long prompts within context caps.
+
+## Helix Ask Robust Prompt Handling (Domain + Evidence + Format) - Status: ready for test
 - Goal: treat all prompts consistently by routing to repo/general/hybrid, enforcing evidence
   relevance, and matching format to intent.
 - Core rule: every prompt goes through the same decision checkpoints in order:
@@ -3328,7 +3333,11 @@ Expected output:
 - Retrieval controls:
   - Boost Helix Ask pipeline files only when the question is explicitly system-related.
 
-## Helix Ask Continual Learning Loop (Trace -> Refinery -> Adapter A/B) - Status: planned
+Progress notes:
+- Added claim-level evidence coverage gate and ambiguity-triggered clarification fallback.
+- Evidence eligibility ignores instruction noise and routes clarify when repo evidence is weak.
+
+## Helix Ask Continual Learning Loop (Trace -> Refinery -> Adapter A/B) - Status: ready for test
 - Goal: keep Helix Ask reasoning aligned with the evolving repo while preserving a stable, known-good baseline.
 - Do:
   - Tag Helix Ask traces with lattice version + repo commit so training data is recency-aware.
@@ -3360,6 +3369,10 @@ Expected output:
     mapping paragraph that can cite both repo files and gate/certificate ids.
   - Step lists appear only when explicitly requested.
   - Clarification triggered for ambiguous terms with no repo evidence.
+
+Progress notes:
+- Helix Ask training traces now tag lattice version + commit and prompt ingest metrics.
+- Regression/sweep scripts already wired; A/B adapter overrides flow through AGI_*_ADAPTER envs.
 
 ## Helix Ask Falsifiability Directory (Intent -> Tier -> Strategy) - Status: in progress
 - Goal: align Helix Ask intent handling with the falsifiable framework by routing
@@ -3494,7 +3507,7 @@ Progress notes:
 - Server now builds envelopes in `server/services/helix-ask/envelope.ts` and attaches them to `/api/agi/ask` responses.
 - UI renders Answer + Details/Proof drawers in `client/src/components/helix/HelixAskPill.tsx` and `client/src/pages/desktop.tsx`.
 
-## Helix Ask Deterministic Math Solver (JS primary; Python fallback deferred) - Status: in progress
+## Helix Ask Deterministic Math Solver (JS primary; Python fallback deferred) - Status: ready for test
 - Goal: make math answers falsifiable by solver verification, and scale toward repo-style symbolic equations (not just school algebra).
 - Truth model: the solver is the judge; the LLM is narration. When the solver succeeds, Helix Ask skips micro-pass and bypasses LLM scaffolds.
 - Implementation (current):
@@ -3538,7 +3551,10 @@ Progress notes:
   - A curated set of repo-style symbolic equations solves with residuals below tolerance and admissible roots.
   - Solver-rooted answers stay short, correct, and do not regress Helix Ask routing or formatting gates.
 
-## Helix Ask Platonic Layer / Belief-State Gates - Status: planned
+Progress notes:
+- Math solver now reports a maturity stage (exploratory/reduced-order/diagnostic/certified).
+
+## Helix Ask Platonic Layer / Belief-State Gates - Status: ready for test
 - Goal: operationalize "constraints-first narration" for concepts/definitions by treating meanings as state with residuals, not as free-form LLM text.
 - F0 platonic constraints (generic answers should still be structured):
   - Always attempt concept-card lookup first; if found, use the card directly.
@@ -3595,7 +3611,10 @@ Progress notes:
   - Belief-graph gates prevent contradictions and unsupported repo claims from surviving to the final answer.
   - High-rattling cases degrade gracefully (clarification or tier downgrade) rather than over-claiming.
 
-## Helix Ask Evidence Coverage + Routing Sweep (UI Concept Anchors) - Status: planned
+Progress notes:
+- Platonic gates now run with belief graph summaries, rattling metrics, and training trace capture.
+
+## Helix Ask Evidence Coverage + Routing Sweep (UI Concept Anchors) - Status: complete
 - Goal: close the gap where UI vocabulary exists in code/docs but is missing from the concept registry and routing anchors, causing "bag-of-words" drift or weak grounding.
 - Sweep sources (treat these as the concept ground truth map):
   - Helix panel ids + keywords: `client/src/pages/helix-core.panels.ts`
@@ -3705,6 +3724,10 @@ Progress notes:
   - UI-language prompts (ledger/kappa/star/mission ethos) ground to repo files instead of drifting to unrelated pipelines.
   - Ideology prompts reliably anchor to `docs/ethos/ideology.json` (and related ethos docs) without decorative citations.
   - Conceptual prompts that are not repo-grounded degrade gracefully with explicit general/hybrid framing.
+
+Progress notes:
+- Concept audit script + reports are available (scripts/helix-ask-concept-audit.ts, reports/helix-ask-concept-audit.*).
+- Added concept cards + topic routing anchors for ideology, ledger, and star/solar concepts.
 
 ## D) Hybrid Arbiter (repo-hint aware, evidence-relevance gated)
 - Goal: when repo hints fire, still allow a *general* answer if retrieved evidence is weak or irrelevant.
