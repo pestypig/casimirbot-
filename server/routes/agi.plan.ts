@@ -6591,6 +6591,13 @@ const AMBIGUOUS_IGNORE_TOKENS = new Set([
   "citation",
   "module",
   "modules",
+  "define",
+  "defined",
+  "definition",
+  "explain",
+  "describe",
+  "meaning",
+  "mean",
 ]);
 
 const collectConceptTokens = (conceptMatch: HelixAskConceptMatch | null): Set<string> => {
@@ -8551,6 +8558,7 @@ const executeHelixAsk = async ({
       }
     }
     let evidenceText = "";
+    let evidenceGateOk = true;
     let constraintEvidenceText = "";
     let constraintEvidenceRefs: string[] = [];
     const mathSolverOk = mathSolveResult?.ok === true;
@@ -9320,6 +9328,7 @@ const executeHelixAsk = async ({
           debugPayload.verification_anchor_ok = verificationAnchorOk;
           debugPayload.plan_must_include_ok = planMustIncludeOk;
         }
+        evidenceGateOk = evidenceGate.ok;
         if (debugPayload) {
           debugPayload.evidence_gate_ok = evidenceGate.ok;
           debugPayload.evidence_match_ratio = evidenceGate.matchRatio;
@@ -9478,6 +9487,7 @@ const executeHelixAsk = async ({
             if (retryScoreGap >= 0.02 || retryTopScore >= 0.05) retrievalConfidence += 0.05;
             if (evidenceGate.matchCount === 0) retrievalConfidence = 0;
             retrievalConfidence = Math.min(1, Math.max(0, retrievalConfidence));
+            evidenceGateOk = evidenceGate.ok;
             if (debugPayload) {
               debugPayload.evidence_gate_ok = evidenceGate.ok;
               debugPayload.evidence_match_ratio = evidenceGate.matchRatio;
@@ -9942,7 +9952,6 @@ const executeHelixAsk = async ({
           debugPayload.ambiguity_gate_applied = true;
         }
       }
-      const evidenceGateOk = debugPayload?.evidence_gate_ok ?? true;
       const shouldClarifyNow =
         !promptIngested &&
         (intentDomain === "repo" || intentDomain === "hybrid") &&
