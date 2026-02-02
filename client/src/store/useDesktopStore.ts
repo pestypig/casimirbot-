@@ -87,6 +87,42 @@ const normalizeWindowState = (window: WindowState): WindowState => ({
 });
 
 const STORAGE_KEY = "desktop-windows-v2";
+const DESKTOP_STORE_VERSION = 1;
+const LEGACY_AUTO_OPEN_PANELS = new Set([
+  "helix-phoenix",
+  "mass-provenance",
+  "curvature-ledger",
+  "endpoints",
+]);
+
+const shouldCloseLegacyAutoOpen = (windows?: Record<string, WindowState>) => {
+  if (!windows) return false;
+  const openIds = Object.values(windows)
+    .filter((win) => win?.isOpen)
+    .map((win) => win.id);
+  if (openIds.length === 0) return false;
+  return openIds.every((id) => LEGACY_AUTO_OPEN_PANELS.has(id));
+};
+
+const migrateDesktopStore = (state: unknown, version: number) => {
+  if (!state || typeof state !== "object") return state as DesktopState;
+  if (version >= DESKTOP_STORE_VERSION) return state as DesktopState;
+  const current = state as DesktopState;
+  if (!shouldCloseLegacyAutoOpen(current.windows)) return current;
+  const windows = { ...current.windows };
+  for (const id of LEGACY_AUTO_OPEN_PANELS) {
+    const win = windows[id];
+    if (!win?.isOpen) continue;
+    windows[id] = {
+      ...win,
+      isOpen: false,
+      isMinimized: false,
+      isMaximized: false,
+      isFullscreen: false,
+    };
+  }
+  return { ...current, windows };
+};
 
 const DEFAULT_Z_BASE = 10;
 const TOP_Z_BASE = 100000;
@@ -452,7 +488,11 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
         recordPanelActivity(target, "openInHelix");
       }
     }),
-    { name: STORAGE_KEY }
+    {
+      name: STORAGE_KEY,
+      version: DESKTOP_STORE_VERSION,
+      migrate: migrateDesktopStore,
+    }
   )
 );
 
