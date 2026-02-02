@@ -5368,6 +5368,29 @@ async function buildAskContextFromQueries(
   });
 }
 
+function buildAskContextFromCandidates(args: {
+  selected: AskCandidate[];
+  topicTier?: number;
+  topicMustIncludeOk?: boolean;
+  queryHitCount?: number;
+  topScore?: number;
+  scoreGap?: number;
+  channelHits?: AskCandidateChannelStats;
+  channelTopScores?: AskCandidateChannelStats;
+}): {
+  context: string;
+  files: string[];
+  topicTier?: number;
+  topicMustIncludeOk?: boolean;
+  queryHitCount?: number;
+  topScore?: number;
+  scoreGap?: number;
+  channelHits?: AskCandidateChannelStats;
+  channelTopScores?: AskCandidateChannelStats;
+} {
+  return finalizeAskContext(args);
+}
+
 async function buildAmbiguityCandidateSnapshot(args: {
   question: string;
   targetSpan?: string;
@@ -6758,7 +6781,7 @@ const buildAmbiguityClarifyLine = (terms: string[]): string => {
 };
 
 const resolveClusterKey = (filePath: string): string => {
-  const normalized = normalizeEvidencePath(filePath);
+  const normalized = normalizeEvidencePath(filePath) ?? filePath;
   const parts = normalized.split("/").filter(Boolean);
   if (parts.length === 0) return "unknown";
   const root = parts[0];
@@ -8108,6 +8131,9 @@ const executeHelixAsk = async ({
       topic_allowlist_tiers?: number;
       topic_must_include_files?: string[];
       docs_first_enabled?: boolean;
+      docs_first_used?: boolean;
+      docs_first_ok?: boolean;
+      docs_grep_hits?: number;
       plan_scope_allowlist_tiers?: number;
       plan_scope_avoidlist?: number;
       plan_scope_must_include?: number;
@@ -8208,6 +8234,9 @@ const executeHelixAsk = async ({
       repo_search_hits?: number;
       repo_search_truncated?: boolean;
       repo_search_error?: string;
+      endpoint_hints?: string[];
+      endpoint_anchor_paths?: string[];
+      endpoint_anchor_violation?: boolean;
       ambiguity_terms?: string[];
       ambiguity_gate_applied?: boolean;
       overflow_retry_applied?: boolean;
@@ -9466,22 +9495,23 @@ const executeHelixAsk = async ({
               }
             | undefined;
           let docsFirstOk = false;
-          if (planScope?.docsFirst && planScope.docsAllowlist?.length) {
+          const scope = planScope ?? undefined;
+          if (scope?.docsFirst && scope.docsAllowlist?.length) {
             const docsScope = await buildAskContextFromQueries(
               baseQuestion,
               queries,
               parsed.data.topK,
               topicProfile,
               {
-                allowlistTiers: planScope.docsAllowlist,
-                avoidlist: planScope.avoidlist,
+                allowlistTiers: scope.docsAllowlist,
+                avoidlist: scope.avoidlist,
                 overrideAllowlist: true,
               },
             );
             const planMustIncludeOk =
-              planScope.mustIncludeGlobs?.length
+              scope.mustIncludeGlobs?.length
                 ? docsScope.files.some((filePath) =>
-                    pathMatchesAny(filePath, planScope.mustIncludeGlobs ?? []),
+                    pathMatchesAny(filePath, scope.mustIncludeGlobs ?? []),
                   )
                 : true;
             docsFirstOk = docsScope.files.length > 0 && planMustIncludeOk;
@@ -9501,10 +9531,10 @@ const executeHelixAsk = async ({
             if (docsFirstOk) {
               contextResult = docsScope;
             } else if (requiresRepoEvidence) {
-              const docsAllowlist = (planScope.docsAllowlist ?? []).flat();
+              const docsAllowlist = (scope.docsAllowlist ?? []).flat();
               const grepCandidates = collectDocsGrepCandidates(queries, baseQuestion, {
                 allowlist: docsAllowlist,
-                avoidlist: planScope.avoidlist,
+                avoidlist: scope.avoidlist,
                 limit: 160,
               });
               if (grepCandidates.length > 0) {
@@ -10009,7 +10039,7 @@ const executeHelixAsk = async ({
           mustIncludeOk,
           viabilityMustIncludeOk,
           topicMustIncludeOk,
-          conceptMatch,
+          conceptMatch: Boolean(conceptMatch),
           hasRepoHints,
           topicTags,
           verificationAnchorRequired,
@@ -10043,7 +10073,7 @@ const executeHelixAsk = async ({
           debugPayload.arbiter_hybrid_ok = arbiterHybridOk;
           debugPayload.arbiter_ratio = arbiterDecision.ratio;
           debugPayload.arbiter_topic_ok = arbiterDecision.topicOk;
-          debugPayload.arbiter_concept_match = arbiterDecision.conceptMatch;
+          debugPayload.arbiter_concept_match = Boolean(arbiterDecision.conceptMatch);
         }
         const softExpansionAllowed =
           softExpansionBudget > 0 &&

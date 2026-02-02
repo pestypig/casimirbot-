@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import nerdamer from "nerdamer";
 import "nerdamer/Solve.js";
 import "nerdamer/Calculus.js";
-import type { MathStage } from "../../shared/math-stage.js";
+import type { MathStage } from "../../../shared/math-stage.js";
 
 const scriptPath = fileURLToPath(new URL("../../../scripts/py/math_solve.py", import.meta.url));
 
