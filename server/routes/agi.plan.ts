@@ -8804,10 +8804,17 @@ const executeHelixAsk = async ({
           !HELIX_ASK_REPO_EXPECTS.test(block.text) &&
           !HELIX_ASK_REPO_HINT.test(block.text) &&
           !HELIX_ASK_FILE_HINT.test(block.text);
+        const needsHelixAskAnchor =
+          /helix ask/i.test(rawQuestion) && !/helix ask/i.test(block.text);
         const needsCitationPrompt =
           reportRepoContext &&
           !/\b(cite|citation|file|path|source)\b/i.test(block.text);
-        const baseBlockQuestion = needsRepoPrefix ? `In this repo, ${block.text}` : block.text;
+        const prefix = needsHelixAskAnchor
+          ? "In this repo's Helix Ask system, "
+          : needsRepoPrefix
+            ? "In this repo, "
+            : "";
+        const baseBlockQuestion = `${prefix}${block.text}`.trim();
         const blockQuestion = needsCitationPrompt
           ? `${baseBlockQuestion} Cite repo file paths.`
           : baseBlockQuestion;
@@ -8851,6 +8858,7 @@ const executeHelixAsk = async ({
               evidence_gate_ok?: boolean;
               coverage_gate_applied?: boolean;
               coverage_ratio?: number;
+              context_files?: string[];
             }
           | undefined;
         let citations = extractFilePathsFromText(rawBlockAnswer);
@@ -8860,7 +8868,7 @@ const executeHelixAsk = async ({
           Boolean(blockDebug?.clarify_triggered) ||
           /^what do you mean|please point|could you clarify/i.test(rawBlockAnswer);
         if (reportRepoContext) {
-          const repoExpectationFailed = coverageApplied || !evidenceOk || citations.length === 0;
+          const repoExpectationFailed = coverageApplied || !evidenceOk;
           if (repoExpectationFailed) {
             clarify = true;
           }
@@ -8872,6 +8880,9 @@ const executeHelixAsk = async ({
             : rawMode === "repo_grounded" || rawMode === "hybrid" || rawMode === "general"
               ? rawMode
               : "general";
+        if (!clarify && citations.length === 0 && blockDebug?.context_files?.length) {
+          citations = blockDebug.context_files.slice(0, 6);
+        }
         const blockAnswer = clarify ? buildAmbiguityClarifyLine([]) : rawBlockAnswer;
         if (clarify) {
           citations = [];
