@@ -8804,7 +8804,13 @@ const executeHelixAsk = async ({
           !HELIX_ASK_REPO_EXPECTS.test(block.text) &&
           !HELIX_ASK_REPO_HINT.test(block.text) &&
           !HELIX_ASK_FILE_HINT.test(block.text);
-        const blockQuestion = needsRepoPrefix ? `In this repo, ${block.text}` : block.text;
+        const needsCitationPrompt =
+          reportRepoContext &&
+          !/\b(cite|citation|file|path|source)\b/i.test(block.text);
+        const baseBlockQuestion = needsRepoPrefix ? `In this repo, ${block.text}` : block.text;
+        const blockQuestion = needsCitationPrompt
+          ? `${baseBlockQuestion} Cite repo file paths.`
+          : baseBlockQuestion;
         logEvent(
           "Report block",
           "start",
@@ -8834,16 +8840,31 @@ const executeHelixAsk = async ({
             blockCount: limitedBlocks.length,
           },
         });
-        const blockAnswer =
+        const rawBlockAnswer =
           blockPayload && blockPayload.status < 400
             ? String(blockPayload.payload?.text ?? "").trim()
             : "Unable to complete this block. Please clarify or point to the relevant files.";
         const blockDebug = blockPayload?.payload?.debug as
-          | { arbiter_mode?: string; clarify_triggered?: boolean }
+          | {
+              arbiter_mode?: string;
+              clarify_triggered?: boolean;
+              evidence_gate_ok?: boolean;
+              coverage_gate_applied?: boolean;
+              coverage_ratio?: number;
+            }
           | undefined;
-        const clarify =
+        let citations = extractFilePathsFromText(rawBlockAnswer);
+        const evidenceOk = blockDebug?.evidence_gate_ok !== false;
+        const coverageApplied = Boolean(blockDebug?.coverage_gate_applied);
+        let clarify =
           Boolean(blockDebug?.clarify_triggered) ||
-          /^what do you mean|please point|could you clarify/i.test(blockAnswer);
+          /^what do you mean|please point|could you clarify/i.test(rawBlockAnswer);
+        if (reportRepoContext) {
+          const repoExpectationFailed = coverageApplied || !evidenceOk || citations.length === 0;
+          if (repoExpectationFailed) {
+            clarify = true;
+          }
+        }
         const rawMode = blockDebug?.arbiter_mode ?? "general";
         const mode: HelixAskReportBlockResult["mode"] =
           clarify
@@ -8851,7 +8872,10 @@ const executeHelixAsk = async ({
             : rawMode === "repo_grounded" || rawMode === "hybrid" || rawMode === "general"
               ? rawMode
               : "general";
-        const citations = extractFilePathsFromText(blockAnswer);
+        const blockAnswer = clarify ? buildAmbiguityClarifyLine([]) : rawBlockAnswer;
+        if (clarify) {
+          citations = [];
+        }
         blockResults.push({
           id: block.id,
           index,
