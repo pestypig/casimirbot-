@@ -18,6 +18,11 @@ type RegressionCase = {
     intent_domain: string;
     format: string;
     stage_tags?: boolean;
+    clarify?: boolean;
+    ambiguity?: {
+      targetSpan?: string;
+      requireClusters?: boolean;
+    };
   };
 };
 
@@ -32,8 +37,11 @@ const ALLOW_FAIL = process.env.HELIX_ASK_REGRESSION_ALLOW_FAIL === "1";
 const DRY_RUN = process.env.HELIX_ASK_REGRESSION_DRY_RUN === "1";
 const LIGHT_MODE = process.env.HELIX_ASK_REGRESSION_LIGHT === "1";
 const ONLY_LABEL = process.env.HELIX_ASK_REGRESSION_ONLY?.trim();
+const AMBIGUITY_MODE = process.env.HELIX_ASK_REGRESSION_AMBIGUITY === "1";
 const normalizeLabel = (value: string): string =>
   value.toLowerCase().replace(/[\s_-]+/g, "_");
+const normalizeToken = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 const cases: RegressionCase[] = [
   {
@@ -99,10 +107,56 @@ const cases: RegressionCase[] = [
   },
 ];
 
+const ambiguityCases: RegressionCase[] = [
+  {
+    label: "ambiguity lattice",
+    question: "Define lattice.",
+    expect: {
+      intent_id: "general.conceptual_define_compare",
+      intent_domain: "general",
+      format: "compare",
+      clarify: true,
+      ambiguity: {
+        targetSpan: "lattice",
+        requireClusters: false,
+      },
+    },
+  },
+  {
+    label: "ambiguity cavity",
+    question: "What's a cavity?",
+    expect: {
+      intent_id: "general.conceptual_define_compare",
+      intent_domain: "general",
+      format: "compare",
+      clarify: true,
+      ambiguity: {
+        targetSpan: "cavity",
+        requireClusters: false,
+      },
+    },
+  },
+  {
+    label: "ambiguity warp bubble repo",
+    question: "What is a warp bubble in this codebase?",
+    expect: {
+      intent_id: "repo.warp_definition_docs_first",
+      intent_domain: "repo",
+      format: "brief",
+      clarify: false,
+      ambiguity: {
+        targetSpan: "warp bubble",
+        requireClusters: false,
+      },
+    },
+  },
+];
+
 const resolvedCases = LIGHT_MODE ? cases.slice(0, 3) : cases;
+const expandedCases = AMBIGUITY_MODE ? [...resolvedCases, ...ambiguityCases] : resolvedCases;
 const finalCases = ONLY_LABEL
-  ? resolvedCases.filter((entry) => normalizeLabel(entry.label) === normalizeLabel(ONLY_LABEL))
-  : resolvedCases;
+  ? expandedCases.filter((entry) => normalizeLabel(entry.label) === normalizeLabel(ONLY_LABEL))
+  : expandedCases;
 
 const runCase = async (entry: RegressionCase, sessionId: string): Promise<string[]> => {
   console.log(`Running: ${entry.label}`);
@@ -173,6 +227,26 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
       failures.push(
         `${entry.label}: stage_tags ${payload.debug.stage_tags ?? "missing"} !== ${entry.expect.stage_tags}`,
       );
+    }
+  }
+  if (typeof entry.expect.clarify === "boolean") {
+    const clarified = Boolean(payload.debug.clarify_triggered);
+    if (clarified !== entry.expect.clarify) {
+      failures.push(`${entry.label}: clarify ${clarified} !== ${entry.expect.clarify}`);
+    }
+  }
+  if (entry.expect.ambiguity?.targetSpan) {
+    const got = payload.debug.ambiguity_target_span ?? "";
+    if (normalizeToken(got) !== normalizeToken(entry.expect.ambiguity.targetSpan)) {
+      failures.push(
+        `${entry.label}: ambiguity_target_span ${got || "missing"} !== ${entry.expect.ambiguity.targetSpan}`,
+      );
+    }
+  }
+  if (entry.expect.ambiguity?.requireClusters) {
+    const count = payload.debug.ambiguity_cluster_count ?? 0;
+    if (count <= 0) {
+      failures.push(`${entry.label}: ambiguity_cluster_count ${count} <= 0`);
     }
   }
   return failures;

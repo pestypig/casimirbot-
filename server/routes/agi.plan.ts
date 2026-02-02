@@ -2735,6 +2735,8 @@ const HELIX_ASK_AMBIGUITY_GATE =
   String(process.env.HELIX_ASK_AMBIGUITY_GATE ?? "1").trim() !== "0";
 const HELIX_ASK_AMBIGUITY_RESOLVER =
   String(process.env.HELIX_ASK_AMBIGUITY_RESOLVER ?? "1").trim() !== "0";
+const HELIX_ASK_AMBIGUITY_LABEL_LLM =
+  String(process.env.HELIX_ASK_AMBIGUITY_LABEL_LLM ?? "0").trim() === "1";
 const HELIX_ASK_AMBIGUITY_SHORT_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_AMBIGUITY_SHORT_TOKENS, 4),
   2,
@@ -2749,6 +2751,21 @@ const HELIX_ASK_AMBIGUITY_MARGIN_MIN = clampNumber(
   readNumber(process.env.HELIX_ASK_AMBIGUITY_MARGIN_MIN, 4),
   0,
   40,
+);
+const HELIX_ASK_AMBIGUITY_CLUSTER_TOPK = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUITY_CLUSTER_TOPK, 18),
+  6,
+  60,
+);
+const HELIX_ASK_AMBIGUITY_CLUSTER_MARGIN_MIN = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUITY_CLUSTER_MARGIN_MIN, 0.35),
+  0,
+  1,
+);
+const HELIX_ASK_AMBIGUITY_CLUSTER_ENTROPY_MAX = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUITY_CLUSTER_ENTROPY_MAX, 0.6),
+  0,
+  1,
 );
 const HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN = clampNumber(
   readNumber(process.env.HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN, 5),
@@ -4427,6 +4444,24 @@ type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path";
 type AskCandidateChannelStats = Record<AskCandidateChannel, number>;
 type AskCandidateChannelList = { channel: AskCandidateChannel; candidates: AskCandidate[] };
 
+type AmbiguityCluster = {
+  key: string;
+  label: string;
+  score: number;
+  mass: number;
+  count: number;
+  paths: string[];
+};
+
+type AmbiguityClusterSummary = {
+  targetSpan?: string;
+  totalScore: number;
+  topScore: number;
+  margin: number;
+  entropy: number;
+  clusters: AmbiguityCluster[];
+};
+
 const HELIX_ASK_CHANNELS: AskCandidateChannel[] = ["lexical", "symbol", "fuzzy", "path"];
 const HELIX_ASK_RRF_CHANNEL_WEIGHTS: AskCandidateChannelStats = {
   lexical: HELIX_ASK_RRF_WEIGHT_LEXICAL,
@@ -5331,6 +5366,52 @@ async function buildAskContextFromQueries(
     channelHits,
     channelTopScores,
   });
+}
+
+async function buildAmbiguityCandidateSnapshot(args: {
+  question: string;
+  targetSpan?: string;
+  topicProfile?: HelixAskTopicProfile | null;
+}): Promise<{ candidates: AskCandidate[]; queries: string[] }> {
+  const snapshot = await loadCodeLattice();
+  if (!snapshot) return { candidates: [], queries: [] };
+  const rawQueries = [args.targetSpan, args.question].filter(Boolean) as string[];
+  const seen = new Set<string>();
+  const queries = rawQueries.filter((entry) => {
+    const normalized = entry.trim().toLowerCase();
+    if (!normalized) return false;
+    if (seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+  if (queries.length === 0) return { candidates: [], queries: [] };
+  const allowlist = args.topicProfile?.allowlistTiers?.[0] ?? [];
+  const candidatePool = Math.max(HELIX_ASK_AMBIGUITY_CLUSTER_TOPK * 3, 12);
+  const candidateLists: AskCandidateChannelList[] = [];
+  for (const query of queries) {
+    const multi = collectAskCandidatesMultiChannel(snapshot, query, args.question, {
+      topicProfile: args.topicProfile,
+      allowlist,
+    });
+    for (const entry of multi.lists) {
+      const trimmed = entry.candidates.slice(0, candidatePool);
+      if (trimmed.length > 0) {
+        candidateLists.push({ channel: entry.channel, candidates: trimmed });
+      }
+    }
+  }
+  if (candidateLists.length === 0) {
+    return { candidates: [], queries };
+  }
+  const merged = mergeCandidatesWithWeightedRrf(
+    candidateLists,
+    HELIX_ASK_RRF_K,
+    HELIX_ASK_RRF_CHANNEL_WEIGHTS,
+  );
+  return {
+    candidates: merged.slice(0, HELIX_ASK_AMBIGUITY_CLUSTER_TOPK),
+    queries,
+  };
 }
 
 function finalizeAskContext({
@@ -6676,6 +6757,170 @@ const buildAmbiguityClarifyLine = (terms: string[]): string => {
   return `I do not see ${joined} in the repo evidence yet. Which files define those terms?`;
 };
 
+const resolveClusterKey = (filePath: string): string => {
+  const normalized = normalizeEvidencePath(filePath);
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length === 0) return "unknown";
+  const root = parts[0];
+  if (root === "docs" && parts[1]) return `docs/${parts[1]}`;
+  if (root === "modules" && parts[1]) return `modules/${parts[1]}`;
+  if (root === "client" && parts[1]) return `client/${parts[1]}`;
+  if (root === "server" && parts[1]) return `server/${parts[1]}`;
+  if (root === "shared" && parts[1]) return `shared/${parts[1]}`;
+  if (root === "tests") return "tests";
+  if (root === "scripts") return "scripts";
+  return parts.slice(0, Math.min(2, parts.length)).join("/");
+};
+
+const formatClusterLabel = (key: string): string => key.replace(/_/g, " ");
+
+const computeClusterEntropy = (clusters: AmbiguityCluster[], totalScore: number): number => {
+  if (clusters.length <= 1 || totalScore <= 0) return 0;
+  const base = Math.log(clusters.length);
+  if (!Number.isFinite(base) || base <= 0) return 0;
+  let sum = 0;
+  for (const cluster of clusters) {
+    const p = cluster.score / totalScore;
+    if (p <= 0) continue;
+    sum += -p * Math.log(p);
+  }
+  return Math.min(1, Math.max(0, sum / base));
+};
+
+const buildAmbiguityClusterSummary = (
+  candidates: AskCandidate[],
+  targetSpan?: string,
+): AmbiguityClusterSummary | null => {
+  if (candidates.length === 0) {
+    return {
+      targetSpan,
+      totalScore: 0,
+      topScore: 0,
+      margin: 0,
+      entropy: 0,
+      clusters: [],
+    };
+  }
+  const map = new Map<string, AmbiguityCluster>();
+  for (const candidate of candidates) {
+    const key = resolveClusterKey(candidate.filePath);
+    const entry = map.get(key);
+    if (entry) {
+      entry.score += candidate.rrfScore;
+      entry.count += 1;
+      if (entry.paths.length < 3) {
+        entry.paths.push(candidate.filePath);
+      }
+    } else {
+      map.set(key, {
+        key,
+        label: formatClusterLabel(key),
+        score: candidate.rrfScore,
+        mass: 0,
+        count: 1,
+        paths: [candidate.filePath],
+      });
+    }
+  }
+  const clusters = Array.from(map.values()).sort((a, b) => b.score - a.score);
+  const totalScore = clusters.reduce((sum, cluster) => sum + cluster.score, 0);
+  for (const cluster of clusters) {
+    cluster.mass = totalScore > 0 ? cluster.score / totalScore : 0;
+  }
+  const topScore = clusters[0]?.score ?? 0;
+  const secondScore = clusters[1]?.score ?? 0;
+  const margin = topScore > 0 ? Math.max(0, (topScore - secondScore) / topScore) : 0;
+  const entropy = computeClusterEntropy(clusters, totalScore);
+  return {
+    targetSpan,
+    totalScore,
+    topScore,
+    margin,
+    entropy,
+    clusters,
+  };
+};
+
+const parseLabelList = (raw: string): string[] | null => {
+  if (!raw.trim()) return null;
+  const match = raw.match(/\[[\s\S]*\]/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map((entry) => String(entry).trim()).filter(Boolean);
+  } catch {
+    return null;
+  }
+};
+
+const applyAmbiguityClusterLabels = (
+  clusters: AmbiguityCluster[],
+  labels: string[] | null,
+): AmbiguityCluster[] => {
+  if (!labels || labels.length === 0) return clusters;
+  return clusters.map((cluster, index) => ({
+    ...cluster,
+    label: labels[index] ?? cluster.label,
+  }));
+};
+
+const buildAmbiguityLabelPrompt = (args: {
+  question: string;
+  targetSpan?: string;
+  clusters: AmbiguityCluster[];
+}): string => {
+  const lines = args.clusters.map((cluster, index) => {
+    const samples = cluster.paths.slice(0, 2).join(", ");
+    return `- ${index + 1}. key: ${cluster.key}; samples: ${samples || "n/a"}`;
+  });
+  return [
+    "You label ambiguity clusters for a clarification question.",
+    "Return a JSON array of short labels (2-6 words) in the same order as the list.",
+    `Question: "${args.question}"`,
+    args.targetSpan ? `Target: "${args.targetSpan}"` : "",
+    "Clusters:",
+    ...lines,
+    "Return JSON only.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+};
+
+const labelAmbiguityClustersWithLlm = async (args: {
+  question: string;
+  targetSpan?: string;
+  clusters: AmbiguityCluster[];
+  personaId: string;
+  sessionId?: string;
+  traceId?: string;
+}): Promise<{ clusters: AmbiguityCluster[]; applied: boolean; overflow?: HelixAskOverflowMeta }> => {
+  if (!HELIX_ASK_AMBIGUITY_LABEL_LLM || args.clusters.length === 0) {
+    return { clusters: args.clusters, applied: false };
+  }
+  const prompt = buildAmbiguityLabelPrompt(args);
+  const { result, overflow } = await runHelixAskLocalWithOverflowRetry(
+    {
+      prompt,
+      max_tokens: 96,
+      temperature: 0.1,
+    },
+    {
+      personaId: args.personaId,
+      sessionId: args.sessionId,
+      traceId: args.traceId,
+    },
+    {
+      fallbackMaxTokens: 96,
+      allowContextDrop: true,
+      label: "ambiguity_labels",
+    },
+  );
+  const labels = parseLabelList(result.text ?? "");
+  const labeled = applyAmbiguityClusterLabels(args.clusters, labels);
+  return { clusters: labeled, applied: Boolean(labels && labels.length), overflow };
+};
+
 const selectClarifyToken = (question: string): string | undefined => {
   const span = extractClarifySpan(question);
   if (span) {
@@ -6701,7 +6946,21 @@ const formatAmbiguityCandidateLabel = (candidate: HelixAskConceptCandidate): str
 const buildPreIntentClarifyLine = (
   question: string,
   candidates: HelixAskConceptCandidate[],
+  clusterSummary?: AmbiguityClusterSummary | null,
 ): string => {
+  const clusterLabels = (clusterSummary?.clusters ?? [])
+    .map((cluster) => cluster.label)
+    .filter(Boolean);
+  if (clusterLabels.length >= 2) {
+    return `Do you mean "${clusterLabels[0]}" or "${clusterLabels[1]}"? If you mean a repo concept, point me to the file or module.`;
+  }
+  if (clusterLabels.length === 1) {
+    const token =
+      selectClarifyToken(question) ??
+      clusterSummary?.targetSpan ??
+      candidates[0]?.matchedTerm;
+    return `Do you mean "${clusterLabels[0]}" in this repo, or the general meaning of "${token ?? "that term"}"? If it's repo-specific, point me to the file or module.`;
+  }
   if (candidates.length >= 2) {
     const labelA = formatAmbiguityCandidateLabel(candidates[0]);
     const labelB = formatAmbiguityCandidateLabel(candidates[1]);
@@ -6722,11 +6981,13 @@ const buildPreIntentClarifyLine = (
 const resolvePreIntentAmbiguity = ({
   question,
   candidates,
+  clusterSummary,
   explicitRepoExpectation,
   repoExpectationLevel,
 }: {
   question: string;
   candidates: HelixAskConceptCandidate[];
+  clusterSummary?: AmbiguityClusterSummary | null;
   explicitRepoExpectation: boolean;
   repoExpectationLevel: "low" | "medium" | "high";
 }): {
@@ -6736,6 +6997,9 @@ const resolvePreIntentAmbiguity = ({
   shortPrompt: boolean;
   topScore: number;
   margin: number;
+  clusterMargin: number;
+  clusterEntropy: number;
+  clusterTopMass: number;
 } => {
   if (!HELIX_ASK_AMBIGUITY_RESOLVER) {
     return {
@@ -6744,25 +7008,47 @@ const resolvePreIntentAmbiguity = ({
       shortPrompt: false,
       topScore: 0,
       margin: 0,
+      clusterMargin: 0,
+      clusterEntropy: 0,
+      clusterTopMass: 0,
     };
   }
   const tokenCount = filterCriticTokens(tokenizeAskQuery(question)).length;
   const shortPrompt = tokenCount > 0 && tokenCount <= HELIX_ASK_AMBIGUITY_SHORT_TOKENS;
   const topScore = candidates[0]?.score ?? 0;
   const margin = candidates.length > 1 ? topScore - candidates[1].score : topScore;
+  const clusterMargin = clusterSummary?.margin ?? 0;
+  const clusterEntropy = clusterSummary?.entropy ?? 0;
+  const clusterTopMass = clusterSummary?.clusters?.[0]?.mass ?? 0;
   const strongConcept =
     candidates.length > 0 &&
     topScore >= HELIX_ASK_AMBIGUITY_MIN_SCORE &&
     (candidates.length < 2 || margin >= HELIX_ASK_AMBIGUITY_MARGIN_MIN);
-  const hasRepoExpectation = explicitRepoExpectation || repoExpectationLevel !== "low";
-  const shouldClarify = shortPrompt && !hasRepoExpectation && !strongConcept;
+  const clusterSplit =
+    clusterSummary &&
+    clusterSummary.clusters.length >= 2 &&
+    (clusterMargin < HELIX_ASK_AMBIGUITY_CLUSTER_MARGIN_MIN ||
+      clusterEntropy > HELIX_ASK_AMBIGUITY_CLUSTER_ENTROPY_MAX);
+  const shouldClarify =
+    shortPrompt &&
+    (clusterSplit ||
+      (!strongConcept && !clusterSummary?.clusters?.length && repoExpectationLevel === "low"));
   return {
     shouldClarify,
-    reason: shouldClarify ? "short_prompt_low_signal" : undefined,
+    reason: shouldClarify
+      ? clusterSplit
+        ? clusterMargin < HELIX_ASK_AMBIGUITY_CLUSTER_MARGIN_MIN
+          ? "cluster_margin"
+          : "cluster_entropy"
+        : "short_prompt_low_signal"
+      : undefined,
     tokenCount,
     shortPrompt,
     topScore,
     margin,
+    clusterMargin,
+    clusterEntropy,
+    clusterTopMass,
   };
 };
 
@@ -7954,6 +8240,17 @@ const executeHelixAsk = async ({
       ambiguity_resolver_short_prompt?: boolean;
       ambiguity_resolver_top_score?: number;
       ambiguity_resolver_margin?: number;
+      ambiguity_target_span?: string;
+      ambiguity_cluster_count?: number;
+      ambiguity_cluster_top_mass?: number;
+      ambiguity_cluster_margin?: number;
+      ambiguity_cluster_entropy?: number;
+      ambiguity_cluster_candidates?: Array<{
+        label: string;
+        score: number;
+        mass: number;
+        count: number;
+      }>;
       belief_claim_count?: number;
       belief_supported_count?: number;
       belief_unsupported_count?: number;
@@ -8054,6 +8351,17 @@ const executeHelixAsk = async ({
           resolverTopScore?: number;
           resolverMargin?: number;
           resolverCandidates?: string[];
+          targetSpan?: string;
+          clusterCount?: number;
+          clusterTopMass?: number;
+          clusterMargin?: number;
+          clusterEntropy?: number;
+          clusterCandidates?: Array<{
+            label: string;
+            score: number;
+            mass: number;
+            count: number;
+          }>;
           gateApplied?: boolean;
           terms?: string[];
         };
@@ -8184,12 +8492,91 @@ const executeHelixAsk = async ({
     } else {
       logEvent("Topic profile", "none", "no profile");
     }
+    const ambiguityTargetSpan = extractClarifySpan(baseQuestion);
+    let ambiguityClusterSummary: AmbiguityClusterSummary | null = null;
+    if (debugPayload && ambiguityTargetSpan) {
+      debugPayload.ambiguity_target_span = ambiguityTargetSpan;
+    }
+    if (HELIX_ASK_AMBIGUITY_RESOLVER) {
+      const ambiguityTokenCount = filterCriticTokens(tokenizeAskQuery(baseQuestion)).length;
+      const shouldProbeClusters =
+        ambiguityTokenCount > 0 && ambiguityTokenCount <= HELIX_ASK_AMBIGUITY_SHORT_TOKENS + 2;
+      if (shouldProbeClusters) {
+        const clusterStart = Date.now();
+        const snapshot = await buildAmbiguityCandidateSnapshot({
+          question: baseQuestion,
+          targetSpan: ambiguityTargetSpan,
+          topicProfile,
+        });
+        const summary = buildAmbiguityClusterSummary(snapshot.candidates, ambiguityTargetSpan);
+        if (summary) {
+          ambiguityClusterSummary = summary;
+          if (summary.clusters.length > 0) {
+            if (HELIX_ASK_AMBIGUITY_LABEL_LLM) {
+              try {
+                const labeled = await labelAmbiguityClustersWithLlm({
+                  question: baseQuestion,
+                  targetSpan: ambiguityTargetSpan,
+                  clusters: summary.clusters,
+                  personaId,
+                  sessionId: parsed.data.sessionId,
+                  traceId: askTraceId,
+                });
+                ambiguityClusterSummary = {
+                  ...summary,
+                  clusters: labeled.clusters,
+                };
+                if (labeled.overflow) {
+                  recordOverflow("ambiguity_labels", labeled.overflow);
+                }
+                logEvent(
+                  "Ambiguity labels",
+                  labeled.applied ? "llm" : "fallback",
+                  labeled.clusters
+                    .slice(0, 3)
+                    .map((cluster) => cluster.label)
+                    .join(", "),
+                );
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                logEvent("Ambiguity labels", "error", message);
+              }
+            }
+            const finalSummary = ambiguityClusterSummary ?? summary;
+            const detail = [
+              `clusters=${finalSummary.clusters.length}`,
+              `margin=${finalSummary.margin.toFixed(2)}`,
+              `entropy=${finalSummary.entropy.toFixed(2)}`,
+              snapshot.queries.length ? `queries=${snapshot.queries.length}` : "",
+            ]
+              .filter(Boolean)
+              .join(" | ");
+            logEvent("Ambiguity clusters", "ok", detail, clusterStart);
+          }
+          if (debugPayload) {
+            debugPayload.ambiguity_target_span = ambiguityTargetSpan;
+            const finalSummary = ambiguityClusterSummary ?? summary;
+            debugPayload.ambiguity_cluster_count = finalSummary.clusters.length;
+            debugPayload.ambiguity_cluster_top_mass = finalSummary.clusters[0]?.mass ?? 0;
+            debugPayload.ambiguity_cluster_margin = finalSummary.margin;
+            debugPayload.ambiguity_cluster_entropy = finalSummary.entropy;
+            debugPayload.ambiguity_cluster_candidates = finalSummary.clusters.map((cluster) => ({
+              label: cluster.label,
+              score: Number(cluster.score.toFixed(6)),
+              mass: Number(cluster.mass.toFixed(6)),
+              count: cluster.count,
+            }));
+          }
+        }
+      }
+    }
     const ambiguityCandidates = HELIX_ASK_AMBIGUITY_RESOLVER
       ? listConceptCandidates(baseQuestion, 3)
       : [];
     const ambiguityResolution = resolvePreIntentAmbiguity({
       question: baseQuestion,
       candidates: ambiguityCandidates,
+      clusterSummary: ambiguityClusterSummary,
       explicitRepoExpectation,
       repoExpectationLevel,
     });
@@ -8201,12 +8588,21 @@ const executeHelixAsk = async ({
       debugPayload.ambiguity_resolver_short_prompt = ambiguityResolution.shortPrompt;
       debugPayload.ambiguity_resolver_top_score = ambiguityResolution.topScore;
       debugPayload.ambiguity_resolver_margin = ambiguityResolution.margin;
+      if (ambiguityClusterSummary) {
+        debugPayload.ambiguity_cluster_margin = ambiguityResolution.clusterMargin;
+        debugPayload.ambiguity_cluster_entropy = ambiguityResolution.clusterEntropy;
+        debugPayload.ambiguity_cluster_top_mass = ambiguityResolution.clusterTopMass;
+      }
       debugPayload.ambiguity_resolver_candidates = ambiguityCandidates.map((candidate) =>
         formatAmbiguityCandidateLabel(candidate),
       );
     }
     if (ambiguityResolution.shouldClarify) {
-      preIntentClarify = buildPreIntentClarifyLine(baseQuestion, ambiguityCandidates);
+      preIntentClarify = buildPreIntentClarifyLine(
+        baseQuestion,
+        ambiguityCandidates,
+        ambiguityClusterSummary,
+      );
       logEvent(
         "Ambiguity resolver",
         "clarify",
@@ -10815,6 +11211,12 @@ const executeHelixAsk = async ({
             resolverTopScore: debugPayload.ambiguity_resolver_top_score,
             resolverMargin: debugPayload.ambiguity_resolver_margin,
             resolverCandidates: debugPayload.ambiguity_resolver_candidates,
+            targetSpan: debugPayload.ambiguity_target_span,
+            clusterCount: debugPayload.ambiguity_cluster_count,
+            clusterTopMass: debugPayload.ambiguity_cluster_top_mass,
+            clusterMargin: debugPayload.ambiguity_cluster_margin,
+            clusterEntropy: debugPayload.ambiguity_cluster_entropy,
+            clusterCandidates: debugPayload.ambiguity_cluster_candidates,
             gateApplied: debugPayload.ambiguity_gate_applied,
             terms: debugPayload.ambiguity_terms,
           },

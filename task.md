@@ -3977,3 +3977,6 @@ Progress notes:
   - Clarifier targets the noun span (no verbs or trailing punctuation).
   - Short ambiguous prompts clarify with options; repo-specific prompts bypass.
   - Debug payload includes target span + dominance/entropy metrics + candidate labels.
+
+### Helix Ask Ambiguity Resolver v2 - Status update
+- Implemented target-span selection, cluster dispersion metrics, top-2 cluster clarifier, optional LLM label micro-pass, debug payload metrics, and ambiguity regression cases.
