@@ -7131,6 +7131,132 @@ const REPORT_MODE_INTENT_RE =
 const REPORT_MODE_HEADING_RE = /^#{1,6}\s+(.+)$/;
 const REPORT_MODE_BULLET_RE = /^\s*(?:[-*+]|[0-9]+[.)]|[a-zA-Z][.)])\s+(.+)$/;
 const REPORT_MODE_SECTION_RE = /^(?:Q:|Question:|Requirement:|Issue:|Task:)\s*(.+)$/i;
+type HelixAskReportBlockHint = {
+  id: string;
+  patterns: RegExp[];
+  anchorFiles: string[];
+  searchTerms?: string[];
+  repoFocus?: boolean;
+};
+
+const REPORT_BLOCK_HINTS: HelixAskReportBlockHint[] = [
+  {
+    id: "helix_ask_sources",
+    patterns: [
+      /\b(selects?|selection|sources?|retrieval|context assembly|evidence gate|coverage gate|belief gate|rattling gate|citation repair)\b/i,
+      /\b(arbiter|arbiter threshold|repo ratio|hybrid ratio)\b/i,
+    ],
+    anchorFiles: [
+      "server/routes/agi.plan.ts",
+      "server/services/helix-ask/arbiter.ts",
+      "server/services/helix-ask/platonic-gates.ts",
+      "server/services/helix-ask/query.ts",
+      "docs/helix-ask-flow.md",
+    ],
+    searchTerms: [
+      "retrieval",
+      "evidence gate",
+      "coverage gate",
+      "belief gate",
+      "rattling gate",
+      "arbiter",
+    ],
+    repoFocus: true,
+  },
+  {
+    id: "helix_ask_ambiguity",
+    patterns: [
+      /\b(ambiguity|ambiguous|clarify|clarification|short prompt|short prompts)\b/i,
+      /\b(cavity|lattice|bubble|ledger)\b/i,
+    ],
+    anchorFiles: [
+      "server/routes/agi.plan.ts",
+      "server/services/helix-ask/query.ts",
+      "server/services/helix-ask/platonic-gates.ts",
+      "server/services/helix-ask/topic.ts",
+    ],
+    searchTerms: ["ambiguity resolver", "clarify", "short prompt", "target span"],
+    repoFocus: true,
+  },
+  {
+    id: "helix_ask_longprompt",
+    patterns: [
+      /\b(long prompt|prompt ingest|ingest(ed|ion)?|chunk|chunking|overflow|context window|token budget)\b/i,
+    ],
+    anchorFiles: [
+      "server/routes/agi.plan.ts",
+      "server/services/helix-ask/query.ts",
+    ],
+    searchTerms: ["longprompt", "overflow retry", "prompt chunk"],
+    repoFocus: true,
+  },
+  {
+    id: "helix_ask_report_mode",
+    patterns: [/\b(report mode|point[- ]by[- ]point|coverage map|executive summary)\b/i],
+    anchorFiles: [
+      "server/routes/agi.plan.ts",
+      "docs/helix-ask-flow.md",
+    ],
+    searchTerms: ["report mode", "report blocks", "coverage map"],
+    repoFocus: true,
+  },
+];
+
+const REPORT_BLOCK_EXAMPLE_RE = /\b(?:like|such as)\s+(\"[^\"]+\"|'[^']+')/gi;
+const REPORT_BLOCK_PAREN_EXAMPLE_RE = /\((?:e\.g\.|for example)[^)]*\)/gi;
+const REPORT_BLOCK_EXAMPLE_TAIL_RE = /\b(?:like|such as)\s+([a-z0-9_-]{3,30})/gi;
+
+const normalizeReportBlockText = (text: string): string => {
+  if (!text) return "";
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(REPORT_BLOCK_PAREN_EXAMPLE_RE, " ");
+  cleaned = cleaned.replace(REPORT_BLOCK_EXAMPLE_RE, " ");
+  cleaned = cleaned.replace(REPORT_BLOCK_EXAMPLE_TAIL_RE, " ");
+  cleaned = cleaned.replace(/\s{2,}/g, " ");
+  return cleaned.trim();
+};
+
+const resolveReportBlockHints = (text: string): {
+  anchorFiles: string[];
+  searchTerms: string[];
+  repoFocus: boolean;
+  hintIds: string[];
+} => {
+  const anchorFiles: string[] = [];
+  const searchTerms: string[] = [];
+  const hintIds: string[] = [];
+  let repoFocus = false;
+  for (const hint of REPORT_BLOCK_HINTS) {
+    if (!hint.patterns.some((pattern) => pattern.test(text))) continue;
+    hintIds.push(hint.id);
+    if (hint.anchorFiles?.length) anchorFiles.push(...hint.anchorFiles);
+    if (hint.searchTerms?.length) searchTerms.push(...hint.searchTerms);
+    if (hint.repoFocus) repoFocus = true;
+  }
+  return {
+    anchorFiles: Array.from(new Set(anchorFiles)),
+    searchTerms: Array.from(new Set(searchTerms)),
+    repoFocus,
+    hintIds,
+  };
+};
+
+const buildReportBlockSearchQuery = (args: {
+  blockText: string;
+  searchTerms: string[];
+  anchorFiles: string[];
+  reportRepoContext: boolean;
+}): string => {
+  const parts: string[] = [];
+  if (args.blockText) parts.push(args.blockText);
+  if (args.reportRepoContext && !/helix ask/i.test(args.blockText)) {
+    parts.push("helix ask");
+  }
+  if (args.searchTerms.length) parts.push(...args.searchTerms);
+  if (args.anchorFiles.length) parts.push(...args.anchorFiles);
+  const unique = Array.from(new Set(parts.map((part) => part.trim()).filter(Boolean)));
+  return unique.join(" ");
+};
 
 const countReportBlockCandidates = (question: string): number => {
   if (!question.trim()) return 0;
@@ -8459,6 +8585,23 @@ const executeHelixAsk = async ({
         answer_preview?: string;
         trace_id?: string;
       }>;
+      report_blocks_detail?: Array<{
+        id: string;
+        label?: string;
+        question: string;
+        search_query?: string;
+        anchor_files?: string[];
+        hint_ids?: string[];
+        intent_id?: string;
+        arbiter_mode?: string;
+        clarify?: boolean;
+        evidence_ok?: boolean;
+        coverage_applied?: boolean;
+        coverage_ratio?: number;
+        coverage_missing_keys?: string[];
+        topic_tags?: string[];
+        context_files?: string[];
+      }>;
       plan_scope_allowlist_tiers?: number;
       plan_scope_avoidlist?: number;
       plan_scope_must_include?: number;
@@ -8473,6 +8616,7 @@ const executeHelixAsk = async ({
       concept_fast_path?: boolean;
       concept_fast_path_reason?: string;
       concept_fast_path_source?: string;
+      concept_fast_path_blocked_reason?: string;
       math_solver_ok?: boolean;
       math_solver_kind?: string;
       math_solver_final?: string;
@@ -8803,34 +8947,64 @@ const executeHelixAsk = async ({
         return;
       }
       const blockResults: HelixAskReportBlockResult[] = [];
+      const reportBlockDetails: Array<{
+        id: string;
+        label?: string;
+        question: string;
+        search_query?: string;
+        anchor_files?: string[];
+        hint_ids?: string[];
+        intent_id?: string;
+        arbiter_mode?: string;
+        clarify?: boolean;
+        evidence_ok?: boolean;
+        coverage_applied?: boolean;
+        coverage_ratio?: number;
+        coverage_missing_keys?: string[];
+        topic_tags?: string[];
+        context_files?: string[];
+      }> = [];
       for (let index = 0; index < limitedBlocks.length; index += 1) {
         const block = limitedBlocks[index];
         const blockTraceId = `${askTraceId}:b${index + 1}`.slice(0, 128);
         const blockStart = Date.now();
+        const blockText = normalizeReportBlockText(block.text);
+        const blockHints = resolveReportBlockHints(block.text);
+        const blockRepoContext = reportRepoContext || blockHints.repoFocus;
+        const blockAnchorFiles = Array.from(
+          new Set([...helixAskAnchorFiles, ...blockHints.anchorFiles]),
+        );
+        const blockTextForQuestion = blockText || block.text;
         const needsRepoPrefix =
-          reportRepoContext &&
-          !HELIX_ASK_REPO_FORCE.test(block.text) &&
-          !HELIX_ASK_REPO_EXPECTS.test(block.text) &&
-          !HELIX_ASK_REPO_HINT.test(block.text) &&
-          !HELIX_ASK_FILE_HINT.test(block.text);
+          blockRepoContext &&
+          !HELIX_ASK_REPO_FORCE.test(blockTextForQuestion) &&
+          !HELIX_ASK_REPO_EXPECTS.test(blockTextForQuestion) &&
+          !HELIX_ASK_REPO_HINT.test(blockTextForQuestion) &&
+          !HELIX_ASK_FILE_HINT.test(blockTextForQuestion);
         const needsHelixAskAnchor =
-          helixAskAnchorFiles.length > 0 && !/helix ask/i.test(block.text);
+          blockRepoContext &&
+          blockAnchorFiles.length > 0 &&
+          !/helix ask/i.test(blockTextForQuestion);
         const needsCitationPrompt =
-          reportRepoContext &&
-          !/\b(cite|citation|file|path|source)\b/i.test(block.text);
+          blockRepoContext &&
+          !/\b(cite|citation|file|path|source)\b/i.test(blockTextForQuestion);
         const prefix = needsHelixAskAnchor
           ? "In this repo's Helix Ask system, "
           : needsRepoPrefix
             ? "In this repo, "
             : "";
-        const baseBlockQuestion = `${prefix}${block.text}`.trim();
+        const baseBlockQuestion = `${prefix}${blockTextForQuestion}`.trim();
         const anchorHint =
-          helixAskAnchorFiles.length > 0
-            ? `Use files: ${helixAskAnchorFiles.join(", ")}.`
-            : "";
+          blockAnchorFiles.length > 0 ? `Use files: ${blockAnchorFiles.join(", ")}.` : "";
         const blockQuestion = needsCitationPrompt
           ? `${baseBlockQuestion} Cite repo file paths. ${anchorHint}`.trim()
           : `${baseBlockQuestion} ${anchorHint}`.trim();
+        const blockSearchQuery = buildReportBlockSearchQuery({
+          blockText: blockTextForQuestion,
+          searchTerms: blockHints.searchTerms,
+          anchorFiles: blockAnchorFiles,
+          reportRepoContext: blockRepoContext,
+        });
         logEvent(
           "Report block",
           "start",
@@ -8845,10 +9019,7 @@ const executeHelixAsk = async ({
             prompt: undefined,
             traceId: blockTraceId,
             debug: debugEnabled,
-            searchQuery:
-              helixAskAnchorFiles.length > 0
-                ? [rawQuestion, ...helixAskAnchorFiles].join(" ")
-                : rawQuestion || parsed.data.searchQuery,
+            searchQuery: blockSearchQuery || rawQuestion || parsed.data.searchQuery,
           },
           personaId,
           responder: {
@@ -8863,17 +9034,22 @@ const executeHelixAsk = async ({
             blockCount: limitedBlocks.length,
           },
         });
+        const resolvedBlockPayload = blockPayload as { status: number; payload: any } | null;
         const rawBlockAnswer =
-          blockPayload && blockPayload.status < 400
-            ? String(blockPayload.payload?.text ?? "").trim()
+          resolvedBlockPayload && resolvedBlockPayload.status < 400
+            ? String(resolvedBlockPayload.payload?.text ?? "").trim()
             : "Unable to complete this block. Please clarify or point to the relevant files.";
-        const blockDebug = blockPayload?.payload?.debug as
+        const blockDebug = resolvedBlockPayload?.payload?.debug as
           | {
               arbiter_mode?: string;
               clarify_triggered?: boolean;
               evidence_gate_ok?: boolean;
               coverage_gate_applied?: boolean;
               coverage_ratio?: number;
+              coverage_missing_keys?: string[];
+              ambiguity_terms?: string[];
+              intent_id?: string;
+              topic_tags?: string[];
               context_files?: string[];
             }
           | undefined;
@@ -8883,7 +9059,7 @@ const executeHelixAsk = async ({
         let clarify =
           Boolean(blockDebug?.clarify_triggered) ||
           /^what do you mean|please point|could you clarify/i.test(rawBlockAnswer);
-        if (reportRepoContext) {
+        if (blockRepoContext) {
           const repoExpectationFailed = coverageApplied || !evidenceOk;
           if (repoExpectationFailed) {
             clarify = true;
@@ -8899,7 +9075,11 @@ const executeHelixAsk = async ({
         if (!clarify && citations.length === 0 && blockDebug?.context_files?.length) {
           citations = blockDebug.context_files.slice(0, 6);
         }
-        const blockAnswer = clarify ? buildAmbiguityClarifyLine([]) : rawBlockAnswer;
+        const clarifyTerms = (blockDebug?.coverage_missing_keys ?? blockDebug?.ambiguity_terms ?? []).slice(
+          0,
+          2,
+        );
+        const blockAnswer = clarify ? buildAmbiguityClarifyLine(clarifyTerms) : rawBlockAnswer;
         if (clarify) {
           citations = [];
         }
@@ -8914,6 +9094,25 @@ const executeHelixAsk = async ({
           citations,
           traceId: blockTraceId,
         });
+        if (debugPayload) {
+          reportBlockDetails.push({
+            id: block.id,
+            label: block.label,
+            question: blockQuestion,
+            search_query: blockSearchQuery,
+            anchor_files: blockAnchorFiles,
+            hint_ids: blockHints.hintIds,
+            intent_id: blockDebug?.intent_id,
+            arbiter_mode: blockDebug?.arbiter_mode,
+            clarify,
+            evidence_ok: evidenceOk,
+            coverage_applied: coverageApplied,
+            coverage_ratio: blockDebug?.coverage_ratio,
+            coverage_missing_keys: blockDebug?.coverage_missing_keys,
+            topic_tags: blockDebug?.topic_tags,
+            context_files: blockDebug?.context_files?.slice(0, 6),
+          });
+        }
         logEvent(
           "Report block",
           "ok",
@@ -8937,6 +9136,7 @@ const executeHelixAsk = async ({
       };
       if (debugPayload) {
         debugPayload.report_blocks = reportPayload.report_blocks as any;
+        debugPayload.report_blocks_detail = reportBlockDetails as any;
       }
       responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
       return;
@@ -9464,11 +9664,33 @@ const executeHelixAsk = async ({
           .filter(Boolean),
       ),
     );
-    const conceptFastPath =
+    const conceptFastPathCandidate =
       Boolean(conceptMatch) &&
       conceptualFocus &&
       intentDomain === "repo" &&
       HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id);
+    let conceptFastPath = false;
+    let conceptFastPathBlockedReason: string | null = null;
+    if (conceptFastPathCandidate && conceptMatch) {
+      const topCandidate = ambiguityCandidates[0];
+      const secondCandidate = ambiguityCandidates[1];
+      const candidateTopMatch = !topCandidate || topCandidate.card.id === conceptMatch.card.id;
+      const candidateMarginOk =
+        !secondCandidate || (topCandidate?.score ?? 0) - secondCandidate.score >= 3;
+      const conceptRelevantTags = topicTags.filter((tag) => repoNativeTags.has(tag));
+      const conceptTagCoverageOk =
+        conceptTopicTags.length === 0 ||
+        conceptRelevantTags.every((tag) => conceptTopicTags.includes(tag));
+      if (!candidateTopMatch) {
+        conceptFastPathBlockedReason = "concept_candidate_mismatch";
+      } else if (!candidateMarginOk) {
+        conceptFastPathBlockedReason = "concept_candidate_ambiguous";
+      } else if (!conceptTagCoverageOk) {
+        conceptFastPathBlockedReason = "concept_topic_mismatch";
+      } else {
+        conceptFastPath = true;
+      }
+    }
     if (conceptFastPath) {
       if (debugPayload) {
         debugPayload.concept_fast_path = true;
@@ -9486,6 +9708,11 @@ const executeHelixAsk = async ({
           .filter(Boolean)
           .join(" | "),
       );
+    } else if (conceptFastPathCandidate && conceptFastPathBlockedReason) {
+      if (debugPayload) {
+        debugPayload.concept_fast_path_blocked_reason = conceptFastPathBlockedReason;
+      }
+      logEvent("Concept fast path", "skipped", conceptFastPathBlockedReason);
     }
     verificationAnchorRequired = shouldRequireVerificationAnchors(
       intentProfile,

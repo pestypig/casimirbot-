@@ -4043,3 +4043,12 @@ Progress notes:
   - Weak/ambiguous blocks clarify without failing the entire response.
   - Debug payload exposes report mode, block stats, and per-block gate outcomes.
 
+
+
+## Helix Ask Report Mode - Status update (2026-02-02)
+- Implemented block-level routing hints (anchor files + search query) to improve report-mode retrieval.
+- Added report_blocks_detail debug payload with per-block question, search query, anchors, coverage, and intent data.
+- Normalized report block text to strip example phrases (e.g., like cavity) to reduce false coverage misses.
+- Coverage token noise updated to ignore generic select/source/report verbs.
+- Remaining: validate block-specific coverage passes on multi-topic Helix Ask report prompts.
+
