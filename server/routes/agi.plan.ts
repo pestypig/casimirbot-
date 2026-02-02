@@ -2688,6 +2688,32 @@ const HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS = clampNumber(
   120,
   1200,
 );
+const HELIX_ASK_REPORT_MODE = String(process.env.HELIX_ASK_REPORT_MODE ?? "1").trim() !== "0";
+const HELIX_ASK_REPORT_TRIGGER_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_ASK_REPORT_TRIGGER_TOKENS, 220),
+  40,
+  2000,
+);
+const HELIX_ASK_REPORT_TRIGGER_CHARS = clampNumber(
+  readNumber(process.env.HELIX_ASK_REPORT_TRIGGER_CHARS, 1400),
+  200,
+  10000,
+);
+const HELIX_ASK_REPORT_TRIGGER_BLOCKS = clampNumber(
+  readNumber(process.env.HELIX_ASK_REPORT_TRIGGER_BLOCKS, 4),
+  1,
+  20,
+);
+const HELIX_ASK_REPORT_MAX_BLOCKS = clampNumber(
+  readNumber(process.env.HELIX_ASK_REPORT_MAX_BLOCKS, 12),
+  2,
+  40,
+);
+const HELIX_ASK_REPORT_BLOCK_CHAR_LIMIT = clampNumber(
+  readNumber(process.env.HELIX_ASK_REPORT_BLOCK_CHAR_LIMIT, 900),
+  180,
+  6000,
+);
 const HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO = clampNumber(
   readNumber(
     process.env.HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO ?? process.env.VITE_HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
@@ -7001,6 +7027,206 @@ const buildPreIntentClarifyLine = (
   return "Could you clarify the term or point me to the relevant files?";
 };
 
+type HelixAskReportBlock = {
+  id: string;
+  text: string;
+  label?: string;
+  typeHint?: string;
+};
+
+type HelixAskReportBlockResult = {
+  id: string;
+  index: number;
+  label?: string;
+  text: string;
+  answer: string;
+  mode: "repo_grounded" | "hybrid" | "general" | "clarify";
+  clarify: boolean;
+  citations: string[];
+  traceId?: string;
+};
+
+type HelixAskReportModeDecision = {
+  enabled: boolean;
+  reason?: string;
+  tokenCount: number;
+  charCount: number;
+  blockCount: number;
+};
+
+const REPORT_MODE_INTENT_RE =
+  /\b(report|point[- ]by[- ]point|line by line|go through (each|every)|analyze each)\b/i;
+const REPORT_MODE_HEADING_RE = /^#{1,6}\s+(.+)$/;
+const REPORT_MODE_BULLET_RE = /^\s*(?:[-*+]|[0-9]+[.)]|[a-zA-Z][.)])\s+(.+)$/;
+const REPORT_MODE_SECTION_RE = /^(?:Q:|Question:|Requirement:|Issue:|Task:)\s*(.+)$/i;
+
+const countReportBlockCandidates = (question: string): number => {
+  if (!question.trim()) return 0;
+  const lines = question.split(/\r?\n/);
+  let count = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (REPORT_MODE_BULLET_RE.test(trimmed)) count += 1;
+    else if (REPORT_MODE_SECTION_RE.test(trimmed)) count += 1;
+  }
+  return count;
+};
+
+const splitLongReportBlock = (text: string, limit: number): string[] => {
+  if (text.length <= limit) return [text];
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const chunks: string[] = [];
+  let current = "";
+  for (const sentence of sentences) {
+    if (!sentence.trim()) continue;
+    if (!current) {
+      current = sentence.trim();
+      continue;
+    }
+    if ((current + " " + sentence).length > limit) {
+      chunks.push(current.trim());
+      current = sentence.trim();
+    } else {
+      current = `${current} ${sentence.trim()}`;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks.length ? chunks : [text];
+};
+
+const buildReportBlocks = (question: string): HelixAskReportBlock[] => {
+  const lines = question.split(/\r?\n/);
+  const blocks: HelixAskReportBlock[] = [];
+  let current: string[] = [];
+  let currentLabel: string | undefined;
+  const pushCurrent = () => {
+    const text = current.join(" ").trim();
+    if (!text) {
+      current = [];
+      return;
+    }
+    const parts = splitLongReportBlock(text, HELIX_ASK_REPORT_BLOCK_CHAR_LIMIT);
+    for (const part of parts) {
+      blocks.push({
+        id: `block-${blocks.length + 1}`,
+        text: part,
+        label: currentLabel,
+      });
+    }
+    current = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      pushCurrent();
+      continue;
+    }
+    const headingMatch = trimmed.match(REPORT_MODE_HEADING_RE);
+    if (headingMatch) {
+      pushCurrent();
+      currentLabel = headingMatch[1].trim();
+      continue;
+    }
+    const sectionMatch = trimmed.match(REPORT_MODE_SECTION_RE);
+    if (sectionMatch) {
+      pushCurrent();
+      const sectionText = sectionMatch[1].trim();
+      if (sectionText) {
+        blocks.push({
+          id: `block-${blocks.length + 1}`,
+          text: sectionText,
+          label: currentLabel ?? sectionMatch[0].split(":")[0],
+        });
+      }
+      continue;
+    }
+    const bulletMatch = trimmed.match(REPORT_MODE_BULLET_RE);
+    if (bulletMatch) {
+      pushCurrent();
+      const bulletText = bulletMatch[1].trim();
+      if (bulletText) {
+        blocks.push({
+          id: `block-${blocks.length + 1}`,
+          text: bulletText,
+          label: currentLabel,
+        });
+      }
+      continue;
+    }
+    current.push(trimmed);
+  }
+  pushCurrent();
+  if (blocks.length === 0 && question.trim()) {
+    blocks.push({ id: "block-1", text: question.trim() });
+  }
+  return blocks;
+};
+
+const resolveReportModeDecision = (question: string): HelixAskReportModeDecision => {
+  const tokens = filterCriticTokens(tokenizeAskQuery(question));
+  const tokenCount = tokens.length;
+  const charCount = question.length;
+  const blockCount = countReportBlockCandidates(question);
+  if (!HELIX_ASK_REPORT_MODE) {
+    return { enabled: false, tokenCount, charCount, blockCount };
+  }
+  if (REPORT_MODE_INTENT_RE.test(question)) {
+    return { enabled: true, reason: "explicit_report_request", tokenCount, charCount, blockCount };
+  }
+  if (blockCount >= HELIX_ASK_REPORT_TRIGGER_BLOCKS) {
+    return { enabled: true, reason: "block_count", tokenCount, charCount, blockCount };
+  }
+  if (tokenCount >= HELIX_ASK_REPORT_TRIGGER_TOKENS || charCount >= HELIX_ASK_REPORT_TRIGGER_CHARS) {
+    return { enabled: true, reason: "long_prompt", tokenCount, charCount, blockCount };
+  }
+  return { enabled: false, tokenCount, charCount, blockCount };
+};
+
+const buildHelixAskReportAnswer = (
+  blocks: HelixAskReportBlockResult[],
+  omittedCount: number,
+): string => {
+  const counts = {
+    repo_grounded: 0,
+    hybrid: 0,
+    general: 0,
+    clarify: 0,
+  };
+  for (const block of blocks) {
+    counts[block.mode] += 1;
+  }
+  const summary = [
+    `Report covers ${blocks.length} item${blocks.length === 1 ? "" : "s"}.`,
+    `Grounded: ${counts.repo_grounded}, hybrid: ${counts.hybrid}, general: ${counts.general}, clarify: ${counts.clarify}.`,
+  ];
+  if (omittedCount > 0) {
+    summary.push(`Omitted ${omittedCount} item${omittedCount === 1 ? "" : "s"} due to report block limits.`);
+  }
+  const lines: string[] = [];
+  lines.push("Executive summary:");
+  for (const line of summary) lines.push(`- ${line}`);
+  lines.push("");
+  lines.push("Coverage map:");
+  lines.push(`- Grounded: ${counts.repo_grounded}`);
+  lines.push(`- Hybrid: ${counts.hybrid}`);
+  lines.push(`- General: ${counts.general}`);
+  lines.push(`- Clarify: ${counts.clarify}`);
+  lines.push("");
+  lines.push("Point-by-point:");
+  blocks.forEach((block, index) => {
+    const label = block.label ? `${block.label}` : `Item ${index + 1}`;
+    lines.push(`${index + 1}) ${label}`);
+    lines.push(block.answer.trim());
+    if (block.citations.length > 0 && extractFilePathsFromText(block.answer).length === 0) {
+      lines.push(`Sources: ${block.citations.join(", ")}`);
+    }
+    lines.push("");
+  });
+  return lines.join("\n").trim();
+};
+
 const resolvePreIntentAmbiguity = ({
   question,
   candidates,
@@ -7904,6 +8130,12 @@ type HelixAskExecutionArgs = {
   personaId: string;
   responder: HelixAskResponder;
   streamChunk?: (chunk: string) => void;
+  skipReportMode?: boolean;
+  reportContext?: {
+    parentTraceId?: string;
+    blockIndex?: number;
+    blockCount?: number;
+  };
 };
 
 const executeHelixAsk = async ({
@@ -7911,6 +8143,8 @@ const executeHelixAsk = async ({
   personaId,
   responder,
   streamChunk,
+  skipReportMode,
+  reportContext,
 }: HelixAskExecutionArgs): Promise<void> => {
   const parsed = { data: request };
   const askSessionId = parsed.data.sessionId;
@@ -8134,6 +8368,18 @@ const executeHelixAsk = async ({
       docs_first_used?: boolean;
       docs_first_ok?: boolean;
       docs_grep_hits?: number;
+      report_mode?: boolean;
+      report_mode_reason?: string;
+      report_blocks_count?: number;
+      report_blocks?: Array<{
+        id: string;
+        label?: string;
+        mode: "repo_grounded" | "hybrid" | "general" | "clarify";
+        clarify: boolean;
+        citation_count: number;
+        answer_preview?: string;
+        trace_id?: string;
+      }>;
       plan_scope_allowlist_tiers?: number;
       plan_scope_avoidlist?: number;
       plan_scope_must_include?: number;
@@ -8437,6 +8683,117 @@ const executeHelixAsk = async ({
       }
     }
     const baseQuestion = (questionValue ?? question ?? "").trim();
+    const reportDecision = resolveReportModeDecision(baseQuestion);
+    if (reportDecision.enabled && !skipReportMode && baseQuestion) {
+      const reportBlocks = buildReportBlocks(baseQuestion);
+      const limitedBlocks = reportBlocks.slice(0, HELIX_ASK_REPORT_MAX_BLOCKS);
+      const omittedCount = Math.max(0, reportBlocks.length - limitedBlocks.length);
+      logEvent(
+        "Report mode",
+        "start",
+        reportDecision.reason ?? "enabled",
+      );
+      if (debugPayload) {
+        debugPayload.report_mode = true;
+        debugPayload.report_mode_reason = reportDecision.reason;
+        debugPayload.report_blocks_count = limitedBlocks.length;
+      }
+      if (dryRun) {
+        const responsePayload = debugPayload
+          ? { text: "", report_mode: true, debug: debugPayload, dry_run: true }
+          : { text: "", report_mode: true, dry_run: true };
+        responder.send(200, responsePayload);
+        return;
+      }
+      const blockResults: HelixAskReportBlockResult[] = [];
+      for (let index = 0; index < limitedBlocks.length; index += 1) {
+        const block = limitedBlocks[index];
+        const blockTraceId = `${askTraceId}:b${index + 1}`.slice(0, 128);
+        const blockStart = Date.now();
+        logEvent(
+          "Report block",
+          "start",
+          `block=${index + 1}/${limitedBlocks.length}`,
+          blockStart,
+        );
+        let blockPayload: { status: number; payload: any } | null = null;
+        await executeHelixAsk({
+          request: {
+            ...request,
+            question: block.text,
+            prompt: undefined,
+            traceId: blockTraceId,
+            debug: debugEnabled,
+          },
+          personaId,
+          responder: {
+            send: (status, payload) => {
+              blockPayload = { status, payload };
+            },
+          },
+          skipReportMode: true,
+          reportContext: {
+            parentTraceId: askTraceId,
+            blockIndex: index + 1,
+            blockCount: limitedBlocks.length,
+          },
+        });
+        const blockAnswer =
+          blockPayload && blockPayload.status < 400
+            ? String(blockPayload.payload?.text ?? "").trim()
+            : "Unable to complete this block. Please clarify or point to the relevant files.";
+        const blockDebug = blockPayload?.payload?.debug as
+          | { arbiter_mode?: string; clarify_triggered?: boolean }
+          | undefined;
+        const clarify =
+          Boolean(blockDebug?.clarify_triggered) ||
+          /^what do you mean|please point|could you clarify/i.test(blockAnswer);
+        const rawMode = blockDebug?.arbiter_mode ?? "general";
+        const mode: HelixAskReportBlockResult["mode"] =
+          clarify
+            ? "clarify"
+            : rawMode === "repo_grounded" || rawMode === "hybrid" || rawMode === "general"
+              ? rawMode
+              : "general";
+        const citations = extractFilePathsFromText(blockAnswer);
+        blockResults.push({
+          id: block.id,
+          index,
+          label: block.label,
+          text: block.text,
+          answer: blockAnswer || "No answer returned for this block.",
+          mode,
+          clarify,
+          citations,
+          traceId: blockTraceId,
+        });
+        logEvent(
+          "Report block",
+          "ok",
+          `mode=${mode}`,
+          blockStart,
+        );
+      }
+      const reportText = buildHelixAskReportAnswer(blockResults, omittedCount);
+      const reportPayload: LocalAskResult = {
+        text: reportText,
+        report_mode: true,
+        report_blocks: blockResults.map((block) => ({
+          id: block.id,
+          label: block.label,
+          mode: block.mode,
+          clarify: block.clarify,
+          citation_count: block.citations.length,
+          answer_preview: clipAskText(block.answer.replace(/\s+/g, " ").trim(), 240),
+          trace_id: block.traceId,
+        })),
+      };
+      if (debugPayload) {
+        debugPayload.report_blocks = reportPayload.report_blocks as any;
+      }
+      responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
+      return;
+    }
     const hasFilePathHints = HELIX_ASK_FILE_HINT.test(baseQuestion);
     const explicitRepoExpectation =
       hasFilePathHints ||
