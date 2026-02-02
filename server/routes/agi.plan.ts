@@ -8005,6 +8005,17 @@ const executeHelixAsk = async ({
           label?: string;
           candidateCount?: number;
         };
+        ambiguity?: {
+          resolverApplied?: boolean;
+          resolverReason?: string;
+          resolverTokenCount?: number;
+          resolverShortPrompt?: boolean;
+          resolverTopScore?: number;
+          resolverMargin?: number;
+          resolverCandidates?: string[];
+          gateApplied?: boolean;
+          terms?: string[];
+        };
       };
       answer_path?: string[];
       live_events?: Array<{
@@ -8142,6 +8153,17 @@ const executeHelixAsk = async ({
       repoExpectationLevel,
     });
     let preIntentClarify: string | null = null;
+    if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+      debugPayload.ambiguity_resolver_applied = ambiguityResolution.shouldClarify;
+      debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
+      debugPayload.ambiguity_resolver_token_count = ambiguityResolution.tokenCount;
+      debugPayload.ambiguity_resolver_short_prompt = ambiguityResolution.shortPrompt;
+      debugPayload.ambiguity_resolver_top_score = ambiguityResolution.topScore;
+      debugPayload.ambiguity_resolver_margin = ambiguityResolution.margin;
+      debugPayload.ambiguity_resolver_candidates = ambiguityCandidates.map((candidate) =>
+        formatAmbiguityCandidateLabel(candidate),
+      );
+    }
     if (ambiguityResolution.shouldClarify) {
       preIntentClarify = buildPreIntentClarifyLine(baseQuestion, ambiguityCandidates);
       logEvent(
@@ -8149,17 +8171,6 @@ const executeHelixAsk = async ({
         "clarify",
         ambiguityResolution.reason ?? "short_prompt",
       );
-      if (debugPayload) {
-        debugPayload.ambiguity_resolver_applied = true;
-        debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
-        debugPayload.ambiguity_resolver_token_count = ambiguityResolution.tokenCount;
-        debugPayload.ambiguity_resolver_short_prompt = ambiguityResolution.shortPrompt;
-        debugPayload.ambiguity_resolver_top_score = ambiguityResolution.topScore;
-        debugPayload.ambiguity_resolver_margin = ambiguityResolution.margin;
-        debugPayload.ambiguity_resolver_candidates = ambiguityCandidates.map((candidate) =>
-          formatAmbiguityCandidateLabel(candidate),
-        );
-      }
     }
     const intentMatch = matchHelixAskIntent({
       question: baseQuestion,
@@ -10751,6 +10762,17 @@ const executeHelixAsk = async ({
             reason: debugPayload.variant_selection_reason,
             label: debugPayload.variant_selection_label,
             candidateCount: debugPayload.variant_selection_candidate_count,
+          },
+          ambiguity: {
+            resolverApplied: debugPayload.ambiguity_resolver_applied,
+            resolverReason: debugPayload.ambiguity_resolver_reason,
+            resolverTokenCount: debugPayload.ambiguity_resolver_token_count,
+            resolverShortPrompt: debugPayload.ambiguity_resolver_short_prompt,
+            resolverTopScore: debugPayload.ambiguity_resolver_top_score,
+            resolverMargin: debugPayload.ambiguity_resolver_margin,
+            resolverCandidates: debugPayload.ambiguity_resolver_candidates,
+            gateApplied: debugPayload.ambiguity_gate_applied,
+            terms: debugPayload.ambiguity_terms,
           },
         };
         debugPayload.answer_path = answerPath;

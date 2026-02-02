@@ -187,6 +187,17 @@ type HelixAskReply = {
         label?: string;
         candidateCount?: number;
       };
+      ambiguity?: {
+        resolverApplied?: boolean;
+        resolverReason?: string;
+        resolverTokenCount?: number;
+        resolverShortPrompt?: boolean;
+        resolverTopScore?: number;
+        resolverMargin?: number;
+        resolverCandidates?: string[];
+        gateApplied?: boolean;
+        terms?: string[];
+      };
     };
     citation_repair?: boolean;
     live_events?: Array<{
