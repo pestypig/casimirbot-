@@ -8778,6 +8778,15 @@ const executeHelixAsk = async ({
         HELIX_ASK_REPO_EXPECTS.test(rawQuestion) ||
         HELIX_ASK_REPO_HINT.test(rawQuestion) ||
         /helix ask|codebase|repository|repo|arbiter|evidence gate|constraint/i.test(rawQuestion);
+      const helixAskAnchorFiles = reportRepoContext && /helix ask/i.test(rawQuestion)
+        ? [
+            "server/routes/agi.plan.ts",
+            "server/services/helix-ask/arbiter.ts",
+            "server/services/helix-ask/platonic-gates.ts",
+            "server/services/helix-ask/query.ts",
+            "docs/helix-ask-flow.md",
+          ]
+        : [];
       logEvent(
         "Report mode",
         "start",
@@ -8805,7 +8814,7 @@ const executeHelixAsk = async ({
           !HELIX_ASK_REPO_HINT.test(block.text) &&
           !HELIX_ASK_FILE_HINT.test(block.text);
         const needsHelixAskAnchor =
-          /helix ask/i.test(rawQuestion) && !/helix ask/i.test(block.text);
+          helixAskAnchorFiles.length > 0 && !/helix ask/i.test(block.text);
         const needsCitationPrompt =
           reportRepoContext &&
           !/\b(cite|citation|file|path|source)\b/i.test(block.text);
@@ -8815,9 +8824,13 @@ const executeHelixAsk = async ({
             ? "In this repo, "
             : "";
         const baseBlockQuestion = `${prefix}${block.text}`.trim();
+        const anchorHint =
+          helixAskAnchorFiles.length > 0
+            ? `Use files: ${helixAskAnchorFiles.join(", ")}.`
+            : "";
         const blockQuestion = needsCitationPrompt
-          ? `${baseBlockQuestion} Cite repo file paths.`
-          : baseBlockQuestion;
+          ? `${baseBlockQuestion} Cite repo file paths. ${anchorHint}`.trim()
+          : `${baseBlockQuestion} ${anchorHint}`.trim();
         logEvent(
           "Report block",
           "start",
@@ -8832,7 +8845,10 @@ const executeHelixAsk = async ({
             prompt: undefined,
             traceId: blockTraceId,
             debug: debugEnabled,
-            searchQuery: rawQuestion || parsed.data.searchQuery,
+            searchQuery:
+              helixAskAnchorFiles.length > 0
+                ? [rawQuestion, ...helixAskAnchorFiles].join(" ")
+                : rawQuestion || parsed.data.searchQuery,
           },
           personaId,
           responder: {
