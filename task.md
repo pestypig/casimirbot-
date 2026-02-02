@@ -4052,3 +4052,30 @@ Progress notes:
 - Coverage token noise updated to ignore generic select/source/report verbs.
 - Remaining: validate block-specific coverage passes on multi-topic Helix Ask report prompts.
 
+
+
+## Helix Ask Report Mode: Per-block Diagnostics + Retrieval Phases - Status: planned
+- Goal: finish report-mode correctness by adding per-block trace visibility, scoped retrieval phases, drift repair, and block-specific clarification.
+- Work items:
+  - Per-block trace summarizer (debug): emit queries, topPaths, matchRatio, mustIncludeOk, drift flags, repair attempts per block.
+  - Retrieval phases per block: docs-only -> expand to code/tests if evidence weak (log phase in live events).
+  - Drift-repair pass: when evidence exists but drift gate fires, revise-to-evidence and re-run gates.
+  - Block-targeted clarification: 2 options + escape hatch, include missing term(s) or candidate directories.
+  - Per-block obligation inheritance: only force repo-required when block has repo cues.
+  - Metrics pack: block_answer_rate, block_grounded_rate, drift_fail_rate, clarify_quality, latency_per_block.
+- Debug + live event visibility:
+  - Add report_blocks_detail fields for queries/topPaths/matchRatio/mustInclude/repair.
+  - Emit live events for per-block phase: plan, retrieval-phase, evidence gate, drift-repair, arbiter.
+- Acceptance:
+  - Report blocks answer rate improves (>=70% on test pack) with grounded citations.
+  - Drift-repair resolves at least 50% of drifted blocks when evidence exists.
+  - Clarify blocks include specific missing terms + options.
+  - Debug payload shows per-block phase outcomes and retrieval scope.
+
+
+## Helix Ask Report Mode: Per-block Diagnostics + Retrieval Phases - Status update
+- Implemented report block routing hints + per-block scope override (docs->code tiers).
+- Added report_blocks_detail metrics, report_metrics summary, and block-level clarify options.
+- Added concept fast-path suppression for multi-concept questions.
+- Drift-repair pass added after platonic gates (configurable via HELIX_ASK_DRIFT_REPAIR).
+
