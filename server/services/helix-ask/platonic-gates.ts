@@ -620,6 +620,14 @@ function expandPathToken(token: string): string[] {
   const segments = normalized.split("/").filter(Boolean);
   for (const segment of segments) {
     out.add(segment);
+    if (segment.includes("-") || segment.includes("_")) {
+      for (const part of segment.split(/[-_]/g)) {
+        const trimmed = part.trim();
+        if (trimmed.length >= 3) {
+          out.add(trimmed);
+        }
+      }
+    }
   }
   const last = segments.length > 0 ? segments[segments.length - 1] : normalized;
   if (last.includes(".")) {
