@@ -228,7 +228,7 @@
     "gray-matter": "^4.0.3",
     "jsdom": "^25.0.1",
     "supertest": "^7.1.1",
-    "tsx": "^4.19.1",
+    "tsx": "^4.21.0",
     "vitest": "^1.6.0"
   },
   "optionalDependencies": {
