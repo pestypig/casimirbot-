@@ -3980,3 +3980,66 @@ Progress notes:
 
 ### Helix Ask Ambiguity Resolver v2 - Status update
 - Implemented target-span selection, cluster dispersion metrics, top-2 cluster clarifier, optional LLM label micro-pass, debug payload metrics, and ambiguity regression cases.
+## Helix Ask Report Mode (Selective, Evidence-Aware Report Writer) - Status: planned
+- Goal: handle long, multi-point prompts by decomposing into evidence-verified blocks, so more relevant material yields longer, structured output without breaking falsifiability.
+- Mode resolver (pre-intent):
+  - Trigger report mode when prompt length exceeds token/char thresholds, or when bullets/headings/tasks count exceeds N, or when user asks for a report/point-by-point.
+  - Emit report_mode + report_blocks_count in debug payload and live events.
+- Block segmentation (deterministic):
+  - Preserve order, section labels, and user priority markers.
+  - Output blocks[] = { id, text, label?, type_hint? }.
+- Per-block plan pass (trace-only):
+  - Plan outputs only slots: goal, needed_evidence, repo_surfaces, answer_shape, clarify_question.
+  - No factual claims in plan output.
+- Per-block retrieval + evidence gates:
+  - Run multi-channel retrieval per block; apply RRF + MMR.
+  - Compute per-block evidence/coverage/belief and docShare.
+  - Arbiter decision is block-local (repo/hybrid/general/clarify).
+- Per-block synthesis + assemble:
+  - Synthesize each block within fixed per-block budgets, then assemble:
+    1) Executive summary
+    2) Coverage map (grounded/hybrid/general/clarify counts)
+    3) Point-by-point sections with citations or clarify prompts.
+- Token budget controller:
+  - Allocate budgets by block strength: t_min base + t_bonus for strong evidence.
+  - Enforce global cap and overflow retry policy.
+- Debug + live event visibility:
+  - Emit per-block events for plan, retrieval, gates, and arbiter.
+  - Add report_blocks[] summary in debug payload (block id, mode, evidence ratios, citations count).
+- Acceptance:
+  - Long prompts return multi-section reports with block-level citations.
+  - Weak/ambiguous blocks clarify without failing the entire response.
+  - Debug payload exposes report mode, block stats, and per-block gate outcomes.
+
+## Helix Ask Report Mode (Selective, Evidence-Aware Report Writer) - Status: planned
+- Goal: handle long, multi-point prompts by decomposing into evidence-verified blocks, so more relevant material yields longer, structured output without breaking falsifiability.
+- Mode resolver (pre-intent):
+  - Trigger report mode when prompt length exceeds token/char thresholds, or when bullets/headings/tasks count exceeds N, or when user asks for a report/point-by-point.
+  - Emit report_mode + report_blocks_count in debug payload and live events.
+- Block segmentation (deterministic):
+  - Split by headings, bullets, numbered lists, and Q:/Requirement:/Issue: patterns.
+  - Preserve order, section labels, and user priority markers.
+  - Output blocks[] = { id, text, label?, type_hint? }.
+- Per-block plan pass (trace-only):
+  - Plan outputs only slots: goal, needed_evidence, repo_surfaces, answer_shape, clarify_question.
+  - No factual claims in plan output.
+- Per-block retrieval + evidence gates:
+  - Run multi-channel retrieval per block; apply RRF + MMR.
+  - Compute per-block evidence/coverage/belief and docShare.
+  - Arbiter decision is block-local (repo/hybrid/general/clarify).
+- Per-block synthesis + assemble:
+  - Synthesize each block within fixed per-block budgets, then assemble:
+    1) Executive summary
+    2) Coverage map (grounded/hybrid/general/clarify counts)
+    3) Point-by-point sections with citations or clarify prompts.
+- Token budget controller:
+  - Allocate budgets by block strength: t_min base + t_bonus for strong evidence.
+  - Enforce global cap and overflow retry policy.
+- Debug + live event visibility:
+  - Emit per-block events for plan, retrieval, gates, and arbiter.
+  - Add report_blocks[] summary in debug payload (block id, mode, evidence ratios, citations count).
+- Acceptance:
+  - Long prompts return multi-section reports with block-level citations.
+  - Weak/ambiguous blocks clarify without failing the entire response.
+  - Debug payload exposes report mode, block stats, and per-block gate outcomes.
+
