@@ -2722,6 +2722,12 @@ const HELIX_ASK_REPORT_BLOCK_CHAR_LIMIT = clampNumber(
   180,
   6000,
 );
+const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
+const HELIX_ASK_DRIFT_REPAIR_MAX = clampNumber(
+  readNumber(process.env.HELIX_ASK_DRIFT_REPAIR_MAX, 1),
+  0,
+  3,
+);
 const HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO = clampNumber(
   readNumber(
     process.env.HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO ?? process.env.VITE_HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
@@ -4582,6 +4588,7 @@ type HelixAskPlanScope = {
   mustIncludeGlobs?: RegExp[];
   docsFirst?: boolean;
   docsAllowlist?: RegExp[][];
+  overrideAllowlist?: boolean;
 };
 
 function initAskChannelStats(value = 0): AskCandidateChannelStats {
@@ -4870,12 +4877,14 @@ function buildPlanScope({
   requiresRepoEvidence,
   repoExpectationLevel,
   question,
+  override,
 }: {
   directives?: HelixAskPlanDirectives | null;
   topicTags: HelixAskTopicTag[];
   requiresRepoEvidence: boolean;
   repoExpectationLevel: "low" | "medium" | "high";
   question: string;
+  override?: HelixAskPlanScope | null;
 }): HelixAskPlanScope {
   const scope: HelixAskPlanScope = {};
   const preferredSurfaces = new Set<string>(directives?.preferredSurfaces ?? []);
@@ -4927,7 +4936,32 @@ function buildPlanScope({
     scope.docsFirst = true;
     scope.docsAllowlist = docsAllowlist.length ? docsAllowlist : undefined;
   }
-  return scope;
+  if (!override) return scope;
+  return mergePlanScope(scope, override);
+}
+
+function mergePlanScope(base: HelixAskPlanScope, override: HelixAskPlanScope): HelixAskPlanScope {
+  const merged: HelixAskPlanScope = { ...base };
+  if (override.allowlistTiers && override.allowlistTiers.length > 0) {
+    merged.allowlistTiers = override.allowlistTiers;
+    merged.overrideAllowlist = override.overrideAllowlist ?? true;
+  }
+  if (override.avoidlist && override.avoidlist.length > 0) {
+    merged.avoidlist = override.avoidlist;
+  }
+  if (override.mustIncludeGlobs && override.mustIncludeGlobs.length > 0) {
+    merged.mustIncludeGlobs = override.mustIncludeGlobs;
+  }
+  if (override.docsFirst !== undefined) {
+    merged.docsFirst = override.docsFirst;
+  }
+  if (override.docsAllowlist && override.docsAllowlist.length > 0) {
+    merged.docsAllowlist = override.docsAllowlist;
+  }
+  if (override.overrideAllowlist !== undefined) {
+    merged.overrideAllowlist = override.overrideAllowlist;
+  }
+  return merged;
 }
 
 function normalizeSlotName(value: string): string {
@@ -6447,6 +6481,39 @@ function buildHelixAskCitationRepairPrompt(
   return lines.join("\n");
 }
 
+function buildHelixAskDriftRepairPrompt(
+  question: string,
+  answer: string,
+  evidence: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+): string {
+  const lines = [
+    "You are Helix Ask evidence aligner.",
+    "Rewrite the answer to only include claims supported by the evidence list.",
+    "Remove or rewrite any unsupported sentences. Do not add new facts.",
+    "If evidence is insufficient, say so and ask for the relevant files (one short sentence).",
+  ];
+  if (format === "steps") {
+    lines.push("Keep the numbered step list and the trailing \"In practice,\" paragraph.");
+    if (stageTags) {
+      lines.push("Preserve any stage tags already present.");
+    }
+  } else {
+    lines.push("Keep the paragraph format; do not introduce numbered steps.");
+  }
+  lines.push("Use only citation identifiers that appear in the evidence list.");
+  lines.push("");
+  lines.push("Evidence:");
+  lines.push(evidence || "No evidence available.");
+  lines.push("");
+  lines.push("Answer:");
+  lines.push(answer);
+  lines.push("");
+  lines.push("FINAL:");
+  return lines.join("\n");
+}
+
 const HelixAskTuningOverrides = z
   .object({
     arbiter_repo_ratio: z.coerce.number().min(0.05).max(0.95).optional(),
@@ -7205,6 +7272,14 @@ const REPORT_BLOCK_HINTS: HelixAskReportBlockHint[] = [
 const REPORT_BLOCK_EXAMPLE_RE = /\b(?:like|such as)\s+(\"[^\"]+\"|'[^']+')/gi;
 const REPORT_BLOCK_PAREN_EXAMPLE_RE = /\((?:e\.g\.|for example)[^)]*\)/gi;
 const REPORT_BLOCK_EXAMPLE_TAIL_RE = /\b(?:like|such as)\s+([a-z0-9_-]{3,30})/gi;
+const REPORT_BLOCK_REPO_CUE_RE =
+  /\b(repo|repository|codebase|file|files|path|paths|cite|citation|source|sources|module|component|helix ask|arbiter|gate|constraint)\b/i;
+const REPORT_BLOCK_CLARIFY_LABELS: Record<string, string> = {
+  helix_ask_sources: "Helix Ask source selection + evidence gates",
+  helix_ask_ambiguity: "Ambiguity resolver / clarification behavior",
+  helix_ask_longprompt: "Long prompt ingest + overflow retry",
+  helix_ask_report_mode: "Report mode behavior",
+};
 
 const normalizeReportBlockText = (text: string): string => {
   if (!text) return "";
@@ -7256,6 +7331,94 @@ const buildReportBlockSearchQuery = (args: {
   if (args.anchorFiles.length) parts.push(...args.anchorFiles);
   const unique = Array.from(new Set(parts.map((part) => part.trim()).filter(Boolean)));
   return unique.join(" ");
+};
+
+const buildReportBlockClarifyLine = (
+  terms: string[],
+  hintIds: string[],
+  anchorFiles: string[],
+): string => {
+  const cleanedTerms = terms.map((term) => term.replace(/[\"'`.,;:!?]+$/g, "").trim()).filter(Boolean);
+  const options = hintIds
+    .map((id) => REPORT_BLOCK_CLARIFY_LABELS[id])
+    .filter((label): label is string => Boolean(label));
+  const dirHints = Array.from(
+    new Set(
+      anchorFiles
+        .map((filePath) => filePath.split("/")[0])
+        .filter((segment) => Boolean(segment)),
+    ),
+  ).slice(0, 2);
+  if (cleanedTerms.length > 0) {
+    const termText = cleanedTerms.length === 1 ? `"${cleanedTerms[0]}"` : cleanedTerms.join(", ");
+    if (options.length > 0) {
+      return `I could not confirm ${termText} for this block yet. Do you mean ${options.join(
+        " or ",
+      )}, or can you point to the relevant files?`;
+    }
+    if (dirHints.length > 0) {
+      return `I could not confirm ${termText} for this block yet. Can you point to files under ${dirHints.join(
+        " or ",
+      )}?`;
+    }
+    return `I could not confirm ${termText} for this block yet. Please point to the relevant files or clarify the term.`;
+  }
+  if (options.length > 0) {
+    return `Repo evidence was required for this block. Do you mean ${options.join(
+      " or ",
+    )}, or can you point to the relevant files?`;
+  }
+  return "Repo evidence was required for this block but could not be confirmed. Please point to the relevant files or clarify the term.";
+};
+
+const buildReportBlockScopeOverride = (anchorFiles: string[], hintIds: string[]): HelixAskPlanScope => {
+  const docsSurfaces = new Set<string>();
+  const codeSurfaces = new Set<string>();
+  const testSurfaces = new Set<string>();
+  for (const filePath of anchorFiles) {
+    const normalized = filePath.replace(/\\/g, "/");
+    if (normalized.startsWith("docs/ethos/")) {
+      docsSurfaces.add("docs");
+      docsSurfaces.add("ethos");
+      continue;
+    }
+    if (normalized.startsWith("docs/knowledge/")) {
+      docsSurfaces.add("docs");
+      docsSurfaces.add("knowledge");
+      continue;
+    }
+    if (normalized.startsWith("docs/")) {
+      docsSurfaces.add("docs");
+      continue;
+    }
+    if (normalized.startsWith("tests/")) {
+      testSurfaces.add("tests");
+      continue;
+    }
+    codeSurfaces.add("code");
+  }
+  if (hintIds.includes("helix_ask_sources") || hintIds.includes("helix_ask_report_mode")) {
+    docsSurfaces.add("docs");
+    codeSurfaces.add("code");
+  }
+  const tiers: RegExp[][] = [];
+  if (docsSurfaces.size > 0) {
+    tiers.push(buildPlanSurfaceRegexes(Array.from(docsSurfaces)));
+  }
+  if (codeSurfaces.size > 0) {
+    tiers.push(buildPlanSurfaceRegexes(Array.from(codeSurfaces)));
+  }
+  if (testSurfaces.size > 0) {
+    tiers.push(buildPlanSurfaceRegexes(Array.from(testSurfaces)));
+  }
+  if (tiers.length === 0) return {};
+  tiers.push([]);
+  return {
+    allowlistTiers: tiers,
+    overrideAllowlist: true,
+    docsFirst: docsSurfaces.size > 0,
+    docsAllowlist: docsSurfaces.size > 0 ? [buildPlanSurfaceRegexes(Array.from(docsSurfaces))] : undefined,
+  };
 };
 
 const countReportBlockCandidates = (question: string): number => {
@@ -7430,6 +7593,57 @@ const buildHelixAskReportAnswer = (
     lines.push("");
   });
   return lines.join("\n").trim();
+};
+
+const computeReportMetrics = (
+  blocks: HelixAskReportBlockResult[],
+  details: Array<{
+    clarify?: boolean;
+    coverage_missing_keys?: string[];
+    belief_gate_applied?: boolean;
+    rattling_gate_applied?: boolean;
+    duration_ms?: number;
+  }>,
+): {
+  block_count: number;
+  block_answer_rate: number;
+  block_grounded_rate: number;
+  drift_fail_rate: number;
+  clarify_with_terms_rate: number;
+  avg_block_ms: number;
+} => {
+  const total = blocks.length;
+  if (total === 0) {
+    return {
+      block_count: 0,
+      block_answer_rate: 0,
+      block_grounded_rate: 0,
+      drift_fail_rate: 0,
+      clarify_with_terms_rate: 0,
+      avg_block_ms: 0,
+    };
+  }
+  const clarifyCount = blocks.filter((block) => block.clarify).length;
+  const groundedCount = blocks.filter(
+    (block) => block.mode === "repo_grounded" || block.mode === "hybrid",
+  ).length;
+  const driftFails = details.filter(
+    (detail) => detail.belief_gate_applied || detail.rattling_gate_applied,
+  ).length;
+  const clarifyWithTerms = details.filter(
+    (detail) => detail.clarify && (detail.coverage_missing_keys?.length ?? 0) > 0,
+  ).length;
+  const durations = details.map((detail) => detail.duration_ms ?? 0).filter((value) => value > 0);
+  const avgBlockMs =
+    durations.length > 0 ? durations.reduce((sum, value) => sum + value, 0) / durations.length : 0;
+  return {
+    block_count: total,
+    block_answer_rate: (total - clarifyCount) / total,
+    block_grounded_rate: groundedCount / total,
+    drift_fail_rate: driftFails / total,
+    clarify_with_terms_rate: clarifyWithTerms / total,
+    avg_block_ms: avgBlockMs,
+  };
 };
 
 const resolvePreIntentAmbiguity = ({
@@ -8340,6 +8554,7 @@ type HelixAskExecutionArgs = {
     parentTraceId?: string;
     blockIndex?: number;
     blockCount?: number;
+    planScopeOverride?: HelixAskPlanScope;
   };
 };
 
@@ -8601,7 +8816,27 @@ const executeHelixAsk = async ({
         coverage_missing_keys?: string[];
         topic_tags?: string[];
         context_files?: string[];
+        retrieval_confidence?: number;
+        retrieval_doc_share?: number;
+        retrieval_context_file_count?: number;
+        retrieval_query_hit_count?: number;
+        retrieval_top_score?: number;
+        retrieval_score_gap?: number;
+        topic_tier?: number;
+        topic_must_include_ok?: boolean;
+        docs_first_ok?: boolean;
+        belief_gate_applied?: boolean;
+        rattling_gate_applied?: boolean;
+        duration_ms?: number;
       }>;
+      report_metrics?: {
+        block_count: number;
+        block_answer_rate: number;
+        block_grounded_rate: number;
+        drift_fail_rate: number;
+        clarify_with_terms_rate: number;
+        avg_block_ms: number;
+      };
       plan_scope_allowlist_tiers?: number;
       plan_scope_avoidlist?: number;
       plan_scope_must_include?: number;
@@ -8724,6 +8959,9 @@ const executeHelixAsk = async ({
       concept_lint_reasons?: string[];
       physics_lint_applied?: boolean;
       physics_lint_reasons?: string[];
+      drift_repair_applied?: boolean;
+      drift_repair_attempts?: number;
+      drift_repair_improved?: boolean;
       coverage_token_count?: number;
       coverage_key_count?: number;
       coverage_missing_key_count?: number;
@@ -8917,9 +9155,12 @@ const executeHelixAsk = async ({
       const reportBlocks = buildReportBlocks(baseQuestion);
       const limitedBlocks = reportBlocks.slice(0, HELIX_ASK_REPORT_MAX_BLOCKS);
       const omittedCount = Math.max(0, reportBlocks.length - limitedBlocks.length);
-      const reportRepoContext =
+      const reportExplicitRepo =
         HELIX_ASK_REPO_FORCE.test(rawQuestion) ||
         HELIX_ASK_REPO_EXPECTS.test(rawQuestion) ||
+        HELIX_ASK_FILE_HINT.test(rawQuestion);
+      const reportRepoContext =
+        reportExplicitRepo ||
         HELIX_ASK_REPO_HINT.test(rawQuestion) ||
         /helix ask|codebase|repository|repo|arbiter|evidence gate|constraint/i.test(rawQuestion);
       const helixAskAnchorFiles = reportRepoContext && /helix ask/i.test(rawQuestion)
@@ -8963,18 +9204,40 @@ const executeHelixAsk = async ({
         coverage_missing_keys?: string[];
         topic_tags?: string[];
         context_files?: string[];
+        retrieval_confidence?: number;
+        retrieval_doc_share?: number;
+        retrieval_context_file_count?: number;
+        retrieval_query_hit_count?: number;
+        retrieval_top_score?: number;
+        retrieval_score_gap?: number;
+        topic_tier?: number;
+        topic_must_include_ok?: boolean;
+        docs_first_ok?: boolean;
+        belief_gate_applied?: boolean;
+        rattling_gate_applied?: boolean;
+        duration_ms?: number;
       }> = [];
       for (let index = 0; index < limitedBlocks.length; index += 1) {
         const block = limitedBlocks[index];
         const blockTraceId = `${askTraceId}:b${index + 1}`.slice(0, 128);
         const blockStart = Date.now();
         const blockText = normalizeReportBlockText(block.text);
+        const blockTextForQuestion = blockText || block.text;
         const blockHints = resolveReportBlockHints(block.text);
-        const blockRepoContext = reportRepoContext || blockHints.repoFocus;
+        const blockHasRepoCue =
+          HELIX_ASK_REPO_FORCE.test(blockTextForQuestion) ||
+          HELIX_ASK_REPO_EXPECTS.test(blockTextForQuestion) ||
+          HELIX_ASK_REPO_HINT.test(blockTextForQuestion) ||
+          HELIX_ASK_FILE_HINT.test(blockTextForQuestion) ||
+          REPORT_BLOCK_REPO_CUE_RE.test(blockTextForQuestion);
+        const blockRepoContext =
+          reportExplicitRepo || blockHints.repoFocus || blockHasRepoCue;
         const blockAnchorFiles = Array.from(
           new Set([...helixAskAnchorFiles, ...blockHints.anchorFiles]),
         );
-        const blockTextForQuestion = blockText || block.text;
+        const blockScopeOverride = blockRepoContext
+          ? buildReportBlockScopeOverride(blockAnchorFiles, blockHints.hintIds)
+          : {};
         const needsRepoPrefix =
           blockRepoContext &&
           !HELIX_ASK_REPO_FORCE.test(blockTextForQuestion) &&
@@ -9011,6 +9274,22 @@ const executeHelixAsk = async ({
           `block=${index + 1}/${limitedBlocks.length}`,
           blockStart,
         );
+        if (blockRepoContext && (blockAnchorFiles.length > 0 || blockScopeOverride.allowlistTiers)) {
+          logEvent(
+            "Report block scope",
+            `block=${index + 1}`,
+            [
+              blockAnchorFiles.length ? `anchors=${blockAnchorFiles.length}` : "",
+              blockScopeOverride.allowlistTiers?.length
+                ? `tiers=${blockScopeOverride.allowlistTiers.length}`
+                : "",
+              blockHints.hintIds.length ? `hints=${blockHints.hintIds.join(",")}` : "",
+            ]
+              .filter(Boolean)
+              .join(" | "),
+            blockStart,
+          );
+        }
         let blockPayload: { status: number; payload: any } | null = null;
         await executeHelixAsk({
           request: {
@@ -9032,6 +9311,7 @@ const executeHelixAsk = async ({
             parentTraceId: askTraceId,
             blockIndex: index + 1,
             blockCount: limitedBlocks.length,
+            planScopeOverride: blockScopeOverride,
           },
         });
         const resolvedBlockPayload = blockPayload as { status: number; payload: any } | null;
@@ -9051,6 +9331,17 @@ const executeHelixAsk = async ({
               intent_id?: string;
               topic_tags?: string[];
               context_files?: string[];
+              retrieval_confidence?: number;
+              retrieval_doc_share?: number;
+              retrieval_context_file_count?: number;
+              retrieval_query_hit_count?: number;
+              retrieval_top_score?: number;
+              retrieval_score_gap?: number;
+              topic_tier?: number;
+              topic_must_include_ok?: boolean;
+              docs_first_ok?: boolean;
+              belief_gate_applied?: boolean;
+              rattling_gate_applied?: boolean;
             }
           | undefined;
         let citations = extractFilePathsFromText(rawBlockAnswer);
@@ -9079,7 +9370,9 @@ const executeHelixAsk = async ({
           0,
           2,
         );
-        const blockAnswer = clarify ? buildAmbiguityClarifyLine(clarifyTerms) : rawBlockAnswer;
+        const blockAnswer = clarify
+          ? buildReportBlockClarifyLine(clarifyTerms, blockHints.hintIds, blockAnchorFiles)
+          : rawBlockAnswer;
         if (clarify) {
           citations = [];
         }
@@ -9095,6 +9388,7 @@ const executeHelixAsk = async ({
           traceId: blockTraceId,
         });
         if (debugPayload) {
+          const blockDuration = Math.max(0, Date.now() - blockStart);
           reportBlockDetails.push({
             id: block.id,
             label: block.label,
@@ -9111,6 +9405,18 @@ const executeHelixAsk = async ({
             coverage_missing_keys: blockDebug?.coverage_missing_keys,
             topic_tags: blockDebug?.topic_tags,
             context_files: blockDebug?.context_files?.slice(0, 6),
+            retrieval_confidence: blockDebug?.retrieval_confidence,
+            retrieval_doc_share: blockDebug?.retrieval_doc_share,
+            retrieval_context_file_count: blockDebug?.retrieval_context_file_count,
+            retrieval_query_hit_count: blockDebug?.retrieval_query_hit_count,
+            retrieval_top_score: blockDebug?.retrieval_top_score,
+            retrieval_score_gap: blockDebug?.retrieval_score_gap,
+            topic_tier: blockDebug?.topic_tier,
+            topic_must_include_ok: blockDebug?.topic_must_include_ok,
+            docs_first_ok: blockDebug?.docs_first_ok,
+            belief_gate_applied: blockDebug?.belief_gate_applied,
+            rattling_gate_applied: blockDebug?.rattling_gate_applied,
+            duration_ms: blockDuration,
           });
         }
         logEvent(
@@ -9121,6 +9427,9 @@ const executeHelixAsk = async ({
         );
       }
       const reportText = buildHelixAskReportAnswer(blockResults, omittedCount);
+      const reportMetrics = debugPayload
+        ? computeReportMetrics(blockResults, reportBlockDetails)
+        : null;
       const reportPayload: LocalAskResult = {
         text: reportText,
         report_mode: true,
@@ -9137,6 +9446,7 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         debugPayload.report_blocks = reportPayload.report_blocks as any;
         debugPayload.report_blocks_detail = reportBlockDetails as any;
+        debugPayload.report_metrics = reportMetrics as any;
       }
       responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
       return;
@@ -10139,6 +10449,7 @@ const executeHelixAsk = async ({
             requiresRepoEvidence,
             repoExpectationLevel,
             question: baseQuestion,
+            override: reportContext?.planScopeOverride,
           });
           if (debugPayload) {
             debugPayload.docs_first_enabled = planScope.docsFirst ?? false;
@@ -11657,7 +11968,7 @@ const executeHelixAsk = async ({
           ...extractFilePathsFromText(promptScaffold),
         ]),
       );
-      const platonicResult = applyHelixAskPlatonicGates({
+      let platonicResult = applyHelixAskPlatonicGates({
         question: baseQuestion,
         answer: cleaned,
         domain: platonicDomain,
@@ -11706,6 +12017,98 @@ const executeHelixAsk = async ({
         platonicResult.rattlingGateApplied ? "applied" : "pass",
         `score=${platonicResult.rattlingScore.toFixed(2)}`,
       );
+      let driftRepairApplied = false;
+      let driftRepairAttempts = 0;
+      let driftRepairImproved = false;
+      if (
+        HELIX_ASK_DRIFT_REPAIR &&
+        HELIX_ASK_DRIFT_REPAIR_MAX > 0 &&
+        (platonicResult.beliefGateApplied || platonicResult.rattlingGateApplied) &&
+        !platonicResult.coverageGateApplied &&
+        evidenceText.trim().length > 0 &&
+        (platonicDomain === "repo" || platonicDomain === "hybrid" || platonicDomain === "falsifiable")
+      ) {
+        const repairStart = Date.now();
+        driftRepairAttempts += 1;
+        try {
+          const repairEvidence = appendEvidenceSources(evidenceText, contextFiles, 8, contextText);
+          const repairPrompt = buildHelixAskDriftRepairPrompt(
+            baseQuestion,
+            cleaned,
+            repairEvidence,
+            formatSpec.format,
+            formatSpec.stageTags,
+          );
+          const { result: repairResult, overflow: repairOverflow } =
+            await runHelixAskLocalWithOverflowRetry(
+              {
+                prompt: repairPrompt,
+                max_tokens: repairTokens,
+                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.35),
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+              },
+              {
+                fallbackMaxTokens: repairTokens,
+                allowContextDrop: true,
+                label: "drift_repair",
+              },
+            );
+          recordOverflow("drift_repair", repairOverflow);
+          const repairText = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
+          if (repairText) {
+            const candidate = applyHelixAskPlatonicGates({
+              question: baseQuestion,
+              answer: repairText,
+              domain: platonicDomain,
+              tier: intentTier,
+              intentId: intentProfile.id,
+              format: formatSpec.format,
+              evidenceText,
+              evidencePaths,
+              generalScaffold,
+              repoScaffold,
+              promptScaffold,
+              conceptMatch,
+            });
+            const gateScore = (result: typeof platonicResult): number =>
+              (result.coverageGateApplied ? 1 : 0) +
+              (result.beliefGateApplied ? 1 : 0) +
+              (result.rattlingGateApplied ? 1 : 0);
+            const priorScore = gateScore(platonicResult);
+            const nextScore = gateScore(candidate);
+            if (
+              nextScore < priorScore ||
+              (nextScore === priorScore &&
+                candidate.beliefSummary.unsupportedRate <= platonicResult.beliefSummary.unsupportedRate)
+            ) {
+              platonicResult = candidate;
+              cleaned = candidate.answer;
+              driftRepairImproved = true;
+            }
+            driftRepairApplied = true;
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          logEvent("Drift repair", "error", message, repairStart, false);
+        }
+        if (driftRepairApplied) {
+          logEvent(
+            "Drift repair",
+            driftRepairImproved ? "ok" : "no_change",
+            [
+              `attempts=${driftRepairAttempts}`,
+              driftRepairImproved ? "improved=yes" : "improved=no",
+            ].join(" | "),
+            repairStart,
+          );
+        }
+      }
       if (HELIX_ASK_TRAINING_TRACE) {
         try {
           const notes: string[] = [];
@@ -11851,6 +12254,9 @@ const executeHelixAsk = async ({
         debugPayload.concept_lint_reasons = platonicResult.conceptLintReasons;
         debugPayload.physics_lint_applied = platonicResult.physicsLintApplied;
         debugPayload.physics_lint_reasons = platonicResult.physicsLintReasons;
+        debugPayload.drift_repair_applied = driftRepairApplied;
+        debugPayload.drift_repair_attempts = driftRepairAttempts;
+        debugPayload.drift_repair_improved = driftRepairImproved;
         debugPayload.coverage_token_count = platonicResult.coverageSummary.tokenCount;
         debugPayload.coverage_key_count = platonicResult.coverageSummary.keyCount;
         debugPayload.coverage_missing_key_count = platonicResult.coverageSummary.missingKeyCount;
