@@ -107,6 +107,71 @@ acts as planner + code generator + debugger, not as the source of truth.
   - Two-paragraph prompts return exactly two paragraphs in main answer.
   - Live events include obligation extraction, plan pass, retrieval retry, arbiter decision, clarify trigger.
 
+
+### D10) Claim-graph + context proofs for long-form prompt compliance
+- Goal: combine LLM generation with falsifiable module reasoning and explicit context proofs so long answers remain prompt-compliant and auditable.
+- Why: long responses can look correct but hide unsupported claims or drift from user constraints.
+- Design:
+  - Hybrid reasoning stack: LLM for plan + narrative; deterministic module for constraints + proof obligations.
+  - Treat outputs as a claim graph with stable claim IDs and typed claims.
+  - Prompt contract: hard constraints vs soft goals; hard constraint failures block output.
+- Core artifacts:
+  - Claim ledger: list of atomic claims with ids, type (fact | inference | assumption | hypothesis | question), and dependencies.
+  - Context proof: short justification trace (source -> rule -> conclusion) per claim.
+  - Constraint matrix: constraints x response sections with coverage/violation markers.
+  - Uncertainty register: unverified, probabilistic, or user-confirmation-required claims.
+- Workflow:
+  1) Spec extraction -> prompt contract.
+  2) Skeleton plan -> constraint pre-check.
+  3) Claim assembly -> attach evidence or derivation rules.
+  4) Verification pass -> consistency, coverage, and forbidden-content checks.
+  5) Narrative synthesis -> prose generated only from verified claims.
+  6) Final gate -> all claims proven, sourced, or explicitly flagged.
+- Design principles:
+  - Typed claims only; no hidden context.
+  - Explicit derivation rules for every "therefore".
+  - Dependency chain must be available for every claim.
+- Long-response safety:
+  - Section-level constraints + coverage metrics.
+  - Stop-gap filter: block or flag any unverified claim.
+- Output example (internal trace):
+  ```text
+  Claim C12 (inference): "X improves Y under condition Z."
+  Proof: C3 + C7 via rule R2.
+  Claim C13 (assumption): "Condition Z holds in this domain."
+  Status: unverified; requires user confirmation.
+  ```
+- Minimal tooling:
+  - JSON schema for the claim ledger.
+  - Rules engine or SAT/SMT checks for constraint validation.
+  - Response composer that only renders verified claims.
+
+### D11) Coverage gate v2 (slot-based + partial clarify)
+- Goal: remove hard veto on literal tokens while preserving falsifiability.
+- Why: coverage gate currently blocks even when evidence match is high; missing_key_terms for surface tokens.
+- Changes:
+  - Replace token coverage with slot coverage.
+  - Slot satisfaction: literal, normalized (hyphen/space, plural/singular, stemming), concept alias, or doc path/title match when docs-first.
+  - Convert global FAIL to partial answer when evidence gate is ok:
+    - Answer covered slots with citations.
+    - Add targeted clarify for missing slots (2 options + escape).
+  - Docs-first evidence card guarantee:
+    - minDocEvidenceCards >= 2 (or >= 1 per required slot).
+    - require at least one excerpt containing the slot noun phrase or alias.
+  - Evidence card selection becomes slot-aware (prefer chunks that satisfy slots).
+- Ambiguity resolver (dominance-based):
+  - Use target noun phrase extraction + repo vs general retrieval dominance.
+  - If dominance weak/mixed, ask clarify instead of guessing; no hand-curated word lists.
+- Slot-aware retrieval retry:
+  - If slots missing, run one retry with query expansion from slot spans; forbid new facts.
+- Metrics:
+  - partial_answer_rate, clarify_precision, slot_coverage_rate, doc_evidence_card_rate, time_to_first_grounded_sentence.
+- Acceptance:
+  - High evidence_match_ratio cannot be vetoed by missing literal tokens alone.
+  - Repo-required prompts return partial + clarify when some slots are missing.
+  - Coverage logs report slots_covered/slots_missing and doc evidence card counts.
+  - Defaults: HELIX_ASK_COVERAGE_GATE, HELIX_ASK_BELIEF_GATE, and HELIX_ASK_RATTLING_GATE are enabled when unset.
+
 ### CAS / Math backend
 - Primary: Python stack: SymPy + EinsteinPy.
 - Optional (v2): Cadabra adapter for advanced canonicalization/symmetry handling.

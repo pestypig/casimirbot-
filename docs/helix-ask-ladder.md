@@ -74,6 +74,7 @@ Live events
 - Helix Ask: Context ready - N files
 
 ## 6) Evidence eligibility + slot coverage
+- Defaults: HELIX_ASK_COVERAGE_GATE, HELIX_ASK_BELIEF_GATE, and HELIX_ASK_RATTLING_GATE are enabled when unset.
 - Evidence gate checks match ratio, min tokens, etc.
 - Slot coverage ensures required slots are supported (definition, repo_mapping,
   verification, failure_path).

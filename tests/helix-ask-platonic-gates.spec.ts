@@ -71,13 +71,14 @@ describe("helix ask platonic gates", () => {
       tier: "F1",
       intentId: "repo.helix_ask_pipeline_explain",
       format: "compare",
+      evidenceGateOk: true,
       evidenceText:
         "helix ask pipeline intent directory evidence gate format envelope helix ask pill.",
     });
     expect(result.coverageSummary.keyCount).toBeGreaterThan(0);
     expect(result.coverageSummary.missingKeyCount).toBeGreaterThan(0);
     expect(result.coverageGateApplied).toBe(true);
-    expect(result.answer).toMatch(/did not cover key terms/i);
+    expect(result.answer).toMatch(/I don't see repo evidence/i);
     expect(result.answer).toMatch(/morphospace|attractors/i);
   });
 

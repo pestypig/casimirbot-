@@ -155,6 +155,7 @@ import {
 import {
   applyHelixAskPlatonicGates,
   type HelixAskDomain,
+  evaluateCoverageSlots,
 } from "../services/helix-ask/platonic-gates";
 import {
   buildHelixAskTopicProfile,
@@ -3826,6 +3827,55 @@ function enforceHelixAskPromptContract(answer: string, question: string): string
 const hasTwoParagraphContract = (question: string): boolean =>
   HELIX_ASK_TWO_PARAGRAPH_CONTRACT.test(question);
 
+function buildConstraintMatrix(args: {
+  answer: string;
+  question: string;
+  format: HelixAskFormat;
+  requiresRepoEvidence: boolean;
+  stageTags: boolean;
+}): { section_count: number; constraints: Array<{ id: string; satisfied: boolean; detail?: string }> } {
+  const trimmed = args.answer.trim();
+  const paragraphs = trimmed
+    ? trimmed.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean)
+    : [];
+  const lines = trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const stepLines = lines.filter((line) => /^\d+\.\s+/.test(line));
+  const sectionCount = args.format === "steps" ? stepLines.length : paragraphs.length;
+  const constraints: Array<{ id: string; satisfied: boolean; detail?: string }> = [];
+  if (args.format === "steps") {
+    constraints.push({
+      id: "steps_format",
+      satisfied: stepLines.length > 0,
+      detail: `steps=${stepLines.length}`,
+    });
+  } else if (hasTwoParagraphContract(args.question)) {
+    constraints.push({
+      id: "two_paragraphs",
+      satisfied: paragraphs.length === 2,
+      detail: `paragraphs=${paragraphs.length}`,
+    });
+  }
+  if (args.requiresRepoEvidence) {
+    const citationCount = extractFilePathsFromText(args.answer).length;
+    constraints.push({
+      id: "citations_required",
+      satisfied: citationCount > 0,
+      detail: `citations=${citationCount}`,
+    });
+  }
+  if (args.stageTags && args.format === "steps") {
+    const hasStageTag = stepLines.some((line) =>
+      /\((observe|hypothesis|experiment|analysis|explain)\)/i.test(line),
+    );
+    constraints.push({
+      id: "stage_tags",
+      satisfied: hasStageTag,
+      detail: hasStageTag ? "present" : "missing",
+    });
+  }
+  return { section_count: sectionCount, constraints };
+}
+
 function normalizeNumberedListLines(value: string): string {
   if (!value) return value;
   const lines = value.split(/\r?\n/);
@@ -5521,6 +5571,19 @@ function buildAskContextFromCandidates(args: {
   channelTopScores?: AskCandidateChannelStats;
 } {
   return finalizeAskContext(args);
+}
+
+function splitAskContextBlocks(context: string): Array<{ path: string; block: string }> {
+  if (!context.trim()) return [];
+  return context
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const [firstLine] = block.split(/\r?\n/);
+      return { path: (firstLine ?? "").trim(), block };
+    })
+    .filter((entry) => entry.path.length > 0);
 }
 
 async function buildAmbiguityCandidateSnapshot(args: {
@@ -8787,6 +8850,11 @@ const executeHelixAsk = async ({
       docs_first_enabled?: boolean;
       docs_first_used?: boolean;
       docs_first_ok?: boolean;
+      docs_first_min_cards?: number;
+      docs_first_evidence_cards?: number;
+      docs_first_slot_covered?: string[];
+      docs_first_slot_missing?: string[];
+      docs_first_slot_ratio?: number;
       docs_grep_hits?: number;
       report_mode?: boolean;
       report_mode_reason?: string;
@@ -8931,6 +8999,10 @@ const executeHelixAsk = async ({
       slot_coverage_missing?: string[];
       slot_coverage_ratio?: number;
       slot_coverage_ok?: boolean;
+      coverage_slots_required?: string[];
+      coverage_slots_covered?: string[];
+      coverage_slots_missing?: string[];
+      coverage_slots_ratio?: number;
       repo_search_terms?: string[];
       repo_search_paths?: string[];
       repo_search_reason?: string;
@@ -8969,6 +9041,26 @@ const executeHelixAsk = async ({
       coverage_missing_keys?: string[];
       coverage_gate_applied?: boolean;
       coverage_gate_reason?: string;
+      claim_ledger?: Array<{
+        id: string;
+        type: string;
+        supported: boolean;
+        evidence_refs: string[];
+        proof: string;
+      }>;
+      uncertainty_register?: Array<{
+        id: string;
+        type: string;
+        reason: string;
+      }>;
+      constraint_matrix?: {
+        section_count: number;
+        constraints: Array<{
+          id: string;
+          satisfied: boolean;
+          detail?: string;
+        }>;
+      };
       ambiguity_resolver_applied?: boolean;
       ambiguity_resolver_reason?: string;
       ambiguity_resolver_candidates?: string[];
@@ -10515,6 +10607,8 @@ const executeHelixAsk = async ({
           channelHits: initAskChannelStats(),
           channelTopScores: initAskChannelStats(),
         };
+        let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+        let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
 
         if (!contextText) {
           const contextStart = Date.now();
@@ -10634,11 +10728,132 @@ const executeHelixAsk = async ({
           contextFiles = contextResult.files.slice();
           topicMustIncludeOk = contextResult.topicMustIncludeOk;
           contextMeta = contextResult;
-          logProgress("Context ready", `${contextResult.files.length} files`, contextStart);
+          const contextBlocks = splitAskContextBlocks(contextText);
+          const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+          const docContextText = docBlocks.map((block) => block.block).join("\n\n");
+          coverageSlotSummary = evaluateCoverageSlots({
+            question: baseQuestion,
+            referenceText: contextText,
+            evidencePaths: contextFiles,
+            conceptMatch,
+            domain: intentDomain,
+          });
+          docSlotSummary =
+            docContextText.trim().length > 0
+              ? evaluateCoverageSlots({
+                  question: baseQuestion,
+                  referenceText: docContextText,
+                  evidencePaths: docBlocks.map((block) => block.path),
+                  conceptMatch,
+                  domain: intentDomain,
+                })
+              : coverageSlotSummary;
+          const minDocEvidenceCards = Math.max(
+            2,
+            Math.min(coverageSlotSummary.slots.length || 0, 4) || 2,
+          );
+          if (debugPayload && planScope?.docsFirst) {
+            debugPayload.docs_first_evidence_cards = docBlocks.length;
+            debugPayload.docs_first_min_cards = minDocEvidenceCards;
+          }
+          if (
+            planScope?.docsFirst &&
+            (docBlocks.length < minDocEvidenceCards || docSlotSummary.missingSlots.length > 0)
+          ) {
+            const docsAllowlist = (planScope.docsAllowlist ?? []).flat();
+            const slotHints =
+              docSlotSummary.missingSlots.length > 0
+                ? docSlotSummary.missingSlots
+                : coverageSlotSummary.slots;
+            const docQueries = mergeHelixAskQueries(
+              queries,
+              slotHints,
+              HELIX_ASK_QUERY_MERGE_MAX + 4,
+            );
+            const grepCandidates = collectDocsGrepCandidates(docQueries, baseQuestion, {
+              allowlist: docsAllowlist,
+              avoidlist: planScope.avoidlist,
+              limit: 200,
+            });
+            if (grepCandidates.length > 0) {
+              const existing = new Set(contextFiles.map((entry) => entry.toLowerCase()));
+              const extras = grepCandidates.filter(
+                (candidate) => !existing.has(candidate.filePath.toLowerCase()),
+              );
+              const extraLimit = Math.min(
+                4,
+                Math.max(minDocEvidenceCards - docBlocks.length, docSlotSummary.missingSlots.length || 1),
+              );
+              const selectedExtras = selectCandidatesWithMmr(
+                extras,
+                extraLimit,
+                HELIX_ASK_MMR_LAMBDA,
+              );
+              if (selectedExtras.length > 0) {
+                const extraLines = selectedExtras
+                  .map((entry) => {
+                    const preview = clipAskText(entry.preview, HELIX_ASK_CONTEXT_CHARS);
+                    if (!preview) return null;
+                    return `${entry.filePath}\n${preview}`;
+                  })
+                  .filter(Boolean) as string[];
+                if (extraLines.length > 0) {
+                  contextText = [contextText, extraLines.join("\n\n")].filter(Boolean).join("\n\n");
+                  contextFiles = Array.from(
+                    new Set([...contextFiles, ...selectedExtras.map((entry) => entry.filePath)]),
+                  );
+                }
+              }
+            }
+            const refreshedBlocks = splitAskContextBlocks(contextText);
+            const refreshedDocBlocks = refreshedBlocks.filter((block) =>
+              /(^|\/)docs\//i.test(block.path),
+            );
+            const refreshedDocText = refreshedDocBlocks.map((block) => block.block).join("\n\n");
+            if (debugPayload && planScope?.docsFirst) {
+              debugPayload.docs_first_evidence_cards = refreshedDocBlocks.length;
+            }
+            coverageSlotSummary = evaluateCoverageSlots({
+              question: baseQuestion,
+              referenceText: contextText,
+              evidencePaths: contextFiles,
+              conceptMatch,
+              domain: intentDomain,
+            });
+            docSlotSummary =
+              refreshedDocText.trim().length > 0
+                ? evaluateCoverageSlots({
+                    question: baseQuestion,
+                    referenceText: refreshedDocText,
+                    evidencePaths: refreshedDocBlocks.map((block) => block.path),
+                    conceptMatch,
+                    domain: intentDomain,
+                  })
+                : coverageSlotSummary;
+            if (planScope?.docsFirst) {
+              const docStatus =
+                refreshedDocBlocks.length >= minDocEvidenceCards &&
+                docSlotSummary.missingSlots.length === 0
+                  ? "ok"
+                  : "weak";
+              logEvent(
+                "Docs-first evidence",
+                docStatus,
+                [
+                  `docs=${refreshedDocBlocks.length}`,
+                  `min=${minDocEvidenceCards}`,
+                  docSlotSummary.missingSlots.length
+                    ? `missing=${docSlotSummary.missingSlots.join(",")}`
+                    : "missing=none",
+                ].join(" | "),
+              );
+            }
+          }
+          logProgress("Context ready", `${contextFiles.length} files`, contextStart);
           logEvent(
             "Context ready",
-            `${contextResult.files.length} files`,
-            formatFileList(contextResult.files),
+            `${contextFiles.length} files`,
+            formatFileList(contextFiles),
             contextStart,
           );
           if (topicProfile) {
@@ -10653,8 +10868,8 @@ const executeHelixAsk = async ({
               logEvent("Allowlist tier", "none", "no topic tier selected", contextStart);
             }
           }
-          if (debugPayload && contextResult.files.length > 0) {
-            debugPayload.context_files = contextResult.files;
+          if (debugPayload && contextFiles.length > 0) {
+            debugPayload.context_files = contextFiles;
           }
           if (debugPayload) {
             if (contextResult.topicTier) {
@@ -10713,6 +10928,29 @@ const executeHelixAsk = async ({
             : topicMustIncludeSatisfied(extractFilePathsFromText(contextText), topicProfile);
         if (verificationAnchorRequired && !verificationAnchorOk) {
           mustIncludeOk = false;
+        }
+        if (!coverageSlotSummary) {
+          coverageSlotSummary = evaluateCoverageSlots({
+            question: baseQuestion,
+            referenceText: contextText,
+            evidencePaths: contextFiles,
+            conceptMatch,
+            domain: intentDomain,
+          });
+        }
+        if (!docSlotSummary) {
+          const contextBlocks = splitAskContextBlocks(contextText);
+          const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+          const docContextText = docBlocks.map((block) => block.block).join("\n\n");
+          if (docContextText.trim().length > 0) {
+            docSlotSummary = evaluateCoverageSlots({
+              question: baseQuestion,
+              referenceText: docContextText,
+              evidencePaths: docBlocks.map((block) => block.path),
+              conceptMatch,
+              domain: intentDomain,
+            });
+          }
         }
         const contextFilesSnapshot = extractFilePathsFromText(contextText);
         const planMustIncludeOk =
@@ -10802,6 +11040,29 @@ const executeHelixAsk = async ({
             }
           }
         }
+        if (coverageSlotSummary) {
+          coverageSlotSummary = evaluateCoverageSlots({
+            question: baseQuestion,
+            referenceText: contextText,
+            evidencePaths: contextFiles,
+            conceptMatch,
+            domain: intentDomain,
+          });
+        }
+        if (docSlotSummary) {
+          const contextBlocks = splitAskContextBlocks(contextText);
+          const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+          const docContextText = docBlocks.map((block) => block.block).join("\n\n");
+          if (docContextText.trim().length > 0) {
+            docSlotSummary = evaluateCoverageSlots({
+              question: baseQuestion,
+              referenceText: docContextText,
+              evidencePaths: docBlocks.map((block) => block.path),
+              conceptMatch,
+              domain: intentDomain,
+            });
+          }
+        }
         const queryHitCount = contextMeta.queryHitCount ?? 0;
         const topScore = contextMeta.topScore ?? 0;
         const scoreGap = contextMeta.scoreGap ?? 0;
@@ -10849,6 +11110,17 @@ const executeHelixAsk = async ({
           debugPayload.slot_coverage_missing = slotCoverage.missing;
           debugPayload.slot_coverage_ratio = slotCoverage.ratio;
           debugPayload.slot_coverage_ok = slotCoverageOk;
+          if (coverageSlotSummary) {
+            debugPayload.coverage_slots_required = coverageSlotSummary.slots;
+            debugPayload.coverage_slots_covered = coverageSlotSummary.coveredSlots;
+            debugPayload.coverage_slots_missing = coverageSlotSummary.missingSlots;
+            debugPayload.coverage_slots_ratio = coverageSlotSummary.ratio;
+          }
+          if (docSlotSummary) {
+            debugPayload.docs_first_slot_covered = docSlotSummary.coveredSlots;
+            debugPayload.docs_first_slot_missing = docSlotSummary.missingSlots;
+            debugPayload.docs_first_slot_ratio = docSlotSummary.ratio;
+          }
         }
         if (requiredSlots.length > 0) {
           logEvent(
@@ -10857,6 +11129,18 @@ const executeHelixAsk = async ({
             [
               `ratio=${slotCoverage.ratio.toFixed(2)}`,
               slotCoverage.missing.length ? `missing=${slotCoverage.missing.join(",")}` : "missing=none",
+            ].join(" | "),
+          );
+        }
+        if (coverageSlotSummary && coverageSlotSummary.slots.length > 0) {
+          logEvent(
+            "Coverage slots",
+            coverageSlotSummary.missingSlots.length ? "missing" : "ok",
+            [
+              `ratio=${coverageSlotSummary.ratio.toFixed(2)}`,
+              coverageSlotSummary.missingSlots.length
+                ? `missing=${coverageSlotSummary.missingSlots.join(",")}`
+                : "missing=none",
             ].join(" | "),
           );
         }
@@ -10893,17 +11177,21 @@ const executeHelixAsk = async ({
           ].join(" | "),
         );
         const arbiterHybridThreshold = Math.min(arbiterRepoRatio, arbiterHybridRatio);
+        const coverageSlotsMissing = Boolean(
+          coverageSlotSummary && coverageSlotSummary.missingSlots.length > 0,
+        );
         const shouldRetryRetrieval =
           HELIX_ASK_RETRIEVAL_RETRY_ENABLED &&
           !promptIngested &&
           hasRepoHints &&
-          retrievalConfidence < arbiterHybridThreshold;
+          (retrievalConfidence < arbiterHybridThreshold || coverageSlotsMissing);
         if (shouldRetryRetrieval) {
           const retryStart = Date.now();
           const retryHints = [
             ...(topicProfile?.mustIncludeFiles ?? []),
             ...compositeRequiredFiles,
             ...verificationAnchorHints,
+            ...(coverageSlotSummary?.missingSlots ?? []).slice(0, 4),
           ];
           const retryQueries = mergeHelixAskQueries(
             baseQueries,
@@ -10964,6 +11252,25 @@ const executeHelixAsk = async ({
               ? evaluateSlotCoverage({ contextText, requiredSlots, conceptMatch })
               : { required: [], covered: [], missing: [], ratio: 1 };
             const retrySlotCoverageOk = retrySlotCoverage.missing.length === 0;
+            coverageSlotSummary = evaluateCoverageSlots({
+              question: baseQuestion,
+              referenceText: contextText,
+              evidencePaths: retryFiles,
+              conceptMatch,
+              domain: intentDomain,
+            });
+            const retryBlocks = splitAskContextBlocks(contextText);
+            const retryDocBlocks = retryBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+            const retryDocText = retryDocBlocks.map((block) => block.block).join("\n\n");
+            if (retryDocText.trim().length > 0) {
+              docSlotSummary = evaluateCoverageSlots({
+                question: baseQuestion,
+                referenceText: retryDocText,
+                evidencePaths: retryDocBlocks.map((block) => block.path),
+                conceptMatch,
+                domain: intentDomain,
+              });
+            }
             if (requiredSlots.length && !retrySlotCoverageOk) {
               mustIncludeOk = false;
               evidenceGate = { ...evidenceGate, ok: false };
@@ -11011,6 +11318,17 @@ const executeHelixAsk = async ({
               debugPayload.slot_coverage_missing = retrySlotCoverage.missing;
               debugPayload.slot_coverage_ratio = retrySlotCoverage.ratio;
               debugPayload.slot_coverage_ok = retrySlotCoverageOk;
+              if (coverageSlotSummary) {
+                debugPayload.coverage_slots_required = coverageSlotSummary.slots;
+                debugPayload.coverage_slots_covered = coverageSlotSummary.coveredSlots;
+                debugPayload.coverage_slots_missing = coverageSlotSummary.missingSlots;
+                debugPayload.coverage_slots_ratio = coverageSlotSummary.ratio;
+              }
+              if (docSlotSummary) {
+                debugPayload.docs_first_slot_covered = docSlotSummary.coveredSlots;
+                debugPayload.docs_first_slot_missing = docSlotSummary.missingSlots;
+                debugPayload.docs_first_slot_ratio = docSlotSummary.ratio;
+              }
             }
             logProgress(
               "Context retry ready",
@@ -11977,6 +12295,7 @@ const executeHelixAsk = async ({
         format: formatSpec.format,
         evidenceText,
         evidencePaths,
+        evidenceGateOk,
         generalScaffold,
         repoScaffold,
         promptScaffold,
@@ -12071,6 +12390,7 @@ const executeHelixAsk = async ({
               format: formatSpec.format,
               evidenceText,
               evidencePaths,
+              evidenceGateOk,
               generalScaffold,
               repoScaffold,
               promptScaffold,
@@ -12264,6 +12584,29 @@ const executeHelixAsk = async ({
         debugPayload.coverage_missing_keys = platonicResult.coverageSummary.missingKeys;
         debugPayload.coverage_gate_applied = platonicResult.coverageGateApplied;
         debugPayload.coverage_gate_reason = platonicResult.coverageGateReason;
+        debugPayload.claim_ledger = platonicResult.claimLedger
+          .slice(0, 8)
+          .map((entry) => ({
+            id: entry.id,
+            type: entry.type,
+            supported: entry.supported,
+            evidence_refs: entry.evidenceRefs.slice(0, 4),
+            proof: entry.proof,
+          }));
+        debugPayload.uncertainty_register = platonicResult.uncertaintyRegister
+          .slice(0, 8)
+          .map((entry) => ({
+            id: entry.id,
+            type: entry.type,
+            reason: entry.reason,
+          }));
+        debugPayload.constraint_matrix = buildConstraintMatrix({
+          answer: cleaned,
+          question: baseQuestion,
+          format: formatSpec.format,
+          requiresRepoEvidence,
+          stageTags: formatSpec.stageTags,
+        });
         debugPayload.belief_claim_count = platonicResult.beliefSummary.claimCount;
         debugPayload.belief_supported_count = platonicResult.beliefSummary.supportedCount;
         debugPayload.belief_unsupported_count = platonicResult.beliefSummary.unsupportedCount;

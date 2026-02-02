@@ -13,12 +13,38 @@ export type HelixAskBeliefSummary = {
   contradictionCount: number;
 };
 
+export type HelixAskClaimType =
+  | "fact"
+  | "inference"
+  | "assumption"
+  | "hypothesis"
+  | "question";
+
+export type HelixAskClaimLedgerEntry = {
+  id: string;
+  text: string;
+  type: HelixAskClaimType;
+  supported: boolean;
+  evidenceRefs: string[];
+  proof: string;
+};
+
+export type HelixAskUncertaintyEntry = {
+  id: string;
+  text: string;
+  type: HelixAskClaimType;
+  reason: string;
+};
+
 export type HelixAskCoverageSummary = {
   tokenCount: number;
   keyCount: number;
   missingKeyCount: number;
   coverageRatio: number;
   missingKeys: string[];
+  slots: string[];
+  coveredSlots: string[];
+  missingSlots: string[];
 };
 
 export type HelixAskBeliefGraphSummary = {
@@ -62,6 +88,7 @@ export type HelixAskPlatonicInput = {
   format: HelixAskFormat;
   evidenceText?: string;
   evidencePaths?: string[];
+  evidenceGateOk?: boolean;
   generalScaffold?: string;
   repoScaffold?: string;
   promptScaffold?: string;
@@ -79,6 +106,8 @@ export type HelixAskPlatonicResult = {
   coverageSummary: HelixAskCoverageSummary;
   coverageGateApplied: boolean;
   coverageGateReason?: string;
+  claimLedger: HelixAskClaimLedgerEntry[];
+  uncertaintyRegister: HelixAskUncertaintyEntry[];
   beliefSummary: HelixAskBeliefSummary;
   beliefGraphSummary: HelixAskBeliefGraphSummary;
   beliefGateApplied: boolean;
@@ -176,6 +205,16 @@ const COMMON_QUERY_TOKENS = new Set([
   "define",
   "defined",
   "definition",
+  "meaning",
+  "mean",
+  "what",
+  "whats",
+  "what's",
+  "how",
+  "does",
+  "do",
+  "is",
+  "are",
   "include",
   "including",
   "use",
@@ -340,6 +379,71 @@ function buildClaimNodes(answer: string): ClaimNode[] {
     };
   });
 }
+
+const CLAIM_ASSUMPTION_RE = /\b(assume|assumption|assuming|suppose|supposing)\b/i;
+const CLAIM_HYPOTHESIS_RE = /\b(may|might|could|possible|likely|uncertain|suggests|suggesting)\b/i;
+
+const classifyClaimType = (claim: ClaimNode): HelixAskClaimType => {
+  if (/\?\s*$/.test(claim.text.trim())) return "question";
+  if (CLAIM_ASSUMPTION_RE.test(claim.text)) return "assumption";
+  if (CLAIM_HYPOTHESIS_RE.test(claim.text)) return "hypothesis";
+  if (claim.isConclusion) return "inference";
+  return "fact";
+};
+
+const buildClaimProof = (claim: ClaimNode, supported: boolean): string => {
+  if (claim.evidenceRefs.length > 0) {
+    return `source:${claim.evidenceRefs.join(", ")} -> cite -> ${claim.id}`;
+  }
+  if (supported) {
+    return `source:evidence_text -> token_overlap -> ${claim.id}`;
+  }
+  return `source:missing -> verify -> ${claim.id}`;
+};
+
+const buildClaimLedger = (
+  input: HelixAskPlatonicInput,
+  claims: ClaimNode[],
+): { ledger: HelixAskClaimLedgerEntry[]; uncertainty: HelixAskUncertaintyEntry[] } => {
+  const evidenceText = [
+    input.evidenceText,
+    input.repoScaffold,
+    input.generalScaffold,
+    input.promptScaffold,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
+  const ledger: HelixAskClaimLedgerEntry[] = [];
+  const uncertainty: HelixAskUncertaintyEntry[] = [];
+  for (const claim of claims) {
+    const supported =
+      claim.evidenceRefs.length > 0 || isClaimSupported(claim.tokens, evidenceTokens);
+    const type = classifyClaimType(claim);
+    const entry: HelixAskClaimLedgerEntry = {
+      id: claim.id,
+      text: claim.text,
+      type,
+      supported,
+      evidenceRefs: claim.evidenceRefs.slice(),
+      proof: buildClaimProof(claim, supported),
+    };
+    ledger.push(entry);
+    if (!supported) {
+      uncertainty.push({
+        id: claim.id,
+        text: claim.text,
+        type,
+        reason: "missing_evidence",
+      });
+    } else if (type === "assumption" || type === "hypothesis") {
+      uncertainty.push({ id: claim.id, text: claim.text, type, reason: type });
+    } else if (type === "question") {
+      uncertainty.push({ id: claim.id, text: claim.text, type, reason: "question" });
+    }
+  }
+  return { ledger, uncertainty };
+};
 
 function countTokenOverlap(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 || b.size === 0) return 0;
@@ -654,8 +758,187 @@ function toTokenSet(text: string): Set<string> {
   return new Set(tokens);
 }
 
+const COVERAGE_SLOT_SPLIT_RE = /\s+(?:and|or|vs\.?|versus|\/|&|,)\s+/i;
+const COVERAGE_SLOT_MAX = 8;
+
+const stripEdgePunctuation = (value: string): string =>
+  value.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, "");
+
+const stripLeadingArticles = (value: string): string =>
+  value.replace(/^(?:a|an|the)\s+/i, "");
+
+const normalizeCoverageToken = (token: string): string | undefined => {
+  const cleaned = stripEdgePunctuation(token.toLowerCase());
+  if (!cleaned) return undefined;
+  let stem = cleaned;
+  if (stem.length > 4 && stem.endsWith("ies")) {
+    stem = `${stem.slice(0, -3)}y`;
+  } else if (stem.length > 4 && stem.endsWith("es")) {
+    stem = stem.slice(0, -2);
+  } else if (stem.length > 5 && stem.endsWith("ing")) {
+    stem = stem.slice(0, -3);
+  } else if (stem.length > 4 && stem.endsWith("ed")) {
+    stem = stem.slice(0, -2);
+  } else if (stem.length > 3 && stem.endsWith("s")) {
+    stem = stem.slice(0, -1);
+  }
+  return stem || cleaned;
+};
+
+const normalizeCoverageSlot = (value: string): string => {
+  const cleaned = stripEdgePunctuation(value.toLowerCase());
+  return cleaned.replace(/\s+/g, " ").trim();
+};
+
+const extractCoverageSpan = (question: string): string | undefined => {
+  const match = question.match(
+    /\b(?:what\s+is|what's|whats|define|explain|describe|meaning\s+of)\b\s+(.+)$/i,
+  );
+  if (!match) return undefined;
+  let span = match[1].trim();
+  span = span.replace(/[?!.]+$/g, "").trim();
+  span = stripLeadingArticles(span);
+  return span || undefined;
+};
+
+const collectConceptTokens = (conceptMatch: HelixAskConceptMatch | null | undefined): Set<string> => {
+  if (!conceptMatch) return new Set<string>();
+  const values = [
+    conceptMatch.card.id,
+    conceptMatch.card.label ?? "",
+    ...(conceptMatch.card.aliases ?? []),
+  ].filter(Boolean);
+  const tokens = values
+    .flatMap((value) => tokenizeAskQuery(value))
+    .flatMap((token) => filterSignalTokens([token]))
+    .map((token) => normalizeCoverageToken(token))
+    .filter((token): token is string => Boolean(token));
+  return new Set(tokens.map((token) => token.toLowerCase()));
+};
+
+const buildCoverageSlotTokens = (
+  slot: string,
+  conceptTokens: Set<string>,
+  domain: HelixAskDomain,
+): string[] => {
+  const tokens = filterSignalTokens(tokenizeAskQuery(slot))
+    .map((token) => normalizeCoverageToken(token))
+    .filter((token): token is string => Boolean(token))
+    .filter((token) => token.length >= 3)
+    .filter((token) => !COMMON_QUERY_TOKENS.has(token))
+    .filter((token) => !(domain === "hybrid" && CONCEPTUAL_TOKENS.has(token)))
+    .filter((token) => !conceptTokens.has(token));
+  return Array.from(new Set(tokens));
+};
+
+const buildCoverageSlotVariants = (slot: string): string[] => {
+  const normalized = normalizeCoverageSlot(slot);
+  if (!normalized) return [];
+  const variants = new Set<string>([normalized]);
+  if (normalized.includes(" ")) {
+    variants.add(normalized.replace(/\s+/g, "-"));
+    variants.add(normalized.replace(/\s+/g, "_"));
+  }
+  if (normalized.length > 3) {
+    if (normalized.endsWith("s")) {
+      variants.add(normalized.slice(0, -1));
+    } else {
+      variants.add(`${normalized}s`);
+    }
+  }
+  return Array.from(variants);
+};
+
+export function evaluateCoverageSlots(args: {
+  question: string;
+  referenceText: string;
+  evidencePaths?: string[];
+  conceptMatch?: HelixAskConceptMatch | null;
+  conceptAnchored?: boolean;
+  domain?: HelixAskDomain;
+}): { slots: string[]; coveredSlots: string[]; missingSlots: string[]; ratio: number } {
+  const domain = args.domain ?? "general";
+  const conceptTokens = collectConceptTokens(args.conceptMatch);
+  const slots = new Set<string>();
+  const span = extractCoverageSpan(args.question);
+  if (span) {
+    for (const part of span.split(COVERAGE_SLOT_SPLIT_RE)) {
+      const trimmed = part.trim();
+      if (/^(how|why|when|where|which|who|does|do|is|are|can|should|could|would)\b/i.test(trimmed)) {
+        continue;
+      }
+      const normalized = normalizeCoverageSlot(trimmed);
+      if (normalized) slots.add(normalized);
+    }
+  }
+  const conceptLabel = args.conceptMatch?.card.label ?? args.conceptMatch?.card.id ?? "";
+  if (conceptLabel) {
+    const normalized = normalizeCoverageSlot(conceptLabel);
+    if (normalized) slots.add(normalized);
+  }
+  const questionTokens = filterSignalTokens(tokenizeAskQuery(args.question));
+  for (const token of questionTokens) {
+    const normalized = normalizeCoverageToken(token);
+    if (!normalized || normalized.length < 3) continue;
+    if (COMMON_QUERY_TOKENS.has(normalized)) continue;
+    if (domain === "hybrid" && CONCEPTUAL_TOKENS.has(normalized)) continue;
+    if (conceptTokens.has(normalized)) continue;
+    slots.add(normalized);
+  }
+  const slotList = Array.from(slots).filter(Boolean).slice(0, COVERAGE_SLOT_MAX);
+  if (slotList.length === 0) {
+    return { slots: [], coveredSlots: [], missingSlots: [], ratio: 1 };
+  }
+
+  const referenceText = args.referenceText?.toLowerCase() ?? "";
+  const referenceTokensRaw = referenceText ? toTokenSet(referenceText) : new Set<string>();
+  const referenceTokens = new Set<string>();
+  for (const token of referenceTokensRaw) {
+    const normalized = normalizeCoverageToken(token);
+    if (normalized) referenceTokens.add(normalized);
+  }
+  const pathTokens = new Set<string>();
+  const evidencePaths = [
+    ...(args.evidencePaths ?? []),
+    ...extractFilePathsFromText(args.referenceText ?? ""),
+  ];
+  for (const path of evidencePaths) {
+    for (const token of expandPathToken(path)) {
+      const normalized = normalizeCoverageToken(token);
+      if (normalized) pathTokens.add(normalized);
+    }
+  }
+  const coveredSlots: string[] = [];
+  for (const slot of slotList) {
+    const slotTokens = buildCoverageSlotTokens(slot, conceptTokens, domain);
+    const variants = buildCoverageSlotVariants(slot);
+    let covered = false;
+    if (args.conceptAnchored && slotTokens.length > 0) {
+      const matchesConcept = slotTokens.every((token) => conceptTokens.has(token));
+      if (matchesConcept) {
+        covered = true;
+      }
+    }
+    if (!covered && variants.length > 0) {
+      covered = variants.some((variant) => referenceText.includes(variant));
+    }
+    if (!covered && slotTokens.length > 0) {
+      const tokensCovered = slotTokens.every((token) => referenceTokens.has(token));
+      if (tokensCovered) covered = true;
+    }
+    if (!covered && slotTokens.length > 0 && pathTokens.size > 0) {
+      const pathCovered = slotTokens.every((token) => pathTokens.has(token));
+      if (pathCovered) covered = true;
+    }
+    if (covered) coveredSlots.push(slot);
+  }
+  const missingSlots = slotList.filter((slot) => !coveredSlots.includes(slot));
+  const ratio = slotList.length ? coveredSlots.length / slotList.length : 1;
+  return { slots: slotList, coveredSlots, missingSlots, ratio };
+}
+
 function computeCoverageSummary(input: HelixAskPlatonicInput): HelixAskCoverageSummary {
-  const questionTokens = Array.from(toTokenSet(input.question));
+  const questionTokens = filterSignalTokens(tokenizeAskQuery(input.question));
   const tokenCount = questionTokens.length;
   const referenceText = [
     input.evidenceText,
@@ -665,32 +948,62 @@ function computeCoverageSummary(input: HelixAskPlatonicInput): HelixAskCoverageS
   ]
     .filter(Boolean)
     .join("\n\n");
-  const referenceTokens = referenceText ? toTokenSet(referenceText) : new Set<string>();
-  const keyTokens = questionTokens.filter((token) => {
-    if (COMMON_QUERY_TOKENS.has(token)) return false;
-    if (input.domain === "hybrid" && CONCEPTUAL_TOKENS.has(token)) return false;
-    return token.length >= 5;
+  const slotSummary = evaluateCoverageSlots({
+    question: input.question,
+    referenceText,
+    evidencePaths: input.evidencePaths,
+    conceptMatch: input.conceptMatch ?? null,
+    conceptAnchored: conceptEvidenceAnchored(input),
+    domain: input.domain,
   });
-  const keyCount = keyTokens.length;
-  if (keyCount === 0) {
-    return {
-      tokenCount,
-      keyCount: 0,
-      missingKeyCount: 0,
-      coverageRatio: 1,
-      missingKeys: [],
-    };
-  }
-  const missingKeys = keyTokens.filter((token) => !referenceTokens.has(token));
-  const missingKeyCount = missingKeys.length;
-  const coverageRatio = keyCount > 0 ? (keyCount - missingKeyCount) / keyCount : 0;
+  const keyCount = slotSummary.slots.length;
+  const missingKeyCount = slotSummary.missingSlots.length;
+  const coverageRatio = slotSummary.ratio;
   return {
     tokenCount,
     keyCount,
     missingKeyCount,
     coverageRatio,
-    missingKeys: missingKeys.slice(0, 6),
+    missingKeys: slotSummary.missingSlots.slice(0, 6),
+    slots: slotSummary.slots,
+    coveredSlots: slotSummary.coveredSlots,
+    missingSlots: slotSummary.missingSlots,
   };
+}
+
+function appendCoverageClarify(
+  answer: string,
+  format: HelixAskFormat,
+  clarifyLine: string,
+): string {
+  const trimmed = answer.trim();
+  if (!clarifyLine.trim()) return answer;
+  if (!trimmed) return clarifyLine.trim();
+  const normalized = trimmed.toLowerCase();
+  if (normalized.includes(clarifyLine.toLowerCase())) return answer;
+  if (format === "steps" && LIST_STRUCTURE_RE.test(trimmed)) {
+    const lines = trimmed.split(/\r?\n/);
+    let maxStep = 0;
+    for (const line of lines) {
+      const match = line.trim().match(/^(\d+)\.\s+/);
+      if (!match) continue;
+      const num = Number(match[1]);
+      if (Number.isFinite(num)) maxStep = Math.max(maxStep, num);
+    }
+    const nextStep = maxStep > 0 ? maxStep + 1 : 1;
+    return `${trimmed}\n${nextStep}. ${clarifyLine.trim()}`;
+  }
+  const paragraphs = trimmed
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  if (paragraphs.length === 0) {
+    return clarifyLine.trim();
+  }
+  const last = paragraphs.pop() ?? "";
+  const merged = `${ensureSentence(last)} ${ensureSentence(clarifyLine)}`.trim();
+  paragraphs.push(merged);
+  return paragraphs.join("\n\n");
 }
 
 function applyCoverageGate(
@@ -718,11 +1031,21 @@ function applyCoverageGate(
   if (summary.missingKeyCount === 0) {
     return { answer: input.answer, applied: false };
   }
-  const missingList = summary.missingKeys.join(", ");
+  const missingSlots = summary.missingSlots.length
+    ? summary.missingSlots
+    : summary.missingKeys;
+  const missingList = missingSlots.join(", ");
   const guarded = missingList
     ? `Repo evidence did not cover key terms from the question (${missingList}). Please point to the relevant files or narrow the request.`
     : "Repo evidence did not cover key terms from the question. Please point to the relevant files or narrow the request.";
-  return { answer: guarded, applied: true, reason: "missing_key_terms" };
+  if (input.evidenceGateOk !== true) {
+    return { answer: guarded, applied: true, reason: "missing_slots" };
+  }
+  const clarifyLine = missingList
+    ? `I don't see repo evidence for ${missingList}. Do you mean a repo-specific module/file, or the general concept? Point me to the file path or clarify the sense.`
+    : "I don't see repo evidence for a key term here. Point me to the file path or clarify the intended sense.";
+  const appended = appendCoverageClarify(input.answer, input.format, clarifyLine);
+  return { answer: appended, applied: true, reason: "missing_slots_partial" };
 }
 
 function computeBeliefSummary(input: HelixAskPlatonicInput): HelixAskBeliefSummary {
@@ -1233,6 +1556,7 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
     answer =
       "Answer drifted too far from the provided evidence. Please narrow the request or specify the relevant files.";
   }
+  const claimLedger = buildClaimLedger(variantInput, variantClaims);
   return {
     answer,
     junkCleanApplied: junkClean.applied,
@@ -1246,6 +1570,8 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
     coverageSummary,
     coverageGateApplied: coverageGate.applied,
     coverageGateReason: coverageGate.reason,
+    claimLedger: claimLedger.ledger,
+    uncertaintyRegister: claimLedger.uncertainty,
     beliefSummary,
     beliefGraphSummary,
     beliefGateApplied: beliefGate.applied,
