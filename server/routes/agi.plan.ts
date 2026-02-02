@@ -2531,6 +2531,14 @@ const HELIX_ASK_HTTP_KEEPALIVE_MS = clampNumber(
   2000,
   60000,
 );
+const HELIX_ASK_FAILURE_MAX_RAW = readNumber(process.env.HELIX_ASK_FAILURE_MAX, 1);
+const HELIX_ASK_FAILURE_MAX =
+  HELIX_ASK_FAILURE_MAX_RAW <= 0 ? 0 : clampNumber(HELIX_ASK_FAILURE_MAX_RAW, 1, 10);
+const HELIX_ASK_FAILURE_COOLDOWN_MS = clampNumber(
+  readNumber(process.env.HELIX_ASK_FAILURE_COOLDOWN_MS, 120000),
+  10_000,
+  900_000,
+);
 const HELIX_ASK_LOCAL_CONTEXT_TOKENS = resolveLocalContextTokens();
 const HELIX_ASK_SCAFFOLD_CONTEXT_CHARS = Math.max(
   800,
@@ -3378,6 +3386,70 @@ function createHelixAskJsonKeepAlive(
 
   return { send, stop, isStreaming: () => streaming };
 }
+
+type HelixAskCircuitState = {
+  failures: number;
+  openedUntil: number;
+  lastError?: string;
+  lastFailureAt?: number;
+};
+
+const helixAskCircuit: HelixAskCircuitState = {
+  failures: 0,
+  openedUntil: 0,
+};
+
+const resetHelixAskCircuit = (): void => {
+  helixAskCircuit.failures = 0;
+  helixAskCircuit.openedUntil = 0;
+  helixAskCircuit.lastError = undefined;
+  helixAskCircuit.lastFailureAt = undefined;
+};
+
+const normalizeHelixAskError = (error: unknown): string => {
+  if (!error) return "unknown_error";
+  if (error instanceof Error) return error.message || "error";
+  if (typeof error === "string") return error;
+  if (typeof (error as { message?: unknown }).message === "string") {
+    return String((error as { message?: unknown }).message);
+  }
+  return "error";
+};
+
+const recordHelixAskFailure = (error: unknown): void => {
+  if (HELIX_ASK_FAILURE_MAX <= 0) return;
+  const message = normalizeHelixAskError(error);
+  helixAskCircuit.failures += 1;
+  helixAskCircuit.lastError = message.slice(0, 280);
+  helixAskCircuit.lastFailureAt = Date.now();
+  if (helixAskCircuit.failures >= HELIX_ASK_FAILURE_MAX) {
+    helixAskCircuit.openedUntil = Date.now() + HELIX_ASK_FAILURE_COOLDOWN_MS;
+  }
+};
+
+const recordHelixAskSuccess = (): void => {
+  if (HELIX_ASK_FAILURE_MAX <= 0) return;
+  resetHelixAskCircuit();
+};
+
+const isHelixAskCircuitOpen = (): boolean => {
+  if (HELIX_ASK_FAILURE_MAX <= 0) return false;
+  if (!helixAskCircuit.openedUntil) return false;
+  if (Date.now() < helixAskCircuit.openedUntil) return true;
+  resetHelixAskCircuit();
+  return false;
+};
+
+const buildHelixAskCircuitPayload = () => {
+  const retryAfterMs = Math.max(0, helixAskCircuit.openedUntil - Date.now());
+  return {
+    ok: false,
+    error: "helix_ask_temporarily_unavailable",
+    message: "Helix Ask is cooling down after a runtime error. Please retry shortly.",
+    retryAfterMs,
+    status: 503,
+  };
+};
 
 function stripStageTags(value: string): string {
   if (!value) return value;
@@ -11687,15 +11759,37 @@ planRouter.post("/ask", async (req, res) => {
   if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
     return res.status(403).json({ error: "forbidden" });
   }
+  if (isHelixAskCircuitOpen()) {
+    const payload = buildHelixAskCircuitPayload();
+    const retryAfterSeconds = Math.ceil(payload.retryAfterMs / 1000);
+    if (retryAfterSeconds > 0) {
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+    }
+    return res.status(503).json(payload);
+  }
   const keepAlive = createHelixAskJsonKeepAlive(res, {
     enabled: HELIX_ASK_HTTP_KEEPALIVE && parsed.data.dryRun !== true,
     intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
   });
-  await executeHelixAsk({
-    request: parsed.data,
-    personaId,
-    responder: { send: keepAlive.send },
-  });
+  const safeSend: HelixAskResponder["send"] = (status, payload) => {
+    if (status >= 500) {
+      recordHelixAskFailure(payload);
+    } else if (status < 400) {
+      recordHelixAskSuccess();
+    }
+    keepAlive.send(status, payload);
+  };
+  try {
+    await executeHelixAsk({
+      request: parsed.data,
+      personaId,
+      responder: { send: safeSend },
+    });
+  } catch (error) {
+    recordHelixAskFailure(error);
+    const message = error instanceof Error ? error.message : String(error);
+    safeSend(500, { ok: false, error: "helix_ask_unhandled", message, status: 500 });
+  }
 });
 
 const describeHelixAskJobError = (payload: unknown, status: number): string => {
@@ -11734,6 +11828,10 @@ const runHelixAskJob = async (
   personaId: string,
 ): Promise<void> => {
   if (!(await markHelixAskJobRunning(jobId))) return;
+  if (isHelixAskCircuitOpen()) {
+    await failHelixAskJob(jobId, "helix_ask_temporarily_unavailable");
+    return;
+  }
   let settled = false;
   let timeoutHandle: NodeJS.Timeout | null = null;
   const timeoutMs = HELIX_ASK_JOB_TIMEOUT_MS;
@@ -11750,6 +11848,11 @@ const runHelixAskJob = async (
     send: (status, payload) => {
       if (settled) return;
       settled = true;
+      if (status >= 500) {
+        recordHelixAskFailure(payload);
+      } else if (status < 400) {
+        recordHelixAskSuccess();
+      }
       if (status >= 400) {
         const message = describeHelixAskJobError(payload, status);
         void failHelixAskJob(jobId, message);
@@ -11781,6 +11884,7 @@ const runHelixAskJob = async (
     const normalized = message.includes("helix_ask_timeout")
       ? "helix_ask_timeout"
       : message || "helix_ask_failed";
+    recordHelixAskFailure(error);
     await failHelixAskJob(jobId, normalized);
   } finally {
     if (timeoutHandle) {
@@ -11801,6 +11905,14 @@ planRouter.post("/ask/jobs", async (req, res) => {
   }
   if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
     return res.status(403).json({ error: "forbidden" });
+  }
+  if (isHelixAskCircuitOpen()) {
+    const payload = buildHelixAskCircuitPayload();
+    const retryAfterSeconds = Math.ceil(payload.retryAfterMs / 1000);
+    if (retryAfterSeconds > 0) {
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+    }
+    return res.status(503).json(payload);
   }
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
   const request = { ...parsed.data, traceId: askTraceId };
