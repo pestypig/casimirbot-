@@ -135,8 +135,10 @@ import { resolveHelixAskArbiter } from "../services/helix-ask/arbiter";
 import {
   buildConceptScaffold,
   findConceptMatch,
+  listConceptCandidates,
   renderConceptAnswer,
   renderConceptDefinition,
+  type HelixAskConceptCandidate,
   type HelixAskConceptMatch,
 } from "../services/helix-ask/concepts";
 import {
@@ -2731,6 +2733,23 @@ const HELIX_ASK_TRAINING_TRACE =
   String(process.env.HELIX_ASK_TRAINING_TRACE ?? "1").trim() !== "0";
 const HELIX_ASK_AMBIGUITY_GATE =
   String(process.env.HELIX_ASK_AMBIGUITY_GATE ?? "1").trim() !== "0";
+const HELIX_ASK_AMBIGUITY_RESOLVER =
+  String(process.env.HELIX_ASK_AMBIGUITY_RESOLVER ?? "1").trim() !== "0";
+const HELIX_ASK_AMBIGUITY_SHORT_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUITY_SHORT_TOKENS, 4),
+  2,
+  12,
+);
+const HELIX_ASK_AMBIGUITY_MIN_SCORE = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUITY_MIN_SCORE, 8),
+  1,
+  40,
+);
+const HELIX_ASK_AMBIGUITY_MARGIN_MIN = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUITY_MARGIN_MIN, 4),
+  0,
+  40,
+);
 const HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN = clampNumber(
   readNumber(process.env.HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN, 5),
   3,
@@ -6624,6 +6643,88 @@ const buildAmbiguityClarifyLine = (terms: string[]): string => {
   return `I do not see ${joined} in the repo evidence yet. Which files define those terms?`;
 };
 
+const selectClarifyToken = (question: string): string | undefined => {
+  const tokens = filterCriticTokens(tokenizeAskQuery(question));
+  for (const token of tokens) {
+    const normalized = token.toLowerCase();
+    if (AMBIGUOUS_IGNORE_TOKENS.has(normalized)) continue;
+    if (normalized.length < HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN) continue;
+    return normalized;
+  }
+  return tokens[0];
+};
+
+const formatAmbiguityCandidateLabel = (candidate: HelixAskConceptCandidate): string =>
+  candidate.card.label ?? candidate.card.id;
+
+const buildPreIntentClarifyLine = (
+  question: string,
+  candidates: HelixAskConceptCandidate[],
+): string => {
+  if (candidates.length >= 2) {
+    const labelA = formatAmbiguityCandidateLabel(candidates[0]);
+    const labelB = formatAmbiguityCandidateLabel(candidates[1]);
+    return `Do you mean "${labelA}" or "${labelB}"? If you mean a repo concept, point me to the file or module.`;
+  }
+  if (candidates.length === 1) {
+    const label = formatAmbiguityCandidateLabel(candidates[0]);
+    const token = selectClarifyToken(question) ?? candidates[0].matchedTerm;
+    return `Do you mean "${label}" in this repo, or the general meaning of "${token}"? If it's repo-specific, point me to the file or module.`;
+  }
+  const token = selectClarifyToken(question);
+  if (token) {
+    return `What do you mean by "${token}"? If you mean a repo/physics concept, point me to the file or module.`;
+  }
+  return "Could you clarify the term or point me to the relevant files?";
+};
+
+const resolvePreIntentAmbiguity = ({
+  question,
+  candidates,
+  explicitRepoExpectation,
+  repoExpectationLevel,
+}: {
+  question: string;
+  candidates: HelixAskConceptCandidate[];
+  explicitRepoExpectation: boolean;
+  repoExpectationLevel: "low" | "medium" | "high";
+}): {
+  shouldClarify: boolean;
+  reason?: string;
+  tokenCount: number;
+  shortPrompt: boolean;
+  topScore: number;
+  margin: number;
+} => {
+  if (!HELIX_ASK_AMBIGUITY_RESOLVER) {
+    return {
+      shouldClarify: false,
+      tokenCount: 0,
+      shortPrompt: false,
+      topScore: 0,
+      margin: 0,
+    };
+  }
+  const tokenCount = filterCriticTokens(tokenizeAskQuery(question)).length;
+  const shortPrompt = tokenCount > 0 && tokenCount <= HELIX_ASK_AMBIGUITY_SHORT_TOKENS;
+  const topScore = candidates[0]?.score ?? 0;
+  const margin = candidates.length > 1 ? topScore - candidates[1].score : topScore;
+  const strongConcept =
+    candidates.length > 0 &&
+    topScore >= HELIX_ASK_AMBIGUITY_MIN_SCORE &&
+    (candidates.length < 2 || margin >= HELIX_ASK_AMBIGUITY_MARGIN_MIN);
+  const hasRepoExpectation = explicitRepoExpectation || repoExpectationLevel !== "low";
+  const shouldClarify = shortPrompt && !hasRepoExpectation && !strongConcept;
+  return {
+    shouldClarify,
+    reason: shouldClarify ? "short_prompt_low_signal" : undefined,
+    tokenCount,
+    shortPrompt,
+    topScore,
+    margin,
+  };
+};
+
 const ExecuteRequest = z.object({
   traceId: z.string().min(8, "traceId required"),
   debugSources: z.boolean().optional(),
@@ -7805,6 +7906,13 @@ const executeHelixAsk = async ({
       coverage_missing_keys?: string[];
       coverage_gate_applied?: boolean;
       coverage_gate_reason?: string;
+      ambiguity_resolver_applied?: boolean;
+      ambiguity_resolver_reason?: string;
+      ambiguity_resolver_candidates?: string[];
+      ambiguity_resolver_token_count?: number;
+      ambiguity_resolver_short_prompt?: boolean;
+      ambiguity_resolver_top_score?: number;
+      ambiguity_resolver_margin?: number;
       belief_claim_count?: number;
       belief_supported_count?: number;
       belief_unsupported_count?: number;
@@ -8024,6 +8132,35 @@ const executeHelixAsk = async ({
     } else {
       logEvent("Topic profile", "none", "no profile");
     }
+    const ambiguityCandidates = HELIX_ASK_AMBIGUITY_RESOLVER
+      ? listConceptCandidates(baseQuestion, 3)
+      : [];
+    const ambiguityResolution = resolvePreIntentAmbiguity({
+      question: baseQuestion,
+      candidates: ambiguityCandidates,
+      explicitRepoExpectation,
+      repoExpectationLevel,
+    });
+    let preIntentClarify: string | null = null;
+    if (ambiguityResolution.shouldClarify) {
+      preIntentClarify = buildPreIntentClarifyLine(baseQuestion, ambiguityCandidates);
+      logEvent(
+        "Ambiguity resolver",
+        "clarify",
+        ambiguityResolution.reason ?? "short_prompt",
+      );
+      if (debugPayload) {
+        debugPayload.ambiguity_resolver_applied = true;
+        debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
+        debugPayload.ambiguity_resolver_token_count = ambiguityResolution.tokenCount;
+        debugPayload.ambiguity_resolver_short_prompt = ambiguityResolution.shortPrompt;
+        debugPayload.ambiguity_resolver_top_score = ambiguityResolution.topScore;
+        debugPayload.ambiguity_resolver_margin = ambiguityResolution.margin;
+        debugPayload.ambiguity_resolver_candidates = ambiguityCandidates.map((candidate) =>
+          formatAmbiguityCandidateLabel(candidate),
+        );
+      }
+    }
     const intentMatch = matchHelixAskIntent({
       question: baseQuestion,
       hasRepoHints,
@@ -8223,6 +8360,14 @@ const executeHelixAsk = async ({
     let mathSolveResult: HelixAskMathSolveResult | null = null;
     let verificationAnchorRequired = false;
     let verificationAnchorHints: string[] = [];
+    let forcedAnswer: string | null = null;
+    if (preIntentClarify) {
+      forcedAnswer = preIntentClarify;
+      answerPath.push("clarify:pre_intent");
+      if (debugPayload) {
+        debugPayload.clarify_triggered = true;
+      }
+    }
     const conceptualFocus = HELIX_ASK_CONCEPTUAL_FOCUS.test(baseQuestion);
     const wantsConceptMatch =
       intentDomain === "general" ||
@@ -8394,7 +8539,6 @@ const executeHelixAsk = async ({
         debugPayload.math_solver_maturity = mathSolveResult.maturityStage;
       }
     }
-    let forcedAnswer: string | null = null;
     let evidenceText = "";
     let constraintEvidenceText = "";
     let constraintEvidenceRefs: string[] = [];

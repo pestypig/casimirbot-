@@ -3839,3 +3839,25 @@ Progress notes:
 
 
 
+
+## Helix Ask Ambiguity Resolver (Pre-Intent) - Status: complete
+- Goal: prevent short, high-ambiguity prompts (e.g., "cavity", "lattice", "bubble") from defaulting to the wrong everyday sense by clarifying before intent routing.
+- D0) Pre-intent ambiguity resolver:
+  - Compute concept candidate scores and margin before `matchHelixAskIntent`.
+  - If prompt is short, repo obligation is absent, and concept signal is weak/ambiguous, ask one clarifying question.
+  - Use deterministic, evidence-aware phrasing (no speculative definitions before disambiguation).
+- D1) Clarify prompt contract:
+  - Prefer two-option clarifying question when multiple concept candidates exist.
+  - Fall back to a generic clarification asking for repo files or the intended domain.
+- D2) Debug visibility:
+  - Emit `ambiguity_resolver_*` fields in Helix Ask debug payload.
+  - Record whether pre-intent clarification was triggered.
+- D3) Controls (env):
+  - `HELIX_ASK_AMBIGUITY_RESOLVER=1`
+  - `HELIX_ASK_AMBIGUITY_SHORT_TOKENS=4`
+  - `HELIX_ASK_AMBIGUITY_MIN_SCORE=8`
+  - `HELIX_ASK_AMBIGUITY_MARGIN_MIN=4`
+- Acceptance:
+  - Short ambiguous prompts yield a clarifying question, not a wrong-sense answer.
+  - Explicit repo questions bypass the resolver and proceed to repo/hybrid routing.
+  - Debug panel shows pre-intent ambiguity signals for audits.

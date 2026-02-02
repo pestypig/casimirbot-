@@ -21,6 +21,10 @@ export type HelixAskConceptMatch = {
   matchedField: "id" | "alias";
 };
 
+export type HelixAskConceptCandidate = HelixAskConceptMatch & {
+  score: number;
+};
+
 const CONCEPT_DIR = path.resolve(process.cwd(), "docs", "knowledge");
 let conceptCache: HelixAskConceptCard[] | null = null;
 let conceptLoadFailed = false;
@@ -222,6 +226,42 @@ export function findConceptMatch(question: string): HelixAskConceptMatch | null 
     }
   }
   return best;
+}
+
+export function listConceptCandidates(
+  question: string,
+  limit = 3,
+): HelixAskConceptCandidate[] {
+  const normalized = normalizeTerm(question);
+  if (!normalized) return [];
+  const cards = loadConceptCards();
+  const candidates: HelixAskConceptCandidate[] = [];
+  for (const card of cards) {
+    let best: HelixAskConceptCandidate | null = null;
+    const idRegex = buildTermRegex(card.id);
+    if (idRegex.test(normalized)) {
+      best = {
+        card,
+        matchedTerm: card.id,
+        matchedField: "id",
+        score: card.id.length + 6,
+      };
+    }
+    for (const alias of card.aliases) {
+      const aliasRegex = buildTermRegex(alias);
+      if (!aliasRegex.test(normalized)) continue;
+      const score = alias.length + 3;
+      if (!best || score > best.score) {
+        best = { card, matchedTerm: alias, matchedField: "alias", score };
+      }
+    }
+    if (best) {
+      candidates.push(best);
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  if (limit <= 0) return candidates;
+  return candidates.slice(0, limit);
 }
 
 export function buildConceptScaffold(match: HelixAskConceptMatch | null): string {
