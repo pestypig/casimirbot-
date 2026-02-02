@@ -9942,11 +9942,12 @@ const executeHelixAsk = async ({
           debugPayload.ambiguity_gate_applied = true;
         }
       }
+      const evidenceGateOk = debugPayload?.evidence_gate_ok ?? true;
       const shouldClarifyNow =
         !promptIngested &&
         (intentDomain === "repo" || intentDomain === "hybrid") &&
         requiresRepoEvidence &&
-        (claimGateFailed || (!evidenceGate.ok && ambiguityTerms.length > 0));
+        (claimGateFailed || (!evidenceGateOk && ambiguityTerms.length > 0));
       if (shouldClarifyNow && !forcedAnswer && intentStrategy !== "constraint_report") {
         forcedAnswer = clarifyOverride ?? buildAmbiguityClarifyLine([]);
         answerPath.push("clarify:ambiguity");
