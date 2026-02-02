@@ -2660,6 +2660,88 @@ G) SunPy helioseismology anchors
 - By design, the build is not complete at that level yet.
 - A physics-claim-ready build needs experimental anchoring and models, not just software plumbing.
 
+### Literal Diosi-Penrose collapse engine build (full implementation) - Status: complete
+- Goal: implement a literal DP-style collapse engine (DeltaE from mass-density superposition -> tau) and wire it into existing collapse + GR diagnostics without over-claiming physics.
+- Do:
+  - Add a shared DP module that computes DeltaE from two branch mass-density fields with an explicit smear length ell, plus analytic baselines.
+  - Define mass-density inputs and provenance: lattice voxel fields, analytic primitives, and explicit branch pairing schemas.
+  - Extend collapse benchmark to accept a DP-derived tau_source (e.g., "dp_deltaE") and enforce the causal gate L_present <= c * tau.
+  - Expose DP diagnostics in telemetry/UI (DeltaE, tau, r_c_m, ell, geometry provenance) with clean fallback to heuristics when inputs are missing.
+  - Add math-maturity labeling + evidence for the DP engine (exploratory -> diagnostic), updating MATH_STATUS.md/MATH_GRAPH.json if needed.
+  - Tests: analytic shapes (sphere/shell/smeared point), determinism, sensitivity to ell, regression fixtures for DeltaE/tau.
+  - Experimental anchoring plan: config hooks for CSL/DP bounds and lab/optomech constraints, recorded as non-authoritative priors.
+  - Scientific accuracy guardrails:
+    - Treat Penrose OR as a heuristic argument (ill-defined time translation between superposed geometries -> energy uncertainty -> tau ~ hbar/DeltaE), not a derived GR theorem.
+    - Separate Penrose estimate from the Diosi-Penrose stochastic model; do not conflate heuristic lifetime with dynamical noise.
+    - Require an explicit smear/renormalization length ell (R0) and a documented mass-density coarse-graining choice; reject point-mass inputs.
+    - DeltaE must be computed from the mass-density difference between branches; document overlap suppression when branch separation is small relative to object size.
+    - Emit DP side-effect diagnostics (momentum diffusion / spontaneous heating / force noise) for cross-checks; mark as constraints, not evidence of collapse.
+    - Record that parameter-free DP-style rates are already tightly constrained by heating bounds; treat any rate as conditional on ell and noise assumptions.
+    - Add a scale sanity check against 2026 nanoparticle interference (>=170,000 Da, >7,000 atoms) as a benchmark that is not yet decisive for DP.
+- Do not:
+  - Claim physical viability or certification without experimental anchors and pass criteria.
+  - Allow unsmeared point-mass inputs or ambiguous branch definitions; require ell or reject.
+  - Override WARP/GR hard constraints or the equilibrium gate in the governor.
+- Acceptance:
+  - Given two branch mass-density fields + ell, the engine returns deterministic DeltaE and tau matching analytic baselines within tolerance.
+  - Collapse benchmark runs end-to-end with dp_deltaE tau_source and emits provenance hashes.
+  - Governor consumes dp_tau only as a gated input; heuristics remain available.
+  - Required tests and Casimir verification pass; evidence/maturity labels updated.
+- Update (2026-02-02): Implemented dp_adapter build endpoint, adapters for stress-energy and GR evolve sources, derivation doc, tests, and math registry updates.
+
+### DP collapse full implementation plan (scientific + constraints) - Status: complete
+- Goal: fully implement the DP collapse engine with explicit derivations, unit provenance, and constraint gates, then wire it to every applicable physics pipeline.
+- Scope audit (codebase mapping for derivation narratives):
+  - shared/dp-collapse.ts (DeltaE functional, cutoff kernel, tau = hbar/DeltaE, discretization and normalization).
+  - server/services/dp-adapters.ts (stress-energy -> mass density conversions and sign handling).
+  - server/services/collapse-benchmark.ts + server/routes/benchmarks.collapse.ts (DP integration points, provenance, and boundary hashes).
+  - server/stress-energy-brick.ts + server/gr/evolution/stress-energy.ts + modules/gr/stress-energy.ts (stress-energy sources and units).
+  - modules/dynamic/stress-energy-equations.ts (pipeline energy density model and assumptions).
+  - shared/gr-units.ts + shared/physics-const.ts (unit conversions and constants).
+  - shared/curvature-proxy.ts and any collapse/coherence heuristics (narrative alignment of tau/r_c usage).
+  - client collapse diagnostics panels (expose DP provenance, method, ell, tau_infinite).
+  - Any modules with "collapse", "decoherence", "tau", "r_c", "mass density", or "stress-energy" references.
+- Derivation narrative requirements:
+  - Explicitly name each physical quantity at system boundaries, with units and sign conventions.
+  - Track conversions: geom stress -> SI J/m^3 -> kg/m^3 using GEOM_TO_SI_STRESS and C^2.
+  - Document cutoff kernel choice (Plummer), normalization (1/2 factor), and self-term handling.
+  - Define ensemble map: dephasing channel with Gamma = DeltaE/hbar and coherence decay exp(-Gamma t).
+  - State assumptions: weak-field Newtonian, fixed background, no full GR superposition claims.
+- Implementation steps:
+  1) Add a dp_adapter endpoint for live pipeline and GR snapshots, returning DP-ready inputs with provenance hashes.
+  2) Wire adapter outputs into collapse benchmark and telemetry; log unit sources, sign_mode, and constraints.
+  3) Add a derivation narrative section (docs or task) that traces each quantity across modules.
+  4) Add tests: adapter unit conversions, grid mismatch rejection, DeltaE monotonicity, and dephasing-rate sanity.
+  5) Add policy gates: reject missing ell, reject ambiguous branches, reject mixed units without explicit units.
+  6) Update math-stage registry and evidence for any new modules and tests.
+- Scientific constraints:
+  - Preserve ensemble linearity; do not depend on decomposition choice.
+  - Treat DP output as a model-based rate, not an observed event.
+  - Keep negative energy handling explicit via sign_mode and document its effect.
+  - DP side-effect bounds are checks, not proofs of collapse.
+- Acceptance:
+  - End-to-end: live pipeline or GR snapshot -> dp_adapter -> DP collapse -> tau with provenance.
+  - Deterministic DeltaE within tolerance; derivation narrative complete and consistent.
+  - Required tests and Casimir verification pass.
+### DP planning calculator (science planning) - Status: complete
+- Goal: add a DP planning calculator that turns DP rates into test-planning metrics (visibility decay, time-to-target, detectability ratio).
+- Do:
+  - Add shared dp-planner schema for visibility/detectability outputs and DP linkage.
+  - Add server service to compute gamma, visibility decay, time-to-target, and detectability ratios.
+  - Add /api/benchmarks/collapse/dp-plan endpoint with information-boundary hashes.
+  - Add tests for planner math + HTTP route.
+  - Register dp-planner modules in math-stage registry and MATH_STATUS.
+- Scientific constraints:
+  - Use DP deltaE as a model-based rate; do not interpret as observed collapse.
+  - Require ell and explicit units; no silent sign flips.
+  - Treat environment gamma as an input; ratios are diagnostic only.
+  - Avoid embedding raw density fields in planning outputs (metadata + summaries only).
+- Acceptance:
+  - Planner returns gamma, visibility curve, time-to-target, and detectability ratio deterministically.
+  - Information-boundary hashes and data_cutoff_iso are emitted.
+  - Tests and Casimir verification pass.
+- Update (2026-02-02): Implemented dp-planner schema, service, endpoint, tests, and math registry entries.
+
 ### Practical definition-of-done checklist (engineering target)
 1) Live device driver + auto streaming into /api/neuro/features
 2) Calibration routine + baseline persistence
@@ -3861,3 +3943,37 @@ Progress notes:
   - Short ambiguous prompts yield a clarifying question, not a wrong-sense answer.
   - Explicit repo questions bypass the resolver and proceed to repo/hybrid routing.
   - Debug panel shows pre-intent ambiguity signals for audits.
+
+
+
+
+## Helix Ask Ambiguity Resolver v2 (Target Span + Dispersion) - Status: planned
+- Goal: make the clarifier select the correct target term without hand-curated verb lists by using target-span heuristics and retrieval dispersion.
+- Research threads to anchor behavior:
+  - Ambiguous QA (multi-sense questions) and clarifying question policy.
+  - Clarifying question generation for information seeking (short, option-like prompts).
+  - Abstain/selective QA under uncertainty (clarify vs answer).
+  - Retrieval diversification (MMR/RRF) as a signal for split senses.
+- Implementation steps:
+  - Target span selector:
+    - Extract the content span after cues ("what is/define/explain") and strip punctuation/articles.
+    - Fallback: pick the highest-salience content span from repo retrieval or IDF.
+  - Sense candidates:
+    - Build candidates from retrieval clusters (directory family + topic tags + embeddings if available).
+    - Score clusters by total score mass; retain top 2-3.
+  - Dominance/dispersion decision:
+    - Compute p_top, margin, and entropy from cluster scores.
+    - Clarify when margin is low or entropy high on short prompts.
+  - Clarify prompt builder:
+    - Two options + one escape hatch (general meaning / point to file).
+    - Use candidate labels when available.
+  - Optional LLM micro-pass (constrained):
+    - Only label clusters and format the clarifying question.
+    - No answering before sense selection.
+  - Regression pack + metrics:
+    - Prompts: "what is a cavity", "define lattice", "what is a bubble", "what is a ledger".
+    - Metrics: clarify_rate, wrong_sense_rate, ambiguity_trigger_rate, latency_delta.
+- Acceptance:
+  - Clarifier targets the noun span (no verbs or trailing punctuation).
+  - Short ambiguous prompts clarify with options; repo-specific prompts bypass.
+  - Debug payload includes target span + dominance/entropy metrics + candidate labels.

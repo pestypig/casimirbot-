@@ -6613,6 +6613,31 @@ const collectConceptTokens = (conceptMatch: HelixAskConceptMatch | null): Set<st
   return new Set(tokens.map((token) => token.toLowerCase()));
 };
 
+const stripEdgePunctuation = (value: string): string =>
+  value.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, "");
+
+const stripLeadingArticles = (value: string): string =>
+  value.replace(/^(?:a|an|the)\s+/i, "");
+
+const extractClarifySpan = (question: string): string | undefined => {
+  const match = question.match(
+    /\b(?:what\s+is|what's|whats|define|explain|describe|meaning\s+of)\b\s+(.+)$/i,
+  );
+  if (!match) return undefined;
+  let span = match[1].trim();
+  span = span.replace(/[?!.]+$/g, "").trim();
+  span = stripLeadingArticles(span);
+  return span || undefined;
+};
+
+const normalizeClarifyToken = (value: string): string | undefined => {
+  const trimmed = stripEdgePunctuation(value.toLowerCase());
+  if (!trimmed) return undefined;
+  if (AMBIGUOUS_IGNORE_TOKENS.has(trimmed)) return undefined;
+  if (trimmed.length < HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN) return undefined;
+  return trimmed;
+};
+
 const extractAmbiguousTerms = (
   question: string,
   referenceText: string,
@@ -6625,7 +6650,8 @@ const extractAmbiguousTerms = (
   const out: string[] = [];
   const seen = new Set<string>();
   for (const token of tokens) {
-    const normalized = token.toLowerCase();
+    const normalized = stripEdgePunctuation(token.toLowerCase());
+    if (!normalized) continue;
     if (seen.has(normalized)) continue;
     seen.add(normalized);
     if (normalized.length < HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN) continue;
@@ -6651,14 +6677,22 @@ const buildAmbiguityClarifyLine = (terms: string[]): string => {
 };
 
 const selectClarifyToken = (question: string): string | undefined => {
-  const tokens = filterCriticTokens(tokenizeAskQuery(question));
-  for (const token of tokens) {
-    const normalized = token.toLowerCase();
-    if (AMBIGUOUS_IGNORE_TOKENS.has(normalized)) continue;
-    if (normalized.length < HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN) continue;
-    return normalized;
+  const span = extractClarifySpan(question);
+  if (span) {
+    const spanTokens = filterCriticTokens(tokenizeAskQuery(span));
+    for (let i = spanTokens.length - 1; i >= 0; i -= 1) {
+      const normalized = normalizeClarifyToken(spanTokens[i]);
+      if (normalized) return normalized;
+    }
+    const normalizedSpan = normalizeClarifyToken(span);
+    if (normalizedSpan) return normalizedSpan;
   }
-  return tokens[0];
+  const tokens = filterCriticTokens(tokenizeAskQuery(question));
+  for (let i = tokens.length - 1; i >= 0; i -= 1) {
+    const normalized = normalizeClarifyToken(tokens[i]);
+    if (normalized) return normalized;
+  }
+  return undefined;
 };
 
 const formatAmbiguityCandidateLabel = (candidate: HelixAskConceptCandidate): string =>
