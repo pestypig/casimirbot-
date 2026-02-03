@@ -91,6 +91,7 @@ export type HelixAskPlatonicInput = {
   evidenceGateOk?: boolean;
   requiresRepoEvidence?: boolean;
   coverageSlots?: string[];
+  coverageSlotAliases?: Record<string, string[]>;
   generalScaffold?: string;
   repoScaffold?: string;
   promptScaffold?: string;
@@ -871,9 +872,11 @@ export function evaluateCoverageSlots(args: {
   domain?: HelixAskDomain;
   explicitSlots?: string[];
   includeQuestionTokens?: boolean;
+  slotAliases?: Record<string, string[]>;
 }): { slots: string[]; coveredSlots: string[]; missingSlots: string[]; ratio: number } {
   const domain = args.domain ?? "general";
   const conceptTokens = collectConceptTokens(args.conceptMatch);
+  const slotAliases = args.slotAliases ?? {};
   const slots = new Set<string>();
   const explicitSlots = (args.explicitSlots ?? [])
     .map((slot) => normalizeCoverageSlot(slot))
@@ -938,7 +941,15 @@ export function evaluateCoverageSlots(args: {
   const coveredSlots: string[] = [];
   for (const slot of slotList) {
     const slotTokens = buildCoverageSlotTokens(slot, conceptTokens, domain);
-    const variants = buildCoverageSlotVariants(slot);
+    const aliasVariants = new Set<string>();
+    const aliasList = slotAliases[slot] ?? [];
+    for (const alias of aliasList) {
+      buildCoverageSlotVariants(alias).forEach((variant) => aliasVariants.add(variant));
+    }
+    const variants = new Set<string>([
+      ...buildCoverageSlotVariants(slot),
+      ...Array.from(aliasVariants),
+    ]);
     let covered = false;
     if (args.conceptAnchored && slotTokens.length > 0) {
       const matchesConcept = slotTokens.every((token) => conceptTokens.has(token));
@@ -946,8 +957,8 @@ export function evaluateCoverageSlots(args: {
         covered = true;
       }
     }
-    if (!covered && variants.length > 0) {
-      covered = variants.some((variant) => referenceText.includes(variant));
+    if (!covered && variants.size > 0) {
+      covered = Array.from(variants).some((variant) => referenceText.includes(variant));
     }
     if (!covered && slotTokens.length > 0) {
       const tokensCovered = slotTokens.every((token) => referenceTokens.has(token));
@@ -984,6 +995,7 @@ function computeCoverageSummary(input: HelixAskPlatonicInput): HelixAskCoverageS
     domain: input.domain,
     explicitSlots: input.coverageSlots,
     includeQuestionTokens: !(input.coverageSlots && input.coverageSlots.length > 0),
+    slotAliases: input.coverageSlotAliases,
   });
   const keyCount = slotSummary.slots.length;
   const missingKeyCount = slotSummary.missingSlots.length;
