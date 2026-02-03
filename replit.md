@@ -40,7 +40,7 @@ Use build + dist server with static assets.
 
 **Build command (Replit deploy/preview, tested):**
 ```
-bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=600000 VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"
+bash -lc "VITE_HELIX_ASK_JOB_TIMEOUT_MS=1200000 VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"
 ```
 
 **Run command (Replit deploy/preview, tested baseline):**
@@ -49,7 +49,7 @@ env NODE_ENV=production PORT=5000 HOST=0.0.0.0 NOISEGEN_STORAGE_BACKEND=replit F
 SKIP_MODULE_INIT=0 DEFER_ROUTE_BOOT=0 HEALTH_READY_ON_LISTEN=1 \
 VITE_HELIX_ASK_MAX_TOKENS=4096 VITE_HELIX_ASK_CONTEXT_TOKENS=4096 \
 LLM_LOCAL_CONTEXT_TOKENS=4096 LLM_LOCAL_MAX_TOKENS=2048 \
-HELIX_ASK_JOB_TIMEOUT_MS=600000 LLM_LOCAL_SPAWN_TIMEOUT_MS=600000 \
+HELIX_ASK_JOB_TIMEOUT_MS=1200000 LLM_LOCAL_SPAWN_TIMEOUT_MS=600000 \
 HELIX_ASK_BELIEF_UNSUPPORTED_MAX=0.95 HELIX_ASK_BELIEF_SUPPORT_MIN_RATIO=0.25 HELIX_ASK_BELIEF_SUPPORT_MIN_TOKENS=2 \
 HELIX_ASK_RATTLING_PERTURB=1 HELIX_ASK_VARIANT_SELECTION=1 HELIX_ASK_VARIANT_MIN_SENTENCES=2 HELIX_ASK_VARIANT_MIN_RATIO=0.5 \
 HELIX_ASK_TRAINING_TRACE=1 HELIX_ASK_EVIDENCE_CRITIC=1 HELIX_ASK_EVIDENCE_CLAIM_GATE=1 HELIX_ASK_EVIDENCE_CLAIM_MAX=6 \
@@ -157,9 +157,9 @@ node dist/index.js
 ### Known-Good Checklist (Preview/Deploy)
 - Build completes and `dist/index.js` exists.
 - Bundle contains the baked timeout:
-  - `rg -n "180000|600000|1200000" dist/public/assets/*.js`
+  - `rg -n "180000|1200000" dist/public/assets/*.js`
 - `/` responds `200` quickly (health check passes).
-- Helix Ask completes a long question (< 10 minutes) with `HELIX_ASK_JOB_TIMEOUT_MS=600000`.
+- Helix Ask completes a long question (< 20 minutes) with `HELIX_ASK_JOB_TIMEOUT_MS=1200000`.
 - If UI times out, confirm job status with:
   - `curl -s http://localhost:5000/api/agi/ask/jobs/<JOB_ID> | jq .`
 - If deploy health checks fail on `/` during heavy startup (model hydration), re-run the deploy.
