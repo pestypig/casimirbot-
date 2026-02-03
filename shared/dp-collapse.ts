@@ -212,9 +212,9 @@ const isFiniteNumber = (value: number): boolean => Number.isFinite(value);
 
 const decodeFloat32 = (payload: TFloat32VolumeB64, expectedLength: number): Float32Array => {
   const data = payload.data_b64.trim();
-  const buffer = (() => {
+  const buffer: Uint8Array = (() => {
     if (typeof Buffer !== "undefined") {
-      return Buffer.from(data, "base64");
+      return new Uint8Array(Buffer.from(data, "base64"));
     }
     if (typeof atob === "function") {
       const binary = atob(data);
@@ -232,10 +232,7 @@ const decodeFloat32 = (payload: TFloat32VolumeB64, expectedLength: number): Floa
   if (floatCount < expectedLength) {
     throw new Error(`density_field_length_mismatch: expected ${expectedLength}, got ${floatCount}`);
   }
-  const view =
-    buffer instanceof Uint8Array
-      ? new Float32Array(buffer.buffer, buffer.byteOffset, expectedLength)
-      : new Float32Array(buffer.buffer, buffer.byteOffset, expectedLength);
+  const view = new Float32Array(buffer.buffer, buffer.byteOffset, expectedLength);
   return new Float32Array(view);
 };
 

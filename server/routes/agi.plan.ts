@@ -4542,6 +4542,7 @@ function buildHelixAskQueryPrompt(
     "must_include_globs: docs/ethos/**, docs/knowledge/**",
     "Only emit must_include_globs if you can name real repo paths (docs/, server/, client/, modules/, shared/, apps/, tools/, scripts/, cli/, packages/, warp-web/, .github/).",
     "required_slots: definition, repo_mapping, verification, failure_path",
+    "concept_slots: <slot-id-1>, <slot-id-2>",
     "clarify: <one short question if evidence is likely missing>",
     "Use one line per query. Prefer module names, symbols, or paths.",
     "No preamble, no numbering, no extra commentary.",
@@ -4629,6 +4630,7 @@ type HelixAskPlanDirectives = {
   avoidSurfaces: string[];
   mustIncludeGlobs: string[];
   requiredSlots: string[];
+  conceptSlots: string[];
   clarifyQuestion?: string;
 };
 
@@ -4806,6 +4808,7 @@ function parsePlanDirectives(text: string): { directives: HelixAskPlanDirectives
     avoidSurfaces: [],
     mustIncludeGlobs: [],
     requiredSlots: [],
+    conceptSlots: [],
   };
   const isInstructionLine = (value: string): boolean => {
     return (
@@ -4901,6 +4904,10 @@ function parsePlanDirectives(text: string): { directives: HelixAskPlanDirectives
       directives.requiredSlots.push(...parsePlanList(splitDirectiveValue(cleaned)));
       continue;
     }
+    if (normalized.startsWith("concept_slots")) {
+      directives.conceptSlots.push(...parsePlanList(splitDirectiveValue(cleaned)));
+      continue;
+    }
     if (normalized.startsWith("clarify")) {
       const clarify = normalizePlanValue(splitDirectiveValue(cleaned));
       if (clarify) directives.clarifyQuestion = clarify;
@@ -4918,6 +4925,7 @@ function parsePlanDirectives(text: string): { directives: HelixAskPlanDirectives
   directives.avoidSurfaces = Array.from(new Set(directives.avoidSurfaces));
   directives.mustIncludeGlobs = Array.from(new Set(directives.mustIncludeGlobs));
   directives.requiredSlots = Array.from(new Set(directives.requiredSlots));
+  directives.conceptSlots = Array.from(new Set(directives.conceptSlots));
   return { directives, queryHints };
 }
 
@@ -5017,6 +5025,297 @@ function mergePlanScope(base: HelixAskPlanScope, override: HelixAskPlanScope): H
 function normalizeSlotName(value: string): string {
   return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
+
+type HelixAskSlotPlanEntry = {
+  id: string;
+  label: string;
+  required: boolean;
+  source: "concept" | "plan" | "token";
+  surfaces?: string[];
+  aliases?: string[];
+};
+
+type HelixAskSlotPlan = {
+  slots: HelixAskSlotPlanEntry[];
+  coverageSlots: string[];
+};
+
+const STRUCTURAL_SLOTS = new Set([
+  "definition",
+  "repo_mapping",
+  "verification",
+  "failure_path",
+  "flow",
+  "pipeline",
+]);
+
+const DOC_SURFACES = new Set(["docs", "knowledge", "ethos"]);
+
+const SLOT_IGNORE_TOKENS = new Set([
+  "plan",
+  "fit",
+  "creation",
+  "create",
+  "creating",
+  "make",
+  "made",
+  "build",
+  "building",
+  "relate",
+  "relation",
+  "relates",
+  "relating",
+  "root",
+  "cause",
+  "causes",
+  "also",
+  "into",
+  "about",
+  "with",
+  "without",
+  "from",
+  "that",
+  "this",
+  "these",
+  "those",
+  "which",
+  "what",
+  "why",
+  "how",
+  "does",
+  "do",
+  "is",
+  "are",
+  "can",
+  "should",
+  "could",
+  "would",
+]);
+
+const normalizeSlotId = (value: string): string => {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized;
+};
+
+const deriveSlotSurfaces = (sourcePath?: string, mustInclude?: string[]): string[] => {
+  const surfaces = new Set<string>();
+  const pushFromPath = (entry: string) => {
+    const normalized = entry.replace(/\\/g, "/").toLowerCase();
+    if (normalized.startsWith("docs/ethos/")) {
+      surfaces.add("ethos");
+      surfaces.add("docs");
+    } else if (normalized.startsWith("docs/knowledge/")) {
+      surfaces.add("knowledge");
+      surfaces.add("docs");
+    } else if (normalized.startsWith("docs/")) {
+      surfaces.add("docs");
+    } else if (/^(server|client|shared|modules|apps|tools|scripts|cli|packages)\//.test(normalized)) {
+      surfaces.add("code");
+    }
+  };
+  if (sourcePath) pushFromPath(sourcePath);
+  mustInclude?.forEach((entry) => entry && pushFromPath(entry));
+  return Array.from(surfaces);
+};
+
+const buildCanonicalSlotPlan = (args: {
+  question: string;
+  directives?: HelixAskPlanDirectives | null;
+  candidates?: HelixAskConceptCandidate[];
+  maxTokens?: number;
+}): HelixAskSlotPlan => {
+  const slots: HelixAskSlotPlanEntry[] = [];
+  const seen = new Set<string>();
+  const maxTokens = args.maxTokens ?? 6;
+  const addSlot = (entry: HelixAskSlotPlanEntry) => {
+    const id = normalizeSlotId(entry.id);
+    if (!id) return;
+    if (seen.has(id)) return;
+    seen.add(id);
+    slots.push({ ...entry, id });
+  };
+  const candidates = args.candidates ?? listConceptCandidates(args.question, 4);
+  for (const candidate of candidates) {
+    const card = candidate.card;
+    addSlot({
+      id: card.id,
+      label: card.label ?? card.id,
+      required: true,
+      source: "concept",
+      aliases: card.aliases ?? [],
+      surfaces: deriveSlotSurfaces(card.sourcePath, card.mustIncludeFiles),
+    });
+  }
+  const directives = args.directives;
+  const planSlots = [
+    ...(directives?.conceptSlots ?? []),
+    ...(directives?.requiredSlots ?? []).filter((slot) => !STRUCTURAL_SLOTS.has(normalizeSlotName(slot))),
+  ];
+  for (const slot of planSlots) {
+    addSlot({
+      id: slot,
+      label: slot,
+      required: true,
+      source: "plan",
+    });
+  }
+  if (args.question.trim()) {
+    const conceptTokens = new Set<string>();
+    for (const candidate of candidates) {
+      [candidate.card.id, candidate.card.label ?? "", ...(candidate.card.aliases ?? [])]
+        .filter(Boolean)
+        .flatMap((value) => tokenizeAskQuery(value))
+        .flatMap((token) => filterCriticTokens([token]))
+        .forEach((token) => conceptTokens.add(token.toLowerCase()));
+    }
+    for (const slot of planSlots) {
+      tokenizeAskQuery(slot)
+        .flatMap((token) => filterCriticTokens([token]))
+        .forEach((token) => conceptTokens.add(token.toLowerCase()));
+    }
+    const tokens = filterCriticTokens(tokenizeAskQuery(args.question));
+    for (const token of tokens) {
+      const cleaned = token.toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+      if (!cleaned) continue;
+      if (cleaned.length < 4) continue;
+      if (SLOT_IGNORE_TOKENS.has(cleaned)) continue;
+      if (conceptTokens.has(cleaned)) continue;
+      if (/^\d+$/.test(cleaned)) continue;
+      addSlot({
+        id: cleaned,
+        label: cleaned,
+        required: false,
+        source: "token",
+      });
+      if (slots.length >= maxTokens) break;
+    }
+  }
+  return { slots, coverageSlots: slots.map((slot) => slot.id) };
+};
+
+const collectSlotAliasHints = (slotPlan: HelixAskSlotPlan | null): string[] => {
+  if (!slotPlan) return [];
+  const hints = new Set<string>();
+  for (const slot of slotPlan.slots) {
+    if (slot.label) hints.add(slot.label);
+    if (slot.id) hints.add(slot.id.replace(/-/g, " "));
+    (slot.aliases ?? []).forEach((alias) => alias && hints.add(alias));
+  }
+  return Array.from(hints).filter(Boolean).slice(0, 16);
+};
+
+const buildSlotVariants = (slot: HelixAskSlotPlanEntry): string[] => {
+  const base = slot.id.toLowerCase();
+  const variants = new Set<string>();
+  if (base) {
+    variants.add(base);
+    variants.add(base.replace(/-/g, " "));
+    variants.add(base.replace(/-/g, "_"));
+    if (base.endsWith("s")) {
+      variants.add(base.slice(0, -1));
+    } else {
+      variants.add(`${base}s`);
+    }
+  }
+  (slot.aliases ?? []).forEach((alias) => {
+    const cleaned = alias.trim().toLowerCase();
+    if (cleaned) variants.add(cleaned);
+  });
+  return Array.from(variants).filter((entry) => entry.length >= 3);
+};
+
+const hasDocSurface = (slot: HelixAskSlotPlanEntry): boolean =>
+  Boolean(slot.surfaces?.some((surface) => DOC_SURFACES.has(surface)));
+
+const resolveDocRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
+  if (!slotPlan) return [];
+  return slotPlan.slots
+    .filter((slot) => slot.required && hasDocSurface(slot))
+    .map((slot) => slot.id);
+};
+
+const resolveRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
+  if (!slotPlan) return [];
+  return slotPlan.slots.filter((slot) => slot.required).map((slot) => slot.id);
+};
+
+const countSlotDocHits = (
+  slot: HelixAskSlotPlanEntry,
+  docBlocks: Array<{ path: string; block: string }>,
+): number => {
+  if (!docBlocks.length) return 0;
+  const variants = buildSlotVariants(slot);
+  if (!variants.length) return 0;
+  let count = 0;
+  for (const block of docBlocks) {
+    const lines = block.block.split(/\r?\n/);
+    const text = lines.slice(1).join(" ").toLowerCase();
+    if (variants.some((variant) => text.includes(variant))) {
+      count += 1;
+    }
+  }
+  return count;
+};
+
+const evaluateDocSlotCoverage = (
+  slotPlan: HelixAskSlotPlan | null,
+  docBlocks: Array<{ path: string; block: string }>,
+  slotIds: string[],
+): { slots: string[]; coveredSlots: string[]; missingSlots: string[]; ratio: number } => {
+  if (!slotPlan || slotIds.length === 0) {
+    return { slots: [], coveredSlots: [], missingSlots: [], ratio: 1 };
+  }
+  const slotMap = new Map(slotPlan.slots.map((slot) => [slot.id, slot]));
+  const coveredSlots: string[] = [];
+  const missingSlots: string[] = [];
+  for (const slotId of slotIds) {
+    const slot = slotMap.get(slotId);
+    if (!slot) {
+      missingSlots.push(slotId);
+      continue;
+    }
+    const hits = countSlotDocHits(slot, docBlocks);
+    if (hits > 0) {
+      coveredSlots.push(slotId);
+    } else {
+      missingSlots.push(slotId);
+    }
+  }
+  const ratio = slotIds.length ? coveredSlots.length / slotIds.length : 1;
+  return { slots: slotIds, coveredSlots, missingSlots, ratio };
+};
+
+const buildSlotEvidenceSnapshot = (
+  slotPlan: HelixAskSlotPlan | null,
+  docBlocks: Array<{ path: string; block: string }>,
+  coverage?: { coveredSlots: string[]; missingSlots: string[] } | null,
+  options?: { evidenceGateOk?: boolean },
+): Array<{
+  id: string;
+  label: string;
+  doc_card_count: number;
+  evidence_gate_ok?: boolean;
+  coverage_ratio: number;
+  missing_slots: string[];
+}> => {
+  if (!slotPlan || slotPlan.slots.length === 0) return [];
+  const coverageSet = new Set(coverage?.coveredSlots ?? []);
+  return slotPlan.slots.map((slot) => {
+    const covered = coverageSet.has(slot.id);
+    return {
+      id: slot.id,
+      label: slot.label,
+      doc_card_count: countSlotDocHits(slot, docBlocks),
+      evidence_gate_ok: options?.evidenceGateOk,
+      coverage_ratio: covered ? 1 : 0,
+      missing_slots: covered ? [] : [slot.id],
+    };
+  });
+};
 
 function evaluateSlotCoverage({
   contextText,
@@ -7595,6 +7894,25 @@ const buildReportBlocks = (question: string): HelixAskReportBlock[] => {
   return blocks;
 };
 
+const buildSlotReportBlocks = (
+  slotPlan: HelixAskSlotPlan,
+  question: string,
+): HelixAskReportBlock[] => {
+  if (!slotPlan.slots.length) return buildReportBlocks(question);
+  const blocks: HelixAskReportBlock[] = [];
+  for (let index = 0; index < slotPlan.slots.length; index += 1) {
+    const slot = slotPlan.slots[index];
+    const label = slot.label || slot.id;
+    blocks.push({
+      id: `slot-${index + 1}`,
+      text: `Focus on ${label}. Answer only the parts of the question that pertain to this slot. Question: ${question}`,
+      label,
+      typeHint: slot.source,
+    });
+  }
+  return blocks;
+};
+
 const resolveReportModeDecision = (question: string): HelixAskReportModeDecision => {
   const tokens = filterCriticTokens(tokenizeAskQuery(question));
   const tokenCount = tokens.length;
@@ -7755,15 +8073,18 @@ const resolvePreIntentAmbiguity = ({
     candidates.length > 0 &&
     topScore >= HELIX_ASK_AMBIGUITY_MIN_SCORE &&
     (candidates.length < 2 || margin >= HELIX_ASK_AMBIGUITY_MARGIN_MIN);
-  const clusterSplit =
+  const clusterSplit = Boolean(
     clusterSummary &&
-    clusterSummary.clusters.length >= 2 &&
-    (clusterMargin < HELIX_ASK_AMBIGUITY_CLUSTER_MARGIN_MIN ||
-      clusterEntropy > HELIX_ASK_AMBIGUITY_CLUSTER_ENTROPY_MAX);
+      clusterSummary.clusters.length >= 2 &&
+      (clusterMargin < HELIX_ASK_AMBIGUITY_CLUSTER_MARGIN_MIN ||
+        clusterEntropy > HELIX_ASK_AMBIGUITY_CLUSTER_ENTROPY_MAX),
+  );
+  const allowLongClarify = explicitRepoExpectation || repoExpectationLevel !== "low";
   const shouldClarify =
-    shortPrompt &&
-    (clusterSplit ||
-      (!strongConcept && !clusterSummary?.clusters?.length && repoExpectationLevel === "low"));
+    (shortPrompt &&
+      (clusterSplit ||
+        (!strongConcept && !clusterSummary?.clusters?.length && repoExpectationLevel === "low"))) ||
+    (clusterSplit && allowLongClarify);
   return {
     shouldClarify,
     reason: shouldClarify
@@ -8964,6 +9285,24 @@ const executeHelixAsk = async ({
       plan_pass_used?: boolean;
       plan_pass_forced?: boolean;
       plan_directives?: HelixAskPlanDirectives;
+      slot_plan?: Array<{
+        id: string;
+        label: string;
+        required: boolean;
+        source: string;
+        surfaces?: string[];
+      }>;
+      slot_count?: number;
+      slot_required_count?: number;
+      slot_evidence?: Array<{
+        id: string;
+        label: string;
+        doc_card_count: number;
+        evidence_gate_ok?: boolean;
+        coverage_ratio: number;
+        missing_slots: string[];
+      }>;
+      fallback_reason?: string;
       clarify_triggered?: boolean;
       obligation_violation?: boolean;
       context_deferred?: boolean;
@@ -9237,14 +9576,30 @@ const executeHelixAsk = async ({
     }
     const baseQuestion = (questionValue ?? question ?? "").trim();
     const rawQuestion = (request.question ?? request.prompt ?? "").trim();
-    const reportDecision = resolveReportModeDecision(rawQuestion || baseQuestion);
+    const slotPreviewCandidates = listConceptCandidates(rawQuestion || baseQuestion, 4);
+    const slotPreview = buildCanonicalSlotPlan({
+      question: rawQuestion || baseQuestion,
+      candidates: slotPreviewCandidates,
+    });
+    let reportDecision = resolveReportModeDecision(rawQuestion || baseQuestion);
+    if (!reportDecision.enabled && slotPreview.coverageSlots.length >= 2) {
+      reportDecision = {
+        ...reportDecision,
+        enabled: true,
+        reason: "multi_slot",
+        blockCount: slotPreview.coverageSlots.length,
+      };
+    }
     if (debugPayload) {
       debugPayload.report_mode = reportDecision.enabled;
       debugPayload.report_mode_reason = reportDecision.reason;
       debugPayload.report_blocks_count = reportDecision.blockCount;
     }
     if (reportDecision.enabled && !skipReportMode && baseQuestion) {
-      const reportBlocks = buildReportBlocks(baseQuestion);
+      const reportBlocks =
+        reportDecision.reason === "multi_slot"
+          ? buildSlotReportBlocks(slotPreview, baseQuestion)
+          : buildReportBlocks(baseQuestion);
       const limitedBlocks = reportBlocks.slice(0, HELIX_ASK_REPORT_MAX_BLOCKS);
       const omittedCount = Math.max(0, reportBlocks.length - limitedBlocks.length);
       const reportExplicitRepo =
@@ -9706,7 +10061,7 @@ const executeHelixAsk = async ({
       }
     }
     const ambiguityCandidates = HELIX_ASK_AMBIGUITY_RESOLVER
-      ? listConceptCandidates(baseQuestion, 3)
+      ? slotPreviewCandidates.slice(0, 3)
       : [];
     const ambiguityResolution = resolvePreIntentAmbiguity({
       question: baseQuestion,
@@ -9949,6 +10304,7 @@ const executeHelixAsk = async ({
       answerPath.push("clarify:pre_intent");
       if (debugPayload) {
         debugPayload.clarify_triggered = true;
+        debugPayload.fallback_reason = "ambiguity_clarify";
       }
     }
     const conceptualFocus = HELIX_ASK_CONCEPTUAL_FOCUS.test(baseQuestion);
@@ -10387,6 +10743,13 @@ const executeHelixAsk = async ({
     let planScope: HelixAskPlanScope | null = null;
     let clarifyOverride: string | undefined;
     let requiredSlots: string[] = [];
+    let slotPlan: HelixAskSlotPlan | null = null;
+    let coverageSlots: string[] = [];
+    let slotAliases: string[] = [];
+    let slotCoverageOk = true;
+    let slotCoverageFailed = false;
+    let failClosedRepoEvidence = false;
+    let failClosedReason: string | null = null;
 
     if (debugPayload && skipMicroPass) {
       debugPayload.micro_pass = false;
@@ -10500,6 +10863,9 @@ const executeHelixAsk = async ({
                   planDirectives.requiredSlots.length
                     ? `slots=${planDirectives.requiredSlots.join(",")}`
                     : "",
+                  planDirectives.conceptSlots.length
+                    ? `conceptSlots=${planDirectives.conceptSlots.join(",")}`
+                    : "",
                   planDirectives.clarifyQuestion ? "clarify=provided" : "",
                 ]
                   .filter(Boolean)
@@ -10517,13 +10883,46 @@ const executeHelixAsk = async ({
         if (debugPayload && planDirectives) {
           debugPayload.plan_directives = planDirectives;
         }
+        slotPlan = buildCanonicalSlotPlan({
+          question: baseQuestion,
+          directives: planDirectives,
+          candidates: slotPreviewCandidates,
+        });
+        coverageSlots = slotPlan.coverageSlots.slice();
+        slotAliases = collectSlotAliasHints(slotPlan);
+        if (slotPlan.slots.length > 0) {
+          const slotLabels = slotPlan.slots
+            .slice(0, 6)
+            .map((slot) => `${slot.id}${slot.required ? "" : "?"}`);
+          const suffix = slotPlan.slots.length > 6 ? "..." : "";
+          logEvent(
+            "Slot plan",
+            `${slotPlan.slots.length} slots`,
+            `${slotLabels.join(", ")}${suffix}`,
+          );
+        }
+        if (debugPayload) {
+          debugPayload.slot_plan = slotPlan.slots.map((slot) => ({
+            id: slot.id,
+            label: slot.label,
+            required: slot.required,
+            source: slot.source,
+            surfaces: slot.surfaces,
+          }));
+          debugPayload.slot_count = slotPlan.slots.length;
+          debugPayload.slot_required_count = slotPlan.slots.filter((slot) => slot.required).length;
+        }
 
         const searchSeed = parsed.data.searchQuery?.trim() || baseQuestion;
         const baseQueries = buildHelixAskSearchQueries(searchSeed, topicTags);
         if (conceptMatch?.card.sourcePath) {
           baseQueries.push(conceptMatch.card.sourcePath);
         }
-        const queries = mergeHelixAskQueries(baseQueries, queryHints, HELIX_ASK_QUERY_MERGE_MAX);
+        const queries = mergeHelixAskQueries(
+          baseQueries,
+          [...queryHints, ...slotAliases],
+          HELIX_ASK_QUERY_MERGE_MAX,
+        );
         if (debugPayload && queries.length > 0) {
           debugPayload.queries = queries;
         }
@@ -10609,6 +11008,8 @@ const executeHelixAsk = async ({
         };
         let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
         let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+        let docSlotTargets: string[] = [];
+        let docBlocks: Array<{ path: string; block: string }> = [];
 
         if (!contextText) {
           const contextStart = Date.now();
@@ -10729,7 +11130,7 @@ const executeHelixAsk = async ({
           topicMustIncludeOk = contextResult.topicMustIncludeOk;
           contextMeta = contextResult;
           const contextBlocks = splitAskContextBlocks(contextText);
-          const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+          docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
           const docContextText = docBlocks.map((block) => block.block).join("\n\n");
           coverageSlotSummary = evaluateCoverageSlots({
             question: baseQuestion,
@@ -10737,37 +11138,56 @@ const executeHelixAsk = async ({
             evidencePaths: contextFiles,
             conceptMatch,
             domain: intentDomain,
+            explicitSlots: coverageSlots,
+            includeQuestionTokens: coverageSlots.length === 0,
           });
-          docSlotSummary =
-            docContextText.trim().length > 0
-              ? evaluateCoverageSlots({
-                  question: baseQuestion,
-                  referenceText: docContextText,
-                  evidencePaths: docBlocks.map((block) => block.path),
-                  conceptMatch,
-                  domain: intentDomain,
-                })
-              : coverageSlotSummary;
-          const minDocEvidenceCards = Math.max(
-            2,
-            Math.min(coverageSlotSummary.slots.length || 0, 4) || 2,
-          );
+          const docRequiredSlots = resolveDocRequiredSlots(slotPlan);
+          const requiredSlotIds = resolveRequiredSlots(slotPlan);
+          docSlotTargets = slotPlan
+            ? docRequiredSlots.length > 0
+              ? docRequiredSlots
+              : requiredSlotIds
+            : [];
+          if (planScope?.docsFirst && docSlotTargets.length > 0) {
+            logEvent("Docs-first slots", `${docSlotTargets.length} slots`, docSlotTargets.join(","));
+          }
+          if (slotPlan && docSlotTargets.length > 0) {
+            docSlotSummary = evaluateDocSlotCoverage(slotPlan, docBlocks, docSlotTargets);
+          } else {
+            docSlotSummary =
+              docContextText.trim().length > 0
+                ? evaluateCoverageSlots({
+                    question: baseQuestion,
+                    referenceText: docContextText,
+                    evidencePaths: docBlocks.map((block) => block.path),
+                    conceptMatch,
+                    domain: intentDomain,
+                    explicitSlots: coverageSlots,
+                    includeQuestionTokens: coverageSlots.length === 0,
+                  })
+                : coverageSlotSummary;
+          }
+          const slotCountForDocs =
+            docSlotSummary?.slots.length ??
+            (coverageSlots.length > 0 ? coverageSlots.length : coverageSlotSummary?.slots.length ?? 0);
+          const minDocEvidenceCards = Math.max(2, Math.min(slotCountForDocs || 0, 4) || 2);
           if (debugPayload && planScope?.docsFirst) {
             debugPayload.docs_first_evidence_cards = docBlocks.length;
             debugPayload.docs_first_min_cards = minDocEvidenceCards;
           }
           if (
             planScope?.docsFirst &&
-            (docBlocks.length < minDocEvidenceCards || docSlotSummary.missingSlots.length > 0)
+            (docBlocks.length < minDocEvidenceCards ||
+              (docSlotSummary?.slots.length ? docSlotSummary.missingSlots.length > 0 : false))
           ) {
             const docsAllowlist = (planScope.docsAllowlist ?? []).flat();
             const slotHints =
-              docSlotSummary.missingSlots.length > 0
+              docSlotSummary?.missingSlots?.length
                 ? docSlotSummary.missingSlots
-                : coverageSlotSummary.slots;
+                : coverageSlotSummary?.slots ?? [];
             const docQueries = mergeHelixAskQueries(
               queries,
-              slotHints,
+              [...slotHints, ...slotAliases],
               HELIX_ASK_QUERY_MERGE_MAX + 4,
             );
             const grepCandidates = collectDocsGrepCandidates(docQueries, baseQuestion, {
@@ -10782,7 +11202,7 @@ const executeHelixAsk = async ({
               );
               const extraLimit = Math.min(
                 4,
-                Math.max(minDocEvidenceCards - docBlocks.length, docSlotSummary.missingSlots.length || 1),
+                Math.max(minDocEvidenceCards - docBlocks.length, docSlotSummary?.missingSlots.length || 1),
               );
               const selectedExtras = selectCandidatesWithMmr(
                 extras,
@@ -10809,6 +11229,7 @@ const executeHelixAsk = async ({
             const refreshedDocBlocks = refreshedBlocks.filter((block) =>
               /(^|\/)docs\//i.test(block.path),
             );
+            docBlocks = refreshedDocBlocks;
             const refreshedDocText = refreshedDocBlocks.map((block) => block.block).join("\n\n");
             if (debugPayload && planScope?.docsFirst) {
               debugPayload.docs_first_evidence_cards = refreshedDocBlocks.length;
@@ -10819,21 +11240,29 @@ const executeHelixAsk = async ({
               evidencePaths: contextFiles,
               conceptMatch,
               domain: intentDomain,
+              explicitSlots: coverageSlots,
+              includeQuestionTokens: coverageSlots.length === 0,
             });
-            docSlotSummary =
-              refreshedDocText.trim().length > 0
-                ? evaluateCoverageSlots({
-                    question: baseQuestion,
-                    referenceText: refreshedDocText,
-                    evidencePaths: refreshedDocBlocks.map((block) => block.path),
-                    conceptMatch,
-                    domain: intentDomain,
-                  })
-                : coverageSlotSummary;
+            if (slotPlan && docSlotTargets.length > 0) {
+              docSlotSummary = evaluateDocSlotCoverage(slotPlan, refreshedDocBlocks, docSlotTargets);
+            } else {
+              docSlotSummary =
+                refreshedDocText.trim().length > 0
+                  ? evaluateCoverageSlots({
+                      question: baseQuestion,
+                      referenceText: refreshedDocText,
+                      evidencePaths: refreshedDocBlocks.map((block) => block.path),
+                      conceptMatch,
+                      domain: intentDomain,
+                      explicitSlots: coverageSlots,
+                      includeQuestionTokens: coverageSlots.length === 0,
+                    })
+                  : coverageSlotSummary;
+            }
             if (planScope?.docsFirst) {
               const docStatus =
                 refreshedDocBlocks.length >= minDocEvidenceCards &&
-                docSlotSummary.missingSlots.length === 0
+                (docSlotSummary?.missingSlots.length ?? 0) === 0
                   ? "ok"
                   : "weak";
               logEvent(
@@ -10842,11 +11271,19 @@ const executeHelixAsk = async ({
                 [
                   `docs=${refreshedDocBlocks.length}`,
                   `min=${minDocEvidenceCards}`,
-                  docSlotSummary.missingSlots.length
+                  docSlotSummary?.missingSlots?.length
                     ? `missing=${docSlotSummary.missingSlots.join(",")}`
                     : "missing=none",
                 ].join(" | "),
               );
+            }
+            if (debugPayload && slotPlan) {
+              const slotEvidence = buildSlotEvidenceSnapshot(slotPlan, docBlocks, docSlotSummary ?? coverageSlotSummary, {
+                evidenceGateOk,
+              });
+              if (slotEvidence.length) {
+                debugPayload.slot_evidence = slotEvidence;
+              }
             }
           }
           logProgress("Context ready", `${contextFiles.length} files`, contextStart);
@@ -10877,6 +11314,14 @@ const executeHelixAsk = async ({
             }
             if (typeof contextResult.topicMustIncludeOk === "boolean") {
               debugPayload.topic_must_include_ok = contextResult.topicMustIncludeOk;
+            }
+            if (slotPlan && !debugPayload.slot_evidence) {
+              const slotEvidence = buildSlotEvidenceSnapshot(slotPlan, docBlocks, docSlotSummary ?? coverageSlotSummary, {
+                evidenceGateOk,
+              });
+              if (slotEvidence.length) {
+                debugPayload.slot_evidence = slotEvidence;
+              }
             }
           }
         }
@@ -10936,19 +11381,30 @@ const executeHelixAsk = async ({
             evidencePaths: contextFiles,
             conceptMatch,
             domain: intentDomain,
+            explicitSlots: coverageSlots,
+            includeQuestionTokens: coverageSlots.length === 0,
           });
         }
         if (!docSlotSummary) {
           const contextBlocks = splitAskContextBlocks(contextText);
           const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
           const docContextText = docBlocks.map((block) => block.block).join("\n\n");
-          if (docContextText.trim().length > 0) {
+          if (slotPlan && docSlotTargets.length === 0) {
+            const docRequiredSlots = resolveDocRequiredSlots(slotPlan);
+            const requiredSlotIds = resolveRequiredSlots(slotPlan);
+            docSlotTargets = docRequiredSlots.length > 0 ? docRequiredSlots : requiredSlotIds;
+          }
+          if (slotPlan && docSlotTargets.length > 0) {
+            docSlotSummary = evaluateDocSlotCoverage(slotPlan, docBlocks, docSlotTargets);
+          } else if (docContextText.trim().length > 0) {
             docSlotSummary = evaluateCoverageSlots({
               question: baseQuestion,
               referenceText: docContextText,
               evidencePaths: docBlocks.map((block) => block.path),
               conceptMatch,
               domain: intentDomain,
+              explicitSlots: coverageSlots,
+              includeQuestionTokens: coverageSlots.length === 0,
             });
           }
         }
@@ -10963,8 +11419,9 @@ const executeHelixAsk = async ({
         const slotCoverage = requiredSlots.length
           ? evaluateSlotCoverage({ contextText, requiredSlots, conceptMatch })
           : { required: [], covered: [], missing: [], ratio: 1 };
-        const slotCoverageOk = slotCoverage.missing.length === 0;
-        if (requiredSlots.length && !slotCoverageOk) {
+        slotCoverageOk = slotCoverage.missing.length === 0;
+        slotCoverageFailed = requiredSlots.length > 0 && !slotCoverageOk;
+        if (slotCoverageFailed) {
           mustIncludeOk = false;
           evidenceGate = { ...evidenceGate, ok: false };
         }
@@ -11047,19 +11504,25 @@ const executeHelixAsk = async ({
             evidencePaths: contextFiles,
             conceptMatch,
             domain: intentDomain,
+            explicitSlots: coverageSlots,
+            includeQuestionTokens: coverageSlots.length === 0,
           });
         }
         if (docSlotSummary) {
           const contextBlocks = splitAskContextBlocks(contextText);
           const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
           const docContextText = docBlocks.map((block) => block.block).join("\n\n");
-          if (docContextText.trim().length > 0) {
+          if (slotPlan && docSlotTargets.length > 0) {
+            docSlotSummary = evaluateDocSlotCoverage(slotPlan, docBlocks, docSlotTargets);
+          } else if (docContextText.trim().length > 0) {
             docSlotSummary = evaluateCoverageSlots({
               question: baseQuestion,
               referenceText: docContextText,
               evidencePaths: docBlocks.map((block) => block.path),
               conceptMatch,
               domain: intentDomain,
+              explicitSlots: coverageSlots,
+              includeQuestionTokens: coverageSlots.length === 0,
             });
           }
         }
@@ -11120,6 +11583,14 @@ const executeHelixAsk = async ({
             debugPayload.docs_first_slot_covered = docSlotSummary.coveredSlots;
             debugPayload.docs_first_slot_missing = docSlotSummary.missingSlots;
             debugPayload.docs_first_slot_ratio = docSlotSummary.ratio;
+          }
+          if (slotPlan) {
+            const slotEvidence = buildSlotEvidenceSnapshot(slotPlan, docBlocks, docSlotSummary ?? coverageSlotSummary, {
+              evidenceGateOk,
+            });
+            if (slotEvidence.length) {
+              debugPayload.slot_evidence = slotEvidence;
+            }
           }
         }
         if (requiredSlots.length > 0) {
@@ -11252,23 +11723,37 @@ const executeHelixAsk = async ({
               ? evaluateSlotCoverage({ contextText, requiredSlots, conceptMatch })
               : { required: [], covered: [], missing: [], ratio: 1 };
             const retrySlotCoverageOk = retrySlotCoverage.missing.length === 0;
+            slotCoverageOk = retrySlotCoverageOk;
+            slotCoverageFailed = requiredSlots.length > 0 && !slotCoverageOk;
             coverageSlotSummary = evaluateCoverageSlots({
               question: baseQuestion,
               referenceText: contextText,
               evidencePaths: retryFiles,
               conceptMatch,
               domain: intentDomain,
+              explicitSlots: coverageSlots,
+              includeQuestionTokens: coverageSlots.length === 0,
             });
             const retryBlocks = splitAskContextBlocks(contextText);
             const retryDocBlocks = retryBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
             const retryDocText = retryDocBlocks.map((block) => block.block).join("\n\n");
-            if (retryDocText.trim().length > 0) {
+            docBlocks = retryDocBlocks;
+            if (slotPlan && docSlotTargets.length === 0) {
+              const docRequiredSlots = resolveDocRequiredSlots(slotPlan);
+              const requiredSlotIds = resolveRequiredSlots(slotPlan);
+              docSlotTargets = docRequiredSlots.length > 0 ? docRequiredSlots : requiredSlotIds;
+            }
+            if (slotPlan && docSlotTargets.length > 0) {
+              docSlotSummary = evaluateDocSlotCoverage(slotPlan, retryDocBlocks, docSlotTargets);
+            } else if (retryDocText.trim().length > 0) {
               docSlotSummary = evaluateCoverageSlots({
                 question: baseQuestion,
                 referenceText: retryDocText,
                 evidencePaths: retryDocBlocks.map((block) => block.path),
                 conceptMatch,
                 domain: intentDomain,
+                explicitSlots: coverageSlots,
+                includeQuestionTokens: coverageSlots.length === 0,
               });
             }
             if (requiredSlots.length && !retrySlotCoverageOk) {
@@ -11388,6 +11873,15 @@ const executeHelixAsk = async ({
           requiresRepoEvidence || intentDomain === "repo" || intentDomain === "falsifiable";
         const userExpectsRepo =
           intentDomain === "falsifiable" || requiresRepoEvidence;
+        failClosedReason = null;
+        if (requiresRepoEvidence && intentStrategy !== "constraint_report") {
+          if (slotCoverageFailed) {
+            failClosedReason = "slot_coverage_failed";
+          } else if (!evidenceGateOk) {
+            failClosedReason = "evidence_gate_failed";
+          }
+        }
+        failClosedRepoEvidence = Boolean(failClosedReason);
         const hasHighStakesConstraints =
           intentTier === "F3" ||
           intentStrategy === "constraint_report" ||
@@ -11780,6 +12274,24 @@ const executeHelixAsk = async ({
       if (shouldClarifyNow && !forcedAnswer && intentStrategy !== "constraint_report") {
         forcedAnswer = clarifyOverride ?? buildAmbiguityClarifyLine([]);
         answerPath.push("clarify:ambiguity");
+        if (debugPayload) {
+          debugPayload.fallback_reason = "ambiguity_clarify";
+        }
+      }
+      if (failClosedRepoEvidence && !forcedAnswer && intentStrategy !== "constraint_report") {
+        const planClarify = (clarifyOverride ?? planDirectives?.clarifyQuestion ?? "").trim();
+        const clarifyLine =
+          planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)
+            ? planClarify
+            : "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
+        const failLabel = failClosedReason ?? "evidence_gate_failed";
+        forcedAnswer = clarifyLine;
+        answerPath.push(`failClosed:${failLabel}`);
+        logEvent("Fail-closed", failLabel, clarifyLine);
+        if (debugPayload) {
+          debugPayload.clarify_triggered = true;
+          debugPayload.fallback_reason = failClosedReason ?? "evidence_gate_failed";
+        }
       }
 
       const generalEvidence = promptScaffold || generalScaffold;
@@ -12296,6 +12808,8 @@ const executeHelixAsk = async ({
         evidenceText,
         evidencePaths,
         evidenceGateOk,
+        requiresRepoEvidence,
+        coverageSlots: coverageSlots.length > 0 ? coverageSlots : undefined,
         generalScaffold,
         repoScaffold,
         promptScaffold,
@@ -12391,6 +12905,8 @@ const executeHelixAsk = async ({
               evidenceText,
               evidencePaths,
               evidenceGateOk,
+              requiresRepoEvidence,
+              coverageSlots: coverageSlots.length > 0 ? coverageSlots : undefined,
               generalScaffold,
               repoScaffold,
               promptScaffold,

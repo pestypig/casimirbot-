@@ -172,6 +172,104 @@ acts as planner + code generator + debugger, not as the source of truth.
   - Coverage logs report slots_covered/slots_missing and doc evidence card counts.
   - Defaults: HELIX_ASK_COVERAGE_GATE, HELIX_ASK_BELIEF_GATE, and HELIX_ASK_RATTLING_GATE are enabled when unset.
 
+
+### D12) Reasoning gap closure (control-flow + representation)
+- Summary: The current gap is not just tuning. The ladder runs, but slot meaning is not canonical and weak repo evidence can fall through to generic reasoning.
+- Core failure modes (from debug payloads):
+  - Token-shaped slots: coverage keys like "plan/fit/creation" instead of concept slots like "solar-restoration/warp-bubble/consciousness-framing".
+  - Docs-first used but evidence cards still code-heavy, so doc excerpts do not satisfy slot coverage.
+  - Repo-required + weak evidence sometimes yields generic paragraphs with citation repair attached to unrelated files.
+- First principle:
+  - Structure everywhere, facts only where evidence dominates.
+  - Planner/LLM can emit slots and instructions; it must not introduce facts unless the evidence gate supports the slot.
+
+#### Build steps (ordered)
+0) Fail-closed for repo-required when evidence gate fails.
+   - If requiresRepoEvidence=true and (evidence_gate_ok=false or slot_coverage_ok=false):
+     - return clarify or partial per-slot report only.
+     - do NOT generate explanatory paragraphs.
+1) Slot canonicalization + concept binding.
+   - Replace surface-token coverage with canonical concept slots derived from:
+     - topic tags + concept registry + plan pass.
+   - Filter low-signal glue verbs (plan/fit/creation/etc).
+   - Plan pass emits a machine schema:
+     - slots[] = { id, surfaces, required }
+   - Example:
+     - solar-restoration -> docs/ethos + docs/knowledge
+     - warp-bubble -> docs/knowledge + modules/warp + client/src
+     - consciousness-curvature -> docs/knowledge/research (optional/clarify if unsupported)
+2) Slot-aware docs-first evidence guarantees.
+   - If docs_first_used=true and slot wants docs:
+     - require >=1 doc excerpt card per required slot containing an alias span or definition heading.
+     - if missing, run a targeted retry for that slot.
+     - if still missing, mark slot as unsupported -> clarify.
+3) Query rewriting / HyDE retrieval assist (retrieval-only).
+   - Per-slot rewrite: 2-4 rewritten queries.
+   - Fuse with original using RRF.
+   - HyDE output is used only to retrieve; it never enters evidence cards.
+4) Auto report-mode per slot for multi-topic prompts.
+   - If slot_count >= 2, produce per-slot sections.
+   - Each slot has its own evidence gate outcome.
+   - Missing slots get localized clarifying questions, not global refusal.
+5) Ambiguity resolver = dominance decision.
+   - Build candidate senses from concept registry + retrieval clusters.
+   - Clarify when dominance is weak/mixed; answer repo-grounded when repo sense dominates.
+6) Long prompt scalability = segmentation + dynamic budgets + compression.
+   - Segment into blocks/slots, retrieve per block, allocate output by evidence strength.
+   - Compress evidence cards (not user prompt) to preserve key spans/definitions.
+
+#### North-star rule
+- The system should be excellent at producing plans and slots, and strict about refusing to turn plans into claims without evidence.
+
+#### Metrics (add to debug/telemetry)
+- slot_count, slot_required_count
+- slot_doc_card_rate (per slot)
+- slot_evidence_gate_ok (per slot)
+- repo_required_generic_fallback_rate (target ~0)
+- citation_claim_binding_rate (claims with >=1 evidence ref)
+
+
+#### Live events + debug visibility
+- Live events must cover:
+  - slot canonicalization start/end
+  - per-slot retrieval phase (docs-only -> expanded)
+  - evidence card selection per slot
+  - per-slot gate outcomes (evidence, coverage, belief)
+  - fail-closed clarify decision
+  - report-mode assembly (if enabled)
+- Debug payload additions:
+  - slot_plan (ids, required, surfaces)
+  - slot_evidence (per slot: doc_card_count, evidence_gate_ok, coverage_ratio, missing_slots)
+  - fallback_reason (evidence_gate_failed, slot_coverage_failed, ambiguity_clarify)
+  - report_blocks_detail (when report mode is active)
+#### Regression prompt (must pass)
+- "How does the plan to save the sun fit into the creation of warp bubble ships? Is curvature of spacetime also the root of consciousness?"
+  - Expected: grounded sections where docs exist + targeted clarify where not.
+
+#### References
+- AmbigQA: https://nlp.cs.washington.edu/ambigqa/
+- RAG: https://arxiv.org/abs/2005.11401
+- Query rewriting for RAG: https://openreview.net/forum?id=gXq1cwkUZc
+- HyDE: https://ar5iv.org/abs/2212.10496
+- LongLLMLingua: https://arxiv.org/abs/2310.06839
+
+
+### D13) Remaining gaps to close (observed in latest run)
+- Based on current debug behavior, these items appear not fully implemented or not enforced:
+  - Fail-closed on repo-required when evidence gate fails (still emitting generic paragraphs).
+  - Canonical slot IDs / concept-shaped slots feeding coverage and gates.
+  - Per-slot docs-first evidence card guarantees (doc excerpts not satisfying slots).
+  - Per-slot report-mode rendering for multi-topic prompts.
+  - Claim-to-evidence binding enforcement (claims supported with empty evidence_refs).
+  - Ambiguity resolver dominance -> clarify not firing in this path.
+- Secondary / optional high-ROI:
+  - Per-slot retrieval retry with alias/definition expansions.
+  - Query rewrite / HyDE retrieval-only assist.
+  - Per-slot live events + debug fields.
+- Success checks:
+  - For multi-slot prompts, evidence_gate_ok=false => clarify/partial only, no generic answer.
+  - Coverage slots are canonical IDs (e.g., solar-restoration/warp-bubble/consciousness-curvature), not glue verbs.
+  - docs_first_slot_ratio reflects doc excerpt cards that satisfy slots.
 ### CAS / Math backend
 - Primary: Python stack: SymPy + EinsteinPy.
 - Optional (v2): Cadabra adapter for advanced canonicalization/symmetry handling.

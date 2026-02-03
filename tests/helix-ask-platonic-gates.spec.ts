@@ -82,6 +82,41 @@ describe("helix ask platonic gates", () => {
     expect(result.answer).toMatch(/morphospace|attractors/i);
   });
 
+  it("uses explicit coverage slots when provided", () => {
+    const result = applyHelixAskPlatonicGates({
+      question:
+        "How does the plan to save the sun fit into the creation of warp bubble ships?",
+      answer: "The repo defines solar restoration and warp bubble concepts.",
+      domain: "repo",
+      tier: "F1",
+      intentId: "repo.warp_conceptual_explain",
+      format: "compare",
+      evidenceGateOk: true,
+      evidenceText:
+        "docs/knowledge/solar-restoration.md docs/knowledge/warp/warp-bubble.md helix ask pipeline",
+      coverageSlots: ["solar-restoration", "warp-bubble"],
+    });
+    expect(result.coverageSummary.keyCount).toBe(2);
+    expect(result.coverageSummary.missingKeys.join(" ")).not.toMatch(
+      /\b(plan|fit|creation)\b/i,
+    );
+  });
+
+  it("flags unsupported claims when repo evidence is required without citations", () => {
+    const result = applyHelixAskPlatonicGates({
+      question: "How does the Helix Ask pipeline work?",
+      answer: "The pipeline routes intents and applies evidence gates.",
+      domain: "repo",
+      tier: "F1",
+      intentId: "repo.helix_ask_pipeline_explain",
+      format: "brief",
+      evidenceText: "helix ask pipeline intent evidence gate server/routes/agi.plan.ts",
+      requiresRepoEvidence: true,
+    });
+    expect(result.beliefSummary.unsupportedRate).toBeGreaterThanOrEqual(0.85);
+    expect(result.beliefGateApplied).toBe(true);
+  });
+
   it("ignores instruction tokens when gating hybrid coverage", () => {
     const result = applyHelixAskPlatonicGates({
       question:

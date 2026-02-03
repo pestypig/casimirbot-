@@ -89,6 +89,8 @@ export type HelixAskPlatonicInput = {
   evidenceText?: string;
   evidencePaths?: string[];
   evidenceGateOk?: boolean;
+  requiresRepoEvidence?: boolean;
+  coverageSlots?: string[];
   generalScaffold?: string;
   repoScaffold?: string;
   promptScaffold?: string;
@@ -391,9 +393,14 @@ const classifyClaimType = (claim: ClaimNode): HelixAskClaimType => {
   return "fact";
 };
 
-const buildClaimProof = (claim: ClaimNode, supported: boolean): string => {
-  if (claim.evidenceRefs.length > 0) {
-    return `source:${claim.evidenceRefs.join(", ")} -> cite -> ${claim.id}`;
+const buildClaimProof = (
+  claim: ClaimNode,
+  supported: boolean,
+  evidenceRefs?: string[],
+): string => {
+  const refs = evidenceRefs ?? claim.evidenceRefs;
+  if (refs.length > 0) {
+    return `source:${refs.join(", ")} -> cite -> ${claim.id}`;
   }
   if (supported) {
     return `source:evidence_text -> token_overlap -> ${claim.id}`;
@@ -416,17 +423,23 @@ const buildClaimLedger = (
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
   const ledger: HelixAskClaimLedgerEntry[] = [];
   const uncertainty: HelixAskUncertaintyEntry[] = [];
+  const enforceEvidenceRefs = input.requiresRepoEvidence === true;
+  const globalEvidenceRefs = ensureUnique(extractFilePathsFromText(input.answer)).slice(0, 3);
   for (const claim of claims) {
-    const supported =
-      claim.evidenceRefs.length > 0 || isClaimSupported(claim.tokens, evidenceTokens);
+    const claimEvidenceRefs =
+      claim.evidenceRefs.length > 0 ? claim.evidenceRefs : globalEvidenceRefs;
+    const supportedByTokens = isClaimSupported(claim.tokens, evidenceTokens);
+    const supported = enforceEvidenceRefs
+      ? claimEvidenceRefs.length > 0 && supportedByTokens
+      : claimEvidenceRefs.length > 0 || supportedByTokens;
     const type = classifyClaimType(claim);
     const entry: HelixAskClaimLedgerEntry = {
       id: claim.id,
       text: claim.text,
       type,
       supported,
-      evidenceRefs: claim.evidenceRefs.slice(),
-      proof: buildClaimProof(claim, supported),
+      evidenceRefs: claimEvidenceRefs.slice(),
+      proof: buildClaimProof(claim, supported, claimEvidenceRefs),
     };
     ledger.push(entry);
     if (!supported) {
@@ -856,34 +869,48 @@ export function evaluateCoverageSlots(args: {
   conceptMatch?: HelixAskConceptMatch | null;
   conceptAnchored?: boolean;
   domain?: HelixAskDomain;
+  explicitSlots?: string[];
+  includeQuestionTokens?: boolean;
 }): { slots: string[]; coveredSlots: string[]; missingSlots: string[]; ratio: number } {
   const domain = args.domain ?? "general";
   const conceptTokens = collectConceptTokens(args.conceptMatch);
   const slots = new Set<string>();
-  const span = extractCoverageSpan(args.question);
-  if (span) {
-    for (const part of span.split(COVERAGE_SLOT_SPLIT_RE)) {
-      const trimmed = part.trim();
-      if (/^(how|why|when|where|which|who|does|do|is|are|can|should|could|would)\b/i.test(trimmed)) {
-        continue;
+  const explicitSlots = (args.explicitSlots ?? [])
+    .map((slot) => normalizeCoverageSlot(slot))
+    .filter((slot): slot is string => Boolean(slot));
+  for (const slot of explicitSlots) {
+    slots.add(slot);
+  }
+  const includeQuestionTokens =
+    args.includeQuestionTokens ?? explicitSlots.length === 0;
+  if (includeQuestionTokens) {
+    const span = extractCoverageSpan(args.question);
+    if (span) {
+      for (const part of span.split(COVERAGE_SLOT_SPLIT_RE)) {
+        const trimmed = part.trim();
+        if (
+          /^(how|why|when|where|which|who|does|do|is|are|can|should|could|would)\b/i.test(trimmed)
+        ) {
+          continue;
+        }
+        const normalized = normalizeCoverageSlot(trimmed);
+        if (normalized) slots.add(normalized);
       }
-      const normalized = normalizeCoverageSlot(trimmed);
+    }
+    const conceptLabel = args.conceptMatch?.card.label ?? args.conceptMatch?.card.id ?? "";
+    if (conceptLabel) {
+      const normalized = normalizeCoverageSlot(conceptLabel);
       if (normalized) slots.add(normalized);
     }
-  }
-  const conceptLabel = args.conceptMatch?.card.label ?? args.conceptMatch?.card.id ?? "";
-  if (conceptLabel) {
-    const normalized = normalizeCoverageSlot(conceptLabel);
-    if (normalized) slots.add(normalized);
-  }
-  const questionTokens = filterSignalTokens(tokenizeAskQuery(args.question));
-  for (const token of questionTokens) {
-    const normalized = normalizeCoverageToken(token);
-    if (!normalized || normalized.length < 3) continue;
-    if (COMMON_QUERY_TOKENS.has(normalized)) continue;
-    if (domain === "hybrid" && CONCEPTUAL_TOKENS.has(normalized)) continue;
-    if (conceptTokens.has(normalized)) continue;
-    slots.add(normalized);
+    const questionTokens = filterSignalTokens(tokenizeAskQuery(args.question));
+    for (const token of questionTokens) {
+      const normalized = normalizeCoverageToken(token);
+      if (!normalized || normalized.length < 3) continue;
+      if (COMMON_QUERY_TOKENS.has(normalized)) continue;
+      if (domain === "hybrid" && CONCEPTUAL_TOKENS.has(normalized)) continue;
+      if (conceptTokens.has(normalized)) continue;
+      slots.add(normalized);
+    }
   }
   const slotList = Array.from(slots).filter(Boolean).slice(0, COVERAGE_SLOT_MAX);
   if (slotList.length === 0) {
@@ -955,6 +982,8 @@ function computeCoverageSummary(input: HelixAskPlatonicInput): HelixAskCoverageS
     conceptMatch: input.conceptMatch ?? null,
     conceptAnchored: conceptEvidenceAnchored(input),
     domain: input.domain,
+    explicitSlots: input.coverageSlots,
+    includeQuestionTokens: !(input.coverageSlots && input.coverageSlots.length > 0),
   });
   const keyCount = slotSummary.slots.length;
   const missingKeyCount = slotSummary.missingSlots.length;
@@ -1069,11 +1098,17 @@ function computeBeliefSummary(input: HelixAskPlatonicInput): HelixAskBeliefSumma
     .join("\n\n");
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
   const questionTokens = toTokenSet(input.question);
+  const enforceEvidenceRefs = input.requiresRepoEvidence === true;
+  const hasGlobalEvidenceRefs = extractFilePathsFromText(input.answer).length > 0;
   let supportedCount = 0;
   let unsupportedCount = 0;
   for (const claim of claims) {
     if (extractFilePathsFromText(claim).length > 0) {
       supportedCount += 1;
+      continue;
+    }
+    if (enforceEvidenceRefs && !hasGlobalEvidenceRefs) {
+      unsupportedCount += 1;
       continue;
     }
     if (evidenceTokens.size === 0) {
@@ -1136,11 +1171,13 @@ function buildBeliefGraphSummary(
     .join("\n\n");
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
   const evidenceRefs = ensureUnique(extractFilePathsFromText(evidenceText));
+  const globalEvidenceRefs = ensureUnique(extractFilePathsFromText(input.answer)).slice(0, 3);
   const constraintLines = evidenceText
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => CONSTRAINT_LINE_RE.test(line));
   const constraintCount = constraintLines.length;
+  const enforceEvidenceRefs = input.requiresRepoEvidence === true;
   let supports = 0;
   let mapsTo = 0;
   let dependsOn = 0;
@@ -1149,11 +1186,16 @@ function buildBeliefGraphSummary(
   const contradictionIds = new Set<string>();
 
   for (const claim of claims) {
-    const hasEvidenceRef = claim.evidenceRefs.length > 0;
+    const claimEvidenceRefs =
+      claim.evidenceRefs.length > 0 ? claim.evidenceRefs : globalEvidenceRefs;
+    const hasEvidenceRef = claimEvidenceRefs.length > 0;
     if (hasEvidenceRef) {
-      mapsTo += claim.evidenceRefs.length;
+      mapsTo += claimEvidenceRefs.length;
     }
-    const supported = hasEvidenceRef || isClaimSupported(claim.tokens, evidenceTokens);
+    const supportedByTokens = isClaimSupported(claim.tokens, evidenceTokens);
+    const supported = enforceEvidenceRefs
+      ? hasEvidenceRef && supportedByTokens
+      : hasEvidenceRef || supportedByTokens;
     if (supported) {
       supports += 1;
     } else {
