@@ -8488,6 +8488,23 @@ const splitLongReportBlock = (text: string, limit: number): string[] => {
 const stripAnswerMarkers = (value: string): string =>
   value.replace(/\bANSWER_(?:START|END)\b/g, "").trim();
 
+const REPORT_SENTENCE_SPLIT = /(?<=[.!?])\s+/;
+
+const collapseRepeatedSentenceBlock = (value: string): string => {
+  const sentences = value
+    .split(REPORT_SENTENCE_SPLIT)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  if (sentences.length < 2 || sentences.length % 2 !== 0) return value;
+  const half = sentences.length / 2;
+  for (let i = 0; i < half; i += 1) {
+    const left = sentences[i].replace(/\s+/g, " ").toLowerCase();
+    const right = sentences[i + half].replace(/\s+/g, " ").toLowerCase();
+    if (left !== right) return value;
+  }
+  return sentences.slice(0, half).join(" ").trim();
+};
+
 const dedupeReportParagraphs = (
   value: string,
 ): { text: string; applied: boolean } => {
@@ -8498,7 +8515,9 @@ const dedupeReportParagraphs = (
   for (const paragraph of paragraphs) {
     const trimmed = paragraph.trim();
     if (!trimmed) continue;
-    const normalized = trimmed.replace(/\s+/g, " ").toLowerCase();
+    const collapsed = collapseRepeatedSentenceBlock(trimmed);
+    if (collapsed !== trimmed) applied = true;
+    const normalized = collapsed.replace(/\s+/g, " ").toLowerCase();
     if (normalized.length >= 80 && seen.has(normalized)) {
       applied = true;
       continue;
@@ -8506,7 +8525,7 @@ const dedupeReportParagraphs = (
     if (normalized.length >= 80) {
       seen.add(normalized);
     }
-    output.push(trimmed);
+    output.push(collapsed.trim());
   }
   return { text: output.join("\n\n"), applied };
 };
@@ -8517,6 +8536,8 @@ const scrubUnsupportedPaths = (
 ): { text: string; removed: string[] } => {
   if (!value.trim()) return { text: value, removed: [] };
   if (allowedPaths.length === 0) return { text: value, removed: [] };
+  const escapeRegExp = (input: string): string =>
+    input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const allowed = new Set<string>();
   for (const path of allowedPaths) {
     const normalized = normalizeEvidenceRef(path) ?? path;
@@ -8532,9 +8553,17 @@ const scrubUnsupportedPaths = (
     const normalized = normalizeEvidenceRef(candidate) ?? candidate;
     if (allowed.has(normalized) || allowed.has(candidate)) continue;
     removed.push(candidate);
+    const escaped = escapeRegExp(candidate);
+    cleaned = cleaned.replace(new RegExp(`\\[[^\\]]*${escaped}[^\\]]*\\]`, "g"), "");
+    cleaned = cleaned.replace(new RegExp(`\\s*\\|\\s*(?:symbol|file)=${escaped}\\b`, "gi"), "");
+    cleaned = cleaned.replace(new RegExp(`\\b(?:symbol|file)=${escaped}\\b`, "gi"), "");
     cleaned = cleaned.split(candidate).join("");
   }
   if (removed.length) {
+    cleaned = cleaned.replace(/\[(?:r|g|s|c):\s*\]/gi, "");
+    cleaned = cleaned.replace(/\s*\|\s*(?:symbol|file)=\s*(?=\s|$)/gi, "");
+    cleaned = cleaned.replace(/\b(?:symbol|file)=\s*(?=\s|$)/gi, "");
+    cleaned = cleaned.replace(/\s*\|\s*(?=\s*(?:\n|$))/g, "");
     cleaned = cleaned.replace(/[ \t]{2,}/g, " ");
     cleaned = cleaned.replace(/ +([,.;:])/g, "$1");
     cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
@@ -8725,6 +8754,7 @@ const computeReportMetrics = (
   details: Array<{
     clarify?: boolean;
     coverage_missing_keys?: string[];
+    drift_detected?: boolean;
     belief_gate_applied?: boolean;
     rattling_gate_applied?: boolean;
     duration_ms?: number;
@@ -8752,9 +8782,12 @@ const computeReportMetrics = (
   const groundedCount = blocks.filter(
     (block) => block.mode === "repo_grounded" || block.mode === "hybrid",
   ).length;
-  const driftFails = details.filter(
-    (detail) => detail.belief_gate_applied || detail.rattling_gate_applied,
-  ).length;
+  const driftFails = details.filter((detail) => {
+    if (typeof detail.drift_detected === "boolean") {
+      return detail.drift_detected;
+    }
+    return Boolean(detail.belief_gate_applied || detail.rattling_gate_applied);
+  }).length;
   const clarifyWithTerms = details.filter(
     (detail) => detail.clarify && (detail.coverage_missing_keys?.length ?? 0) > 0,
   ).length;
@@ -9943,6 +9976,7 @@ const executeHelixAsk = async ({
         intent_id?: string;
         arbiter_mode?: string;
         clarify?: boolean;
+        drift_detected?: boolean;
         evidence_ok?: boolean;
         evidence_match_ratio?: number;
         evidence_match_count?: number;
@@ -10454,6 +10488,7 @@ const executeHelixAsk = async ({
         intent_id?: string;
         arbiter_mode?: string;
         clarify?: boolean;
+        drift_detected?: boolean;
         evidence_ok?: boolean;
         evidence_match_ratio?: number;
         evidence_match_count?: number;
@@ -10694,9 +10729,10 @@ const executeHelixAsk = async ({
         const coverageApplied = !failedBlock && Boolean(blockDebug?.coverage_gate_applied);
         const driftDetected =
           !failedBlock &&
-          (Boolean(blockDebug?.belief_gate_applied) ||
-            Boolean(blockDebug?.rattling_gate_applied) ||
-            /drifted too far/i.test(rawBlockAnswer));
+          (/drifted too far/i.test(rawBlockAnswer) ||
+            ((Boolean(blockDebug?.belief_gate_applied) ||
+              Boolean(blockDebug?.rattling_gate_applied)) &&
+              !evidenceOk));
         let clarify =
           failedBlock ||
           Boolean(blockDebug?.clarify_triggered) ||
@@ -10766,6 +10802,7 @@ const executeHelixAsk = async ({
             intent_id: blockDebug?.intent_id,
             arbiter_mode: blockDebug?.arbiter_mode,
             clarify,
+            drift_detected: driftDetected,
             evidence_ok: evidenceOk,
             evidence_match_ratio: blockDebug?.evidence_match_ratio,
             evidence_match_count: blockDebug?.evidence_match_count,

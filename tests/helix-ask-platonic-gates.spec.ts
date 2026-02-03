@@ -191,7 +191,8 @@ describe("helix ask platonic gates", () => {
     expect(result.beliefGateApplied).toBe(false);
     expect(result.rattlingScore).toBeGreaterThanOrEqual(0.8);
     expect(result.rattlingGateApplied).toBe(true);
-    expect(result.answer).toMatch(/drifted too far/i);
+    expect(result.answer).toMatch(/intent directory/i);
+    expect(result.answer).not.toMatch(/drifted too far/i);
   });
 
   it("removes prompt leakage fragments before other gates", () => {
