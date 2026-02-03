@@ -9,7 +9,15 @@ import {
 } from "react";
 import { BrainCircuit, Search, Square } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
-import { askLocal, askMoodHint, subscribeToolLogs, type ToolLogEvent } from "@/lib/agi/api";
+import {
+  askLocal,
+  askMoodHint,
+  getPendingHelixAskJob,
+  resumeHelixAskJob,
+  subscribeToolLogs,
+  type PendingHelixAskJob,
+  type ToolLogEvent,
+} from "@/lib/agi/api";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
@@ -985,6 +993,7 @@ export function HelixAskPill({
     if (typeof navigator === "undefined") return false;
     return navigator.onLine === false;
   });
+  const resumeAttemptedRef = useRef(false);
   const askStartRef = useRef<number | null>(null);
   const lastAskStatusRef = useRef<string | null>(null);
   const askDraftRef = useRef("");
@@ -1441,6 +1450,126 @@ export function HelixAskPill({
       .map((line) => line.trim())
       .filter(Boolean);
   }, []);
+
+  const resumePendingAsk = useCallback(
+    async (pending: PendingHelixAskJob) => {
+      if (!pending.jobId) return;
+      const questionText = pending.question?.trim() ?? "";
+      setAskBusy(true);
+      setAskStatus("Reconnecting to previous answer...");
+      setAskError(null);
+      setAskLiveEvents([]);
+      setAskLiveDraft("");
+      askLiveDraftRef.current = "";
+      askStartRef.current = Date.now();
+      setAskElapsedMs(0);
+      setAskActiveQuestion(questionText || null);
+      if (questionText) {
+        clearMoodTimer();
+        cancelMoodHint();
+        updateMoodFromText(questionText);
+        requestMoodHint(questionText, { force: true });
+      }
+      const sessionId = pending.sessionId ?? getHelixAskSessionId();
+      const traceId = pending.traceId ?? `ask:${crypto.randomUUID()}`;
+      setAskLiveSessionId(sessionId ?? null);
+      setAskLiveTraceId(traceId);
+      if (sessionId) {
+        setActive(sessionId);
+      }
+
+      const controller = new AbortController();
+      askAbortRef.current = controller;
+      const runId = ++askRunIdRef.current;
+      let skipReply = false;
+
+      try {
+        let responseText = "";
+        let responseDebug: HelixAskReply["debug"];
+        let responsePromptIngested: boolean | undefined;
+        let responseEnvelope: HelixAskResponseEnvelope | undefined;
+        try {
+          const localResponse = await resumeHelixAskJob(pending.jobId, {
+            signal: controller.signal,
+          });
+          responseEnvelope = localResponse.envelope;
+          const envelopeAnswer = responseEnvelope?.answer?.trim() ?? "";
+          responseText = envelopeAnswer
+            ? envelopeAnswer
+            : stripPromptEcho(localResponse.text ?? "", questionText);
+          responseDebug = localResponse.debug;
+          responsePromptIngested = localResponse.prompt_ingested;
+        } catch (error) {
+          const aborted =
+            controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+          if (aborted) {
+            skipReply = true;
+            setAskStatus("Generation stopped.");
+          } else {
+            const message = error instanceof Error ? error.message : String(error);
+            const streamedFallback = askLiveDraftRef.current.trim();
+            responseText = streamedFallback || message || "Request failed.";
+          }
+        }
+        if (!skipReply) {
+          if (!responseText) {
+            responseText = "No response returned.";
+          }
+          updateMoodFromText(responseText);
+          requestMoodHint(responseText, { force: true });
+          const replyId = crypto.randomUUID();
+          setAskReplies((prev) =>
+            [
+              {
+                id: replyId,
+                content: responseText,
+                question: questionText || "Previous request",
+                debug: responseDebug,
+                promptIngested: responsePromptIngested,
+                envelope: responseEnvelope,
+                sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
+              },
+              ...prev,
+            ].slice(0, 3),
+          );
+          if (sessionId) {
+            addMessage(sessionId, { role: "assistant", content: responseText });
+          }
+        }
+      } finally {
+        if (askRunIdRef.current === runId) {
+          setAskBusy(false);
+          setAskStatus(null);
+          setAskLiveSessionId(null);
+          setAskLiveTraceId(null);
+          setAskLiveDraft("");
+          askLiveDraftRef.current = "";
+          setAskActiveQuestion(null);
+        }
+        if (askAbortRef.current === controller) {
+          askAbortRef.current = null;
+        }
+      }
+    },
+    [
+      addMessage,
+      cancelMoodHint,
+      clearMoodTimer,
+      getHelixAskSessionId,
+      requestMoodHint,
+      setActive,
+      updateMoodFromText,
+    ],
+  );
+
+  useEffect(() => {
+    if (askBusy) return;
+    if (resumeAttemptedRef.current) return;
+    const pending = getPendingHelixAskJob();
+    if (!pending) return;
+    resumeAttemptedRef.current = true;
+    void resumePendingAsk(pending);
+  }, [askBusy, resumePendingAsk]);
 
   const runAsk = useCallback(
     async (question: string) => {

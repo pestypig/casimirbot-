@@ -421,6 +421,7 @@ app.get(["/desktop", "/mobile", "/start", "/helix-core"], (req: Request, res: Re
   res.status(503);
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
+  res.setHeader("Retry-After", "8");
   res.send(renderStartupRetryHtml(req.path));
 });
 

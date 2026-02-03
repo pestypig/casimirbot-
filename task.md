@@ -4242,3 +4242,27 @@ Progress notes:
 - Added concept fast-path suppression for multi-concept questions.
 - Drift-repair pass added after platonic gates (configurable via HELIX_ASK_DRIFT_REPAIR).
 
+
+
+## Runtime Resilience Plan (2026-02-03)
+Goal: prevent single runtime errors from cascading into downtime and keep UX responsive during partial outages.
+
+Work items
+- Server process supervision: ensure a supervisor (PM2/systemd/platform) restarts cleanly on crash; document recommended settings.
+- Global error safeguards: log unhandledRejection/uncaughtException, capture trace context, and exit to allow clean restart.
+- Request error boundary: wrap async routes and return controlled 5xx JSON payloads (never bubble uncaught).
+- Readiness gating: /health for liveness, /healthz for readiness (model hydration, index ready); keep 503 startup page with Retry-After.
+- Dependency circuit breakers: LLM spawn + object storage failures trip short cooldown; return 503 + retry hints.
+- Timeouts + aborts: enforce upper bounds per dependency call and cancel downstream work.
+- Bulkheads + rate limits: isolate expensive routes and apply per-IP + per-session limits.
+- Client resilience: offline detection, resume in-flight Helix Ask jobs after refresh, retry with jitter.
+- Service worker safety: versioned cache, stale-while-revalidate, and offline JSON fallback for API paths.
+- Observability + alerts: Sentry (frontend + backend), structured logs, and basic uptime checks.
+- Deploy safeguards: feature flags, canary/rollback checklist, post-deploy smoke tests for /healthz and /api/agi/ask.
+
+Acceptance
+- A single handler error returns controlled 5xx without taking the process down.
+- Readiness only flips once the model is hydrated; startup page auto-refreshes within 30s.
+- Offline clients show reconnect state and resume pending jobs after refresh.
+- Error spikes do not trigger repeated restarts; circuit breaker returns 503 with retry hints.
+- Cache updates do not strand users on a blank page or stale bundle.

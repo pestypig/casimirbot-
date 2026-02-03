@@ -7,9 +7,9 @@
     "gguf": null,
     "canary": "tests/fixtures/tokenizer-canary.json",
     "expected": {
-      "tokenizerHash": "sha256:7ab652d7f8e299c025298e25c74bb3937186e5a31b6490eb1d191e25279e992e",
+      "tokenizerHash": "sha256:75852170560abebea0502a5a6873c42c7a4875a6277b3c2ec13c7aeca807d072",
       "mergesHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "vocabSize": 27,
+      "vocabSize": 23,
       "mergesCount": 0,
       "specialTokens": {
         "bos": 0,

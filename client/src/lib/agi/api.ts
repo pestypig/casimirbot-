@@ -208,6 +208,14 @@ export type HelixAskJobResponse = {
   result?: LocalAskResponse | null;
 };
 
+export type PendingHelixAskJob = {
+  jobId: string;
+  question?: string;
+  sessionId?: string | null;
+  traceId?: string | null;
+  startedAt?: number;
+};
+
 export type MoodHintResponse = {
   mood: LumaMood | null;
   confidence: number;
@@ -581,6 +589,44 @@ const isJobMissingError = (error: unknown): boolean => {
   return message.includes("not_found") || message.includes("404");
 };
 
+const HELIX_ASK_PENDING_JOB_KEY = "helixAsk.pendingJob.v1";
+
+const readPendingHelixAskJob = (): PendingHelixAskJob | null => {
+  if (typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(HELIX_ASK_PENDING_JOB_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingHelixAskJob;
+    if (!parsed || typeof parsed.jobId !== "string" || !parsed.jobId.trim()) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writePendingHelixAskJob = (payload: PendingHelixAskJob): void => {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(HELIX_ASK_PENDING_JOB_KEY, JSON.stringify(payload));
+  } catch {
+    // Best-effort persistence only.
+  }
+};
+
+const clearPendingHelixAskJob = (jobId?: string): void => {
+  if (typeof sessionStorage === "undefined") return;
+  if (!jobId) {
+    sessionStorage.removeItem(HELIX_ASK_PENDING_JOB_KEY);
+    return;
+  }
+  const existing = readPendingHelixAskJob();
+  if (!existing || existing.jobId === jobId) {
+    sessionStorage.removeItem(HELIX_ASK_PENDING_JOB_KEY);
+  }
+};
+
 const isNavigatorOffline = (): boolean =>
   typeof navigator !== "undefined" && navigator.onLine === false;
 
@@ -741,6 +787,20 @@ const pollAskJob = async (
   }
 };
 
+export const getPendingHelixAskJob = (): PendingHelixAskJob | null =>
+  readPendingHelixAskJob();
+
+export const resumeHelixAskJob = async (
+  jobId: string,
+  options?: { signal?: AbortSignal; pollIntervalMs?: number; timeoutMs?: number },
+): Promise<LocalAskResponse> => {
+  try {
+    return await pollAskJob(jobId, options);
+  } finally {
+    clearPendingHelixAskJob(jobId);
+  }
+};
+
 export async function askLocal(
   prompt?: string,
   options?: {
@@ -794,14 +854,38 @@ export async function askLocal(
   }
   try {
     const job = await createAskJob(body, signal);
-    const result = await pollAskJob(job.jobId, { signal });
-    return result;
+    const question = typeof body.question === "string" ? body.question : undefined;
+    writePendingHelixAskJob({
+      jobId: job.jobId,
+      question,
+      sessionId: job.sessionId ?? options?.sessionId ?? null,
+      traceId: job.traceId ?? options?.traceId ?? null,
+      startedAt: Date.now(),
+    });
+    try {
+      const result = await pollAskJob(job.jobId, { signal });
+      return result;
+    } finally {
+      clearPendingHelixAskJob(job.jobId);
+    }
   } catch (error) {
     if (isNavigatorOffline()) {
       await waitForOnline(signal);
       const job = await createAskJob(body, signal);
-      const result = await pollAskJob(job.jobId, { signal });
-      return result;
+      const question = typeof body.question === "string" ? body.question : undefined;
+      writePendingHelixAskJob({
+        jobId: job.jobId,
+        question,
+        sessionId: job.sessionId ?? options?.sessionId ?? null,
+        traceId: job.traceId ?? options?.traceId ?? null,
+        startedAt: Date.now(),
+      });
+      try {
+        const result = await pollAskJob(job.jobId, { signal });
+        return result;
+      } finally {
+        clearPendingHelixAskJob(job.jobId);
+      }
     }
     if (!isHelixAskJobUnsupported(error)) {
       throw error;

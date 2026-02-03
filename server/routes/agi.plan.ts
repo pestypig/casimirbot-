@@ -9701,6 +9701,15 @@ const executeHelixAsk = async ({
         return;
       }
       const blockResults: HelixAskReportBlockResult[] = [];
+      const reportLiveEvents: Array<{
+        ts: string;
+        tool: string;
+        stage: string;
+        detail?: string;
+        ok?: boolean;
+        durationMs?: number;
+        text?: string;
+      }> = [];
       const reportBlockDetails: Array<{
         id: string;
         label?: string;
@@ -9888,6 +9897,20 @@ const executeHelixAsk = async ({
               rattling_gate_applied?: boolean;
             }
           | undefined;
+        const blockLiveEvents = resolvedBlockPayload?.payload?.debug?.live_events as
+          | Array<{
+              ts: string;
+              tool: string;
+              stage: string;
+              detail?: string;
+              ok?: boolean;
+              durationMs?: number;
+              text?: string;
+            }>
+          | undefined;
+        if (Array.isArray(blockLiveEvents)) {
+          reportLiveEvents.push(...blockLiveEvents);
+        }
         let citations = extractFilePathsFromText(rawBlockAnswer);
         const evidenceOk = failedBlock ? false : blockDebug?.evidence_gate_ok !== false;
         const coverageApplied = !failedBlock && Boolean(blockDebug?.coverage_gate_applied);
@@ -10001,6 +10024,7 @@ const executeHelixAsk = async ({
         debugPayload.report_blocks = reportPayload.report_blocks as any;
         debugPayload.report_blocks_detail = reportBlockDetails as any;
         debugPayload.report_metrics = reportMetrics as any;
+        debugPayload.live_events = [...liveEventHistory, ...reportLiveEvents];
       }
       responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
       return;
