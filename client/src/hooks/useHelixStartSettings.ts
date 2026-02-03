@@ -1,6 +1,7 @@
 import * as React from "react";
 
 export type StartSettings = {
+  settingsVersion: number;
   rememberChoice: boolean;
   preferDesktop: boolean;
   showZen: boolean;
@@ -13,11 +14,12 @@ export type StartSettings = {
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
+  settingsVersion: 2,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
   enableSplashCursor: false,
-  showHelixAskDebug: false,
+  showHelixAskDebug: true,
   showPowerShellDebug: false,
   powerShellScratch: ""
 };
@@ -34,7 +36,12 @@ export function useHelixStartSettings() {
       const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<StartSettings>;
-      setUserSettings({ ...DEFAULT_SETTINGS, ...parsed });
+      const merged: StartSettings = { ...DEFAULT_SETTINGS, ...parsed };
+      if (parsed.settingsVersion !== DEFAULT_SETTINGS.settingsVersion) {
+        merged.settingsVersion = DEFAULT_SETTINGS.settingsVersion;
+        merged.showHelixAskDebug = DEFAULT_SETTINGS.showHelixAskDebug;
+      }
+      setUserSettings(merged);
     } catch {
       // ignore malformed localStorage entries
     }
