@@ -6897,6 +6897,7 @@ const HelixAskTuningOverrides = z
     dryRun: z.boolean().optional(),
     verbosity: z.enum(["brief", "normal", "extended"]).optional(),
     searchQuery: z.string().optional(),
+    coverageSlots: z.array(z.string().min(1)).max(12).optional(),
     topK: z.coerce.number().int().min(1).max(48).optional(),
     context: z.string().optional(),
     max_tokens: z.coerce.number().int().min(1).max(8_192).optional(),
@@ -7533,6 +7534,9 @@ type HelixAskReportBlock = {
   text: string;
   label?: string;
   typeHint?: string;
+  slotId?: string;
+  slotSurfaces?: string[];
+  slotAliases?: string[];
 };
 
 type HelixAskReportBlockResult = {
@@ -7661,26 +7665,36 @@ const resolveReportBlockHints = (
   searchTerms: string[];
   repoFocus: boolean;
   hintIds: string[];
+  includeHelixAsk: boolean;
 } => {
   if (options?.typeHint) {
-    return { anchorFiles: [], searchTerms: [], repoFocus: false, hintIds: [] };
+    return {
+      anchorFiles: [],
+      searchTerms: [],
+      repoFocus: false,
+      hintIds: [],
+      includeHelixAsk: false,
+    };
   }
   const anchorFiles: string[] = [];
   const searchTerms: string[] = [];
   const hintIds: string[] = [];
   let repoFocus = false;
+  let includeHelixAsk = false;
   for (const hint of REPORT_BLOCK_HINTS) {
     if (!hint.patterns.some((pattern) => pattern.test(text))) continue;
     hintIds.push(hint.id);
     if (hint.anchorFiles?.length) anchorFiles.push(...hint.anchorFiles);
     if (hint.searchTerms?.length) searchTerms.push(...hint.searchTerms);
     if (hint.repoFocus) repoFocus = true;
+    includeHelixAsk = true;
   }
   return {
     anchorFiles: Array.from(new Set(anchorFiles)),
     searchTerms: Array.from(new Set(searchTerms)),
     repoFocus,
     hintIds,
+    includeHelixAsk,
   };
 };
 
@@ -7689,11 +7703,20 @@ const buildReportBlockSearchQuery = (args: {
   searchTerms: string[];
   anchorFiles: string[];
   reportRepoContext: boolean;
+  slotAliases?: string[];
+  slotId?: string;
+  includeHelixAsk?: boolean;
 }): string => {
   const parts: string[] = [];
   if (args.blockText) parts.push(args.blockText);
-  if (args.reportRepoContext && !/helix ask/i.test(args.blockText)) {
+  if (args.includeHelixAsk && !/helix ask/i.test(args.blockText)) {
     parts.push("helix ask");
+  }
+  if (args.slotAliases?.length) {
+    parts.push(...args.slotAliases);
+  }
+  if (args.slotId) {
+    parts.push(args.slotId.replace(/-/g, " "));
   }
   if (args.searchTerms.length) parts.push(...args.searchTerms);
   if (args.anchorFiles.length) parts.push(...args.anchorFiles);
@@ -7786,6 +7809,30 @@ const buildReportBlockScopeOverride = (anchorFiles: string[], hintIds: string[])
     overrideAllowlist: true,
     docsFirst: docsSurfaces.size > 0,
     docsAllowlist: docsSurfaces.size > 0 ? [buildPlanSurfaceRegexes(Array.from(docsSurfaces))] : undefined,
+  };
+};
+
+const buildSlotReportBlockScopeOverride = (
+  slotSurfaces: string[],
+  slotId?: string,
+): HelixAskPlanScope => {
+  const surfaces = new Set(slotSurfaces.map((surface) => surface.trim()).filter(Boolean));
+  if (surfaces.size === 0) {
+    surfaces.add("docs");
+    surfaces.add("knowledge");
+  }
+  if (!surfaces.has("docs")) surfaces.add("docs");
+  const surfaceRegexes = buildPlanSurfaceRegexes(Array.from(surfaces));
+  const allowlistTiers: RegExp[][] = [];
+  if (surfaceRegexes.length) allowlistTiers.push(surfaceRegexes);
+  const docsAllowlist: RegExp[][] = [];
+  if (surfaceRegexes.length) docsAllowlist.push(surfaceRegexes);
+  const mustIncludeGlobs = slotId ? [globToRegex(`**/${slotId}*`)] : undefined;
+  return {
+    allowlistTiers: allowlistTiers.length ? allowlistTiers : undefined,
+    docsAllowlist: docsAllowlist.length ? docsAllowlist : undefined,
+    docsFirst: true,
+    mustIncludeGlobs,
   };
 };
 
@@ -7916,6 +7963,9 @@ const buildSlotReportBlocks = (
       text: `Focus on ${label}. Answer only the parts of the question that pertain to this slot. Question: ${question}`,
       label,
       typeHint: slot.source,
+      slotId: slot.id,
+      slotSurfaces: slot.surfaces ?? [],
+      slotAliases: slot.aliases ?? [],
     });
   }
   return blocks;
@@ -9690,9 +9740,16 @@ const executeHelixAsk = async ({
         const blockAnchorFiles = Array.from(
           new Set([...helixAskAnchorFiles, ...blockHints.anchorFiles]),
         );
+        const slotScopeOverride =
+          block.typeHint === "concept"
+            ? buildSlotReportBlockScopeOverride(block.slotSurfaces ?? [], block.slotId)
+            : null;
         const blockScopeOverride = blockRepoContext
           ? buildReportBlockScopeOverride(blockAnchorFiles, blockHints.hintIds)
           : {};
+        const mergedBlockScopeOverride = slotScopeOverride
+          ? mergePlanScope(blockScopeOverride, slotScopeOverride)
+          : blockScopeOverride;
         const needsRepoPrefix =
           blockRepoContext &&
           !HELIX_ASK_REPO_FORCE.test(blockTextForQuestion) &&
@@ -9714,14 +9771,27 @@ const executeHelixAsk = async ({
         const baseBlockQuestion = `${prefix}${blockTextForQuestion}`.trim();
         const anchorHint =
           blockAnchorFiles.length > 0 ? `Use files: ${blockAnchorFiles.join(", ")}.` : "";
+        const baseSlotAliasText = (block.slotAliases ?? [])
+          .map((alias) => alias.trim())
+          .filter(Boolean)
+          .slice(0, 4);
+        if (block.slotId) {
+          baseSlotAliasText.push(block.slotId.replace(/-/g, " "));
+        }
+        const slotAliasText = baseSlotAliasText.length
+          ? `Use slot terms: ${Array.from(new Set(baseSlotAliasText)).join(", ")}.`
+          : "";
         const blockQuestion = needsCitationPrompt
-          ? `${baseBlockQuestion} Cite repo file paths. ${anchorHint}`.trim()
-          : `${baseBlockQuestion} ${anchorHint}`.trim();
+          ? `${baseBlockQuestion} Cite repo file paths. ${anchorHint} ${slotAliasText}`.trim()
+          : `${baseBlockQuestion} ${anchorHint} ${slotAliasText}`.trim();
         const blockSearchQuery = buildReportBlockSearchQuery({
           blockText: blockTextForQuestion,
           searchTerms: blockHints.searchTerms,
           anchorFiles: blockAnchorFiles,
           reportRepoContext: blockRepoContext,
+          slotAliases: block.slotAliases,
+          slotId: block.slotId,
+          includeHelixAsk: blockHints.includeHelixAsk,
         });
         logEvent(
           "Report block",
@@ -9729,14 +9799,17 @@ const executeHelixAsk = async ({
           `block=${index + 1}/${limitedBlocks.length}`,
           blockStart,
         );
-        if (blockRepoContext && (blockAnchorFiles.length > 0 || blockScopeOverride.allowlistTiers)) {
+        if (
+          blockRepoContext &&
+          (blockAnchorFiles.length > 0 || mergedBlockScopeOverride.allowlistTiers)
+        ) {
           logEvent(
             "Report block scope",
             `block=${index + 1}`,
             [
               blockAnchorFiles.length ? `anchors=${blockAnchorFiles.length}` : "",
-              blockScopeOverride.allowlistTiers?.length
-                ? `tiers=${blockScopeOverride.allowlistTiers.length}`
+              mergedBlockScopeOverride.allowlistTiers?.length
+                ? `tiers=${mergedBlockScopeOverride.allowlistTiers.length}`
                 : "",
               blockHints.hintIds.length ? `hints=${blockHints.hintIds.join(",")}` : "",
             ]
@@ -9754,6 +9827,7 @@ const executeHelixAsk = async ({
             traceId: blockTraceId,
             debug: debugEnabled,
             searchQuery: blockSearchQuery || rawQuestion || parsed.data.searchQuery,
+            coverageSlots: block.slotId ? [block.slotId] : undefined,
           },
           personaId,
           responder: {
@@ -9766,7 +9840,7 @@ const executeHelixAsk = async ({
             parentTraceId: askTraceId,
             blockIndex: index + 1,
             blockCount: limitedBlocks.length,
-            planScopeOverride: blockScopeOverride,
+            planScopeOverride: mergedBlockScopeOverride,
           },
         });
         const resolvedBlockPayload = blockPayload as { status: number; payload: any } | null;
@@ -10900,7 +10974,14 @@ const executeHelixAsk = async ({
           directives: planDirectives,
           candidates: slotPreviewCandidates,
         });
-        coverageSlots = slotPlan.coverageSlots.slice();
+        const requestCoverageSlots = Array.isArray(parsed.data.coverageSlots)
+          ? parsed.data.coverageSlots.map(normalizeSlotId)
+          : [];
+        const slotCoverageSet = new Set([
+          ...requestCoverageSlots,
+          ...slotPlan.coverageSlots,
+        ]);
+        coverageSlots = Array.from(slotCoverageSet);
         slotAliases = collectSlotAliasHints(slotPlan);
         if (slotPlan.slots.length > 0) {
           const slotLabels = slotPlan.slots
