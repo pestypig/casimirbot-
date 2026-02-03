@@ -7817,7 +7817,9 @@ const buildSlotReportBlockScopeOverride = (
   slotId?: string,
 ): HelixAskPlanScope => {
   const surfaces = new Set(slotSurfaces.map((surface) => surface.trim()).filter(Boolean));
-  if (surfaces.size === 0) {
+  const hasDocSurface =
+    surfaces.has("docs") || surfaces.has("knowledge") || surfaces.has("ethos");
+  if (!hasDocSurface) {
     surfaces.add("docs");
     surfaces.add("knowledge");
   }
@@ -7832,6 +7834,7 @@ const buildSlotReportBlockScopeOverride = (
     allowlistTiers: allowlistTiers.length ? allowlistTiers : undefined,
     docsAllowlist: docsAllowlist.length ? docsAllowlist : undefined,
     docsFirst: true,
+    overrideAllowlist: true,
     mustIncludeGlobs,
   };
 };
@@ -10977,11 +10980,10 @@ const executeHelixAsk = async ({
         const requestCoverageSlots = Array.isArray(parsed.data.coverageSlots)
           ? parsed.data.coverageSlots.map(normalizeSlotId)
           : [];
-        const slotCoverageSet = new Set([
-          ...requestCoverageSlots,
-          ...slotPlan.coverageSlots,
-        ]);
-        coverageSlots = Array.from(slotCoverageSet);
+        coverageSlots =
+          requestCoverageSlots.length > 0
+            ? requestCoverageSlots
+            : slotPlan.coverageSlots.slice();
         slotAliases = collectSlotAliasHints(slotPlan);
         if (slotPlan.slots.length > 0) {
           const slotLabels = slotPlan.slots
