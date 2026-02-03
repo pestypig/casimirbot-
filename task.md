@@ -4276,3 +4276,108 @@ Acceptance
 - Added request timeouts on the HTTP server.
 - Added client error reporting endpoint + frontend reporting hook.
 - Added smoke-check script and runtime resilience runbook.
+### D14) Semantic Slot Binding + Evidence-First Disambiguation (Codex-like retrieval)
+- Goal: keep the platonic / falsifiable ladder intact while making slot binding and retrieval "Codex-like" from small read-ins.
+- Why: current failures show literal slot coverage and weak doc evidence text, not a routing/tuning issue.
+
+#### 1) What the gap is (from logs)
+- Routing and obligations fire, plan pass runs, docs-first sometimes runs.
+- Retrieval finds "something" but not the evidence text that proves a slot.
+- Gates do the right thing (clarify/refuse), but slot binding is too literal and evidence cards miss titles/headings.
+
+#### 2) Research-backed principles to adopt
+- Ambiguity is first-class: clarify when dominance is unclear (AmbigQA / ClariQ style).
+- Selective answering: abstain/clarify when confidence is low, but only after best-effort retrieval.
+- Multi-channel retrieval should be fused (RRF) and diversified (MMR).
+
+#### 3) Full proposal: Semantic Slot Binding + Evidence-First Disambiguation
+Step 0 - Slot canonicalization (before retrieval, after obligations)
+- Convert prompt to canonical slots that match repo concepts (ex: solar-restoration, warp-bubble, consciousness-curvature).
+- Plan pass emits structure only: slots[], disambiguation_needed, slot_query_hints.
+- Hard rule: plan pass never asserts facts; only what to look for.
+
+Step 1 - Automatic alias generation (no manual word lists)
+- Build per-slot alias sets from:
+  - prompt span normalization (hyphen/space, plural/singular, light stemming, edit-distance)
+  - repo structure signals (file names, doc titles, H1/H2 headings, concept registry)
+- Use alias sets for coverage and evidence matching (not raw slot tokens).
+
+Step 2 - Slot-aware retrieval with fused channels + diversity
+- Per-slot retrieval channels:
+  - lexical (BM25-ish)
+  - symbol/path
+  - fuzzy trigram/edit distance
+  - optional embedding (if available)
+- Fuse with RRF, then apply MMR-style diversification.
+- Hard rule: if requiresRepoEvidence=true, each slot must yield >=1 doc evidence card
+  containing either an alias hit or a doc heading/title match.
+- If missing after 1-2 retries, mark slot as clarify.
+
+Step 3 - Evidence card header injection
+- Prepend doc title + top H1/H2 headings to each doc evidence card.
+- Ensures coverage gates see the concept even when the snippet misses the term.
+- Keeps proofs falsifiable (still extracted, not invented).
+- Observability: emit live events + debug fields for header injection, alias hits, and per-slot evidence/card counts.
+
+Step 4 - Evidence-first ambiguity resolver
+- Trigger when:
+  - short prompt, or
+  - multiple plausible slots close in score, or
+  - retrieval split across topics with low dominance.
+- Build 2-3 candidate senses from concept registry + doc titles + topic tags.
+- If one dominates by evidence, proceed. Else ask minimal clarifying question (2 options max).
+
+Step 5 - Fail-closed policy for repo-required questions
+- If requiresRepoEvidence=true and slot evidence fails:
+  - return partial grounded sections for supported slots,
+  - targeted clarifications for missing slots,
+  - no generic filler.
+
+#### 4) Where this fits in Helix Ask
+- After obligations, before intent/topic:
+  - slotCanonicalize(question) -> slots[], aliases[], slot spans
+- Replace single retrieval with per-slot retrieval:
+  - docs-first per slot, then fused multi-channel retry if needed.
+- Evidence gate becomes per-slot:
+  - slotEvidenceOk[slot], slotCoverageOk[slot]
+- Arbiter uses slot coverage:
+  - if any slots grounded -> partial answer
+  - if none grounded -> clarify
+
+#### 5) Metrics and policies (avoid endless tuning)
+- Metrics:
+  - slot_doc_hit_rate
+  - slot_alias_coverage_rate
+  - slot_dominance_margin
+  - grounded_sentence_rate
+  - clarify_precision
+- Default policy (repo-required):
+  - require slot_doc_hit_rate >= 0.5 to emit multi-slot answer
+  - else clarify with top-2 candidate senses per slot
+- Multi-slot prompts:
+  - default to sectioned output to prevent cross-topic contamination
+
+#### 6) Practical roadmap
+Phase 1 - Slot + alias foundation
+- Implement slotCanonicalize() and alias generation from prompt + repo structure.
+- Success: ambiguous prompts (cavity/bubble/ledger) yield correct slots or clarify.
+
+Phase 2 - Slot-aware retrieval + header injection
+- Per-slot retrieval, doc title/headings injected into evidence cards.
+- Enforce >=1 doc card per required slot.
+- Success: docs-first produces evidence text that satisfies gates.
+
+Phase 3 - Evidence-first ambiguity resolver
+- Dominance scoring + two-option clarifier.
+- Success: "What is a cavity?" clarifies unless repo evidence dominates.
+
+Phase 4 - Partial grounded assembly (default for multi-slot)
+- Multi-slot prompts assemble grounded/clarify sections automatically.
+- Success: no generic paragraphs + random citations on multi-slot prompts.
+
+#### 7) References
+- AmbigQA: https://nlp.cs.washington.edu/ambigqa/
+- The Art of Abstention (selective prediction): https://aclanthology.org/2021.acl-long.84.pdf
+- RRF (retrieval fusion): https://trec.nist.gov/pubs/trec18/papers/uwaterloo-cormack.RF.WEB.pdf
+- MMR / diversification: https://sigir.org/files/forum/F99/Varian.pdf
+- Conversational search survey: https://arxiv.org/html/2410.15576v1
