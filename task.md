@@ -4408,6 +4408,13 @@ Phase 4 - Partial grounded assembly (default for multi-slot)
 
 6) Diagnostics:
    - Add block_must_include_ok, block_must_include_missing, block_doc_slot_targets, block_gate_decision.
+
+#### 6.6) Block answer hygiene (citations + hallucination scrub + dedupe)
+- Ensure grounded blocks never fail solely due to missing citations.
+- Scrub hallucinated file paths not present in block context/anchors.
+- Deduplicate repeated paragraphs and strip stray ANSWER_START/ANSWER_END markers.
+- If a block is grounded but has no citations, attach fallback Sources from block context.
+- Diagnostics: block_citation_fallback, block_paths_scrubbed, block_dedupe_applied.
    - Makes tuning/reasoning transparent in live events + debug.
 
 #### 7) References
