@@ -1,4 +1,5 @@
 import React from "react";
+import { reportClientError } from "@/lib/observability/client-error";
 
 type Props = { children: React.ReactNode };
 type State = { hasError: boolean; error?: Error };
@@ -12,6 +13,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[app] render error:", error, info);
+    reportClientError(error, { componentStack: info.componentStack });
   }
 
   handleReload = () => {

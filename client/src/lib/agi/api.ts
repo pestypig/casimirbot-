@@ -760,8 +760,9 @@ const pollAskJob = async (
         const fallback = lastPartialText || "Request failed. Please try again.";
         return { text: fallback } as LocalAskResponse;
       }
-      const backoff = Math.min(8000, pollInterval * Math.pow(2, Math.min(consecutiveErrors, 4)));
-      await sleep(backoff, options?.signal);
+      const backoffBase = Math.min(8000, pollInterval * Math.pow(2, Math.min(consecutiveErrors, 4)));
+      const jitter = backoffBase * (0.75 + Math.random() * 0.5);
+      await sleep(jitter, options?.signal);
       continue;
     }
     if (job.partialText) {

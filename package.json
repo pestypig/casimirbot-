@@ -10,6 +10,7 @@
     "dev:static": "cross-env NODE_ENV=development SKIP_VITE_MIDDLEWARE=1 tsx server/index.ts",
     "bench": "tsx scripts/bench.ts",
     "eval:smoke": "tsx scripts/eval-smoke.ts",
+    "smoke:check": "tsx scripts/smoke-check.ts",
     "specialists:mini": "tsx scripts/specialists-mini-loop.ts",
     "signoff:v0.1": "tsx scripts/v0.1-signoff.ts",
     "chatl:bench": "tsx scripts/bench.ts",

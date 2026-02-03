@@ -4266,3 +4266,13 @@ Acceptance
 - Offline clients show reconnect state and resume pending jobs after refresh.
 - Error spikes do not trigger repeated restarts; circuit breaker returns 503 with retry hints.
 - Cache updates do not strand users on a blank page or stale bundle.
+
+
+## Runtime Resilience Plan (2026-02-03) - Status update
+- Added express async error guard to prevent unhandled promise rejections from crashing routes.
+- Added readiness gating based on runtime artifact hydration and 503 startup headers with Retry-After.
+- Added API rate limiting + Helix Ask concurrency bulkhead.
+- Added runtime artifact + LLM spawn circuit breakers with cooldowns.
+- Added request timeouts on the HTTP server.
+- Added client error reporting endpoint + frontend reporting hook.
+- Added smoke-check script and runtime resilience runbook.

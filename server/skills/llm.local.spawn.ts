@@ -12,6 +12,7 @@ import { beginLlMJob } from "../services/hardware/gpu-scheduler";
 import { llmLocalSpawnCalls, llmLocalSpawnLatency } from "../metrics";
 import { resolveLocalContextTokens } from "../services/llm/local-runtime";
 import { recordLocalRuntimeStats } from "../services/llm/local-runtime-stats";
+import { createCircuitBreaker } from "../services/resilience/circuit-breaker";
 
 const DEFAULT_RPM = Math.max(1, Number(process.env.LLM_LOCAL_RPM ?? 60));
 const DEFAULT_MODEL =
@@ -33,6 +34,16 @@ const PROMPT_INLINE_MAX = 8000;
 const PROMPT_FILE_DIR = resolve(process.env.LLM_LOCAL_PROMPT_DIR?.trim() || "tmp/llm-prompts");
 let activeSpawns = 0;
 const spawnWaiters: Array<() => void> = [];
+const LLM_SPAWN_BREAKER_FAIL_MAX = toPositiveInt(process.env.LLM_SPAWN_BREAKER_FAIL_MAX, 3);
+const LLM_SPAWN_BREAKER_COOLDOWN_MS = toPositiveInt(
+  process.env.LLM_SPAWN_BREAKER_COOLDOWN_MS,
+  60_000,
+);
+const llmSpawnBreaker = createCircuitBreaker({
+  name: "llm-local-spawn",
+  failureThreshold: LLM_SPAWN_BREAKER_FAIL_MAX,
+  cooldownMs: LLM_SPAWN_BREAKER_COOLDOWN_MS,
+});
 
 const resolveExecutable = (value: string): string => {
   if (!value) return value;
@@ -108,6 +119,9 @@ export const llmLocalSpawnSpec: ToolSpecShape = {
 };
 
 export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<LocalSpawnOutput> => {
+  if (llmSpawnBreaker.isOpen()) {
+    throw new Error("llm_spawn_temporarily_unavailable");
+  }
   const parsed = GenerateInput.parse(rawInput ?? {});
   const personaId = (ctx?.personaId as string) || "persona:unknown";
   const sessionId = (ctx?.sessionId as string) || undefined;
@@ -355,6 +369,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     }
     throw error;
   } catch (err) {
+    llmSpawnBreaker.recordFailure(err);
     lastError = err;
     const memory = process.memoryUsage();
     recordLocalRuntimeStats({
@@ -406,6 +421,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   }
 
   async function finalizeSuccess(): Promise<LocalSpawnOutput> {
+    llmSpawnBreaker.recordSuccess();
     const trimmedOutput = stripCliNoise(outputText);
     const outputBytes = Buffer.byteLength(outputText ?? "", "utf8");
     const stderrText = stderr.join("").trim();

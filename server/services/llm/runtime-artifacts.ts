@@ -4,6 +4,7 @@ import { promises as fs } from "node:fs";
 import { createReadStream, createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import type { Client as ReplitStorageClient } from "@replit/object-storage";
+import { createCircuitBreaker } from "../resilience/circuit-breaker";
 
 type ArtifactSpec = {
   label: string;
@@ -15,6 +16,18 @@ type ArtifactSpec = {
 
 let replitClient: ReplitStorageClient | null = null;
 let hydrationPromise: Promise<void> | null = null;
+
+const toPositiveInt = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  return fallback;
+};
+
+const hydrationBreaker = createCircuitBreaker({
+  name: "runtime-artifacts",
+  failureThreshold: toPositiveInt(process.env.RUNTIME_ARTIFACT_BREAKER_FAIL_MAX, 3),
+  cooldownMs: toPositiveInt(process.env.RUNTIME_ARTIFACT_BREAKER_COOLDOWN_MS, 60_000),
+});
 
 const getReplitClient = async (): Promise<ReplitStorageClient> => {
   if (!replitClient) {
@@ -263,11 +276,19 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
 };
 
 export const ensureRuntimeArtifactsHydrated = (): Promise<void> => {
+  if (hydrationBreaker.isOpen()) {
+    throw new Error("runtime_artifacts_temporarily_unavailable");
+  }
   if (!hydrationPromise) {
-    hydrationPromise = hydrateRuntimeArtifacts().catch((error) => {
-      hydrationPromise = null;
-      throw error;
-    });
+    hydrationPromise = hydrateRuntimeArtifacts()
+      .then(() => {
+        hydrationBreaker.recordSuccess();
+      })
+      .catch((error) => {
+        hydrationPromise = null;
+        hydrationBreaker.recordFailure(error);
+        throw error;
+      });
   }
   return hydrationPromise;
 };

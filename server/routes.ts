@@ -49,11 +49,20 @@ import type { SimResult, Schedule, Flow, Faults, ClockModel } from "@shared/tsn-
 import { DEFAULT_QBV_SCHEDULE, DEMO_FLOWS, simulate as simulateTsn } from "../simulations/tsn-sim";
 import { getGitFirstAppearances } from "./lib/git-first-appearance";
 import { trainStatusRouter } from "./routes/train-status";
+import { clientErrorRouter } from "./routes/observability.client-error";
+import { createRateLimiter } from "./middleware/rate-limit";
+import { createConcurrencyGuard } from "./middleware/concurrency-guard";
 
 const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === "1") return true;
   if (value === "0") return false;
   return defaultValue;
+};
+
+const toPositiveInt = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  return fallback;
 };
 
 const fastBoot = process.env.FAST_BOOT === "1";
@@ -70,6 +79,31 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   if (fastBoot) {
     console.warn("[routes] FAST_BOOT=1: skipping optional routes and background jobs for faster startup.");
   }
+  const rateLimitEnabled = flagEnabled(
+    process.env.RATE_LIMIT_ENABLED,
+    process.env.NODE_ENV === "production",
+  );
+  if (rateLimitEnabled) {
+    const windowMs = toPositiveInt(process.env.RATE_LIMIT_API_WINDOW_MS, 60_000);
+    const max = toPositiveInt(process.env.RATE_LIMIT_API_MAX, 240);
+    app.use(
+      "/api",
+      createRateLimiter({
+        windowMs,
+        max,
+      }),
+    );
+  }
+  const askConcurrencyMax = toPositiveInt(process.env.HELIX_ASK_CONCURRENCY_MAX, 4);
+  if (askConcurrencyMax > 0) {
+    app.use(
+      "/api/agi/ask",
+      createConcurrencyGuard({
+        max: askConcurrencyMax,
+      }),
+    );
+  }
+  app.use("/api/observability", clientErrorRouter);
   app.use("/api/luma/ops", lumaHceRouter);
   app.use("/api/luma", lumaRouter);
   registerLumaWhisperRoute(app);

@@ -7,6 +7,12 @@ import os from "os";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
 import { otelMiddleware } from "./services/observability/otel-middleware";
+import { patchExpressAsyncHandlers } from "./utils/express-async-guard";
+import {
+  flushErrorReporter,
+  initErrorReporter,
+  reportError,
+} from "./services/observability/error-reporter";
 import {
   loadIdeologyVerifierPack,
   validateIdeologyVerifierPackAgainstNodeIds,
@@ -24,6 +30,7 @@ type HealthCheckRequest = {
   headers: Record<string, string | string[] | undefined>;
 };
 
+patchExpressAsyncHandlers();
 const app = express();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +46,9 @@ const runtimeEnv = process.env.NODE_ENV ?? "development";
 const fastBoot = process.env.FAST_BOOT === "1";
 const skipModuleInit = process.env.SKIP_MODULE_INIT === "1";
 const deferRouteBoot = process.env.DEFER_ROUTE_BOOT === "1";
+const fatalExitOnError =
+  process.env.FATAL_EXIT_ON_ERROR !== "0" && runtimeEnv !== "development";
+const fatalExitDelayMs = Number(process.env.FATAL_EXIT_DELAY_MS ?? "1500");
 const healthReadyOnListen =
   process.env.HEALTH_READY_ON_LISTEN === "1" ||
   (process.env.HEALTH_READY_ON_LISTEN !== "0" && deferRouteBoot);
@@ -56,6 +66,10 @@ const bootstrapDelayMs = Number.isFinite(Number(bootstrapDelayMsRaw))
   ? Math.max(0, Number(bootstrapDelayMsRaw))
   : 0;
 let bootstrapPromise: Promise<void> | null = null;
+let artifactsReady = false;
+let artifactHydrationError: string | null = null;
+let artifactRetryTimer: NodeJS.Timeout | null = null;
+let artifactHydrationInFlight = false;
 const log = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -65,6 +79,52 @@ const log = (message: string, source = "express") => {
   });
 
   console.log(`${formattedTime} [${source}] ${message}`);
+};
+
+const resolveReadyState = (): boolean => appReady && artifactsReady;
+
+const trustProxy = process.env.TRUST_PROXY;
+if (trustProxy && trustProxy !== "0") {
+  app.set("trust proxy", trustProxy === "1" ? true : trustProxy);
+}
+
+const toPositiveInt = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  return fallback;
+};
+
+const artifactRetryMs = toPositiveInt(process.env.RUNTIME_ARTIFACT_RETRY_MS, 30_000);
+
+const scheduleArtifactRetry = () => {
+  if (artifactRetryTimer || artifactRetryMs <= 0) return;
+  artifactRetryTimer = setTimeout(() => {
+    artifactRetryTimer = null;
+    void attemptArtifactHydration();
+  }, artifactRetryMs);
+  artifactRetryTimer.unref?.();
+};
+
+const noteArtifactError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  artifactHydrationError = message.slice(0, 280);
+};
+
+const attemptArtifactHydration = async () => {
+  if (artifactHydrationInFlight) return;
+  artifactHydrationInFlight = true;
+  try {
+    const { ensureRuntimeArtifactsHydrated } = await import("./services/llm/runtime-artifacts");
+    await ensureRuntimeArtifactsHydrated();
+    artifactsReady = true;
+    artifactHydrationError = null;
+  } catch (error) {
+    artifactsReady = false;
+    noteArtifactError(error);
+    scheduleArtifactRetry();
+  } finally {
+    artifactHydrationInFlight = false;
+  }
 };
 
 const resolveExistingPath = (primary: string, fallback?: string) => {
@@ -102,10 +162,14 @@ const validateIdeologyVerifierPack = () => {
 };
 
 const healthPayload = () => {
-  const ready = appReady || healthReady;
+  const ready = resolveReadyState();
   return {
     status: ready ? "ok" : "starting",
     ready,
+    appReady,
+    artifactsReady,
+    healthReady,
+    artifactsError: artifactHydrationError,
     timestamp: new Date().toISOString(),
   };
 };
@@ -159,7 +223,7 @@ app.get("/healthz", (_req, res) => {
   res.status(payload.ready ? 200 : 503).json(payload);
 });
 app.head("/healthz", (_req, res) => {
-  const ready = appReady || healthReady;
+  const ready = resolveReadyState();
   res.status(ready ? 200 : 503).end();
 });
 app.get("/health", (_req, res) => {
@@ -288,7 +352,7 @@ app.use((req, res, next) => {
   }
   return jwtMiddleware(req, res, next);
 });
-const requestShutdown = (signal: NodeJS.Signals) => {
+const requestShutdown = (signal: NodeJS.Signals | string) => {
   try {
     console.error(`[process] signal received: ${signal}`);
   } catch {}
@@ -344,16 +408,36 @@ const requestShutdown = (signal: NodeJS.Signals) => {
   }
 };
 
-// Keep the dev server resilient: log unexpected errors instead of exiting
+void initErrorReporter();
+
+const scheduleFatalExit = (reason: string, error?: unknown) => {
+  if (!fatalExitOnError) return;
+  try {
+    console.error(`[process] fatal error (${reason}); exiting for supervisor restart`);
+  } catch {}
+  if (error) {
+    reportError(error, { tags: { reason } });
+  }
+  const delay = Number.isFinite(fatalExitDelayMs) ? Math.max(0, fatalExitDelayMs) : 0;
+  setTimeout(() => {
+    void flushErrorReporter().finally(() => requestShutdown(reason));
+  }, delay).unref?.();
+};
+
+// Keep the dev server resilient: log unexpected errors; exit in production to allow supervisor restart.
 process.on('uncaughtException', (err) => {
   try {
     console.error('[process] uncaughtException:', err?.stack || err);
   } catch {}
+  reportError(err, { tags: { source: "uncaughtException" } });
+  scheduleFatalExit("uncaughtException", err);
 });
 process.on('unhandledRejection', (reason) => {
   try {
     console.error('[process] unhandledRejection:', reason);
   } catch {}
+  reportError(reason, { tags: { source: "unhandledRejection" } });
+  scheduleFatalExit("unhandledRejection", reason);
 });
 // Extra lifecycle diagnostics to catch unexpected shutdowns
 process.on('beforeExit', (code) => {
@@ -900,6 +984,12 @@ app.use((req, res, next) => {
     }
     app(req, res);
   });
+  const requestTimeoutMs = toPositiveInt(process.env.HTTP_SERVER_REQUEST_TIMEOUT_MS, 120_000);
+  const headersTimeoutMs = toPositiveInt(process.env.HTTP_SERVER_HEADERS_TIMEOUT_MS, 65_000);
+  const keepAliveTimeoutMs = toPositiveInt(process.env.HTTP_SERVER_KEEPALIVE_TIMEOUT_MS, 5_000);
+  server.requestTimeout = requestTimeoutMs;
+  server.headersTimeout = headersTimeoutMs;
+  server.keepAliveTimeout = keepAliveTimeoutMs;
   serverInstance = server;
 
   if (netDiag) {
@@ -934,8 +1024,7 @@ app.use((req, res, next) => {
 
   const bootstrap = async () => {
     validateIdeologyVerifierPack();
-    const { ensureRuntimeArtifactsHydrated } = await import("./services/llm/runtime-artifacts");
-    await ensureRuntimeArtifactsHydrated();
+    await attemptArtifactHydration();
 
     if (fastBoot) {
       log("FAST_BOOT=1: skipping module init, API routes, and background services");
@@ -969,6 +1058,10 @@ app.use((req, res, next) => {
           console.error(err?.stack || err);
         }
       } catch {}
+      reportError(err, {
+        tags: { source: "express" },
+        extra: { status, path: _req?.path, method: _req?.method },
+      });
       if (!res.headersSent) {
         res.status(status).json({ message });
       }
