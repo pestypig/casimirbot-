@@ -7653,12 +7653,18 @@ const normalizeReportBlockText = (text: string): string => {
   return cleaned.trim();
 };
 
-const resolveReportBlockHints = (text: string): {
+const resolveReportBlockHints = (
+  text: string,
+  options?: { typeHint?: string },
+): {
   anchorFiles: string[];
   searchTerms: string[];
   repoFocus: boolean;
   hintIds: string[];
 } => {
+  if (options?.typeHint) {
+    return { anchorFiles: [], searchTerms: [], repoFocus: false, hintIds: [] };
+  }
   const anchorFiles: string[] = [];
   const searchTerms: string[] = [];
   const hintIds: string[] = [];
@@ -7900,8 +7906,10 @@ const buildSlotReportBlocks = (
 ): HelixAskReportBlock[] => {
   if (!slotPlan.slots.length) return buildReportBlocks(question);
   const blocks: HelixAskReportBlock[] = [];
-  for (let index = 0; index < slotPlan.slots.length; index += 1) {
-    const slot = slotPlan.slots[index];
+  const selectedSlots = slotPlan.slots.filter((slot) => slot.required);
+  const slots = selectedSlots.length > 0 ? selectedSlots : slotPlan.slots;
+  for (let index = 0; index < slots.length; index += 1) {
+    const slot = slots[index];
     const label = slot.label || slot.id;
     blocks.push({
       id: `slot-${index + 1}`,
@@ -9670,7 +9678,7 @@ const executeHelixAsk = async ({
         const blockStart = Date.now();
         const blockText = normalizeReportBlockText(block.text);
         const blockTextForQuestion = blockText || block.text;
-        const blockHints = resolveReportBlockHints(block.text);
+        const blockHints = resolveReportBlockHints(block.text, { typeHint: block.typeHint });
         const blockHasRepoCue =
           HELIX_ASK_REPO_FORCE.test(blockTextForQuestion) ||
           HELIX_ASK_REPO_EXPECTS.test(blockTextForQuestion) ||
@@ -9678,7 +9686,7 @@ const executeHelixAsk = async ({
           HELIX_ASK_FILE_HINT.test(blockTextForQuestion) ||
           REPORT_BLOCK_REPO_CUE_RE.test(blockTextForQuestion);
         const blockRepoContext =
-          reportExplicitRepo || blockHints.repoFocus || blockHasRepoCue;
+          reportRepoContext || reportExplicitRepo || blockHints.repoFocus || blockHasRepoCue;
         const blockAnchorFiles = Array.from(
           new Set([...helixAskAnchorFiles, ...blockHints.anchorFiles]),
         );
@@ -9762,6 +9770,8 @@ const executeHelixAsk = async ({
           },
         });
         const resolvedBlockPayload = blockPayload as { status: number; payload: any } | null;
+        const failedBlock =
+          !resolvedBlockPayload || resolvedBlockPayload.status >= 400;
         const rawBlockAnswer =
           resolvedBlockPayload && resolvedBlockPayload.status < 400
             ? String(resolvedBlockPayload.payload?.text ?? "").trim()
@@ -9792,9 +9802,10 @@ const executeHelixAsk = async ({
             }
           | undefined;
         let citations = extractFilePathsFromText(rawBlockAnswer);
-        const evidenceOk = blockDebug?.evidence_gate_ok !== false;
-        const coverageApplied = Boolean(blockDebug?.coverage_gate_applied);
+        const evidenceOk = failedBlock ? false : blockDebug?.evidence_gate_ok !== false;
+        const coverageApplied = !failedBlock && Boolean(blockDebug?.coverage_gate_applied);
         let clarify =
+          failedBlock ||
           Boolean(blockDebug?.clarify_triggered) ||
           /^what do you mean|please point|could you clarify/i.test(rawBlockAnswer);
         if (blockRepoContext) {
@@ -9803,7 +9814,7 @@ const executeHelixAsk = async ({
             clarify = true;
           }
         }
-        const rawMode = blockDebug?.arbiter_mode ?? "general";
+        const rawMode = failedBlock ? "clarify" : blockDebug?.arbiter_mode ?? "general";
         const mode: HelixAskReportBlockResult["mode"] =
           clarify
             ? "clarify"
@@ -9813,10 +9824,11 @@ const executeHelixAsk = async ({
         if (!clarify && citations.length === 0 && blockDebug?.context_files?.length) {
           citations = blockDebug.context_files.slice(0, 6);
         }
-        const clarifyTerms = (blockDebug?.coverage_missing_keys ?? blockDebug?.ambiguity_terms ?? []).slice(
-          0,
-          2,
-        );
+        const clarifyTerms = (
+          failedBlock && block.label
+            ? [block.label]
+            : (blockDebug?.coverage_missing_keys ?? blockDebug?.ambiguity_terms ?? [])
+        ).slice(0, 2);
         const blockAnswer = clarify
           ? buildReportBlockClarifyLine(clarifyTerms, blockHints.hintIds, blockAnchorFiles)
           : rawBlockAnswer;
