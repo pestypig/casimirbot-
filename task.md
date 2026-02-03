@@ -248,6 +248,7 @@ acts as planner + code generator + debugger, not as the source of truth.
 
 #### References
 - AmbigQA: https://nlp.cs.washington.edu/ambigqa/
+- ClariQ (clarifying questions): https://arxiv.org/abs/2004.01822
 - RAG: https://arxiv.org/abs/2005.11401
 - Query rewriting for RAG: https://openreview.net/forum?id=gXq1cwkUZc
 - HyDE: https://ar5iv.org/abs/2212.10496
@@ -4284,9 +4285,11 @@ Acceptance
 - Routing and obligations fire, plan pass runs, docs-first sometimes runs.
 - Retrieval finds "something" but not the evidence text that proves a slot.
 - Gates do the right thing (clarify/refuse), but slot binding is too literal and evidence cards miss titles/headings.
+- Generic reasoning still leaks when evidence should either bind at least one slot or ask a targeted clarification (not a generic refusal).
 
 #### 2) Research-backed principles to adopt
 - Ambiguity is first-class: clarify when dominance is unclear (AmbigQA / ClariQ style).
+- Clarifying questions should be targeted and minimal (ClariQ / conversational search), not generic refusals.
 - Selective answering: abstain/clarify when confidence is low, but only after best-effort retrieval.
 - Multi-channel retrieval should be fused (RRF) and diversified (MMR).
 
@@ -4294,6 +4297,7 @@ Acceptance
 Step 0 - Slot canonicalization (before retrieval, after obligations)
 - Convert prompt to canonical slots that match repo concepts (ex: solar-restoration, warp-bubble, consciousness-curvature).
 - Plan pass emits structure only: slots[], disambiguation_needed, slot_query_hints.
+- Include evidence_criteria per slot (what evidence would prove it) to guide retrieval without adding facts.
 - Hard rule: plan pass never asserts facts; only what to look for.
 
 Step 1 - Automatic alias generation (no manual word lists)
@@ -4309,6 +4313,7 @@ Step 2 - Slot-aware retrieval with fused channels + diversity
   - fuzzy trigram/edit distance
   - optional embedding (if available)
 - Fuse with RRF, then apply MMR-style diversification.
+- Weight RRF by channel confidence and retain per-channel scores in debug.
 - Hard rule: if requiresRepoEvidence=true, each slot must yield >=1 doc evidence card
   containing either an alias hit or a doc heading/title match.
 - If missing after 1-2 retries, mark slot as clarify.
@@ -4326,11 +4331,12 @@ Step 4 - Evidence-first ambiguity resolver
   - retrieval split across topics with low dominance.
 - Build 2-3 candidate senses from concept registry + doc titles + topic tags.
 - If one dominates by evidence, proceed. Else ask minimal clarifying question (2 options max).
+- Session bias is only a weak prior; never override evidence-dominance.
 
 Step 5 - Fail-closed policy for repo-required questions
 - If requiresRepoEvidence=true and slot evidence fails:
   - return partial grounded sections for supported slots,
-  - targeted clarifications for missing slots,
+  - targeted clarifications for missing slots (not generic refusals),
   - no generic filler.
 
 #### 4) Where this fits in Helix Ask
@@ -4377,6 +4383,7 @@ Phase 4 - Partial grounded assembly (default for multi-slot)
 
 #### 7) References
 - AmbigQA: https://nlp.cs.washington.edu/ambigqa/
+- ClariQ (clarifying questions): https://arxiv.org/abs/2004.01822
 - The Art of Abstention (selective prediction): https://aclanthology.org/2021.acl-long.84.pdf
 - RRF (retrieval fusion): https://trec.nist.gov/pubs/trec18/papers/uwaterloo-cormack.RF.WEB.pdf
 - MMR / diversification: https://sigir.org/files/forum/F99/Varian.pdf
