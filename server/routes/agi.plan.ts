@@ -9804,6 +9804,9 @@ const executeHelixAsk = async ({
         arbiter_mode?: string;
         clarify?: boolean;
         evidence_ok?: boolean;
+        evidence_match_ratio?: number;
+        evidence_match_count?: number;
+        evidence_token_count?: number;
         coverage_applied?: boolean;
         coverage_ratio?: number;
         coverage_missing_keys?: string[];
@@ -10449,6 +10452,9 @@ const executeHelixAsk = async ({
               arbiter_mode?: string;
               clarify_triggered?: boolean;
               evidence_gate_ok?: boolean;
+              evidence_match_ratio?: number;
+              evidence_match_count?: number;
+              evidence_token_count?: number;
               evidence_use_question_tokens?: boolean;
               evidence_signal_tokens?: string[];
               evidence_tokens_preview?: string[];
@@ -10557,6 +10563,9 @@ const executeHelixAsk = async ({
             arbiter_mode: blockDebug?.arbiter_mode,
             clarify,
             evidence_ok: evidenceOk,
+            evidence_match_ratio: blockDebug?.evidence_match_ratio,
+            evidence_match_count: blockDebug?.evidence_match_count,
+            evidence_token_count: blockDebug?.evidence_token_count,
             coverage_applied: coverageApplied,
             coverage_ratio: blockDebug?.coverage_ratio,
             coverage_missing_keys: blockDebug?.coverage_missing_keys,
