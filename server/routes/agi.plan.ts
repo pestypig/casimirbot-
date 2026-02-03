@@ -11726,13 +11726,22 @@ const executeHelixAsk = async ({
         }
         if (!requiredSlots.length) {
           if (planDirectives?.requiredSlots?.length) {
-            requiredSlots = planDirectives.requiredSlots.slice(0, 6);
-          } else if (intentStrategy === "hybrid_explain" && (requiresRepoEvidence || intentDomain === "hybrid")) {
+            const structural = planDirectives.requiredSlots
+              .map((slot) => normalizeSlotName(slot))
+              .filter((slot) => STRUCTURAL_SLOTS.has(slot))
+              .slice(0, 6);
+            requiredSlots = structural;
+          }
+          if (
+            requiredSlots.length === 0 &&
+            intentStrategy === "hybrid_explain" &&
+            (requiresRepoEvidence || intentDomain === "hybrid")
+          ) {
             requiredSlots = ["definition", "repo_mapping"];
             if (verificationAnchorRequired) {
               requiredSlots.push("verification");
             }
-          } else if (verificationAnchorRequired) {
+          } else if (requiredSlots.length === 0 && verificationAnchorRequired) {
             requiredSlots = ["verification", "repo_mapping"];
           }
         }
@@ -11921,11 +11930,15 @@ const executeHelixAsk = async ({
           });
           const docRequiredSlots = resolveDocRequiredSlots(slotPlan);
           const requiredSlotIds = resolveRequiredSlots(slotPlan);
-          docSlotTargets = slotPlan
-            ? docRequiredSlots.length > 0
-              ? docRequiredSlots
-              : requiredSlotIds
-            : [];
+          if (coverageSlotsFromRequest && coverageSlots.length > 0) {
+            docSlotTargets = coverageSlots.slice();
+          } else {
+            docSlotTargets = slotPlan
+              ? docRequiredSlots.length > 0
+                ? docRequiredSlots
+                : requiredSlotIds
+              : [];
+          }
           if (planScope?.docsFirst && docSlotTargets.length > 0) {
             logEvent("Docs-first slots", `${docSlotTargets.length} slots`, docSlotTargets.join(","));
           }
@@ -12243,7 +12256,7 @@ const executeHelixAsk = async ({
           const contextBlocks = splitAskContextBlocks(contextText);
           const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
           const docContextText = docBlocks.map((block) => block.block).join("\n\n");
-          if (slotPlan && docSlotTargets.length === 0) {
+          if (!coverageSlotsFromRequest && slotPlan && docSlotTargets.length === 0) {
             const docRequiredSlots = resolveDocRequiredSlots(slotPlan);
             const requiredSlotIds = resolveRequiredSlots(slotPlan);
             docSlotTargets = docRequiredSlots.length > 0 ? docRequiredSlots : requiredSlotIds;
@@ -12642,7 +12655,7 @@ const executeHelixAsk = async ({
             const retryDocBlocks = retryBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
             const retryDocText = retryDocBlocks.map((block) => block.block).join("\n\n");
             docBlocks = retryDocBlocks;
-            if (slotPlan && docSlotTargets.length === 0) {
+            if (!coverageSlotsFromRequest && slotPlan && docSlotTargets.length === 0) {
               const docRequiredSlots = resolveDocRequiredSlots(slotPlan);
               const requiredSlotIds = resolveRequiredSlots(slotPlan);
               docSlotTargets = docRequiredSlots.length > 0 ? docRequiredSlots : requiredSlotIds;
