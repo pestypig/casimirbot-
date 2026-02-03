@@ -3257,6 +3257,18 @@ G) SunPy helioseismology anchors
 - Release note: mark M1 as DONE with artifacts + hashes in task.md.
 - Optional: index coverage stretch >= 0.80 or finalized exclusions policy; base-model A/B benchmark if latency/quality tradeoff unclear.
 
+
+### Helix Ask Capability Matrix (Current vs Target)
+Note: "Current" values are from recent single-run traces; replace with aggregated metrics once a regression suite is wired.
+
+| Metric | Current (sample) | Target (M1) | Notes / How to measure |
+| --- | --- | --- | --- |
+| Report block grounded rate | ~0.66 (2/3 blocks grounded) | >= 0.90 | `report_metrics.block_grounded_rate` on regression prompts. |
+| Report block clarify rate | ~0.33 (1/3 blocks clarify) | <= 0.10 | `report_metrics` + count of `mode=clarify` blocks. |
+| Drift fail rate | ~0.33 | <= 0.05 | `report_metrics.drift_fail_rate` on multi-slot prompts. |
+| Citation pass rate (required) | inconsistent (missing after drift repair in some runs) | >= 0.98 | `Citations - required` with `present=yes` and non-empty files. |
+| p95 block latency | observed 2-11 min per block | <= 120s | `report_blocks_detail.duration_ms` across regression runs. |
+| Job timeout rate | unknown (UI timeouts observed) | <= 1% | Count of UI timeouts / total asks in `tool_logs`. |
 ### Helix Ask Build Prompt (Codex) - Status: ready
 Goal: finish Helix Ask M1 by completing smoke, adapter training, holdout gates, and runtime packaging validation.
 Do:

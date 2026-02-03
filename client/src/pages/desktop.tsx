@@ -1294,6 +1294,7 @@ export default function DesktopPage() {
   const [askError, setAskError] = useState<string | null>(null);
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [askLiveEvents, setAskLiveEvents] = useState<AskLiveEventEntry[]>([]);
+  const askLiveEventsRef = useRef<AskLiveEventEntry[]>([]);
   const [askLiveSessionId, setAskLiveSessionId] = useState<string | null>(null);
   const [askLiveTraceId, setAskLiveTraceId] = useState<string | null>(null);
   const [askElapsedMs, setAskElapsedMs] = useState<number | null>(null);
@@ -1312,6 +1313,7 @@ export default function DesktopPage() {
       sources?: string[];
       promptIngested?: boolean;
       envelope?: HelixAskResponseEnvelope;
+      liveEvents?: AskLiveEventEntry[];
       debug?: {
         two_pass?: boolean;
         micro_pass?: boolean;
@@ -1948,7 +1950,9 @@ export default function DesktopPage() {
         const id = event.id ?? String(event.seq ?? Date.now());
         if (prev.some((entry) => entry.id === id)) return prev;
         const next = [...prev, { id, text, tool: toolName || undefined, ts: event.ts }];
-        return next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+        const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+        askLiveEventsRef.current = clipped;
+        return clipped;
       });
     };
     const unsubscribe = subscribeToolLogs(handleEvent, {
@@ -1990,6 +1994,26 @@ export default function DesktopPage() {
       .filter(Boolean);
   }, []);
 
+  const resolveReplyEvents = useCallback((reply: { id: string; liveEvents?: AskLiveEventEntry[]; debug?: { live_events?: Array<{ ts: string; tool: string; stage: string; detail?: string; text?: string }> } }): AskLiveEventEntry[] => {
+    if (reply.liveEvents && reply.liveEvents.length > 0) {
+      return reply.liveEvents;
+    }
+    const debugEvents = reply.debug?.live_events;
+    if (!debugEvents || debugEvents.length === 0) {
+      return [];
+    }
+    return debugEvents.map((entry, index) => {
+      const fallbackLabel = `${entry.stage}${entry.detail ? ` - ${entry.detail}` : ""}`.trim();
+      const text = entry.text?.trim() || fallbackLabel || "Helix Ask update";
+      return {
+        id: `${reply.id}-debug-${index}`,
+        text,
+        tool: entry.tool,
+        ts: entry.ts,
+      };
+    });
+  }, []);
+
   const runAsk = useCallback(
     async (question: string) => {
       const trimmed = question.trim();
@@ -1998,6 +2022,7 @@ export default function DesktopPage() {
       setAskStatus("Interpreting prompt...");
       setAskError(null);
       setAskLiveEvents([]);
+      askLiveEventsRef.current = [];
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
       askStartRef.current = Date.now();
@@ -2205,6 +2230,7 @@ export default function DesktopPage() {
         updateMoodFromText(responseText);
         requestMoodHint(responseText, { force: true });
         const replyId = crypto.randomUUID();
+        const liveEventsSnapshot = [...askLiveEventsRef.current];
         setAskReplies((prev) =>
           [
             {
@@ -2220,6 +2246,7 @@ export default function DesktopPage() {
               debug: responseDebug,
               promptIngested: responsePromptIngested,
               envelope: responseEnvelope,
+              liveEvents: liveEventsSnapshot,
             },
             ...prev,
           ].slice(0, 3),
@@ -2240,6 +2267,7 @@ export default function DesktopPage() {
             updateMoodFromText(streamedFallback);
             requestMoodHint(streamedFallback, { force: true });
             const replyId = crypto.randomUUID();
+            const liveEventsSnapshot = [...askLiveEventsRef.current];
             setAskReplies((prev) =>
               [
                 {
@@ -2248,6 +2276,7 @@ export default function DesktopPage() {
                   question: trimmed,
                   traceId: askTraceId,
                   sources: [],
+                  liveEvents: liveEventsSnapshot,
                 },
                 ...prev,
               ].slice(0, 3),
@@ -2582,208 +2611,242 @@ export default function DesktopPage() {
           ) : null}
           {askReplies.length > 0 ? (
             <div className="pointer-events-auto mt-4 w-full max-w-4xl max-h-[52vh] space-y-3 overflow-y-auto pr-2">
-              {askReplies.map((reply) => (
-                <div
-                  key={reply.id}
-                  className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${askMoodPalette.replyBorder}`}
-                >
+              {askReplies.map((reply) => {
+                const replyEvents = resolveReplyEvents(reply);
+                return (
                   <div
-                    className={`pointer-events-none absolute inset-0 opacity-80 ${askMoodPalette.replyTint}`}
-                    aria-hidden
-                  />
-                  <div className="relative">
-                  {reply.question ? (
-                    <p className="mb-2 text-xs text-slate-300">
-                      <span className="text-slate-400">Question:</span> {reply.question}
-                    </p>
-                  ) : null}
-                  {renderHelixAskEnvelope(reply)}
-                  {userSettings.showHelixAskDebug && reply.debug ? (
-                    <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                        Ask debug
-                      </p>
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        Two-pass: {reply.debug.two_pass ? "on" : "off"}
-                      </p>
-                      {typeof reply.debug.micro_pass === "boolean" ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Micro-pass: {reply.debug.micro_pass ? "on" : "off"}
-                          {reply.debug.micro_pass_auto === true ? " (auto)" : ""}
+                    key={reply.id}
+                    className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${askMoodPalette.replyBorder}`}
+                  >
+                    <div
+                      className={`pointer-events-none absolute inset-0 opacity-80 ${askMoodPalette.replyTint}`}
+                      aria-hidden
+                    />
+                    <div className="relative">
+                      {reply.question ? (
+                        <p className="mb-2 text-xs text-slate-300">
+                          <span className="text-slate-400">Question:</span> {reply.question}
                         </p>
                       ) : null}
-                      {reply.debug.micro_pass_reason ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Micro-pass reason: {reply.debug.micro_pass_reason}
-                        </p>
-                      ) : null}
-                      {typeof reply.promptIngested === "boolean" ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Prompt ingest: {reply.promptIngested ? "on" : "off"}
-                        </p>
-                      ) : null}
-                      {reply.debug.prompt_ingest_reason ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Prompt ingest reason: {reply.debug.prompt_ingest_reason}
-                        </p>
-                      ) : null}
-                      {reply.debug.prompt_ingest_source ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Prompt ingest source: {reply.debug.prompt_ingest_source}
-                        </p>
-                      ) : null}
-                      {typeof reply.debug.prompt_chunk_count === "number" ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Prompt chunks: {reply.debug.prompt_chunk_count}
-                          {typeof reply.debug.prompt_selected === "number"
-                            ? ` (selected ${reply.debug.prompt_selected})`
-                            : ""}
-                        </p>
-                      ) : null}
-                      {reply.debug.prompt_context_points &&
-                      reply.debug.prompt_context_points.length > 0 ? (
-                        <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-400">
-                          Prompt context points:
-                          {"\n"}
-                          {reply.debug.prompt_context_points.join("\n")}
+                      {renderHelixAskEnvelope(reply)}
+                      {replyEvents.length > 0 ? (
+                        <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                            Execution log
+                          </p>
+                          <div className="mt-2 space-y-2 text-[11px] text-slate-300">
+                            {replyEvents.map((entry) => {
+                              const label = entry.tool?.startsWith("helix.ask.")
+                                ? entry.tool.replace("helix.ask.", "").replace(/\./g, " ")
+                                : entry.tool ?? "event";
+                              return (
+                                <div
+                                  key={entry.id}
+                                  className="rounded-md border border-white/5 bg-white/[0.03] px-2 py-1"
+                                >
+                                  <div className="text-[9px] uppercase tracking-[0.22em] text-slate-500">
+                                    {label}
+                                  </div>
+                                  <p className="mt-1 whitespace-pre-wrap text-slate-300">
+                                    {entry.text}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       ) : null}
-                      {reply.debug.prompt_used_sections &&
-                      reply.debug.prompt_used_sections.length > 0 ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Prompt sections: {reply.debug.prompt_used_sections.join(", ")}
-                        </p>
-                      ) : null}
-                      {typeof reply.debug.evidence_claim_count === "number" ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Claim gate: {reply.debug.evidence_claim_supported ?? 0}/
-                          {reply.debug.evidence_claim_count} supported
-                          {typeof reply.debug.evidence_claim_ratio === "number"
-                            ? ` (${reply.debug.evidence_claim_ratio.toFixed(2)})`
-                            : ""}
-                        </p>
-                      ) : null}
-                      {reply.debug.ambiguity_terms && reply.debug.ambiguity_terms.length > 0 ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Ambiguous terms: {reply.debug.ambiguity_terms.join(", ")}
-                        </p>
-                      ) : null}
-                      {reply.debug.overflow_retry_steps &&
-                      reply.debug.overflow_retry_steps.length > 0 ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Overflow retry: {reply.debug.overflow_retry_steps.join(" -> ")}
-                        </p>
-                      ) : null}
-                      {reply.debug.intent_id ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Intent: {reply.debug.intent_id}
-                          {reply.debug.intent_domain ? ` · ${reply.debug.intent_domain}` : ""}
-                          {reply.debug.intent_tier ? ` · ${reply.debug.intent_tier}` : ""}
-                          {reply.debug.intent_strategy ? ` · ${reply.debug.intent_strategy}` : ""}
-                        </p>
-                      ) : null}
-                      {reply.debug.intent_reason ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Intent reason: {reply.debug.intent_reason}
-                        </p>
-                      ) : null}
-                      {typeof reply.debug.evidence_gate_ok === "boolean" ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Evidence gate: {reply.debug.evidence_gate_ok ? "pass" : "fail"}
-                          {typeof reply.debug.evidence_match_count === "number" &&
-                          typeof reply.debug.evidence_token_count === "number"
-                            ? ` (${reply.debug.evidence_match_count}/${reply.debug.evidence_token_count}${
-                                typeof reply.debug.evidence_match_ratio === "number"
-                                  ? `, ${reply.debug.evidence_match_ratio.toFixed(2)}`
-                                  : ""
-                              })`
-                            : ""}
-                        </p>
-                      ) : null}
-                      {reply.debug.format ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Format: {reply.debug.format}
-                          {typeof reply.debug.stage_tags === "boolean"
-                            ? ` · Stage tags: ${reply.debug.stage_tags ? "on" : "off"}`
-                            : ""}
-                        </p>
-                      ) : null}
-                      {reply.debug.scaffold ? (
-                        <p className="mt-2 whitespace-pre-wrap">{reply.debug.scaffold}</p>
-                      ) : null}
-                      {reply.debug.evidence_cards ? (
-                        <p className="mt-2 whitespace-pre-wrap">{reply.debug.evidence_cards}</p>
-                      ) : null}
-                      {reply.debug.live_events && reply.debug.live_events.length > 0 ? (
-                        <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-300">
-                          Live events:
-                          {"\n"}
-                          {reply.debug.live_events
-                            .map((entry) => {
-                              const status = entry.ok === false ? "FAIL" : "OK";
-                              const duration =
-                                typeof entry.durationMs === "number"
-                                  ? ` ${Math.round(entry.durationMs)}ms`
-                                  : "";
-                              const label =
-                                entry.text?.trim() ||
-                                `${entry.stage}${entry.detail ? ` - ${entry.detail}` : ""}`;
-                              const toolLabel = entry.tool?.trim();
-                              const prefix = toolLabel ? `${toolLabel} ` : "";
-                              return `${prefix}${status}${duration} | ${label}`;
-                            })
-                            .join("\n")}
+                      {userSettings.showHelixAskDebug && reply.debug ? (
+                        <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                            Ask debug
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            Two-pass: {reply.debug.two_pass ? "on" : "off"}
+                          </p>
+                          {typeof reply.debug.micro_pass === "boolean" ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Micro-pass: {reply.debug.micro_pass ? "on" : "off"}
+                              {reply.debug.micro_pass_auto === true ? " (auto)" : ""}
+                            </p>
+                          ) : null}
+                          {reply.debug.micro_pass_reason ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Micro-pass reason: {reply.debug.micro_pass_reason}
+                            </p>
+                          ) : null}
+                          {typeof reply.promptIngested === "boolean" ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Prompt ingest: {reply.promptIngested ? "on" : "off"}
+                            </p>
+                          ) : null}
+                          {reply.debug.prompt_ingest_reason ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Prompt ingest reason: {reply.debug.prompt_ingest_reason}
+                            </p>
+                          ) : null}
+                          {reply.debug.prompt_ingest_source ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Prompt ingest source: {reply.debug.prompt_ingest_source}
+                            </p>
+                          ) : null}
+                          {typeof reply.debug.prompt_chunk_count === "number" ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Prompt chunks: {reply.debug.prompt_chunk_count}
+                              {typeof reply.debug.prompt_selected === "number"
+                                ? ` (selected ${reply.debug.prompt_selected})`
+                                : ""}
+                            </p>
+                          ) : null}
+                          {reply.debug.prompt_context_points &&
+                          reply.debug.prompt_context_points.length > 0 ? (
+                            <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-400">
+                              Prompt context points:
+                              {"\n"}
+                              {reply.debug.prompt_context_points.join("\n")}
+                            </div>
+                          ) : null}
+                          {reply.debug.prompt_used_sections &&
+                          reply.debug.prompt_used_sections.length > 0 ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Prompt sections: {reply.debug.prompt_used_sections.join(", ")}
+                            </p>
+                          ) : null}
+                          {typeof reply.debug.evidence_claim_count === "number" ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Claim gate: {reply.debug.evidence_claim_supported ?? 0}/
+                              {reply.debug.evidence_claim_count} supported
+                              {typeof reply.debug.evidence_claim_ratio === "number"
+                                ? ` (${reply.debug.evidence_claim_ratio.toFixed(2)})`
+                                : ""}
+                            </p>
+                          ) : null}
+                          {reply.debug.ambiguity_terms && reply.debug.ambiguity_terms.length > 0 ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Ambiguous terms: {reply.debug.ambiguity_terms.join(", ")}
+                            </p>
+                          ) : null}
+                          {reply.debug.overflow_retry_steps &&
+                          reply.debug.overflow_retry_steps.length > 0 ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Overflow retry: {reply.debug.overflow_retry_steps.join(" -> ")}
+                            </p>
+                          ) : null}
+                          {reply.debug.intent_id ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Intent: {reply.debug.intent_id}
+                              {reply.debug.intent_domain ? ` · ${reply.debug.intent_domain}` : ""}
+                              {reply.debug.intent_tier ? ` · ${reply.debug.intent_tier}` : ""}
+                              {reply.debug.intent_strategy ? ` · ${reply.debug.intent_strategy}` : ""}
+                            </p>
+                          ) : null}
+                          {reply.debug.intent_reason ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Intent reason: {reply.debug.intent_reason}
+                            </p>
+                          ) : null}
+                          {typeof reply.debug.evidence_gate_ok === "boolean" ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Evidence gate: {reply.debug.evidence_gate_ok ? "pass" : "fail"}
+                              {typeof reply.debug.evidence_match_count === "number" &&
+                              typeof reply.debug.evidence_token_count === "number"
+                                ? ` (${reply.debug.evidence_match_count}/${reply.debug.evidence_token_count}${
+                                    typeof reply.debug.evidence_match_ratio === "number"
+                                      ? `, ${reply.debug.evidence_match_ratio.toFixed(2)}`
+                                      : ""
+                                  })`
+                                : ""}
+                            </p>
+                          ) : null}
+                          {reply.debug.format ? (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Format: {reply.debug.format}
+                              {typeof reply.debug.stage_tags === "boolean"
+                                ? ` · Stage tags: ${reply.debug.stage_tags ? "on" : "off"}`
+                                : ""}
+                            </p>
+                          ) : null}
+                          {reply.debug.scaffold ? (
+                            <p className="mt-2 whitespace-pre-wrap">{reply.debug.scaffold}</p>
+                          ) : null}
+                          {reply.debug.evidence_cards ? (
+                            <p className="mt-2 whitespace-pre-wrap">{reply.debug.evidence_cards}</p>
+                          ) : null}
+                          {reply.debug.live_events &&
+                          reply.debug.live_events.length > 0 &&
+                          replyEvents.length === 0 ? (
+                            <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-300">
+                              Live events:
+                              {"\n"}
+                              {reply.debug.live_events
+                                .map((entry) => {
+                                  const status = entry.ok === false ? "FAIL" : "OK";
+                                  const duration =
+                                    typeof entry.durationMs === "number"
+                                      ? ` ${Math.round(entry.durationMs)}ms`
+                                      : "";
+                                  const label =
+                                    entry.text?.trim() ||
+                                    `${entry.stage}${entry.detail ? ` - ${entry.detail}` : ""}`;
+                                  const toolLabel = entry.tool?.trim();
+                                  const prefix = toolLabel ? `${toolLabel} ` : "";
+                                  return `${prefix}${status}${duration} | ${label}`;
+                                })
+                                .join("\n")}
+                            </div>
+                          ) : null}
+                          {reply.debug.citation_repair ? (
+                            <p className="mt-2 text-[11px] text-slate-400">
+                              Citation repair: applied
+                            </p>
+                          ) : null}
                         </div>
                       ) : null}
-                      {reply.debug.citation_repair ? (
-                        <p className="mt-2 text-[11px] text-slate-400">
-                          Citation repair: applied
-                        </p>
+                      {userSettings.showHelixAskDebug &&
+                      (reply.sources?.length || reply.debug?.context_files?.length) ? (
+                        <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                            Context sources
+                          </p>
+                          <p className="mt-1 whitespace-pre-wrap">
+                            {(reply.sources?.length
+                              ? reply.sources
+                              : reply.debug?.context_files ??
+                                reply.debug?.prompt_context_files ??
+                                [])
+                              .filter(Boolean)
+                              .slice(0, 12)
+                              .join("\n")}
+                          </p>
+                        </div>
                       ) : null}
-                    </div>
-                  ) : null}
-                  {userSettings.showHelixAskDebug &&
-                  (reply.sources?.length || reply.debug?.context_files?.length) ? (
-                    <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                        Context sources
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap">
-                        {(reply.sources?.length
-                          ? reply.sources
-                          : reply.debug?.context_files ?? reply.debug?.prompt_context_files ?? [])
-                          .filter(Boolean)
-                          .slice(0, 12)
-                          .join("\n")}
-                      </p>
-                    </div>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-                    <span>
-                      Saved in Helix Console
-                      {reply.promptIngested ? " · Prompt ingested" : ""}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleCopyReply(reply)}
-                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-200"
-                        aria-label="Copy response"
-                      >
-                        Copy
-                      </button>
-                      <button
-                        className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-200 transition hover:bg-white/10"
-                        onClick={handleOpenConversationPanel}
-                        type="button"
-                      >
-                        Open conversation
-                      </button>
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                        <span>
+                          Saved in Helix Console
+                          {reply.promptIngested ? " · Prompt ingested" : ""}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleCopyReply(reply)}
+                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-200"
+                            aria-label="Copy response"
+                          >
+                            Copy
+                          </button>
+                          <button
+                            className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-200 transition hover:bg-white/10"
+                            onClick={handleOpenConversationPanel}
+                            type="button"
+                          >
+                            Open conversation
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
         </div>
