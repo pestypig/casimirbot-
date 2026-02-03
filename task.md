@@ -4381,6 +4381,35 @@ Phase 4 - Partial grounded assembly (default for multi-slot)
 - Multi-slot prompts assemble grounded/clarify sections automatically.
 - Success: no generic paragraphs + random citations on multi-slot prompts.
 
+#### 6.5) Block-level scope hardening (long-term fix for mis-scoped gates)
+- Goal: make report blocks pass when their own evidence is sufficient, without being vetoed by unrelated plan-level constraints.
+- This is a ladder alignment fix (scope + precedence), not a new retrieval method.
+
+1) Split obligations into global vs block:
+   - Global: repo-required, security, viability/cert anchors.
+   - Block: must-include, docs-first, slot coverage.
+   - Rule: block evidence can pass even if global must-include is missing.
+
+2) Sanitize plan-pass must-include paths:
+   - Drop any must-include file that does not exist in repo.
+   - LLM-invented paths are warnings, never hard failures.
+
+3) Block-scoped must-include:
+   - If coverageSlotsFromRequest=true, evaluate must-include only against the block's slot docs + block context files.
+   - Do not inherit full plan must-include for narrow blocks.
+
+4) Block-scoped docs-first + retries:
+   - docs-first should target only the block's slot ids.
+   - If docs-first misses, retry once with slot aliases, then clarify that slot only.
+
+5) Gate precedence:
+   - If evidence_ok=true and slot_doc_hit_rate >= threshold for the block,
+     then missing plan-must-include is a warning (not a veto).
+
+6) Diagnostics:
+   - Add block_must_include_ok, block_must_include_missing, block_doc_slot_targets, block_gate_decision.
+   - Makes tuning/reasoning transparent in live events + debug.
+
 #### 7) References
 - AmbigQA: https://nlp.cs.washington.edu/ambigqa/
 - ClariQ (clarifying questions): https://arxiv.org/abs/2004.01822
