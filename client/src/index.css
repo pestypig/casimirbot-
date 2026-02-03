@@ -70,6 +70,14 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 
+  @media (max-width: 900px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+
   .mood-transition-scope,
   .mood-transition-scope *,
   .mood-transition-scope *::before,

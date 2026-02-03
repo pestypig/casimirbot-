@@ -409,6 +409,65 @@ const renderRootRedirectHtml = (target: string) => `<!doctype html>
   </body>
 </html>`;
 
+app.get(["/desktop", "/mobile", "/start", "/helix-core"], (req: Request, res: Response, next: NextFunction) => {
+  if (appReady) {
+    next();
+    return;
+  }
+  if (req.method !== "GET") {
+    next();
+    return;
+  }
+  res.status(503);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  res.send(renderStartupRetryHtml(req.path));
+});
+
+const renderStartupRetryHtml = (target: string) => `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="8">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Starting up…</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #0b1020; color: #e2e8f0; display: flex; min-height: 100vh; margin: 0; }
+      .card { max-width: 520px; margin: auto; padding: 28px 32px; border-radius: 16px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); }
+      h1 { font-size: 18px; margin: 0 0 8px; }
+      p { font-size: 14px; line-height: 1.5; margin: 0 0 10px; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .muted { color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Starting up…</h1>
+      <p>The server is still warming up. This page will auto-refresh when it is ready.</p>
+      <p class="muted">Target: <code>${target}</code></p>
+      <p class="muted">If this persists, check the deploy logs for runtime errors.</p>
+    </div>
+    <script>
+      (function retryWhenReady() {
+        function reload() { window.location.replace(${JSON.stringify(target)}); }
+        function poll() {
+          fetch("/healthz", { cache: "no-store" })
+            .then(function (res) { return res.json ? res.json() : null; })
+            .then(function (payload) {
+              if (payload && payload.ready) {
+                reload();
+                return;
+              }
+              setTimeout(poll, 2000);
+            })
+            .catch(function () { setTimeout(poll, 2000); });
+        }
+        poll();
+      })();
+    </script>
+  </body>
+</html>`;
+
 const renderRootBootHtml = (target: string) => `<!doctype html>
 <html lang="en">
   <head>

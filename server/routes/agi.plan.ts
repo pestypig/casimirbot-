@@ -7817,18 +7817,23 @@ const buildSlotReportBlockScopeOverride = (
   slotId?: string,
 ): HelixAskPlanScope => {
   const surfaces = new Set(slotSurfaces.map((surface) => surface.trim()).filter(Boolean));
-  const hasDocSurface =
-    surfaces.has("docs") || surfaces.has("knowledge") || surfaces.has("ethos");
-  if (!hasDocSurface) {
-    surfaces.add("docs");
-    surfaces.add("knowledge");
+  const docSurfaces = new Set(
+    Array.from(surfaces).filter((surface) =>
+      surface === "docs" || surface === "knowledge" || surface === "ethos",
+    ),
+  );
+  if (docSurfaces.size === 0) {
+    docSurfaces.add("docs");
+    docSurfaces.add("knowledge");
   }
-  if (!surfaces.has("docs")) surfaces.add("docs");
-  const surfaceRegexes = buildPlanSurfaceRegexes(Array.from(surfaces));
+  const codeSurfaces = new Set(Array.from(surfaces).filter((surface) => surface === "code"));
+  const docRegexes = buildPlanSurfaceRegexes(Array.from(docSurfaces));
+  const codeRegexes = buildPlanSurfaceRegexes(Array.from(codeSurfaces));
   const allowlistTiers: RegExp[][] = [];
-  if (surfaceRegexes.length) allowlistTiers.push(surfaceRegexes);
+  if (docRegexes.length) allowlistTiers.push(docRegexes);
+  if (codeRegexes.length) allowlistTiers.push(codeRegexes);
   const docsAllowlist: RegExp[][] = [];
-  if (surfaceRegexes.length) docsAllowlist.push(surfaceRegexes);
+  if (docRegexes.length) docsAllowlist.push(docRegexes);
   const mustIncludeGlobs = slotId ? [globToRegex(`**/${slotId}*`)] : undefined;
   return {
     allowlistTiers: allowlistTiers.length ? allowlistTiers : undefined,
@@ -9738,8 +9743,13 @@ const executeHelixAsk = async ({
           HELIX_ASK_REPO_HINT.test(blockTextForQuestion) ||
           HELIX_ASK_FILE_HINT.test(blockTextForQuestion) ||
           REPORT_BLOCK_REPO_CUE_RE.test(blockTextForQuestion);
+        const slotRepoContext = block.typeHint === "concept";
         const blockRepoContext =
-          reportRepoContext || reportExplicitRepo || blockHints.repoFocus || blockHasRepoCue;
+          slotRepoContext ||
+          reportRepoContext ||
+          reportExplicitRepo ||
+          blockHints.repoFocus ||
+          blockHasRepoCue;
         const blockAnchorFiles = Array.from(
           new Set([...helixAskAnchorFiles, ...blockHints.anchorFiles]),
         );

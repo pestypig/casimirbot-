@@ -73,7 +73,15 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (isBypassPath(url.pathname)) {
-    event.respondWith(fetch(request));
+    event.respondWith(
+      fetch(request).catch(
+        () =>
+          new Response(JSON.stringify({ error: "offline", message: "Network unavailable." }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
     return;
   }
 
@@ -105,10 +113,12 @@ self.addEventListener("fetch", (event) => {
     caches.match(request, { cacheName: CACHE_NAME }).then(
       (cached) =>
         cached ||
-        fetch(request).then((response) => {
-          cacheResponse(request, response.clone());
-          return response;
-        }),
+        fetch(request)
+          .then((response) => {
+            cacheResponse(request, response.clone());
+            return response;
+          })
+          .catch(() => matchShell()),
     ),
   );
 });

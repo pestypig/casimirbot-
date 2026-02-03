@@ -981,7 +981,12 @@ export function HelixAskPill({
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
   const [askMoodBroken, setAskMoodBroken] = useState(false);
+  const [isOffline, setIsOffline] = useState<boolean>(() => {
+    if (typeof navigator === "undefined") return false;
+    return navigator.onLine === false;
+  });
   const askStartRef = useRef<number | null>(null);
+  const lastAskStatusRef = useRef<string | null>(null);
   const askDraftRef = useRef("");
   const askMoodTimerRef = useRef<number | null>(null);
   const moodHintAbortRef = useRef<AbortController | null>(null);
@@ -1001,6 +1006,18 @@ export function HelixAskPill({
   useEffect(() => {
     setAskMoodBroken(false);
   }, [askMood]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof navigator === "undefined") return;
+    const update = () => setIsOffline(navigator.onLine === false);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   useEffect(() => {
     broadcastLumaMood(askMood);
@@ -1089,6 +1106,30 @@ export function HelixAskPill({
     if (!askBusy) return;
     cancelMoodHint();
   }, [askBusy, cancelMoodHint]);
+
+  useEffect(() => {
+    if (!askBusy) return;
+    const offlineStatus = "Offline - reconnecting...";
+    if (isOffline) {
+      if (askStatus && askStatus !== offlineStatus) {
+        lastAskStatusRef.current = askStatus;
+      }
+      if (askStatus !== offlineStatus) {
+        setAskStatus(offlineStatus);
+      }
+      return;
+    }
+    if (askStatus === offlineStatus) {
+      setAskStatus(lastAskStatusRef.current ?? "Generating answer...");
+    }
+  }, [askBusy, askStatus, isOffline]);
+
+  useEffect(() => {
+    if (isOffline) return;
+    if (askStatus) {
+      lastAskStatusRef.current = askStatus;
+    }
+  }, [askStatus, isOffline]);
 
 
   const moodAsset = resolveMoodAsset(askMood);
@@ -1644,6 +1685,11 @@ export function HelixAskPill({
             aria-hidden
           />
           <div className="relative">
+            {isOffline ? (
+              <div className="px-4 pt-3 text-[10px] uppercase tracking-[0.22em] text-amber-200/80">
+                Offline - reconnecting
+              </div>
+            ) : null}
             <div className="flex items-center gap-3 px-4 py-3">
               <div
                 className={`flex h-12 w-12 items-center justify-center rounded-full border ${moodPalette.aura}`}
@@ -1671,7 +1717,7 @@ export function HelixAskPill({
             <textarea
               aria-label="Ask Helix"
               aria-disabled={askBusy}
-              className="flex-1 resize-none bg-transparent text-sm leading-6 text-slate-100 placeholder:text-slate-500 focus:outline-none"
+              className="flex-1 resize-none bg-transparent text-[16px] leading-6 text-slate-100 placeholder:text-slate-500 focus:outline-none sm:text-sm"
               ref={askInputRef}
               placeholder={currentPlaceholder}
               rows={1}

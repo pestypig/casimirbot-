@@ -581,6 +581,37 @@ const isJobMissingError = (error: unknown): boolean => {
   return message.includes("not_found") || message.includes("404");
 };
 
+const isNavigatorOffline = (): boolean =>
+  typeof navigator !== "undefined" && navigator.onLine === false;
+
+const waitForOnline = async (signal?: AbortSignal): Promise<number> => {
+  if (!isNavigatorOffline()) return 0;
+  const startedAt = Date.now();
+  await new Promise<void>((resolve, reject) => {
+    const handleOnline = () => {
+      cleanup();
+      resolve();
+    };
+    const handleAbort = () => {
+      cleanup();
+      reject(buildAbortError());
+    };
+    const cleanup = () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+      }
+      signal?.removeEventListener("abort", handleAbort);
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", handleOnline, { once: true });
+    }
+    if (signal) {
+      signal.addEventListener("abort", handleAbort, { once: true });
+    }
+  });
+  return Date.now() - startedAt;
+};
+
 const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
   new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
@@ -646,6 +677,11 @@ const pollAskJob = async (
     if (options?.signal?.aborted) {
       throw buildAbortError();
     }
+    if (isNavigatorOffline()) {
+      const waited = await waitForOnline(options?.signal);
+      timeoutDeadline += waited;
+      continue;
+    }
     let job: HelixAskJobResponse | null = null;
     try {
       job = await getAskJob(jobId, options?.signal);
@@ -660,6 +696,11 @@ const pollAskJob = async (
       if (isJobMissingError(error)) {
         const fallback = lastPartialText || "Request interrupted. Please try again.";
         return { text: fallback } as LocalAskResponse;
+      }
+      if (isNavigatorOffline()) {
+        const waited = await waitForOnline(options?.signal);
+        timeoutDeadline += waited;
+        continue;
       }
       if (!isJobPollTransientError(error)) {
         throw error;
@@ -748,14 +789,26 @@ export async function askLocal(
     body.context = options.context;
   }
   const signal = options?.signal;
+  if (isNavigatorOffline()) {
+    await waitForOnline(signal);
+  }
   try {
     const job = await createAskJob(body, signal);
     const result = await pollAskJob(job.jobId, { signal });
     return result;
   } catch (error) {
+    if (isNavigatorOffline()) {
+      await waitForOnline(signal);
+      const job = await createAskJob(body, signal);
+      const result = await pollAskJob(job.jobId, { signal });
+      return result;
+    }
     if (!isHelixAskJobUnsupported(error)) {
       throw error;
     }
+  }
+  if (isNavigatorOffline()) {
+    await waitForOnline(signal);
   }
   return asJson(
     await fetch("/api/agi/ask", {
