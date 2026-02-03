@@ -1,4 +1,4 @@
-import type { Express, Response } from "express";
+import type { Express, Response, Request } from "express";
 import express from "express";
 import path from "node:path";
 import fs from "node:fs";
@@ -59,6 +59,11 @@ const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean 
   return defaultValue;
 };
 
+const headerValue = (value: string | string[] | undefined): string => {
+  if (Array.isArray(value)) return value.join(", ");
+  return value ?? "";
+};
+
 const toPositiveInt = (value: string | undefined, fallback: number): number => {
   const parsed = Number(value);
   if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
@@ -86,11 +91,32 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   if (rateLimitEnabled) {
     const windowMs = toPositiveInt(process.env.RATE_LIMIT_API_WINDOW_MS, 60_000);
     const max = toPositiveInt(process.env.RATE_LIMIT_API_MAX, 240);
+    const shouldSkipRateLimit = (req: Request): boolean => {
+      if (req.method === "OPTIONS") return true;
+      const accept = headerValue(req.headers["accept"]).toLowerCase();
+      if (accept.includes("text/event-stream")) return true;
+      const path = req.path || "";
+      if (path.includes("/stream")) return true;
+      return false;
+    };
     app.use(
       "/api",
       createRateLimiter({
         windowMs,
         max,
+        skip: shouldSkipRateLimit,
+        onLimit: (req, res, retryAfterMs) => {
+          const ip = headerValue(req.headers["x-forwarded-for"]).split(",")[0]?.trim() || req.ip;
+          const ua = headerValue(req.headers["user-agent"]);
+          console.warn(
+            `[rate-limit] ${req.method} ${req.originalUrl} ip=${ip || "unknown"} ua="${ua.slice(0, 160)}"`
+          );
+          res.status(429).json({
+            error: "rate_limited",
+            message: "Too many requests. Please retry shortly.",
+            retryAfterMs,
+          });
+        },
       }),
     );
   }

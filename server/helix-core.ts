@@ -1443,8 +1443,13 @@ function checkMetricViolation(metricType: string) {
 
 // Rate limiting for OpenAI API calls
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_PER_MINUTE = 10;
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const toPositiveInt = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  return fallback;
+};
+const RATE_LIMIT_PER_MINUTE = toPositiveInt(process.env.HELIX_COMMAND_RATE_LIMIT_PER_MINUTE, 30);
+const RATE_LIMIT_WINDOW = toPositiveInt(process.env.HELIX_COMMAND_RATE_LIMIT_WINDOW_MS, 60000); // 1 minute
 
 function clientKey(req: Request) {
   const h = req.headers;
@@ -1623,6 +1628,14 @@ export async function handleHelixCommand(req: Request, res: Response) {
     // Rate limiting
     const clientId = clientKey(req);
     if (!checkRateLimit(clientId)) {
+      try {
+        console.warn("[helix-core] rate limit exceeded", {
+          clientId,
+          ip: req.ip,
+          path: req.path,
+          ua: req.headers["user-agent"]
+        });
+      } catch {}
       res.setHeader('X-RateLimit-Limit', RATE_LIMIT_PER_MINUTE.toString());
       res.setHeader('X-RateLimit-Remaining', '0');
       res.setHeader('Retry-After', (RATE_LIMIT_WINDOW / 1000).toString());

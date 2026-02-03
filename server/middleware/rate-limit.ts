@@ -5,6 +5,7 @@ type RateLimitOptions = {
   max: number;
   keyGenerator?: (req: Request) => string;
   onLimit?: (req: Request, res: Response, retryAfterMs: number) => void;
+  skip?: (req: Request) => boolean;
 };
 
 type RateLimitEntry = {
@@ -48,6 +49,10 @@ export const createRateLimiter = (options: RateLimitOptions) => {
   };
 
   return (req: Request, res: Response, next: NextFunction) => {
+    if (options.skip?.(req)) {
+      next();
+      return;
+    }
     if (max <= 0) {
       next();
       return;
