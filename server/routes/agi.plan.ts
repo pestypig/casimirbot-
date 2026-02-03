@@ -8561,20 +8561,18 @@ const buildReportBlocks = (question: string): HelixAskReportBlock[] => {
   return blocks;
 };
 
-const buildSlotReportBlocks = (
-  slotPlan: HelixAskSlotPlan,
-  question: string,
-): HelixAskReportBlock[] => {
-  if (!slotPlan.slots.length) return buildReportBlocks(question);
+const buildSlotReportBlocks = (slotPlan: HelixAskSlotPlan): HelixAskReportBlock[] => {
+  if (!slotPlan.slots.length) return [];
   const blocks: HelixAskReportBlock[] = [];
   const selectedSlots = slotPlan.slots.filter((slot) => slot.required);
   const slots = selectedSlots.length > 0 ? selectedSlots : slotPlan.slots;
   for (let index = 0; index < slots.length; index += 1) {
     const slot = slots[index];
     const label = slot.label || slot.id;
+    const scopedText = `Answer only about "${label}". Ignore other topics from the original question.`;
     blocks.push({
       id: `slot-${index + 1}`,
-      text: `Focus on ${label}. Answer only the parts of the question that pertain to this slot. Question: ${question}`,
+      text: scopedText,
       label,
       typeHint: slot.source,
       slotId: slot.id,
@@ -10318,9 +10316,13 @@ const executeHelixAsk = async ({
       debugPayload.report_blocks_count = reportDecision.blockCount;
     }
     if (reportDecision.enabled && !skipReportMode && baseQuestion) {
+      const slotBlocks =
+        reportDecision.reason === "multi_slot"
+          ? buildSlotReportBlocks(slotPreview)
+          : [];
       const reportBlocks =
         reportDecision.reason === "multi_slot"
-          ? buildSlotReportBlocks(slotPreview, baseQuestion)
+          ? (slotBlocks.length ? slotBlocks : buildReportBlocks(baseQuestion))
           : buildReportBlocks(baseQuestion);
       const limitedBlocks = reportBlocks.slice(0, HELIX_ASK_REPORT_MAX_BLOCKS);
       const omittedCount = Math.max(0, reportBlocks.length - limitedBlocks.length);
@@ -10408,7 +10410,7 @@ const executeHelixAsk = async ({
           HELIX_ASK_REPO_HINT.test(blockTextForQuestion) ||
           HELIX_ASK_FILE_HINT.test(blockTextForQuestion) ||
           REPORT_BLOCK_REPO_CUE_RE.test(blockTextForQuestion);
-        const slotRepoContext = block.typeHint === "concept";
+        const slotRepoContext = Boolean(block.slotId);
         const blockRepoContext =
           slotRepoContext ||
           reportRepoContext ||
