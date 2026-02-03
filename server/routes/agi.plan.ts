@@ -5488,10 +5488,10 @@ const collectCoverageSlotAliases = (
   slotAliasMap: Record<string, string[]> | null,
   coverageSlots: string[],
 ): string[] => {
-  if (!slotAliasMap || coverageSlots.length === 0) return [];
+  if (coverageSlots.length === 0) return [];
   const aliases = new Set<string>();
   for (const slot of coverageSlots) {
-    const values = slotAliasMap[slot] ?? [];
+    const values = slotAliasMap ? slotAliasMap[slot] ?? [] : [];
     for (const value of values) {
       const cleaned = normalizeAliasValue(value);
       if (cleaned) aliases.add(cleaned);
@@ -10176,6 +10176,10 @@ const executeHelixAsk = async ({
     }
     const baseQuestion = (questionValue ?? question ?? "").trim();
     const rawQuestion = (request.question ?? request.prompt ?? "").trim();
+    const requestCoverageSlots = Array.isArray(parsed.data.coverageSlots)
+      ? parsed.data.coverageSlots.map(normalizeSlotId)
+      : [];
+    const coverageSlotsFromRequest = requestCoverageSlots.length > 0;
     const slotPreviewCandidates = listConceptCandidates(rawQuestion || baseQuestion, 4);
     const slotPreview = buildCanonicalSlotPlan({
       question: rawQuestion || baseQuestion,
@@ -11580,10 +11584,6 @@ const executeHelixAsk = async ({
           directives: planDirectives,
           candidates: slotPreviewCandidates,
         });
-        const requestCoverageSlots = Array.isArray(parsed.data.coverageSlots)
-          ? parsed.data.coverageSlots.map(normalizeSlotId)
-          : [];
-        const coverageSlotsFromRequest = requestCoverageSlots.length > 0;
         coverageSlots =
           coverageSlotsFromRequest
             ? requestCoverageSlots
@@ -12121,6 +12121,19 @@ const executeHelixAsk = async ({
           }
         }
 
+        if (coverageSlotsFromRequest && evidenceUseQuestionTokens) {
+          if (coverageSlots.length === 0) {
+            coverageSlots = requestCoverageSlots.slice();
+          }
+          const coverageSlotAliases = collectCoverageSlotAliases(slotAliasMap, coverageSlots);
+          if (coverageSlotAliases.length > 0 || slotEvidenceHints.length > 0) {
+            evidenceSignalTokens = mergeEvidenceSignalTokens(
+              coverageSlotAliases,
+              slotEvidenceHints,
+            );
+            evidenceUseQuestionTokens = false;
+          }
+        }
         const baseEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
           minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
           minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
