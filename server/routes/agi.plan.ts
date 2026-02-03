@@ -9881,6 +9881,11 @@ const executeHelixAsk = async ({
         let citations = extractFilePathsFromText(rawBlockAnswer);
         const evidenceOk = failedBlock ? false : blockDebug?.evidence_gate_ok !== false;
         const coverageApplied = !failedBlock && Boolean(blockDebug?.coverage_gate_applied);
+        const driftDetected =
+          !failedBlock &&
+          (Boolean(blockDebug?.belief_gate_applied) ||
+            Boolean(blockDebug?.rattling_gate_applied) ||
+            /drifted too far/i.test(rawBlockAnswer));
         let clarify =
           failedBlock ||
           Boolean(blockDebug?.clarify_triggered) ||
@@ -9891,7 +9896,10 @@ const executeHelixAsk = async ({
             clarify = true;
           }
         }
-        const rawMode = failedBlock ? "clarify" : blockDebug?.arbiter_mode ?? "general";
+        if (driftDetected) {
+          clarify = true;
+        }
+        const rawMode = failedBlock || driftDetected ? "clarify" : blockDebug?.arbiter_mode ?? "general";
         const mode: HelixAskReportBlockResult["mode"] =
           clarify
             ? "clarify"
