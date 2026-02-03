@@ -1603,9 +1603,13 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
     !beliefGate.applied &&
     applyRattlingGate(gatedInput, rattlingScore);
   let answer = gatedInput.answer;
+  const evidenceHealthy =
+    gatedInput.evidenceGateOk !== false &&
+    Boolean(gatedInput.evidenceText && gatedInput.evidenceText.trim().length > 0);
   if (
     rattlingGateApplied &&
-    (gatedInput.domain === "repo" || gatedInput.domain === "falsifiable")
+    (gatedInput.domain === "repo" || gatedInput.domain === "falsifiable") &&
+    !evidenceHealthy
   ) {
     answer =
       "Answer drifted too far from the provided evidence. Please narrow the request or specify the relevant files.";
