@@ -8485,6 +8485,79 @@ const splitLongReportBlock = (text: string, limit: number): string[] => {
   return chunks.length ? chunks : [text];
 };
 
+const stripAnswerMarkers = (value: string): string =>
+  value.replace(/\bANSWER_(?:START|END)\b/g, "").trim();
+
+const dedupeReportParagraphs = (
+  value: string,
+): { text: string; applied: boolean } => {
+  const paragraphs = value.split(/\n{2,}/);
+  const seen = new Set<string>();
+  const output: string[] = [];
+  let applied = false;
+  for (const paragraph of paragraphs) {
+    const trimmed = paragraph.trim();
+    if (!trimmed) continue;
+    const normalized = trimmed.replace(/\s+/g, " ").toLowerCase();
+    if (normalized.length >= 80 && seen.has(normalized)) {
+      applied = true;
+      continue;
+    }
+    if (normalized.length >= 80) {
+      seen.add(normalized);
+    }
+    output.push(trimmed);
+  }
+  return { text: output.join("\n\n"), applied };
+};
+
+const scrubUnsupportedPaths = (
+  value: string,
+  allowedPaths: string[],
+): { text: string; removed: string[] } => {
+  if (!value.trim()) return { text: value, removed: [] };
+  if (allowedPaths.length === 0) return { text: value, removed: [] };
+  const allowed = new Set<string>();
+  for (const path of allowedPaths) {
+    const normalized = normalizeEvidenceRef(path) ?? path;
+    if (normalized) allowed.add(normalized);
+    if (path) allowed.add(path);
+  }
+  const presentPaths = extractFilePathsFromText(value);
+  if (presentPaths.length === 0) return { text: value, removed: [] };
+  let cleaned = value;
+  const removed: string[] = [];
+  for (const candidate of presentPaths) {
+    if (/^(gate|certificate):/i.test(candidate)) continue;
+    const normalized = normalizeEvidenceRef(candidate) ?? candidate;
+    if (allowed.has(normalized) || allowed.has(candidate)) continue;
+    removed.push(candidate);
+    cleaned = cleaned.split(candidate).join("");
+  }
+  if (removed.length) {
+    cleaned = cleaned.replace(/[ \t]{2,}/g, " ");
+    cleaned = cleaned.replace(/ +([,.;:])/g, "$1");
+    cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
+  }
+  return { text: cleaned, removed };
+};
+
+const sanitizeReportBlockAnswer = (
+  value: string,
+  allowedPaths: string[],
+): { text: string; removedPaths: string[]; dedupeApplied: boolean } => {
+  let cleaned = stripAnswerMarkers(stripTruncationMarkers(value));
+  const deduped = dedupeReportParagraphs(cleaned);
+  cleaned = deduped.text;
+  const scrubbed = scrubUnsupportedPaths(cleaned, allowedPaths);
+  cleaned = scrubbed.text;
+  return {
+    text: cleaned,
+    removedPaths: scrubbed.removed,
+    dedupeApplied: deduped.applied,
+  };
+};
+
 const buildReportBlocks = (question: string): HelixAskReportBlock[] => {
   const lines = question.split(/\r?\n/);
   const blocks: HelixAskReportBlock[] = [];
@@ -9877,6 +9950,9 @@ const executeHelixAsk = async ({
         coverage_applied?: boolean;
         coverage_ratio?: number;
         coverage_missing_keys?: string[];
+        block_citation_fallback?: boolean;
+        block_paths_scrubbed?: string[];
+        block_dedupe_applied?: boolean;
         evidence_use_question_tokens?: boolean;
         evidence_signal_tokens?: string[];
         evidence_tokens_preview?: string[];
@@ -10379,22 +10455,40 @@ const executeHelixAsk = async ({
         arbiter_mode?: string;
         clarify?: boolean;
         evidence_ok?: boolean;
+        evidence_match_ratio?: number;
+        evidence_match_count?: number;
+        evidence_token_count?: number;
         coverage_applied?: boolean;
         coverage_ratio?: number;
         coverage_missing_keys?: string[];
+        evidence_use_question_tokens?: boolean;
+        evidence_signal_tokens?: string[];
+        evidence_tokens_preview?: string[];
+        evidence_match_preview?: string[];
         topic_tags?: string[];
         context_files?: string[];
+        block_citation_fallback?: boolean;
+        block_paths_scrubbed?: string[];
+        block_dedupe_applied?: boolean;
         retrieval_confidence?: number;
         retrieval_doc_share?: number;
         retrieval_context_file_count?: number;
         retrieval_query_hit_count?: number;
         retrieval_top_score?: number;
         retrieval_score_gap?: number;
+        retrieval_channel_weights?: AskCandidateChannelStats;
         topic_tier?: number;
         topic_must_include_ok?: boolean;
         docs_first_ok?: boolean;
+        block_must_include_ok?: boolean;
+        block_must_include_missing?: string[];
+        block_doc_slot_targets?: string[];
+        block_gate_decision?: string;
         belief_gate_applied?: boolean;
         rattling_gate_applied?: boolean;
+        doc_header_injected?: number;
+        slot_doc_hit_rate?: number;
+        slot_alias_coverage_rate?: number;
         duration_ms?: number;
       }> = [];
       for (let index = 0; index < limitedBlocks.length; index += 1) {
@@ -10596,7 +10690,6 @@ const executeHelixAsk = async ({
         if (Array.isArray(blockLiveEvents)) {
           reportLiveEvents.push(...blockLiveEvents);
         }
-        let citations = extractFilePathsFromText(rawBlockAnswer);
         const evidenceOk = failedBlock ? false : blockDebug?.evidence_gate_ok !== false;
         const coverageApplied = !failedBlock && Boolean(blockDebug?.coverage_gate_applied);
         const driftDetected =
@@ -10624,19 +10717,31 @@ const executeHelixAsk = async ({
             : rawMode === "repo_grounded" || rawMode === "hybrid" || rawMode === "general"
               ? rawMode
               : "general";
-        if (!clarify && citations.length === 0 && blockDebug?.context_files?.length) {
-          citations = blockDebug.context_files.slice(0, 6);
-        }
         const clarifyTerms = (
           failedBlock && block.label
             ? [block.label]
             : (blockDebug?.coverage_missing_keys ?? blockDebug?.ambiguity_terms ?? [])
         ).slice(0, 2);
-        const blockAnswer = clarify
+        let blockAnswer = clarify
           ? buildReportBlockClarifyLine(clarifyTerms, blockHints.hintIds, blockAnchorFiles)
           : rawBlockAnswer;
-        if (clarify) {
-          citations = [];
+        let citations: string[] = [];
+        let citationFallbackApplied = false;
+        let scrubbedPaths: string[] = [];
+        let dedupeApplied = false;
+        if (!clarify) {
+          const allowedPaths = Array.from(
+            new Set([...(blockDebug?.context_files ?? []), ...blockAnchorFiles]),
+          );
+          const sanitized = sanitizeReportBlockAnswer(blockAnswer, allowedPaths);
+          blockAnswer = sanitized.text || blockAnswer;
+          scrubbedPaths = sanitized.removedPaths;
+          dedupeApplied = sanitized.dedupeApplied;
+          citations = normalizeCitations(extractFilePathsFromText(blockAnswer));
+          if (citations.length === 0 && allowedPaths.length > 0) {
+            citations = normalizeCitations(allowedPaths).slice(0, 6);
+            citationFallbackApplied = citations.length > 0;
+          }
         }
         blockResults.push({
           id: block.id,
@@ -10674,6 +10779,9 @@ const executeHelixAsk = async ({
             evidence_match_preview: blockDebug?.evidence_match_preview,
             topic_tags: blockDebug?.topic_tags,
             context_files: blockDebug?.context_files?.slice(0, 6),
+            block_citation_fallback: citationFallbackApplied,
+            block_paths_scrubbed: scrubbedPaths.slice(0, 4),
+            block_dedupe_applied: dedupeApplied,
             retrieval_confidence: blockDebug?.retrieval_confidence,
             retrieval_doc_share: blockDebug?.retrieval_doc_share,
             retrieval_context_file_count: blockDebug?.retrieval_context_file_count,
