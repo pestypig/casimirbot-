@@ -5512,6 +5512,24 @@ const mergeEvidenceSignalTokens = (...groups: string[][]): string[] =>
     ),
   );
 
+const buildEvidenceEligibilityTokens = (
+  question: string,
+  signalTokens: string[],
+  useQuestionTokens: boolean,
+): string[] => {
+  const baseTokens = useQuestionTokens ? filterCriticTokens(tokenizeAskQuery(question)) : [];
+  const extraTokens = signalTokens
+    .flatMap((token) => tokenizeAskQuery(token))
+    .flatMap((token) => filterCriticTokens([token]));
+  return Array.from(new Set([...baseTokens, ...extraTokens])).filter(Boolean);
+};
+
+const matchEvidenceTokens = (tokens: string[], contextText: string): string[] => {
+  if (!tokens.length || !contextText) return [];
+  const lower = contextText.toLowerCase();
+  return tokens.filter((token) => lower.includes(token.toLowerCase()));
+};
+
 const buildAliasVariants = (value: string): string[] => {
   const cleaned = normalizeAliasValue(value).toLowerCase();
   if (!cleaned) return [];
@@ -9789,6 +9807,10 @@ const executeHelixAsk = async ({
         coverage_applied?: boolean;
         coverage_ratio?: number;
         coverage_missing_keys?: string[];
+        evidence_use_question_tokens?: boolean;
+        evidence_signal_tokens?: string[];
+        evidence_tokens_preview?: string[];
+        evidence_match_preview?: string[];
         topic_tags?: string[];
         context_files?: string[];
         retrieval_confidence?: number;
@@ -9912,6 +9934,10 @@ const executeHelixAsk = async ({
       evidence_match_ratio?: number;
       evidence_match_count?: number;
       evidence_token_count?: number;
+      evidence_use_question_tokens?: boolean;
+      evidence_signal_tokens?: string[];
+      evidence_tokens_preview?: string[];
+      evidence_match_preview?: string[];
       evidence_claim_count?: number;
       evidence_claim_supported?: number;
       evidence_claim_unsupported?: number;
@@ -10423,6 +10449,10 @@ const executeHelixAsk = async ({
               arbiter_mode?: string;
               clarify_triggered?: boolean;
               evidence_gate_ok?: boolean;
+              evidence_use_question_tokens?: boolean;
+              evidence_signal_tokens?: string[];
+              evidence_tokens_preview?: string[];
+              evidence_match_preview?: string[];
               coverage_gate_applied?: boolean;
               coverage_ratio?: number;
               coverage_missing_keys?: string[];
@@ -10530,6 +10560,10 @@ const executeHelixAsk = async ({
             coverage_applied: coverageApplied,
             coverage_ratio: blockDebug?.coverage_ratio,
             coverage_missing_keys: blockDebug?.coverage_missing_keys,
+            evidence_use_question_tokens: blockDebug?.evidence_use_question_tokens,
+            evidence_signal_tokens: blockDebug?.evidence_signal_tokens,
+            evidence_tokens_preview: blockDebug?.evidence_tokens_preview,
+            evidence_match_preview: blockDebug?.evidence_match_preview,
             topic_tags: blockDebug?.topic_tags,
             context_files: blockDebug?.context_files?.slice(0, 6),
             retrieval_confidence: blockDebug?.retrieval_confidence,
@@ -12372,10 +12406,20 @@ const executeHelixAsk = async ({
         }
         evidenceGateOk = evidenceGate.ok;
         if (debugPayload) {
+          const evidenceTokensPreview = buildEvidenceEligibilityTokens(
+            baseQuestion,
+            evidenceSignalTokens,
+            evidenceUseQuestionTokens,
+          );
+          const matchedPreview = matchEvidenceTokens(evidenceTokensPreview, contextText);
           debugPayload.evidence_gate_ok = evidenceGate.ok;
           debugPayload.evidence_match_ratio = evidenceGate.matchRatio;
           debugPayload.evidence_match_count = evidenceGate.matchCount;
           debugPayload.evidence_token_count = evidenceGate.tokenCount;
+          debugPayload.evidence_use_question_tokens = evidenceUseQuestionTokens;
+          debugPayload.evidence_signal_tokens = evidenceSignalTokens.slice(0, 12);
+          debugPayload.evidence_tokens_preview = evidenceTokensPreview.slice(0, 12);
+          debugPayload.evidence_match_preview = matchedPreview.slice(0, 12);
           debugPayload.retrieval_confidence = retrievalConfidence;
           debugPayload.retrieval_doc_share = docShare;
           debugPayload.retrieval_doc_hits = docsHits.length;
