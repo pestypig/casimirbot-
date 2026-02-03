@@ -9,6 +9,7 @@ export type EvidenceEligibilityOptions = {
   minTokens: number;
   minRatio: number;
   signalTokens?: string[];
+  useQuestionTokens?: boolean;
 };
 
 export type EvidenceClaimCoverageOptions = EvidenceEligibilityOptions & {
@@ -132,8 +133,12 @@ const CLAIM_CITATION_RE =
   /\s*\([^)]*(?:\/|\.tsx?|\.jsx?|\.json|\.md|\.yml|gate:|certificate:)[^)]*\)\s*[.!?]*\s*$/gi;
 const SENTENCE_SPLIT = /(?<=[.!?])\s+/;
 
-const buildEligibilityTokens = (question: string, signalTokens?: string[]): string[] => {
-  const baseTokens = filterCriticTokens(tokenizeAskQuery(question));
+const buildEligibilityTokens = (
+  question: string,
+  signalTokens?: string[],
+  useQuestionTokens = true,
+): string[] => {
+  const baseTokens = useQuestionTokens ? filterCriticTokens(tokenizeAskQuery(question)) : [];
   if (!signalTokens || signalTokens.length === 0) {
     return baseTokens;
   }
@@ -160,7 +165,11 @@ export function evaluateEvidenceEligibility(
   contextText: string,
   options: EvidenceEligibilityOptions,
 ): EvidenceEligibility {
-  const tokens = buildEligibilityTokens(question, options.signalTokens);
+  const tokens = buildEligibilityTokens(
+    question,
+    options.signalTokens,
+    options.useQuestionTokens ?? true,
+  );
   const tokenCount = tokens.length;
   if (!contextText || tokenCount === 0) {
     return { ok: false, matchCount: 0, tokenCount, matchRatio: 0 };
@@ -176,7 +185,11 @@ export function evaluateEvidenceCritic(
   contextText: string,
   options: EvidenceEligibilityOptions,
 ): EvidenceEligibility {
-  const tokens = buildEligibilityTokens(question, options.signalTokens);
+  const tokens = buildEligibilityTokens(
+    question,
+    options.signalTokens,
+    options.useQuestionTokens ?? true,
+  );
   const tokenCount = tokens.length;
   if (!contextText || tokenCount === 0) {
     return { ok: false, matchCount: 0, tokenCount, matchRatio: 0 };

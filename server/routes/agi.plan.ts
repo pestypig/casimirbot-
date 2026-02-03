@@ -5484,6 +5484,34 @@ const buildSlotAliasMap = (slotPlan: HelixAskSlotPlan | null): Record<string, st
   return map;
 };
 
+const collectCoverageSlotAliases = (
+  slotAliasMap: Record<string, string[]> | null,
+  coverageSlots: string[],
+): string[] => {
+  if (!slotAliasMap || coverageSlots.length === 0) return [];
+  const aliases = new Set<string>();
+  for (const slot of coverageSlots) {
+    const values = slotAliasMap[slot] ?? [];
+    for (const value of values) {
+      const cleaned = normalizeAliasValue(value);
+      if (cleaned) aliases.add(cleaned);
+    }
+    const spaced = slot.replace(/[-_]+/g, " ").trim();
+    if (spaced) aliases.add(spaced);
+  }
+  return Array.from(aliases).filter(Boolean).slice(0, 12);
+};
+
+const mergeEvidenceSignalTokens = (...groups: string[][]): string[] =>
+  Array.from(
+    new Set(
+      groups
+        .flat()
+        .map((token) => token.trim())
+        .filter(Boolean),
+    ),
+  );
+
 const buildAliasVariants = (value: string): string[] => {
   const cleaned = normalizeAliasValue(value).toLowerCase();
   if (!cleaned) return [];
@@ -11065,7 +11093,7 @@ const executeHelixAsk = async ({
         debugPayload.topic_must_include_files = topicProfile.mustIncludeFiles?.slice();
       }
     }
-    const evidenceSignalTokens = Array.from(
+    const baseEvidenceSignalTokens = Array.from(
       new Set(
         [
           ...topicTags.map((tag) => tag.replace(/_/g, " ")),
@@ -11077,6 +11105,8 @@ const executeHelixAsk = async ({
           .filter(Boolean),
       ),
     );
+    let evidenceSignalTokens = baseEvidenceSignalTokens.slice();
+    let evidenceUseQuestionTokens = true;
     const conceptFastPathCandidate =
       Boolean(conceptMatch) &&
       conceptualFocus &&
@@ -11553,13 +11583,27 @@ const executeHelixAsk = async ({
         const requestCoverageSlots = Array.isArray(parsed.data.coverageSlots)
           ? parsed.data.coverageSlots.map(normalizeSlotId)
           : [];
+        const coverageSlotsFromRequest = requestCoverageSlots.length > 0;
         coverageSlots =
-          requestCoverageSlots.length > 0
+          coverageSlotsFromRequest
             ? requestCoverageSlots
             : slotPlan.coverageSlots.slice();
         slotAliases = collectSlotAliasHints(slotPlan);
         slotEvidenceHints = collectSlotEvidenceHints(slotPlan);
         slotAliasMap = buildSlotAliasMap(slotPlan);
+        if (coverageSlotsFromRequest) {
+          const coverageSlotAliases = collectCoverageSlotAliases(slotAliasMap, coverageSlots);
+          evidenceSignalTokens = mergeEvidenceSignalTokens(
+            coverageSlotAliases,
+            slotEvidenceHints,
+          );
+          evidenceUseQuestionTokens = false;
+        } else if (slotEvidenceHints.length > 0) {
+          evidenceSignalTokens = mergeEvidenceSignalTokens(
+            evidenceSignalTokens,
+            slotEvidenceHints,
+          );
+        }
         if (slotPlan.slots.length > 0) {
           const slotLabels = slotPlan.slots
             .slice(0, 6)
@@ -12081,6 +12125,7 @@ const executeHelixAsk = async ({
           minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
           minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
           signalTokens: evidenceSignalTokens,
+          useQuestionTokens: evidenceUseQuestionTokens,
         });
         let evidenceGate = baseEvidenceGate;
         const evidenceCritic =
@@ -12089,6 +12134,7 @@ const executeHelixAsk = async ({
                 minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
                 minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
                 signalTokens: evidenceSignalTokens,
+                useQuestionTokens: evidenceUseQuestionTokens,
               })
             : null;
         if (evidenceCritic && evidenceCritic.tokenCount > 0) {
@@ -12206,6 +12252,7 @@ const executeHelixAsk = async ({
               minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
               minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
               signalTokens: evidenceSignalTokens,
+              useQuestionTokens: evidenceUseQuestionTokens,
             });
             evidenceGate = repoEvidenceGate;
             if (HELIX_ASK_EVIDENCE_CRITIC) {
@@ -12213,6 +12260,7 @@ const executeHelixAsk = async ({
                 minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
                 minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
                 signalTokens: evidenceSignalTokens,
+                useQuestionTokens: evidenceUseQuestionTokens,
               });
               if (repoCritic.tokenCount > 0) {
                 evidenceGate = repoCritic;
@@ -12475,6 +12523,7 @@ const executeHelixAsk = async ({
               minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
               minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
               signalTokens: evidenceSignalTokens,
+              useQuestionTokens: evidenceUseQuestionTokens,
             });
             evidenceGate = retryEvidenceGate;
             if (HELIX_ASK_EVIDENCE_CRITIC) {
@@ -12482,6 +12531,7 @@ const executeHelixAsk = async ({
                 minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
                 minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
                 signalTokens: evidenceSignalTokens,
+                useQuestionTokens: evidenceUseQuestionTokens,
               });
               if (retryCritic.tokenCount > 0) {
                 evidenceGate = retryCritic;
