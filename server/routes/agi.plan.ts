@@ -158,6 +158,8 @@ import {
 import {
   applyHelixAskPlatonicGates,
   type HelixAskDomain,
+  type HelixAskClaimLedgerEntry,
+  type HelixAskUncertaintyEntry,
   evaluateCoverageSlots,
 } from "../services/helix-ask/platonic-gates";
 import {
@@ -2838,6 +2840,21 @@ const HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN = clampNumber(
 const HELIX_ASK_AMBIGUOUS_MAX_TERMS = clampNumber(
   readNumber(process.env.HELIX_ASK_AMBIGUOUS_MAX_TERMS, 2),
   1,
+  6,
+);
+const HELIX_ASK_SCIENTIFIC_CLARIFY =
+  String(process.env.HELIX_ASK_SCIENTIFIC_CLARIFY ?? "1").trim() !== "0";
+const HELIX_ASK_HYPOTHESIS =
+  String(process.env.HELIX_ASK_HYPOTHESIS ?? "0").trim() === "1";
+const HELIX_ASK_HYPOTHESIS_STYLE = (() => {
+  const raw = String(process.env.HELIX_ASK_HYPOTHESIS_STYLE ?? "conservative")
+    .trim()
+    .toLowerCase();
+  return raw === "exploratory" ? "exploratory" : "conservative";
+})();
+const HELIX_ASK_SCIENTIFIC_MAX_HYPOTHESES = clampNumber(
+  readNumber(process.env.HELIX_ASK_SCIENTIFIC_MAX_HYPOTHESES, 3),
+  0,
   6,
 );
 const HELIX_ASK_OVERFLOW_RETRY =
@@ -6781,11 +6798,16 @@ const computeClaimRefRate = (claims: Array<{ evidenceRefs?: string[] }>): number
 async function buildAmbiguityCandidateSnapshot(args: {
   question: string;
   targetSpan?: string;
+  seedTerms?: string[];
   topicProfile?: HelixAskTopicProfile | null;
 }): Promise<{ candidates: AskCandidate[]; queries: string[] }> {
   const snapshot = await loadCodeLattice();
   if (!snapshot) return { candidates: [], queries: [] };
-  const rawQueries = [args.targetSpan, args.question].filter(Boolean) as string[];
+  const rawQueries = [
+    args.targetSpan,
+    args.question,
+    ...(args.seedTerms ?? []),
+  ].filter(Boolean) as string[];
   const seen = new Set<string>();
   const queries = rawQueries.filter((entry) => {
     const normalized = entry.trim().toLowerCase();
@@ -8284,6 +8306,218 @@ const buildSlotClarifyLine = (args: {
   return `I could not confirm "${label}" yet. Please point to the relevant files or clarify the term.`;
 };
 
+const SCIENTIFIC_REPORT_HEAD_RE =
+  /^(Confirmed:|Reasoned connections|Hypotheses \(optional\)|Next evidence:)/im;
+
+const isScientificMicroReport = (text: string): boolean =>
+  Boolean(text && SCIENTIFIC_REPORT_HEAD_RE.test(text));
+
+const extractNextEvidenceLines = (text: string): string[] => {
+  if (!text) return [];
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((line) => /^Next evidence:/i.test(line.trim()));
+  if (start < 0) return [];
+  const out: string[] = [];
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) {
+      if (out.length > 0) break;
+      continue;
+    }
+    if (/^[A-Za-z ].+:\s*$/.test(trimmed) && !/^[-*]\s+/.test(trimmed)) {
+      break;
+    }
+    if (/^[-*]\s+/.test(trimmed)) {
+      out.push(trimmed.replace(/^[-*]\s+/, "").trim());
+      continue;
+    }
+    if (out.length > 0) break;
+  }
+  return out;
+};
+
+const buildSlotSurfaceHints = (surfaces?: string[]): string[] => {
+  if (!surfaces?.length) return [];
+  const set = new Set(surfaces.map((entry) => entry.trim().toLowerCase()).filter(Boolean));
+  const hints: string[] = [];
+  if (set.has("ethos")) hints.push("docs/ethos");
+  if (set.has("knowledge")) hints.push("docs/knowledge");
+  if (set.has("docs")) hints.push("docs/");
+  if (set.has("code")) hints.push("server/ or client/ or modules/");
+  return hints;
+};
+
+const buildNextEvidenceHints = (args: {
+  question: string;
+  missingSlots?: string[];
+  slotPlan?: HelixAskSlotPlan | null;
+  anchorFiles?: string[];
+  planClarify?: string;
+  headingSeedSlots?: HelixAskSlotPlanEntry[];
+  limit?: number;
+}): string[] => {
+  const limit = Math.max(1, args.limit ?? 4);
+  const hints: string[] = [];
+  const seen = new Set<string>();
+  const pushHint = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    hints.push(trimmed);
+  };
+  const planClarify = (args.planClarify ?? "").trim();
+  if (planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)) {
+    pushHint(`Clarify: ${planClarify}`);
+  }
+  const dirHints = Array.from(
+    new Set(
+      (args.anchorFiles ?? [])
+        .map((filePath) => filePath.split("/")[0])
+        .filter((segment) => Boolean(segment)),
+    ),
+  ).slice(0, 2);
+  if (dirHints.length > 0) {
+    pushHint(`Check files under ${dirHints.join(" or ")}.`);
+  }
+  const slots = filterClarifySlots(args.missingSlots ?? []);
+  for (const slotId of slots) {
+    const slotEntry = args.slotPlan?.slots.find(
+      (entry) => entry.id === slotId || normalizeSlotId(entry.label) === slotId,
+    );
+    const label = slotEntry?.label ?? slotId;
+    const conceptCard =
+      resolveConceptCardForSlot(slotId) ??
+      (slotEntry?.label ? resolveConceptCardForSlot(slotEntry.label) : null);
+    if (conceptCard?.sourcePath) {
+      pushHint(`Check ${conceptCard.sourcePath} for "${label}".`);
+    } else if (conceptCard?.mustIncludeFiles?.length) {
+      conceptCard.mustIncludeFiles.forEach((filePath) =>
+        pushHint(`Check ${filePath} for "${label}".`),
+      );
+    } else {
+      const surfaceHints = buildSlotSurfaceHints(slotEntry?.surfaces);
+      if (surfaceHints.length > 0) {
+        pushHint(`Search ${surfaceHints.join(" or ")} for "${label}".`);
+      } else {
+        pushHint(`Search docs headings for "${label}".`);
+      }
+    }
+    if (hints.length >= limit) break;
+  }
+  if (hints.length < limit) {
+    const headingSeeds =
+      args.headingSeedSlots && args.headingSeedSlots.length > 0
+        ? args.headingSeedSlots
+        : buildDocHeadingSeedSlots(args.question);
+    for (const seed of headingSeeds) {
+      if (!seed.label) continue;
+      pushHint(`Search docs headings for "${seed.label}".`);
+      if (hints.length >= limit) break;
+    }
+  }
+  return hints.slice(0, limit);
+};
+
+const buildScientificMicroReport = (args: {
+  question: string;
+  claimLedger?: HelixAskClaimLedgerEntry[];
+  uncertaintyRegister?: HelixAskUncertaintyEntry[];
+  missingSlots?: string[];
+  slotPlan?: HelixAskSlotPlan | null;
+  anchorFiles?: string[];
+  planClarify?: string;
+  headingSeedSlots?: HelixAskSlotPlanEntry[];
+  hypothesisEnabled?: boolean;
+  hypothesisStyle?: "conservative" | "exploratory";
+  requiresRepoEvidence?: boolean;
+}): {
+  text: string;
+  nextEvidence: string[];
+  confirmedCount: number;
+  hypothesisCount: number;
+} => {
+  const supportedClaims =
+    args.claimLedger?.filter((entry) => entry.supported && entry.type !== "question") ?? [];
+  const confirmedItems = supportedClaims.map((entry) => ensureSentence(entry.text)).slice(0, 3);
+  const lines: string[] = [];
+  lines.push("Confirmed:");
+  if (confirmedItems.length > 0) {
+    confirmedItems.forEach((item) => lines.push(`- ${item}`));
+  } else {
+    lines.push(
+      `- ${
+        args.requiresRepoEvidence
+          ? "No repo-evidenced claims were confirmed yet."
+          : "No confirmed evidence was found yet."
+      }`,
+    );
+  }
+  lines.push("");
+  lines.push("Reasoned connections (bounded):");
+  if (supportedClaims.length >= 2) {
+    const first = supportedClaims[0];
+    const second = supportedClaims[1];
+    const firstRef = first.evidenceRefs[0] ? `see ${first.evidenceRefs[0]}` : "see cited evidence";
+    const secondRef = second.evidenceRefs[0] ? `see ${second.evidenceRefs[0]}` : "see cited evidence";
+    const firstText = clipAskText(first.text, 160);
+    const secondText = clipAskText(second.text, 160);
+    lines.push(
+      `- ${firstText} (${firstRef}). ${secondText} (${secondRef}). Hypothesis: a direct connection needs evidence mentioning both.`,
+    );
+  } else {
+    lines.push("- Need at least two grounded points before drawing a connection.");
+  }
+  const hypothesisEnabled = args.hypothesisEnabled ?? false;
+  let hypothesisItems: string[] = [];
+  if (hypothesisEnabled && HELIX_ASK_SCIENTIFIC_MAX_HYPOTHESES > 0) {
+    const rawCandidates =
+      args.claimLedger?.filter((entry) => !entry.supported && entry.type !== "question") ?? [];
+    const filtered =
+      (args.hypothesisStyle ?? "conservative") === "exploratory"
+        ? rawCandidates
+        : rawCandidates.filter(
+            (entry) => entry.type === "hypothesis" || entry.type === "assumption",
+          );
+    hypothesisItems = filtered
+      .map((entry) => ensureSentence(entry.text))
+      .filter(Boolean)
+      .slice(0, HELIX_ASK_SCIENTIFIC_MAX_HYPOTHESES);
+  }
+  if (hypothesisEnabled) {
+    lines.push("");
+    lines.push("Hypotheses (optional):");
+    if (hypothesisItems.length > 0) {
+      hypothesisItems.forEach((item) => lines.push(`- ${item}`));
+    } else {
+      lines.push("- None without additional evidence.");
+    }
+  }
+  const nextEvidence = buildNextEvidenceHints({
+    question: args.question,
+    missingSlots: args.missingSlots,
+    slotPlan: args.slotPlan,
+    anchorFiles: args.anchorFiles,
+    planClarify: args.planClarify,
+    headingSeedSlots: args.headingSeedSlots,
+    limit: 4,
+  });
+  lines.push("");
+  lines.push("Next evidence:");
+  if (nextEvidence.length > 0) {
+    nextEvidence.forEach((item) => lines.push(`- ${item}`));
+  } else {
+    lines.push("- Provide the file path or doc section that defines the missing terms.");
+  }
+  return {
+    text: lines.join("\n").trim(),
+    nextEvidence,
+    confirmedCount: confirmedItems.length,
+    hypothesisCount: hypothesisItems.length,
+  };
+};
+
 const resolveClusterKey = (filePath: string): string => {
   const normalized = normalizeEvidencePath(filePath) ?? filePath;
   const parts = normalized.split("/").filter(Boolean);
@@ -8470,10 +8704,41 @@ const selectClarifyToken = (question: string): string | undefined => {
 const formatAmbiguityCandidateLabel = (candidate: HelixAskConceptCandidate): string =>
   candidate.card.label ?? candidate.card.id;
 
+const collectAmbiguitySeedLabels = (
+  slots: Array<{ label?: string; aliases?: string[] }>,
+  limit = 3,
+): string[] => {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  const pushLabel = (value?: string) => {
+    if (!value) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (trimmed.length < HELIX_ASK_AMBIGUOUS_TERM_MIN_LEN) return;
+    const normalized = normalizeSlotName(trimmed);
+    if (STRUCTURAL_SLOTS.has(normalized)) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    labels.push(trimmed);
+  };
+  for (const slot of slots) {
+    pushLabel(slot.label);
+    if (labels.length >= limit) break;
+    for (const alias of slot.aliases ?? []) {
+      pushLabel(alias);
+      if (labels.length >= limit) break;
+    }
+    if (labels.length >= limit) break;
+  }
+  return labels.slice(0, limit);
+};
+
 const buildPreIntentClarifyLine = (
   question: string,
   candidates: HelixAskConceptCandidate[],
   clusterSummary?: AmbiguityClusterSummary | null,
+  seedLabels: string[] = [],
 ): string => {
   const clusterLabels = (clusterSummary?.clusters ?? [])
     .map((cluster) => cluster.label)
@@ -8487,6 +8752,13 @@ const buildPreIntentClarifyLine = (
       clusterSummary?.targetSpan ??
       candidates[0]?.matchedTerm;
     return `Do you mean "${clusterLabels[0]}" in this repo, or the general meaning of "${token ?? "that term"}"? If it's repo-specific, point me to the file or module.`;
+  }
+  if (seedLabels.length >= 2) {
+    return `Do you mean "${seedLabels[0]}" or "${seedLabels[1]}"? If you mean a repo concept, point me to the file or module.`;
+  }
+  if (seedLabels.length === 1) {
+    const token = selectClarifyToken(question) ?? seedLabels[0];
+    return `Do you mean "${seedLabels[0]}" in this repo, or the general meaning of "${token}"? If it's repo-specific, point me to the file or module.`;
   }
   if (candidates.length >= 2) {
     const labelA = formatAmbiguityCandidateLabel(candidates[0]);
@@ -8526,6 +8798,7 @@ type HelixAskReportBlockResult = {
   clarify: boolean;
   citations: string[];
   traceId?: string;
+  nextEvidence?: string[];
 };
 
 type HelixAskReportModeDecision = {
@@ -9235,6 +9508,14 @@ const buildHelixAskReportAnswer = (
     );
     lines.push("");
   }
+  const nextEvidence = Array.from(
+    new Set(blocks.flatMap((block) => block.nextEvidence ?? [])),
+  ).slice(0, 4);
+  if (nextEvidence.length > 0) {
+    lines.push("Next evidence (global):");
+    nextEvidence.forEach((item) => lines.push(`- ${item}`));
+    lines.push("");
+  }
   lines.push("Point-by-point:");
   blocks.forEach((block, index) => {
     const label = block.label ? `${block.label}` : `Item ${index + 1}`;
@@ -9309,12 +9590,14 @@ const resolvePreIntentAmbiguity = ({
   clusterSummary,
   explicitRepoExpectation,
   repoExpectationLevel,
+  seedLabels,
 }: {
   question: string;
   candidates: HelixAskConceptCandidate[];
   clusterSummary?: AmbiguityClusterSummary | null;
   explicitRepoExpectation: boolean;
   repoExpectationLevel: "low" | "medium" | "high";
+  seedLabels?: string[];
 }): {
   shouldClarify: boolean;
   reason?: string;
@@ -9345,6 +9628,8 @@ const resolvePreIntentAmbiguity = ({
   const clusterMargin = clusterSummary?.margin ?? 0;
   const clusterEntropy = clusterSummary?.entropy ?? 0;
   const clusterTopMass = clusterSummary?.clusters?.[0]?.mass ?? 0;
+  const labelCount = seedLabels?.length ?? 0;
+  const labelAmbiguity = labelCount >= 2;
   const strongConcept =
     candidates.length > 0 &&
     topScore >= HELIX_ASK_AMBIGUITY_MIN_SCORE &&
@@ -9359,8 +9644,11 @@ const resolvePreIntentAmbiguity = ({
   const shouldClarify =
     (shortPrompt &&
       (clusterSplit ||
-        (!strongConcept && !clusterSummary?.clusters?.length && repoExpectationLevel === "low"))) ||
-    (clusterSplit && allowLongClarify);
+        (!strongConcept &&
+          !clusterSummary?.clusters?.length &&
+          (repoExpectationLevel === "low" || labelAmbiguity)))) ||
+    (clusterSplit && allowLongClarify) ||
+    (labelAmbiguity && allowLongClarify && !strongConcept && !clusterSummary?.clusters?.length);
   return {
     shouldClarify,
     reason: shouldClarify
@@ -10674,6 +10962,13 @@ const executeHelixAsk = async ({
       slot_alias_coverage_rate?: number;
       slot_dominance_margin?: number;
       grounded_sentence_rate?: number;
+      scientific_response_applied?: boolean;
+      hypothesis_enabled?: boolean;
+      hypothesis_count?: number;
+      hypothesis_rate?: number;
+      next_evidence_count?: number;
+      next_evidence_coverage?: number;
+      ambiguity_clarify_rate?: number;
       clarify_precision?: number;
       coverage_slots_required?: string[];
       coverage_slots_covered?: string[];
@@ -10903,6 +11198,7 @@ const executeHelixAsk = async ({
       debugPayload.scaffold_tokens = scaffoldTokens;
       debugPayload.evidence_tokens = evidenceTokens;
       debugPayload.repair_tokens = repairTokens;
+      debugPayload.hypothesis_enabled = HELIX_ASK_HYPOTHESIS;
     }
     const answerPath: string[] = [];
     if (!questionValue && prompt) {
@@ -11360,9 +11656,40 @@ const executeHelixAsk = async ({
             ? [block.label]
             : (blockDebug?.coverage_missing_keys ?? blockDebug?.ambiguity_terms ?? [])
         ).slice(0, 2);
-        let blockAnswer = clarify
-          ? buildReportBlockClarifyLine(clarifyTerms, blockHints.hintIds, blockAnchorFiles)
-          : rawBlockAnswer;
+        const rawScientific = isScientificMicroReport(rawBlockAnswer);
+        let blockAnswer = rawBlockAnswer;
+        let blockNextEvidence: string[] = [];
+        if (clarify) {
+          if (rawScientific) {
+            blockNextEvidence = extractNextEvidenceLines(rawBlockAnswer);
+            blockAnswer = rawBlockAnswer;
+          } else if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
+            const clarifyLine = buildReportBlockClarifyLine(
+              clarifyTerms,
+              blockHints.hintIds,
+              blockAnchorFiles,
+            );
+            const scientific = buildScientificMicroReport({
+              question: blockQuestion,
+              missingSlots: clarifyTerms,
+              slotPlan: slotPreview,
+              anchorFiles: blockAnchorFiles,
+              planClarify: clarifyLine,
+              headingSeedSlots,
+              hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
+              hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
+              requiresRepoEvidence: blockRepoContext,
+            });
+            blockAnswer = scientific.text;
+            blockNextEvidence = scientific.nextEvidence;
+          } else {
+            blockAnswer = buildReportBlockClarifyLine(
+              clarifyTerms,
+              blockHints.hintIds,
+              blockAnchorFiles,
+            );
+          }
+        }
         let citations: string[] = [];
         let citationFallbackApplied = false;
         let scrubbedPaths: string[] = [];
@@ -11391,6 +11718,7 @@ const executeHelixAsk = async ({
           clarify,
           citations,
           traceId: blockTraceId,
+          nextEvidence: blockNextEvidence,
         });
         if (debugPayload) {
           const blockDuration = Math.max(0, Date.now() - blockStart);
@@ -11564,6 +11892,14 @@ const executeHelixAsk = async ({
       logEvent("Topic profile", "none", "no profile");
     }
     const ambiguityTargetSpan = extractClarifySpan(baseQuestion);
+    const ambiguitySeedLabels = collectAmbiguitySeedLabels(
+      [
+        ...(slotPreview?.slots ?? []),
+        ...headingSeedSlots,
+        ...slotPlanPassSlots,
+      ],
+      3,
+    );
     let ambiguityClusterSummary: AmbiguityClusterSummary | null = null;
     if (debugPayload && ambiguityTargetSpan) {
       debugPayload.ambiguity_target_span = ambiguityTargetSpan;
@@ -11577,6 +11913,7 @@ const executeHelixAsk = async ({
         const snapshot = await buildAmbiguityCandidateSnapshot({
           question: baseQuestion,
           targetSpan: ambiguityTargetSpan,
+          seedTerms: ambiguitySeedLabels,
           topicProfile,
         });
         const summary = buildAmbiguityClusterSummary(snapshot.candidates, ambiguityTargetSpan);
@@ -11644,12 +11981,19 @@ const executeHelixAsk = async ({
     const ambiguityCandidates = HELIX_ASK_AMBIGUITY_RESOLVER
       ? slotPreviewCandidates.slice(0, 3)
       : [];
+    const ambiguityCandidateLabels = Array.from(
+      new Set([
+        ...ambiguitySeedLabels,
+        ...ambiguityCandidates.map((candidate) => formatAmbiguityCandidateLabel(candidate)),
+      ]),
+    ).slice(0, 3);
     const ambiguityResolution = resolvePreIntentAmbiguity({
       question: baseQuestion,
       candidates: ambiguityCandidates,
       clusterSummary: ambiguityClusterSummary,
       explicitRepoExpectation,
       repoExpectationLevel,
+      seedLabels: ambiguitySeedLabels,
     });
     let preIntentClarify: string | null = null;
     if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
@@ -11666,15 +12010,14 @@ const executeHelixAsk = async ({
         debugPayload.ambiguity_cluster_entropy = ambiguityResolution.clusterEntropy;
         debugPayload.ambiguity_cluster_top_mass = ambiguityResolution.clusterTopMass;
       }
-      debugPayload.ambiguity_resolver_candidates = ambiguityCandidates.map((candidate) =>
-        formatAmbiguityCandidateLabel(candidate),
-      );
+      debugPayload.ambiguity_resolver_candidates = ambiguityCandidateLabels;
     }
     if (ambiguityResolution.shouldClarify) {
       preIntentClarify = buildPreIntentClarifyLine(
         baseQuestion,
         ambiguityCandidates,
         ambiguityClusterSummary,
+        ambiguitySeedLabels,
       );
       logEvent(
         "Ambiguity resolver",
@@ -11883,11 +12226,32 @@ const executeHelixAsk = async ({
     let verificationAnchorHints: string[] = [];
     let forcedAnswer: string | null = null;
     if (preIntentClarify) {
-      forcedAnswer = preIntentClarify;
+      if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
+        const scientific = buildScientificMicroReport({
+          question: baseQuestion,
+          slotPlan: slotPreview,
+          planClarify: preIntentClarify,
+          headingSeedSlots,
+          hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
+          hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
+          requiresRepoEvidence,
+        });
+        forcedAnswer = scientific.text;
+        if (debugPayload) {
+          debugPayload.scientific_response_applied = true;
+          debugPayload.next_evidence_count = scientific.nextEvidence.length;
+          debugPayload.next_evidence_coverage = scientific.nextEvidence.length > 0 ? 1 : 0;
+          debugPayload.hypothesis_count = scientific.hypothesisCount;
+          debugPayload.hypothesis_rate = scientific.hypothesisCount > 0 ? 1 : 0;
+        }
+      } else {
+        forcedAnswer = preIntentClarify;
+      }
       answerPath.push("clarify:pre_intent");
       if (debugPayload) {
         debugPayload.clarify_triggered = true;
         debugPayload.fallback_reason = "ambiguity_clarify";
+        debugPayload.ambiguity_clarify_rate = 1;
       }
     }
     const conceptualFocus = HELIX_ASK_CONCEPTUAL_FOCUS.test(baseQuestion);
@@ -14279,10 +14643,32 @@ const executeHelixAsk = async ({
         requiresRepoEvidence &&
         (claimGateFailed || (!evidenceGateOk && ambiguityTerms.length > 0));
       if (shouldClarifyNow && !forcedAnswer && intentStrategy !== "constraint_report") {
-        forcedAnswer = clarifyOverride ?? buildAmbiguityClarifyLine([]);
+        const clarifyLine = clarifyOverride ?? buildAmbiguityClarifyLine([]);
+        if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
+          const scientific = buildScientificMicroReport({
+            question: baseQuestion,
+            slotPlan,
+            planClarify: clarifyLine,
+            headingSeedSlots,
+            hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
+            hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
+            requiresRepoEvidence,
+          });
+          forcedAnswer = scientific.text;
+          if (debugPayload) {
+            debugPayload.scientific_response_applied = true;
+            debugPayload.next_evidence_count = scientific.nextEvidence.length;
+            debugPayload.next_evidence_coverage = scientific.nextEvidence.length > 0 ? 1 : 0;
+            debugPayload.hypothesis_count = scientific.hypothesisCount;
+            debugPayload.hypothesis_rate = scientific.hypothesisCount > 0 ? 1 : 0;
+          }
+        } else {
+          forcedAnswer = clarifyLine;
+        }
         answerPath.push("clarify:ambiguity");
         if (debugPayload) {
           debugPayload.fallback_reason = "ambiguity_clarify";
+          debugPayload.ambiguity_clarify_rate = 1;
         }
       }
       if (failClosedRepoEvidence && !forcedAnswer && intentStrategy !== "constraint_report") {
@@ -14308,7 +14694,33 @@ const executeHelixAsk = async ({
             ? planClarify
             : "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
         const failLabel = failClosedReason ?? "evidence_gate_failed";
-        forcedAnswer = clarifyLine;
+        if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
+          const scientific = buildScientificMicroReport({
+            question: baseQuestion,
+            missingSlots: clarifySlots,
+            slotPlan,
+            anchorFiles: contextFiles,
+            planClarify: clarifyLine,
+            headingSeedSlots,
+            hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
+            hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
+            requiresRepoEvidence,
+          });
+          forcedAnswer = scientific.text;
+          if (debugPayload) {
+            debugPayload.scientific_response_applied = true;
+            debugPayload.next_evidence_count = scientific.nextEvidence.length;
+            debugPayload.next_evidence_coverage =
+              clarifySlots.length > 0 ? scientific.nextEvidence.length / clarifySlots.length : 0;
+            debugPayload.hypothesis_count = scientific.hypothesisCount;
+            debugPayload.hypothesis_rate =
+              scientific.hypothesisCount > 0
+                ? scientific.hypothesisCount / Math.max(1, clarifySlots.length)
+                : 0;
+          }
+        } else {
+          forcedAnswer = clarifyLine;
+        }
         answerPath.push(`failClosed:${failLabel}`);
         logEvent("Fail-closed", failLabel, clarifyLine);
         if (debugPayload) {
@@ -14810,6 +15222,39 @@ const executeHelixAsk = async ({
           answerPath.push("citationFallback:sources");
           logProgress("Citation missing", "repaired");
           logEvent("Citation missing", "repaired", formatFileList(repoEvidencePaths));
+        } else if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
+          const missingSlots =
+            docSlotSummary?.missingSlots?.length
+              ? docSlotSummary.missingSlots
+              : coverageSlotSummary?.missingSlots ?? [];
+          const scientific = buildScientificMicroReport({
+            question: baseQuestion,
+            claimLedger: [],
+            uncertaintyRegister: [],
+            missingSlots,
+            slotPlan,
+            anchorFiles: contextFiles,
+            planClarify:
+              "Repo evidence was available but the answer could not be grounded with file citations.",
+            headingSeedSlots: slotPlanHeadingSeedSlots.length ? slotPlanHeadingSeedSlots : headingSeedSlots,
+            hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
+            hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
+            requiresRepoEvidence,
+          });
+          cleaned = scientific.text;
+          if (debugPayload) {
+            debugPayload.scientific_response_applied = true;
+            debugPayload.next_evidence_count = scientific.nextEvidence.length;
+            debugPayload.next_evidence_coverage =
+              missingSlots.length > 0 ? scientific.nextEvidence.length / missingSlots.length : 0;
+            debugPayload.hypothesis_count = scientific.hypothesisCount;
+            debugPayload.hypothesis_rate =
+              scientific.hypothesisCount > 0
+                ? scientific.hypothesisCount / Math.max(1, missingSlots.length)
+                : 0;
+          }
+          logProgress("Citation missing", "scientific");
+          logEvent("Citation missing", "scientific", formatFileList(repoEvidencePaths));
         } else {
           cleaned =
             "Repo evidence was available but the answer could not be grounded with file citations. Please point to the relevant files or narrow the request.";
@@ -15017,11 +15462,67 @@ const executeHelixAsk = async ({
             repairStart,
           );
         }
-      }
+    }
+    if (
+      HELIX_ASK_SCIENTIFIC_CLARIFY &&
+      !isScientificMicroReport(cleaned) &&
+      (platonicDomain === "repo" || platonicDomain === "hybrid" || platonicDomain === "falsifiable") &&
+      (platonicResult.coverageGateApplied ||
+        platonicResult.beliefGateApplied ||
+        platonicResult.rattlingGateApplied)
+    ) {
+      const missingSlots =
+        docSlotSummary?.missingSlots?.length
+          ? docSlotSummary.missingSlots
+          : coverageSlotSummary?.missingSlots ?? [];
+      const scientific = buildScientificMicroReport({
+        question: baseQuestion,
+        claimLedger: platonicResult.claimLedger,
+        uncertaintyRegister: platonicResult.uncertaintyRegister,
+        missingSlots,
+        slotPlan,
+        anchorFiles: contextFiles,
+        planClarify: planDirectives?.clarifyQuestion,
+        headingSeedSlots: slotPlanHeadingSeedSlots.length ? slotPlanHeadingSeedSlots : headingSeedSlots,
+        hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
+        hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
+        requiresRepoEvidence,
+      });
+      cleaned = scientific.text;
+      platonicResult = applyHelixAskPlatonicGates({
+        question: baseQuestion,
+        answer: cleaned,
+        domain: platonicDomain,
+        tier: intentTier,
+        intentId: intentProfile.id,
+        format: formatSpec.format,
+        evidenceText,
+        evidencePaths,
+        evidenceGateOk,
+        requiresRepoEvidence,
+        coverageSlots: coverageSlots.length > 0 ? coverageSlots : undefined,
+        coverageSlotAliases: slotAliasMap ?? undefined,
+        generalScaffold,
+        repoScaffold,
+        promptScaffold,
+        conceptMatch,
+      });
       if (debugPayload) {
-        debugPayload.claim_ref_rate = computeClaimRefRate(platonicResult.claimLedger);
+        debugPayload.scientific_response_applied = true;
+        debugPayload.next_evidence_count = scientific.nextEvidence.length;
+        debugPayload.next_evidence_coverage =
+          missingSlots.length > 0 ? scientific.nextEvidence.length / missingSlots.length : 0;
+        debugPayload.hypothesis_count = scientific.hypothesisCount;
+        debugPayload.hypothesis_rate =
+          scientific.hypothesisCount > 0
+            ? scientific.hypothesisCount / Math.max(1, missingSlots.length)
+            : 0;
       }
-      if (HELIX_ASK_TRAINING_TRACE) {
+    }
+    if (debugPayload) {
+      debugPayload.claim_ref_rate = computeClaimRefRate(platonicResult.claimLedger);
+    }
+    if (HELIX_ASK_TRAINING_TRACE) {
         try {
           const notes: string[] = [];
           if (platonicResult.coverageGateApplied) {

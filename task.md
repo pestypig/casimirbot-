@@ -4784,3 +4784,67 @@ Deliverables:
 - Proof spans present for >=80% of grounded claims in curated tests.
 - Clarify precision >=60% on ambiguous prompts.
 - False clarify rate below 20% on mixed-domain prompts.
+### D17) Scientific Response Contract (SRC) + ambiguity + verification (platonic prompts)
+Goal: always produce a scientific, falsifiable response shape (evidence -> bounded reasoning -> hypotheses -> next evidence) without fabricating repo facts.
+
+#### Core principle
+Always respond scientifically, not always with facts. If evidence is missing, return a structured micro-report instead of a single-line refusal.
+
+#### D17.A) Scientific Response Contract renderer
+- When `requires_repo_evidence` and evidence is weak/partial:
+  - Render a compact SRC block with:
+    1) Confirmed (Grounded): statements with proof pointers (path + header/span/symbol).
+    2) Reasoned connections (Bounded inference): only between grounded statements.
+    3) Hypotheses (Optional): only if enabled by policy.
+    4) Next evidence: smallest set of files/headings/queries to resolve gaps.
+- Replace raw "Repo evidence required..." with SRC output.
+
+Deliverables:
+- SRC renderer applied in clarify/weak-evidence paths.
+- "Next evidence" builder based on slot plan + missing slots + heading seeds.
+
+#### D17.B) Clarify vs Hypothesis policy switch
+- Add opt-in hypotheses:
+  - `HELIX_ASK_HYPOTHESIS=0|1` (default 0).
+  - `HELIX_ASK_HYPOTHESIS_STYLE=conservative|exploratory`.
+- Default remains safe: clarify + next evidence, no invented repo claims.
+
+Deliverables:
+- Hypothesis path gated by policy + explicit labeling in SRC.
+
+#### D17.C) Semantic ambiguity resolver (evidence-driven)
+- Target-span selection from noun-phrase/slot binder (avoid low-signal verbs).
+- Candidate senses from: concept cards, doc heading seeds, file tokens.
+- Dominance rule: answer only if one sense dominates retrieval mass; otherwise clarify with 2-3 options.
+
+Deliverables:
+- Ambiguity resolver uses evidence dominance + entropy/margin.
+- Clarify question includes 2-3 concrete options.
+
+#### D17.D) Verification micro-pass (claim demotion)
+- Add a lightweight verify pass:
+  1) Draft answer
+  2) Verify claims against proof pointers
+  3) Demote unsupported claims to Hypothesis or move to Next evidence
+- Prefer demotion over global failure.
+
+Deliverables:
+- Verify pass integrated after synthesis, before final output.
+- Claim ledger reflects demotions.
+
+#### D17.E) Report-mode SRC
+- Each block uses SRC (even if clarify).
+- Keep grounded-only Connections across blocks.
+- Add global "Next evidence" summary for the whole report.
+
+#### Metrics (telemetry)
+- proof_span_rate
+- claim_ref_rate
+- clarify_precision
+- hypothesis_rate
+- next_evidence_coverage (missing slots addressed)
+- ambiguity_clarify_rate
+
+#### Exit criteria
+- Clarify responses include actionable "Next evidence" in >=90% of cases.
+- Hypothesis mode (when enabled) never asserts repo facts without proof pointers.
