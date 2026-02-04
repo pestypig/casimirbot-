@@ -12337,7 +12337,7 @@ const executeHelixAsk = async ({
     let slotPlanPassSlots: HelixAskSlotPlanEntry[] = [];
     let sessionMemory: HelixAskSessionMemory | null = null;
     let memorySeedSlots: HelixAskSlotPlanEntry[] = [];
-    let headingSeedSlots: HelixAskSlotPlanEntry[] = [];
+    let slotPlanHeadingSeedSlots: HelixAskSlotPlanEntry[] = [];
     let memoryPinnedFiles: string[] = [];
     let slotCoverageOk = true;
     let slotCoverageFailed = false;
@@ -12493,12 +12493,12 @@ const executeHelixAsk = async ({
         }
         const slotPlanQuestion =
           blockScoped && blockSearchSeed ? blockSearchSeed : baseQuestion;
-        headingSeedSlots = buildDocHeadingSeedSlots(slotPlanQuestion);
+        slotPlanHeadingSeedSlots = buildDocHeadingSeedSlots(slotPlanQuestion);
         slotPlan = buildCanonicalSlotPlan({
           question: slotPlanQuestion,
           directives: planDirectives,
           candidates: slotPreviewCandidates,
-          seedSlots: [...memorySeedSlots, ...headingSeedSlots, ...slotPlanPassSlots],
+          seedSlots: [...memorySeedSlots, ...slotPlanHeadingSeedSlots, ...slotPlanPassSlots],
         });
         coverageSlots = coverageSlotsFromRequest
           ? requestCoverageSlots
