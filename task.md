@@ -3684,6 +3684,81 @@ Progress notes:
   - F2/F3 answers include verifier artifacts when required.
   - Ambiguous terms trigger clarification or explicit interpretation.
 
+## Helix Ask Answer Blocks (Right-Answer Building Blocks) - Status: planned
+- Goal: convert verified Helix Ask answers into modular, versioned blocks with scope,
+  variables, evidence, and maturity so "right answers" can refine as conditions change.
+- Block schema (v0): id, claim, scope, variables, evidence, metrics, maturity, confidence,
+  version, relations (depends_on, refines, contradicts, generalizes).
+- Do:
+  - Define shared block schema + maturity enum aligned to math maturity
+    (exploratory -> reduced-order -> diagnostic -> certified) in `shared/helix-answer-blocks.ts`.
+  - Add a block registry store (JSONL in `.cal/helix-ask-blocks.jsonl` or DB adapter)
+    with versioning + relation edges.
+  - Emit a candidate block after Platonic gates (see `docs/helix-ask-ladder.md`)
+    and attach the block id + maturity to the response envelope / proof drawer.
+  - Add a block evaluation pass that updates metrics (accuracy, coverage, robustness)
+    from regression prompts / holdouts and spawns refinement blocks when contradictions appear.
+  - Add operator endpoints for block browser/reporting (list, diff, lineage, maturity history).
+  - UBI linkage: treat certified blocks as contribution events that award tokens via
+    `server/services/jobs/token-budget.ts` (`awardEarnings`, `TokenLedgerSource` in
+    `shared/jobs.ts`) and feed the pool via `UBI_POOL_SHARE`; distribution + payout
+    surfaces already live in `server/routes/jobs.ts` and `server/services/jobs/payouts.ts`.
+- Acceptance:
+  - At least one Helix Ask answer produces a block with citations, version, and maturity.
+  - Block lineage shows refinement/contradiction links.
+  - Token ledger shows block rewards and UBI pool share; `/api/jobs/ubi/run` can distribute when funded.
+  - Response envelope includes block id + maturity in the proof drawer.
+
+
+## Auth: Google Sign-In + Profile Storage - Status: planned
+- Goal: add trusted Google account sign-in so Helix Ask answers and profile data
+  can be persisted per user with minimal friction.
+- Do:
+  - Implement Google OAuth (OIDC) with minimal scopes (`openid`, `email`, `profile`).
+  - Add server auth endpoints (`/api/auth/google/start`, `/api/auth/google/callback`, `/api/auth/logout`).
+  - Verify Google ID tokens server-side and mint a signed session token (JWT or opaque
+    session id) stored in an HttpOnly cookie; continue to accept `Authorization: Bearer` for APIs.
+  - Map Google `sub` to a stable `userId` / persona id; persist a user record with
+    display name + email + avatar (no extra sensitive fields).
+  - Update `server/auth/jwt.ts` to read cookie-based sessions (for browser clients)
+    and keep header-based JWT for API/CLI use.
+  - Gate API routes (not static pages) behind auth when `ENABLE_AUTH=1`; keep health
+    endpoints public as today (`/health`, `/healthz`, `/version`).
+  - Update client session handling (`client/src/lib/auth/session.ts`) to reflect
+    real account state and hydrate profile from `/api/auth/me`.
+  - Store Helix Ask answers and blocks under `owner_id=userId` in the memory store
+    and any new block registry so per-account history is preserved.
+  - Add account deletion / data export hooks (profile + answer history) for trust compliance.
+- Acceptance:
+  - Google sign-in produces a valid session and `req.auth.sub` maps to the same user across visits.
+  - Helix Ask answers are saved and retrievable per account.
+  - Anonymous sessions still work when auth is disabled (local/dev mode).
+  - Security: cookie is HttpOnly + SameSite; tokens are validated and rotated.
+
+
+## Helix Start Profile Entry Points (Desktop/Mobile) - Status: planned
+- Goal: keep Helix Ask open to all users while offering a clear profile/sign-in
+  entry point on both `/desktop` and `/mobile`.
+- Desktop plan:
+  - Replace the top-right `Settings` button label with `Profile` and show avatar
+    when signed in; open the existing settings dialog with a new `Profile` tab.
+  - `Profile` tab: sign in/out, account status, data export/delete, and per-account
+    toggles (persisted server-side after auth).
+  - Keep current settings tabs; only move sign-in and account controls into Profile.
+- Mobile plan:
+  - Add a `Profile` button in the Ask landing view (near the Start button), and
+    an entry in the app viewer header for signed-in users.
+  - Mobile profile uses the same dialog or a lightweight panel sheet.
+- UX rules:
+  - Helix Ask works without signing in; show a subtle "Sign in to save" hint in the
+    Ask reply footer when unauthenticated.
+  - No hard auth wall unless a feature explicitly requires storage or uploads.
+- Acceptance:
+  - `/desktop` and `/mobile` both surface Profile access in one tap.
+  - Signed-in users see avatar/name; signed-out users see sign-in CTA.
+  - All existing settings remain available; Helix Ask remains usable without auth.
+
+
 ## Helix Ask Topic Router + Concept Registry - Status: complete
 - Goal: prevent topic drift inside repo mode and provide stable, "platonic" definitions
   without building bespoke pipelines for every term.

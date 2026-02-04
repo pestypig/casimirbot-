@@ -12509,7 +12509,10 @@ const executeHelixAsk = async ({
     if (intentStrategy === "constraint_report") {
       isRepoQuestion = false;
     }
-    if (blockScoped && intentStrategy !== "constraint_report" && intentProfile.evidencePolicy.allowRepoCitations) {
+    if (blockScoped && intentStrategy !== "constraint_report") {
+      isRepoQuestion = true;
+    }
+    if (!isRepoQuestion && contextFiles.length > 0 && intentStrategy !== "constraint_report") {
       isRepoQuestion = true;
     }
     if (debugPayload) {
@@ -12917,7 +12920,7 @@ const executeHelixAsk = async ({
       }
       logProgress("Constraint evidence ready", label, constraintStart);
     }
-    if (!isRepoQuestion) {
+    if (!isRepoQuestion && !blockScoped) {
       contextText = "";
       contextFiles = [];
     }

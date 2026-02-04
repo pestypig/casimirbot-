@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "trees": [
+    {
+      "id": "ideology",
+      "label": "Mission Ethos Tree",
+      "path": "docs/ethos/ideology.json",
+      "topicTags": ["ideology"],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    }
+  ]
+}

@@ -9,7 +9,7 @@
       "excerpt": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.",
       "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.\n\nWhen measurements disagree with our story, we revise the story. The vow survives by truth, not by force.",
       "tags": ["stewardship", "compassion"],
-      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols", "jurisdictional-floor", "two-key-approval", "lawful-interface-protocol", "federal-civic-listening-circuit", "metric-integrity-guardrail", "harm-weighted-priority-standard", "integration-ladder", "local-stability-compact", "access-to-counsel-pathway", "training-certification-gate", "interbeing-systems", "sangha-architecture", "citizens-arc", "right-speech-infrastructure", "restorative-harm-repair", "impermanence-by-design", "koan-governance", "three-tenets-loop", "no-bypass-guardrail", "capture-resistance", "scarcity-justice", "data-dignity", "civic-memory-continuity", "skillful-mediation", "external-interface-integrity"],
+      "children": ["bodhisattva-craft", "beginners-mind", "struggle-testament", "devotion-course", "worldview-integrity", "values-over-images", "capability-ambition-gradient", "integrity-protocols", "jurisdictional-floor", "two-key-approval", "lawful-interface-protocol", "federal-civic-listening-circuit", "metric-integrity-guardrail", "harm-weighted-priority-standard", "integration-ladder", "local-stability-compact", "access-to-counsel-pathway", "training-certification-gate", "interbeing-systems", "sangha-architecture", "citizens-arc", "right-speech-infrastructure", "restorative-harm-repair", "impermanence-by-design", "koan-governance", "three-tenets-loop", "no-bypass-guardrail", "capture-resistance", "scarcity-justice", "data-dignity", "civic-memory-continuity", "skillful-mediation", "external-interface-integrity", "verification-based-diplomacy"],
       "links": [
         { "rel": "see-also", "to": "bodhisattva-craft" },
         { "rel": "see-also", "to": "beginners-mind" },
@@ -35,7 +35,8 @@
         { "rel": "parent", "to": "mission-ethos" },
         { "rel": "see-also", "to": "bodhisattva-craft" },
         { "rel": "see-also", "to": "stewardship-ledger" },
-        { "rel": "see-also", "to": "feedback-loop-hygiene" }
+        { "rel": "see-also", "to": "feedback-loop-hygiene" },
+        { "rel": "see-also", "to": "shadow-rail-interdiction" }
       ]
     },
     {
@@ -145,7 +146,8 @@
         { "rel": "parent", "to": "mission-ethos" },
         { "rel": "see-also", "to": "integrity-protocols" },
         { "rel": "see-also", "to": "stewardship-ledger" },
-        { "rel": "see-also", "to": "verification-checklist" }
+        { "rel": "see-also", "to": "verification-checklist" },
+        { "rel": "see-also", "to": "repair-debt-compact" }
       ]
     },
     {
@@ -175,7 +177,8 @@
         { "rel": "parent", "to": "mission-ethos" },
         { "rel": "see-also", "to": "beginners-mind" },
         { "rel": "see-also", "to": "values-over-images" },
-        { "rel": "see-also", "to": "promise-trials" }
+        { "rel": "see-also", "to": "promise-trials" },
+        { "rel": "see-also", "to": "dignified-exit-design" }
       ]
     },
     {
@@ -326,7 +329,80 @@
         { "rel": "parent", "to": "mission-ethos" },
         { "rel": "see-also", "to": "worldview-integrity" },
         { "rel": "see-also", "to": "values-over-images" },
-        { "rel": "see-also", "to": "reciprocity-contract" }
+        { "rel": "see-also", "to": "reciprocity-contract" },
+        { "rel": "see-also", "to": "verification-based-diplomacy" }
+      ]
+    },
+    {
+      "id": "verification-based-diplomacy",
+      "slug": "verification-based-diplomacy",
+      "title": "Verification-Based Diplomacy",
+      "excerpt": "When trust is low, peace depends on verification, not handshakes.",
+      "bodyMD": "Trust is low. When trust is low, diplomacy cannot rely on handshakes and rhetoric. It must evolve from trust-based diplomacy to verification-based diplomacy.\n\nAn integrity floor is the shared minimum: the question is not who is right but how to prevent trade, money, and logistics from leaking into shadow rails that prolong harm. Zen governance refuses to pretend the rails are neutral.\n\nAnti-pattern: peace by press release while supply rails continue to feed harm.\n\nMinimal artifact: Verification Diplomacy Charter with shared claims, verification steps, audit trails, and rollback triggers.\n\nSee [[node:integrity-protocols]], [[node:verification-checklist]], [[node:interbeing-systems]], [[node:external-interface-integrity]], and [[node:right-speech-infrastructure]].",
+      "tags": ["diplomacy", "verification", "trust", "integrity", "peace"],
+      "children": ["shadow-rail-interdiction", "dignified-exit-design", "repair-debt-compact"],
+      "links": [
+        { "rel": "parent", "to": "mission-ethos" },
+        { "rel": "child", "to": "shadow-rail-interdiction" },
+        { "rel": "child", "to": "dignified-exit-design" },
+        { "rel": "child", "to": "repair-debt-compact" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "jurisdictional-floor" },
+        { "rel": "see-also", "to": "external-interface-integrity" },
+        { "rel": "see-also", "to": "verification-checklist" },
+        { "rel": "see-also", "to": "right-speech-infrastructure" },
+        { "rel": "see-also", "to": "interbeing-systems" }
+      ]
+    },
+    {
+      "id": "shadow-rail-interdiction",
+      "slug": "shadow-rail-interdiction",
+      "title": "Shadow Rail Interdiction",
+      "excerpt": "Pressure targets the shadow stack that keeps harm funded and supplied.",
+      "bodyMD": "Wars are sustained by systems: fuel moving, money clearing, parts arriving, and intermediaries profiting. Pressure should target the shadow stack: opaque shipping, fake insurance, illicit procurement networks, and predatory intermediaries.\n\nKeep defensive and civilian-survival support predictable so civilians are protected and not used as leverage.\n\nAnti-pattern: broad embargoes that starve civilians while gray networks thrive.\n\nMinimal artifact: Shadow Rail Map + Interdiction Plan with beneficial-ownership disclosure, shipping and insurance audits, and verified civilian carve-outs.\n\nSee [[node:interbeing-systems]], [[node:integrity-protocols]], [[node:external-interface-integrity]], [[node:capture-resistance]], and [[node:harm-weighted-priority-standard]].",
+      "tags": ["supply-chain", "shadow-economy", "enforcement", "integrity", "war"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "verification-based-diplomacy" },
+        { "rel": "see-also", "to": "interbeing-systems" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "external-interface-integrity" },
+        { "rel": "see-also", "to": "capture-resistance" },
+        { "rel": "see-also", "to": "harm-weighted-priority-standard" }
+      ]
+    },
+    {
+      "id": "dignified-exit-design",
+      "slug": "dignified-exit-design",
+      "title": "Dignified Exit Design",
+      "excerpt": "Off-ramps reduce cornered escalation without rewarding aggression.",
+      "bodyMD": "When a heavily armed state believes there is no dignified exit, pride, fear, and sunk-cost logic can trap actors in escalation loops. A dignified exit is not a reward; it is an off-ramp so peace does not require humiliation as fuel.\n\nNon-attachment (Zen) rejects victory narratives that demand continued harm. Non-forcing (Daoist) avoids cornering an armed state into pride-driven escalation.\n\nAnti-pattern: maximalist demands with no face-saving path.\n\nMinimal artifact: Off-Ramp Package with phased verification, face-saving language, time-bounded security assurances, and review triggers.\n\nSee [[node:koan-governance]], [[node:restorative-harm-repair]], [[node:impermanence-by-design]], [[node:skillful-mediation]], and [[node:no-bypass-guardrail]].",
+      "tags": ["off-ramp", "non-attachment", "de-escalation", "diplomacy", "conflict"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "verification-based-diplomacy" },
+        { "rel": "see-also", "to": "koan-governance" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "impermanence-by-design" },
+        { "rel": "see-also", "to": "skillful-mediation" },
+        { "rel": "see-also", "to": "no-bypass-guardrail" }
+      ]
+    },
+    {
+      "id": "repair-debt-compact",
+      "slug": "repair-debt-compact",
+      "title": "Repair Debt Compact",
+      "excerpt": "Harm creates a repair debt that must be restored, audited, and time-bounded.",
+      "bodyMD": "Legitimacy is not determined by stockpiles. In the moral grammar of order, harm creates a repair debt: an obligation to restore what was broken and reduce future suffering.\n\nRepair is not revenge, and it is not humiliation. Commitments must be auditable, escrowed, revocable, and time-bounded so reconstruction does not become a new corruption surface or permanent control.\n\nAnti-pattern: reconstruction as slush funds, patronage, or indefinite occupation.\n\nMinimal artifact: Repair Escrow Covenant with audit hooks, release triggers, and sunset clauses.\n\nSee [[node:restorative-harm-repair]], [[node:stewardship-ledger]], [[node:integrity-protocols]], [[node:jurisdictional-floor]], and [[node:metric-integrity-guardrail]].",
+      "tags": ["repair", "legitimacy", "reconstruction", "accountability", "justice"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "verification-based-diplomacy" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "stewardship-ledger" },
+        { "rel": "see-also", "to": "integrity-protocols" },
+        { "rel": "see-also", "to": "jurisdictional-floor" },
+        { "rel": "see-also", "to": "metric-integrity-guardrail" }
       ]
     },
     {
