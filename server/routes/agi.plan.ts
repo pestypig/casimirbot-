@@ -156,8 +156,8 @@ import {
   type HelixAskMathSolveResult,
 } from "../services/helix-ask/math";
 import {
-  resolveHelixAskGraphFramework,
-  type HelixAskGraphFramework,
+  resolveHelixAskGraphPack,
+  type HelixAskGraphPack,
 } from "../services/helix-ask/graph-resolver";
 import {
   applyHelixAskPlatonicGates,
@@ -5650,37 +5650,50 @@ const buildDocHeadingSeedSlots = (question: string): HelixAskSlotPlanEntry[] => 
 };
 
 const GRAPH_SLOT_LIMIT = 6;
+const GRAPH_HINT_TERM_LIMIT = 16;
 
-const collectGraphHintTerms = (framework: HelixAskGraphFramework | null): string[] => {
-  if (!framework) return [];
-  const terms = new Set<string>();
-  const nodes = [...framework.anchors, ...framework.path];
-  for (const node of nodes) {
-    if (node.title) terms.add(node.title);
-    if (node.id) terms.add(node.id);
-    for (const tag of node.tags ?? []) terms.add(tag);
+const collectGraphHintTerms = (pack: HelixAskGraphPack | null): string[] => {
+  if (!pack) return [];
+  const terms: string[] = [];
+  const seenNodes = new Set<string>();
+  const pushNodeTerms = (node: HelixAskGraphPack["frameworks"][number]["anchors"][number]): void => {
+    if (node.title) terms.push(node.title);
+    if (node.id) terms.push(node.id);
+    for (const tag of node.tags ?? []) terms.push(tag);
+  };
+  for (const framework of pack.frameworks) {
+    for (const node of framework.anchors) {
+      pushNodeTerms(node);
+      if (node.id) seenNodes.add(node.id);
+    }
+    for (const node of framework.path) {
+      if (node.id && seenNodes.has(node.id)) continue;
+      pushNodeTerms(node);
+    }
   }
-  return filterSlotHintTerms(Array.from(terms), { maxTokens: 8, maxChars: 90 });
+  const filtered = filterSlotHintTerms(terms, { maxTokens: 8, maxChars: 90 });
+  return filtered.slice(0, GRAPH_HINT_TERM_LIMIT);
 };
 
 const buildGraphSeedSlots = (
-  framework: HelixAskGraphFramework | null,
+  pack: HelixAskGraphPack | null,
 ): HelixAskSlotPlanEntry[] => {
-  if (!framework) return [];
-  const nodes = [...framework.anchors, ...framework.path]
-    .slice()
-    .sort((a, b) => b.score - a.score);
+  if (!pack) return [];
+  const frameworks = pack.frameworks;
+  if (frameworks.length === 0) return [];
   const out: HelixAskSlotPlanEntry[] = [];
   const seen = new Set<string>();
-  for (const node of nodes) {
+  const buildSlotEntry = (
+    node: HelixAskGraphPack["frameworks"][number]["anchors"][number],
+    framework: HelixAskGraphPack["frameworks"][number],
+  ): HelixAskSlotPlanEntry | null => {
     const id = normalizeSlotId(node.id || node.title || "");
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
+    if (!id) return null;
     const aliases = filterSlotHintTerms(
       [node.title ?? "", node.id, ...(node.tags ?? [])],
       { maxTokens: 6, maxChars: 72 },
     ).slice(0, SLOT_ALIAS_MAX);
-    out.push({
+    return {
       id,
       label: node.title || node.id,
       required: false,
@@ -5689,9 +5702,46 @@ const buildGraphSeedSlots = (
       aliases,
       surfaces: deriveSlotSurfaces(node.artifact ?? framework.sourcePath),
       evidenceCriteria: (node.tags ?? []).slice(0, 6),
-    });
-    if (out.length >= GRAPH_SLOT_LIMIT) break;
+    };
+  };
+
+  const nodeBuckets = frameworks.map((framework) => ({
+    framework,
+    nodes: [...framework.anchors, ...framework.path].slice().sort((a, b) => b.score - a.score),
+  }));
+  const perTreeQuota = Math.max(1, Math.floor(GRAPH_SLOT_LIMIT / nodeBuckets.length));
+
+  for (const bucket of nodeBuckets) {
+    let added = 0;
+    for (const node of bucket.nodes) {
+      if (out.length >= GRAPH_SLOT_LIMIT || added >= perTreeQuota) break;
+      const slot = buildSlotEntry(node, bucket.framework);
+      if (!slot || seen.has(slot.id)) continue;
+      seen.add(slot.id);
+      out.push(slot);
+      added += 1;
+    }
   }
+
+  if (out.length < GRAPH_SLOT_LIMIT) {
+    const ranked = nodeBuckets
+      .flatMap((bucket, index) =>
+        bucket.nodes.map((node) => ({
+          node,
+          framework: bucket.framework,
+          score: node.score + (nodeBuckets.length - index) * 0.25,
+        })),
+      )
+      .sort((a, b) => b.score - a.score);
+    for (const entry of ranked) {
+      if (out.length >= GRAPH_SLOT_LIMIT) break;
+      const slot = buildSlotEntry(entry.node, entry.framework);
+      if (!slot || seen.has(slot.id)) continue;
+      seen.add(slot.id);
+      out.push(slot);
+    }
+  }
+
   return out;
 };
 
@@ -11567,9 +11617,15 @@ const executeHelixAsk = async ({
       ? parsed.data.coverageSlots.map(normalizeSlotId)
       : [];
     const coverageSlotsFromRequest = requestCoverageSlots.length > 0;
-    const blockScoped = coverageSlotsFromRequest;
+    const reportBlockScoped = Boolean(reportContext?.blockIndex);
+    const blockScoped = coverageSlotsFromRequest || reportBlockScoped;
     if (debugPayload) {
       debugPayload.block_scoped = blockScoped;
+      if (reportBlockScoped && !coverageSlotsFromRequest) {
+        debugPayload.block_scoped_source = "report_context";
+      } else if (coverageSlotsFromRequest) {
+        debugPayload.block_scoped_source = "coverage_slots";
+      }
     }
     const blockSearchSeed =
       blockScoped && parsed.data.searchQuery?.trim()
@@ -12691,7 +12747,7 @@ const executeHelixAsk = async ({
       }
     }
     let conceptMatch: HelixAskConceptMatch | null = null;
-    let graphFramework: HelixAskGraphFramework | null = null;
+    let graphPack: HelixAskGraphPack | null = null;
     let graphResolverPreferred = false;
     let mathSolveResult: HelixAskMathSolveResult | null = null;
     let verificationAnchorRequired = false;
@@ -12829,30 +12885,39 @@ const executeHelixAsk = async ({
         debugPayload.topic_must_include_files = topicProfile.mustIncludeFiles?.slice();
       }
     }
-    graphFramework = resolveHelixAskGraphFramework({
+    graphPack = resolveHelixAskGraphPack({
       question: baseQuestion,
       topicTags,
       conceptMatch,
     });
-    graphResolverPreferred = Boolean(graphFramework?.preferGraph);
-    graphHintTerms = collectGraphHintTerms(graphFramework);
-    graphSeedSlots = buildGraphSeedSlots(graphFramework);
-    if (graphFramework) {
-      logEvent(
-        "Graph framework",
-        "resolved",
-        [
-          `tree=${graphFramework.treeId}`,
-          `anchors=${graphFramework.anchors.length}`,
-          `nodes=${graphFramework.path.length}`,
-        ].join(" | "),
-      );
+    graphResolverPreferred = Boolean(graphPack?.preferGraph);
+    graphHintTerms = collectGraphHintTerms(graphPack);
+    graphSeedSlots = buildGraphSeedSlots(graphPack);
+    if (graphPack) {
+      const treeCount = graphPack.frameworks.length;
+      const anchorCount = graphPack.frameworks.reduce((sum, framework) => sum + framework.anchors.length, 0);
+      const nodeCount = graphPack.frameworks.reduce((sum, framework) => sum + framework.path.length, 0);
+      const treeList = graphPack.treeIds.join(", ");
+      const graphDetail = [
+        `trees=${treeCount}`,
+        treeList ? `tree_ids=${treeList}` : null,
+        graphPack.primaryTreeId ? `primary=${graphPack.primaryTreeId}` : null,
+        `anchors=${anchorCount}`,
+        `nodes=${nodeCount}`,
+      ]
+        .filter(Boolean)
+        .join(" | ");
+      logEvent("Graph pack", "resolved", graphDetail);
       if (debugPayload) {
         debugPayload.graph_framework = {
-          tree: graphFramework.treeId,
-          anchors: graphFramework.anchors.map((node) => node.id),
-          nodes: graphFramework.path.map((node) => node.id),
-          source: graphFramework.sourcePath,
+          primary: graphPack.primaryTreeId,
+          trees: graphPack.frameworks.map((framework) => ({
+            tree: framework.treeId,
+            anchors: framework.anchors.map((node) => node.id),
+            nodes: framework.path.map((node) => node.id),
+            source: framework.sourcePath,
+            score: framework.rankScore ?? null,
+          })),
         };
       }
     }
@@ -14029,20 +14094,20 @@ const executeHelixAsk = async ({
           }
         }
 
-        if (!dryRun && graphFramework?.contextText) {
-          const merged = appendContextBlock(contextText, graphFramework.contextText);
+        if (!dryRun && graphPack?.contextText) {
+          const merged = appendContextBlock(contextText, graphPack.contextText);
           if (merged !== contextText) {
             contextText = merged;
           }
-          if (graphFramework.sourcePath) {
-            contextFiles = Array.from(new Set([...contextFiles, graphFramework.sourcePath]));
+          if (graphPack.sourcePaths.length > 0) {
+            contextFiles = Array.from(new Set([...contextFiles, ...graphPack.sourcePaths]));
           }
           coverageSlotSummary = null;
           docSlotSummary = null;
           logEvent(
-            "Graph framework",
+            "Graph pack",
             "context_added",
-            `tree=${graphFramework.treeId} nodes=${graphFramework.path.length}`,
+            `trees=${graphPack.frameworks.length} nodes=${graphPack.frameworks.reduce((sum, framework) => sum + framework.path.length, 0)}`,
           );
           if (debugPayload) {
             debugPayload.graph_framework_applied = true;
@@ -15184,8 +15249,8 @@ const executeHelixAsk = async ({
         }
       }
 
-      if (graphFramework?.scaffoldText && (isRepoQuestion || wantsHybrid)) {
-        repoScaffold = mergeEvidenceScaffolds(repoScaffold, graphFramework.scaffoldText);
+      if (graphPack?.scaffoldText && (isRepoQuestion || wantsHybrid)) {
+        repoScaffold = mergeEvidenceScaffolds(repoScaffold, graphPack.scaffoldText);
       }
 
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
