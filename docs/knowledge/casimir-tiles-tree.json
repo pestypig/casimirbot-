@@ -8,7 +8,12 @@
       "title": "Casimir Tiles Tree",
       "excerpt": "A walk from tile mechanics to guardrails and roadmap proofs.",
       "bodyMD": "Casimir tiles define a concrete negative-energy mechanism and its verification path.\n\nMinimal artifact: Casimir tile docs and roadmaps.",
-      "tags": ["casimir", "tiles", "verification", "mechanism"],
+      "tags": [
+        "casimir",
+        "tiles",
+        "verification",
+        "mechanism"
+      ],
       "children": [
         "casimir-tiles-overview",
         "casimir-tile-mechanism",
@@ -17,7 +22,8 @@
         "guarded-casimir-tile-code-mapped",
         "qi-guard-consolidation",
         "qi-homogenization-addendum",
-        "qi-ops-runbook"
+        "qi-ops-runbook",
+        "casimir-calculation-stack"
       ],
       "links": []
     },
@@ -27,9 +33,18 @@
       "title": "Casimir Tiles Overview",
       "excerpt": "Casimir tile definitions and scope.",
       "bodyMD": "Overview of the Casimir tile concept (docs/knowledge/casimir-tiles.md).\n\nMinimal artifact: tile definition summary.",
-      "tags": ["casimir", "tiles", "overview"],
+      "tags": [
+        "casimir",
+        "tiles",
+        "overview"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-tiles-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
     },
     {
       "id": "casimir-tile-mechanism",
@@ -37,9 +52,18 @@
       "title": "Casimir Tile Mechanism",
       "excerpt": "Mechanism and physical justification.",
       "bodyMD": "Mechanism details and assumptions (docs/casimir-tile-mechanism.md).\n\nMinimal artifact: mechanism assumptions list.",
-      "tags": ["mechanism", "casimir", "tiles"],
+      "tags": [
+        "mechanism",
+        "casimir",
+        "tiles"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-tiles-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
     },
     {
       "id": "casimir-tile-roadmap",
@@ -47,9 +71,18 @@
       "title": "Casimir Tile Roadmap",
       "excerpt": "Roadmap for proof and development milestones.",
       "bodyMD": "Roadmap for validation steps (docs/casimir-tile-roadmap.md).\n\nMinimal artifact: milestone list.",
-      "tags": ["roadmap", "proof", "milestones"],
+      "tags": [
+        "roadmap",
+        "proof",
+        "milestones"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-tiles-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
     },
     {
       "id": "casimir-tile-schematic-roadmap",
@@ -57,9 +90,18 @@
       "title": "Casimir Tile Schematic Roadmap",
       "excerpt": "Schematic steps and verification hooks.",
       "bodyMD": "Schematic roadmap for physical validation (docs/casimir-tile-schematic-roadmap.md).\n\nMinimal artifact: schematic checklist.",
-      "tags": ["schematic", "roadmap", "verification"],
+      "tags": [
+        "schematic",
+        "roadmap",
+        "verification"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-tiles-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
     },
     {
       "id": "guarded-casimir-tile-code-mapped",
@@ -67,9 +109,18 @@
       "title": "Guarded Casimir Tile Code Map",
       "excerpt": "Code-mapped guardrails and implementation trace.",
       "bodyMD": "Code-mapped guardrails for Casimir tiles (docs/guarded-casimir-tile-code-mapped.md).\n\nMinimal artifact: guardrail mapping table.",
-      "tags": ["guardrails", "code-map", "casimir"],
+      "tags": [
+        "guardrails",
+        "code-map",
+        "casimir"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-tiles-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
     },
     {
       "id": "qi-guard-consolidation",
@@ -77,9 +128,18 @@
       "title": "QI Guard Consolidation",
       "excerpt": "Quantum inequality guardrail consolidation.",
       "bodyMD": "QI guard consolidation supports safe constraints (docs/qi-guard-consolidation.md).\n\nMinimal artifact: guard consolidation summary.",
-      "tags": ["qi", "guard", "constraints"],
+      "tags": [
+        "qi",
+        "guard",
+        "constraints"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-tiles-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
     },
     {
       "id": "qi-homogenization-addendum",
@@ -87,9 +147,18 @@
       "title": "QI Homogenization Addendum",
       "excerpt": "Homogenization notes for quantum inequality handling.",
       "bodyMD": "QI homogenization addendum (docs/qi-homogenization-addendum.md).\n\nMinimal artifact: homogenization notes.",
-      "tags": ["qi", "homogenization", "constraints"],
+      "tags": [
+        "qi",
+        "homogenization",
+        "constraints"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-tiles-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
     },
     {
       "id": "qi-ops-runbook",
@@ -97,9 +166,138 @@
       "title": "QI Ops Runbook",
       "excerpt": "Operational runbook for QI guardrails.",
       "bodyMD": "QI operations guidance (docs/qi-ops-runbook.md).\n\nMinimal artifact: runbook checklist.",
-      "tags": ["qi", "runbook", "operations"],
+      "tags": [
+        "qi",
+        "runbook",
+        "operations"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-tiles-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
+    },
+    {
+      "id": "casimir-calculation-stack",
+      "slug": "casimir-calculation-stack",
+      "title": "Casimir Calculation Stack",
+      "excerpt": "Calculation modules underpinning Casimir tiles.",
+      "bodyMD": "Casimir calculations connect static baselines, dynamic sweeps, and inference.\n\nMinimal artifact: Casimir calculation summary.",
+      "tags": [
+        "casimir",
+        "calculation",
+        "tiles"
+      ],
+      "children": [
+        "casimir-static-engine",
+        "casimir-dynamic-engine",
+        "casimir-inference-engine",
+        "casimir-natario-metric",
+        "casimir-stress-energy-equations"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        }
+      ]
+    },
+    {
+      "id": "casimir-static-engine",
+      "slug": "casimir-static-engine",
+      "title": "Static Casimir Engine",
+      "excerpt": "Compute static Casimir energy baseline.",
+      "bodyMD": "Static Casimir baseline supports tile energy estimates (modules/sim_core/static-casimir.ts).\n\nMinimal artifact: baseline energy value.",
+      "tags": [
+        "casimir",
+        "static",
+        "baseline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-calculation-stack"
+        }
+      ]
+    },
+    {
+      "id": "casimir-dynamic-engine",
+      "slug": "casimir-dynamic-engine",
+      "title": "Dynamic Casimir Engine",
+      "excerpt": "Dynamic Casimir sweeps for tile calculations.",
+      "bodyMD": "Dynamic Casimir engine executes sweeps (modules/dynamic/dynamic-casimir.ts).\n\nMinimal artifact: sweep curve record.",
+      "tags": [
+        "casimir",
+        "dynamic",
+        "sweep"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-calculation-stack"
+        }
+      ]
+    },
+    {
+      "id": "casimir-inference-engine",
+      "slug": "casimir-inference-engine",
+      "title": "Casimir Inference",
+      "excerpt": "Infer energy from force series and datasets.",
+      "bodyMD": "Inference utilities map force series to energy (modules/sim_core/casimir-inference.ts).\n\nMinimal artifact: inference fit summary.",
+      "tags": [
+        "casimir",
+        "inference",
+        "force"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-calculation-stack"
+        }
+      ]
+    },
+    {
+      "id": "casimir-natario-metric",
+      "slug": "casimir-natario-metric",
+      "title": "Natario Metric Helpers",
+      "excerpt": "Natario metric helpers for Casimir geometry.",
+      "bodyMD": "Natario metric helpers supply geometry parameters (modules/dynamic/natario-metric.ts).\n\nMinimal artifact: metric parameter snapshot.",
+      "tags": [
+        "natario",
+        "metric",
+        "geometry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-calculation-stack"
+        }
+      ]
+    },
+    {
+      "id": "casimir-stress-energy-equations",
+      "slug": "casimir-stress-energy-equations",
+      "title": "Casimir Stress-Energy Equations",
+      "excerpt": "Stress-energy equations for Casimir fields.",
+      "bodyMD": "Stress-energy equations map Casimir fields (modules/dynamic/stress-energy-equations.ts).\n\nMinimal artifact: tensor component summary.",
+      "tags": [
+        "stress-energy",
+        "casimir",
+        "equations"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-calculation-stack"
+        }
+      ]
     }
   ]
 }

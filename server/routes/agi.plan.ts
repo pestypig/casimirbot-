@@ -5290,7 +5290,7 @@ type HelixAskSlotPlanEntry = {
   id: string;
   label: string;
   required: boolean;
-  source: "concept" | "plan" | "plan_pass" | "memory" | "heading" | "token";
+  source: "concept" | "plan" | "plan_pass" | "memory" | "heading" | "graph" | "token";
   weak?: boolean;
   surfaces?: string[];
   aliases?: string[];
@@ -5649,6 +5649,52 @@ const buildDocHeadingSeedSlots = (question: string): HelixAskSlotPlanEntry[] => 
     }));
 };
 
+const GRAPH_SLOT_LIMIT = 6;
+
+const collectGraphHintTerms = (framework: HelixAskGraphFramework | null): string[] => {
+  if (!framework) return [];
+  const terms = new Set<string>();
+  const nodes = [...framework.anchors, ...framework.path];
+  for (const node of nodes) {
+    if (node.title) terms.add(node.title);
+    if (node.id) terms.add(node.id);
+    for (const tag of node.tags ?? []) terms.add(tag);
+  }
+  return filterSlotHintTerms(Array.from(terms), { maxTokens: 8, maxChars: 90 });
+};
+
+const buildGraphSeedSlots = (
+  framework: HelixAskGraphFramework | null,
+): HelixAskSlotPlanEntry[] => {
+  if (!framework) return [];
+  const nodes = [...framework.anchors, ...framework.path]
+    .slice()
+    .sort((a, b) => b.score - a.score);
+  const out: HelixAskSlotPlanEntry[] = [];
+  const seen = new Set<string>();
+  for (const node of nodes) {
+    const id = normalizeSlotId(node.id || node.title || "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const aliases = filterSlotHintTerms(
+      [node.title ?? "", node.id, ...(node.tags ?? [])],
+      { maxTokens: 6, maxChars: 72 },
+    ).slice(0, SLOT_ALIAS_MAX);
+    out.push({
+      id,
+      label: node.title || node.id,
+      required: false,
+      source: "graph",
+      weak: false,
+      aliases,
+      surfaces: deriveSlotSurfaces(node.artifact ?? framework.sourcePath),
+      evidenceCriteria: (node.tags ?? []).slice(0, 6),
+    });
+    if (out.length >= GRAPH_SLOT_LIMIT) break;
+  }
+  return out;
+};
+
 const getConceptCardIndex = (): Map<string, HelixAskConceptCard> => {
   if (conceptCardIndex) return conceptCardIndex;
   const index = new Map<string, HelixAskConceptCard>();
@@ -5713,6 +5759,7 @@ const buildCanonicalSlotPlan = (args: {
     memory: 3,
     plan: 2,
     heading: 2,
+    graph: 2,
     token: 1,
   };
   const mergeSlot = (
@@ -10837,9 +10884,11 @@ const executeHelixAsk = async ({
     let sessionMemory: HelixAskSessionMemory | null = null;
     let memorySeedSlots: HelixAskSlotPlanEntry[] = [];
     let slotPlanHeadingSeedSlots: HelixAskSlotPlanEntry[] = [];
+    let graphSeedSlots: HelixAskSlotPlanEntry[] = [];
     let memoryPinnedFiles: string[] = [];
     let slotPlanPass: HelixAskSlotPlanPass | null = null;
     let slotPlanPassSlots: HelixAskSlotPlanEntry[] = [];
+    let graphHintTerms: string[] = [];
     const tuningOverrides = HELIX_ASK_SWEEP_OVERRIDES ? parsed.data.tuning : undefined;
     const arbiterRepoRatio = clampNumber(
       typeof tuningOverrides?.arbiter_repo_ratio === "number"
@@ -12772,6 +12821,8 @@ const executeHelixAsk = async ({
       conceptMatch,
     });
     graphResolverPreferred = Boolean(graphFramework?.preferGraph);
+    graphHintTerms = collectGraphHintTerms(graphFramework);
+    graphSeedSlots = buildGraphSeedSlots(graphFramework);
     if (graphFramework) {
       logEvent(
         "Graph framework",
@@ -12804,6 +12855,9 @@ const executeHelixAsk = async ({
       ),
     );
     let evidenceSignalTokens = baseEvidenceSignalTokens.slice();
+    if (graphHintTerms.length > 0) {
+      evidenceSignalTokens = mergeEvidenceSignalTokens(evidenceSignalTokens, graphHintTerms);
+    }
     let evidenceUseQuestionTokens = true;
     const conceptFastPathCandidate =
       Boolean(conceptMatch) &&
@@ -13287,6 +13341,9 @@ const executeHelixAsk = async ({
         if (debugPayload && queryHints.length > 0) {
           debugPayload.query_hints = queryHints;
         }
+        if (debugPayload && graphHintTerms.length > 0) {
+          debugPayload.graph_hint_terms = graphHintTerms.slice(0, 12);
+        }
         if (debugPayload && planDirectives) {
           debugPayload.plan_directives = planDirectives;
         }
@@ -13297,7 +13354,12 @@ const executeHelixAsk = async ({
           question: slotPlanQuestion,
           directives: planDirectives,
           candidates: slotPreviewCandidates,
-          seedSlots: [...memorySeedSlots, ...slotPlanHeadingSeedSlots, ...slotPlanPassSlots],
+          seedSlots: [
+            ...memorySeedSlots,
+            ...slotPlanHeadingSeedSlots,
+            ...slotPlanPassSlots,
+            ...graphSeedSlots,
+          ],
         });
         coverageSlots = coverageSlotsFromRequest
           ? requestCoverageSlots
@@ -13316,17 +13378,23 @@ const executeHelixAsk = async ({
         slotAliasMap = buildSlotAliasMap(slotPlan);
         if (coverageSlotsFromRequest) {
           const coverageSlotAliases = collectCoverageSlotAliases(slotAliasMap, coverageSlots);
-          if (coverageSlotAliases.length > 0 || slotEvidenceHints.length > 0) {
+          if (
+            coverageSlotAliases.length > 0 ||
+            slotEvidenceHints.length > 0 ||
+            graphHintTerms.length > 0
+          ) {
             evidenceSignalTokens = mergeEvidenceSignalTokens(
               coverageSlotAliases,
               slotEvidenceHints,
+              graphHintTerms,
             );
             evidenceUseQuestionTokens = false;
           }
-        } else if (slotEvidenceHints.length > 0) {
+        } else if (slotEvidenceHints.length > 0 || graphHintTerms.length > 0) {
           evidenceSignalTokens = mergeEvidenceSignalTokens(
             evidenceSignalTokens,
             slotEvidenceHints,
+            graphHintTerms,
           );
         }
         if (slotPlan.slots.length > 0) {
@@ -13364,8 +13432,14 @@ const executeHelixAsk = async ({
         }
         const blockQueryHints = blockScoped && HELIX_ASK_QUERY_HINTS_BLOCKS ? queryHints : [];
         const mergeHints = blockScoped
-          ? [...blockQueryHints, ...slotAliases, ...slotEvidenceHints]
-          : [...queryHints, ...slotAliases, ...slotEvidenceHints, ...memoryPinnedFiles];
+          ? [...blockQueryHints, ...graphHintTerms, ...slotAliases, ...slotEvidenceHints]
+          : [
+              ...queryHints,
+              ...graphHintTerms,
+              ...slotAliases,
+              ...slotEvidenceHints,
+              ...memoryPinnedFiles,
+            ];
         const queries = mergeHelixAskQueries(
           baseQueries,
           mergeHints,

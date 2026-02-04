@@ -8,7 +8,12 @@
       "title": "Physics Foundations Tree",
       "excerpt": "A walkable map from spacetime geometry to constraints, proofs, and verification.",
       "bodyMD": "This tree anchors how GR, energy conditions, and numerical checks connect to verification.\n\nMinimal artifact: foundational doc set (docs/knowledge/physics/*.md).",
-      "tags": ["physics", "foundations", "geometry", "verification"],
+      "tags": [
+        "physics",
+        "foundations",
+        "geometry",
+        "verification"
+      ],
       "children": [
         "geometry-stack",
         "field-equations-stack",
@@ -28,14 +33,21 @@
       "title": "Geometry Stack",
       "excerpt": "Metric, connection, and curvature define the spacetime substrate.",
       "bodyMD": "Geometry provides the language for GR proofs and constraint checks.\n\nMinimal artifact: spacetime metric + curvature notes.",
-      "tags": ["geometry", "metric", "curvature"],
+      "tags": [
+        "geometry",
+        "metric",
+        "curvature"
+      ],
       "children": [
         "spacetime-metric-basics",
         "connection-curvature",
         "boundary-conditions-modes"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        }
       ]
     },
     {
@@ -44,9 +56,18 @@
       "title": "Spacetime Metric Basics",
       "excerpt": "Define the metric as the core object for distances and intervals.",
       "bodyMD": "Metric definitions anchor coordinate-invariant statements (docs/knowledge/physics/spacetime-metric-basics.md).\n\nMinimal artifact: metric definition + sign convention.",
-      "tags": ["metric", "spacetime", "geometry"],
+      "tags": [
+        "metric",
+        "spacetime",
+        "geometry"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "geometry-stack"
+        }
+      ]
     },
     {
       "id": "connection-curvature",
@@ -54,9 +75,18 @@
       "title": "Connection and Curvature",
       "excerpt": "Curvature expresses how geometry responds to matter and energy.",
       "bodyMD": "Connections and curvature tensors map geometry to dynamics (docs/knowledge/physics/connection-curvature.md).\n\nMinimal artifact: curvature identity checklist.",
-      "tags": ["curvature", "connection", "geometry"],
+      "tags": [
+        "curvature",
+        "connection",
+        "geometry"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "geometry-stack"
+        }
+      ]
     },
     {
       "id": "boundary-conditions-modes",
@@ -64,9 +94,18 @@
       "title": "Boundary Conditions and Modes",
       "excerpt": "Boundary choices shape stability and the physical interpretation of solutions.",
       "bodyMD": "Boundary conditions determine allowed modes and constraint behavior (docs/knowledge/physics/boundary-conditions-modes.md).\n\nMinimal artifact: boundary condition specification.",
-      "tags": ["boundary", "modes", "stability"],
+      "tags": [
+        "boundary",
+        "modes",
+        "stability"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "geometry-stack"
+        }
+      ]
     },
     {
       "id": "field-equations-stack",
@@ -74,15 +113,26 @@
       "title": "Field Equations Stack",
       "excerpt": "Einstein equations and 3+1 decomposition structure the dynamics.",
       "bodyMD": "Field equations define how curvature responds to stress-energy.\n\nMinimal artifact: Einstein equation statement and 3+1 split.",
-      "tags": ["einstein", "adm", "equations", "gr"],
+      "tags": [
+        "einstein",
+        "adm",
+        "equations",
+        "gr"
+      ],
       "children": [
         "einstein-field-equations",
         "adm-3plus1",
         "york-time-constraints"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" },
-        { "rel": "see-also", "to": "stress-energy-stack" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "stress-energy-stack"
+        }
       ]
     },
     {
@@ -91,9 +141,18 @@
       "title": "Einstein Field Equations",
       "excerpt": "Curvature equals stress-energy with constant factors.",
       "bodyMD": "Field equations connect geometry to matter (docs/knowledge/physics/einstein-field-equations.md).\n\nMinimal artifact: equation form and sign convention.",
-      "tags": ["einstein", "equations", "gr"],
+      "tags": [
+        "einstein",
+        "equations",
+        "gr"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "field-equations-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "field-equations-stack"
+        }
+      ]
     },
     {
       "id": "adm-3plus1",
@@ -101,9 +160,18 @@
       "title": "ADM 3+1 Decomposition",
       "excerpt": "Split spacetime into spatial slices and time evolution.",
       "bodyMD": "ADM decomposition makes evolution and constraint equations explicit (docs/knowledge/physics/adm-3plus1.md).\n\nMinimal artifact: lapse, shift, and spatial metric definitions.",
-      "tags": ["adm", "3plus1", "evolution"],
+      "tags": [
+        "adm",
+        "3plus1",
+        "evolution"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "field-equations-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "field-equations-stack"
+        }
+      ]
     },
     {
       "id": "york-time-constraints",
@@ -111,9 +179,18 @@
       "title": "York Time Constraints",
       "excerpt": "York time gauges constrain slicing and stability.",
       "bodyMD": "York time constraints shape admissible evolution and consistency (docs/knowledge/physics/york-time-constraints.md).\n\nMinimal artifact: York time bounds and assumptions.",
-      "tags": ["york", "constraints", "slicing"],
+      "tags": [
+        "york",
+        "constraints",
+        "slicing"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "field-equations-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "field-equations-stack"
+        }
+      ]
     },
     {
       "id": "stress-energy-stack",
@@ -121,14 +198,24 @@
       "title": "Stress-Energy Stack",
       "excerpt": "Stress-energy defines how matter sources curvature.",
       "bodyMD": "Stress-energy is the bridge between physics inputs and GR dynamics.\n\nMinimal artifact: stress-energy definition and units.",
-      "tags": ["stress-energy", "matter", "source"],
+      "tags": [
+        "stress-energy",
+        "matter",
+        "source"
+      ],
       "children": [
         "stress-energy-tensor",
         "energy-mass-equivalence"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" },
-        { "rel": "see-also", "to": "energy-conditions-stack" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "energy-conditions-stack"
+        }
       ]
     },
     {
@@ -137,9 +224,18 @@
       "title": "Stress-Energy Tensor",
       "excerpt": "Tensor form of energy, momentum, and pressure.",
       "bodyMD": "The tensor encodes energy density and fluxes (docs/knowledge/physics/stress-energy-tensor.md).\n\nMinimal artifact: tensor component glossary.",
-      "tags": ["tensor", "stress-energy", "fields"],
+      "tags": [
+        "tensor",
+        "stress-energy",
+        "fields"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "stress-energy-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "stress-energy-stack"
+        }
+      ]
     },
     {
       "id": "energy-mass-equivalence",
@@ -147,9 +243,18 @@
       "title": "Energy-Mass Equivalence",
       "excerpt": "Energy and mass relate through scaling constants.",
       "bodyMD": "Energy-mass equivalence sets the scale for stress-energy inputs (docs/knowledge/physics/energy-mass-equivalence.md).\n\nMinimal artifact: conversion formula checklist.",
-      "tags": ["energy", "mass", "equivalence"],
+      "tags": [
+        "energy",
+        "mass",
+        "equivalence"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "stress-energy-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "stress-energy-stack"
+        }
+      ]
     },
     {
       "id": "energy-conditions-stack",
@@ -157,15 +262,25 @@
       "title": "Energy Conditions Stack",
       "excerpt": "Energy conditions and quantum inequalities bound exotic matter.",
       "bodyMD": "Energy conditions define allowed stress-energy behaviors.\n\nMinimal artifact: condition definitions + inequality references.",
-      "tags": ["energy", "conditions", "constraints"],
+      "tags": [
+        "energy",
+        "conditions",
+        "constraints"
+      ],
       "children": [
         "energy-conditions",
         "negative-energy-interpretation",
         "ford-roman-quantum-inequality"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" },
-        { "rel": "see-also", "to": "casimir-phenomena" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-phenomena"
+        }
       ]
     },
     {
@@ -174,9 +289,18 @@
       "title": "Energy Conditions",
       "excerpt": "Classical conditions restrict stress-energy.",
       "bodyMD": "Energy conditions constrain admissible matter (docs/knowledge/physics/energy-conditions.md).\n\nMinimal artifact: condition checklist.",
-      "tags": ["energy", "conditions", "constraints"],
+      "tags": [
+        "energy",
+        "conditions",
+        "constraints"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "energy-conditions-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-conditions-stack"
+        }
+      ]
     },
     {
       "id": "negative-energy-interpretation",
@@ -184,9 +308,18 @@
       "title": "Negative Energy Interpretation",
       "excerpt": "Interpretation and limits for negative energy densities.",
       "bodyMD": "Negative energy requires careful interpretation and limits (docs/knowledge/physics/negative-energy-interpretation.md).\n\nMinimal artifact: interpretation note + limits.",
-      "tags": ["negative-energy", "interpretation", "limits"],
+      "tags": [
+        "negative-energy",
+        "interpretation",
+        "limits"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "energy-conditions-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-conditions-stack"
+        }
+      ]
     },
     {
       "id": "ford-roman-quantum-inequality",
@@ -194,9 +327,18 @@
       "title": "Ford-Roman Quantum Inequality",
       "excerpt": "Quantum inequalities bound magnitude and duration of negative energy.",
       "bodyMD": "Quantum inequalities constrain negative energy exposure (docs/knowledge/physics/ford-roman-quantum-inequality.md).\n\nMinimal artifact: inequality bounds summary.",
-      "tags": ["quantum-inequality", "ford-roman", "constraints"],
+      "tags": [
+        "quantum-inequality",
+        "ford-roman",
+        "constraints"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "energy-conditions-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-conditions-stack"
+        }
+      ]
     },
     {
       "id": "casimir-phenomena",
@@ -204,7 +346,11 @@
       "title": "Casimir Phenomena",
       "excerpt": "Casimir effects provide a concrete negative-energy mechanism.",
       "bodyMD": "Casimir effects connect vacuum structure to measurable forces (docs/knowledge/physics/casimir-force-energy.md).\n\nMinimal artifact: Casimir effect summary and geometry notes.",
-      "tags": ["casimir", "vacuum", "negative-energy"],
+      "tags": [
+        "casimir",
+        "vacuum",
+        "negative-energy"
+      ],
       "children": [
         "casimir-force-energy",
         "casimir-geometry-effects",
@@ -212,8 +358,14 @@
         "vacuum-fluctuations"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" },
-        { "rel": "see-also", "to": "energy-conditions-stack" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "energy-conditions-stack"
+        }
       ]
     },
     {
@@ -222,9 +374,18 @@
       "title": "Casimir Force and Energy",
       "excerpt": "Vacuum boundary conditions generate measurable forces.",
       "bodyMD": "Casimir force derivations link geometry to energy shifts (docs/knowledge/physics/casimir-force-energy.md).\n\nMinimal artifact: force-energy scaling summary.",
-      "tags": ["casimir", "force", "energy"],
+      "tags": [
+        "casimir",
+        "force",
+        "energy"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-phenomena" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-phenomena"
+        }
+      ]
     },
     {
       "id": "casimir-geometry-effects",
@@ -232,9 +393,18 @@
       "title": "Casimir Geometry Effects",
       "excerpt": "Geometry choices change mode structure and energy density.",
       "bodyMD": "Geometry sets the mode spectrum (docs/knowledge/physics/casimir-geometry-effects.md).\n\nMinimal artifact: geometry sensitivity notes.",
-      "tags": ["casimir", "geometry", "modes"],
+      "tags": [
+        "casimir",
+        "geometry",
+        "modes"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-phenomena" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-phenomena"
+        }
+      ]
     },
     {
       "id": "dynamic-casimir-effect",
@@ -242,9 +412,18 @@
       "title": "Dynamic Casimir Effect",
       "excerpt": "Time-varying boundaries create real photons.",
       "bodyMD": "Dynamic Casimir links motion and radiation (docs/knowledge/physics/dynamic-casimir-effect.md).\n\nMinimal artifact: boundary modulation summary.",
-      "tags": ["casimir", "dynamic", "radiation"],
+      "tags": [
+        "casimir",
+        "dynamic",
+        "radiation"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-phenomena" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-phenomena"
+        }
+      ]
     },
     {
       "id": "vacuum-fluctuations",
@@ -252,9 +431,18 @@
       "title": "Vacuum Fluctuations",
       "excerpt": "Vacuum fluctuations underpin zero-point energy effects.",
       "bodyMD": "Vacuum fluctuations motivate negative energy discussions (docs/knowledge/physics/vacuum-fluctuations.md).\n\nMinimal artifact: fluctuation interpretation notes.",
-      "tags": ["vacuum", "fluctuations", "quantum"],
+      "tags": [
+        "vacuum",
+        "fluctuations",
+        "quantum"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "casimir-phenomena" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-phenomena"
+        }
+      ]
     },
     {
       "id": "units-and-scaling",
@@ -262,16 +450,27 @@
       "title": "Units and Scaling",
       "excerpt": "Consistent units and scaling keep proofs and simulations coherent.",
       "bodyMD": "Unit systems and scaling laws prevent silent errors.\n\nMinimal artifact: unit conversion checklist.",
-      "tags": ["units", "scaling", "consistency"],
+      "tags": [
+        "units",
+        "scaling",
+        "consistency"
+      ],
       "children": [
         "units-systems",
         "dimensional-analysis",
         "scaling-laws",
-        "fundamental-constants"
+        "fundamental-constants",
+        "gr-units-conversion"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" },
-        { "rel": "see-also", "to": "numerics-and-stability" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "numerics-and-stability"
+        }
       ]
     },
     {
@@ -280,9 +479,18 @@
       "title": "Units Systems",
       "excerpt": "Geometric and SI units must be mapped explicitly.",
       "bodyMD": "Unit systems align numerical outputs and physical meaning (docs/knowledge/physics/units-systems.md).\n\nMinimal artifact: unit mapping table.",
-      "tags": ["units", "systems", "conversion"],
+      "tags": [
+        "units",
+        "systems",
+        "conversion"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "units-and-scaling" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "units-and-scaling"
+        }
+      ]
     },
     {
       "id": "dimensional-analysis",
@@ -290,9 +498,18 @@
       "title": "Dimensional Analysis",
       "excerpt": "Dimensional checks prevent hidden inconsistencies.",
       "bodyMD": "Dimensional analysis guards against scale errors (docs/knowledge/physics/dimensional-analysis.md).\n\nMinimal artifact: dimensionless grouping list.",
-      "tags": ["dimensions", "analysis", "consistency"],
+      "tags": [
+        "dimensions",
+        "analysis",
+        "consistency"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "units-and-scaling" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "units-and-scaling"
+        }
+      ]
     },
     {
       "id": "scaling-laws",
@@ -300,9 +517,18 @@
       "title": "Scaling Laws",
       "excerpt": "Scaling relations explain how results change with size.",
       "bodyMD": "Scaling laws map parameter shifts to outcomes (docs/knowledge/physics/scaling-laws.md).\n\nMinimal artifact: scaling relation summary.",
-      "tags": ["scaling", "relations", "models"],
+      "tags": [
+        "scaling",
+        "relations",
+        "models"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "units-and-scaling" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "units-and-scaling"
+        }
+      ]
     },
     {
       "id": "fundamental-constants",
@@ -310,9 +536,18 @@
       "title": "Fundamental Constants",
       "excerpt": "Constants anchor conversions and scaling.",
       "bodyMD": "Constants keep equations grounded (docs/knowledge/physics/fundamental-constants.md).\n\nMinimal artifact: constant reference list.",
-      "tags": ["constants", "units", "reference"],
+      "tags": [
+        "constants",
+        "units",
+        "reference"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "units-and-scaling" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "units-and-scaling"
+        }
+      ]
     },
     {
       "id": "numerics-and-stability",
@@ -320,15 +555,24 @@
       "title": "Numerics and Stability",
       "excerpt": "Discretization and precision define trustworthy simulations.",
       "bodyMD": "Numerical methods require stability and precision checks.\n\nMinimal artifact: discretization + stability report.",
-      "tags": ["numerics", "stability", "precision"],
+      "tags": [
+        "numerics",
+        "stability",
+        "precision"
+      ],
       "children": [
         "discretization-mesh",
         "numerical-precision",
         "stability-timestep",
-        "visualization-scaling"
+        "visualization-scaling",
+        "curvature-diagnostics",
+        "qi-diagnostics-schema"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        }
       ]
     },
     {
@@ -337,9 +581,18 @@
       "title": "Discretization and Mesh",
       "excerpt": "Mesh resolution shapes accuracy and stability.",
       "bodyMD": "Discretization defines numerical error profiles (docs/knowledge/physics/discretization-mesh.md).\n\nMinimal artifact: mesh resolution plan.",
-      "tags": ["mesh", "discretization", "resolution"],
+      "tags": [
+        "mesh",
+        "discretization",
+        "resolution"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "numerics-and-stability" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "numerics-and-stability"
+        }
+      ]
     },
     {
       "id": "numerical-precision",
@@ -347,9 +600,18 @@
       "title": "Numerical Precision",
       "excerpt": "Precision limits determine residual reliability.",
       "bodyMD": "Precision constraints affect diagnostics (docs/knowledge/physics/numerical-precision.md).\n\nMinimal artifact: precision budget note.",
-      "tags": ["precision", "errors", "diagnostics"],
+      "tags": [
+        "precision",
+        "errors",
+        "diagnostics"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "numerics-and-stability" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "numerics-and-stability"
+        }
+      ]
     },
     {
       "id": "stability-timestep",
@@ -357,9 +619,18 @@
       "title": "Stability and Timestep",
       "excerpt": "Timestep choices control numerical stability.",
       "bodyMD": "Stability bounds set timestep choices (docs/knowledge/physics/stability-timestep.md).\n\nMinimal artifact: timestep stability checklist.",
-      "tags": ["stability", "timestep", "cfl"],
+      "tags": [
+        "stability",
+        "timestep",
+        "cfl"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "numerics-and-stability" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "numerics-and-stability"
+        }
+      ]
     },
     {
       "id": "visualization-scaling",
@@ -367,9 +638,18 @@
       "title": "Visualization Scaling",
       "excerpt": "Scaling choices impact interpretation of plots.",
       "bodyMD": "Visualization scaling can distort interpretations (docs/knowledge/physics/visualization-scaling.md).\n\nMinimal artifact: plot scaling rules.",
-      "tags": ["visualization", "scaling", "interpretation"],
+      "tags": [
+        "visualization",
+        "scaling",
+        "interpretation"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "numerics-and-stability" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "numerics-and-stability"
+        }
+      ]
     },
     {
       "id": "time-bounds-stack",
@@ -377,12 +657,19 @@
       "title": "Sampling and Time Bounds",
       "excerpt": "Sampling windows and time bounds constrain valid claims.",
       "bodyMD": "Time bounds protect against over-claiming from short windows.\n\nMinimal artifact: sampling window report.",
-      "tags": ["sampling", "time", "bounds"],
+      "tags": [
+        "sampling",
+        "time",
+        "bounds"
+      ],
       "children": [
         "sampling-time-bounds"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        }
       ]
     },
     {
@@ -391,9 +678,18 @@
       "title": "Sampling Time Bounds",
       "excerpt": "Bounds on sampling windows prevent false averages.",
       "bodyMD": "Sampling bounds must respect system timescales (docs/knowledge/physics/sampling-time-bounds.md).\n\nMinimal artifact: sampling window justification.",
-      "tags": ["sampling", "bounds", "time"],
+      "tags": [
+        "sampling",
+        "bounds",
+        "time"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "time-bounds-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "time-bounds-stack"
+        }
+      ]
     },
     {
       "id": "viability-and-claims",
@@ -401,15 +697,25 @@
       "title": "Viability and Claims",
       "excerpt": "Define what counts as viable and what claims are allowed.",
       "bodyMD": "Viability definitions and claim limits prevent overreach.\n\nMinimal artifact: viability definition + no-feasibility-claims guard.",
-      "tags": ["viability", "claims", "guardrails"],
+      "tags": [
+        "viability",
+        "claims",
+        "guardrails"
+      ],
       "children": [
         "viability-definition",
         "no-feasibility-claims",
         "certificate-integrity"
       ],
       "links": [
-        { "rel": "parent", "to": "physics-foundations-tree" },
-        { "rel": "see-also", "to": "energy-conditions-stack" }
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "energy-conditions-stack"
+        }
       ]
     },
     {
@@ -418,9 +724,18 @@
       "title": "Viability Definition",
       "excerpt": "Define viability in terms of constraints and evidence.",
       "bodyMD": "Viability must be tied to constraints and evidence (docs/knowledge/physics/viability-definition.md).\n\nMinimal artifact: viability definition statement.",
-      "tags": ["viability", "definition", "evidence"],
+      "tags": [
+        "viability",
+        "definition",
+        "evidence"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "viability-and-claims" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "viability-and-claims"
+        }
+      ]
     },
     {
       "id": "no-feasibility-claims",
@@ -428,9 +743,18 @@
       "title": "No Feasibility Claims",
       "excerpt": "Guard against unsupported feasibility claims.",
       "bodyMD": "No-feasibility guardrails block over-claiming (docs/knowledge/physics/no-feasibility-claims.md).\n\nMinimal artifact: claim limitation note.",
-      "tags": ["claims", "guardrails", "feasibility"],
+      "tags": [
+        "claims",
+        "guardrails",
+        "feasibility"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "viability-and-claims" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "viability-and-claims"
+        }
+      ]
     },
     {
       "id": "certificate-integrity",
@@ -438,9 +762,75 @@
       "title": "Certificate Integrity",
       "excerpt": "Integrity checks back any certified claim.",
       "bodyMD": "Certificate integrity is required for certified claims (docs/knowledge/physics/certificate-integrity.md).\n\nMinimal artifact: certificate hash and integrity check.",
-      "tags": ["certificate", "integrity", "verification"],
+      "tags": [
+        "certificate",
+        "integrity",
+        "verification"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "viability-and-claims" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "viability-and-claims"
+        }
+      ]
+    },
+    {
+      "id": "gr-units-conversion",
+      "slug": "gr-units-conversion",
+      "title": "GR Units Conversion",
+      "excerpt": "Convert between SI and geometric GR units.",
+      "bodyMD": "GR units conversion defines SI/geometric scaling (shared/gr-units.ts).\n\nMinimal artifact: conversion constants.",
+      "tags": [
+        "units",
+        "gr",
+        "conversion"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "units-and-scaling"
+        }
+      ]
+    },
+    {
+      "id": "curvature-diagnostics",
+      "slug": "curvature-diagnostics",
+      "title": "Curvature Diagnostics",
+      "excerpt": "Schema for curvature diagnostics output.",
+      "bodyMD": "Curvature diagnostics schema records ridge tracking and hashes (shared/curvature-diagnostics.ts).\n\nMinimal artifact: diagnostics schema.",
+      "tags": [
+        "curvature",
+        "diagnostics",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "numerics-and-stability"
+        }
+      ]
+    },
+    {
+      "id": "qi-diagnostics-schema",
+      "slug": "qi-diagnostics-schema",
+      "title": "QI Diagnostics Schema",
+      "excerpt": "Schema for QI diagnostic payloads.",
+      "bodyMD": "QI diagnostics schema defines payload fields (shared/qi-diagnostics.ts).\n\nMinimal artifact: diagnostics schema snapshot.",
+      "tags": [
+        "qi",
+        "diagnostics",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "numerics-and-stability"
+        }
+      ]
     }
   ]
 }

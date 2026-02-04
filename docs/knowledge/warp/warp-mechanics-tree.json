@@ -8,11 +8,17 @@
       "title": "Warp Mechanics Tree",
       "excerpt": "A walkable map of warp geometry, proxies, and control levers.",
       "bodyMD": "Warp mechanics connect geometry choices to proxy constraints and operational controls.\n\nMinimal artifact: warp knowledge docs (docs/knowledge/warp/*.md).",
-      "tags": ["warp", "geometry", "proxies", "controls"],
+      "tags": [
+        "warp",
+        "geometry",
+        "proxies",
+        "controls"
+      ],
       "children": [
         "warp-geometry-stack",
         "warp-proxy-stack",
-        "warp-control-stack"
+        "warp-control-stack",
+        "warp-implementation-stack"
       ],
       "links": []
     },
@@ -22,7 +28,11 @@
       "title": "Warp Geometry Stack",
       "excerpt": "Geometry choices define the bubble shape and expansion behavior.",
       "bodyMD": "Geometry anchors how metrics map to practical warp constraints.\n\nMinimal artifact: metric definitions and geometry assumptions.",
-      "tags": ["warp", "geometry", "metric"],
+      "tags": [
+        "warp",
+        "geometry",
+        "metric"
+      ],
       "children": [
         "warp-bubble",
         "alcubierre-metric",
@@ -32,7 +42,10 @@
         "vdb-compression-factor"
       ],
       "links": [
-        { "rel": "parent", "to": "warp-mechanics-tree" }
+        {
+          "rel": "parent",
+          "to": "warp-mechanics-tree"
+        }
       ]
     },
     {
@@ -41,9 +54,18 @@
       "title": "Warp Bubble",
       "excerpt": "Define the bubble geometry and boundary choices.",
       "bodyMD": "Warp bubble definitions set the stage for constraints (docs/knowledge/warp/warp-bubble.md).\n\nMinimal artifact: bubble profile and boundary assumptions.",
-      "tags": ["warp", "bubble", "geometry"],
+      "tags": [
+        "warp",
+        "bubble",
+        "geometry"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack"
+        }
+      ]
     },
     {
       "id": "alcubierre-metric",
@@ -51,9 +73,18 @@
       "title": "Alcubierre Metric",
       "excerpt": "Classic warp metric with expansion and contraction regions.",
       "bodyMD": "Alcubierre metric defines a warp bubble with expansion/contraction (docs/knowledge/warp/alcubierre-metric.md).\n\nMinimal artifact: metric form and assumptions.",
-      "tags": ["alcubierre", "metric", "warp"],
+      "tags": [
+        "alcubierre",
+        "metric",
+        "warp"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack"
+        }
+      ]
     },
     {
       "id": "natario-zero-expansion",
@@ -61,9 +92,18 @@
       "title": "Natario Zero-Expansion",
       "excerpt": "Zero-expansion warp metric variants.",
       "bodyMD": "Natario metrics focus on zero expansion scalars (docs/knowledge/warp/natario-zero-expansion.md).\n\nMinimal artifact: zero-expansion condition summary.",
-      "tags": ["natario", "expansion", "warp"],
+      "tags": [
+        "natario",
+        "expansion",
+        "warp"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack"
+        }
+      ]
     },
     {
       "id": "shift-vector-expansion-scalar",
@@ -71,9 +111,18 @@
       "title": "Shift Vector and Expansion Scalar",
       "excerpt": "Shift vector choices drive expansion properties.",
       "bodyMD": "Shift vectors control expansion scalars (docs/knowledge/warp/shift-vector-expansion-scalar.md).\n\nMinimal artifact: shift vector definition and expansion relation.",
-      "tags": ["shift", "expansion", "warp"],
+      "tags": [
+        "shift",
+        "expansion",
+        "warp"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack"
+        }
+      ]
     },
     {
       "id": "bubble-wall-thickness",
@@ -81,9 +130,18 @@
       "title": "Bubble Wall Thickness",
       "excerpt": "Wall thickness controls gradients and energy needs.",
       "bodyMD": "Wall thickness shapes energy density and gradient scale (docs/knowledge/warp/bubble-wall-thickness.md).\n\nMinimal artifact: thickness parameter bounds.",
-      "tags": ["wall", "thickness", "warp"],
+      "tags": [
+        "wall",
+        "thickness",
+        "warp"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack"
+        }
+      ]
     },
     {
       "id": "vdb-compression-factor",
@@ -91,9 +149,18 @@
       "title": "Van den Broeck Compression Factor",
       "excerpt": "Compression factor trades bubble interior for reduced energy.",
       "bodyMD": "VdB compression changes volume/energy tradeoffs (docs/knowledge/warp/vdb-compression-factor.md).\n\nMinimal artifact: compression factor band.",
-      "tags": ["vdb", "compression", "warp"],
+      "tags": [
+        "vdb",
+        "compression",
+        "warp"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-geometry-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack"
+        }
+      ]
     },
     {
       "id": "warp-proxy-stack",
@@ -101,14 +168,21 @@
       "title": "Warp Proxy Stack",
       "excerpt": "Proxies bound energy requirements and feasibility narratives.",
       "bodyMD": "Proxies translate geometry into energy and constraint estimates.\n\nMinimal artifact: proxy constraint summary.",
-      "tags": ["proxies", "constraints", "warp"],
+      "tags": [
+        "proxies",
+        "constraints",
+        "warp"
+      ],
       "children": [
         "casimir-lattice",
         "ford-roman-proxy",
         "power-mass-ladders"
       ],
       "links": [
-        { "rel": "parent", "to": "warp-mechanics-tree" }
+        {
+          "rel": "parent",
+          "to": "warp-mechanics-tree"
+        }
       ]
     },
     {
@@ -117,9 +191,18 @@
       "title": "Casimir Lattice",
       "excerpt": "Lattice configurations as negative-energy proxies.",
       "bodyMD": "Casimir lattice assumptions inform proxy estimates (docs/knowledge/warp/casimir-lattice.md).\n\nMinimal artifact: lattice configuration notes.",
-      "tags": ["casimir", "lattice", "proxy"],
+      "tags": [
+        "casimir",
+        "lattice",
+        "proxy"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-proxy-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-proxy-stack"
+        }
+      ]
     },
     {
       "id": "ford-roman-proxy",
@@ -127,9 +210,18 @@
       "title": "Ford-Roman Proxy",
       "excerpt": "Proxy bounds from quantum inequality constraints.",
       "bodyMD": "Ford-Roman proxies bound negative energy (docs/knowledge/warp/ford-roman-proxy.md).\n\nMinimal artifact: proxy inequality summary.",
-      "tags": ["ford-roman", "proxy", "constraints"],
+      "tags": [
+        "ford-roman",
+        "proxy",
+        "constraints"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-proxy-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-proxy-stack"
+        }
+      ]
     },
     {
       "id": "power-mass-ladders",
@@ -137,9 +229,18 @@
       "title": "Power-Mass Ladders",
       "excerpt": "Scaling ladders for energy and mass requirements.",
       "bodyMD": "Power-mass ladders relate parameters to energy needs (docs/knowledge/warp/power-mass-ladders.md).\n\nMinimal artifact: ladder table.",
-      "tags": ["power", "mass", "scaling"],
+      "tags": [
+        "power",
+        "mass",
+        "scaling"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-proxy-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-proxy-stack"
+        }
+      ]
     },
     {
       "id": "warp-control-stack",
@@ -147,13 +248,20 @@
       "title": "Warp Control Stack",
       "excerpt": "Control levers manage duty cycles and active fractions.",
       "bodyMD": "Control parameters keep energy delivery consistent and bounded.\n\nMinimal artifact: duty cycle and active fraction settings.",
-      "tags": ["control", "duty", "active-fraction"],
+      "tags": [
+        "control",
+        "duty",
+        "active-fraction"
+      ],
       "children": [
         "sector-strobes-duty-cycle",
         "active-fraction"
       ],
       "links": [
-        { "rel": "parent", "to": "warp-mechanics-tree" }
+        {
+          "rel": "parent",
+          "to": "warp-mechanics-tree"
+        }
       ]
     },
     {
@@ -162,9 +270,18 @@
       "title": "Sector Strobes Duty Cycle",
       "excerpt": "Duty cycle controls temporal averaging in warp drives.",
       "bodyMD": "Duty cycle constraints shape effective averages (docs/knowledge/warp/sector-strobes-duty-cycle.md).\n\nMinimal artifact: duty cycle bounds.",
-      "tags": ["duty-cycle", "strobes", "control"],
+      "tags": [
+        "duty-cycle",
+        "strobes",
+        "control"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-control-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-control-stack"
+        }
+      ]
     },
     {
       "id": "active-fraction",
@@ -172,9 +289,178 @@
       "title": "Active Fraction",
       "excerpt": "Active fraction defines how much of the system is energized at once.",
       "bodyMD": "Active fraction controls energy delivery and stability (docs/knowledge/warp/active-fraction.md).\n\nMinimal artifact: active fraction schedule.",
-      "tags": ["active-fraction", "control", "stability"],
+      "tags": [
+        "active-fraction",
+        "control",
+        "stability"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "warp-control-stack" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-control-stack"
+        }
+      ]
+    },
+    {
+      "id": "warp-implementation-stack",
+      "slug": "warp-implementation-stack",
+      "title": "Warp Implementation Stack",
+      "excerpt": "Implementation modules and control references.",
+      "bodyMD": "Implementation modules connect geometry to runtime calculations.\n\nMinimal artifact: implementation notes and module outputs.",
+      "tags": [
+        "warp",
+        "implementation",
+        "modules"
+      ],
+      "children": [
+        "warp-module",
+        "natario-warp-implementation",
+        "theta-semantics",
+        "warp-pulsed-power",
+        "warpfield-mesh-patch-plan",
+        "warpfield-visualization-roadmap",
+        "warp-console-architecture"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-mechanics-tree"
+        }
+      ]
+    },
+    {
+      "id": "warp-module",
+      "slug": "warp-module",
+      "title": "Warp Module",
+      "excerpt": "Module integrating Natario warp calculations.",
+      "bodyMD": "Warp module integrates Natario warp bubble calculations (modules/warp/warp-module.ts).\n\nMinimal artifact: module output summary.",
+      "tags": [
+        "warp",
+        "module",
+        "natario"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        }
+      ]
+    },
+    {
+      "id": "natario-warp-implementation",
+      "slug": "natario-warp-implementation",
+      "title": "Natario Warp Implementation",
+      "excerpt": "Natario zero-expansion warp computations.",
+      "bodyMD": "Natario implementation computes warp parameters (modules/warp/natario-warp.ts).\n\nMinimal artifact: parameter summary.",
+      "tags": [
+        "natario",
+        "warp",
+        "implementation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        }
+      ]
+    },
+    {
+      "id": "theta-semantics",
+      "slug": "theta-semantics",
+      "title": "Theta Semantics",
+      "excerpt": "Theta definitions and calibration semantics.",
+      "bodyMD": "Theta semantics clarify calibration meaning (docs/theta-semantics.md).\n\nMinimal artifact: theta calibration notes.",
+      "tags": [
+        "theta",
+        "calibration",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        }
+      ]
+    },
+    {
+      "id": "warp-pulsed-power",
+      "slug": "warp-pulsed-power",
+      "title": "Warp Pulsed Power",
+      "excerpt": "Pulsed power assumptions for warp operations.",
+      "bodyMD": "Pulsed power notes inform control assumptions (docs/warp-pulsed-power.md).\n\nMinimal artifact: pulsed power assumptions.",
+      "tags": [
+        "warp",
+        "pulsed-power",
+        "control"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        }
+      ]
+    },
+    {
+      "id": "warpfield-mesh-patch-plan",
+      "slug": "warpfield-mesh-patch-plan",
+      "title": "Warpfield Mesh Patch Plan",
+      "excerpt": "Mesh plan for warpfield sampling.",
+      "bodyMD": "Mesh patch plan informs sampling strategy (docs/warpfield-mesh-patch-plan.md).\n\nMinimal artifact: mesh plan summary.",
+      "tags": [
+        "warpfield",
+        "mesh",
+        "sampling"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        }
+      ]
+    },
+    {
+      "id": "warpfield-visualization-roadmap",
+      "slug": "warpfield-visualization-roadmap",
+      "title": "Warpfield Visualization Roadmap",
+      "excerpt": "Visualization plan for warpfield outputs.",
+      "bodyMD": "Visualization roadmap ties outputs to views (docs/warpfield-visualization-roadmap.md).\n\nMinimal artifact: visualization plan.",
+      "tags": [
+        "warpfield",
+        "visualization",
+        "roadmap"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        }
+      ]
+    },
+    {
+      "id": "warp-console-architecture",
+      "slug": "warp-console-architecture",
+      "title": "Warp Console Architecture",
+      "excerpt": "Architecture overview for warp console.",
+      "bodyMD": "Warp console architecture document (docs/warp-console-architecture.md).\n\nMinimal artifact: architecture summary.",
+      "tags": [
+        "warp",
+        "architecture",
+        "console"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        }
+      ]
     }
   ]
 }

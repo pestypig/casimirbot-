@@ -8,14 +8,24 @@
       "title": "GR Solver Tree",
       "excerpt": "A walk from GR evolution to constraint gates and robustness notes.",
       "bodyMD": "GR solver components move from evolution to diagnostics and gate decisions.\n\nMinimal artifact: GR solver progress and robustness docs.",
-      "tags": ["gr", "solver", "constraints", "verification"],
+      "tags": [
+        "gr",
+        "solver",
+        "constraints",
+        "verification"
+      ],
       "children": [
         "gr-solver-progress",
         "gr-solver-robustness",
+        "gr-evolution-orchestration",
         "bssn-evolution",
         "gr-constraint-network",
         "gr-constraint-gate",
-        "gr-agent-loop"
+        "gr-constraint-policy",
+        "gr-evaluation",
+        "gr-worker-stack",
+        "gr-agent-loop",
+        "gr-assistant-adapter"
       ],
       "links": []
     },
@@ -25,9 +35,18 @@
       "title": "GR Solver Progress",
       "excerpt": "Status and milestones for solver development.",
       "bodyMD": "Progress notes document current solver status (docs/gr-solver-progress.md).\n\nMinimal artifact: progress milestone list.",
-      "tags": ["gr", "solver", "progress"],
+      "tags": [
+        "gr",
+        "solver",
+        "progress"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
     },
     {
       "id": "gr-solver-robustness",
@@ -35,9 +54,18 @@
       "title": "GR Solver Robustness",
       "excerpt": "Robustness checks and failure modes.",
       "bodyMD": "Robustness notes outline stability risks (docs/gr-solver-robustness.md).\n\nMinimal artifact: robustness checklist.",
-      "tags": ["gr", "solver", "robustness"],
+      "tags": [
+        "gr",
+        "solver",
+        "robustness"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
     },
     {
       "id": "bssn-evolution",
@@ -45,9 +73,25 @@
       "title": "BSSN Evolution",
       "excerpt": "Core evolution step for GR fields.",
       "bodyMD": "BSSN evolution computes field updates (modules/gr/bssn-evolve.ts).\n\nMinimal artifact: evolution step summary.",
-      "tags": ["bssn", "evolution", "gr"],
-      "children": [],
-      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+      "tags": [
+        "bssn",
+        "evolution",
+        "gr"
+      ],
+      "children": [
+        "bssn-state",
+        "rk4-integrator",
+        "stencils",
+        "gr-diagnostics",
+        "gr-stress-energy",
+        "stress-energy-integrals"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
     },
     {
       "id": "gr-constraint-network",
@@ -55,9 +99,18 @@
       "title": "GR Constraint Network",
       "excerpt": "Compute constraint residuals and diagnostics.",
       "bodyMD": "Constraint network evaluates residuals (server/gr/gr-constraint-network.ts).\n\nMinimal artifact: residual summary.",
-      "tags": ["constraints", "residuals", "gr"],
+      "tags": [
+        "constraints",
+        "residuals",
+        "gr"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
     },
     {
       "id": "gr-constraint-gate",
@@ -65,9 +118,18 @@
       "title": "GR Constraint Gate",
       "excerpt": "Gate evaluation converts diagnostics into pass/fail.",
       "bodyMD": "Constraint gate applies thresholds (server/gr/constraint-evaluator.ts).\n\nMinimal artifact: gate status summary.",
-      "tags": ["gate", "constraints", "verification"],
+      "tags": [
+        "gate",
+        "constraints",
+        "verification"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
     },
     {
       "id": "gr-agent-loop",
@@ -75,9 +137,411 @@
       "title": "GR Agent Loop",
       "excerpt": "Orchestration loop for GR evaluation and proposals.",
       "bodyMD": "Agent loop coordinates evaluation and acceptance (server/gr/gr-agent-loop.ts).\n\nMinimal artifact: loop trace summary.",
-      "tags": ["agent-loop", "orchestration", "gr"],
+      "tags": [
+        "agent-loop",
+        "orchestration",
+        "gr"
+      ],
+      "children": [
+        "gr-agent-loop-schema"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
+    },
+    {
+      "id": "gr-evolution-orchestration",
+      "slug": "gr-evolution-orchestration",
+      "title": "GR Evolution Orchestration",
+      "excerpt": "Orchestrate GR evolution runs and bricks.",
+      "bodyMD": "Evolution orchestration wires initial data, solver, and bricks (server/gr/evolution.ts, server/gr/evolution/solver.ts, server/gr/evolution/brick.ts, server/gr-evolve-brick.ts).\n\nMinimal artifact: evolution run snapshot.",
+      "tags": [
+        "gr",
+        "evolution",
+        "orchestration"
+      ],
+      "children": [
+        "gr-initial-data",
+        "gr-evolution-solver",
+        "gr-evolution-brick"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
+    },
+    {
+      "id": "gr-initial-data",
+      "slug": "gr-initial-data",
+      "title": "GR Initial Data",
+      "excerpt": "Initialize GR fields for evolution.",
+      "bodyMD": "Initial data assembly sets starting fields (server/gr/evolution/initial-data.ts, server/gr-initial-brick.ts).\n\nMinimal artifact: initial data snapshot.",
+      "tags": [
+        "gr",
+        "initial",
+        "evolution"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-evolution-orchestration"
+        }
+      ]
+    },
+    {
+      "id": "gr-evolution-solver",
+      "slug": "gr-evolution-solver",
+      "title": "GR Evolution Solver",
+      "excerpt": "Solver loop for GR evolution.",
+      "bodyMD": "Evolution solver advances fields (server/gr/evolution/solver.ts).\n\nMinimal artifact: solver step record.",
+      "tags": [
+        "gr",
+        "solver",
+        "evolution"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-evolution-orchestration"
+        }
+      ]
+    },
+    {
+      "id": "gr-evolution-brick",
+      "slug": "gr-evolution-brick",
+      "title": "GR Evolution Brick",
+      "excerpt": "Brick wrapper for GR evolution outputs.",
+      "bodyMD": "Evolution brick packages solver outputs (server/gr/evolution/brick.ts, server/gr-evolve-brick.ts).\n\nMinimal artifact: brick payload.",
+      "tags": [
+        "gr",
+        "brick",
+        "evolution"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-evolution-orchestration"
+        }
+      ]
+    },
+    {
+      "id": "bssn-state",
+      "slug": "bssn-state",
+      "title": "BSSN State",
+      "excerpt": "State containers for BSSN fields.",
+      "bodyMD": "BSSN state defines fields and grid layout (modules/gr/bssn-state.ts).\n\nMinimal artifact: state schema.",
+      "tags": [
+        "bssn",
+        "state",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "bssn-evolution"
+        }
+      ]
+    },
+    {
+      "id": "rk4-integrator",
+      "slug": "rk4-integrator",
+      "title": "RK4 Integrator",
+      "excerpt": "Runge-Kutta integrator for BSSN fields.",
+      "bodyMD": "RK4 integrator advances BSSN fields (modules/gr/rk4.ts).\n\nMinimal artifact: integrator step metrics.",
+      "tags": [
+        "rk4",
+        "integrator",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "bssn-evolution"
+        }
+      ]
+    },
+    {
+      "id": "stencils",
+      "slug": "stencils",
+      "title": "Finite Difference Stencils",
+      "excerpt": "Stencil operators for derivatives and boundaries.",
+      "bodyMD": "Stencil operators compute spatial derivatives (modules/gr/stencils.ts).\n\nMinimal artifact: stencil order config.",
+      "tags": [
+        "stencils",
+        "derivatives",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "bssn-evolution"
+        }
+      ]
+    },
+    {
+      "id": "gr-diagnostics",
+      "slug": "gr-diagnostics",
+      "title": "GR Diagnostics",
+      "excerpt": "Diagnostics for shift stiffness and stability.",
+      "bodyMD": "GR diagnostics compute shift stiffness metrics (modules/gr/gr-diagnostics.ts).\n\nMinimal artifact: diagnostics snapshot.",
+      "tags": [
+        "diagnostics",
+        "gr",
+        "stability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "bssn-evolution"
+        }
+      ]
+    },
+    {
+      "id": "gr-stress-energy",
+      "slug": "gr-stress-energy",
+      "title": "GR Stress-Energy Fields",
+      "excerpt": "Stress-energy grids for GR evolution.",
+      "bodyMD": "GR stress-energy fields store tensor grids (modules/gr/stress-energy.ts, server/gr/evolution/stress-energy.ts).\n\nMinimal artifact: field grid snapshot.",
+      "tags": [
+        "stress-energy",
+        "gr",
+        "fields"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "bssn-evolution"
+        }
+      ]
+    },
+    {
+      "id": "stress-energy-integrals",
+      "slug": "stress-energy-integrals",
+      "title": "Stress-Energy Integrals",
+      "excerpt": "Integrals over stress-energy fields.",
+      "bodyMD": "Stress-energy integrals compute totals and diagnostics (modules/gr/stress-energy-integrals.ts).\n\nMinimal artifact: integral summary.",
+      "tags": [
+        "stress-energy",
+        "integrals",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "bssn-evolution"
+        }
+      ]
+    },
+    {
+      "id": "gr-constraint-policy",
+      "slug": "gr-constraint-policy",
+      "title": "GR Constraint Policy",
+      "excerpt": "Constraint policy thresholds and modes.",
+      "bodyMD": "Constraint policy defines thresholds and modes (server/gr/gr-constraint-policy.ts).\n\nMinimal artifact: policy snapshot.",
+      "tags": [
+        "constraints",
+        "policy",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
+    },
+    {
+      "id": "gr-evaluation",
+      "slug": "gr-evaluation",
+      "title": "GR Evaluation",
+      "excerpt": "Evaluation orchestration for GR runs.",
+      "bodyMD": "GR evaluation aggregates diagnostics (server/gr/gr-evaluation.ts).\n\nMinimal artifact: evaluation summary.",
+      "tags": [
+        "evaluation",
+        "gr",
+        "constraints"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
+    },
+    {
+      "id": "gr-worker-stack",
+      "slug": "gr-worker-stack",
+      "title": "GR Worker Stack",
+      "excerpt": "Worker processes for GR evaluation.",
+      "bodyMD": "GR worker stack runs evaluations and payloads.\n\nMinimal artifact: worker payload record.",
+      "tags": [
+        "gr",
+        "worker",
+        "orchestration"
+      ],
+      "children": [
+        "gr-worker",
+        "gr-worker-client",
+        "gr-worker-types",
+        "gr-os-payload"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
+    },
+    {
+      "id": "gr-worker",
+      "slug": "gr-worker",
+      "title": "GR Worker",
+      "excerpt": "Worker runtime for GR evaluations.",
+      "bodyMD": "GR worker executes solver jobs (server/gr/gr-worker.ts).\n\nMinimal artifact: worker run log.",
+      "tags": [
+        "gr",
+        "worker",
+        "runtime"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-worker-stack"
+        }
+      ]
+    },
+    {
+      "id": "gr-worker-client",
+      "slug": "gr-worker-client",
+      "title": "GR Worker Client",
+      "excerpt": "Client interface for GR worker calls.",
+      "bodyMD": "Worker client sends evaluation requests (server/gr/gr-worker-client.ts).\n\nMinimal artifact: client request sample.",
+      "tags": [
+        "gr",
+        "worker",
+        "client"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-worker-stack"
+        }
+      ]
+    },
+    {
+      "id": "gr-worker-types",
+      "slug": "gr-worker-types",
+      "title": "GR Worker Types",
+      "excerpt": "Shared types for GR worker payloads.",
+      "bodyMD": "Worker types define payload schema (server/gr/gr-worker-types.ts).\n\nMinimal artifact: payload schema.",
+      "tags": [
+        "gr",
+        "worker",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-worker-stack"
+        }
+      ]
+    },
+    {
+      "id": "gr-os-payload",
+      "slug": "gr-os-payload",
+      "title": "GR OS Payload",
+      "excerpt": "Payload schema for GR OS telemetry.",
+      "bodyMD": "GR OS payload defines telemetry fields (server/gr/gr-os-payload.ts).\n\nMinimal artifact: payload sample.",
+      "tags": [
+        "gr",
+        "payload",
+        "telemetry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-worker-stack"
+        }
+      ]
+    },
+    {
+      "id": "gr-assistant-adapter",
+      "slug": "gr-assistant-adapter",
+      "title": "GR Assistant Adapter",
+      "excerpt": "Adapter for GR assistant workflows.",
+      "bodyMD": "Assistant adapter connects GR solver outputs (server/gr/gr-assistant-adapter.ts).\n\nMinimal artifact: adapter response.",
+      "tags": [
+        "gr",
+        "assistant",
+        "adapter"
+      ],
+      "children": [
+        "gr-assistant-tools"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        }
+      ]
+    },
+    {
+      "id": "gr-agent-loop-schema",
+      "slug": "gr-agent-loop-schema",
+      "title": "GR Agent Loop Schema",
+      "excerpt": "Schema for GR agent loop runs.",
+      "bodyMD": "Agent loop schema defines payloads (server/gr/gr-agent-loop-schema.ts).\n\nMinimal artifact: schema sample.",
+      "tags": [
+        "gr",
+        "agent-loop",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-agent-loop"
+        }
+      ]
+    },
+    {
+      "id": "gr-assistant-tools",
+      "slug": "gr-assistant-tools",
+      "title": "GR Assistant Tools",
+      "excerpt": "Standalone GR helper service for metric checks.",
+      "bodyMD": "GR assistant tools provide deterministic checks (tools/gr_assistant/README.md, tools/gr_assistant/server.py, tools/gr_assistant/orchestrator.py).\n\nMinimal artifact: tool response sample.",
+      "tags": [
+        "gr",
+        "assistant",
+        "tools"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-assistant-adapter"
+        }
+      ]
     }
   ]
 }

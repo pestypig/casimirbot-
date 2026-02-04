@@ -295,7 +295,8 @@
         "evaluation"
       ],
       "children": [
-        "warp-viability-sim"
+        "warp-viability-sim",
+        "phase-diagram-validation"
       ],
       "links": [
         {
@@ -1284,6 +1285,25 @@
         {
           "rel": "parent",
           "to": "math-verification-gates"
+        }
+      ]
+    },
+    {
+      "id": "phase-diagram-validation",
+      "slug": "phase-diagram-validation",
+      "title": "Phase Diagram Validation",
+      "excerpt": "Validate viability outputs against phase diagram expectations.",
+      "bodyMD": "Phase diagram validation checks viability accuracy (tools/validate-phase-diagram.ts, tests/viability-validation.ts).\n\nMinimal artifact: validation run output.",
+      "tags": [
+        "viability",
+        "validation",
+        "tests"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-viability"
         }
       ]
     }
