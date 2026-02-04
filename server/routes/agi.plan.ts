@@ -2620,10 +2620,22 @@ const HELIX_ASK_AGENT_LOOP_BUDGET_MS = clampNumber(
 );
 const HELIX_ASK_AGENT_CODE_FIRST =
   String(process.env.HELIX_ASK_AGENT_CODE_FIRST ?? "1").trim() !== "0";
+const HELIX_ASK_QUERY_HINTS_BLOCKS =
+  String(process.env.HELIX_ASK_QUERY_HINTS_BLOCKS ?? "1").trim() !== "0";
 const HELIX_ASK_QUERY_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_QUERY_TOKENS ?? process.env.VITE_HELIX_ASK_QUERY_TOKENS, 128),
   32,
   512,
+);
+const HELIX_ASK_QUERY_TOKENS_BLOCK = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_QUERY_TOKENS_BLOCK ??
+      process.env.HELIX_ASK_QUERY_TOKENS ??
+      process.env.VITE_HELIX_ASK_QUERY_TOKENS,
+    96,
+  ),
+  32,
+  256,
 );
 const HELIX_ASK_EVIDENCE_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_EVIDENCE_TOKENS ?? process.env.VITE_HELIX_ASK_EVIDENCE_TOKENS, 256),
@@ -5604,7 +5616,10 @@ const buildDocHeadingSeedSlots = (question: string): HelixAskSlotPlanEntry[] => 
       const id = normalizeSlotId(heading);
       if (!id) continue;
       const existing = candidates.get(id);
-      const aliases = Array.from(new Set([heading, ...(index.aliases ?? [])])).slice(0, SLOT_ALIAS_MAX);
+      const aliases = filterSlotHintTerms(
+        [heading, ...(index.aliases ?? [])],
+        { maxTokens: 6, maxChars: 72 },
+      ).slice(0, SLOT_ALIAS_MAX);
       if (!existing || score > existing.score) {
         candidates.set(id, {
           id,
@@ -5863,7 +5878,8 @@ const collectSlotAliasHints = (slotPlan: HelixAskSlotPlan | null): string[] => {
       if (cleaned) hints.add(cleaned);
     });
   }
-  return Array.from(hints).filter(Boolean).slice(0, 16);
+  const filtered = filterSlotHintTerms(Array.from(hints));
+  return filtered.slice(0, 16);
 };
 
 const collectSlotEvidenceHints = (slotPlan: HelixAskSlotPlan | null): string[] => {
@@ -5874,7 +5890,8 @@ const collectSlotEvidenceHints = (slotPlan: HelixAskSlotPlan | null): string[] =
   for (const slot of hintSlots) {
     (slot.evidenceCriteria ?? []).forEach((entry) => entry && hints.add(entry));
   }
-  return Array.from(hints).filter(Boolean).slice(0, 12);
+  const filtered = filterSlotHintTerms(Array.from(hints), { maxTokens: 6, maxChars: 72 });
+  return filtered.slice(0, 12);
 };
 
 const buildRetryHintsForSlots = (
@@ -5907,10 +5924,7 @@ const buildSlotAliasMap = (slotPlan: HelixAskSlotPlan | null): Record<string, st
     const aliases = new Set<string>();
     if (slot.label) aliases.add(slot.label);
     (slot.aliases ?? []).forEach((alias) => alias && aliases.add(alias));
-    const values = Array.from(aliases)
-      .map((alias) => normalizeAliasValue(alias))
-      .filter(Boolean)
-      .slice(0, SLOT_ALIAS_MAX);
+    const values = filterSlotHintTerms(Array.from(aliases)).slice(0, SLOT_ALIAS_MAX);
     if (values.length > 0) {
       map[slot.id] = values;
     }
@@ -5933,7 +5947,8 @@ const collectCoverageSlotAliases = (
     const spaced = slot.replace(/[-_]+/g, " ").trim();
     if (spaced) aliases.add(spaced);
   }
-  return Array.from(aliases).filter(Boolean).slice(0, 12);
+  const filtered = filterSlotHintTerms(Array.from(aliases), { maxTokens: 6, maxChars: 72 });
+  return filtered.slice(0, 12);
 };
 
 const mergeEvidenceSignalTokens = (...groups: string[][]): string[] =>
@@ -6001,6 +6016,44 @@ const buildSlotVariants = (slot: HelixAskSlotPlanEntry): string[] => {
   return Array.from(variants).filter((entry) => entry.length >= 3);
 };
 
+const SLOT_HINT_MAX_CHARS = 80;
+const SLOT_HINT_MAX_TOKENS = 8;
+const SLOT_HINT_PREFIX_RE = /^(overview|definition|purpose|notes?)\b/i;
+const SLOT_HINT_COLON_RE = /:/;
+
+const isPathLikeHint = (value: string): boolean => {
+  if (!value) return false;
+  if (/[\\/]/.test(value)) return true;
+  return /\.[a-z0-9]{1,4}\b/i.test(value);
+};
+
+const filterSlotHintTerms = (
+  terms: string[],
+  options?: { maxTokens?: number; maxChars?: number },
+): string[] => {
+  if (terms.length === 0) return [];
+  const maxTokens = options?.maxTokens ?? SLOT_HINT_MAX_TOKENS;
+  const maxChars = options?.maxChars ?? SLOT_HINT_MAX_CHARS;
+  const out = new Set<string>();
+  for (const term of terms) {
+    const cleaned = normalizeAliasValue(term);
+    if (!cleaned) continue;
+    if (isPathLikeHint(cleaned)) {
+      if (cleaned.length <= Math.max(120, maxChars)) {
+        out.add(cleaned);
+      }
+      continue;
+    }
+    if (cleaned.length > maxChars) continue;
+    if (SLOT_HINT_PREFIX_RE.test(cleaned)) continue;
+    const tokens = filterCriticTokens(tokenizeAskQuery(cleaned));
+    if (tokens.length === 0 || tokens.length > maxTokens) continue;
+    if (SLOT_HINT_COLON_RE.test(cleaned) && tokens.length > 3) continue;
+    out.add(cleaned);
+  }
+  return Array.from(out);
+};
+
 const buildSlotQueryTerms = (slot: HelixAskSlotPlanEntry): string[] => {
   const terms = new Set<string>();
   if (slot.label) terms.add(slot.label);
@@ -6008,10 +6061,8 @@ const buildSlotQueryTerms = (slot: HelixAskSlotPlanEntry): string[] => {
   (slot.aliases ?? []).forEach((alias) => alias && terms.add(alias));
   (slot.evidenceCriteria ?? []).forEach((entry) => entry && terms.add(entry));
   buildSlotVariants(slot).forEach((variant) => terms.add(variant));
-  return Array.from(terms)
-    .map((term) => normalizeAliasValue(term))
-    .filter(Boolean)
-    .slice(0, 12);
+  const filtered = filterSlotHintTerms(Array.from(terms));
+  return filtered.slice(0, 12);
 };
 
 const hasDocSurface = (slot: HelixAskSlotPlanEntry): boolean =>
@@ -9019,15 +9070,21 @@ const buildReportBlockSearchQuery = (args: {
   includeHelixAsk?: boolean;
 }): string => {
   const parts: string[] = [];
+  const aliasHints = args.slotAliases?.length
+    ? filterSlotHintTerms(args.slotAliases, { maxTokens: 6, maxChars: 72 })
+    : [];
+  const evidenceHints = args.slotEvidenceCriteria?.length
+    ? filterSlotHintTerms(args.slotEvidenceCriteria, { maxTokens: 6, maxChars: 72 })
+    : [];
   if (args.blockText) parts.push(args.blockText);
   if (args.includeHelixAsk && !/helix ask/i.test(args.blockText)) {
     parts.push("helix ask");
   }
-  if (args.slotAliases?.length) {
-    parts.push(...args.slotAliases);
+  if (aliasHints.length) {
+    parts.push(...aliasHints);
   }
-  if (args.slotEvidenceCriteria?.length) {
-    parts.push(...args.slotEvidenceCriteria);
+  if (evidenceHints.length) {
+    parts.push(...evidenceHints);
   }
   if (args.slotId) {
     parts.push(args.slotId.replace(/-/g, " "));
@@ -9498,6 +9555,11 @@ const buildSlotReportBlocks = (
     const slot = slots[index];
     const label = slot.label || slot.id;
     const slotHeader = slot.id ? `Canonical slot: ${slot.id}` : "";
+    const slotAliases = filterSlotHintTerms(slot.aliases ?? [], { maxTokens: 6, maxChars: 72 });
+    const slotEvidenceCriteria = filterSlotHintTerms(
+      slot.evidenceCriteria ?? [],
+      { maxTokens: 6, maxChars: 72 },
+    );
     const scopedText = [globalHeader, slotHeader, `Answer only about "${label}". Ignore other topics from the original question.`]
       .filter(Boolean)
       .join("\n");
@@ -9508,8 +9570,8 @@ const buildSlotReportBlocks = (
       typeHint: slot.source,
       slotId: slot.id,
       slotSurfaces: slot.surfaces ?? [],
-      slotAliases: slot.aliases ?? [],
-      slotEvidenceCriteria: slot.evidenceCriteria ?? [],
+      slotAliases,
+      slotEvidenceCriteria,
     });
   }
   return blocks;
@@ -11728,6 +11790,7 @@ const executeHelixAsk = async ({
         const blockSearchSeed =
           blockSearchQuery ||
           (block.slotId ? block.slotId.replace(/-/g, " ") : blockTextForQuestion);
+        const blockHeadingSeedSlots = buildDocHeadingSeedSlots(blockSearchSeed);
         logEvent(
           "Report block",
           "start",
@@ -11891,7 +11954,8 @@ const executeHelixAsk = async ({
               slotPlan: slotPreview,
               anchorFiles: blockAnchorFiles,
               planClarify: clarifyLine,
-              headingSeedSlots,
+              headingSeedSlots:
+                blockHeadingSeedSlots.length > 0 ? blockHeadingSeedSlots : headingSeedSlots,
               hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
               hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
               requiresRepoEvidence: blockRepoContext,
@@ -12987,7 +13051,7 @@ const executeHelixAsk = async ({
         if (!dryRun) {
           if (conceptFastPath) {
             logEvent("Query hints ready", "skipped", "concept_fast_path");
-          } else if (blockScoped) {
+          } else if (blockScoped && !HELIX_ASK_QUERY_HINTS_BLOCKS) {
             const queryStart = Date.now();
             queryHints = [];
             planDirectives = null;
@@ -13004,11 +13068,12 @@ const executeHelixAsk = async ({
                 conceptSkeleton,
                 anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
               });
+              const queryMaxTokens = blockScoped ? HELIX_ASK_QUERY_TOKENS_BLOCK : HELIX_ASK_QUERY_TOKENS;
               const { result: queryResult, overflow: queryOverflow } =
                 await runHelixAskLocalWithOverflowRetry(
                   {
                     prompt: queryPrompt,
-                    max_tokens: HELIX_ASK_QUERY_TOKENS,
+                    max_tokens: queryMaxTokens,
                     temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
                     seed: parsed.data.seed,
                     stop: parsed.data.stop,
@@ -13019,7 +13084,7 @@ const executeHelixAsk = async ({
                     traceId: askTraceId,
                   },
                   {
-                    fallbackMaxTokens: HELIX_ASK_QUERY_TOKENS,
+                    fallbackMaxTokens: queryMaxTokens,
                     allowContextDrop: true,
                     label: "query_hints",
                   },
@@ -13027,7 +13092,8 @@ const executeHelixAsk = async ({
               recordOverflow("query_hints", queryOverflow);
               const planParse = parsePlanDirectives(queryResult.text ?? "");
               planDirectives = planParse.directives;
-              queryHints = planParse.queryHints;
+              queryHints = filterSlotHintTerms(planParse.queryHints, { maxTokens: 8, maxChars: 90 })
+                .slice(0, HELIX_ASK_QUERY_HINTS_MAX);
               if (verificationAnchorHints.length > 0) {
                 queryHints = mergeHelixAskQueries(
                   queryHints,
@@ -13103,11 +13169,13 @@ const executeHelixAsk = async ({
         slotAliasMap = buildSlotAliasMap(slotPlan);
         if (coverageSlotsFromRequest) {
           const coverageSlotAliases = collectCoverageSlotAliases(slotAliasMap, coverageSlots);
-          evidenceSignalTokens = mergeEvidenceSignalTokens(
-            coverageSlotAliases,
-            slotEvidenceHints,
-          );
-          evidenceUseQuestionTokens = false;
+          if (coverageSlotAliases.length > 0 || slotEvidenceHints.length > 0) {
+            evidenceSignalTokens = mergeEvidenceSignalTokens(
+              coverageSlotAliases,
+              slotEvidenceHints,
+            );
+            evidenceUseQuestionTokens = false;
+          }
         } else if (slotEvidenceHints.length > 0) {
           evidenceSignalTokens = mergeEvidenceSignalTokens(
             evidenceSignalTokens,
