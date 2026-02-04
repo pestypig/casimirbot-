@@ -156,6 +156,10 @@ import {
   type HelixAskMathSolveResult,
 } from "../services/helix-ask/math";
 import {
+  resolveHelixAskGraphFramework,
+  type HelixAskGraphFramework,
+} from "../services/helix-ask/graph-resolver";
+import {
   applyHelixAskPlatonicGates,
   type HelixAskDomain,
   type HelixAskClaimLedgerEntry,
@@ -6999,8 +7003,9 @@ function finalizeAskContext({
     if (injected.injected) docHeaderInjected += 1;
     preview = clipAskText(preview, HELIX_ASK_CONTEXT_CHARS);
     if (!preview) continue;
-    lines.push(`${entry.filePath}\n${preview}`);
-    files.push(entry.filePath);
+    const normalizedPath = entry.filePath.replace(/\\/g, "/");
+    lines.push(`${normalizedPath}\n${preview}`);
+    files.push(normalizedPath);
   }
   return {
     context: lines.join("\n\n"),
@@ -7204,6 +7209,30 @@ function appendEvidenceSources(
     return `Sources: ${sources.join(", ")}`;
   }
   return `${trimmed}\n\nSources: ${sources.join(", ")}`;
+}
+
+function appendContextBlock(contextText: string, block: string): string {
+  const trimmedBlock = block?.trim() ?? "";
+  if (!trimmedBlock) return contextText;
+  const trimmedContext = contextText?.trim() ?? "";
+  if (!trimmedContext) return trimmedBlock;
+  if (trimmedContext.includes(trimmedBlock)) return contextText;
+  return `${trimmedContext}\n\n${trimmedBlock}`;
+}
+
+function mergeEvidenceScaffolds(base: string, extra: string): string {
+  const baseTrimmed = base?.trim() ?? "";
+  const extraTrimmed = extra?.trim() ?? "";
+  if (!extraTrimmed) return baseTrimmed;
+  if (!baseTrimmed) return extraTrimmed;
+  const baseLines = baseTrimmed.split(/\r?\n/);
+  const existing = new Set(baseLines.map((line) => line.trim().toLowerCase()).filter(Boolean));
+  const extraLines = extraTrimmed
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !existing.has(line.toLowerCase()));
+  if (extraLines.length === 0) return baseTrimmed;
+  return `${baseTrimmed}\n${extraLines.join("\n")}`;
 }
 
 function buildHelixAskScaffoldPrompt(
@@ -12599,6 +12628,8 @@ const executeHelixAsk = async ({
       }
     }
     let conceptMatch: HelixAskConceptMatch | null = null;
+    let graphFramework: HelixAskGraphFramework | null = null;
+    let graphResolverPreferred = false;
     let mathSolveResult: HelixAskMathSolveResult | null = null;
     let verificationAnchorRequired = false;
     let verificationAnchorHints: string[] = [];
@@ -12735,6 +12766,31 @@ const executeHelixAsk = async ({
         debugPayload.topic_must_include_files = topicProfile.mustIncludeFiles?.slice();
       }
     }
+    graphFramework = resolveHelixAskGraphFramework({
+      question: baseQuestion,
+      topicTags,
+      conceptMatch,
+    });
+    graphResolverPreferred = Boolean(graphFramework?.preferGraph);
+    if (graphFramework) {
+      logEvent(
+        "Graph framework",
+        "resolved",
+        [
+          `tree=${graphFramework.treeId}`,
+          `anchors=${graphFramework.anchors.length}`,
+          `nodes=${graphFramework.path.length}`,
+        ].join(" | "),
+      );
+      if (debugPayload) {
+        debugPayload.graph_framework = {
+          tree: graphFramework.treeId,
+          anchors: graphFramework.anchors.map((node) => node.id),
+          nodes: graphFramework.path.map((node) => node.id),
+          source: graphFramework.sourcePath,
+        };
+      }
+    }
     const baseEvidenceSignalTokens = Array.from(
       new Set(
         [
@@ -12753,7 +12809,8 @@ const executeHelixAsk = async ({
       Boolean(conceptMatch) &&
       conceptualFocus &&
       intentDomain === "repo" &&
-      HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id);
+      HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id) &&
+      !graphResolverPreferred;
     let conceptFastPath = false;
     let conceptFastPathBlockedReason: string | null = null;
     if (conceptFastPathCandidate && conceptMatch) {
@@ -13881,6 +13938,28 @@ const executeHelixAsk = async ({
                 }
               }
             }
+          }
+        }
+
+        if (!dryRun && graphFramework?.contextText) {
+          const merged = appendContextBlock(contextText, graphFramework.contextText);
+          if (merged !== contextText) {
+            contextText = merged;
+          }
+          if (graphFramework.sourcePath) {
+            contextFiles = Array.from(new Set([...contextFiles, graphFramework.sourcePath]));
+          }
+          coverageSlotSummary = null;
+          docSlotSummary = null;
+          logEvent(
+            "Graph framework",
+            "context_added",
+            `tree=${graphFramework.treeId} nodes=${graphFramework.path.length}`,
+          );
+          if (debugPayload) {
+            debugPayload.graph_framework_applied = true;
+            debugPayload.context_files = contextFiles.slice();
+            debugPayload.context_files_count = contextFiles.length;
           }
         }
 
@@ -15015,6 +15094,10 @@ const executeHelixAsk = async ({
             evidenceStart,
           );
         }
+      }
+
+      if (graphFramework?.scaffoldText && (isRepoQuestion || wantsHybrid)) {
+        repoScaffold = mergeEvidenceScaffolds(repoScaffold, graphFramework.scaffoldText);
       }
 
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {

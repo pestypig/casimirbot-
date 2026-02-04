@@ -16,6 +16,242 @@
         "parent": 2,
         "see-also": 1
       }
+    },
+    {
+      "id": "math",
+      "label": "Math Maturity + Verification Walk",
+      "path": "docs/knowledge/physics/math-tree.json",
+      "topicTags": ["physics", "warp"],
+      "matchers": [
+        "math maturity",
+        "math status",
+        "math stage",
+        "maturity stages",
+        "certified",
+        "diagnostic",
+        "constraint gate",
+        "verification gate",
+        "viability certificate",
+        "evidence registry"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    }
+    ,
+    {
+      "id": "physics-foundations",
+      "label": "Physics Foundations Walk",
+      "path": "docs/knowledge/physics/physics-foundations-tree.json",
+      "topicTags": ["physics"],
+      "matchers": [
+        "spacetime metric",
+        "curvature",
+        "einstein field equations",
+        "adm",
+        "york time",
+        "stress-energy",
+        "energy conditions",
+        "negative energy",
+        "casimir",
+        "quantum inequality",
+        "units",
+        "dimensional analysis",
+        "viability definition"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "warp-mechanics",
+      "label": "Warp Mechanics Walk",
+      "path": "docs/knowledge/warp/warp-mechanics-tree.json",
+      "topicTags": ["warp"],
+      "matchers": [
+        "warp mechanics",
+        "warp geometry",
+        "warp bubble",
+        "alcubierre",
+        "natario",
+        "van den broeck",
+        "shift vector",
+        "bubble wall",
+        "active fraction",
+        "duty cycle"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "gr-solver",
+      "label": "GR Solver Walk",
+      "path": "docs/knowledge/physics/gr-solver-tree.json",
+      "topicTags": ["physics"],
+      "matchers": [
+        "gr solver",
+        "bssn",
+        "constraint gate",
+        "constraint network",
+        "gr agent loop",
+        "solver robustness"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "casimir-tiles",
+      "label": "Casimir Tiles Walk",
+      "path": "docs/knowledge/casimir-tiles-tree.json",
+      "topicTags": ["physics", "warp"],
+      "matchers": [
+        "casimir tiles",
+        "casimir tile",
+        "qi guard",
+        "quantum inequality guard",
+        "casimir roadmap",
+        "qi ops runbook"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "dp-collapse",
+      "label": "DP Collapse Walk",
+      "path": "docs/knowledge/dp-collapse-tree.json",
+      "topicTags": ["physics"],
+      "matchers": [
+        "dp collapse",
+        "diosi-penrose",
+        "penrose collapse",
+        "collapse estimator",
+        "deltae",
+        "dp adapter",
+        "dp planner"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "pipeline-ledger",
+      "label": "Pipeline + Ledger Walk",
+      "path": "docs/knowledge/pipeline-ledger-tree.json",
+      "topicTags": ["ledger"],
+      "matchers": [
+        "pipeline ledger",
+        "curvature ledger",
+        "warp ledger",
+        "stewardship ledger",
+        "kappa proxy",
+        "potato threshold",
+        "qi bounds",
+        "verification core"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "stellar-restoration",
+      "label": "Stellar Restoration Walk",
+      "path": "docs/knowledge/stellar-restoration-tree.json",
+      "topicTags": ["star"],
+      "matchers": [
+        "stellar restoration",
+        "solar restoration",
+        "star hydrostatic",
+        "red giant",
+        "sun ledger",
+        "stellar ledger",
+        "solar pipeline"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "analysis-loops",
+      "label": "Analysis Loops Walk",
+      "path": "docs/knowledge/analysis-loops-tree.json",
+      "topicTags": ["concepts"],
+      "matchers": [
+        "analysis loop",
+        "analysis loops",
+        "noise field loop",
+        "diffusion loop",
+        "belief graph loop",
+        "constraint loop"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
     }
   ]
 }

@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "rootId": "stellar-restoration-tree",
+  "nodes": [
+    {
+      "id": "stellar-restoration-tree",
+      "slug": "stellar-restoration-tree",
+      "title": "Stellar Restoration Tree",
+      "excerpt": "A walk from stellar structure to ledgers, monitoring, and restoration plans.",
+      "bodyMD": "This tree connects star physics, ledgers, and restoration obligations.\n\nMinimal artifact: star and ledger knowledge docs.",
+      "tags": ["star", "stellar", "restoration", "ledger"],
+      "children": [
+        "stellar-structure-stack",
+        "stellar-evolution-stack",
+        "stellar-ledger-stack",
+        "stellar-observation-stack",
+        "solar-restoration-plan"
+      ],
+      "links": []
+    },
+    {
+      "id": "stellar-structure-stack",
+      "slug": "stellar-structure-stack",
+      "title": "Stellar Structure",
+      "excerpt": "Hydrostatic balance and structure definitions.",
+      "bodyMD": "Stellar structure sets the baseline for evolution and restoration.\n\nMinimal artifact: hydrostatic model notes.",
+      "tags": ["structure", "hydrostatic", "star"],
+      "children": [
+        "star-hydrostatic"
+      ],
+      "links": [
+        { "rel": "parent", "to": "stellar-restoration-tree" }
+      ]
+    },
+    {
+      "id": "star-hydrostatic",
+      "slug": "star-hydrostatic",
+      "title": "Star Hydrostatic Balance",
+      "excerpt": "Equilibrium between pressure and gravity.",
+      "bodyMD": "Hydrostatic balance anchors star models (docs/knowledge/star-hydrostatic.md).\n\nMinimal artifact: hydrostatic equation summary.",
+      "tags": ["hydrostatic", "equilibrium", "star"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "stellar-structure-stack" }]
+    },
+    {
+      "id": "stellar-evolution-stack",
+      "slug": "stellar-evolution-stack",
+      "title": "Stellar Evolution",
+      "excerpt": "Evolution phases frame long-term restoration choices.",
+      "bodyMD": "Evolutionary phases define the urgency and timing of restoration work.\n\nMinimal artifact: evolution phase notes.",
+      "tags": ["evolution", "phases", "star"],
+      "children": [
+        "red-giant-phase"
+      ],
+      "links": [
+        { "rel": "parent", "to": "stellar-restoration-tree" }
+      ]
+    },
+    {
+      "id": "red-giant-phase",
+      "slug": "red-giant-phase",
+      "title": "Red Giant Phase",
+      "excerpt": "Transition phase with major structural change.",
+      "bodyMD": "Red giant dynamics shape restoration planning (docs/knowledge/red-giant-phase.md).\n\nMinimal artifact: red giant phase summary.",
+      "tags": ["red-giant", "evolution", "star"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "stellar-evolution-stack" }]
+    },
+    {
+      "id": "stellar-ledger-stack",
+      "slug": "stellar-ledger-stack",
+      "title": "Stellar Ledger Stack",
+      "excerpt": "Ledgers track obligations and restoration accounting.",
+      "bodyMD": "Ledgers make restoration commitments auditable.\n\nMinimal artifact: ledger definitions and accounting cadence.",
+      "tags": ["ledger", "accounting", "restoration"],
+      "children": [
+        "stellar-ledger",
+        "sun-ledger"
+      ],
+      "links": [
+        { "rel": "parent", "to": "stellar-restoration-tree" }
+      ]
+    },
+    {
+      "id": "stellar-ledger",
+      "slug": "stellar-ledger",
+      "title": "Stellar Ledger",
+      "excerpt": "Ledger framework for stellar-scale commitments.",
+      "bodyMD": "Stellar ledger definitions tie physics to obligation (docs/knowledge/stellar-ledger.md).\n\nMinimal artifact: ledger glossary.",
+      "tags": ["ledger", "stellar", "accounting"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "stellar-ledger-stack" }]
+    },
+    {
+      "id": "sun-ledger",
+      "slug": "sun-ledger",
+      "title": "Sun Ledger",
+      "excerpt": "Specific ledger for solar restoration obligations.",
+      "bodyMD": "Sun ledger entries encode restoration commitments (docs/knowledge/sun-ledger.md).\n\nMinimal artifact: sun ledger schema.",
+      "tags": ["sun", "ledger", "restoration"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "stellar-ledger-stack" }]
+    },
+    {
+      "id": "stellar-observation-stack",
+      "slug": "stellar-observation-stack",
+      "title": "Observation and Monitoring",
+      "excerpt": "Monitoring provides the evidence for ledger updates.",
+      "bodyMD": "Observation cadence links telemetry to restoration actions.\n\nMinimal artifact: monitoring cadence plan.",
+      "tags": ["observation", "monitoring", "telemetry"],
+      "children": [
+        "sun-5-minute-bins",
+        "curvature-unit-solar-notes",
+        "solar-pipeline"
+      ],
+      "links": [
+        { "rel": "parent", "to": "stellar-restoration-tree" }
+      ]
+    },
+    {
+      "id": "sun-5-minute-bins",
+      "slug": "sun-5-minute-bins",
+      "title": "Sun 5-Minute Bins",
+      "excerpt": "Time-binned telemetry for solar monitoring.",
+      "bodyMD": "Short cadence bins provide steady telemetry (docs/sun-5-minute-bins.md).\n\nMinimal artifact: binning specification.",
+      "tags": ["telemetry", "bins", "sun"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "stellar-observation-stack" }]
+    },
+    {
+      "id": "curvature-unit-solar-notes",
+      "slug": "curvature-unit-solar-notes",
+      "title": "Curvature Unit Solar Notes",
+      "excerpt": "Unit mapping for solar curvature metrics.",
+      "bodyMD": "Curvature unit notes tie physics units to solar metrics (docs/curvature-unit-solar-notes.md).\n\nMinimal artifact: unit mapping table.",
+      "tags": ["curvature", "units", "solar"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "stellar-observation-stack" }]
+    },
+    {
+      "id": "solar-pipeline",
+      "slug": "solar-pipeline",
+      "title": "Solar Pipeline",
+      "excerpt": "Pipeline for solar telemetry and restoration actions.",
+      "bodyMD": "Solar pipeline connects telemetry to action (docs/solar-pipeline.md).\n\nMinimal artifact: pipeline flow summary.",
+      "tags": ["pipeline", "solar", "telemetry"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "stellar-observation-stack" }]
+    },
+    {
+      "id": "solar-restoration-plan",
+      "slug": "solar-restoration-plan",
+      "title": "Solar Restoration Plan",
+      "excerpt": "Restoration vow translated into actionable steps.",
+      "bodyMD": "Solar restoration connects physics to commitment (docs/knowledge/solar-restoration.md).\n\nMinimal artifact: restoration objectives list.",
+      "tags": ["restoration", "solar", "plan"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "stellar-restoration-tree" },
+        { "rel": "see-also", "to": "stellar-ledger-stack" }
+      ]
+    }
+  ]
+}

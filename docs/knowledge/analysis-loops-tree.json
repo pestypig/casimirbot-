@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "rootId": "analysis-loops-tree",
+  "nodes": [
+    {
+      "id": "analysis-loops-tree",
+      "slug": "analysis-loops-tree",
+      "title": "Analysis Loops Tree",
+      "excerpt": "Constraint and analysis loops used for diagnostics and verification prototypes.",
+      "bodyMD": "Analysis loops provide controlled diagnostics for prototype constraint checks.\n\nMinimal artifact: analysis loop definitions (docs/knowledge/analysis-loops.md).",
+      "tags": ["analysis", "loops", "diagnostics"],
+      "children": [
+        "analysis-loops-overview",
+        "noise-field-loop",
+        "diffusion-loop",
+        "belief-graph-loop",
+        "constraint-loop",
+        "analysis-loop-routes"
+      ],
+      "links": []
+    },
+    {
+      "id": "analysis-loops-overview",
+      "slug": "analysis-loops-overview",
+      "title": "Analysis Loops Overview",
+      "excerpt": "Prototype loops for constraint exploration and diagnostics.",
+      "bodyMD": "Overview of analysis loops and intended usage (docs/knowledge/analysis-loops.md).\n\nMinimal artifact: loop summary doc.",
+      "tags": ["analysis", "overview", "loops"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "analysis-loops-tree" }]
+    },
+    {
+      "id": "noise-field-loop",
+      "slug": "noise-field-loop",
+      "title": "Noise Field Loop",
+      "excerpt": "Prototype loop for noise field constraints.",
+      "bodyMD": "Noise field loop runs diagnostic constraints (modules/analysis/noise-field-loop.ts).\n\nMinimal artifact: gate summary and residuals.",
+      "tags": ["noise", "constraints", "analysis"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "analysis-loops-tree" }]
+    },
+    {
+      "id": "diffusion-loop",
+      "slug": "diffusion-loop",
+      "title": "Diffusion Loop",
+      "excerpt": "Prototype loop for diffusion field constraints.",
+      "bodyMD": "Diffusion loop checks score/fidelity diagnostics (modules/analysis/diffusion-loop.ts).\n\nMinimal artifact: diffusion residual report.",
+      "tags": ["diffusion", "analysis", "constraints"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "analysis-loops-tree" }]
+    },
+    {
+      "id": "belief-graph-loop",
+      "slug": "belief-graph-loop",
+      "title": "Belief Graph Loop",
+      "excerpt": "Prototype loop for belief graph consistency checks.",
+      "bodyMD": "Belief graph loop validates consistency metrics (modules/analysis/belief-graph-loop.ts).\n\nMinimal artifact: violation summary.",
+      "tags": ["belief-graph", "analysis", "consistency"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "analysis-loops-tree" }]
+    },
+    {
+      "id": "constraint-loop",
+      "slug": "constraint-loop",
+      "title": "Constraint Loop",
+      "excerpt": "Generic constraint loop driver for prototypes.",
+      "bodyMD": "Constraint loop provides a reusable driver (modules/analysis/constraint-loop.ts).\n\nMinimal artifact: loop configuration.",
+      "tags": ["constraints", "loop", "analysis"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "analysis-loops-tree" }]
+    },
+    {
+      "id": "analysis-loop-routes",
+      "slug": "analysis-loop-routes",
+      "title": "Analysis Loop Routes",
+      "excerpt": "HTTP routes for analysis loop execution.",
+      "bodyMD": "Analysis loop routes expose loop runs (server/routes/analysis-loops.ts).\n\nMinimal artifact: route list and payload schema.",
+      "tags": ["routes", "analysis", "api"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "analysis-loops-tree" }]
+    }
+  ]
+}

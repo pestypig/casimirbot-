@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "rootId": "dp-collapse-tree",
+  "nodes": [
+    {
+      "id": "dp-collapse-tree",
+      "slug": "dp-collapse-tree",
+      "title": "DP Collapse Tree",
+      "excerpt": "A walk from DP collapse theory to adapters, planners, and validation.",
+      "bodyMD": "DP collapse components map stress-energy fields into collapse estimates.\n\nMinimal artifact: DP collapse derivation + adapter code.",
+      "tags": ["dp-collapse", "diosi-penrose", "analysis", "verification"],
+      "children": [
+        "dp-collapse-derivation",
+        "dp-collapse-estimator",
+        "dp-adapters",
+        "dp-adapter-build",
+        "dp-planner-schema",
+        "dp-planner-service"
+      ],
+      "links": []
+    },
+    {
+      "id": "dp-collapse-derivation",
+      "slug": "dp-collapse-derivation",
+      "title": "DP Collapse Derivation",
+      "excerpt": "Derivation and assumptions for DP collapse estimates.",
+      "bodyMD": "DP collapse derivation establishes the theoretical base (docs/DP_COLLAPSE_DERIVATION.md).\n\nMinimal artifact: derivation summary.",
+      "tags": ["derivation", "dp-collapse", "theory"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "dp-collapse-tree" }]
+    },
+    {
+      "id": "dp-collapse-estimator",
+      "slug": "dp-collapse-estimator",
+      "title": "DP Collapse Estimator",
+      "excerpt": "Estimator for DeltaE and collapse timing.",
+      "bodyMD": "DP collapse estimator computes DeltaE (shared/dp-collapse.ts).\n\nMinimal artifact: estimator formula summary.",
+      "tags": ["estimator", "deltae", "dp-collapse"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "dp-collapse-tree" }]
+    },
+    {
+      "id": "dp-adapters",
+      "slug": "dp-adapters",
+      "title": "DP Adapters",
+      "excerpt": "Adapters map stress-energy fields into DP inputs.",
+      "bodyMD": "DP adapters translate stress-energy to DP mass-density (server/services/dp-adapters.ts).\n\nMinimal artifact: adapter mapping summary.",
+      "tags": ["adapters", "stress-energy", "dp-collapse"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "dp-collapse-tree" }]
+    },
+    {
+      "id": "dp-adapter-build",
+      "slug": "dp-adapter-build",
+      "title": "DP Adapter Build",
+      "excerpt": "Construct adapter inputs from GR bricks.",
+      "bodyMD": "DP adapter build assembles inputs (server/services/dp-adapter-build.ts).\n\nMinimal artifact: adapter build steps.",
+      "tags": ["build", "adapters", "dp-collapse"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "dp-collapse-tree" }]
+    },
+    {
+      "id": "dp-planner-schema",
+      "slug": "dp-planner-schema",
+      "title": "DP Planner Schema",
+      "excerpt": "Schema for collapse planning inputs.",
+      "bodyMD": "DP planner schema defines required inputs (shared/dp-planner.ts).\n\nMinimal artifact: planner schema outline.",
+      "tags": ["planner", "schema", "dp-collapse"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "dp-collapse-tree" }]
+    },
+    {
+      "id": "dp-planner-service",
+      "slug": "dp-planner-service",
+      "title": "DP Planner Service",
+      "excerpt": "Service for collapse planning calculations.",
+      "bodyMD": "DP planner service evaluates visibility and detectability (server/services/dp-planner.ts).\n\nMinimal artifact: planner output summary.",
+      "tags": ["planner", "service", "dp-collapse"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "dp-collapse-tree" }]
+    }
+  ]
+}

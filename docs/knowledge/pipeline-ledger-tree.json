@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "rootId": "pipeline-ledger-tree",
+  "nodes": [
+    {
+      "id": "pipeline-ledger-tree",
+      "slug": "pipeline-ledger-tree",
+      "title": "Pipeline and Ledger Tree",
+      "excerpt": "A walk from pipeline outputs to ledger verification.",
+      "bodyMD": "This tree ties pipeline calculations to ledger reporting and verification.\n\nMinimal artifact: pipeline + ledger docs (docs/knowledge/*.md).",
+      "tags": ["pipeline", "ledger", "verification", "physics"],
+      "children": [
+        "pipeline-overview",
+        "curvature-ledger",
+        "warp-ledger",
+        "stewardship-ledger",
+        "kappa-proxy",
+        "qi-bounds",
+        "potato-threshold",
+        "verification-core",
+        "stellar-ledger",
+        "sun-ledger"
+      ],
+      "links": []
+    },
+    {
+      "id": "pipeline-overview",
+      "slug": "pipeline-overview",
+      "title": "Pipeline Overview",
+      "excerpt": "Energy pipeline converts inputs into warp and GR proxies.",
+      "bodyMD": "Pipeline definitions and assumptions live in docs/knowledge/pipeline.md.\n\nMinimal artifact: pipeline assumptions list.",
+      "tags": ["pipeline", "energy", "proxies"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "curvature-ledger",
+      "slug": "curvature-ledger",
+      "title": "Curvature Ledger",
+      "excerpt": "Track curvature proxies and constraints.",
+      "bodyMD": "Curvature ledger ties proxy values to verification (docs/knowledge/curvature-ledger.md).\n\nMinimal artifact: curvature ledger entries.",
+      "tags": ["curvature", "ledger", "constraints"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "warp-ledger",
+      "slug": "warp-ledger",
+      "title": "Warp Ledger",
+      "excerpt": "Ledger of warp-related proxy values and checks.",
+      "bodyMD": "Warp ledger connects pipeline outputs to constraints (docs/knowledge/warp-ledger.md).\n\nMinimal artifact: warp ledger entry list.",
+      "tags": ["warp", "ledger", "proxies"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "stewardship-ledger",
+      "slug": "stewardship-ledger",
+      "title": "Stewardship Ledger",
+      "excerpt": "Ledger of ethical and physics constraints.",
+      "bodyMD": "Stewardship ledger binds capability to verification (docs/knowledge/stewardship-ledger.md).\n\nMinimal artifact: ledger constraints list.",
+      "tags": ["stewardship", "ledger", "verification"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "kappa-proxy",
+      "slug": "kappa-proxy",
+      "title": "Kappa Proxy",
+      "excerpt": "Proxy comparison for drive vs body curvature.",
+      "bodyMD": "Kappa proxy compares drive and body curvature (docs/knowledge/kappa-proxy.md).\n\nMinimal artifact: kappa proxy definition.",
+      "tags": ["kappa", "proxy", "curvature"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "qi-bounds",
+      "slug": "qi-bounds",
+      "title": "Quantum Inequality Bounds",
+      "excerpt": "Proxy bounds on negative energy exposure.",
+      "bodyMD": "QI bounds constrain negative energy (docs/knowledge/qi-bounds.md).\n\nMinimal artifact: QI bound summary.",
+      "tags": ["quantum", "inequality", "bounds"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "potato-threshold",
+      "slug": "potato-threshold",
+      "title": "Potato Threshold",
+      "excerpt": "Threshold for warp proxy sanity checks.",
+      "bodyMD": "Potato threshold is a sanity limit for proxies (docs/knowledge/potato-threshold.md).\n\nMinimal artifact: threshold definition.",
+      "tags": ["threshold", "sanity", "proxies"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "verification-core",
+      "slug": "verification-core",
+      "title": "Verification Core",
+      "excerpt": "Define how verification and evidence connect to claims.",
+      "bodyMD": "Verification definitions govern evidence handling (docs/knowledge/verification.md).\n\nMinimal artifact: verification criteria list.",
+      "tags": ["verification", "evidence", "claims"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "stellar-ledger",
+      "slug": "stellar-ledger",
+      "title": "Stellar Ledger",
+      "excerpt": "Ledger for stellar-scale commitments.",
+      "bodyMD": "Stellar ledger ties star restoration to reporting (docs/knowledge/stellar-ledger.md).\n\nMinimal artifact: stellar ledger entries.",
+      "tags": ["stellar", "ledger", "restoration"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    },
+    {
+      "id": "sun-ledger",
+      "slug": "sun-ledger",
+      "title": "Sun Ledger",
+      "excerpt": "Solar restoration ledger entries.",
+      "bodyMD": "Sun ledger defines restoration accounting (docs/knowledge/sun-ledger.md).\n\nMinimal artifact: sun ledger schema.",
+      "tags": ["sun", "ledger", "restoration"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+    }
+  ]
+}

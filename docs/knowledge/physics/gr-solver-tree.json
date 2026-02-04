@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "rootId": "gr-solver-tree",
+  "nodes": [
+    {
+      "id": "gr-solver-tree",
+      "slug": "gr-solver-tree",
+      "title": "GR Solver Tree",
+      "excerpt": "A walk from GR evolution to constraint gates and robustness notes.",
+      "bodyMD": "GR solver components move from evolution to diagnostics and gate decisions.\n\nMinimal artifact: GR solver progress and robustness docs.",
+      "tags": ["gr", "solver", "constraints", "verification"],
+      "children": [
+        "gr-solver-progress",
+        "gr-solver-robustness",
+        "bssn-evolution",
+        "gr-constraint-network",
+        "gr-constraint-gate",
+        "gr-agent-loop"
+      ],
+      "links": []
+    },
+    {
+      "id": "gr-solver-progress",
+      "slug": "gr-solver-progress",
+      "title": "GR Solver Progress",
+      "excerpt": "Status and milestones for solver development.",
+      "bodyMD": "Progress notes document current solver status (docs/gr-solver-progress.md).\n\nMinimal artifact: progress milestone list.",
+      "tags": ["gr", "solver", "progress"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+    },
+    {
+      "id": "gr-solver-robustness",
+      "slug": "gr-solver-robustness",
+      "title": "GR Solver Robustness",
+      "excerpt": "Robustness checks and failure modes.",
+      "bodyMD": "Robustness notes outline stability risks (docs/gr-solver-robustness.md).\n\nMinimal artifact: robustness checklist.",
+      "tags": ["gr", "solver", "robustness"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+    },
+    {
+      "id": "bssn-evolution",
+      "slug": "bssn-evolution",
+      "title": "BSSN Evolution",
+      "excerpt": "Core evolution step for GR fields.",
+      "bodyMD": "BSSN evolution computes field updates (modules/gr/bssn-evolve.ts).\n\nMinimal artifact: evolution step summary.",
+      "tags": ["bssn", "evolution", "gr"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+    },
+    {
+      "id": "gr-constraint-network",
+      "slug": "gr-constraint-network",
+      "title": "GR Constraint Network",
+      "excerpt": "Compute constraint residuals and diagnostics.",
+      "bodyMD": "Constraint network evaluates residuals (server/gr/gr-constraint-network.ts).\n\nMinimal artifact: residual summary.",
+      "tags": ["constraints", "residuals", "gr"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+    },
+    {
+      "id": "gr-constraint-gate",
+      "slug": "gr-constraint-gate",
+      "title": "GR Constraint Gate",
+      "excerpt": "Gate evaluation converts diagnostics into pass/fail.",
+      "bodyMD": "Constraint gate applies thresholds (server/gr/constraint-evaluator.ts).\n\nMinimal artifact: gate status summary.",
+      "tags": ["gate", "constraints", "verification"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+    },
+    {
+      "id": "gr-agent-loop",
+      "slug": "gr-agent-loop",
+      "title": "GR Agent Loop",
+      "excerpt": "Orchestration loop for GR evaluation and proposals.",
+      "bodyMD": "Agent loop coordinates evaluation and acceptance (server/gr/gr-agent-loop.ts).\n\nMinimal artifact: loop trace summary.",
+      "tags": ["agent-loop", "orchestration", "gr"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "gr-solver-tree" }]
+    }
+  ]
+}

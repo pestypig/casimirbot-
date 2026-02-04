@@ -1,0 +1,1291 @@
+{
+  "version": 1,
+  "rootId": "math-maturity-tree",
+  "nodes": [
+    {
+      "id": "math-maturity-tree",
+      "slug": "math-maturity-tree",
+      "title": "Math Maturity Tree",
+      "excerpt": "A navigable map of math maturity stages and the GR/warp verification walk.",
+      "bodyMD": "Math maturity governs what claims are allowed and what checks are required across the physics stack.\n\nMinimal artifact: Math Status Registry + Evidence Map (MATH_STATUS.md, math.evidence.json).",
+      "tags": [
+        "math",
+        "maturity",
+        "verification",
+        "physics",
+        "governance"
+      ],
+      "children": [
+        "math-maturity-stages",
+        "math-pipeline-walk",
+        "math-verification-gates",
+        "math-evidence-registry"
+      ],
+      "links": []
+    },
+    {
+      "id": "math-maturity-stages",
+      "slug": "math-maturity-stages",
+      "title": "Math Maturity Stages",
+      "excerpt": "Stages define which claims are allowed and which checks are required.",
+      "bodyMD": "Stages keep claims proportional to evidence: exploratory, reduced-order, diagnostic, certified.\n\nMinimal artifact: Stage policy + narrative waypoints (shared/math-stage.ts).",
+      "tags": [
+        "maturity",
+        "stages",
+        "claims",
+        "policy"
+      ],
+      "children": [
+        "stage-exploratory",
+        "stage-reduced-order",
+        "stage-diagnostic",
+        "stage-certified"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "math-evidence-registry"
+        }
+      ]
+    },
+    {
+      "id": "stage-exploratory",
+      "slug": "stage-exploratory",
+      "title": "Stage 0: Exploratory / Proxy",
+      "excerpt": "Intuition-building and visualization without hard pass/fail claims.",
+      "bodyMD": "Stage 0 allows qualitative trends, sanity checks, and visualization. Avoid hard viability claims.\n\nMinimal artifact: exploratory notes + unit sanity checks.",
+      "tags": [
+        "stage-0",
+        "exploratory",
+        "proxy",
+        "intuition"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-maturity-stages"
+        }
+      ]
+    },
+    {
+      "id": "stage-reduced-order",
+      "slug": "stage-reduced-order",
+      "title": "Stage 1: Reduced-Order / Approximate",
+      "excerpt": "Coarse estimates and proxy constraints with regression snapshots.",
+      "bodyMD": "Stage 1 permits simplified dynamics and coarse estimates. Regression snapshots or known-case checks are expected.\n\nMinimal artifact: reduced-order model + regression snapshot.",
+      "tags": [
+        "stage-1",
+        "reduced-order",
+        "approximate",
+        "regression"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-maturity-stages"
+        }
+      ]
+    },
+    {
+      "id": "stage-diagnostic",
+      "slug": "stage-diagnostic",
+      "title": "Stage 2: Diagnostic / High-Fidelity",
+      "excerpt": "Constraint residuals and stability checks enable diagnostic claims.",
+      "bodyMD": "Stage 2 supports diagnostic claims when residual thresholds and stability checks pass.\n\nMinimal artifact: residual report + stability check results.",
+      "tags": [
+        "stage-2",
+        "diagnostic",
+        "residuals",
+        "stability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-maturity-stages"
+        }
+      ]
+    },
+    {
+      "id": "stage-certified",
+      "slug": "stage-certified",
+      "title": "Stage 3: Certified / Policy-Gated",
+      "excerpt": "Pass/fail under named constraints with certificate integrity checks.",
+      "bodyMD": "Stage 3 is policy-gated: pass/fail under hard constraints and certificate integrity.\n\nMinimal artifact: WARP_AGENTS.md hard constraints + certificate hash.",
+      "tags": [
+        "stage-3",
+        "certified",
+        "constraints",
+        "certificate"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-maturity-stages"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-verification-gates"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-certificate"
+        }
+      ]
+    },
+    {
+      "id": "math-pipeline-walk",
+      "slug": "math-pipeline-walk",
+      "title": "GR/Warp Pipeline Walk",
+      "excerpt": "Narrative walk from energy pipeline to viability certificate.",
+      "bodyMD": "This walk follows the main GR/warp math flow: pipeline -> stress-energy -> GR evolution -> constraints -> viability -> certificate.\n\nMinimal artifact: pipeline trace map (MATH_GRAPH.json).",
+      "tags": [
+        "pipeline",
+        "gr",
+        "warp",
+        "verification"
+      ],
+      "children": [
+        "pipeline-energy",
+        "pipeline-stress-energy",
+        "pipeline-gr-evolution",
+        "pipeline-constraint-gate",
+        "pipeline-viability",
+        "pipeline-certificate"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "math-verification-gates"
+        }
+      ]
+    },
+    {
+      "id": "pipeline-energy",
+      "slug": "pipeline-energy",
+      "title": "Energy Pipeline",
+      "excerpt": "Compute dynamic Casimir and warp proxy inputs.",
+      "bodyMD": "Energy pipeline steps assemble dynamic Casimir and warp proxy inputs (server/energy-pipeline.ts).\n\nMinimal artifact: pipeline state snapshot.",
+      "tags": [
+        "pipeline",
+        "energy",
+        "casimir",
+        "warp"
+      ],
+      "children": [
+        "energy-pipeline-core",
+        "dynamic-casimir-stack",
+        "qi-guardrails-stack",
+        "phase-control-stack",
+        "energy-field-inputs"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-pipeline-walk"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-stress-energy"
+        }
+      ]
+    },
+    {
+      "id": "pipeline-stress-energy",
+      "slug": "pipeline-stress-energy",
+      "title": "Stress-Energy Mapping",
+      "excerpt": "Map pipeline outputs into stress-energy fields.",
+      "bodyMD": "Stress-energy mapping converts pipeline outputs into fields for GR evolution (server/stress-energy-brick.ts, server/gr/evolution/stress-energy.ts).\n\nMinimal artifact: stress-energy brick report.",
+      "tags": [
+        "stress-energy",
+        "mapping",
+        "pipeline",
+        "gr"
+      ],
+      "children": [
+        "stress-energy-equations",
+        "stress-energy-brick",
+        "gr-stress-energy-fields",
+        "stress-energy-integrals"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-pipeline-walk"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "pipeline-gr-evolution",
+      "slug": "pipeline-gr-evolution",
+      "title": "GR Evolution",
+      "excerpt": "Evolve BSSN fields and compute diagnostics.",
+      "bodyMD": "GR evolution integrates BSSN fields and produces diagnostics (server/gr/evolution/solver.ts, server/gr-evolve-brick.ts).\n\nMinimal artifact: residual diagnostics report.",
+      "tags": [
+        "gr",
+        "evolution",
+        "bssn",
+        "diagnostic"
+      ],
+      "children": [
+        "gr-initial-data",
+        "gr-evolution-solver",
+        "gr-evolution-brick",
+        "bssn-state",
+        "bssn-evolution-core",
+        "rk4-integrator",
+        "stencils",
+        "gr-diagnostics"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-pipeline-walk"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate"
+        }
+      ]
+    },
+    {
+      "id": "pipeline-constraint-gate",
+      "slug": "pipeline-constraint-gate",
+      "title": "Constraint Gate",
+      "excerpt": "Evaluate constraints against threshold policies.",
+      "bodyMD": "Constraint evaluation applies GR thresholds to diagnostics (server/gr/constraint-evaluator.ts).\n\nMinimal artifact: constraint gate summary.",
+      "tags": [
+        "constraints",
+        "gate",
+        "policy",
+        "gr"
+      ],
+      "children": [
+        "gr-constraint-policy",
+        "gr-constraint-network"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-pipeline-walk"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-viability"
+        }
+      ]
+    },
+    {
+      "id": "pipeline-viability",
+      "slug": "pipeline-viability",
+      "title": "Warp Viability",
+      "excerpt": "Combine pipeline outputs with guardrails to evaluate viability.",
+      "bodyMD": "Warp viability evaluates pipeline outputs against guardrails (tools/warpViability.ts, modules/physics/warpAgents.ts).\n\nMinimal artifact: viability evaluation summary.",
+      "tags": [
+        "viability",
+        "warp",
+        "guardrails",
+        "evaluation"
+      ],
+      "children": [
+        "warp-viability-sim"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-pipeline-walk"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-certificate"
+        }
+      ]
+    },
+    {
+      "id": "pipeline-certificate",
+      "slug": "pipeline-certificate",
+      "title": "Viability Certificate",
+      "excerpt": "Issue certificate with integrity checks and policy gates.",
+      "bodyMD": "Certificates are issued only after constraint and integrity checks pass (tools/warpViabilityCertificate.ts).\n\nMinimal artifact: certificate hash + integrity OK.",
+      "tags": [
+        "certificate",
+        "integrity",
+        "policy",
+        "viability"
+      ],
+      "children": [
+        "certificate-verify"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-pipeline-walk"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-verification-gates"
+        }
+      ]
+    },
+    {
+      "id": "math-verification-gates",
+      "slug": "math-verification-gates",
+      "title": "Verification Gates",
+      "excerpt": "Hard constraints, required tests, and certificate integrity.",
+      "bodyMD": "Verification gates enforce hard constraints and required tests (WARP_AGENTS.md) before certified claims.\n\nMinimal artifact: Casimir verification gate PASS + certificate integrity OK.",
+      "tags": [
+        "verification",
+        "constraints",
+        "tests",
+        "certificate"
+      ],
+      "children": [
+        "constraint-packs",
+        "constraint-pack-policy",
+        "constraint-pack-evaluator",
+        "constraint-pack-telemetry"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-maturity-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "stage-certified"
+        }
+      ]
+    },
+    {
+      "id": "math-evidence-registry",
+      "slug": "math-evidence-registry",
+      "title": "Math Evidence Registry",
+      "excerpt": "Stage policy, evidence profiles, and dependency graph.",
+      "bodyMD": "Math evidence and stage policy live in math.config.json, math.evidence.json, math.waivers.json, and MATH_GRAPH.json.\n\nMinimal artifact: evidence pack + dependency graph.",
+      "tags": [
+        "evidence",
+        "registry",
+        "config",
+        "dependencies"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-maturity-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-maturity-stages"
+        }
+      ]
+    },
+    {
+      "id": "energy-pipeline-core",
+      "slug": "energy-pipeline-core",
+      "title": "Energy Pipeline Core",
+      "excerpt": "Central pipeline calculations and state assembly.",
+      "bodyMD": "Core pipeline logic aggregates dynamic Casimir, QI, and geometry inputs (server/energy-pipeline.ts).\n\nMinimal artifact: pipeline state snapshot.",
+      "tags": [
+        "pipeline",
+        "energy",
+        "casimir",
+        "state"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-energy"
+        }
+      ]
+    },
+    {
+      "id": "dynamic-casimir-stack",
+      "slug": "dynamic-casimir-stack",
+      "title": "Dynamic Casimir Stack",
+      "excerpt": "Dynamic Casimir calculations and geometry coupling.",
+      "bodyMD": "Dynamic Casimir calculations link modulation, geometry, and energy output.\n\nMinimal artifact: dynamic Casimir sweep summary.",
+      "tags": [
+        "casimir",
+        "dynamic",
+        "energy"
+      ],
+      "children": [
+        "dynamic-casimir-engine",
+        "natario-metric-engine",
+        "static-casimir-engine",
+        "casimir-inference-engine"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-energy"
+        }
+      ]
+    },
+    {
+      "id": "dynamic-casimir-engine",
+      "slug": "dynamic-casimir-engine",
+      "title": "Dynamic Casimir Engine",
+      "excerpt": "Compute dynamic Casimir energy and sweep curves.",
+      "bodyMD": "Dynamic Casimir engine executes sweeps and energy estimates (modules/dynamic/dynamic-casimir.ts).\n\nMinimal artifact: sweep curve record.",
+      "tags": [
+        "casimir",
+        "dynamic",
+        "sweep"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "dynamic-casimir-stack"
+        }
+      ]
+    },
+    {
+      "id": "natario-metric-engine",
+      "slug": "natario-metric-engine",
+      "title": "Natario Metric Engine",
+      "excerpt": "Compute Natario metric helpers for dynamic Casimir.",
+      "bodyMD": "Natario metric helpers supply geometry parameters (modules/dynamic/natario-metric.ts).\n\nMinimal artifact: metric parameter snapshot.",
+      "tags": [
+        "natario",
+        "metric",
+        "geometry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "dynamic-casimir-stack"
+        }
+      ]
+    },
+    {
+      "id": "static-casimir-engine",
+      "slug": "static-casimir-engine",
+      "title": "Static Casimir Baseline",
+      "excerpt": "Compute static Casimir energy baseline.",
+      "bodyMD": "Static Casimir baseline supports dynamic deltas (modules/sim_core/static-casimir.ts).\n\nMinimal artifact: baseline energy value.",
+      "tags": [
+        "casimir",
+        "static",
+        "baseline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "dynamic-casimir-stack"
+        }
+      ]
+    },
+    {
+      "id": "casimir-inference-engine",
+      "slug": "casimir-inference-engine",
+      "title": "Casimir Inference",
+      "excerpt": "Infer energy from force series and datasets.",
+      "bodyMD": "Inference utilities map measured force series to energy (modules/sim_core/casimir-inference.ts).\n\nMinimal artifact: inference fit summary.",
+      "tags": [
+        "casimir",
+        "inference",
+        "force"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "dynamic-casimir-stack"
+        }
+      ]
+    },
+    {
+      "id": "qi-guardrails-stack",
+      "slug": "qi-guardrails-stack",
+      "title": "QI Guardrails Stack",
+      "excerpt": "Quantum-inequality monitoring and control loops.",
+      "bodyMD": "QI guardrails apply Ford-Roman bounds, monitoring, and autoscaling.\n\nMinimal artifact: QI guardrail margin report.",
+      "tags": [
+        "qi",
+        "guardrails",
+        "constraints"
+      ],
+      "children": [
+        "qi-bounds-engine",
+        "qi-monitor-engine",
+        "qi-saturation-window",
+        "qi-stream",
+        "qi-autoscale",
+        "qi-autothrottle",
+        "qi-diagnostics"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-energy"
+        }
+      ]
+    },
+    {
+      "id": "qi-bounds-engine",
+      "slug": "qi-bounds-engine",
+      "title": "QI Bounds",
+      "excerpt": "Compute Ford-Roman quantum inequality bounds.",
+      "bodyMD": "QI bounds compute limit values and safety margins (server/qi/qi-bounds.ts).\n\nMinimal artifact: bound calculation record.",
+      "tags": [
+        "qi",
+        "bounds",
+        "ford-roman"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "qi-guardrails-stack"
+        }
+      ]
+    },
+    {
+      "id": "qi-monitor-engine",
+      "slug": "qi-monitor-engine",
+      "title": "QI Monitor",
+      "excerpt": "Kernel-based QI monitor for running averages.",
+      "bodyMD": "QI monitor tracks running averages against bounds (server/qi/qi-monitor.ts).\n\nMinimal artifact: monitor snapshot.",
+      "tags": [
+        "qi",
+        "monitor",
+        "kernel"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "qi-guardrails-stack"
+        }
+      ]
+    },
+    {
+      "id": "qi-saturation-window",
+      "slug": "qi-saturation-window",
+      "title": "QI Saturation Window",
+      "excerpt": "Sampling window and saturation estimates.",
+      "bodyMD": "QI saturation computes sampling windows and S values (server/qi/qi-saturation.ts).\n\nMinimal artifact: saturation summary.",
+      "tags": [
+        "qi",
+        "saturation",
+        "sampling"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "qi-guardrails-stack"
+        }
+      ]
+    },
+    {
+      "id": "qi-stream",
+      "slug": "qi-stream",
+      "title": "QI Telemetry Stream",
+      "excerpt": "Live QI telemetry aggregation and snapshots.",
+      "bodyMD": "QI stream gathers tile telemetry and snapshot updates (server/qi/pipeline-qi-stream.ts, server/qi/qi-snap-source.ts, server/qi/qi-snap-broadcaster.ts).\n\nMinimal artifact: QI stream snapshot.",
+      "tags": [
+        "qi",
+        "telemetry",
+        "stream"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "qi-guardrails-stack"
+        }
+      ]
+    },
+    {
+      "id": "qi-autoscale",
+      "slug": "qi-autoscale",
+      "title": "QI Autoscale",
+      "excerpt": "Autoscale QI controls to hold guardrail margins.",
+      "bodyMD": "QI autoscale adjusts scaling to preserve bounds (server/controls/qi-autoscale.ts).\n\nMinimal artifact: autoscale state record.",
+      "tags": [
+        "qi",
+        "autoscale",
+        "control"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "qi-guardrails-stack"
+        }
+      ]
+    },
+    {
+      "id": "qi-autothrottle",
+      "slug": "qi-autothrottle",
+      "title": "QI Autothrottle",
+      "excerpt": "Throttle controls to prevent guardrail breaches.",
+      "bodyMD": "QI autothrottle limits pump commands and pulses (server/controls/qi-autothrottle.ts).\n\nMinimal artifact: throttle step log.",
+      "tags": [
+        "qi",
+        "autothrottle",
+        "control"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "qi-guardrails-stack"
+        }
+      ]
+    },
+    {
+      "id": "qi-diagnostics",
+      "slug": "qi-diagnostics",
+      "title": "QI Diagnostics Schema",
+      "excerpt": "Schema for QI diagnostic payloads.",
+      "bodyMD": "QI diagnostics schema defines payload fields (shared/qi-diagnostics.ts).\n\nMinimal artifact: diagnostics schema snapshot.",
+      "tags": [
+        "qi",
+        "diagnostics",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "qi-guardrails-stack"
+        }
+      ]
+    },
+    {
+      "id": "phase-control-stack",
+      "slug": "phase-control-stack",
+      "title": "Phase Control Stack",
+      "excerpt": "Phase scheduling, calibration, and pump control.",
+      "bodyMD": "Phase controls coordinate pump commands and sector scheduling.\n\nMinimal artifact: phase schedule output.",
+      "tags": [
+        "phase",
+        "control",
+        "scheduler"
+      ],
+      "children": [
+        "phase-scheduler",
+        "phase-calibration",
+        "pump-controls",
+        "ts-autoscale"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-energy"
+        }
+      ]
+    },
+    {
+      "id": "phase-scheduler",
+      "slug": "phase-scheduler",
+      "title": "Phase Scheduler",
+      "excerpt": "Compute sector phase offsets and pulse alignment.",
+      "bodyMD": "Phase scheduler computes sector offsets (server/energy/phase-scheduler.ts).\n\nMinimal artifact: phase schedule table.",
+      "tags": [
+        "phase",
+        "scheduler",
+        "pulses"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "phase-control-stack"
+        }
+      ]
+    },
+    {
+      "id": "phase-calibration",
+      "slug": "phase-calibration",
+      "title": "Phase Calibration",
+      "excerpt": "Record calibration snapshots for phase tuning.",
+      "bodyMD": "Phase calibration writes and reads calibration snapshots (server/utils/phase-calibration.ts, sim_core/phase_calibration.json).\n\nMinimal artifact: calibration record.",
+      "tags": [
+        "phase",
+        "calibration",
+        "telemetry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "phase-control-stack"
+        }
+      ]
+    },
+    {
+      "id": "pump-controls",
+      "slug": "pump-controls",
+      "title": "Pump Controls",
+      "excerpt": "Drive pump command generation for pulses.",
+      "bodyMD": "Pump controllers generate command tones (server/instruments/pump.ts, server/instruments/pump-multitone.ts).\n\nMinimal artifact: pump command record.",
+      "tags": [
+        "pump",
+        "control",
+        "pulses"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "phase-control-stack"
+        }
+      ]
+    },
+    {
+      "id": "ts-autoscale",
+      "slug": "ts-autoscale",
+      "title": "TS Autoscale",
+      "excerpt": "Autoscale TS ratio to stabilize cadence.",
+      "bodyMD": "TS autoscale manages duty and cadence (server/ts/ts-autoscale.ts).\n\nMinimal artifact: TS autoscale snapshot.",
+      "tags": [
+        "ts",
+        "autoscale",
+        "cadence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "phase-control-stack"
+        }
+      ]
+    },
+    {
+      "id": "energy-field-inputs",
+      "slug": "energy-field-inputs",
+      "title": "Energy Field Inputs",
+      "excerpt": "Schema and adapters for pipeline energy fields.",
+      "bodyMD": "Energy field inputs define raster and tokamak formats.\n\nMinimal artifact: input schema snapshot.",
+      "tags": [
+        "energy",
+        "inputs",
+        "schema"
+      ],
+      "children": [
+        "raster-energy-field",
+        "tokamak-energy-field",
+        "solar-energy-calibration",
+        "tokamak-synthetic-diagnostics",
+        "solar-energy-adapter",
+        "tokamak-energy-adapter"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-energy"
+        }
+      ]
+    },
+    {
+      "id": "raster-energy-field",
+      "slug": "raster-energy-field",
+      "title": "Raster Energy Field",
+      "excerpt": "Canonical raster energy-field contract.",
+      "bodyMD": "Raster energy-field schema defines u_total grids (shared/raster-energy-field.ts).\n\nMinimal artifact: schema sample.",
+      "tags": [
+        "raster",
+        "energy",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-field-inputs"
+        }
+      ]
+    },
+    {
+      "id": "tokamak-energy-field",
+      "slug": "tokamak-energy-field",
+      "title": "Tokamak Energy Field",
+      "excerpt": "Tokamak channel manifests and energy fields.",
+      "bodyMD": "Tokamak energy-field schema defines channel manifests (shared/tokamak-energy-field.ts).\n\nMinimal artifact: channel manifest sample.",
+      "tags": [
+        "tokamak",
+        "energy",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-field-inputs"
+        }
+      ]
+    },
+    {
+      "id": "solar-energy-calibration",
+      "slug": "solar-energy-calibration",
+      "title": "Solar Energy Calibration",
+      "excerpt": "Calibration for solar intensity to energy density.",
+      "bodyMD": "Solar calibration maps intensity to u_total (shared/solar-energy-calibration.ts).\n\nMinimal artifact: calibration record.",
+      "tags": [
+        "solar",
+        "calibration",
+        "energy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-field-inputs"
+        }
+      ]
+    },
+    {
+      "id": "tokamak-synthetic-diagnostics",
+      "slug": "tokamak-synthetic-diagnostics",
+      "title": "Tokamak Synthetic Diagnostics",
+      "excerpt": "Synthetic diagnostic schema for tokamak inputs.",
+      "bodyMD": "Tokamak synthetic diagnostics define sensor reconstructions (shared/tokamak-synthetic-diagnostics.ts).\n\nMinimal artifact: diagnostic schema.",
+      "tags": [
+        "tokamak",
+        "diagnostics",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-field-inputs"
+        }
+      ]
+    },
+    {
+      "id": "solar-energy-adapter",
+      "slug": "solar-energy-adapter",
+      "title": "Solar Energy Adapter",
+      "excerpt": "Adapter for solar telemetry to energy fields.",
+      "bodyMD": "Solar adapter maps solar telemetry to energy fields (server/services/essence/solar-energy-adapter.ts).\n\nMinimal artifact: adapter output snapshot.",
+      "tags": [
+        "solar",
+        "adapter",
+        "energy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-field-inputs"
+        }
+      ]
+    },
+    {
+      "id": "tokamak-energy-adapter",
+      "slug": "tokamak-energy-adapter",
+      "title": "Tokamak Energy Adapter",
+      "excerpt": "Adapter for tokamak telemetry to energy fields.",
+      "bodyMD": "Tokamak adapter maps telemetry to energy fields (server/services/essence/tokamak-energy-adapter.ts).\n\nMinimal artifact: adapter output snapshot.",
+      "tags": [
+        "tokamak",
+        "adapter",
+        "energy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "energy-field-inputs"
+        }
+      ]
+    },
+    {
+      "id": "stress-energy-equations",
+      "slug": "stress-energy-equations",
+      "title": "Stress-Energy Equations",
+      "excerpt": "Compute stress-energy tensors from pipeline fields.",
+      "bodyMD": "Stress-energy equations map fields to tensor components (modules/dynamic/stress-energy-equations.ts).\n\nMinimal artifact: tensor component summary.",
+      "tags": [
+        "stress-energy",
+        "equations",
+        "tensor"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-stress-energy"
+        }
+      ]
+    },
+    {
+      "id": "stress-energy-brick",
+      "slug": "stress-energy-brick",
+      "title": "Stress-Energy Brick",
+      "excerpt": "Brick that packages stress-energy for GR.",
+      "bodyMD": "Stress-energy brick packages tensors for GR (server/stress-energy-brick.ts).\n\nMinimal artifact: brick payload snapshot.",
+      "tags": [
+        "stress-energy",
+        "brick",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-stress-energy"
+        }
+      ]
+    },
+    {
+      "id": "gr-stress-energy-fields",
+      "slug": "gr-stress-energy-fields",
+      "title": "GR Stress-Energy Fields",
+      "excerpt": "GR stress-energy field representation.",
+      "bodyMD": "GR stress-energy fields store tensor grids (modules/gr/stress-energy.ts, server/gr/evolution/stress-energy.ts).\n\nMinimal artifact: field grid snapshot.",
+      "tags": [
+        "stress-energy",
+        "gr",
+        "fields"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-stress-energy"
+        }
+      ]
+    },
+    {
+      "id": "stress-energy-integrals",
+      "slug": "stress-energy-integrals",
+      "title": "Stress-Energy Integrals",
+      "excerpt": "Compute integrals over stress-energy fields.",
+      "bodyMD": "Stress-energy integrals compute totals and diagnostics (modules/gr/stress-energy-integrals.ts).\n\nMinimal artifact: integral summary.",
+      "tags": [
+        "stress-energy",
+        "integrals",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-stress-energy"
+        }
+      ]
+    },
+    {
+      "id": "gr-initial-data",
+      "slug": "gr-initial-data",
+      "title": "GR Initial Data",
+      "excerpt": "Initialize GR fields for evolution.",
+      "bodyMD": "Initial data assembly sets starting fields (server/gr/evolution/initial-data.ts, server/gr-initial-brick.ts).\n\nMinimal artifact: initial data snapshot.",
+      "tags": [
+        "gr",
+        "initial",
+        "evolution"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "gr-evolution-solver",
+      "slug": "gr-evolution-solver",
+      "title": "GR Evolution Solver",
+      "excerpt": "Orchestrate GR evolution steps.",
+      "bodyMD": "Evolution solver orchestrates BSSN stepping (server/gr/evolution/solver.ts).\n\nMinimal artifact: solver step record.",
+      "tags": [
+        "gr",
+        "solver",
+        "evolution"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "gr-evolution-brick",
+      "slug": "gr-evolution-brick",
+      "title": "GR Evolution Brick",
+      "excerpt": "Brick wrapper for GR evolution runs.",
+      "bodyMD": "Evolution brick wraps solver outputs (server/gr/evolution/brick.ts, server/gr-evolve-brick.ts).\n\nMinimal artifact: evolution brick payload.",
+      "tags": [
+        "gr",
+        "brick",
+        "evolution"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "bssn-state",
+      "slug": "bssn-state",
+      "title": "BSSN State",
+      "excerpt": "State containers for BSSN fields.",
+      "bodyMD": "BSSN state defines fields and grid layout (modules/gr/bssn-state.ts).\n\nMinimal artifact: state schema.",
+      "tags": [
+        "bssn",
+        "state",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "bssn-evolution-core",
+      "slug": "bssn-evolution-core",
+      "title": "BSSN Evolution Core",
+      "excerpt": "Core BSSN evolution step.",
+      "bodyMD": "BSSN evolution computes field updates (modules/gr/bssn-evolve.ts).\n\nMinimal artifact: evolution step summary.",
+      "tags": [
+        "bssn",
+        "evolution",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "rk4-integrator",
+      "slug": "rk4-integrator",
+      "title": "RK4 Integrator",
+      "excerpt": "Runge-Kutta integrator for BSSN fields.",
+      "bodyMD": "RK4 integrator advances BSSN fields (modules/gr/rk4.ts).\n\nMinimal artifact: integrator step metrics.",
+      "tags": [
+        "rk4",
+        "integrator",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "stencils",
+      "slug": "stencils",
+      "title": "Finite Difference Stencils",
+      "excerpt": "Stencil operators for derivatives and boundaries.",
+      "bodyMD": "Stencil operators compute spatial derivatives (modules/gr/stencils.ts).\n\nMinimal artifact: stencil order config.",
+      "tags": [
+        "stencils",
+        "derivatives",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "gr-diagnostics",
+      "slug": "gr-diagnostics",
+      "title": "GR Diagnostics",
+      "excerpt": "Diagnostics for shift stiffness and stability.",
+      "bodyMD": "GR diagnostics compute shift stiffness metrics (modules/gr/gr-diagnostics.ts).\n\nMinimal artifact: diagnostics snapshot.",
+      "tags": [
+        "diagnostics",
+        "gr",
+        "stability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-gr-evolution"
+        }
+      ]
+    },
+    {
+      "id": "gr-constraint-policy",
+      "slug": "gr-constraint-policy",
+      "title": "GR Constraint Policy",
+      "excerpt": "Constraint policy thresholds and modes.",
+      "bodyMD": "Constraint policy defines thresholds and modes (server/gr/gr-constraint-policy.ts).\n\nMinimal artifact: policy snapshot.",
+      "tags": [
+        "constraints",
+        "policy",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-constraint-gate"
+        }
+      ]
+    },
+    {
+      "id": "gr-constraint-network",
+      "slug": "gr-constraint-network",
+      "title": "GR Constraint Network",
+      "excerpt": "Compute constraint residuals for GR.",
+      "bodyMD": "Constraint network computes residual fields (server/gr/gr-constraint-network.ts).\n\nMinimal artifact: residual summary.",
+      "tags": [
+        "constraints",
+        "residuals",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-constraint-gate"
+        }
+      ]
+    },
+    {
+      "id": "warp-viability-sim",
+      "slug": "warp-viability-sim",
+      "title": "Sim-Core Viability",
+      "excerpt": "Simplified viability calculation for pipeline sanity checks.",
+      "bodyMD": "Sim-core viability computes simplified constraint checks (sim_core/viability.ts).\n\nMinimal artifact: viability summary.",
+      "tags": [
+        "viability",
+        "sim-core",
+        "constraints"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-viability"
+        }
+      ]
+    },
+    {
+      "id": "certificate-verify",
+      "slug": "certificate-verify",
+      "title": "Certificate Verification",
+      "excerpt": "Verify certificate hashes and integrity.",
+      "bodyMD": "Certificate verification validates integrity (tools/verifyCertificate.ts).\n\nMinimal artifact: verification result.",
+      "tags": [
+        "certificate",
+        "verification",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-certificate"
+        }
+      ]
+    },
+    {
+      "id": "constraint-packs",
+      "slug": "constraint-packs",
+      "title": "Constraint Packs",
+      "excerpt": "Constraint pack definitions and ladder tiers.",
+      "bodyMD": "Constraint packs define constraints and tiers (docs/CONSTRAINT-PACKS.md, shared/constraint-packs.ts).\n\nMinimal artifact: pack definition.",
+      "tags": [
+        "constraints",
+        "packs",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-verification-gates"
+        }
+      ]
+    },
+    {
+      "id": "constraint-pack-policy",
+      "slug": "constraint-pack-policy",
+      "title": "Constraint Pack Policy",
+      "excerpt": "Policy profiles for constraint packs.",
+      "bodyMD": "Constraint pack policy stores ladder thresholds (server/services/constraint-packs/constraint-pack-policy.ts, server/services/constraint-packs/constraint-pack-policy-store.ts).\n\nMinimal artifact: policy profile.",
+      "tags": [
+        "constraints",
+        "policy",
+        "packs"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-verification-gates"
+        }
+      ]
+    },
+    {
+      "id": "constraint-pack-evaluator",
+      "slug": "constraint-pack-evaluator",
+      "title": "Constraint Pack Evaluator",
+      "excerpt": "Evaluate telemetry against pack constraints.",
+      "bodyMD": "Constraint pack evaluator normalizes telemetry (server/services/observability/constraint-pack-evaluator.ts, server/services/observability/constraint-pack-normalizer.ts).\n\nMinimal artifact: evaluation report.",
+      "tags": [
+        "constraints",
+        "evaluation",
+        "telemetry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-verification-gates"
+        }
+      ]
+    },
+    {
+      "id": "constraint-pack-telemetry",
+      "slug": "constraint-pack-telemetry",
+      "title": "Constraint Pack Telemetry",
+      "excerpt": "Telemetry ingestion for constraint evaluation.",
+      "bodyMD": "Telemetry ingestion manages constraint pack inputs (server/services/observability/constraint-pack-telemetry.ts).\n\nMinimal artifact: telemetry ingest snapshot.",
+      "tags": [
+        "constraints",
+        "telemetry",
+        "ingest"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-verification-gates"
+        }
+      ]
+    }
+  ]
+}
