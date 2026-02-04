@@ -4910,3 +4910,18 @@ Build a small eval suite (30-80 prompts) to measure:
 - At least one non-trivial prompt uses >=2 action steps before stop.
 - Clarify happens only after targeted actions (no "first-pass clarify").
 - Agent loop efficiency improves on the eval suite (fewer wasted actions per grounded slot).
+
+#### Missing items to make D18 complete
+- **Per-action budgets and early-exit policy**
+  - Define per-action time/token budgets and a global loop budget.
+  - Stop early when proof density reaches threshold or remaining slots require user input.
+- **Benchmark templates**
+  - Align eval sets with agent-style benchmarks (AgentBench / GAIA / SWE-bench style tasks).
+  - Use as templates for building internal eval prompts and grading rubrics.
+- **Cross-session resolved-term cache (optional)**
+  - Persist resolved term -> proof pointers across sessions when allowed.
+  - Use to bias sense resolution without skipping clarifying steps when evidence is weak.
+- **Action policy table (starter mapping)**
+  - Provide an explicit `gate_outcome -> next_action` table in the doc.
+  - Example: missing slot evidence -> expand heading aliases -> docs-first retry -> slot clarify.
+
