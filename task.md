@@ -4976,3 +4976,10 @@ Deliverables:
 - Planner improves slot doc coverage on mixed prompts by >=20%.
 - Rerank precision >=0.7 (selected cards appear in final citations).
 - No increase in unsupported claim rate.
+
+#### D19 completion notes
+- LLM query hints now run for block-scoped prompts (token-capped).
+- Slot/heading/evidence hints are filtered to avoid definition-length noise.
+- Report blocks now use block-specific heading seeds for scientific clarify.
+- Added env toggles: HELIX_ASK_QUERY_HINTS_BLOCKS, HELIX_ASK_QUERY_TOKENS_BLOCK.
+- Status: DONE
