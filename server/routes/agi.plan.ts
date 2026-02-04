@@ -8023,6 +8023,7 @@ const HelixAskTuningOverrides = z
     coverageSlots: z.array(z.string().min(1)).max(12).optional(),
     topK: z.coerce.number().int().min(1).max(48).optional(),
     context: z.string().optional(),
+    contextFiles: z.array(z.string().min(1)).max(48).optional(),
     max_tokens: z.coerce.number().int().min(1).max(8_192).optional(),
     temperature: z.coerce.number().min(0).max(2).optional(),
     seed: z.coerce.number().int().nonnegative().optional(),
@@ -11954,7 +11955,7 @@ const executeHelixAsk = async ({
           );
         }
         let blockPayload: { status: number; payload: any } | null = null;
-        await executeHelixAsk({
+          await executeHelixAsk({
           request: {
             ...request,
             question: blockQuestion,
@@ -11962,6 +11963,7 @@ const executeHelixAsk = async ({
             traceId: blockTraceId,
             debug: debugEnabled,
             context: blockPrefetchContext?.context,
+            contextFiles: blockPrefetchContext?.files,
             searchQuery: blockSearchSeed,
             coverageSlots: block.slotId ? [block.slotId] : undefined,
           },
@@ -12581,6 +12583,18 @@ const executeHelixAsk = async ({
       contextText = extractContextFromPrompt(prompt);
     }
     let contextFiles = extractFilePathsFromText(contextText);
+    const providedContextFiles = Array.isArray((parsed.data as any).contextFiles)
+      ? (parsed.data as any).contextFiles
+      : [];
+    if (providedContextFiles.length > 0) {
+      const normalized = providedContextFiles
+        .map((entry: string) => (entry ? entry.replace(/\\/g, "/") : ""))
+        .filter(Boolean);
+      if (normalized.length > 0) {
+        const merged = new Set([...contextFiles, ...normalized]);
+        contextFiles = Array.from(merged);
+      }
+    }
     let isRepoQuestion =
       intentProfile.evidencePolicy.allowRepoCitations &&
       (intentDomain === "repo" || intentDomain === "hybrid");
