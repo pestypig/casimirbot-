@@ -430,11 +430,35 @@ async function asJson<T>(response: Response): Promise<T> {
   }
 
   if (!response.ok) {
+    const retryAfterHeader = response.headers.get("retry-after") ?? response.headers.get("Retry-After");
+    let retryAfterMs: number | undefined;
+    if (retryAfterHeader) {
+      const asNumber = Number(retryAfterHeader);
+      if (Number.isFinite(asNumber) && asNumber > 0) {
+        retryAfterMs = asNumber * 1000;
+      } else {
+        const asDate = Date.parse(retryAfterHeader);
+        if (!Number.isNaN(asDate)) {
+          const diff = asDate - Date.now();
+          if (diff > 0) retryAfterMs = diff;
+        }
+      }
+    }
     const message =
       (typeof (payload as any)?.message === "string" && (payload as any).message) ||
       (typeof (payload as any)?.error === "string" && (payload as any).error) ||
       `${response.status} ${response.statusText}`;
-    throw new Error(message);
+    const error = new Error(message);
+    (error as { status?: number }).status = response.status;
+    const payloadRetry =
+      typeof (payload as any)?.retryAfterMs === "number"
+        ? (payload as any).retryAfterMs
+        : undefined;
+    const computedRetry = typeof payloadRetry === "number" ? payloadRetry : retryAfterMs;
+    if (typeof computedRetry === "number" && Number.isFinite(computedRetry)) {
+      (error as { retryAfterMs?: number }).retryAfterMs = computedRetry;
+    }
+    throw error;
   }
 
   return payload as T;
@@ -569,8 +593,13 @@ const buildAbortError = (): Error => {
 
 const isJobPollTransientError = (error: unknown): boolean => {
   if (!(error instanceof Error)) return false;
+  const status = (error as { status?: number }).status;
+  if (status === 429) return true;
   const message = error.message.toLowerCase();
   return (
+    message.includes("rate limit") ||
+    message.includes("rate_limited") ||
+    message.includes("too many requests") ||
     message.includes("failed to fetch") ||
     message.includes("failed to parse json") ||
     message.includes("non-json response") ||
@@ -771,10 +800,15 @@ const pollAskJob = async (
         const fallback = lastPartialText || "Request failed. Please try again.";
         return { text: fallback } as LocalAskResponse;
       }
+      const retryAfterMs = (error as { retryAfterMs?: number }).retryAfterMs;
+      const retryDelay =
+        typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs)
+          ? Math.min(60_000, Math.max(pollInterval, retryAfterMs))
+          : undefined;
       const backoffCap = maxErrorsReached ? 15_000 : 8000;
       const backoffBase = Math.min(backoffCap, pollInterval * Math.pow(2, Math.min(consecutiveErrors, 4)));
-      const jitter = backoffBase * (0.75 + Math.random() * 0.5);
-      await sleep(jitter, options?.signal);
+      const delay = retryDelay ?? backoffBase * (0.75 + Math.random() * 0.5);
+      await sleep(delay, options?.signal);
       continue;
     }
     if (job.partialText) {

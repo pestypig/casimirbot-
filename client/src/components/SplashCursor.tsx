@@ -2,7 +2,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 
-const LOG_SPLASH = true;
+const LOG_SPLASH = Boolean(import.meta.env?.DEV);
+const MAX_SPLASH_RETRIES = 1;
 
 function SplashCursor({
   SIM_RESOLUTION = 128,
@@ -21,16 +22,33 @@ function SplashCursor({
   TRANSPARENT = true
 }) {
   const [retryTick, setRetryTick] = useState(0); // reinit WebGL if context unavailable/lost
+  const [disabled, setDisabled] = useState(false);
   const canvasRef = useRef(null);
+  const retryCountRef = useRef(0);
+  const disabledRef = useRef(false);
 
   useEffect(() => {
+    disabledRef.current = disabled;
+  }, [disabled]);
+
+  useEffect(() => {
+    if (disabled) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     let retryHandle: number | null = null;
     const scheduleRetry = (delay = 800) => {
+      if (disabledRef.current) return;
       if (retryHandle !== null) return;
       retryHandle = window.setTimeout(() => setRetryTick(v => v + 1), delay);
+    };
+    const disableSplash = (reason?: string) => {
+      if (disabledRef.current) return;
+      disabledRef.current = true;
+      if (LOG_SPLASH) {
+        console.warn('[SplashCursor] Disabling WebGL cursor:', reason ?? 'context lost');
+      }
+      setDisabled(true);
     };
 
     function pointerPrototype() {
@@ -70,8 +88,13 @@ function SplashCursor({
 
     const context = getWebGLContext(canvas);
     if (!context) {
-      if (LOG_SPLASH) console.warn('[SplashCursor] WebGL context unavailable; retrying...');
-      scheduleRetry();
+      retryCountRef.current += 1;
+      if (retryCountRef.current > MAX_SPLASH_RETRIES) {
+        disableSplash('WebGL context unavailable');
+      } else {
+        if (LOG_SPLASH) console.warn('[SplashCursor] WebGL context unavailable; retrying...');
+        scheduleRetry();
+      }
       return () => {
         if (retryHandle !== null) clearTimeout(retryHandle);
       };
@@ -1067,8 +1090,13 @@ function SplashCursor({
       if (rafId) {
         cancelAnimationFrame(rafId);
       }
-      if (LOG_SPLASH) console.warn('[SplashCursor] WebGL context lost; retrying...');
-      scheduleRetry();
+      retryCountRef.current += 1;
+      if (retryCountRef.current > MAX_SPLASH_RETRIES) {
+        disableSplash('WebGL context lost');
+      } else {
+        if (LOG_SPLASH) console.warn('[SplashCursor] WebGL context lost; retrying...');
+        scheduleRetry(1500);
+      }
     };
 
     canvas.addEventListener('webglcontextlost', handleContextLost, false);
@@ -1101,6 +1129,7 @@ function SplashCursor({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    disabled,
     retryTick,
     SIM_RESOLUTION,
     DYE_RESOLUTION,
@@ -1117,6 +1146,8 @@ function SplashCursor({
     BACK_COLOR,
     TRANSPARENT
   ]);
+
+  if (disabled) return null;
 
   return (
     <div
