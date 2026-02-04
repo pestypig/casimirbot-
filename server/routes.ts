@@ -91,14 +91,30 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   if (rateLimitEnabled) {
     const windowMs = toPositiveInt(process.env.RATE_LIMIT_API_WINDOW_MS, 60_000);
     const max = toPositiveInt(process.env.RATE_LIMIT_API_MAX, 240);
+    const askJobsWindowMs = toPositiveInt(
+      process.env.RATE_LIMIT_ASK_JOBS_WINDOW_MS,
+      60_000,
+    );
+    const askJobsMax = toPositiveInt(process.env.RATE_LIMIT_ASK_JOBS_MAX, 1200);
     const shouldSkipRateLimit = (req: Request): boolean => {
       if (req.method === "OPTIONS") return true;
       const accept = headerValue(req.headers["accept"]).toLowerCase();
       if (accept.includes("text/event-stream")) return true;
       const path = req.path || "";
       if (path.includes("/stream")) return true;
+      if (path.startsWith("/agi/ask/jobs")) return true;
       return false;
     };
+    if (askJobsMax > 0) {
+      app.use(
+        "/api/agi/ask/jobs",
+        createRateLimiter({
+          windowMs: askJobsWindowMs,
+          max: askJobsMax,
+          skip: (req) => req.method === "OPTIONS",
+        }),
+      );
+    }
     app.use(
       "/api",
       createRateLimiter({
