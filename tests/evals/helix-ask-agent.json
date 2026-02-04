@@ -1,0 +1,163 @@
+{
+  "name": "helix-ask-agent-core",
+  "cases": [
+    {
+      "id": "ambig_cavity",
+      "question": "What is a cavity?",
+      "tags": ["ambiguous", "template:ambigqa"],
+      "expect": { "clarify": true }
+    },
+    {
+      "id": "ambig_bubble",
+      "question": "Define bubble.",
+      "tags": ["ambiguous", "template:ambigqa"],
+      "expect": { "clarify": true }
+    },
+    {
+      "id": "ambig_lattice",
+      "question": "Explain the lattice.",
+      "tags": ["ambiguous", "template:ambigqa"],
+      "expect": { "clarify": true }
+    },
+    {
+      "id": "ambig_ledger",
+      "question": "What does the ledger track?",
+      "tags": ["ambiguous", "template:ambigqa"],
+      "expect": { "clarify": true }
+    },
+    {
+      "id": "ambig_zen_governance",
+      "question": "Is an eye for an eye associated with enforcement in zen governance?",
+      "tags": ["ambiguous", "template:ambigqa"],
+      "expect": { "clarify": true }
+    },
+    {
+      "id": "mixed_sun_warp_consciousness",
+      "question": "How does the plan to save the sun fit into the creation of warp bubble ships? Is curvature of spacetime also the root of consciousness?",
+      "tags": ["mixed", "report", "agentbench-template"]
+    },
+    {
+      "id": "mixed_ideology_warp",
+      "question": "Compare the mission ethos with warp-bubble constraints and describe any overlap.",
+      "tags": ["mixed", "agentbench-template"]
+    },
+    {
+      "id": "mixed_curvature_warp",
+      "question": "How does the curvature ledger relate to warp bubble geometry?",
+      "tags": ["mixed", "gaia-template"]
+    },
+    {
+      "id": "mixed_energy_pipeline",
+      "question": "How does the energy pipeline relate to warp module constraints?",
+      "tags": ["mixed", "gaia-template"]
+    },
+    {
+      "id": "mixed_report_prompt",
+      "question": "Give a brief report: (1) solar restoration plan, (2) warp bubble constraints, (3) curvature ledger definitions, (4) consciousness docs if any.",
+      "tags": ["mixed", "report"]
+    },
+    {
+      "id": "mixed_ui_star",
+      "question": "Which UI panels relate to star hydrostatic and how do they connect to solar restoration docs?",
+      "tags": ["mixed"]
+    },
+    {
+      "id": "warp_geometry",
+      "question": "Define warp bubble geometry and cite the docs.",
+      "tags": ["repo", "warp"],
+      "session": "memory-warp"
+    },
+    {
+      "id": "warp_constraints_followup",
+      "question": "And what constraints are listed for warp bubbles?",
+      "tags": ["repo", "warp"],
+      "session": "memory-warp"
+    },
+    {
+      "id": "natario_warp",
+      "question": "What is natario warp and where is it implemented?",
+      "tags": ["repo", "warp"]
+    },
+    {
+      "id": "warp_module",
+      "question": "Explain the warp module and cite its implementation files.",
+      "tags": ["repo", "warp"]
+    },
+    {
+      "id": "connection_curvature",
+      "question": "Define connection curvature in the repo.",
+      "tags": ["repo", "physics"]
+    },
+    {
+      "id": "curvature_ledger",
+      "question": "What is the curvature ledger and what tensors does it describe?",
+      "tags": ["repo", "physics"]
+    },
+    {
+      "id": "ethos_why",
+      "question": "Summarize docs/ethos/why.md and cite it.",
+      "tags": ["repo", "ideology"]
+    },
+    {
+      "id": "ideology_root",
+      "question": "What is the root of the ideology tree and its main branches?",
+      "tags": ["repo", "ideology"]
+    },
+    {
+      "id": "solar_restoration",
+      "question": "Summarize the solar-restoration plan and its key objectives.",
+      "tags": ["repo", "star"]
+    },
+    {
+      "id": "warp_console_arch",
+      "question": "Summarize the warp console architecture and cite the relevant doc.",
+      "tags": ["repo", "warp"]
+    },
+    {
+      "id": "gr_constraint_gate",
+      "question": "Where is the GR constraint gate defined and what thresholds are enforced?",
+      "tags": ["repo", "physics", "swe-bench-template"]
+    },
+    {
+      "id": "ford_roman_constraint",
+      "question": "Which file defines the Ford-Roman quantum inequality constraint?",
+      "tags": ["repo", "physics", "agentbench-template"]
+    },
+    {
+      "id": "warp_agent_tests",
+      "question": "Which tests are required for warp agents?",
+      "tags": ["repo", "physics", "swe-bench-template"]
+    },
+    {
+      "id": "physics_discretization",
+      "question": "Summarize the discretization mesh notes and cite the doc.",
+      "tags": ["repo", "physics"]
+    },
+    {
+      "id": "einstein_equations",
+      "question": "What does the Einstein field equations doc cover?",
+      "tags": ["repo", "physics"]
+    },
+    {
+      "id": "warp_power_mass_ladders",
+      "question": "Explain power-mass ladders in the warp knowledge docs.",
+      "tags": ["repo", "warp"]
+    },
+    {
+      "id": "concept_ambig_bridge",
+      "question": "Explain the bridge and how it relates to the pipeline.",
+      "tags": ["ambiguous"],
+      "expect": { "clarify": true }
+    },
+    {
+      "id": "mixed_resonance",
+      "question": "How does resonance work in the warp context and what related docs exist?",
+      "tags": ["mixed"]
+    },
+    {
+      "id": "long_report",
+      "question": "Provide a report on: (1) helix ask flow, (2) evidence gates, (3) plan pass, (4) agent loop behavior.",
+      "tags": ["report", "mixed"]
+    }
+  ]
+}

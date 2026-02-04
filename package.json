@@ -77,7 +77,8 @@
     "agi:holdout-compare": "tsx scripts/agi-holdout-compare.ts",
     "agi:holdout-gate": "tsx scripts/agi-holdout-gate.ts",
     "helix:ask:concept-audit": "tsx scripts/helix-ask-concept-audit.ts",
-    "helix:ask:sweep": "tsx scripts/helix-ask-sweep.ts"
+    "helix:ask:sweep": "tsx scripts/helix-ask-sweep.ts",
+    "helix:ask:agent-eval": "tsx scripts/helix-ask-agent-eval.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
