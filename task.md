@@ -4848,3 +4848,65 @@ Deliverables:
 #### Exit criteria
 - Clarify responses include actionable "Next evidence" in >=90% of cases.
 - Hypothesis mode (when enabled) never asserts repo facts without proof pointers.
+
+### D18) Agent Controller + Task State + Evaluation Harness (agent readiness)
+Goal: make Helix Ask behave like an agent by adding a closed-loop controller, persistent state, explicit action selection, and measurable evaluation discipline on top of the existing ladder.
+
+#### Core behavior upgrades
+1) **Agent controller (plan -> act -> observe -> revise)**
+   - Add a thin action policy layer above the ladder.
+   - The controller selects the next action based on slot coverage, proof density, ambiguity signals, and budget.
+   - Every action must record: `action_taken`, `reason`, `expected_gain`, `observed_delta`, `stop_reason`.
+
+2) **First-class task state (persistent across blocks + turns)**
+   - Track:
+     - `resolved_concepts` (concept -> proof pointers)
+     - `open_slots` (slot -> missing evidence requirements)
+     - `attempt_history` (retrieval strategies + outcomes)
+     - `pinned_files` (high-signal anchors)
+     - `recent_topic_bias` (session topic tags)
+     - `user_prefs` (hypothesis enabled, verbosity, cite requirements)
+
+3) **Explicit action selection (not just "retry")**
+   - Supported actions (initial):
+     - `retrieve_docs_first`
+     - `retrieve_code_first`
+     - `expand_heading_aliases`
+     - `expand_filename_aliases`
+     - `slot_local_retry`
+     - `switch_report_mode`
+     - `ask_slot_clarify`
+     - `render_scientific_micro_report`
+   - Actions must be mutually exclusive per loop step.
+
+4) **Stop conditions**
+   - Stop only when one is true:
+     - `proof_density_sufficient`
+     - `only_missing_slots_need_user`
+     - `budget_exhausted`
+     - `user_clarify_required`
+
+#### Agent-ready clarify policy
+- Clarify only after at least one targeted attempt per missing slot.
+- Clarify questions must be slot-local and list concrete proof targets (file/section/symbol).
+- Always include a scientific scaffold (Confirmed / Connections / Hypotheses / Next evidence).
+
+#### Evaluation harness (agent-style)
+Build a small eval suite (30-80 prompts) to measure:
+- `grounded_rate`
+- `clarify_precision`
+- `proof_span_rate`
+- `time_to_first_grounded_sentence`
+- `agent_loop_efficiency` (actions taken before stop)
+- `mixed_prompt_success_rate`
+
+#### Deliverables
+- Agent controller state machine and action policy table (gate outcome -> next best action).
+- Task state persistence in session memory (resolved terms, pinned files, attempt history).
+- Per-step live events + debug fields for action selection and stop reasons.
+- Eval prompts + metrics collector.
+
+#### Exit criteria
+- At least one non-trivial prompt uses >=2 action steps before stop.
+- Clarify happens only after targeted actions (no "first-pass clarify").
+- Agent loop efficiency improves on the eval suite (fewer wasted actions per grounded slot).
