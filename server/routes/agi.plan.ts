@@ -5123,6 +5123,7 @@ type HelixAskSlotPlanEntry = {
   label: string;
   required: boolean;
   source: "concept" | "plan" | "token";
+  weak?: boolean;
   surfaces?: string[];
   aliases?: string[];
   evidenceCriteria?: string[];
@@ -5143,6 +5144,9 @@ const STRUCTURAL_SLOTS = new Set([
 ]);
 
 const DOC_SURFACES = new Set(["docs", "knowledge", "ethos"]);
+
+const isWeakSlot = (slot: HelixAskSlotPlanEntry): boolean =>
+  slot.weak === true || slot.source === "token";
 
 const SLOT_IGNORE_TOKENS = new Set([
   "plan",
@@ -5383,6 +5387,7 @@ const buildCanonicalSlotPlan = (args: {
       ...(incoming.evidenceCriteria ?? []),
       ...(directiveEvidence[existing.id] ?? []),
     ]);
+    const mergedWeak = Boolean(existing.weak) && Boolean(incoming.weak);
     const existingPriority = sourcePriority[existing.source];
     const incomingPriority = sourcePriority[incoming.source];
     const label =
@@ -5397,6 +5402,7 @@ const buildCanonicalSlotPlan = (args: {
       label,
       source: incomingPriority > existingPriority ? incoming.source : existing.source,
       required: existing.required || incoming.required,
+      weak: mergedWeak,
       surfaces: Array.from(mergedSurfaces),
       aliases: Array.from(mergedAliases).slice(0, SLOT_ALIAS_MAX),
       evidenceCriteria: Array.from(mergedEvidence).slice(0, 8),
@@ -5433,6 +5439,7 @@ const buildCanonicalSlotPlan = (args: {
       label: card.label ?? card.id,
       required: true,
       source: "concept",
+      weak: false,
       aliases,
       surfaces: deriveSlotSurfaces(card.sourcePath, card.mustIncludeFiles),
     });
@@ -5455,6 +5462,7 @@ const buildCanonicalSlotPlan = (args: {
       label: conceptCard?.label ?? slot,
       required: true,
       source: conceptCard ? "concept" : "plan",
+      weak: false,
       aliases,
       surfaces: conceptCard
         ? deriveSlotSurfaces(conceptCard.sourcePath, conceptCard.mustIncludeFiles)
@@ -5488,12 +5496,14 @@ const buildCanonicalSlotPlan = (args: {
         label: cleaned,
         required: false,
         source: "token",
+        weak: true,
       });
       if (slotOrder.length >= maxTokens) break;
     }
   }
   const slots = slotOrder.map((id) => slotMap.get(id)).filter(Boolean) as HelixAskSlotPlanEntry[];
-  return { slots, coverageSlots: slots.map((slot) => slot.id) };
+  const strongSlots = slots.filter((slot) => !isWeakSlot(slot));
+  return { slots, coverageSlots: strongSlots.map((slot) => slot.id) };
 };
 
 const restrictSlotPlanToCoverage = (
@@ -5513,7 +5523,9 @@ const restrictSlotPlanToCoverage = (
 const collectSlotAliasHints = (slotPlan: HelixAskSlotPlan | null): string[] => {
   if (!slotPlan) return [];
   const hints = new Set<string>();
-  for (const slot of slotPlan.slots) {
+  const strongSlots = slotPlan.slots.filter((slot) => !isWeakSlot(slot));
+  const hintSlots = strongSlots.length > 0 ? strongSlots : slotPlan.slots;
+  for (const slot of hintSlots) {
     if (slot.label) hints.add(normalizeAliasValue(slot.label));
     if (slot.id) hints.add(slot.id.replace(/-/g, " "));
     (slot.aliases ?? []).forEach((alias) => {
@@ -5527,7 +5539,9 @@ const collectSlotAliasHints = (slotPlan: HelixAskSlotPlan | null): string[] => {
 const collectSlotEvidenceHints = (slotPlan: HelixAskSlotPlan | null): string[] => {
   if (!slotPlan) return [];
   const hints = new Set<string>();
-  for (const slot of slotPlan.slots) {
+  const strongSlots = slotPlan.slots.filter((slot) => !isWeakSlot(slot));
+  const hintSlots = strongSlots.length > 0 ? strongSlots : slotPlan.slots;
+  for (const slot of hintSlots) {
     (slot.evidenceCriteria ?? []).forEach((entry) => entry && hints.add(entry));
   }
   return Array.from(hints).filter(Boolean).slice(0, 12);
@@ -5536,7 +5550,9 @@ const collectSlotEvidenceHints = (slotPlan: HelixAskSlotPlan | null): string[] =
 const buildSlotAliasMap = (slotPlan: HelixAskSlotPlan | null): Record<string, string[]> => {
   if (!slotPlan) return {};
   const map: Record<string, string[]> = {};
-  for (const slot of slotPlan.slots) {
+  const strongSlots = slotPlan.slots.filter((slot) => !isWeakSlot(slot));
+  const aliasSlots = strongSlots.length > 0 ? strongSlots : slotPlan.slots;
+  for (const slot of aliasSlots) {
     const aliases = new Set<string>();
     if (slot.label) aliases.add(slot.label);
     (slot.aliases ?? []).forEach((alias) => alias && aliases.add(alias));
@@ -6005,6 +6021,72 @@ function collectDocsGrepCandidates(
     });
   }
   return candidates.sort((a, b) => b.score - a.score).slice(0, 12);
+}
+
+async function collectSlotDocCandidates(args: {
+  slotPlan: HelixAskSlotPlan | null;
+  slotIds: string[];
+  question: string;
+  allowlist?: RegExp[];
+  avoidlist?: RegExp[];
+  topicProfile?: HelixAskTopicProfile | null;
+  limitPerSlot?: number;
+}): Promise<AskCandidate[]> {
+  if (!args.slotPlan || args.slotIds.length === 0) return [];
+  const snapshot = await loadCodeLattice();
+  if (!snapshot) return [];
+  const allowlist = args.allowlist ?? [];
+  const avoidlist = args.avoidlist ?? [];
+  const limitPerSlot = Math.max(1, args.limitPerSlot ?? 1);
+  const slotMap = new Map(args.slotPlan.slots.map((slot) => [slot.id, slot]));
+  const slotIds = Array.from(new Set(args.slotIds)).filter(Boolean);
+  const out: AskCandidate[] = [];
+  const candidatePool = Math.max(12, limitPerSlot * 8);
+  for (const slotId of slotIds) {
+    const slotEntry = slotMap.get(slotId);
+    if (!slotEntry) continue;
+    const slotQueries = mergeHelixAskQueries(
+      [slotEntry.label ?? slotEntry.id],
+      buildSlotQueryTerms(slotEntry),
+      HELIX_ASK_QUERY_MERGE_MAX,
+    );
+    if (!slotQueries.length) continue;
+    const candidateLists: AskCandidateChannelList[] = [];
+    const channelTopScores = initAskChannelStats();
+    for (const query of slotQueries) {
+      const multi = collectAskCandidatesMultiChannel(snapshot, query, args.question, {
+        topicProfile: args.topicProfile,
+        allowlist,
+        avoidlist,
+      });
+      for (const entry of multi.lists) {
+        const candidates = entry.candidates.slice(0, candidatePool);
+        if (!candidates.length) continue;
+        candidateLists.push({ channel: entry.channel, candidates });
+        channelTopScores[entry.channel] = Math.max(
+          channelTopScores[entry.channel],
+          candidates[0].score,
+        );
+      }
+    }
+    if (!candidateLists.length) continue;
+    const channelWeights = scaleAskChannelWeights(
+      HELIX_ASK_RRF_CHANNEL_WEIGHTS,
+      channelTopScores,
+    );
+    const merged = mergeCandidatesWithWeightedRrf(
+      candidateLists,
+      HELIX_ASK_RRF_K,
+      channelWeights,
+    );
+    const docsOnly = merged.filter((candidate) => /(^|\/)docs\//i.test(candidate.filePath));
+    if (docsOnly.length === 0) continue;
+    const selected = selectCandidatesWithMmr(docsOnly, limitPerSlot, HELIX_ASK_MMR_LAMBDA);
+    if (selected.length > 0) {
+      out.push(...selected);
+    }
+  }
+  return out;
 }
 
 function collectAskCandidatesMultiChannel(
@@ -8666,8 +8748,10 @@ const buildReportBlocks = (question: string): HelixAskReportBlock[] => {
 const buildSlotReportBlocks = (slotPlan: HelixAskSlotPlan): HelixAskReportBlock[] => {
   if (!slotPlan.slots.length) return [];
   const blocks: HelixAskReportBlock[] = [];
-  const selectedSlots = slotPlan.slots.filter((slot) => slot.required);
-  const slots = selectedSlots.length > 0 ? selectedSlots : slotPlan.slots;
+  const strongSlots = slotPlan.slots.filter((slot) => !isWeakSlot(slot));
+  const selectedSlots = strongSlots.filter((slot) => slot.required);
+  const slots = selectedSlots.length > 0 ? selectedSlots : strongSlots;
+  if (slots.length === 0) return [];
   for (let index = 0; index < slots.length; index += 1) {
     const slot = slots[index];
     const label = slot.label || slot.id;
@@ -11933,6 +12017,7 @@ const executeHelixAsk = async ({
             label: slot.label,
             required: slot.required,
             source: slot.source,
+            weak: Boolean(slot.weak),
             surfaces: slot.surfaces,
             aliases: (slot.aliases ?? []).slice(0, 6),
             evidence_criteria: (slot.evidenceCriteria ?? []).slice(0, 4),
@@ -12250,6 +12335,7 @@ const executeHelixAsk = async ({
               (docSlotSummary?.slots.length ? docSlotSummary.missingSlots.length > 0 : false))
           ) {
             const docsAllowlist = (planScope?.docsAllowlist ?? []).flat();
+            const slotDocsAllowlist = docsAllowlist.length ? docsAllowlist : [/^docs\//i];
             const slotHints =
               docSlotSummary?.missingSlots?.length
                 ? docSlotSummary.missingSlots
@@ -12266,6 +12352,18 @@ const executeHelixAsk = async ({
             });
             const perSlotCandidates: AskCandidate[] = [];
             if (slotPlan && docSlotSummary?.missingSlots?.length) {
+              const channelSlotCandidates = await collectSlotDocCandidates({
+                slotPlan,
+                slotIds: docSlotSummary.missingSlots,
+                question: baseQuestion,
+                allowlist: slotDocsAllowlist,
+                avoidlist: planScope?.avoidlist,
+                topicProfile,
+                limitPerSlot: 1,
+              });
+              if (channelSlotCandidates.length > 0) {
+                perSlotCandidates.push(...channelSlotCandidates);
+              }
               for (const slotId of docSlotSummary.missingSlots) {
                 const slotEntry = slotPlan.slots.find((entry) => entry.id === slotId);
                 if (!slotEntry) continue;
@@ -12307,9 +12405,12 @@ const executeHelixAsk = async ({
                 HELIX_ASK_MMR_LAMBDA,
               );
               if (selectedExtras.length > 0) {
+                let extraHeaderInjected = 0;
                 const extraLines = selectedExtras
                   .map((entry) => {
-                    const preview = clipAskText(entry.preview, HELIX_ASK_CONTEXT_CHARS);
+                    const injected = injectDocHeaderPreview(entry.filePath, entry.preview);
+                    if (injected.injected) extraHeaderInjected += 1;
+                    const preview = clipAskText(injected.preview, HELIX_ASK_CONTEXT_CHARS);
                     if (!preview) return null;
                     return `${entry.filePath}\n${preview}`;
                   })
@@ -12319,6 +12420,18 @@ const executeHelixAsk = async ({
                   contextFiles = Array.from(
                     new Set([...contextFiles, ...selectedExtras.map((entry) => entry.filePath)]),
                   );
+                }
+                if (extraHeaderInjected > 0) {
+                  logEvent(
+                    "Doc headers (fallback)",
+                    "injected",
+                    `count=${extraHeaderInjected}`,
+                    contextStart,
+                  );
+                  if (debugPayload) {
+                    debugPayload.doc_header_injected =
+                      (debugPayload.doc_header_injected ?? 0) + extraHeaderInjected;
+                  }
                 }
               }
             }
