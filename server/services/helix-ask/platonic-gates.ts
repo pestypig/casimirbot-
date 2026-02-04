@@ -290,6 +290,7 @@ const JUNK_LINE_PATTERNS = [
   /^",?\s*no headings\./i,
   /^you are helix ask citation fixer\./i,
   /^revise the answer to include citations/i,
+  /^to revise the answer to include citations/i,
   /^do not add new claims or steps/i,
   /^keep the numbered step list/i,
   /^keep the paragraph format/i,
@@ -409,6 +410,11 @@ const buildClaimProof = (
   return `source:missing -> verify -> ${claim.id}`;
 };
 
+const PROOF_POINTER_RE = /\b(?:Span:\s*L\d+|Section:\s+|symbol=)\b/i;
+
+const hasProofPointer = (text?: string): boolean =>
+  Boolean(text && PROOF_POINTER_RE.test(text));
+
 const buildClaimLedger = (
   input: HelixAskPlatonicInput,
   claims: ClaimNode[],
@@ -425,13 +431,14 @@ const buildClaimLedger = (
   const ledger: HelixAskClaimLedgerEntry[] = [];
   const uncertainty: HelixAskUncertaintyEntry[] = [];
   const enforceEvidenceRefs = input.requiresRepoEvidence === true;
+  const proofPointerPresent = hasProofPointer(evidenceText);
   const globalEvidenceRefs = ensureUnique(extractFilePathsFromText(input.answer)).slice(0, 3);
   for (const claim of claims) {
     const claimEvidenceRefs =
       claim.evidenceRefs.length > 0 ? claim.evidenceRefs : globalEvidenceRefs;
     const supportedByTokens = isClaimSupported(claim.tokens, evidenceTokens);
     const supported = enforceEvidenceRefs
-      ? claimEvidenceRefs.length > 0 && supportedByTokens
+      ? claimEvidenceRefs.length > 0 && proofPointerPresent
       : claimEvidenceRefs.length > 0 || supportedByTokens;
     const type = classifyClaimType(claim);
     const entry: HelixAskClaimLedgerEntry = {
@@ -618,6 +625,11 @@ function stripJunkFragments(answer: string): { answer: string; applied: boolean;
   if (leadingExtCleaned !== cleaned) {
     reasons.push("leading_extension_token_removed");
     cleaned = leadingExtCleaned;
+  }
+  const citationFixerIndex = cleaned.toLowerCase().indexOf("to revise the answer to include citations");
+  if (citationFixerIndex >= 0) {
+    cleaned = cleaned.slice(0, citationFixerIndex).trimEnd();
+    reasons.push("citation_fixer_removed");
   }
   cleaned = collapseBlankLines(cleaned);
   const applied = cleaned !== answer;
@@ -1111,16 +1123,23 @@ function computeBeliefSummary(input: HelixAskPlatonicInput): HelixAskBeliefSumma
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
   const questionTokens = toTokenSet(input.question);
   const enforceEvidenceRefs = input.requiresRepoEvidence === true;
-  const hasGlobalEvidenceRefs = extractFilePathsFromText(input.answer).length > 0;
+  const proofPointerPresent = hasProofPointer(evidenceText);
+  const globalEvidenceRefs = extractFilePathsFromText(input.answer);
   let supportedCount = 0;
   let unsupportedCount = 0;
   for (const claim of claims) {
-    if (extractFilePathsFromText(claim).length > 0) {
-      supportedCount += 1;
+    const claimRefs = extractFilePathsFromText(claim);
+    const hasEvidenceRef = claimRefs.length > 0 || globalEvidenceRefs.length > 0;
+    if (enforceEvidenceRefs) {
+      if (hasEvidenceRef && proofPointerPresent) {
+        supportedCount += 1;
+      } else {
+        unsupportedCount += 1;
+      }
       continue;
     }
-    if (enforceEvidenceRefs && !hasGlobalEvidenceRefs) {
-      unsupportedCount += 1;
+    if (hasEvidenceRef) {
+      supportedCount += 1;
       continue;
     }
     if (evidenceTokens.size === 0) {
@@ -1184,6 +1203,7 @@ function buildBeliefGraphSummary(
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
   const evidenceRefs = ensureUnique(extractFilePathsFromText(evidenceText));
   const globalEvidenceRefs = ensureUnique(extractFilePathsFromText(input.answer)).slice(0, 3);
+  const proofPointerPresent = hasProofPointer(evidenceText);
   const constraintLines = evidenceText
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -1206,7 +1226,7 @@ function buildBeliefGraphSummary(
     }
     const supportedByTokens = isClaimSupported(claim.tokens, evidenceTokens);
     const supported = enforceEvidenceRefs
-      ? hasEvidenceRef && supportedByTokens
+      ? hasEvidenceRef && proofPointerPresent
       : hasEvidenceRef || supportedByTokens;
     if (supported) {
       supports += 1;
@@ -1432,6 +1452,9 @@ const chooseVariantCandidate = (
     .filter(Boolean)
     .join("\n\n");
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
+  const proofPointerPresent = hasProofPointer(evidenceText);
+  const enforceEvidenceRefs = input.requiresRepoEvidence === true;
+  const globalEvidenceRefs = ensureUnique(extractFilePathsFromText(input.answer)).slice(0, 3);
   if (evidenceTokens.size === 0) {
     return {
       answer: input.answer,
@@ -1442,7 +1465,14 @@ const chooseVariantCandidate = (
   const questionTokens = toTokenSet(input.question);
   const signals = baseClaims.map((claim) => ({
     claim,
-    supported: claim.evidenceRefs.length > 0 || isClaimSupported(claim.tokens, evidenceTokens),
+    supported: (() => {
+      const claimEvidenceRefs =
+        claim.evidenceRefs.length > 0 ? claim.evidenceRefs : globalEvidenceRefs;
+      if (enforceEvidenceRefs) {
+        return claimEvidenceRefs.length > 0 && proofPointerPresent;
+      }
+      return claimEvidenceRefs.length > 0 || isClaimSupported(claim.tokens, evidenceTokens);
+    })(),
     questionAligned: isQuestionAligned(claim.tokens, questionTokens),
   }));
   const baseCount = baseClaims.length;

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
+import { findDocSectionByHeading, readDocSectionIndex } from "../services/helix-ask/doc-sections";
 
 const DocsHeadingSectionInput = z.object({
   path: z.string().min(1),
@@ -27,11 +28,21 @@ export const docsHeadingSectionSpec: ToolSpecShape = {
 
 export const docsHeadingSectionHandler: ToolHandler = async (rawInput) => {
   const input = DocsHeadingSectionInput.parse(rawInput ?? {});
-  const header = input.heading.startsWith("#") ? input.heading : `## ${input.heading}`;
-  const sectionLines = [`${header}`, "", `Context extracted for ${input.heading}.`, "", "- placeholder line 1", "- placeholder line 2"];
+  const index = readDocSectionIndex(input.path);
+  const section = findDocSectionByHeading(index, input.heading);
+  const headingText = section?.heading ?? input.heading;
+  const level = section?.level ?? 2;
+  const header = `${"#".repeat(level)} ${headingText}`;
+  const headerPath = section?.headerPath?.length ? `Header path: ${section.headerPath.join(" > ")}` : "";
+  const body = section?.bodyLines?.length ? section.bodyLines.join("\n").trim() : "";
+  const sectionLines = [
+    header,
+    headerPath,
+    "",
+    body || `Context extracted for ${headingText}.`,
+  ].filter(Boolean);
   return {
     section: sectionLines.join("\n"),
     citation: { type: "md" as const, path: input.path, heading: input.heading.replace(/^#+\s*/, "") },
   };
 };
-

@@ -4436,3 +4436,351 @@ Phase 4 - Partial grounded assembly (default for multi-slot)
 - RRF (retrieval fusion): https://trec.nist.gov/pubs/trec18/papers/uwaterloo-cormack.RF.WEB.pdf
 - MMR / diversification: https://sigir.org/files/forum/F99/Varian.pdf
 - Conversational search survey: https://arxiv.org/html/2410.15576v1
+### D14) Semantic Slot Binding + Evidence-First Disambiguation - Status update (2026-02-04)
+- Added per-slot multi-channel doc retrieval fallback (RRF + MMR) to target missing slots.
+- Ensured doc header injection also applies to fallback doc evidence cards; debug counts include fallback headers.
+
+### D15) Sense + Slot Induction, Slot-Graded Gating, and Evidence-First Retrieval (research-backed plan)
+Below is a **research-backed build plan** that sits "in-between the tree" you wrote and the Helix Ask ladder you already have (intent -> retrieval -> gates -> arbiter -> synthesis). The goal is exactly what you're aiming for: **Codex-style meaning-level matching + small read-ins**, while still staying **falsifiable** (no repo evidence => no invented repo claims).
+
+---
+
+#### What your shortcomings tree is really saying
+Your system is already strong at **truth enforcement** (evidence gates, clarify behavior). The recurring failures are upstream of that:
+
+1) **Meaning doesn't bind early enough**
+   The system often can't convert "what the user meant" into stable *slots / concepts / candidate senses* before retrieval.
+
+2) **Retrieval doesn't surface "semantic proof," only "file presence"**
+   You're grabbing the right neighborhoods sometimes, but not consistently pulling **the specific doc spans / headers** that make the gates pass.
+
+3) **Fallback behavior sometimes leaks generic reasoning in repo-expected contexts**
+   This creates the "looks fluent but isn't grounded" feel, or "clarify when it feels like it should have found it."
+
+So the "next build" should add one missing layer:
+
+> **Interpretation -> Evidence-seeking -> Verified synthesis**
+> where interpretation is **semantic slot induction + ambiguity resolution** that is **evidence-aware**.
+
+This is the bridge between A/B (understanding & planning) and C/D/E (retrieval & gates & synthesis).
+
+---
+
+#### The research you should anchor to (and why it maps cleanly to your tree)
+
+##### Ambiguity & clarifying questions (A2, D1)
+You're basically building a controlled form of:
+
+- ambiguous QA -> "ask a clarifying question" rather than guess
+  This is well-studied, and the operational behavior you want (clarify when senses compete) is aligned with benchmarks/datasets like **AmbigQA** ([ACL Anthology][1]) and **ClariQ** ([ACM Digital Library][2]).
+
+**Key takeaway for your build:** don't curate word lists; use **evidence dominance** to decide when to clarify.
+
+---
+
+##### Hybrid retrieval + fusion + diversity (C1, C2)
+You're already doing multi-channel retrieval + RRF fusion. That's the right direction.
+
+- **Reciprocal Rank Fusion (RRF)** is a standard fusion method for combining ranked lists from multiple retrieval channels. ([stefan.buettcher.org][3])
+- **MMR** is a classic approach for **diversity-aware reranking**, helpful when mixed-domain prompts pull redundant candidates. ([CMU School of Computer Science][4])
+- For semantic gaps (synonyms/paraphrases), dense retrieval style models (like DPR) are explicitly motivated by "token mismatch" problems.
+- RAG-style systems formalize the "retrieve then generate" pattern you're implementing.
+
+**Key takeaway for your build:** retrieval needs to return *textual evidence* (headers/snippets) that "proves the concept binding," not just "some files from the area."
+
+---
+
+##### Planning/decomposition (B1, E2, long prompts)
+Your "report mode / blocks" design is basically a lightweight variant of "plan then solve" strategies.
+
+- **Plan-and-Solve** shows that a planning step improves reliability by forcing structure before generation. ([arXiv][5])
+- **ReAct** supports the idea of interleaving reasoning and action (here: reasoning -> retrieval action -> reasoning). ([arXiv][6])
+- **Reflexion** supports a controlled "reflect and retry" loop (you already do retries; the missing part is *why* and *what to change* on retry). ([arXiv][7])
+
+**Key takeaway for your build:** you don't need "more chain-of-thought," you need a **small, schema-constrained plan artifact** that drives retrieval and block orchestration.
+
+---
+
+##### Selective answering / abstention (D1, correctness under uncertainty)
+Your "clarify / refuse to fabricate" is essentially **selective prediction** (answer only when confident).
+A known approach is learning/using abstention policies rather than forcing answers; "Deep Gamblers" is one example line of work on selective prediction. ([arXiv][8])
+
+**Key takeaway for your build:** it's correct to abstain - but you want abstention to be **targeted** ("which slot is missing and what evidence would resolve it?"), not global.
+
+---
+
+#### A build plan that fits *your existing ladder* (minimal refactor, maximum leverage)
+
+##### Phase 1 - Add a semantic "Sense + Slot Induction" layer before retrieval
+Targets: **A1, A2, B1, C2**
+
+**Add one new micro-pass: `slot_plan_pass`** (trace/debug only)
+
+- Input: full user prompt (+ optionally last turn / session bias)
+- Output: *structure only* (no facts), e.g.
+
+  - `slots[]`: canonical slot labels (2-5 max)
+  - `slot_aliases[]`: aliases derived from *prompt phrasing* + *repo metadata* (filenames/headings once available)
+  - `expected_surfaces`: docs/ethos, docs/knowledge, modules, tests, client, server (you already do this)
+  - `clarify_candidates`: 2 likely senses if ambiguous
+
+**Crucial rule:** this pass may generate *instructions* only, never claims.
+
+**Why this closes the Codex gap:**
+Codex "feels" like it reads meaning -> chooses a few targets -> searches. This is that step, made explicit.
+
+---
+
+##### Phase 2 - Upgrade retrieval to "small read-in semantic proof"
+Targets: **C1, C2, D1**
+
+You already have multi-channel retrieval. The missing piece is:
+
+###### 2.1 Index and surface doc structure
+For markdown/docs:
+
+- Index **title + H1/H2 headings** as first-class searchable spans
+- Ensure evidence cards include:
+  - doc title
+  - nearest heading(s)
+  - short excerpt around match
+
+This alone fixes a lot of "doc was retrieved but gates don't see the concept."
+
+###### 2.2 Slot-aware query expansion (automatic, not curated)
+For each slot:
+
+- Start with: slot label + prompt phrase + high-IDF tokens
+- Expand with:
+  - filename tokens (`solar-restoration` <-> `save the sun`)
+  - heading tokens from top doc candidates
+  - lightweight normalization (hyphen/space, plural/singular)
+
+This is basically a controlled lexical bridge. Dense retrieval work like DPR exists *because* token mismatch is a core failure mode.
+
+###### 2.3 Retrieval fusion + diversity
+- Keep RRF fusion across channels ([stefan.buettcher.org][3])
+- Add an MMR-style diversity rerank at the *slot level* so each slot gets at least one strong candidate rather than 10 warp hits and 0 ideology hits. ([CMU School of Computer Science][4])
+
+---
+
+##### Phase 3 - Make gating "slot-graded" instead of "answer-global"
+Targets: **D1, E1, E2**
+
+Right now your logs show the system can end up with:
+
+- some slots grounded
+- others missing
+- but the *final* response becomes too generic, or too global-clarify
+
+**Change the contract:**
+
+- If prompt decomposes into N slots:
+  - answer each slot in its own mini-section (even outside report mode)
+  - grounded slots: short answer + citations
+  - missing slots: 1-line clarify question **specific to that slot**
+
+This is the same correctness principle as AmbigQA/ClariQ behavior: clarify precisely when ambiguity/evidence is insufficient. ([ACL Anthology][1])
+
+**This also fixes "weak bridge reasoning":**
+Once you have 2+ grounded slots, you can add a final "connections" paragraph that is **restricted to already-grounded claims**.
+
+---
+
+##### Phase 4 - Agentization without losing falsifiability
+Targets: **B2, F1, H1/H2**
+
+You can make it "agent-like" without turning it into an unbounded agent:
+
+###### 4.1 Lightweight task state ("plan memory")
+Persist for the session (or trace):
+
+- resolved term -> canonical slot
+- pinned files that repeatedly help
+- last clarify answer from user
+
+This stops repeated ambiguity triggers (F1).
+
+###### 4.2 Controlled "reflect & retry"
+You already retry retrieval; upgrade it to be intentional:
+
+- If slot missing, retry with:
+  - heading tokens
+  - filename tokens
+  - alias normalization
+- Hard cap retries
+
+This mirrors the safe part of Reflexion/ReAct: reflection changes the *next action*, not the facts. ([arXiv][6])
+
+---
+
+#### Practical guidelines you can bake into the system (so you stop debating "generic vs hybrid")
+
+##### 1) When to go **generic**
+Go generic only if **all are true**:
+
+- no explicit repo expectation ("in repo", "according to codebase", "cite files")
+- no strong topic tags
+- ambiguity resolver finds no repo-dominant sense
+
+##### 2) When to go **hybrid**
+Go hybrid when:
+
+- repo expectation is medium/high **but only some slots bind**
+- user asked a mixed question (repo + open domain)
+- you can ground at least one slot, but not all
+
+##### 3) When to **clarify**
+Clarify when:
+
+- repo expectation is explicit/high **and** slot evidence is missing after slot-aware retrieval
+- ambiguity senses are close (no dominant evidence cluster)
+- a key slot has competing plausible interpretations
+
+This is the "selective answering" principle: answer what's supported, abstain/clarify what isn't. ([arXiv][8])
+
+---
+
+#### Metrics that will tell you if this build is working
+Add these to your existing telemetry (you already log a lot of this):
+
+1) **slot_bind_rate**: % prompts where slots were induced and bound to evidence
+2) **slot_doc_coverage_rate**: for each slot, do we have >=1 doc evidence card excerpt?
+3) **clarify_precision**: fraction of clarifies that were later resolved by user providing info (high = good)
+4) **false_clarify_rate**: clarifies where relevant evidence existed in repo but wasn't retrieved
+5) **claim_evidence_ref_rate**: % claims with explicit evidence_refs (don't mark "supported" if refs empty)
+6) **cross_slot_bridge_rate**: only measure bridges when >=2 slots grounded
+7) **latency per slot**: retrieval and synthesis cost scales linearly with slots - track it explicitly
+
+---
+
+#### Test suite you should lock in (minimal, high signal)
+
+##### Ambiguity tests (forces sense resolver)
+- "what's a cavity?"
+- "define bubble"
+- "what is ledger?"
+  Expected: clarify unless repo context dominates.
+
+##### Mixed domain + repo tests (your current pain)
+- "How does save-the-sun relate to warp bubbles, and is curvature the root of consciousness?"
+  Expected: slot-graded answer: warp grounded, solar/restoration grounded if docs exist, consciousness grounded if docs exist, otherwise targeted clarify *only for missing slot*.
+
+##### Report mode correctness tests (block context preservation)
+- Provide long prompt with 4 bullet points; require:
+  - no block loses full question context
+  - each block has evidence or a precise clarify
+
+##### Drift tests
+- claims must have evidence refs; otherwise forced downgrade to "assumption" or clarify.
+
+---
+
+#### The "most versatile" principle to keep you honest
+You said: *"My goal is to supply all relevant generations as statements of valid connections."*
+That's achievable if you adopt one rule:
+
+> **Connections are allowed only between already-grounded slot claims.**
+> If a slot isn't grounded, you can describe *what evidence would connect it* - but you don't assert the connection.
+
+This keeps you falsifiable, while still being useful and "agent-like."
+
+---
+
+If you want a single concrete next step that yields the biggest jump in versatility, it's this:
+
+**Implement "Sense + Slot Induction" + "doc heading injection into evidence cards," then make gating slot-graded.**
+That combination eliminates most of the "Codex found it, Helix Ask didn't" failures without hand-curating terms.
+
+[1]: https://aclanthology.org/2020.emnlp-main.466/?utm_source=chatgpt.com "AmbigQA: Answering Ambiguous Open-domain Questions"
+[2]: https://dl.acm.org/doi/10.1145/1571941.1572114?utm_source=chatgpt.com "Reciprocal rank fusion outperforms condorcet and ..."
+[3]: https://www.stefan.buettcher.org/cv/publications.html?utm_source=chatgpt.com "Stefan Buttcher - Publications"
+[4]: https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf?utm_source=chatgpt.com "The Use of MMR, Diversity-Based Reranking for ..."
+[5]: https://arxiv.org/pdf/2305.04091?utm_source=chatgpt.com "arXiv:2305.04091v3 [cs.CL] 26 May 2023"
+[6]: https://arxiv.org/abs/2210.03629 "[2210.03629] ReAct: Synergizing Reasoning and Acting in Language Models"
+[7]: https://arxiv.org/abs/2303.11366 "[2303.11366] Reflexion: Language Agents with Verbal Reinforcement Learning"
+[8]: https://arxiv.org/html/2306.17322?utm_source=chatgpt.com "Source Attribution Using Language Models as Rerankers"
+
+### D16) Proof-Span Retrieval + Canonical Slot Binding (versatility build plan)
+Goal: make Helix Ask behave like a proof compiler (meaning -> snippet -> verified claims), while staying falsifiable. This is the "drop-in" plan based on observed logs: improve evidence precision, canonical slot binding, and ambiguity handling without hand-curated term lists.
+
+#### Invariants (non-negotiable)
+1) No repo-attributed claim without a proof pointer (file path + header/snippet span or symbol + excerpt).
+2) File paths alone are not evidence; proof spans are required for grounding.
+3) Ambiguity is a valid outcome; ask a targeted clarify question when evidence dominance is unclear.
+
+#### Phase 1) Section-aware doc index + proof spans (highest ROI)
+Targets: retrieval precision, evidence gate pass rate.
+- Build a section-aware doc index for markdown:
+  - split by H1/H2/H3; capture header_path and body.
+  - auto-alias from filename tokens + header tokens + first sentence.
+- Evidence cards must include:
+  - doc title, header path, 2-6 line excerpt around match.
+  - stable citation pointer (path + header or span id).
+- Retrieval fusion remains multi-channel (lexical + path + symbol), but add:
+  - RRF for recall, then MMR for diversity at the slot level.
+
+Deliverables:
+- Section index builder + storage (docs only; extendable to code later).
+- Evidence card builder uses section nodes + snippet context.
+- Evidence cards expose header_path and snippet span id for citations.
+
+#### Phase 2) Canonical slot binding + coverage-on-aliases
+Targets: coverage gate stability, reduced false clarifies.
+- Slot extraction uses noun phrases + concept registry + section headings.
+- Canonicalize slots to slot_id + slot_aliases_auto.
+- Coverage gate uses slot aliases + high-IDF terms, not generic verbs ("fit", "plan", "creation").
+
+Deliverables:
+- Slot binder reads section index to propose canonical slot IDs.
+- Coverage keys derived from slot aliases and section tokens.
+
+#### Phase 3) Ambiguity resolver (evidence dominance)
+Targets: fewer wrong guesses; clearer clarifications.
+- Detect ambiguous terms when prompt is short or retrieval clusters split.
+- Ask a 1-turn clarify question with 2-3 options (repo-sense vs general-sense).
+- If dominance is clear, proceed with repo sense.
+
+Deliverables:
+- Ambiguity resolver module with dominance score + clarify output.
+
+#### Phase 4) Claim ledger enforcement + bridge template
+Targets: falsifiability + readable answers with small models.
+- A claim is "supported" only if evidence_refs length > 0.
+- If unsupported:
+  - mark as "unverified" or ask clarify if repo expectation is high.
+- Bridge reasoning allowed only between grounded slots:
+  - sentence A (slot1 + evidence), sentence B (slot2 + evidence), sentence C (connection with both refs or explicit hypothesis tag).
+
+Deliverables:
+- Claim ledger rule update + synthesis template for cross-slot connections.
+
+#### Phase 5) Report mode context preservation
+Targets: reduce block drift.
+- Each block receives:
+  - block text
+  - full question (global intent header)
+  - canonical slot IDs + aliases
+- Keep retrieval-first, evidence-bounded flow (no chain-of-thought requirement).
+
+Deliverables:
+- Report-mode block prompt upgrades with global intent header + slot constraints.
+
+#### Metrics (add to telemetry)
+1) slot_doc_coverage_rate: slots with >=1 section-level evidence card.
+2) proof_span_rate: citations containing header/span, not just file path.
+3) clarify_precision: clarifies resolved by user follow-up.
+4) false_clarify_rate: clarifies despite available proof spans.
+5) claim_ref_rate: claims with non-empty evidence_refs.
+6) mixed_prompt_success_rate: curated mixed prompts yield partial grounded answers.
+
+#### Tests (minimal, high signal)
+- Ambiguity: "what's a cavity?" -> clarify with options.
+- Mixed-domain: "save-the-sun + warp bubbles + consciousness" -> slot-graded answers.
+- Report mode: long prompts preserve global context per block.
+- Drift: unsupported claims become clarify/unverified, not grounded.
+
+#### Exit criteria
+- Proof spans present for >=80% of grounded claims in curated tests.
+- Clarify precision >=60% on ambiguous prompts.
+- False clarify rate below 20% on mixed-domain prompts.
