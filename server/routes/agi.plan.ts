@@ -12212,7 +12212,7 @@ const executeHelixAsk = async ({
         ...ambiguityCandidates.map((candidate) => formatAmbiguityCandidateLabel(candidate)),
       ]),
     ).slice(0, 3);
-    const ambiguityResolution = resolvePreIntentAmbiguity({
+    const ambiguityResolutionRaw = resolvePreIntentAmbiguity({
       question: baseQuestion,
       candidates: ambiguityCandidates,
       clusterSummary: ambiguityClusterSummary,
@@ -12220,6 +12220,9 @@ const executeHelixAsk = async ({
       repoExpectationLevel,
       seedLabels: ambiguitySeedLabels,
     });
+    const ambiguityResolution = blockScoped
+      ? { ...ambiguityResolutionRaw, shouldClarify: false, reason: undefined }
+      : ambiguityResolutionRaw;
     let preIntentClarify: string | null = null;
     if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
       debugPayload.ambiguity_resolver_applied = ambiguityResolution.shouldClarify;
