@@ -33,6 +33,7 @@ type HelixAskReply = {
   sources?: string[];
   promptIngested?: boolean;
   envelope?: HelixAskResponseEnvelope;
+  liveEvents?: AskLiveEventEntry[];
   debug?: {
     two_pass?: boolean;
     micro_pass?: boolean;
@@ -980,6 +981,7 @@ export function HelixAskPill({
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const [askLiveEvents, setAskLiveEvents] = useState<AskLiveEventEntry[]>([]);
+  const askLiveEventsRef = useRef<AskLiveEventEntry[]>([]);
   const [askLiveSessionId, setAskLiveSessionId] = useState<string | null>(null);
   const [askLiveTraceId, setAskLiveTraceId] = useState<string | null>(null);
   const [askElapsedMs, setAskElapsedMs] = useState<number | null>(null);
@@ -1409,7 +1411,9 @@ export function HelixAskPill({
         const id = event.id ?? String(event.seq ?? Date.now());
         if (prev.some((entry) => entry.id === id)) return prev;
         const next = [...prev, { id, text, tool: toolName || undefined, ts: event.ts }];
-        return next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+        const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+        askLiveEventsRef.current = clipped;
+        return clipped;
       });
     };
     const unsubscribe = subscribeToolLogs(handleEvent, {
@@ -1451,6 +1455,26 @@ export function HelixAskPill({
       .filter(Boolean);
   }, []);
 
+  const resolveReplyEvents = useCallback((reply: HelixAskReply): AskLiveEventEntry[] => {
+    if (reply.liveEvents && reply.liveEvents.length > 0) {
+      return reply.liveEvents;
+    }
+    const debugEvents = reply.debug?.live_events;
+    if (!debugEvents || debugEvents.length === 0) {
+      return [];
+    }
+    return debugEvents.map((entry, index) => {
+      const fallbackLabel = `${entry.stage}${entry.detail ? ` - ${entry.detail}` : ""}`.trim();
+      const text = entry.text?.trim() || fallbackLabel || "Helix Ask update";
+      return {
+        id: `${reply.id}-debug-${index}`,
+        text,
+        tool: entry.tool,
+        ts: entry.ts,
+      };
+    });
+  }, []);
+
   const resumePendingAsk = useCallback(
     async (pending: PendingHelixAskJob) => {
       if (!pending.jobId) return;
@@ -1459,6 +1483,7 @@ export function HelixAskPill({
       setAskStatus("Reconnecting to previous answer...");
       setAskError(null);
       setAskLiveEvents([]);
+      askLiveEventsRef.current = [];
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
       askStartRef.current = Date.now();
@@ -1518,6 +1543,7 @@ export function HelixAskPill({
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const replyId = crypto.randomUUID();
+          const liveEventsSnapshot = [...askLiveEventsRef.current];
           setAskReplies((prev) =>
             [
               {
@@ -1528,6 +1554,7 @@ export function HelixAskPill({
                 promptIngested: responsePromptIngested,
                 envelope: responseEnvelope,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
+                liveEvents: liveEventsSnapshot,
               },
               ...prev,
             ].slice(0, 3),
@@ -1579,6 +1606,7 @@ export function HelixAskPill({
       setAskStatus("Interpreting prompt...");
       setAskError(null);
       setAskLiveEvents([]);
+      askLiveEventsRef.current = [];
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
       askStartRef.current = Date.now();
@@ -1648,6 +1676,7 @@ export function HelixAskPill({
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const replyId = crypto.randomUUID();
+          const liveEventsSnapshot = [...askLiveEventsRef.current];
           setAskReplies((prev) =>
             [
               {
@@ -1658,6 +1687,7 @@ export function HelixAskPill({
                 promptIngested: responsePromptIngested,
                 envelope: responseEnvelope,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
+                liveEvents: liveEventsSnapshot,
               },
               ...prev,
             ].slice(0, 3),
@@ -1961,27 +1991,56 @@ export function HelixAskPill({
       ) : null}
       {askReplies.length > 0 ? (
         <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-2">
-          {askReplies.map((reply) => (
-            <div
-              key={reply.id}
-              className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${moodPalette.replyBorder}`}
-            >
+          {askReplies.map((reply) => {
+            const replyEvents = resolveReplyEvents(reply);
+            return (
               <div
-                className={`pointer-events-none absolute inset-0 opacity-80 ${moodPalette.replyTint}`}
-                aria-hidden
-              />
-              <div className="relative">
-              {reply.question ? (
-                <p className="mb-2 text-xs text-slate-300">
-                  <span className="text-slate-400">Question:</span> {reply.question}
-                </p>
-              ) : null}
-              {renderHelixAskEnvelope(reply)}
-              {userSettings.showHelixAskDebug && reply.debug ? (
-                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                    Ask debug
+                key={reply.id}
+                className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${moodPalette.replyBorder}`}
+              >
+                <div
+                  className={`pointer-events-none absolute inset-0 opacity-80 ${moodPalette.replyTint}`}
+                  aria-hidden
+                />
+                <div className="relative">
+                {reply.question ? (
+                  <p className="mb-2 text-xs text-slate-300">
+                    <span className="text-slate-400">Question:</span> {reply.question}
                   </p>
+                ) : null}
+                {renderHelixAskEnvelope(reply)}
+                {replyEvents.length > 0 ? (
+                  <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                      Execution log
+                    </p>
+                    <div className="mt-2 space-y-2 text-[11px] text-slate-300">
+                      {replyEvents.map((entry) => {
+                        const label = entry.tool?.startsWith("helix.ask.")
+                          ? entry.tool.replace("helix.ask.", "").replace(/\./g, " ")
+                          : entry.tool ?? "event";
+                        return (
+                          <div
+                            key={entry.id}
+                            className="rounded-md border border-white/5 bg-white/[0.03] px-2 py-1"
+                          >
+                            <div className="text-[9px] uppercase tracking-[0.22em] text-slate-500">
+                              {label}
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-slate-300">
+                              {entry.text}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                {userSettings.showHelixAskDebug && reply.debug ? (
+                  <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                      Ask debug
+                    </p>
                   {reply.content ? (
                     <div className="mt-2">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
@@ -2179,7 +2238,7 @@ export function HelixAskPill({
                   {reply.debug.evidence_cards ? (
                     <p className="mt-2 whitespace-pre-wrap">{reply.debug.evidence_cards}</p>
                   ) : null}
-                  {reply.debug.live_events && reply.debug.live_events.length > 0 ? (
+                  {reply.debug.live_events && reply.debug.live_events.length > 0 && replyEvents.length === 0 ? (
                     <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-300">
                       Live events:
                       {"\n"}
@@ -2249,9 +2308,10 @@ export function HelixAskPill({
                   ) : null}
                 </div>
               </div>
+                </div>
               </div>
-            </div>
-          ))}
+          );
+          })}
         </div>
       ) : null}
     </div>

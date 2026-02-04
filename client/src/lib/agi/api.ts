@@ -536,7 +536,7 @@ export async function execute(traceId: string): Promise<ExecuteResponse> {
 }
 
 const HELIX_ASK_JOB_POLL_INTERVAL_MS = 1000;
-const HELIX_ASK_JOB_MAX_CONSECUTIVE_ERRORS = 6;
+const HELIX_ASK_JOB_MAX_CONSECUTIVE_ERRORS = 12;
 const clampNumber = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 const readNumberEnv = (value: unknown, fallback: number) => {
@@ -548,7 +548,7 @@ const readNumberEnv = (value: unknown, fallback: number) => {
   return fallback;
 };
 const HELIX_ASK_JOB_TIMEOUT_MS = clampNumber(
-  readNumberEnv(__HELIX_ASK_JOB_TIMEOUT_MS__, 180_000),
+  readNumberEnv(__HELIX_ASK_JOB_TIMEOUT_MS__, 1_200_000),
   30_000,
   30 * 60_000,
 );
@@ -576,10 +576,20 @@ const isJobPollTransientError = (error: unknown): boolean => {
     message.includes("non-json response") ||
     message.includes("network") ||
     message.includes("timeout") ||
+    message.includes("timed out") ||
     message.includes("gateway") ||
     message.includes("service unavailable") ||
     message.includes("503") ||
-    message.includes("502")
+    message.includes("502") ||
+    message.includes("504") ||
+    message.includes("520") ||
+    message.includes("521") ||
+    message.includes("522") ||
+    message.includes("524") ||
+    message.includes("socket hang up") ||
+    message.includes("connection reset") ||
+    message.includes("load failed") ||
+    message.includes("networkerror")
   );
 };
 
@@ -756,11 +766,13 @@ const pollAskJob = async (
         const fallback = lastPartialText || "Request timed out.";
         return { text: fallback } as LocalAskResponse;
       }
-      if (consecutiveErrors >= HELIX_ASK_JOB_MAX_CONSECUTIVE_ERRORS) {
+      const maxErrorsReached = consecutiveErrors >= HELIX_ASK_JOB_MAX_CONSECUTIVE_ERRORS;
+      if (maxErrorsReached && Date.now() > timeoutDeadline) {
         const fallback = lastPartialText || "Request failed. Please try again.";
         return { text: fallback } as LocalAskResponse;
       }
-      const backoffBase = Math.min(8000, pollInterval * Math.pow(2, Math.min(consecutiveErrors, 4)));
+      const backoffCap = maxErrorsReached ? 15_000 : 8000;
+      const backoffBase = Math.min(backoffCap, pollInterval * Math.pow(2, Math.min(consecutiveErrors, 4)));
       const jitter = backoffBase * (0.75 + Math.random() * 0.5);
       await sleep(jitter, options?.signal);
       continue;
