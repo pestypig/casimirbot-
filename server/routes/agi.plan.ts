@@ -12025,7 +12025,7 @@ const executeHelixAsk = async ({
             evidence_tokens_preview: blockDebug?.evidence_tokens_preview,
             evidence_match_preview: blockDebug?.evidence_match_preview,
             topic_tags: blockDebug?.topic_tags,
-            context_files: blockDebug?.context_files?.slice(0, 6),
+            context_files: blockDebug?.context_files?.slice(0, 6) ?? [],
             block_citation_fallback: citationFallbackApplied,
             block_paths_scrubbed: scrubbedPaths.slice(0, 4),
             block_dedupe_applied: dedupeApplied,
@@ -12431,6 +12431,9 @@ const executeHelixAsk = async ({
       (intentDomain === "repo" || intentDomain === "hybrid");
     if (intentStrategy === "constraint_report") {
       isRepoQuestion = false;
+    }
+    if (blockScoped && intentStrategy !== "constraint_report" && intentProfile.evidencePolicy.allowRepoCitations) {
+      isRepoQuestion = true;
     }
     const longPromptCandidate = resolveLongPromptCandidate({
       prompt,
@@ -12942,7 +12945,7 @@ const executeHelixAsk = async ({
     }
 
     const forcePlanPass =
-      repoExpectationLevel !== "low" || requiresRepoEvidence || conceptFastPath;
+      blockScoped || repoExpectationLevel !== "low" || requiresRepoEvidence || conceptFastPath;
     const microPassDecision = decideHelixAskMicroPass(baseQuestion, formatSpec);
     const skipMicroPass = intentStrategy === "constraint_report" || mathSolverOk;
     const microPassEnabled =
@@ -13215,8 +13218,9 @@ const executeHelixAsk = async ({
         if (!blockScoped && conceptMatch?.card.sourcePath) {
           baseQueries.push(conceptMatch.card.sourcePath);
         }
+        const blockQueryHints = blockScoped && HELIX_ASK_QUERY_HINTS_BLOCKS ? queryHints : [];
         const mergeHints = blockScoped
-          ? [...slotAliases, ...slotEvidenceHints]
+          ? [...blockQueryHints, ...slotAliases, ...slotEvidenceHints]
           : [...queryHints, ...slotAliases, ...slotEvidenceHints, ...memoryPinnedFiles];
         const queries = mergeHelixAskQueries(
           baseQueries,
@@ -13269,11 +13273,15 @@ const executeHelixAsk = async ({
           agentActionCounts.retrieve_docs_first === undefined &&
           agentActionCounts.retrieve_mixed === undefined
         ) {
-          if (planScope?.docsFirst) {
-            recordAgentAction("retrieve_docs_first", "docs_first_scope", "prioritize_docs");
-          } else {
-            recordAgentAction("retrieve_mixed", "default_scope", "balanced_retrieval");
-          }
+          const retrievalAction = planScope?.docsFirst ? "retrieve_docs_first" : "retrieve_mixed";
+          const retrievalReason =
+            blockScoped && headingSeedSlots.length > 0
+              ? "heading_seed_followup"
+              : planScope?.docsFirst
+                ? "docs_first_scope"
+                : "default_scope";
+          const retrievalGain = planScope?.docsFirst ? "prioritize_docs" : "balanced_retrieval";
+          recordAgentAction(retrievalAction, retrievalReason, retrievalGain);
         }
         if (!requiredSlots.length) {
           if (planDirectives?.requiredSlots?.length) {
@@ -13754,8 +13762,8 @@ const executeHelixAsk = async ({
               contextStart,
             );
           }
-          if (debugPayload && contextFiles.length > 0) {
-            debugPayload.context_files = contextFiles;
+          if (debugPayload && (contextFiles.length > 0 || blockScoped)) {
+            debugPayload.context_files = contextFiles.slice();
           }
           if (debugPayload) {
             if (contextResult.topicTier) {
