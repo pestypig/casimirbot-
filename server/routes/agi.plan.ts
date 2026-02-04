@@ -10743,6 +10743,7 @@ const executeHelixAsk = async ({
     const question = parsed.data.question?.trim();
     let questionValue = question;
     let sessionMemoryForTags: HelixAskSessionMemory | null = null;
+    let sessionMemory: HelixAskSessionMemory | null = null;
     const tuningOverrides = HELIX_ASK_SWEEP_OVERRIDES ? parsed.data.tuning : undefined;
     const arbiterRepoRatio = clampNumber(
       typeof tuningOverrides?.arbiter_repo_ratio === "number"
@@ -12918,7 +12919,6 @@ const executeHelixAsk = async ({
     let slotAliasMap: Record<string, string[]> | null = null;
     let slotPlanPass: HelixAskSlotPlanPass | null = null;
     let slotPlanPassSlots: HelixAskSlotPlanEntry[] = [];
-    let sessionMemory: HelixAskSessionMemory | null = null;
     let memorySeedSlots: HelixAskSlotPlanEntry[] = [];
     let slotPlanHeadingSeedSlots: HelixAskSlotPlanEntry[] = [];
     let memoryPinnedFiles: string[] = [];
