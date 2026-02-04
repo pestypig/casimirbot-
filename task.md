@@ -4922,3 +4922,57 @@ Build a small eval suite (30-80 prompts) to measure:
 - **Action policy table**
   - Documented in `docs/helix-ask-agent-policy.md`.
 
+
+
+### D19) LLM-steered retrieval (standard, non-optional)
+Goal: use the LLM to steer retrieval and evidence selection without weakening falsifiability. This is now the default path (not optional) and must only operate on existing repo signals (question text, headings, filenames, evidence cards).
+
+#### D19.A) Query planner pass (slot-aware)
+- Add a structured planner pass that outputs:
+  - `slot_aliases` (3-8 per slot)
+  - `expected_surfaces` (docs, knowledge, modules, server, client, tests)
+  - `query_hints` (short phrases; must be derived from question + repo headings/filenames)
+- Hard rule: no new facts, no prose. Output JSON only.
+- Use in the retrieval query merge before docs-first.
+
+Deliverables:
+- `query_planner_pass` integrated into the ladder before retrieval.
+- Planner output recorded in debug payload.
+
+#### D19.B) Evidence card rerank (LLM-assisted)
+- After candidate evidence cards are built, run a short LLM pass to:
+  - select top K cards per slot
+  - provide a confidence tag per selection (low/med/high)
+- Hard rule: LLM may only select among provided cards.
+- Use selected cards for synthesis and gates.
+
+Deliverables:
+- Evidence rerank summary stored in debug payload.
+- Gates operate on reranked cards (not the full pool).
+
+#### D19.C) Gap diagnosis -> next action
+- Use an LLM pass to propose next action when slot evidence is missing:
+  - retry with heading aliases
+  - switch code-first
+  - ask slot-local clarification
+- Output must be one of the supported actions, with a short reason.
+
+Deliverables:
+- Action proposals logged per loop step.
+- Agent controller may override but must log disagreements.
+
+#### D19.D) Safety constraints
+- LLM steering cannot introduce claims or citations.
+- Planner/reranker outputs are treated as hints, not evidence.
+- Any LLM-produced text that looks like facts is discarded.
+
+#### Metrics (telemetry)
+- `planner_hit_rate` (queries that improve slot doc coverage)
+- `rerank_precision` (selected cards used in final citations)
+- `action_proposal_agreement` (LLM action == controller action)
+- `slot_doc_coverage_rate` (before vs after planner)
+
+#### Exit criteria
+- Planner improves slot doc coverage on mixed prompts by >=20%.
+- Rerank precision >=0.7 (selected cards appear in final citations).
+- No increase in unsupported claim rate.
