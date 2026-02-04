@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "rootId": "ui-backend-binding-tree",
+  "nodes": [
+    {
+      "id": "ui-backend-binding-tree",
+      "slug": "ui-backend-binding-tree",
+      "title": "UI Backend Binding Tree",
+      "excerpt": "Backend-to-UI dataflow for physics surfaces and verification panels.",
+      "bodyMD": "This tree maps how backend physics data and verification outputs surface in the client UI.\n\nMinimal artifact: backend-to-UI dataflow map.",
+      "tags": [
+        "ui",
+        "backend",
+        "bindings",
+        "physics"
+      ],
+      "children": [
+        "binding-energy-pipeline",
+        "binding-curvature-bricks",
+        "binding-warp-pipeline",
+        "binding-collapse-benchmark",
+        "binding-simulation-api",
+        "binding-hardware-telemetry",
+        "binding-knowledge-docs",
+        "binding-proof-verification"
+      ],
+      "links": []
+    },
+    {
+      "id": "binding-energy-pipeline",
+      "slug": "binding-energy-pipeline",
+      "title": "Energy Pipeline Binding",
+      "excerpt": "Energy pipeline outputs wired to UI panels.",
+      "bodyMD": "Energy pipeline outputs originate in server/energy-pipeline.ts and flow through API routes to client hooks and panels (client/src/hooks/use-energy-pipeline.ts, client/src/components/EnergyFluxPanel.tsx, client/src/components/energy-pipeline.tsx, client/src/components/live-energy-pipeline.tsx).\n\nMinimal artifact: energy pipeline dataflow.",
+      "tags": [
+        "ui",
+        "energy",
+        "pipeline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ]
+    },
+    {
+      "id": "binding-curvature-bricks",
+      "slug": "binding-curvature-bricks",
+      "title": "Curvature and GR Bricks",
+      "excerpt": "Curvature brick dataflow to GR panels.",
+      "bodyMD": "Curvature and GR bricks are serialized by server/curvature-brick.ts and server/gr-evolve-brick.ts, exposed via server/routes/physics.curvature.ts, and consumed by client/lib + hooks (client/src/lib/curvature-brick.ts, client/src/hooks/useGrBrick.ts, client/src/hooks/useGrEvolveBrick.ts) into panels (client/src/components/CurvatureTensorPanel.tsx, client/src/components/CurvatureSlicePanel.tsx).\n\nMinimal artifact: curvature brick flow map.",
+      "tags": [
+        "ui",
+        "curvature",
+        "gr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ]
+    },
+    {
+      "id": "binding-warp-pipeline",
+      "slug": "binding-warp-pipeline",
+      "title": "Warp Pipeline Binding",
+      "excerpt": "Warp viability and render pipeline mapped to UI.",
+      "bodyMD": "Warp pipeline uses modules/warp/warp-module.ts and server/routes/warp-viability.ts, with client adapters (client/src/lib/warp-pipeline-adapter.ts) feeding panels (client/src/components/AlcubierrePanel.tsx, client/src/components/WarpBubbleGLPanel.tsx, client/src/components/WarpProofPanel.tsx).\n\nMinimal artifact: warp pipeline binding summary.",
+      "tags": [
+        "ui",
+        "warp",
+        "pipeline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ]
+    },
+    {
+      "id": "binding-collapse-benchmark",
+      "slug": "binding-collapse-benchmark",
+      "title": "Collapse Benchmark Binding",
+      "excerpt": "Collapse benchmark outputs to HUD panels.",
+      "bodyMD": "Collapse benchmark routes (server/routes/benchmarks.collapse.ts) return shared/collapse-benchmark.ts payloads that drive HUDs (client/src/components/CollapseBenchmarkHUD.tsx, client/src/components/CollapseBenchmarkHUDPanel.tsx).\n\nMinimal artifact: collapse benchmark HUD map.",
+      "tags": [
+        "ui",
+        "collapse",
+        "benchmark"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ]
+    },
+    {
+      "id": "binding-simulation-api",
+      "slug": "binding-simulation-api",
+      "title": "Simulation API Binding",
+      "excerpt": "Simulation endpoints mapped to UI surfaces.",
+      "bodyMD": "Simulation endpoints in server/routes.ts and server/services/scuffem.ts feed client adapters (client/src/lib/simulation-api.ts) and pages (client/src/pages/simulation.tsx).\n\nMinimal artifact: simulation API flow.",
+      "tags": [
+        "ui",
+        "simulation",
+        "api"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ]
+    },
+    {
+      "id": "binding-hardware-telemetry",
+      "slug": "binding-hardware-telemetry",
+      "title": "Hardware Telemetry Binding",
+      "excerpt": "Hardware ingest endpoints wired to UI controls.",
+      "bodyMD": "Hardware ingest endpoints in server/helix-core.ts feed client hooks (client/src/hooks/useHardwareFeeds.ts) and panels (client/src/components/HardwareConnectModal.tsx, client/src/components/SpectrumTunerPanel.tsx, client/src/components/VacuumGapSweepHUD.tsx, client/src/components/LightSpeedStrobeScale.tsx).\n\nMinimal artifact: hardware telemetry binding map.",
+      "tags": [
+        "ui",
+        "hardware",
+        "telemetry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ]
+    },
+    {
+      "id": "binding-knowledge-docs",
+      "slug": "binding-knowledge-docs",
+      "title": "Knowledge and Docs Binding",
+      "excerpt": "Knowledge ingestion surfaced in doc panels.",
+      "bodyMD": "Knowledge endpoints (server/routes/knowledge.ts, server/services/knowledge/corpus.ts) are surfaced via client panels (client/src/components/DocViewerPanel.tsx, client/src/components/CoreKnowledgePanel.tsx, client/src/components/AgiKnowledgePanel.tsx).\n\nMinimal artifact: knowledge panel dataflow.",
+      "tags": [
+        "ui",
+        "knowledge",
+        "docs"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ]
+    },
+    {
+      "id": "binding-proof-verification",
+      "slug": "binding-proof-verification",
+      "title": "Proof and Verification Binding",
+      "excerpt": "Verification outputs mapped to proof panels.",
+      "bodyMD": "Verification and math maturity panels render proofs and audits (client/src/components/MathMaturityTreePanel.tsx, client/src/components/UniversalAuditTreePanel.tsx, client/src/components/verification-tab.tsx) driven by backend verification routes (server/routes/agi.constraint-packs.ts, server/routes/agi.eval.ts).\n\nMinimal artifact: verification panel binding map.",
+      "tags": [
+        "ui",
+        "verification",
+        "proof"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ]
+    }
+  ]
+}

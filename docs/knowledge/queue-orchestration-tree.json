@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "rootId": "queue-orchestration-tree",
+  "nodes": [
+    {
+      "id": "queue-orchestration-tree",
+      "slug": "queue-orchestration-tree",
+      "title": "Queue and Orchestration Tree",
+      "excerpt": "Async job queues, schedulers, and orchestration services.",
+      "bodyMD": "This tree maps async job queues, orchestration services, and job routes for background processing.\n\nMinimal artifact: queue and job flow map.",
+      "tags": [
+        "queue",
+        "jobs",
+        "orchestration"
+      ],
+      "children": [
+        "queue-core",
+        "queue-routes",
+        "queue-job-services",
+        "queue-essence-ingest",
+        "queue-profile-summarizer",
+        "queue-orchestrator"
+      ],
+      "links": []
+    },
+    {
+      "id": "queue-core",
+      "slug": "queue-core",
+      "title": "Queue Core",
+      "excerpt": "Queue registry and dispatch.",
+      "bodyMD": "Queue registry and dispatch (server/queue/index.ts).\n\nMinimal artifact: queue handler map.",
+      "tags": [
+        "queue",
+        "core"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "queue-orchestration-tree"
+        }
+      ]
+    },
+    {
+      "id": "queue-routes",
+      "slug": "queue-routes",
+      "title": "Queue Routes",
+      "excerpt": "HTTP routes for job dispatch and status.",
+      "bodyMD": "Queue routes and job endpoints (server/routes/jobs.ts).\n\nMinimal artifact: jobs route list.",
+      "tags": [
+        "queue",
+        "routes"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "queue-orchestration-tree"
+        }
+      ]
+    },
+    {
+      "id": "queue-job-services",
+      "slug": "queue-job-services",
+      "title": "Job Services",
+      "excerpt": "Job execution and budget policies.",
+      "bodyMD": "Job services (server/services/jobs/engine.ts, server/services/jobs/payouts.ts, server/services/jobs/token-budget.ts, server/services/jobs/proposals.ts).\n\nMinimal artifact: job service map.",
+      "tags": [
+        "queue",
+        "jobs"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "queue-orchestration-tree"
+        }
+      ]
+    },
+    {
+      "id": "queue-essence-ingest",
+      "slug": "queue-essence-ingest",
+      "title": "Essence Ingest Jobs",
+      "excerpt": "Essence ingest job pipeline.",
+      "bodyMD": "Essence ingest job wiring (server/services/essence/ingest-jobs.ts, server/queue/index.ts).\n\nMinimal artifact: ingest job map.",
+      "tags": [
+        "queue",
+        "essence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "queue-orchestration-tree"
+        }
+      ]
+    },
+    {
+      "id": "queue-profile-summarizer",
+      "slug": "queue-profile-summarizer",
+      "title": "Profile Summarizer",
+      "excerpt": "Profile summarizer job and schedules.",
+      "bodyMD": "Profile summarizer job (server/services/profile-summarizer-job.ts, server/services/profile-summarizer.ts).\n\nMinimal artifact: summarizer job flow.",
+      "tags": [
+        "queue",
+        "summarizer"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "queue-orchestration-tree"
+        }
+      ]
+    },
+    {
+      "id": "queue-orchestrator",
+      "slug": "queue-orchestrator",
+      "title": "Orchestrator",
+      "excerpt": "Orchestration routes and services.",
+      "bodyMD": "Orchestrator service and routes (server/services/orchestrator.ts, server/routes/orchestrator.ts).\n\nMinimal artifact: orchestration flow.",
+      "tags": [
+        "queue",
+        "orchestrator"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "queue-orchestration-tree"
+        }
+      ]
+    }
+  ]
+}

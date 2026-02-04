@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "rootId": "hardware-telemetry-tree",
+  "nodes": [
+    {
+      "id": "hardware-telemetry-tree",
+      "slug": "hardware-telemetry-tree",
+      "title": "Hardware Telemetry Tree",
+      "excerpt": "Hardware ingest, scheduling, and UI control surfaces.",
+      "bodyMD": "This tree maps hardware telemetry ingest, scheduling, and the UI controls used to drive hardware-linked workflows.\n\nMinimal artifact: hardware telemetry flow map.",
+      "tags": [
+        "hardware",
+        "telemetry",
+        "control"
+      ],
+      "children": [
+        "hardware-ingest",
+        "hardware-bus",
+        "hardware-hooks",
+        "hardware-panels",
+        "hardware-scheduler",
+        "hardware-provenance"
+      ],
+      "links": []
+    },
+    {
+      "id": "hardware-ingest",
+      "slug": "hardware-ingest",
+      "title": "Hardware Ingest",
+      "excerpt": "Hardware ingest endpoints and normalization.",
+      "bodyMD": "Hardware ingest routes in server/helix-core.ts accept sector state, spectrum, and sweep data for processing.\n\nMinimal artifact: ingest endpoint list.",
+      "tags": [
+        "hardware",
+        "ingest"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-telemetry-tree"
+        }
+      ]
+    },
+    {
+      "id": "hardware-bus",
+      "slug": "hardware-bus",
+      "title": "Hardware Bus",
+      "excerpt": "Hardware sector bus and broadcast channels.",
+      "bodyMD": "Hardware bus helpers (client/src/lib/hardware-sector-bus.ts) and server-side broadcasts in server/helix-core.ts drive realtime UI updates.\n\nMinimal artifact: hardware bus message map.",
+      "tags": [
+        "hardware",
+        "bus"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-telemetry-tree"
+        }
+      ]
+    },
+    {
+      "id": "hardware-hooks",
+      "slug": "hardware-hooks",
+      "title": "Hardware Hooks",
+      "excerpt": "Client hooks for hardware feeds.",
+      "bodyMD": "Hardware hooks (client/src/hooks/useHardwareFeeds.ts, client/src/hooks/useSectorStateBusRelay.ts) stream telemetry into panels.\n\nMinimal artifact: hardware hook flow.",
+      "tags": [
+        "hardware",
+        "hooks",
+        "client"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-telemetry-tree"
+        }
+      ]
+    },
+    {
+      "id": "hardware-panels",
+      "slug": "hardware-panels",
+      "title": "Hardware Panels",
+      "excerpt": "UI surfaces for hardware control and monitoring.",
+      "bodyMD": "Hardware control panels (client/src/components/HardwareConnectModal.tsx, client/src/components/HardwareConnectButton.tsx, client/src/components/SpectrumTunerPanel.tsx, client/src/components/VacuumGapSweepHUD.tsx, client/src/components/LightSpeedStrobeScale.tsx).\n\nMinimal artifact: hardware panel map.",
+      "tags": [
+        "hardware",
+        "ui"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-telemetry-tree"
+        }
+      ]
+    },
+    {
+      "id": "hardware-scheduler",
+      "slug": "hardware-scheduler",
+      "title": "Hardware Scheduler",
+      "excerpt": "Scheduling and pump control helpers.",
+      "bodyMD": "Hardware scheduling and pump shims (server/services/hardware/gpu-scheduler.ts, server/instruments/pump.ts, server/instruments/pump-multitone.ts).\n\nMinimal artifact: scheduler/pump flow.",
+      "tags": [
+        "hardware",
+        "scheduler"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-telemetry-tree"
+        }
+      ]
+    },
+    {
+      "id": "hardware-provenance",
+      "slug": "hardware-provenance",
+      "title": "Hardware Provenance",
+      "excerpt": "Hardware truth signals feeding physics pipelines.",
+      "bodyMD": "Hardware truth feeds into energy pipeline provenance fields (server/energy-pipeline.ts).\n\nMinimal artifact: hardware provenance summary.",
+      "tags": [
+        "hardware",
+        "provenance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-telemetry-tree"
+        }
+      ]
+    }
+  ]
+}

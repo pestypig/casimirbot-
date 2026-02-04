@@ -1,0 +1,1640 @@
+{
+  "version": 1,
+  "rootId": "ui-components-tree",
+  "nodes": [
+    {
+      "id": "ui-components-tree",
+      "slug": "ui-components-tree",
+      "title": "UI Components Tree",
+      "excerpt": "Client-side surfaces, panels, renderers, and UI primitives.",
+      "bodyMD": "This tree maps the client UI surfaces that render physics backends and verification outputs.\n\nMinimal artifact: UI surface map with panel registry.",
+      "tags": [
+        "ui",
+        "frontend",
+        "client"
+      ],
+      "children": [
+        "ui-app-shell",
+        "ui-page-surfaces",
+        "ui-panel-registry",
+        "ui-panel-physics-core",
+        "ui-panel-warp-drive",
+        "ui-panel-casimir-energy",
+        "ui-panel-curvature-gr",
+        "ui-panel-proof-verification",
+        "ui-panel-knowledge-ideology",
+        "ui-panel-stellar-solar",
+        "ui-panel-lattice-time-dilation",
+        "ui-panel-noise-essence",
+        "ui-renderers-3d",
+        "ui-hud-overlays",
+        "ui-hooks-state",
+        "ui-primitives",
+        "ui-mobile-start",
+        "ui-legacy-warp-web",
+        "ui-visualization-utils",
+        "ui-backend-binding"
+      ],
+      "links": []
+    },
+    {
+      "id": "ui-app-shell",
+      "slug": "ui-app-shell",
+      "title": "App Shell",
+      "excerpt": "Global UI shell and routing entry points.",
+      "bodyMD": "Application shell and bootstrap (client/src/App.tsx, client/src/main.tsx, client/src/index.css).\n\nMinimal artifact: app shell layout map.",
+      "tags": [
+        "ui",
+        "shell",
+        "routing"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-surfaces",
+      "slug": "ui-page-surfaces",
+      "title": "Page Surfaces",
+      "excerpt": "Primary page routes and top-level surfaces.",
+      "bodyMD": "Page-level surfaces anchor panel composition (client/src/pages/*).\n\nMinimal artifact: page routing map.",
+      "tags": [
+        "ui",
+        "pages",
+        "routing"
+      ],
+      "children": [
+        "ui-page-helix-core",
+        "ui-page-desktop",
+        "ui-page-simulation",
+        "ui-page-star",
+        "ui-page-ideology",
+        "ui-page-agi",
+        "ui-page-docs",
+        "ui-page-start"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-helix-core",
+      "slug": "ui-page-helix-core",
+      "title": "Helix Core",
+      "excerpt": "Primary Helix core surface and panel hub.",
+      "bodyMD": "Helix core shell and panel mounting (client/src/pages/helix-core.tsx, client/src/pages/helix-core.panels.ts, client/src/pages/helix-observables.tsx, client/src/pages/helix-noise-gens.tsx).\n\nMinimal artifact: Helix core panel map.",
+      "tags": [
+        "ui",
+        "helix",
+        "panels"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-page-surfaces"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-desktop",
+      "slug": "ui-page-desktop",
+      "title": "Desktop Surface",
+      "excerpt": "Desktop layout and panel stacking.",
+      "bodyMD": "Desktop surface and panel stack (client/src/pages/desktop.tsx).\n\nMinimal artifact: desktop layout map.",
+      "tags": [
+        "ui",
+        "desktop"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-page-surfaces"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-simulation",
+      "slug": "ui-page-simulation",
+      "title": "Simulation Surface",
+      "excerpt": "Simulation UI surface and controls.",
+      "bodyMD": "Simulation page surface (client/src/pages/simulation.tsx).\n\nMinimal artifact: simulation page layout.",
+      "tags": [
+        "ui",
+        "simulation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-page-surfaces"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-star",
+      "slug": "ui-page-star",
+      "title": "Star Surfaces",
+      "excerpt": "Star monitoring and hydrostatic pages.",
+      "bodyMD": "Star watcher and hydrostatic pages (client/src/pages/star-watcher-panel.tsx, client/src/pages/star-hydrostatic-panel.tsx).\n\nMinimal artifact: star page layout map.",
+      "tags": [
+        "ui",
+        "stellar"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-page-surfaces"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-ideology",
+      "slug": "ui-page-ideology",
+      "title": "Ideology Surfaces",
+      "excerpt": "Ideology render and supporting pages.",
+      "bodyMD": "Ideology and rationale surfaces (client/src/pages/ideology-render.tsx, client/src/pages/why.tsx).\n\nMinimal artifact: ideology page map.",
+      "tags": [
+        "ui",
+        "ideology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-page-surfaces"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-agi",
+      "slug": "ui-page-agi",
+      "title": "AGI Admin Surfaces",
+      "excerpt": "AGI administration and refinery pages.",
+      "bodyMD": "AGI surfaces (client/src/pages/agi-refinery.tsx, client/src/pages/code-admin.tsx, client/src/pages/rag-admin.tsx).\n\nMinimal artifact: AGI surface map.",
+      "tags": [
+        "ui",
+        "agi"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-page-surfaces"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-docs",
+      "slug": "ui-page-docs",
+      "title": "Documentation Surfaces",
+      "excerpt": "Docs and ingest pages.",
+      "bodyMD": "Documentation and ingest pages (client/src/pages/documentation.tsx, client/src/pages/ingest.tsx).\n\nMinimal artifact: docs surface list.",
+      "tags": [
+        "ui",
+        "docs"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-page-surfaces"
+        }
+      ]
+    },
+    {
+      "id": "ui-page-start",
+      "slug": "ui-page-start",
+      "title": "Start Surfaces",
+      "excerpt": "Start and home pages.",
+      "bodyMD": "Start and home pages (client/src/pages/start.tsx, client/src/pages/home.tsx, client/src/pages/station.tsx).\n\nMinimal artifact: start surface map.",
+      "tags": [
+        "ui",
+        "start"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-page-surfaces"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-registry",
+      "slug": "ui-panel-registry",
+      "title": "Panel Registry",
+      "excerpt": "Panel mounting and registration.",
+      "bodyMD": "Panel registry and desktop mounting (client/src/pages/helix-core.panels.ts, client/src/pages/desktop.tsx, client/src/components/desktop/*).\n\nMinimal artifact: panel registry listing.",
+      "tags": [
+        "ui",
+        "panels",
+        "registry"
+      ],
+      "children": [
+        "ui-panel-registry-helix",
+        "ui-panel-registry-desktop"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-registry-helix",
+      "slug": "ui-panel-registry-helix",
+      "title": "Helix Panel Registry",
+      "excerpt": "Helix panel registration and docking.",
+      "bodyMD": "Helix panel registration (client/src/pages/helix-core.panels.ts).\n\nMinimal artifact: helix panel list.",
+      "tags": [
+        "ui",
+        "helix",
+        "registry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-registry"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-registry-desktop",
+      "slug": "ui-panel-registry-desktop",
+      "title": "Desktop Panel Registry",
+      "excerpt": "Desktop panel layouts.",
+      "bodyMD": "Desktop layout management (client/src/components/desktop/*, client/src/pages/desktop.tsx).\n\nMinimal artifact: desktop panel layout.",
+      "tags": [
+        "ui",
+        "desktop",
+        "registry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-registry"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-physics-core",
+      "slug": "ui-panel-physics-core",
+      "title": "Physics Core Panels",
+      "excerpt": "Core physics panels for monitoring and controls.",
+      "bodyMD": "Core physics panels and dashboards (client/src/components/*Panel.tsx).\n\nMinimal artifact: physics panel map.",
+      "tags": [
+        "ui",
+        "physics",
+        "panels"
+      ],
+      "children": [
+        "ui-panel-drive-guards",
+        "ui-panel-parameter-sweep",
+        "ui-panel-energy-flux",
+        "ui-panel-observables",
+        "ui-panel-qi-controls",
+        "ui-panel-metrics-dashboard"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-drive-guards",
+      "slug": "ui-panel-drive-guards",
+      "title": "Drive Guard Panels",
+      "excerpt": "Drive guardrails and capability displays.",
+      "bodyMD": "Drive guard panels (client/src/components/DriveGuardsPanel.tsx, client/src/components/SpeedCapabilityPanel.tsx).\n\nMinimal artifact: drive guard summary.",
+      "tags": [
+        "ui",
+        "drive",
+        "guards"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-physics-core"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-parameter-sweep",
+      "slug": "ui-panel-parameter-sweep",
+      "title": "Parameter Sweep Panels",
+      "excerpt": "Parameter sweep controls and visualization.",
+      "bodyMD": "Parameter sweep panels (client/src/components/ParametricSweepPanel.tsx, client/src/components/parameter-panel.tsx, client/src/components/dynamic-controls.tsx).\n\nMinimal artifact: sweep control layout.",
+      "tags": [
+        "ui",
+        "sweep",
+        "controls"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-physics-core"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-energy-flux",
+      "slug": "ui-panel-energy-flux",
+      "title": "Energy Flux Panels",
+      "excerpt": "Energy flux and pipeline indicators.",
+      "bodyMD": "Energy flux and pipeline views (client/src/components/EnergyFluxPanel.tsx, client/src/components/energy-pipeline.tsx, client/src/components/live-energy-pipeline.tsx).\n\nMinimal artifact: energy flux layout.",
+      "tags": [
+        "ui",
+        "energy",
+        "pipeline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-physics-core"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-observables",
+      "slug": "ui-panel-observables",
+      "title": "Observables Panels",
+      "excerpt": "Observables and field sampling views.",
+      "bodyMD": "Observables panels (client/src/components/ObservablesPanel.tsx, client/src/components/PhysicsFieldSampler.tsx).\n\nMinimal artifact: observables layout.",
+      "tags": [
+        "ui",
+        "observables"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-physics-core"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-qi-controls",
+      "slug": "ui-panel-qi-controls",
+      "title": "QI Control Panels",
+      "excerpt": "QI guardrails and tuning widgets.",
+      "bodyMD": "QI control panels (client/src/components/QiAutoTunerPanel.tsx, client/src/components/QiWidget.tsx, client/src/components/QiGuardBadge.tsx, client/src/components/QiTileGuardBands.tsx, client/src/components/QiLatticePanel.tsx).\n\nMinimal artifact: QI guard summary.",
+      "tags": [
+        "ui",
+        "qi",
+        "guards"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-physics-core"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-metrics-dashboard",
+      "slug": "ui-panel-metrics-dashboard",
+      "title": "Metrics Dashboards",
+      "excerpt": "Metrics dashboards and KPI widgets.",
+      "bodyMD": "Metrics dashboards (client/src/components/metrics-dashboard.tsx, client/src/components/NearZeroWidget.tsx, client/src/components/FuelGauge.tsx).\n\nMinimal artifact: metrics dashboard layout.",
+      "tags": [
+        "ui",
+        "metrics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-physics-core"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-warp-drive",
+      "slug": "ui-panel-warp-drive",
+      "title": "Warp Drive Panels",
+      "excerpt": "Warp bubble, shift vector, and proof panels.",
+      "bodyMD": "Warp drive panels for bubble geometry and verification (client/src/components/*Warp*.tsx).\n\nMinimal artifact: warp panel map.",
+      "tags": [
+        "ui",
+        "warp",
+        "panels"
+      ],
+      "children": [
+        "ui-panel-alcubierre",
+        "ui-panel-warp-bubble",
+        "ui-panel-warp-proof",
+        "ui-panel-warp-ledger",
+        "ui-panel-shift-vector"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-alcubierre",
+      "slug": "ui-panel-alcubierre",
+      "title": "Alcubierre Panels",
+      "excerpt": "Primary Alcubierre surface panels.",
+      "bodyMD": "Alcubierre and warp engine panels (client/src/components/AlcubierrePanel.tsx, client/src/components/WarpEngineContainer.tsx).\n\nMinimal artifact: Alcubierre panel layout.",
+      "tags": [
+        "ui",
+        "warp",
+        "alcubierre"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-warp-drive"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-warp-bubble",
+      "slug": "ui-panel-warp-bubble",
+      "title": "Warp Bubble Panels",
+      "excerpt": "Warp bubble visualization and diagnostics.",
+      "bodyMD": "Warp bubble panels (client/src/components/WarpBubbleGLPanel.tsx, client/src/components/WarpBubbleLivePanel.tsx, client/src/components/WarpRenderInspector.tsx).\n\nMinimal artifact: warp bubble view map.",
+      "tags": [
+        "ui",
+        "warp",
+        "bubble"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-warp-drive"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-warp-proof",
+      "slug": "ui-panel-warp-proof",
+      "title": "Warp Proof Panels",
+      "excerpt": "Warp proof and experiment ladder panels.",
+      "bodyMD": "Warp proof panels (client/src/components/WarpProofPanel.tsx, client/src/components/WarpExperimentLadderPanel.tsx).\n\nMinimal artifact: warp proof summary.",
+      "tags": [
+        "ui",
+        "warp",
+        "proof"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-warp-drive"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-warp-ledger",
+      "slug": "ui-panel-warp-ledger",
+      "title": "Warp Ledger Panel",
+      "excerpt": "Warp ledger and accounting UI.",
+      "bodyMD": "Warp ledger panel (client/src/components/WarpLedgerPanel.tsx).\n\nMinimal artifact: warp ledger layout.",
+      "tags": [
+        "ui",
+        "warp",
+        "ledger"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-warp-drive"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-shift-vector",
+      "slug": "ui-panel-shift-vector",
+      "title": "Shift Vector Panel",
+      "excerpt": "Shift vector diagnostic UI.",
+      "bodyMD": "Shift vector panel (client/src/components/ShiftVectorPanel.tsx).\n\nMinimal artifact: shift vector layout.",
+      "tags": [
+        "ui",
+        "warp",
+        "shift"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-warp-drive"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-casimir-energy",
+      "slug": "ui-panel-casimir-energy",
+      "title": "Casimir and Energy Panels",
+      "excerpt": "Casimir geometry, cavity, and energy pipeline surfaces.",
+      "bodyMD": "Casimir and energy panels (client/src/components/*Casimir*.tsx, client/src/components/*Cavity*.tsx).\n\nMinimal artifact: casimir panel map.",
+      "tags": [
+        "ui",
+        "casimir",
+        "energy"
+      ],
+      "children": [
+        "ui-panel-casimir-grid",
+        "ui-panel-cavity-mechanism",
+        "ui-panel-energy-pipeline",
+        "ui-panel-casimir-amplifier",
+        "ui-panel-pipeline-proof",
+        "ui-panel-vacuum"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-casimir-grid",
+      "slug": "ui-panel-casimir-grid",
+      "title": "Casimir Tile Grid",
+      "excerpt": "Casimir tile grid and lattice views.",
+      "bodyMD": "Casimir tile grid panel (client/src/components/CasimirTileGridPanel.tsx).\n\nMinimal artifact: tile grid layout.",
+      "tags": [
+        "ui",
+        "casimir",
+        "tiles"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-casimir-energy"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-cavity-mechanism",
+      "slug": "ui-panel-cavity-mechanism",
+      "title": "Cavity Mechanism Panels",
+      "excerpt": "Cavity geometry and cross-section panels.",
+      "bodyMD": "Cavity mechanism panels (client/src/components/CavityMechanismPanel.tsx, client/src/components/CavityCrossSectionSplit.tsx, client/src/components/CavityFrameView.tsx, client/src/components/CavitySideView.tsx).\n\nMinimal artifact: cavity layout.",
+      "tags": [
+        "ui",
+        "cavity",
+        "casimir"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-casimir-energy"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-energy-pipeline",
+      "slug": "ui-panel-energy-pipeline",
+      "title": "Energy Pipeline Panels",
+      "excerpt": "Energy pipeline and live pipeline views.",
+      "bodyMD": "Energy pipeline panels (client/src/components/energy-pipeline.tsx, client/src/components/live-energy-pipeline.tsx).\n\nMinimal artifact: pipeline panel layout.",
+      "tags": [
+        "ui",
+        "energy",
+        "pipeline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-casimir-energy"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-casimir-amplifier",
+      "slug": "ui-panel-casimir-amplifier",
+      "title": "Casimir Amplifier Panels",
+      "excerpt": "Amplification and metric pockets.",
+      "bodyMD": "Amplifier panels (client/src/components/HelixCasimirAmplifier.tsx, client/src/components/AmplificationPanel.tsx, client/src/components/MetricAmplificationPocket.tsx).\n\nMinimal artifact: amplifier panel summary.",
+      "tags": [
+        "ui",
+        "casimir",
+        "amplifier"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-casimir-energy"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-pipeline-proof",
+      "slug": "ui-panel-pipeline-proof",
+      "title": "Pipeline Proof Panels",
+      "excerpt": "Proof overlays and provenance panels.",
+      "bodyMD": "Pipeline proof panels (client/src/components/PipelineProofPanel.tsx, client/src/components/MassProvenancePanel.tsx, client/src/components/CardProofOverlay.tsx).\n\nMinimal artifact: proof overlay layout.",
+      "tags": [
+        "ui",
+        "proof",
+        "pipeline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-casimir-energy"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-vacuum",
+      "slug": "ui-panel-vacuum",
+      "title": "Vacuum Gap Panels",
+      "excerpt": "Vacuum gap heatmaps and contracts.",
+      "bodyMD": "Vacuum panels (client/src/components/VacuumGapHeatmap.tsx, client/src/components/VacuumGapSweepHUD.tsx, client/src/components/VacuumContractBadge.tsx).\n\nMinimal artifact: vacuum gap UI.",
+      "tags": [
+        "ui",
+        "vacuum",
+        "gap"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-casimir-energy"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-curvature-gr",
+      "slug": "ui-panel-curvature-gr",
+      "title": "Curvature and GR Panels",
+      "excerpt": "Curvature, GR agent loops, and time dilation surfaces.",
+      "bodyMD": "Curvature and GR panels (client/src/components/*Curvature*.tsx, client/src/components/*GrAgentLoop*.tsx).\n\nMinimal artifact: curvature panel map.",
+      "tags": [
+        "ui",
+        "curvature",
+        "gr"
+      ],
+      "children": [
+        "ui-panel-curvature-ledger",
+        "ui-panel-curvature-slices",
+        "ui-panel-gr-agent-loop",
+        "ui-panel-time-dilation"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-curvature-ledger",
+      "slug": "ui-panel-curvature-ledger",
+      "title": "Curvature Ledger Panels",
+      "excerpt": "Curvature ledger and tensor views.",
+      "bodyMD": "Curvature ledger panels (client/src/components/CurvatureLedgerPanel.tsx, client/src/components/CurvatureTensorPanel.tsx, client/src/components/CurvaturePhysicsPanel.tsx).\n\nMinimal artifact: curvature ledger layout.",
+      "tags": [
+        "ui",
+        "curvature",
+        "ledger"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-curvature-gr"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-curvature-slices",
+      "slug": "ui-panel-curvature-slices",
+      "title": "Curvature Slice Panels",
+      "excerpt": "Curvature slices and sampling views.",
+      "bodyMD": "Curvature slice panels (client/src/components/CurvatureSlicePanel.tsx, client/src/components/SliceViewer.tsx).\n\nMinimal artifact: curvature slice layout.",
+      "tags": [
+        "ui",
+        "curvature",
+        "slices"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-curvature-gr"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-gr-agent-loop",
+      "slug": "ui-panel-gr-agent-loop",
+      "title": "GR Agent Loop Panels",
+      "excerpt": "GR agent loop audit and learning panels.",
+      "bodyMD": "GR agent loop panels (client/src/components/GrAgentLoopAuditPanel.tsx, client/src/components/GrAgentLoopKpiPanel.tsx, client/src/components/GrAgentLoopLearningPanel.tsx).\n\nMinimal artifact: GR agent loop summary.",
+      "tags": [
+        "ui",
+        "gr",
+        "agent"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-curvature-gr"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-time-dilation",
+      "slug": "ui-panel-time-dilation",
+      "title": "Time Dilation Panels",
+      "excerpt": "Time dilation lattice and strobe visuals.",
+      "bodyMD": "Time dilation panels (client/src/components/TimeDilationLatticePanel.tsx, client/src/components/LightSpeedStrobeScale.tsx).\n\nMinimal artifact: time dilation layout.",
+      "tags": [
+        "ui",
+        "time",
+        "dilation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-curvature-gr"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-proof-verification",
+      "slug": "ui-panel-proof-verification",
+      "title": "Proof and Verification Panels",
+      "excerpt": "Verification panels and audit trees.",
+      "bodyMD": "Verification panels and audits (client/src/components/MathMaturityTreePanel.tsx, client/src/components/UniversalAuditTreePanel.tsx).\n\nMinimal artifact: verification panel map.",
+      "tags": [
+        "ui",
+        "verification",
+        "proof"
+      ],
+      "children": [
+        "ui-panel-math-maturity",
+        "ui-panel-universal-audit",
+        "ui-panel-verification-tab"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-math-maturity",
+      "slug": "ui-panel-math-maturity",
+      "title": "Math Maturity Panels",
+      "excerpt": "Math maturity tree displays.",
+      "bodyMD": "Math maturity panels (client/src/components/MathMaturityTreePanel.tsx).\n\nMinimal artifact: math maturity tree.",
+      "tags": [
+        "ui",
+        "math",
+        "maturity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-proof-verification"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-universal-audit",
+      "slug": "ui-panel-universal-audit",
+      "title": "Universal Audit Panels",
+      "excerpt": "Audit trees and knowledge panels.",
+      "bodyMD": "Audit tree panels (client/src/components/UniversalAuditTreePanel.tsx, client/src/components/CoreKnowledgePanel.tsx, client/src/components/AgiKnowledgePanel.tsx).\n\nMinimal artifact: audit tree layout.",
+      "tags": [
+        "ui",
+        "audit",
+        "knowledge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-proof-verification"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-verification-tab",
+      "slug": "ui-panel-verification-tab",
+      "title": "Verification Tab Panels",
+      "excerpt": "Verification tab and proof charts.",
+      "bodyMD": "Verification tab and proof charts (client/src/components/verification-tab.tsx, client/src/components/visual-proof-charts.tsx, client/src/components/FrontProofsLedger.tsx).\n\nMinimal artifact: verification tab layout.",
+      "tags": [
+        "ui",
+        "verification",
+        "charts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-proof-verification"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-knowledge-ideology",
+      "slug": "ui-panel-knowledge-ideology",
+      "title": "Knowledge and Ideology Panels",
+      "excerpt": "Panels for ideology and knowledge navigation.",
+      "bodyMD": "Knowledge and ideology panels (client/src/components/IdeologyPanel.tsx, client/src/components/MissionEthosSourcePanel.tsx, client/src/components/DocViewerPanel.tsx).\n\nMinimal artifact: ideology panel map.",
+      "tags": [
+        "ui",
+        "ideology",
+        "knowledge"
+      ],
+      "children": [
+        "ui-panel-ideology",
+        "ui-panel-knowledge-docs",
+        "ui-panel-halobank"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-ideology",
+      "slug": "ui-panel-ideology",
+      "title": "Ideology Panels",
+      "excerpt": "Ideology and ethos surfaces.",
+      "bodyMD": "Ideology panels (client/src/components/IdeologyPanel.tsx, client/src/components/MissionEthosSourcePanel.tsx).\n\nMinimal artifact: ideology panel layout.",
+      "tags": [
+        "ui",
+        "ideology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-knowledge-ideology"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-knowledge-docs",
+      "slug": "ui-panel-knowledge-docs",
+      "title": "Knowledge Docs Panels",
+      "excerpt": "Document viewer and definition chips.",
+      "bodyMD": "Knowledge doc panels (client/src/components/DocViewerPanel.tsx, client/src/components/DefinitionChip.tsx).\n\nMinimal artifact: doc viewer layout.",
+      "tags": [
+        "ui",
+        "docs",
+        "knowledge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-knowledge-ideology"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-halobank",
+      "slug": "ui-panel-halobank",
+      "title": "Halobank Panels",
+      "excerpt": "Halobank and spore timeline panels.",
+      "bodyMD": "Halobank panels (client/src/components/HalobankPanel.tsx, client/src/components/SporeTimeline.tsx).\n\nMinimal artifact: halobank panel layout.",
+      "tags": [
+        "ui",
+        "halobank"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-knowledge-ideology"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-stellar-solar",
+      "slug": "ui-panel-stellar-solar",
+      "title": "Stellar and Solar Panels",
+      "excerpt": "Solar and stellar monitoring panels.",
+      "bodyMD": "Stellar panels (client/src/components/SolarGlobePanel.tsx, client/src/components/SolarDiskCanvas.tsx, client/src/components/SolarMap.tsx, client/src/components/StellarLsrPanel.tsx).\n\nMinimal artifact: stellar panel map.",
+      "tags": [
+        "ui",
+        "stellar",
+        "solar"
+      ],
+      "children": [
+        "ui-panel-solar-globe",
+        "ui-panel-stellar-lsr",
+        "ui-panel-deep-mixing",
+        "ui-panel-tokamak"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-solar-globe",
+      "slug": "ui-panel-solar-globe",
+      "title": "Solar Globe Panels",
+      "excerpt": "Solar globe and navigation panels.",
+      "bodyMD": "Solar panels (client/src/components/SolarGlobePanel.tsx, client/src/components/SolarDiskCanvas.tsx, client/src/components/SolarNavViewer.tsx, client/src/components/SolarMap.tsx).\n\nMinimal artifact: solar globe layout.",
+      "tags": [
+        "ui",
+        "solar"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-stellar-solar"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-stellar-lsr",
+      "slug": "ui-panel-stellar-lsr",
+      "title": "Stellar LSR Panels",
+      "excerpt": "Local standard of rest displays.",
+      "bodyMD": "Stellar LSR panel (client/src/components/StellarLsrPanel.tsx).\n\nMinimal artifact: LSR panel layout.",
+      "tags": [
+        "ui",
+        "stellar"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-stellar-solar"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-deep-mixing",
+      "slug": "ui-panel-deep-mixing",
+      "title": "Deep Mixing Panels",
+      "excerpt": "Deep mixing solar visuals.",
+      "bodyMD": "Deep mixing panels (client/src/components/DeepMixingSolarView.tsx).\n\nMinimal artifact: deep mixing layout.",
+      "tags": [
+        "ui",
+        "solar",
+        "mixing"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-stellar-solar"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-tokamak",
+      "slug": "ui-panel-tokamak",
+      "title": "Tokamak Simulation Panel",
+      "excerpt": "Tokamak simulation UI.",
+      "bodyMD": "Tokamak simulation panel (client/src/components/TokamakSimulationPanel.tsx).\n\nMinimal artifact: tokamak panel layout.",
+      "tags": [
+        "ui",
+        "tokamak",
+        "simulation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-stellar-solar"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-lattice-time-dilation",
+      "slug": "ui-panel-lattice-time-dilation",
+      "title": "Lattice and Hull Panels",
+      "excerpt": "Hull, lattice, and needle panels.",
+      "bodyMD": "Lattice and hull panels (client/src/components/Hull3DRenderer.ts, client/src/components/HullMetricsVisPanel.tsx, client/src/components/Needle*.tsx).\n\nMinimal artifact: lattice and hull panel map.",
+      "tags": [
+        "ui",
+        "lattice",
+        "hull"
+      ],
+      "children": [
+        "ui-panel-hull3d",
+        "ui-panel-lattice",
+        "ui-panel-needle"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-hull3d",
+      "slug": "ui-panel-hull3d",
+      "title": "Hull 3D Panels",
+      "excerpt": "Hull 3D renderer and metrics panels.",
+      "bodyMD": "Hull 3D panels (client/src/components/Hull3DRenderer.ts, client/src/components/HullMetricsVisPanel.tsx, client/src/components/HelixHullCardsPanel.tsx).\n\nMinimal artifact: hull 3D layout.",
+      "tags": [
+        "ui",
+        "hull",
+        "3d"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-lattice-time-dilation"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-lattice",
+      "slug": "ui-panel-lattice",
+      "title": "Lattice Panels",
+      "excerpt": "Lattice and slice viewing panels.",
+      "bodyMD": "Lattice panels (client/src/components/QiLatticePanel.tsx, client/src/components/SliceViewer.tsx, client/src/components/VolumeModeToggle.tsx).\n\nMinimal artifact: lattice panel layout.",
+      "tags": [
+        "ui",
+        "lattice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-lattice-time-dilation"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-needle",
+      "slug": "ui-panel-needle",
+      "title": "Needle Panels",
+      "excerpt": "Needle bubble, worksheet, and roadmap panels.",
+      "bodyMD": "Needle panels (client/src/components/NeedleCavityBubblePanel.tsx, client/src/components/NeedleIpeakWorksheetPanel.tsx, client/src/components/NeedleWorldRoadmap.tsx, client/src/components/PhoenixNeedlePanel.tsx).\n\nMinimal artifact: needle panel layout.",
+      "tags": [
+        "ui",
+        "needle"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-lattice-time-dilation"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-noise-essence",
+      "slug": "ui-panel-noise-essence",
+      "title": "Noise and Essence Panels",
+      "excerpt": "Noise generation, Luma, and essence panels.",
+      "bodyMD": "Noise and essence panels (client/src/components/noise-gen/*, client/src/components/noise-gens/*, client/src/components/LumaPanel.tsx, client/src/components/essence/DresscodePanel.tsx).\n\nMinimal artifact: noise/essence panel map.",
+      "tags": [
+        "ui",
+        "noise",
+        "essence"
+      ],
+      "children": [
+        "ui-panel-noise-gen",
+        "ui-panel-noise-gens",
+        "ui-panel-luma",
+        "ui-panel-essence"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-noise-gen",
+      "slug": "ui-panel-noise-gen",
+      "title": "Noise Gen Panels",
+      "excerpt": "Noise generation project panels.",
+      "bodyMD": "Noise gen panels (client/src/components/noise-gen/ProjectAlbumPanel.tsx, client/src/components/noise-gen/StemDaw.tsx).\n\nMinimal artifact: noise gen layout.",
+      "tags": [
+        "ui",
+        "noise"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-noise-essence"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-noise-gens",
+      "slug": "ui-panel-noise-gens",
+      "title": "Noise Gens Panels",
+      "excerpt": "Noise gen libraries and players.",
+      "bodyMD": "Noise gens panels (client/src/components/noise-gens/CoverCreator.tsx, client/src/components/noise-gens/OriginalsPlayer.tsx, client/src/components/noise-gens/NoiseFieldPanel.tsx).\n\nMinimal artifact: noise gens layout.",
+      "tags": [
+        "ui",
+        "noise"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-noise-essence"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-luma",
+      "slug": "ui-panel-luma",
+      "title": "Luma Panels",
+      "excerpt": "Luma overlays and mood visuals.",
+      "bodyMD": "Luma panels (client/src/components/LumaPanel.tsx, client/src/components/LumaWhisper.tsx, client/src/components/LumaWhisperBubble.tsx, client/src/components/BackgroundLuma.tsx).\n\nMinimal artifact: luma panel layout.",
+      "tags": [
+        "ui",
+        "luma"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-noise-essence"
+        }
+      ]
+    },
+    {
+      "id": "ui-panel-essence",
+      "slug": "ui-panel-essence",
+      "title": "Essence Panels",
+      "excerpt": "Essence dresscode and profile panels.",
+      "bodyMD": "Essence panels (client/src/components/essence/DresscodePanel.tsx).\n\nMinimal artifact: essence panel layout.",
+      "tags": [
+        "ui",
+        "essence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-panel-noise-essence"
+        }
+      ]
+    },
+    {
+      "id": "ui-renderers-3d",
+      "slug": "ui-renderers-3d",
+      "title": "3D Renderers",
+      "excerpt": "3D and WebGL rendering surfaces.",
+      "bodyMD": "3D renderers include hull, warp bubble, and galaxy views.\n\nMinimal artifact: renderer map.",
+      "tags": [
+        "ui",
+        "renderer",
+        "webgl"
+      ],
+      "children": [
+        "ui-renderer-hull3d",
+        "ui-renderer-warp-bubble",
+        "ui-renderer-galaxy"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-renderer-hull3d",
+      "slug": "ui-renderer-hull3d",
+      "title": "Hull 3D Renderer",
+      "excerpt": "Hull 3D renderer and overlays.",
+      "bodyMD": "Hull 3D renderer (client/src/components/Hull3DRenderer.ts, client/src/components/Surface/*).\n\nMinimal artifact: hull renderer summary.",
+      "tags": [
+        "ui",
+        "renderer",
+        "hull"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-renderers-3d"
+        }
+      ]
+    },
+    {
+      "id": "ui-renderer-warp-bubble",
+      "slug": "ui-renderer-warp-bubble",
+      "title": "Warp Bubble Renderer",
+      "excerpt": "Warp bubble GL renderer.",
+      "bodyMD": "Warp bubble GL renderer (client/src/components/WarpBubbleGLPanel.tsx, client/src/components/WebGLDiagnostics.tsx).\n\nMinimal artifact: warp GL renderer summary.",
+      "tags": [
+        "ui",
+        "renderer",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-renderers-3d"
+        }
+      ]
+    },
+    {
+      "id": "ui-renderer-galaxy",
+      "slug": "ui-renderer-galaxy",
+      "title": "Galaxy Renderers",
+      "excerpt": "Galaxy map and deep zoom views.",
+      "bodyMD": "Galaxy renderers (client/src/components/GalaxyMapPanZoom.tsx, client/src/components/GalaxyDeepZoom.tsx).\n\nMinimal artifact: galaxy renderer map.",
+      "tags": [
+        "ui",
+        "renderer",
+        "galaxy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-renderers-3d"
+        }
+      ]
+    },
+    {
+      "id": "ui-hud-overlays",
+      "slug": "ui-hud-overlays",
+      "title": "HUD and Overlays",
+      "excerpt": "HUD overlays and live indicators.",
+      "bodyMD": "HUD overlays include collapse benchmarks and sector HUDs (client/src/components/CollapseBenchmarkHUD.tsx, client/src/components/SectorRolesHud.tsx, client/src/components/NavPoseHUD.tsx).\n\nMinimal artifact: HUD overlay map.",
+      "tags": [
+        "ui",
+        "hud",
+        "overlays"
+      ],
+      "children": [
+        "ui-hud-collapse",
+        "ui-hud-sector",
+        "ui-hud-nav"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-hud-collapse",
+      "slug": "ui-hud-collapse",
+      "title": "Collapse Benchmark HUD",
+      "excerpt": "Collapse benchmark HUD surface.",
+      "bodyMD": "Collapse benchmark HUD (client/src/components/CollapseBenchmarkHUD.tsx, client/src/components/CollapseBenchmarkHUDPanel.tsx).\n\nMinimal artifact: collapse HUD layout.",
+      "tags": [
+        "ui",
+        "hud",
+        "collapse"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-hud-overlays"
+        }
+      ]
+    },
+    {
+      "id": "ui-hud-sector",
+      "slug": "ui-hud-sector",
+      "title": "Sector HUD",
+      "excerpt": "Sector grid and role HUDs.",
+      "bodyMD": "Sector HUDs (client/src/components/SectorGridRing.tsx, client/src/components/SectorRolesHud.tsx, client/src/components/SectorLegend.tsx).\n\nMinimal artifact: sector HUD layout.",
+      "tags": [
+        "ui",
+        "hud",
+        "sector"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-hud-overlays"
+        }
+      ]
+    },
+    {
+      "id": "ui-hud-nav",
+      "slug": "ui-hud-nav",
+      "title": "Navigation HUD",
+      "excerpt": "Navigation pose HUD elements.",
+      "bodyMD": "Navigation HUD (client/src/components/NavPoseHUD.tsx).\n\nMinimal artifact: nav HUD layout.",
+      "tags": [
+        "ui",
+        "hud",
+        "nav"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-hud-overlays"
+        }
+      ]
+    },
+    {
+      "id": "ui-hooks-state",
+      "slug": "ui-hooks-state",
+      "title": "Hooks and State",
+      "excerpt": "Hooks, stores, and client adapters.",
+      "bodyMD": "Hooks, stores, and lib adapters connect physics backends to UI (client/src/hooks/*, client/src/store/*, client/src/lib/*).\n\nMinimal artifact: data flow map from hooks to panels.",
+      "tags": [
+        "ui",
+        "hooks",
+        "state"
+      ],
+      "children": [
+        "ui-hooks-physics",
+        "ui-stores",
+        "ui-lib-adapters"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-hooks-physics",
+      "slug": "ui-hooks-physics",
+      "title": "Physics Hooks",
+      "excerpt": "Physics data hooks.",
+      "bodyMD": "Physics hooks (client/src/hooks/use-energy-pipeline.ts, client/src/hooks/useGrBrick.ts, client/src/hooks/useStressEnergyBrick.ts).\n\nMinimal artifact: physics hook list.",
+      "tags": [
+        "ui",
+        "hooks",
+        "physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-hooks-state"
+        }
+      ]
+    },
+    {
+      "id": "ui-stores",
+      "slug": "ui-stores",
+      "title": "Client Stores",
+      "excerpt": "State stores for panels and routing.",
+      "bodyMD": "Client stores (client/src/store/useDesktopStore.ts, client/src/store/useFlightDirectorStore.ts, client/src/store/useAgiChatStore.ts).\n\nMinimal artifact: store map.",
+      "tags": [
+        "ui",
+        "store",
+        "state"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-hooks-state"
+        }
+      ]
+    },
+    {
+      "id": "ui-lib-adapters",
+      "slug": "ui-lib-adapters",
+      "title": "UI Lib Adapters",
+      "excerpt": "Client library adapters and physics bridges.",
+      "bodyMD": "Client lib adapters (client/src/lib/simulation-api.ts, client/src/lib/warp-pipeline-adapter.ts, client/src/lib/curvature-brick.ts).\n\nMinimal artifact: adapter map.",
+      "tags": [
+        "ui",
+        "lib",
+        "adapters"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-hooks-state"
+        }
+      ]
+    },
+    {
+      "id": "ui-primitives",
+      "slug": "ui-primitives",
+      "title": "UI Primitives",
+      "excerpt": "Shared UI primitives and components.",
+      "bodyMD": "UI primitives (client/src/components/ui/*).\n\nMinimal artifact: primitive component list.",
+      "tags": [
+        "ui",
+        "primitives"
+      ],
+      "children": [
+        "ui-primitives-shadcn"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-primitives-shadcn",
+      "slug": "ui-primitives-shadcn",
+      "title": "Shadcn UI",
+      "excerpt": "Reusable UI building blocks.",
+      "bodyMD": "Reusable components (client/src/components/ui/*).\n\nMinimal artifact: primitive inventory.",
+      "tags": [
+        "ui",
+        "primitives",
+        "components"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-primitives"
+        }
+      ]
+    },
+    {
+      "id": "ui-mobile-start",
+      "slug": "ui-mobile-start",
+      "title": "Mobile Start",
+      "excerpt": "Mobile start surface and components.",
+      "bodyMD": "Mobile start surface (client/src/pages/mobile-start.tsx, client/src/components/mobile/*).\n\nMinimal artifact: mobile start layout.",
+      "tags": [
+        "ui",
+        "mobile"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-legacy-warp-web",
+      "slug": "ui-legacy-warp-web",
+      "title": "Legacy Warp Web",
+      "excerpt": "Static warp web surfaces.",
+      "bodyMD": "Legacy warp web surfaces (warp-web/*.html, warp-web/js/*, warp-web/css/*).\n\nMinimal artifact: warp web page list.",
+      "tags": [
+        "ui",
+        "legacy",
+        "web"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-visualization-utils",
+      "slug": "ui-visualization-utils",
+      "title": "Visualization Utilities",
+      "excerpt": "Charts and visual helpers.",
+      "bodyMD": "Visualization helpers (client/src/components/chart-visualization.tsx, client/src/components/mesh-visualization.tsx, client/src/components/phase-diagram.tsx, client/src/components/dynamic-visualization.tsx).\n\nMinimal artifact: visualization helper list.",
+      "tags": [
+        "ui",
+        "visualization"
+      ],
+      "children": [
+        "ui-vis-charts",
+        "ui-vis-mesh",
+        "ui-vis-phase-diagram"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "ui-vis-charts",
+      "slug": "ui-vis-charts",
+      "title": "Chart Utilities",
+      "excerpt": "Chart and plot helpers.",
+      "bodyMD": "Chart helpers (client/src/components/chart-visualization.tsx, client/src/components/visual-proof-charts.tsx).\n\nMinimal artifact: chart helper map.",
+      "tags": [
+        "ui",
+        "charts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-visualization-utils"
+        }
+      ]
+    },
+    {
+      "id": "ui-vis-mesh",
+      "slug": "ui-vis-mesh",
+      "title": "Mesh Visualization",
+      "excerpt": "Mesh and surface visualization helpers.",
+      "bodyMD": "Mesh visualization (client/src/components/mesh-visualization.tsx, client/src/components/ShellOutlineVisualizer.tsx).\n\nMinimal artifact: mesh visualization summary.",
+      "tags": [
+        "ui",
+        "mesh"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-visualization-utils"
+        }
+      ]
+    },
+    {
+      "id": "ui-vis-phase-diagram",
+      "slug": "ui-vis-phase-diagram",
+      "title": "Phase Diagram",
+      "excerpt": "Phase diagram visualization.",
+      "bodyMD": "Phase diagram panels (client/src/components/phase-diagram.tsx, client/src/components/phase-diagram-validator.tsx).\n\nMinimal artifact: phase diagram layout.",
+      "tags": [
+        "ui",
+        "phase"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-visualization-utils"
+        }
+      ]
+    },
+    {
+      "id": "ui-backend-binding",
+      "slug": "ui-backend-binding",
+      "title": "UI Backend Bindings",
+      "excerpt": "Backend-to-UI dataflow map for physics surfaces.",
+      "bodyMD": "UI backend binding tree (docs/knowledge/ui-backend-binding-tree.json).\n\nMinimal artifact: backend-to-UI binding summary.",
+      "tags": [
+        "ui",
+        "backend",
+        "bindings"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-physics-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-proof-verification"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "rootId": "ops-deployment-tree",
+  "nodes": [
+    {
+      "id": "ops-deployment-tree",
+      "slug": "ops-deployment-tree",
+      "title": "Ops and Deployment Tree",
+      "excerpt": "CI, verification gates, observability, and deployment scaffolding.",
+      "bodyMD": "This tree maps CI workflows, verification tooling, and observability/deployment assets.\n\nMinimal artifact: ops and CI map.",
+      "tags": [
+        "ops",
+        "ci",
+        "deployment"
+      ],
+      "children": [
+        "ops-ci-workflows",
+        "ops-verification-tools",
+        "ops-observability",
+        "ops-env-config",
+        "ops-scripts-tools",
+        "ops-release-packaging"
+      ],
+      "links": []
+    },
+    {
+      "id": "ops-ci-workflows",
+      "slug": "ops-ci-workflows",
+      "title": "CI Workflows",
+      "excerpt": "GitHub Actions workflows for verification and release.",
+      "bodyMD": "CI workflows ( .github/workflows/casimir-verify.yml, .github/workflows/release-packages.yml ).\n\nMinimal artifact: CI workflow list.",
+      "tags": [
+        "ops",
+        "ci"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ops-deployment-tree"
+        }
+      ]
+    },
+    {
+      "id": "ops-verification-tools",
+      "slug": "ops-verification-tools",
+      "title": "Verification Tools",
+      "excerpt": "Casimir verification CLI and adapter contracts.",
+      "bodyMD": "Verification tooling (cli/casimir-verify.ts, cli/casimir-collect.ts, docs/ADAPTER-CONTRACT.md).\n\nMinimal artifact: verification toolchain summary.",
+      "tags": [
+        "ops",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ops-deployment-tree"
+        }
+      ]
+    },
+    {
+      "id": "ops-observability",
+      "slug": "ops-observability",
+      "title": "Observability",
+      "excerpt": "Observability config and compose stacks.",
+      "bodyMD": "Observability assets (docker-compose.observability.yml, ops/observability/prometheus.yml, server/routes/observability.client-error.ts).\n\nMinimal artifact: observability stack map.",
+      "tags": [
+        "ops",
+        "observability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ops-deployment-tree"
+        }
+      ]
+    },
+    {
+      "id": "ops-env-config",
+      "slug": "ops-env-config",
+      "title": "Environment Config",
+      "excerpt": "Environment and configuration files.",
+      "bodyMD": "Environment configuration ( .env.example, configs/*, math.config.json ).\n\nMinimal artifact: environment config map.",
+      "tags": [
+        "ops",
+        "config"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ops-deployment-tree"
+        }
+      ]
+    },
+    {
+      "id": "ops-scripts-tools",
+      "slug": "ops-scripts-tools",
+      "title": "Scripts and Tools",
+      "excerpt": "Scripts, tools, and CLI helpers.",
+      "bodyMD": "Operational scripts and tools (scripts/*, tools/*, cli/README.md).\n\nMinimal artifact: scripts inventory.",
+      "tags": [
+        "ops",
+        "scripts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ops-deployment-tree"
+        }
+      ]
+    },
+    {
+      "id": "ops-release-packaging",
+      "slug": "ops-release-packaging",
+      "title": "Release Packaging",
+      "excerpt": "Packaging and release assets.",
+      "bodyMD": "Release packaging assets (packages/*, cli/package.json, package.json).\n\nMinimal artifact: release packaging map.",
+      "tags": [
+        "ops",
+        "release"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ops-deployment-tree"
+        }
+      ]
+    }
+  ]
+}

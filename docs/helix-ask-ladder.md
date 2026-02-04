@@ -80,7 +80,8 @@ Live events
   verification, failure_path).
 - Plan must-include and topic must-include are enforced.
 - For configured tree topics, an anchor-and-walk graph resolver may inject a
-  compact framework context (derived from the tree) before evidence gating.
+  compact multi-tree pack context (ranked trees with anchors + walk) before
+  evidence gating.
 
 Live events
 - Helix Ask: Slot coverage - ok|missing

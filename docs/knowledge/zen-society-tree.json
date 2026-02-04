@@ -1,0 +1,542 @@
+{
+  "version": 1,
+  "rootId": "zen-society-tree",
+  "nodes": [
+    {
+      "id": "zen-society-tree",
+      "slug": "zen-society-tree",
+      "title": "Zen Society Tree",
+      "excerpt": "Governance spine and artifact templates for zen society.",
+      "bodyMD": "Zen society docs and templates.\n\nMinimal artifact: docs/zen-society/*.md.",
+      "tags": [
+        "zen",
+        "society",
+        "governance"
+      ],
+      "children": [
+        "zen-society-core",
+        "zen-society-templates",
+        "zen-society-artifacts"
+      ],
+      "links": []
+    },
+    {
+      "id": "zen-society-core",
+      "slug": "zen-society-core",
+      "title": "Zen Society Core",
+      "excerpt": "Core governance spine and gates.",
+      "bodyMD": "Core zen society docs (docs/zen-society/README.md, docs/zen-society/gates.md, docs/zen-society/public-safety-governance-spine.md).\n\nMinimal artifact: governance spine summary.",
+      "tags": [
+        "zen",
+        "society",
+        "core"
+      ],
+      "children": [
+        "zen-society-readme",
+        "zen-society-gates",
+        "zen-society-spine"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-tree"
+        }
+      ]
+    },
+    {
+      "id": "zen-society-readme",
+      "slug": "zen-society-readme",
+      "title": "Zen Society README",
+      "excerpt": "Overview of zen society docs.",
+      "bodyMD": "Zen society README (docs/zen-society/README.md).\n\nMinimal artifact: README summary.",
+      "tags": [
+        "zen",
+        "society"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-core"
+        }
+      ]
+    },
+    {
+      "id": "zen-society-gates",
+      "slug": "zen-society-gates",
+      "title": "Zen Society Gates",
+      "excerpt": "Gate definitions for zen society governance.",
+      "bodyMD": "Gates overview (docs/zen-society/gates.md).\n\nMinimal artifact: gate checklist.",
+      "tags": [
+        "zen",
+        "society",
+        "gates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-core"
+        }
+      ]
+    },
+    {
+      "id": "zen-society-spine",
+      "slug": "zen-society-spine",
+      "title": "Governance Spine",
+      "excerpt": "Public safety governance spine.",
+      "bodyMD": "Governance spine doc (docs/zen-society/public-safety-governance-spine.md).\n\nMinimal artifact: spine summary.",
+      "tags": [
+        "zen",
+        "society",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-core"
+        }
+      ]
+    },
+    {
+      "id": "zen-society-templates",
+      "slug": "zen-society-templates",
+      "title": "Zen Society Templates",
+      "excerpt": "Template pillars and logs.",
+      "bodyMD": "Template docs (docs/zen-society/templates/*.md).\n\nMinimal artifact: template checklist.",
+      "tags": [
+        "zen",
+        "society",
+        "templates"
+      ],
+      "children": [
+        "zen-decision-log",
+        "zen-pillar-01-dignity",
+        "zen-pillar-02-services",
+        "zen-pillar-03-contracts",
+        "zen-pillar-04-finance",
+        "zen-pillar-05-consent",
+        "zen-pillar-06-verification",
+        "zen-signatory-registry"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-tree"
+        }
+      ]
+    },
+    {
+      "id": "zen-decision-log",
+      "slug": "zen-decision-log",
+      "title": "Decision Log",
+      "excerpt": "Template for Decision Log.",
+      "bodyMD": "Decision Log template (docs/zen-society/templates/decision-log.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "zen",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-templates"
+        }
+      ]
+    },
+    {
+      "id": "zen-pillar-01-dignity",
+      "slug": "zen-pillar-01-dignity",
+      "title": "Pillar 01 Dignity",
+      "excerpt": "Template for Pillar 01 Dignity.",
+      "bodyMD": "Pillar 01 Dignity template (docs/zen-society/templates/pillar-01-dignity.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "zen",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-templates"
+        }
+      ]
+    },
+    {
+      "id": "zen-pillar-02-services",
+      "slug": "zen-pillar-02-services",
+      "title": "Pillar 02 Services",
+      "excerpt": "Template for Pillar 02 Services.",
+      "bodyMD": "Pillar 02 Services template (docs/zen-society/templates/pillar-02-services.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "zen",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-templates"
+        }
+      ]
+    },
+    {
+      "id": "zen-pillar-03-contracts",
+      "slug": "zen-pillar-03-contracts",
+      "title": "Pillar 03 Contracts",
+      "excerpt": "Template for Pillar 03 Contracts.",
+      "bodyMD": "Pillar 03 Contracts template (docs/zen-society/templates/pillar-03-contracts.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "zen",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-templates"
+        }
+      ]
+    },
+    {
+      "id": "zen-pillar-04-finance",
+      "slug": "zen-pillar-04-finance",
+      "title": "Pillar 04 Finance",
+      "excerpt": "Template for Pillar 04 Finance.",
+      "bodyMD": "Pillar 04 Finance template (docs/zen-society/templates/pillar-04-finance.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "zen",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-templates"
+        }
+      ]
+    },
+    {
+      "id": "zen-pillar-05-consent",
+      "slug": "zen-pillar-05-consent",
+      "title": "Pillar 05 Consent",
+      "excerpt": "Template for Pillar 05 Consent.",
+      "bodyMD": "Pillar 05 Consent template (docs/zen-society/templates/pillar-05-consent.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "zen",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-templates"
+        }
+      ]
+    },
+    {
+      "id": "zen-pillar-06-verification",
+      "slug": "zen-pillar-06-verification",
+      "title": "Pillar 06 Verification",
+      "excerpt": "Template for Pillar 06 Verification.",
+      "bodyMD": "Pillar 06 Verification template (docs/zen-society/templates/pillar-06-verification.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "zen",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-templates"
+        }
+      ]
+    },
+    {
+      "id": "zen-signatory-registry",
+      "slug": "zen-signatory-registry",
+      "title": "Signatory Registry",
+      "excerpt": "Template for Signatory Registry.",
+      "bodyMD": "Signatory Registry template (docs/zen-society/templates/signatory-registry.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "zen",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-templates"
+        }
+      ]
+    },
+    {
+      "id": "zen-society-artifacts",
+      "slug": "zen-society-artifacts",
+      "title": "Zen Society Artifacts",
+      "excerpt": "Artifact templates for governance workflows.",
+      "bodyMD": "Artifact templates (docs/zen-society/templates/artifacts/*.md).\n\nMinimal artifact: artifact template list.",
+      "tags": [
+        "zen",
+        "society",
+        "artifacts"
+      ],
+      "children": [
+        "zen-artifact-access-to-counsel-pathway",
+        "zen-artifact-charter",
+        "zen-artifact-civic-signal-survey",
+        "zen-artifact-dashboard",
+        "zen-artifact-federal-civic-listening-circuit",
+        "zen-artifact-harm-weighted-priority-standard",
+        "zen-artifact-integration-ladder",
+        "zen-artifact-lawful-interface-protocol",
+        "zen-artifact-ledger",
+        "zen-artifact-local-stability-compact",
+        "zen-artifact-metric-integrity-guardrail",
+        "zen-artifact-protocol",
+        "zen-artifact-training-certification-gate"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-tree"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-access-to-counsel-pathway",
+      "slug": "zen-artifact-access-to-counsel-pathway",
+      "title": "Access To Counsel Pathway",
+      "excerpt": "Artifact template for Access To Counsel Pathway.",
+      "bodyMD": "Access To Counsel Pathway artifact template (docs/zen-society/templates/artifacts/access-to-counsel-pathway.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-charter",
+      "slug": "zen-artifact-charter",
+      "title": "Charter",
+      "excerpt": "Artifact template for Charter.",
+      "bodyMD": "Charter artifact template (docs/zen-society/templates/artifacts/charter.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-civic-signal-survey",
+      "slug": "zen-artifact-civic-signal-survey",
+      "title": "Civic Signal Survey",
+      "excerpt": "Artifact template for Civic Signal Survey.",
+      "bodyMD": "Civic Signal Survey artifact template (docs/zen-society/templates/artifacts/civic-signal-survey.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-dashboard",
+      "slug": "zen-artifact-dashboard",
+      "title": "Dashboard",
+      "excerpt": "Artifact template for Dashboard.",
+      "bodyMD": "Dashboard artifact template (docs/zen-society/templates/artifacts/dashboard.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-federal-civic-listening-circuit",
+      "slug": "zen-artifact-federal-civic-listening-circuit",
+      "title": "Federal Civic Listening Circuit",
+      "excerpt": "Artifact template for Federal Civic Listening Circuit.",
+      "bodyMD": "Federal Civic Listening Circuit artifact template (docs/zen-society/templates/artifacts/federal-civic-listening-circuit.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-harm-weighted-priority-standard",
+      "slug": "zen-artifact-harm-weighted-priority-standard",
+      "title": "Harm Weighted Priority Standard",
+      "excerpt": "Artifact template for Harm Weighted Priority Standard.",
+      "bodyMD": "Harm Weighted Priority Standard artifact template (docs/zen-society/templates/artifacts/harm-weighted-priority-standard.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-integration-ladder",
+      "slug": "zen-artifact-integration-ladder",
+      "title": "Integration Ladder",
+      "excerpt": "Artifact template for Integration Ladder.",
+      "bodyMD": "Integration Ladder artifact template (docs/zen-society/templates/artifacts/integration-ladder.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-lawful-interface-protocol",
+      "slug": "zen-artifact-lawful-interface-protocol",
+      "title": "Lawful Interface Protocol",
+      "excerpt": "Artifact template for Lawful Interface Protocol.",
+      "bodyMD": "Lawful Interface Protocol artifact template (docs/zen-society/templates/artifacts/lawful-interface-protocol.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-ledger",
+      "slug": "zen-artifact-ledger",
+      "title": "Ledger",
+      "excerpt": "Artifact template for Ledger.",
+      "bodyMD": "Ledger artifact template (docs/zen-society/templates/artifacts/ledger.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-local-stability-compact",
+      "slug": "zen-artifact-local-stability-compact",
+      "title": "Local Stability Compact",
+      "excerpt": "Artifact template for Local Stability Compact.",
+      "bodyMD": "Local Stability Compact artifact template (docs/zen-society/templates/artifacts/local-stability-compact.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-metric-integrity-guardrail",
+      "slug": "zen-artifact-metric-integrity-guardrail",
+      "title": "Metric Integrity Guardrail",
+      "excerpt": "Artifact template for Metric Integrity Guardrail.",
+      "bodyMD": "Metric Integrity Guardrail artifact template (docs/zen-society/templates/artifacts/metric-integrity-guardrail.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-protocol",
+      "slug": "zen-artifact-protocol",
+      "title": "Protocol",
+      "excerpt": "Artifact template for Protocol.",
+      "bodyMD": "Protocol artifact template (docs/zen-society/templates/artifacts/protocol.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-artifact-training-certification-gate",
+      "slug": "zen-artifact-training-certification-gate",
+      "title": "Training Certification Gate",
+      "excerpt": "Artifact template for Training Certification Gate.",
+      "bodyMD": "Training Certification Gate artifact template (docs/zen-society/templates/artifacts/training-certification-gate.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ]
+    }
+  ]
+}

@@ -23,7 +23,11 @@
         "units-and-scaling",
         "numerics-and-stability",
         "time-bounds-stack",
-        "viability-and-claims"
+        "viability-and-claims",
+        "quantum-gr-bridge",
+        "uncertainty-mechanics",
+        "brick-lattice-dataflow",
+        "simulation-systems"
       ],
       "links": []
     },
@@ -828,6 +832,106 @@
       "links": [
         {
           "rel": "parent",
+          "to": "numerics-and-stability"
+        }
+      ]
+    },
+    {
+      "id": "quantum-gr-bridge",
+      "slug": "quantum-gr-bridge",
+      "title": "Quantum-GR Bridge",
+      "excerpt": "Bridge notes between quantum effects and GR constraints.",
+      "bodyMD": "Bridge notes map quantum constraints to GR narratives (docs/quantum-gr-bridge.md).\n\nMinimal artifact: bridge summary.",
+      "tags": [
+        "quantum",
+        "gr",
+        "bridge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-mechanics",
+      "slug": "uncertainty-mechanics",
+      "title": "Uncertainty Mechanics",
+      "excerpt": "Classical vs statistical uncertainty and physics constraints.",
+      "bodyMD": "Uncertainty mechanics tree (docs/knowledge/physics/uncertainty-mechanics-tree.json).\n\nMinimal artifact: uncertainty mechanics summary.",
+      "tags": [
+        "uncertainty",
+        "physics",
+        "constraints"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "numerics-and-stability"
+        },
+        {
+          "rel": "see-also",
+          "to": "time-bounds-stack"
+        }
+      ]
+    },
+    {
+      "id": "brick-lattice-dataflow",
+      "slug": "brick-lattice-dataflow",
+      "title": "Brick and Lattice Dataflow",
+      "excerpt": "Brick payloads and lattice dataflow in physics pipelines.",
+      "bodyMD": "Brick and lattice dataflow tree (docs/knowledge/physics/brick-lattice-dataflow-tree.json).\n\nMinimal artifact: brick/lattice dataflow summary.",
+      "tags": [
+        "brick",
+        "lattice",
+        "physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "numerics-and-stability"
+        },
+        {
+          "rel": "see-also",
+          "to": "stress-energy-stack"
+        }
+      ]
+    },
+    {
+      "id": "simulation-systems",
+      "slug": "simulation-systems",
+      "title": "Simulation Systems",
+      "excerpt": "Simulation systems and pipelines.",
+      "bodyMD": "Simulation systems tree (docs/knowledge/physics/simulation-systems-tree.json).\n\nMinimal artifact: simulation systems summary.",
+      "tags": [
+        "simulation",
+        "physics",
+        "pipeline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-phenomena"
+        },
+        {
+          "rel": "see-also",
           "to": "numerics-and-stability"
         }
       ]

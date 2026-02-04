@@ -1,0 +1,232 @@
+{
+  "version": 1,
+  "rootId": "resonance-tree",
+  "nodes": [
+    {
+      "id": "resonance-tree",
+      "slug": "resonance-tree",
+      "title": "Resonance and Code-Lattice Tree",
+      "excerpt": "Code-lattice resonance pipeline and diagnostics.",
+      "bodyMD": "Resonance stack for code-lattice computations.\n\nMinimal artifact: code-lattice configs and resonance outputs.",
+      "tags": [
+        "resonance",
+        "code-lattice"
+      ],
+      "children": [
+        "code-lattice-core",
+        "resonance-runtime",
+        "resonance-io",
+        "resonance-tests"
+      ],
+      "links": []
+    },
+    {
+      "id": "code-lattice-core",
+      "slug": "code-lattice-core",
+      "title": "Code Lattice Core",
+      "excerpt": "Shared schema and base lattice definitions.",
+      "bodyMD": "Code lattice schema and base definitions (shared/code-lattice.ts).\n\nMinimal artifact: code lattice schema.",
+      "tags": [
+        "resonance",
+        "schema"
+      ],
+      "children": [
+        "code-lattice-schema"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-tree"
+        }
+      ]
+    },
+    {
+      "id": "code-lattice-schema",
+      "slug": "code-lattice-schema",
+      "title": "Code Lattice Schema",
+      "excerpt": "Schema definitions for code-lattice data.",
+      "bodyMD": "Code lattice schema (shared/code-lattice.ts).\n\nMinimal artifact: schema snapshot.",
+      "tags": [
+        "resonance",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "code-lattice-core"
+        }
+      ]
+    },
+    {
+      "id": "resonance-runtime",
+      "slug": "resonance-runtime",
+      "title": "Resonance Runtime",
+      "excerpt": "Resonance calculations and constants.",
+      "bodyMD": "Resonance runtime computes metrics and constants (server/services/code-lattice/resonance.ts, server/services/code-lattice/resonance.constants.ts).\n\nMinimal artifact: resonance metrics snapshot.",
+      "tags": [
+        "resonance",
+        "runtime"
+      ],
+      "children": [
+        "resonance-constants",
+        "resonance-engine"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-tree"
+        }
+      ]
+    },
+    {
+      "id": "resonance-constants",
+      "slug": "resonance-constants",
+      "title": "Resonance Constants",
+      "excerpt": "Constants for resonance evaluation.",
+      "bodyMD": "Resonance constants (server/services/code-lattice/resonance.constants.ts).\n\nMinimal artifact: constants list.",
+      "tags": [
+        "resonance",
+        "constants"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-runtime"
+        }
+      ]
+    },
+    {
+      "id": "resonance-engine",
+      "slug": "resonance-engine",
+      "title": "Resonance Engine",
+      "excerpt": "Core resonance computation engine.",
+      "bodyMD": "Resonance engine computes lattice metrics (server/services/code-lattice/resonance.ts).\n\nMinimal artifact: resonance output.",
+      "tags": [
+        "resonance",
+        "engine"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-runtime"
+        }
+      ]
+    },
+    {
+      "id": "resonance-io",
+      "slug": "resonance-io",
+      "title": "Resonance IO",
+      "excerpt": "Loaders, builders, watchers, and routes.",
+      "bodyMD": "Resonance IO stack for lattice ingestion and routing (server/services/code-lattice/loader.ts, server/services/code-lattice/builders.ts, server/services/code-lattice/watcher.ts, server/routes/code-lattice.ts).\n\nMinimal artifact: IO pipeline summary.",
+      "tags": [
+        "resonance",
+        "io"
+      ],
+      "children": [
+        "resonance-loader",
+        "resonance-builders",
+        "resonance-watcher",
+        "resonance-routes"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-tree"
+        }
+      ]
+    },
+    {
+      "id": "resonance-loader",
+      "slug": "resonance-loader",
+      "title": "Resonance Loader",
+      "excerpt": "Load lattice inputs for resonance.",
+      "bodyMD": "Lattice loader ingests resonance inputs (server/services/code-lattice/loader.ts).\n\nMinimal artifact: loader sample.",
+      "tags": [
+        "resonance",
+        "loader"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-io"
+        }
+      ]
+    },
+    {
+      "id": "resonance-builders",
+      "slug": "resonance-builders",
+      "title": "Resonance Builders",
+      "excerpt": "Build lattice structures for resonance.",
+      "bodyMD": "Builders assemble resonance structures (server/services/code-lattice/builders.ts).\n\nMinimal artifact: builder summary.",
+      "tags": [
+        "resonance",
+        "builders"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-io"
+        }
+      ]
+    },
+    {
+      "id": "resonance-watcher",
+      "slug": "resonance-watcher",
+      "title": "Resonance Watcher",
+      "excerpt": "Watchers for resonance updates.",
+      "bodyMD": "Watcher monitors resonance updates (server/services/code-lattice/watcher.ts).\n\nMinimal artifact: watcher summary.",
+      "tags": [
+        "resonance",
+        "watcher"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-io"
+        }
+      ]
+    },
+    {
+      "id": "resonance-routes",
+      "slug": "resonance-routes",
+      "title": "Resonance Routes",
+      "excerpt": "HTTP routes for resonance access.",
+      "bodyMD": "Routes expose resonance data (server/routes/code-lattice.ts).\n\nMinimal artifact: route list.",
+      "tags": [
+        "resonance",
+        "routes"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-io"
+        }
+      ]
+    },
+    {
+      "id": "resonance-tests",
+      "slug": "resonance-tests",
+      "title": "Resonance Tests",
+      "excerpt": "Casimir resonance test cases.",
+      "bodyMD": "Resonance tests validate Casimir resonance behavior (server/services/code-lattice/__tests__/resonance.casimir.spec.ts, server/services/code-lattice/__tests__/casimir-resonance.spec.ts).\n\nMinimal artifact: test output summary.",
+      "tags": [
+        "resonance",
+        "tests"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-tree"
+        }
+      ]
+    }
+  ]
+}

@@ -26,6 +26,19 @@ export type HelixAskGraphFramework = {
   scaffoldText: string;
   contextText: string;
   preferGraph: boolean;
+  rankScore?: number;
+  anchorScore?: number;
+  pathScore?: number;
+};
+
+export type HelixAskGraphPack = {
+  frameworks: HelixAskGraphFramework[];
+  scaffoldText: string;
+  contextText: string;
+  preferGraph: boolean;
+  sourcePaths: string[];
+  treeIds: string[];
+  primaryTreeId?: string;
 };
 
 type GraphResolverTreeConfig = {
@@ -43,8 +56,15 @@ type GraphResolverTreeConfig = {
   roleMatchers?: Record<string, string[]>;
 };
 
+type GraphResolverPackConfig = {
+  maxTrees?: number;
+  minScore?: number;
+  minScoreRatio?: number;
+};
+
 type GraphResolverConfig = {
   version?: number;
+  pack?: GraphResolverPackConfig;
   trees?: GraphResolverTreeConfig[];
 };
 
@@ -91,6 +111,10 @@ const DEFAULT_MAX_ANCHORS = 3;
 const DEFAULT_MAX_DEPTH = 2;
 const DEFAULT_MAX_NODES = 8;
 const DEFAULT_MIN_ANCHOR_SCORE = 4;
+const DEFAULT_MAX_PACK_TREES = 3;
+const DEFAULT_PACK_MIN_SCORE = 6;
+const DEFAULT_PACK_MIN_SCORE_RATIO = 0.25;
+const MAX_PACK_TREES_LIMIT = 6;
 
 type GraphConfigCache = { config: GraphResolverConfig; path: string; mtimeMs: number };
 let graphConfigCache: GraphConfigCache | null = null;
@@ -113,6 +137,10 @@ const clipText = (value: string, limit: number): string => {
 };
 
 const ensureArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+const clampNumber = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
+const coerceNumber = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
 const resolveConfigPath = (): string | null => {
   for (const candidate of GRAPH_CONFIG_PATHS) {
@@ -420,13 +448,165 @@ const buildContextBlock = (tree: GraphTree, lines: string[]): string => {
   return [header, ...lines].join("\n");
 };
 
-export function resolveHelixAskGraphFramework(input: {
+type GraphFrameworkCandidate = {
+  framework: HelixAskGraphFramework;
+  score: number;
+  anchorScore: number;
+  pathScore: number;
+  hitCount: number;
+};
+
+const scoreGraphCandidate = (anchorScore: number, pathScore: number, hitCount: number): number =>
+  anchorScore * 2 + pathScore + hitCount;
+
+const mergeScaffoldText = (blocks: string[]): string => {
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const block of blocks) {
+    const trimmed = block?.trim();
+    if (!trimmed) continue;
+    for (const line of trimmed.split(/\r?\n/)) {
+      const cleaned = line.trim();
+      if (!cleaned) continue;
+      const key = cleaned.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      lines.push(cleaned);
+    }
+  }
+  return lines.join("\n");
+};
+
+const mergeContextBlocks = (blocks: string[]): string => {
+  const trimmed = blocks.map((block) => block?.trim() ?? "").filter(Boolean);
+  if (trimmed.length === 0) return "";
+  return trimmed.join("\n\n");
+};
+
+const buildFrameworkCandidate = (
+  tree: GraphTree,
+  tokens: string[],
+  questionNorm: string,
+  conceptBoosts: string[],
+): GraphFrameworkCandidate | null => {
+  const nodeScores = tree.nodes
+    .map((node) => ({
+      node,
+      score: scoreNode(node, tokens, questionNorm, conceptBoosts),
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score);
+  if (nodeScores.length === 0) return null;
+
+  const treeConfig = tree.config;
+  const minScore = treeConfig.minAnchorScore ?? DEFAULT_MIN_ANCHOR_SCORE;
+  let anchors = nodeScores.filter((entry) => entry.score >= minScore);
+  if (anchors.length === 0) {
+    anchors = nodeScores.slice(0, 1);
+  }
+  const maxAnchors = treeConfig.maxAnchors ?? DEFAULT_MAX_ANCHORS;
+  anchors = anchors.slice(0, maxAnchors);
+  const resolvedAnchors: HelixAskGraphResolvedNode[] = anchors.map((entry) => ({
+    id: entry.node.id,
+    title: entry.node.title ?? entry.node.id,
+    excerpt: extractExcerpt(entry.node),
+    artifact: extractArtifact(entry.node.bodyMD),
+    tags: entry.node.tags,
+    score: entry.score,
+    depth: 0,
+    relation: "anchor",
+  }));
+  const maxDepth = treeConfig.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const maxNodes = treeConfig.maxNodes ?? DEFAULT_MAX_NODES;
+  const ordered: HelixAskGraphResolvedNode[] = [...resolvedAnchors];
+  const visited = new Set(resolvedAnchors.map((entry) => entry.id));
+  const queue: Array<{ id: string; depth: number }> = resolvedAnchors.map((entry) => ({
+    id: entry.id,
+    depth: 0,
+  }));
+  while (queue.length > 0 && ordered.length < maxNodes) {
+    const current = queue.shift();
+    if (!current) break;
+    if (current.depth >= maxDepth) continue;
+    const neighbors = tree.neighbors.get(current.id) ?? [];
+    const sortedNeighbors = neighbors
+      .map((neighbor) => ({
+        neighbor,
+        score: tree.nodeById.get(neighbor.id)
+          ? scoreNode(tree.nodeById.get(neighbor.id)!, tokens, questionNorm, conceptBoosts)
+          : 0,
+      }))
+      .sort((a, b) => {
+        if (a.neighbor.weight !== b.neighbor.weight) {
+          return b.neighbor.weight - a.neighbor.weight;
+        }
+        return b.score - a.score;
+      });
+    for (const entry of sortedNeighbors) {
+      if (ordered.length >= maxNodes) break;
+      const neighbor = entry.neighbor;
+      if (visited.has(neighbor.id)) continue;
+      const node = tree.nodeById.get(neighbor.id);
+      if (!node) continue;
+      visited.add(neighbor.id);
+      ordered.push({
+        id: node.id,
+        title: node.title ?? node.id,
+        excerpt: extractExcerpt(node),
+        artifact: extractArtifact(node.bodyMD),
+        tags: node.tags,
+        score: entry.score,
+        depth: current.depth + 1,
+        relation: neighbor.rel,
+      });
+      queue.push({ id: neighbor.id, depth: current.depth + 1 });
+    }
+  }
+  const withRoles = resolveRoles(tree, ordered).slice(0, maxNodes);
+  const lines = buildScaffoldLines(tree, resolvedAnchors, withRoles);
+  if (lines.length === 0) return null;
+  const scaffoldText = lines.join("\n");
+  const contextText = buildContextBlock(tree, lines);
+  const anchorScore = resolvedAnchors.reduce((sum, node) => sum + Math.max(0, node.score), 0);
+  const pathScore = withRoles.reduce((sum, node) => sum + Math.max(0, node.score), 0);
+  const hitCount = nodeScores.length;
+  const treeScore = scoreGraphCandidate(anchorScore, pathScore, hitCount);
+  const framework: HelixAskGraphFramework = {
+    treeId: tree.id,
+    treeLabel: tree.label,
+    sourcePath: tree.sourcePath,
+    rootId: tree.rootId,
+    anchors: resolvedAnchors,
+    path: withRoles,
+    scaffoldText,
+    contextText,
+    preferGraph: treeConfig.preferGraph !== false,
+    rankScore: treeScore,
+    anchorScore,
+    pathScore,
+  };
+  return { framework, score: treeScore, anchorScore, pathScore, hitCount };
+};
+
+export function resolveHelixAskGraphPack(input: {
   question: string;
   topicTags: HelixAskTopicTag[];
   conceptMatch?: HelixAskConceptMatch | null;
-}): HelixAskGraphFramework | null {
+}): HelixAskGraphPack | null {
   const config = loadGraphResolverConfig();
   if (!config?.trees?.length) return null;
+  const packConfig = config.pack ?? {};
+  const maxPackTrees = clampNumber(
+    Math.floor(coerceNumber(packConfig.maxTrees, DEFAULT_MAX_PACK_TREES)),
+    1,
+    MAX_PACK_TREES_LIMIT,
+  );
+  const minPackScore = coerceNumber(packConfig.minScore, DEFAULT_PACK_MIN_SCORE);
+  const minPackScoreRatio = clampNumber(
+    coerceNumber(packConfig.minScoreRatio, DEFAULT_PACK_MIN_SCORE_RATIO),
+    0,
+    1,
+  );
   const question = input.question.trim();
   if (!question) return null;
   const trees = config.trees.filter((tree) => tree && tree.id && tree.path);
@@ -436,101 +616,55 @@ export function resolveHelixAskGraphFramework(input: {
   const questionNorm = normalizeText(question);
   const tokens = extractQuestionTokens(question);
   const conceptBoosts = extractConceptBoosts(input.conceptMatch);
-
-  let bestFramework: HelixAskGraphFramework | null = null;
+  const candidates: GraphFrameworkCandidate[] = [];
   for (const treeConfig of matchingTrees) {
     const tree = loadGraphTree(treeConfig);
     if (!tree) continue;
-    const nodeScores = tree.nodes
-      .map((node) => ({
-        node,
-        score: scoreNode(node, tokens, questionNorm, conceptBoosts),
-      }))
-      .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score);
-    if (nodeScores.length === 0) continue;
-    const minScore = treeConfig.minAnchorScore ?? DEFAULT_MIN_ANCHOR_SCORE;
-    let anchors = nodeScores.filter((entry) => entry.score >= minScore);
-    if (anchors.length === 0) {
-      anchors = nodeScores.slice(0, 1);
-    }
-    const maxAnchors = treeConfig.maxAnchors ?? DEFAULT_MAX_ANCHORS;
-    anchors = anchors.slice(0, maxAnchors);
-    const resolvedAnchors: HelixAskGraphResolvedNode[] = anchors.map((entry) => ({
-      id: entry.node.id,
-      title: entry.node.title ?? entry.node.id,
-      excerpt: extractExcerpt(entry.node),
-      artifact: extractArtifact(entry.node.bodyMD),
-      tags: entry.node.tags,
-      score: entry.score,
-      depth: 0,
-      relation: "anchor",
-    }));
-    const maxDepth = treeConfig.maxDepth ?? DEFAULT_MAX_DEPTH;
-    const maxNodes = treeConfig.maxNodes ?? DEFAULT_MAX_NODES;
-    const ordered: HelixAskGraphResolvedNode[] = [...resolvedAnchors];
-    const visited = new Set(resolvedAnchors.map((entry) => entry.id));
-    const queue: Array<{ id: string; depth: number }> = resolvedAnchors.map((entry) => ({
-      id: entry.id,
-      depth: 0,
-    }));
-    while (queue.length > 0 && ordered.length < maxNodes) {
-      const current = queue.shift();
-      if (!current) break;
-      if (current.depth >= maxDepth) continue;
-      const neighbors = tree.neighbors.get(current.id) ?? [];
-      const sortedNeighbors = neighbors
-        .map((neighbor) => ({
-          neighbor,
-          score: tree.nodeById.get(neighbor.id)
-            ? scoreNode(tree.nodeById.get(neighbor.id)!, tokens, questionNorm, conceptBoosts)
-            : 0,
-        }))
-        .sort((a, b) => {
-          if (a.neighbor.weight !== b.neighbor.weight) {
-            return b.neighbor.weight - a.neighbor.weight;
-          }
-          return b.score - a.score;
-        });
-      for (const entry of sortedNeighbors) {
-        if (ordered.length >= maxNodes) break;
-        const neighbor = entry.neighbor;
-        if (visited.has(neighbor.id)) continue;
-        const node = tree.nodeById.get(neighbor.id);
-        if (!node) continue;
-        visited.add(neighbor.id);
-        ordered.push({
-          id: node.id,
-          title: node.title ?? node.id,
-          excerpt: extractExcerpt(node),
-          artifact: extractArtifact(node.bodyMD),
-          tags: node.tags,
-          score: entry.score,
-          depth: current.depth + 1,
-          relation: neighbor.rel,
-        });
-        queue.push({ id: neighbor.id, depth: current.depth + 1 });
-      }
-    }
-    const withRoles = resolveRoles(tree, ordered).slice(0, maxNodes);
-    const lines = buildScaffoldLines(tree, resolvedAnchors, withRoles);
-    if (lines.length === 0) continue;
-    const scaffoldText = lines.join("\n");
-    const contextText = buildContextBlock(tree, lines);
-    const framework: HelixAskGraphFramework = {
-      treeId: tree.id,
-      treeLabel: tree.label,
-      sourcePath: tree.sourcePath,
-      rootId: tree.rootId,
-      anchors: resolvedAnchors,
-      path: withRoles,
-      scaffoldText,
-      contextText,
-      preferGraph: treeConfig.preferGraph !== false,
-    };
-    if (!bestFramework || framework.path.length > bestFramework.path.length) {
-      bestFramework = framework;
-    }
+    const candidate = buildFrameworkCandidate(tree, tokens, questionNorm, conceptBoosts);
+    if (candidate) candidates.push(candidate);
   }
-  return bestFramework;
+  if (candidates.length === 0) return null;
+  const sorted = candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.anchorScore !== a.anchorScore) return b.anchorScore - a.anchorScore;
+    if (b.framework.path.length !== a.framework.path.length) {
+      return b.framework.path.length - a.framework.path.length;
+    }
+    return a.framework.treeId.localeCompare(b.framework.treeId);
+  });
+  const topScore = sorted[0].score;
+  const threshold = Math.max(minPackScore, topScore * minPackScoreRatio);
+  let filtered = sorted.filter((candidate) => candidate.score >= threshold);
+  if (filtered.length === 0) filtered = [sorted[0]];
+  const maxTrees = Math.min(maxPackTrees, filtered.length);
+  const selected = filtered.slice(0, maxTrees).map((candidate) => candidate.framework);
+  const scaffoldText = mergeScaffoldText(selected.map((framework) => framework.scaffoldText));
+  const contextText = mergeContextBlocks(selected.map((framework) => framework.contextText));
+  const preferGraph = selected.some((framework) => framework.preferGraph);
+  const sourcePaths = Array.from(
+    new Set(
+      selected
+        .map((framework) => framework.sourcePath)
+        .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0),
+    ),
+  );
+  const treeIds = selected.map((framework) => framework.treeId);
+  return {
+    frameworks: selected,
+    scaffoldText,
+    contextText,
+    preferGraph,
+    sourcePaths,
+    treeIds,
+    primaryTreeId: selected[0]?.treeId,
+  };
+}
+
+export function resolveHelixAskGraphFramework(input: {
+  question: string;
+  topicTags: HelixAskTopicTag[];
+  conceptMatch?: HelixAskConceptMatch | null;
+}): HelixAskGraphFramework | null {
+  const pack = resolveHelixAskGraphPack(input);
+  return pack?.frameworks[0] ?? null;
 }

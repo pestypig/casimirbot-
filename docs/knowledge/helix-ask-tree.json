@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "rootId": "helix-ask-tree",
+  "nodes": [
+    {
+      "id": "helix-ask-tree",
+      "slug": "helix-ask-tree",
+      "title": "Helix Ask System Tree",
+      "excerpt": "Helix Ask routing, scaffolds, and evidence gates.",
+      "bodyMD": "Helix Ask system map for routing and scaffolding.\n\nMinimal artifact: helix ask docs.",
+      "tags": [
+        "helix_ask",
+        "agi",
+        "routing"
+      ],
+      "children": [
+        "helix-ask-docs",
+        "helix-ask-core",
+        "helix-ask-evidence",
+        "helix-ask-graph"
+      ],
+      "links": []
+    },
+    {
+      "id": "helix-ask-docs",
+      "slug": "helix-ask-docs",
+      "title": "Helix Ask Docs",
+      "excerpt": "Documentation for Helix Ask flows.",
+      "bodyMD": "Helix Ask docs and ladders (docs/helix-ask-flow.md, docs/helix-ask-ladder.md).\n\nMinimal artifact: flow + ladder summary.",
+      "tags": [
+        "helix_ask",
+        "docs"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-tree"
+        }
+      ]
+    },
+    {
+      "id": "helix-ask-core",
+      "slug": "helix-ask-core",
+      "title": "Helix Ask Core",
+      "excerpt": "Core routing, formatting, and intent services.",
+      "bodyMD": "Core Helix Ask services (server/routes/agi.plan.ts, server/services/helix-ask/arbiter.ts, server/services/helix-ask/intent-directory.ts, server/services/helix-ask/query.ts, server/services/helix-ask/topic.ts, server/services/helix-ask/paths.ts, server/services/helix-ask/format.ts, server/services/helix-ask/doc-sections.ts, server/services/helix-ask/job-store.ts).\n\nMinimal artifact: intent routing summary.",
+      "tags": [
+        "helix_ask",
+        "routing",
+        "format"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-tree"
+        }
+      ]
+    },
+    {
+      "id": "helix-ask-evidence",
+      "slug": "helix-ask-evidence",
+      "title": "Evidence Gates",
+      "excerpt": "Evidence gating and reasoning checks.",
+      "bodyMD": "Evidence and reasoning gates (server/services/helix-ask/platonic-gates.ts, server/services/helix-ask/math.ts, server/services/helix-ask/repo-search.ts, server/services/helix-ask/session-memory.ts).\n\nMinimal artifact: evidence gate summary.",
+      "tags": [
+        "helix_ask",
+        "evidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-tree"
+        }
+      ]
+    },
+    {
+      "id": "helix-ask-graph",
+      "slug": "helix-ask-graph",
+      "title": "Graph Resolver",
+      "excerpt": "Anchor-and-walk graph resolver.",
+      "bodyMD": "Graph resolver for anchor-and-walk scaffolds (server/services/helix-ask/graph-resolver.ts, configs/graph-resolvers.json).\n\nMinimal artifact: graph scaffold output.",
+      "tags": [
+        "helix_ask",
+        "graph"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-tree"
+        }
+      ]
+    }
+  ]
+}

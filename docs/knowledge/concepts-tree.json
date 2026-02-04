@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "rootId": "concepts-tree",
+  "nodes": [
+    {
+      "id": "concepts-tree",
+      "slug": "concepts-tree",
+      "title": "Concepts and Methods Tree",
+      "excerpt": "Epistemology, method, and reasoning frameworks.",
+      "bodyMD": "Conceptual scaffolding for reasoning quality and method.\n\nMinimal artifact: docs/knowledge/*.md (concepts).",
+      "tags": [
+        "concepts",
+        "method",
+        "epistemology"
+      ],
+      "children": [
+        "epistemic-stack",
+        "reasoning-stack",
+        "model-landscape-stack"
+      ],
+      "links": []
+    },
+    {
+      "id": "epistemic-stack",
+      "slug": "epistemic-stack",
+      "title": "Epistemic Foundations",
+      "excerpt": "Core epistemology and scientific method anchors.",
+      "bodyMD": "Epistemic anchors for truth-claims and evidence.\n\nMinimal artifact: epistemology + scientific method notes.",
+      "tags": [
+        "epistemology",
+        "method"
+      ],
+      "children": [
+        "epistemology",
+        "scientific-method",
+        "falsifiability"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "concepts-tree"
+        }
+      ]
+    },
+    {
+      "id": "epistemology",
+      "slug": "epistemology",
+      "title": "Epistemology",
+      "excerpt": "Notes on Epistemology.",
+      "bodyMD": "Epistemology notes (docs/knowledge/epistemology.md).\n\nMinimal artifact: Epistemology summary.",
+      "tags": [
+        "concepts",
+        "epistemology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "epistemic-stack"
+        }
+      ]
+    },
+    {
+      "id": "scientific-method",
+      "slug": "scientific-method",
+      "title": "Scientific Method",
+      "excerpt": "Notes on Scientific Method.",
+      "bodyMD": "Scientific Method notes (docs/knowledge/scientific-method.md).\n\nMinimal artifact: Scientific Method summary.",
+      "tags": [
+        "concepts",
+        "epistemology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "epistemic-stack"
+        }
+      ]
+    },
+    {
+      "id": "falsifiability",
+      "slug": "falsifiability",
+      "title": "Falsifiability",
+      "excerpt": "Notes on Falsifiability.",
+      "bodyMD": "Falsifiability notes (docs/knowledge/falsifiability.md).\n\nMinimal artifact: Falsifiability summary.",
+      "tags": [
+        "concepts",
+        "epistemology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "epistemic-stack"
+        }
+      ]
+    },
+    {
+      "id": "reasoning-stack",
+      "slug": "reasoning-stack",
+      "title": "Reasoning Structures",
+      "excerpt": "Frameworks for reasoning and model behavior.",
+      "bodyMD": "Reasoning structures include platonic reasoning and Halobank notes.\n\nMinimal artifact: platonic reasoning + Halobank notes.",
+      "tags": [
+        "reasoning",
+        "concepts"
+      ],
+      "children": [
+        "platonic-reasoning",
+        "halobank",
+        "degree-of-certainty-framework"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "concepts-tree"
+        }
+      ]
+    },
+    {
+      "id": "platonic-reasoning",
+      "slug": "platonic-reasoning",
+      "title": "Platonic Reasoning",
+      "excerpt": "Notes on Platonic Reasoning.",
+      "bodyMD": "Platonic Reasoning notes (docs/knowledge/platonic-reasoning.md).\n\nMinimal artifact: Platonic Reasoning summary.",
+      "tags": [
+        "concepts",
+        "reasoning"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "reasoning-stack"
+        }
+      ]
+    },
+    {
+      "id": "halobank",
+      "slug": "halobank",
+      "title": "Halobank",
+      "excerpt": "Notes on Halobank.",
+      "bodyMD": "Halobank notes (docs/knowledge/halobank.md).\n\nMinimal artifact: Halobank summary.",
+      "tags": [
+        "concepts",
+        "reasoning"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "reasoning-stack"
+        }
+      ]
+    },
+    {
+      "id": "model-landscape-stack",
+      "slug": "model-landscape-stack",
+      "title": "Model Landscapes",
+      "excerpt": "Landscape and attractor narratives.",
+      "bodyMD": "Model landscape notes anchor attractor thinking.\n\nMinimal artifact: morphospace notes.",
+      "tags": [
+        "concepts",
+        "landscape"
+      ],
+      "children": [
+        "morphospace-attractors"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "concepts-tree"
+        }
+      ]
+    },
+    {
+      "id": "morphospace-attractors",
+      "slug": "morphospace-attractors",
+      "title": "Morphospace Attractors",
+      "excerpt": "Attractor mapping for model behavior.",
+      "bodyMD": "Morphospace attractor notes (docs/knowledge/morphospace-attractors.md).\n\nMinimal artifact: attractor summary.",
+      "tags": [
+        "concepts",
+        "attractors"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "model-landscape-stack"
+        }
+      ]
+    },
+    {
+      "id": "degree-of-certainty-framework",
+      "slug": "degree-of-certainty-framework",
+      "title": "Degree of Certainty Framework",
+      "excerpt": "Framework for evaluating confidence and uncertainty.",
+      "bodyMD": "Degree of certainty framework tree (docs/knowledge/certainty-framework-tree.json).\n\nMinimal artifact: certainty framework summary.",
+      "tags": [
+        "concepts",
+        "certainty",
+        "confidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "reasoning-stack"
+        }
+      ]
+    }
+  ]
+}

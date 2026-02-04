@@ -1,0 +1,627 @@
+{
+  "version": 1,
+  "rootId": "certainty-framework-tree",
+  "nodes": [
+    {
+      "id": "certainty-framework-tree",
+      "slug": "certainty-framework-tree",
+      "title": "Degree of Certainty Framework",
+      "excerpt": "Evaluation framework for confidence, evidence gates, and uncertainty tracking.",
+      "bodyMD": "Degree-of-certainty framework for evaluating claims and outputs.\n\nMinimal artifact: Helix Ask ladder + platonic gates.",
+      "tags": [
+        "certainty",
+        "confidence",
+        "evaluation",
+        "reasoning"
+      ],
+      "children": [
+        "certainty-motivation",
+        "platonic-reasoning-bridge",
+        "helix-ask-certainty-stack",
+        "debate-confidence-stack",
+        "rationale-confidence-stack",
+        "coherence-confidence-stack",
+        "schema-confidence-stack",
+        "uncertainty-mechanics-stack"
+      ],
+      "links": []
+    },
+    {
+      "id": "certainty-motivation",
+      "slug": "certainty-motivation",
+      "title": "Business Model Motivation",
+      "excerpt": "Why graded certainty and verification gates matter.",
+      "bodyMD": "Business model framing for verification and multi-fidelity reasoning (docs/BUSINESS_MODEL.md).\n\nMinimal artifact: business model summary.",
+      "tags": [
+        "certainty",
+        "business-model",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        }
+      ]
+    },
+    {
+      "id": "platonic-reasoning-bridge",
+      "slug": "platonic-reasoning-bridge",
+      "title": "Platonic Reasoning Bridge",
+      "excerpt": "Concept registry and platonic gates as certainty scaffolds.",
+      "bodyMD": "Platonic reasoning links to the gates that regulate claims (docs/knowledge/platonic-reasoning.md, server/services/helix-ask/platonic-gates.ts).\n\nMinimal artifact: platonic gate summary.",
+      "tags": [
+        "platonic",
+        "certainty",
+        "gates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        }
+      ]
+    },
+    {
+      "id": "helix-ask-certainty-stack",
+      "slug": "helix-ask-certainty-stack",
+      "title": "Helix Ask Certainty Stack",
+      "excerpt": "Gates and registers that grade answer certainty.",
+      "bodyMD": "Helix Ask certainty stack spans retrieval confidence, coverage, belief, and rattling gates (docs/helix-ask-ladder.md, server/services/helix-ask/platonic-gates.ts).\n\nMinimal artifact: ladder debug fields + gate outputs.",
+      "tags": [
+        "helix_ask",
+        "certainty",
+        "gates"
+      ],
+      "children": [
+        "retrieval-confidence",
+        "claim-ledger",
+        "uncertainty-register",
+        "coverage-gate",
+        "belief-gate",
+        "rattling-gate",
+        "variant-selection"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        }
+      ]
+    },
+    {
+      "id": "retrieval-confidence",
+      "slug": "retrieval-confidence",
+      "title": "Retrieval Confidence",
+      "excerpt": "Repository retrieval confidence signals.",
+      "bodyMD": "Retrieval confidence emitted during Helix Ask runs (docs/helix-ask-ladder.md).\n\nMinimal artifact: retrieval_confidence field.",
+      "tags": [
+        "helix_ask",
+        "retrieval",
+        "confidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-certainty-stack"
+        }
+      ]
+    },
+    {
+      "id": "claim-ledger",
+      "slug": "claim-ledger",
+      "title": "Claim Ledger",
+      "excerpt": "Ledger of claims and support status.",
+      "bodyMD": "Claim ledger tracks support and evidence refs (server/services/helix-ask/platonic-gates.ts).\n\nMinimal artifact: claim ledger output.",
+      "tags": [
+        "claims",
+        "evidence",
+        "certainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-certainty-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-register",
+      "slug": "uncertainty-register",
+      "title": "Uncertainty Register",
+      "excerpt": "Register of uncertainties per claim.",
+      "bodyMD": "Uncertainty register records unsupported or qualified claims (server/services/helix-ask/platonic-gates.ts).\n\nMinimal artifact: uncertainty register output.",
+      "tags": [
+        "uncertainty",
+        "claims",
+        "certainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-certainty-stack"
+        }
+      ]
+    },
+    {
+      "id": "coverage-gate",
+      "slug": "coverage-gate",
+      "title": "Coverage Gate",
+      "excerpt": "Ensure required slots are covered by evidence.",
+      "bodyMD": "Coverage gate enforces required slot coverage (server/services/helix-ask/platonic-gates.ts).\n\nMinimal artifact: coverage summary.",
+      "tags": [
+        "coverage",
+        "gates",
+        "certainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-certainty-stack"
+        }
+      ]
+    },
+    {
+      "id": "belief-gate",
+      "slug": "belief-gate",
+      "title": "Belief Gate",
+      "excerpt": "Belief graph checks for support and contradictions.",
+      "bodyMD": "Belief gate checks support ratios and contradictions (server/services/helix-ask/platonic-gates.ts).\n\nMinimal artifact: belief summary + belief graph summary.",
+      "tags": [
+        "belief",
+        "gates",
+        "certainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-certainty-stack"
+        }
+      ]
+    },
+    {
+      "id": "rattling-gate",
+      "slug": "rattling-gate",
+      "title": "Rattling Gate",
+      "excerpt": "Stability check via perturbation tests.",
+      "bodyMD": "Rattling gate checks sensitivity to perturbation (server/services/helix-ask/platonic-gates.ts).\n\nMinimal artifact: rattling score + detail.",
+      "tags": [
+        "rattling",
+        "stability",
+        "certainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-certainty-stack"
+        }
+      ]
+    },
+    {
+      "id": "variant-selection",
+      "slug": "variant-selection",
+      "title": "Variant Selection",
+      "excerpt": "Choose variants based on alignment and evidence.",
+      "bodyMD": "Variant selection chooses safer variants (server/services/helix-ask/platonic-gates.ts).\n\nMinimal artifact: variant selection summary.",
+      "tags": [
+        "variants",
+        "certainty",
+        "selection"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-certainty-stack"
+        }
+      ]
+    },
+    {
+      "id": "debate-confidence-stack",
+      "slug": "debate-confidence-stack",
+      "title": "Debate Confidence Stack",
+      "excerpt": "Confidence scoring in debate workflows.",
+      "bodyMD": "Debate workflows emit confidence scores via schemas and skills.\n\nMinimal artifact: debate outcome summary.",
+      "tags": [
+        "debate",
+        "confidence",
+        "evaluation"
+      ],
+      "children": [
+        "debate-schema",
+        "debate-run-skill",
+        "debate-checklist-skill",
+        "debate-planner-logging"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        }
+      ]
+    },
+    {
+      "id": "debate-schema",
+      "slug": "debate-schema",
+      "title": "Debate Schema",
+      "excerpt": "Confidence fields in debate schema.",
+      "bodyMD": "Debate schema includes confidence fields (shared/essence-debate.ts).\n\nMinimal artifact: schema snippet.",
+      "tags": [
+        "debate",
+        "schema",
+        "confidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-confidence-stack"
+        }
+      ]
+    },
+    {
+      "id": "debate-run-skill",
+      "slug": "debate-run-skill",
+      "title": "Debate Run Skill",
+      "excerpt": "Debate.run returns confidence.",
+      "bodyMD": "Debate run skill emits confidence (server/skills/debate.run.ts).\n\nMinimal artifact: debate outcome payload.",
+      "tags": [
+        "debate",
+        "skill",
+        "confidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-confidence-stack"
+        }
+      ]
+    },
+    {
+      "id": "debate-checklist-skill",
+      "slug": "debate-checklist-skill",
+      "title": "Debate Checklist Skill",
+      "excerpt": "Checklist generation with confidence.",
+      "bodyMD": "Debate checklist skill emits confidence (server/skills/debate.checklist.generate.ts).\n\nMinimal artifact: checklist payload.",
+      "tags": [
+        "debate",
+        "skill",
+        "confidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-confidence-stack"
+        }
+      ]
+    },
+    {
+      "id": "debate-planner-logging",
+      "slug": "debate-planner-logging",
+      "title": "Debate Planner Logging",
+      "excerpt": "Planner logging of debate confidence.",
+      "bodyMD": "Planner logs include confidence fields (server/services/planner/chat-b.ts).\n\nMinimal artifact: debate log line.",
+      "tags": [
+        "debate",
+        "planner",
+        "confidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-confidence-stack"
+        }
+      ]
+    },
+    {
+      "id": "rationale-confidence-stack",
+      "slug": "rationale-confidence-stack",
+      "title": "Rationale and Evidence Tags",
+      "excerpt": "Evidence/inference tags with optional confidence.",
+      "bodyMD": "Rationale schema tags evidence and confidence (shared/rationale.ts).\n\nMinimal artifact: whyBelongs schema.",
+      "tags": [
+        "rationale",
+        "confidence",
+        "evidence"
+      ],
+      "children": [
+        "rationale-schema"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        }
+      ]
+    },
+    {
+      "id": "rationale-schema",
+      "slug": "rationale-schema",
+      "title": "Rationale Schema",
+      "excerpt": "Rationale tags and confidence fields.",
+      "bodyMD": "Rationale schema defines tags and confidence (shared/rationale.ts).\n\nMinimal artifact: rationale schema.",
+      "tags": [
+        "rationale",
+        "schema",
+        "confidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "rationale-confidence-stack"
+        }
+      ]
+    },
+    {
+      "id": "coherence-confidence-stack",
+      "slug": "coherence-confidence-stack",
+      "title": "Coherence Confidence Stack",
+      "excerpt": "Coherence and collapse confidence scores.",
+      "bodyMD": "Coherence governor computes collapse confidence (modules/policies/coherence-governor.ts).\n\nMinimal artifact: coherence decision summary.",
+      "tags": [
+        "coherence",
+        "confidence",
+        "policy"
+      ],
+      "children": [
+        "coherence-governor",
+        "noisegen-confidence"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        }
+      ]
+    },
+    {
+      "id": "coherence-governor",
+      "slug": "coherence-governor",
+      "title": "Coherence Governor",
+      "excerpt": "Collapse confidence and action policy.",
+      "bodyMD": "Coherence governor computes confidence and action (modules/policies/coherence-governor.ts).\n\nMinimal artifact: confidence output.",
+      "tags": [
+        "coherence",
+        "confidence",
+        "policy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "coherence-confidence-stack"
+        }
+      ]
+    },
+    {
+      "id": "noisegen-confidence",
+      "slug": "noisegen-confidence",
+      "title": "Noisegen Confidence",
+      "excerpt": "Planner confidence for noisegen proposals.",
+      "bodyMD": "Noisegen planner emits confidence (server/services/noisegen-planner-model.ts).\n\nMinimal artifact: planner output.",
+      "tags": [
+        "noisegen",
+        "confidence",
+        "planner"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "coherence-confidence-stack"
+        }
+      ]
+    },
+    {
+      "id": "schema-confidence-stack",
+      "slug": "schema-confidence-stack",
+      "title": "Confidence Field Schema",
+      "excerpt": "Shared confidence/weight fields used across telemetry.",
+      "bodyMD": "Shared schemas include confidence/weight fields (shared/schema.ts).\n\nMinimal artifact: confidence field definition.",
+      "tags": [
+        "schema",
+        "confidence",
+        "telemetry"
+      ],
+      "children": [
+        "shared-schema-confidence"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        }
+      ]
+    },
+    {
+      "id": "shared-schema-confidence",
+      "slug": "shared-schema-confidence",
+      "title": "Shared Schema Confidence",
+      "excerpt": "Confidence/weight fields in shared schema.",
+      "bodyMD": "Shared schema defines confidence/weight fields (shared/schema.ts).\n\nMinimal artifact: schema field list.",
+      "tags": [
+        "schema",
+        "confidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "schema-confidence-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-mechanics-stack",
+      "slug": "uncertainty-mechanics-stack",
+      "title": "Uncertainty Mechanics Stack",
+      "excerpt": "Classical, statistical, and quantum-stochastic sources of uncertainty.",
+      "bodyMD": "Uncertainty mechanics separates classical error sources, statistical sampling, and quantum-stochastic constraints.\n\nMinimal artifact: uncertainty map + propagation plan.",
+      "tags": [
+        "uncertainty",
+        "mechanics",
+        "physics"
+      ],
+      "children": [
+        "classical-uncertainty",
+        "statistical-uncertainty",
+        "uncertainty-data-contracts",
+        "quantum-stochastic-bridge",
+        "transient-energy-approximations",
+        "collapse-framework-constraints",
+        "uncertainty-reality-constraints"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        }
+      ]
+    },
+    {
+      "id": "classical-uncertainty",
+      "slug": "classical-uncertainty",
+      "title": "Classical Uncertainty",
+      "excerpt": "Model error, discretization, and boundary-condition uncertainty.",
+      "bodyMD": "Classical uncertainty stems from model assumptions, boundary conditions, and discretization error (docs/knowledge/physics/boundary-conditions-modes.md, docs/knowledge/physics/discretization-mesh.md, docs/knowledge/physics/numerical-precision.md).\n\nMinimal artifact: error budget + boundary-condition justification.",
+      "tags": [
+        "uncertainty",
+        "classical",
+        "numerics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-stack"
+        }
+      ]
+    },
+    {
+      "id": "statistical-uncertainty",
+      "slug": "statistical-uncertainty",
+      "title": "Statistical Uncertainty",
+      "excerpt": "Sampling noise, distributions, and stochastic variance.",
+      "bodyMD": "Statistical uncertainty captures sampling noise and distributions, including Monte Carlo bands and propagated ranges (server/energy-pipeline.ts, docs/knowledge/physics/sampling-time-bounds.md).\n\nMinimal artifact: sampling distribution + propagated band.",
+      "tags": [
+        "uncertainty",
+        "statistical",
+        "sampling"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-data-contracts",
+      "slug": "uncertainty-data-contracts",
+      "title": "Uncertainty Data Contracts",
+      "excerpt": "Shared schemas for values, sigmas, and bands.",
+      "bodyMD": "Uncertainty data contracts encode value, sigma, and band fields for downstream reasoning (shared/physics.ts, shared/schema.ts, server/energy-pipeline.ts).\n\nMinimal artifact: uncertainty/band schema snippet.",
+      "tags": [
+        "uncertainty",
+        "schema",
+        "bands"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-stack"
+        }
+      ]
+    },
+    {
+      "id": "quantum-stochastic-bridge",
+      "slug": "quantum-stochastic-bridge",
+      "title": "Quantum-Stochastic Bridge",
+      "excerpt": "Noise-kernel and coherence-window constraints for semiclassical sourcing.",
+      "bodyMD": "Quantum-stochastic uncertainty uses <T_{mu nu}>_ren with noise models and coherence windows (docs/quantum-gr-bridge.md). Collapse bounds inform tau/r_c choices (docs/DP_COLLAPSE_DERIVATION.md, shared/dp-collapse.ts).\n\nMinimal artifact: stochastic source contract + tau/r_c bounds.",
+      "tags": [
+        "uncertainty",
+        "quantum",
+        "stochastic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-stack"
+        }
+      ]
+    },
+    {
+      "id": "transient-energy-approximations",
+      "slug": "transient-energy-approximations",
+      "title": "Transient Energy Approximations",
+      "excerpt": "Approximation ladders and energy bands bridging classical and statistical models.",
+      "bodyMD": "Transient energy approximations bridge classical estimates and statistical bands (server/energy-pipeline.ts axisymmetric + Monte Carlo surface-area bands; modules/sim_core/static-casimir.ts PFA/geometry approximations; docs/casimir-tile-mechanism.md model bands).\n\nMinimal artifact: approximation ladder + band justification.",
+      "tags": [
+        "uncertainty",
+        "approximation",
+        "energy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-stack"
+        }
+      ]
+    },
+    {
+      "id": "collapse-framework-constraints",
+      "slug": "collapse-framework-constraints",
+      "title": "Collapse Framework Constraints",
+      "excerpt": "Causal collapse benchmarks and policy gating.",
+      "bodyMD": "Collapse benchmarks treat commit/selection as a causally bounded event with tau and r_c (docs/collapse-benchmark-backend-roadmap.md, shared/collapse-benchmark.ts) and inform policy via the coherence governor (modules/policies/coherence-governor.ts).\n\nMinimal artifact: collapse benchmark run + causal footprint report.",
+      "tags": [
+        "collapse",
+        "constraints",
+        "uncertainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-reality-constraints",
+      "slug": "uncertainty-reality-constraints",
+      "title": "Reality Constraint Anchors",
+      "excerpt": "Energy conditions, quantum inequality limits, and sampling bounds.",
+      "bodyMD": "Reality constraints bound uncertainty handling: energy conditions, QI limits, and sampling windows (docs/knowledge/physics/energy-conditions.md, docs/knowledge/physics/ford-roman-quantum-inequality.md, docs/knowledge/physics/sampling-time-bounds.md).\n\nMinimal artifact: constraint checklist.",
+      "tags": [
+        "constraints",
+        "uncertainty",
+        "physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-stack"
+        }
+      ]
+    }
+  ]
+}

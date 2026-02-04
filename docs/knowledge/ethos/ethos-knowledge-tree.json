@@ -1,0 +1,1241 @@
+{
+  "version": 1,
+  "rootId": "ethos-knowledge-tree",
+  "nodes": [
+    {
+      "id": "ethos-knowledge-tree",
+      "slug": "ethos-knowledge-tree",
+      "title": "Ethos Knowledge Tree",
+      "excerpt": "Ethical governance, integrity protocols, and civic systems.",
+      "bodyMD": "Ethos knowledge docs supporting governance and integrity practices.\n\nMinimal artifact: docs/knowledge/ethos/*.md.",
+      "tags": [
+        "ethos",
+        "governance",
+        "integrity"
+      ],
+      "children": [
+        "integrity-protocols-stack",
+        "civic-governance-stack",
+        "diplomacy-repair-stack",
+        "practice-culture-stack",
+        "security-resilience-stack"
+      ],
+      "links": []
+    },
+    {
+      "id": "integrity-protocols-stack",
+      "slug": "integrity-protocols-stack",
+      "title": "Integrity and Protocols",
+      "excerpt": "Integrity and Protocols knowledge cluster.",
+      "bodyMD": "Integrity and Protocols references in docs/knowledge/ethos.\n\nMinimal artifact: Integrity and Protocols summary.",
+      "tags": [
+        "ethos",
+        "integrity"
+      ],
+      "children": [
+        "integrity-protocols",
+        "metric-integrity-guardrail",
+        "external-interface-integrity",
+        "voice-integrity",
+        "worldview-integrity",
+        "dream-integrity",
+        "verification-checklist",
+        "training-certification-gate",
+        "provenance-protocol",
+        "no-bypass-guardrail",
+        "lawful-interface-protocol",
+        "liveness-or-it-didnt-happen",
+        "data-dignity",
+        "values-over-images",
+        "capability-ambition-gradient"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ethos-knowledge-tree"
+        }
+      ]
+    },
+    {
+      "id": "civic-governance-stack",
+      "slug": "civic-governance-stack",
+      "title": "Civic and Governance Systems",
+      "excerpt": "Civic and Governance Systems knowledge cluster.",
+      "bodyMD": "Civic and Governance Systems references in docs/knowledge/ethos.\n\nMinimal artifact: Civic and Governance Systems summary.",
+      "tags": [
+        "ethos",
+        "governance"
+      ],
+      "children": [
+        "mission-ethos",
+        "integration-ladder",
+        "two-key-approval",
+        "stewardship-ledger",
+        "lifetime-trust-ledger",
+        "citizens-arc",
+        "citizens-arc-anti-mutation",
+        "citizens-arc-stress-test",
+        "civic-memory-continuity",
+        "civic-signal-loop",
+        "federal-civic-listening-circuit",
+        "jurisdictional-floor",
+        "local-stability-compact",
+        "koan-governance",
+        "sangha-architecture",
+        "right-speech-infrastructure",
+        "three-tenets-loop",
+        "promise-trials",
+        "access-to-counsel-pathway"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ethos-knowledge-tree"
+        }
+      ]
+    },
+    {
+      "id": "diplomacy-repair-stack",
+      "slug": "diplomacy-repair-stack",
+      "title": "Diplomacy and Repair",
+      "excerpt": "Diplomacy and Repair knowledge cluster.",
+      "bodyMD": "Diplomacy and Repair references in docs/knowledge/ethos.\n\nMinimal artifact: Diplomacy and Repair summary.",
+      "tags": [
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [
+        "verification-based-diplomacy",
+        "dignified-exit-design",
+        "skillful-mediation",
+        "repair-debt-compact",
+        "restorative-harm-repair",
+        "harm-weighted-priority-standard",
+        "scarcity-justice",
+        "reciprocity-contract"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ethos-knowledge-tree"
+        }
+      ]
+    },
+    {
+      "id": "practice-culture-stack",
+      "slug": "practice-culture-stack",
+      "title": "Practice and Culture",
+      "excerpt": "Practice and Culture knowledge cluster.",
+      "bodyMD": "Practice and Culture references in docs/knowledge/ethos.\n\nMinimal artifact: Practice and Culture summary.",
+      "tags": [
+        "ethos",
+        "practice"
+      ],
+      "children": [
+        "beginners-mind",
+        "bodhisattva-craft",
+        "devotion-course",
+        "inner-spark",
+        "interbeing-systems",
+        "impermanence-by-design",
+        "habit-pressure-break",
+        "phoenix-averaging",
+        "solitude-to-signal",
+        "struggle-testament",
+        "feedback-loop-hygiene"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ethos-knowledge-tree"
+        }
+      ]
+    },
+    {
+      "id": "security-resilience-stack",
+      "slug": "security-resilience-stack",
+      "title": "Security and Resilience",
+      "excerpt": "Security and Resilience knowledge cluster.",
+      "bodyMD": "Security and Resilience references in docs/knowledge/ethos.\n\nMinimal artifact: Security and Resilience summary.",
+      "tags": [
+        "ethos",
+        "resilience"
+      ],
+      "children": [
+        "capture-resistance",
+        "compromised-channel-response",
+        "shadow-rail-interdiction"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ethos-knowledge-tree"
+        }
+      ]
+    },
+    {
+      "id": "integrity-protocols",
+      "slug": "integrity-protocols",
+      "title": "Integrity Protocols",
+      "excerpt": "Guidance on Integrity Protocols.",
+      "bodyMD": "Integrity Protocols guidance (docs/knowledge/ethos/integrity-protocols.md).\n\nMinimal artifact: Integrity Protocols summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "metric-integrity-guardrail",
+      "slug": "metric-integrity-guardrail",
+      "title": "Metric Integrity Guardrail",
+      "excerpt": "Guidance on Metric Integrity Guardrail.",
+      "bodyMD": "Metric Integrity Guardrail guidance (docs/knowledge/ethos/metric-integrity-guardrail.md).\n\nMinimal artifact: Metric Integrity Guardrail summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "external-interface-integrity",
+      "slug": "external-interface-integrity",
+      "title": "External Interface Integrity",
+      "excerpt": "Guidance on External Interface Integrity.",
+      "bodyMD": "External Interface Integrity guidance (docs/knowledge/ethos/external-interface-integrity.md).\n\nMinimal artifact: External Interface Integrity summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "voice-integrity",
+      "slug": "voice-integrity",
+      "title": "Voice Integrity",
+      "excerpt": "Guidance on Voice Integrity.",
+      "bodyMD": "Voice Integrity guidance (docs/knowledge/ethos/voice-integrity.md).\n\nMinimal artifact: Voice Integrity summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "worldview-integrity",
+      "slug": "worldview-integrity",
+      "title": "Worldview Integrity",
+      "excerpt": "Guidance on Worldview Integrity.",
+      "bodyMD": "Worldview Integrity guidance (docs/knowledge/ethos/worldview-integrity.md).\n\nMinimal artifact: Worldview Integrity summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "dream-integrity",
+      "slug": "dream-integrity",
+      "title": "Dream Integrity",
+      "excerpt": "Guidance on Dream Integrity.",
+      "bodyMD": "Dream Integrity guidance (docs/knowledge/ethos/dream-integrity.md).\n\nMinimal artifact: Dream Integrity summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "verification-checklist",
+      "slug": "verification-checklist",
+      "title": "Verification Checklist",
+      "excerpt": "Guidance on Verification Checklist.",
+      "bodyMD": "Verification Checklist guidance (docs/knowledge/ethos/verification-checklist.md).\n\nMinimal artifact: Verification Checklist summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "training-certification-gate",
+      "slug": "training-certification-gate",
+      "title": "Training Certification Gate",
+      "excerpt": "Guidance on Training Certification Gate.",
+      "bodyMD": "Training Certification Gate guidance (docs/knowledge/ethos/training-certification-gate.md).\n\nMinimal artifact: Training Certification Gate summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "provenance-protocol",
+      "slug": "provenance-protocol",
+      "title": "Provenance Protocol",
+      "excerpt": "Guidance on Provenance Protocol.",
+      "bodyMD": "Provenance Protocol guidance (docs/knowledge/ethos/provenance-protocol.md).\n\nMinimal artifact: Provenance Protocol summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "no-bypass-guardrail",
+      "slug": "no-bypass-guardrail",
+      "title": "No Bypass Guardrail",
+      "excerpt": "Guidance on No Bypass Guardrail.",
+      "bodyMD": "No Bypass Guardrail guidance (docs/knowledge/ethos/no-bypass-guardrail.md).\n\nMinimal artifact: No Bypass Guardrail summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "lawful-interface-protocol",
+      "slug": "lawful-interface-protocol",
+      "title": "Lawful Interface Protocol",
+      "excerpt": "Guidance on Lawful Interface Protocol.",
+      "bodyMD": "Lawful Interface Protocol guidance (docs/knowledge/ethos/lawful-interface-protocol.md).\n\nMinimal artifact: Lawful Interface Protocol summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "liveness-or-it-didnt-happen",
+      "slug": "liveness-or-it-didnt-happen",
+      "title": "Liveness Or It Didnt Happen",
+      "excerpt": "Guidance on Liveness Or It Didnt Happen.",
+      "bodyMD": "Liveness Or It Didnt Happen guidance (docs/knowledge/ethos/liveness-or-it-didnt-happen.md).\n\nMinimal artifact: Liveness Or It Didnt Happen summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "data-dignity",
+      "slug": "data-dignity",
+      "title": "Data Dignity",
+      "excerpt": "Guidance on Data Dignity.",
+      "bodyMD": "Data Dignity guidance (docs/knowledge/ethos/data-dignity.md).\n\nMinimal artifact: Data Dignity summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "values-over-images",
+      "slug": "values-over-images",
+      "title": "Values Over Images",
+      "excerpt": "Guidance on Values Over Images.",
+      "bodyMD": "Values Over Images guidance (docs/knowledge/ethos/values-over-images.md).\n\nMinimal artifact: Values Over Images summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "capability-ambition-gradient",
+      "slug": "capability-ambition-gradient",
+      "title": "Capability Ambition Gradient",
+      "excerpt": "Guidance on Capability Ambition Gradient.",
+      "bodyMD": "Capability Ambition Gradient guidance (docs/knowledge/ethos/capability-ambition-gradient.md).\n\nMinimal artifact: Capability Ambition Gradient summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "integrity-protocols-stack"
+        }
+      ]
+    },
+    {
+      "id": "mission-ethos",
+      "slug": "mission-ethos",
+      "title": "Mission Ethos",
+      "excerpt": "Guidance on Mission Ethos.",
+      "bodyMD": "Mission Ethos guidance (docs/knowledge/ethos/mission-ethos.md).\n\nMinimal artifact: Mission Ethos summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "integration-ladder",
+      "slug": "integration-ladder",
+      "title": "Integration Ladder",
+      "excerpt": "Guidance on Integration Ladder.",
+      "bodyMD": "Integration Ladder guidance (docs/knowledge/ethos/integration-ladder.md).\n\nMinimal artifact: Integration Ladder summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "two-key-approval",
+      "slug": "two-key-approval",
+      "title": "Two Key Approval",
+      "excerpt": "Guidance on Two Key Approval.",
+      "bodyMD": "Two Key Approval guidance (docs/knowledge/ethos/two-key-approval.md).\n\nMinimal artifact: Two Key Approval summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "stewardship-ledger",
+      "slug": "stewardship-ledger",
+      "title": "Stewardship Ledger",
+      "excerpt": "Guidance on Stewardship Ledger.",
+      "bodyMD": "Stewardship Ledger guidance (docs/knowledge/ethos/stewardship-ledger.md).\n\nMinimal artifact: Stewardship Ledger summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "lifetime-trust-ledger",
+      "slug": "lifetime-trust-ledger",
+      "title": "Lifetime Trust Ledger",
+      "excerpt": "Guidance on Lifetime Trust Ledger.",
+      "bodyMD": "Lifetime Trust Ledger guidance (docs/knowledge/ethos/lifetime-trust-ledger.md).\n\nMinimal artifact: Lifetime Trust Ledger summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "citizens-arc",
+      "slug": "citizens-arc",
+      "title": "Citizens Arc",
+      "excerpt": "Guidance on Citizens Arc.",
+      "bodyMD": "Citizens Arc guidance (docs/knowledge/ethos/citizens-arc.md).\n\nMinimal artifact: Citizens Arc summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "citizens-arc-anti-mutation",
+      "slug": "citizens-arc-anti-mutation",
+      "title": "Citizens Arc Anti Mutation",
+      "excerpt": "Guidance on Citizens Arc Anti Mutation.",
+      "bodyMD": "Citizens Arc Anti Mutation guidance (docs/knowledge/ethos/citizens-arc-anti-mutation.md).\n\nMinimal artifact: Citizens Arc Anti Mutation summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "citizens-arc-stress-test",
+      "slug": "citizens-arc-stress-test",
+      "title": "Citizens Arc Stress Test",
+      "excerpt": "Guidance on Citizens Arc Stress Test.",
+      "bodyMD": "Citizens Arc Stress Test guidance (docs/knowledge/ethos/citizens-arc-stress-test.md).\n\nMinimal artifact: Citizens Arc Stress Test summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "civic-memory-continuity",
+      "slug": "civic-memory-continuity",
+      "title": "Civic Memory Continuity",
+      "excerpt": "Guidance on Civic Memory Continuity.",
+      "bodyMD": "Civic Memory Continuity guidance (docs/knowledge/ethos/civic-memory-continuity.md).\n\nMinimal artifact: Civic Memory Continuity summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "civic-signal-loop",
+      "slug": "civic-signal-loop",
+      "title": "Civic Signal Loop",
+      "excerpt": "Guidance on Civic Signal Loop.",
+      "bodyMD": "Civic Signal Loop guidance (docs/knowledge/ethos/civic-signal-loop.md).\n\nMinimal artifact: Civic Signal Loop summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "federal-civic-listening-circuit",
+      "slug": "federal-civic-listening-circuit",
+      "title": "Federal Civic Listening Circuit",
+      "excerpt": "Guidance on Federal Civic Listening Circuit.",
+      "bodyMD": "Federal Civic Listening Circuit guidance (docs/knowledge/ethos/federal-civic-listening-circuit.md).\n\nMinimal artifact: Federal Civic Listening Circuit summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "jurisdictional-floor",
+      "slug": "jurisdictional-floor",
+      "title": "Jurisdictional Floor",
+      "excerpt": "Guidance on Jurisdictional Floor.",
+      "bodyMD": "Jurisdictional Floor guidance (docs/knowledge/ethos/jurisdictional-floor.md).\n\nMinimal artifact: Jurisdictional Floor summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "local-stability-compact",
+      "slug": "local-stability-compact",
+      "title": "Local Stability Compact",
+      "excerpt": "Guidance on Local Stability Compact.",
+      "bodyMD": "Local Stability Compact guidance (docs/knowledge/ethos/local-stability-compact.md).\n\nMinimal artifact: Local Stability Compact summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "koan-governance",
+      "slug": "koan-governance",
+      "title": "Koan Governance",
+      "excerpt": "Guidance on Koan Governance.",
+      "bodyMD": "Koan Governance guidance (docs/knowledge/ethos/koan-governance.md).\n\nMinimal artifact: Koan Governance summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "sangha-architecture",
+      "slug": "sangha-architecture",
+      "title": "Sangha Architecture",
+      "excerpt": "Guidance on Sangha Architecture.",
+      "bodyMD": "Sangha Architecture guidance (docs/knowledge/ethos/sangha-architecture.md).\n\nMinimal artifact: Sangha Architecture summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "right-speech-infrastructure",
+      "slug": "right-speech-infrastructure",
+      "title": "Right Speech Infrastructure",
+      "excerpt": "Guidance on Right Speech Infrastructure.",
+      "bodyMD": "Right Speech Infrastructure guidance (docs/knowledge/ethos/right-speech-infrastructure.md).\n\nMinimal artifact: Right Speech Infrastructure summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "three-tenets-loop",
+      "slug": "three-tenets-loop",
+      "title": "Three Tenets Loop",
+      "excerpt": "Guidance on Three Tenets Loop.",
+      "bodyMD": "Three Tenets Loop guidance (docs/knowledge/ethos/three-tenets-loop.md).\n\nMinimal artifact: Three Tenets Loop summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "promise-trials",
+      "slug": "promise-trials",
+      "title": "Promise Trials",
+      "excerpt": "Guidance on Promise Trials.",
+      "bodyMD": "Promise Trials guidance (docs/knowledge/ethos/promise-trials.md).\n\nMinimal artifact: Promise Trials summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "access-to-counsel-pathway",
+      "slug": "access-to-counsel-pathway",
+      "title": "Access To Counsel Pathway",
+      "excerpt": "Guidance on Access To Counsel Pathway.",
+      "bodyMD": "Access To Counsel Pathway guidance (docs/knowledge/ethos/access-to-counsel-pathway.md).\n\nMinimal artifact: Access To Counsel Pathway summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ]
+    },
+    {
+      "id": "verification-based-diplomacy",
+      "slug": "verification-based-diplomacy",
+      "title": "Verification Based Diplomacy",
+      "excerpt": "Guidance on Verification Based Diplomacy.",
+      "bodyMD": "Verification Based Diplomacy guidance (docs/knowledge/ethos/verification-based-diplomacy.md).\n\nMinimal artifact: Verification Based Diplomacy summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "diplomacy-repair-stack"
+        }
+      ]
+    },
+    {
+      "id": "dignified-exit-design",
+      "slug": "dignified-exit-design",
+      "title": "Dignified Exit Design",
+      "excerpt": "Guidance on Dignified Exit Design.",
+      "bodyMD": "Dignified Exit Design guidance (docs/knowledge/ethos/dignified-exit-design.md).\n\nMinimal artifact: Dignified Exit Design summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "diplomacy-repair-stack"
+        }
+      ]
+    },
+    {
+      "id": "skillful-mediation",
+      "slug": "skillful-mediation",
+      "title": "Skillful Mediation",
+      "excerpt": "Guidance on Skillful Mediation.",
+      "bodyMD": "Skillful Mediation guidance (docs/knowledge/ethos/skillful-mediation.md).\n\nMinimal artifact: Skillful Mediation summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "diplomacy-repair-stack"
+        }
+      ]
+    },
+    {
+      "id": "repair-debt-compact",
+      "slug": "repair-debt-compact",
+      "title": "Repair Debt Compact",
+      "excerpt": "Guidance on Repair Debt Compact.",
+      "bodyMD": "Repair Debt Compact guidance (docs/knowledge/ethos/repair-debt-compact.md).\n\nMinimal artifact: Repair Debt Compact summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "diplomacy-repair-stack"
+        }
+      ]
+    },
+    {
+      "id": "restorative-harm-repair",
+      "slug": "restorative-harm-repair",
+      "title": "Restorative Harm Repair",
+      "excerpt": "Guidance on Restorative Harm Repair.",
+      "bodyMD": "Restorative Harm Repair guidance (docs/knowledge/ethos/restorative-harm-repair.md).\n\nMinimal artifact: Restorative Harm Repair summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "diplomacy-repair-stack"
+        }
+      ]
+    },
+    {
+      "id": "harm-weighted-priority-standard",
+      "slug": "harm-weighted-priority-standard",
+      "title": "Harm Weighted Priority Standard",
+      "excerpt": "Guidance on Harm Weighted Priority Standard.",
+      "bodyMD": "Harm Weighted Priority Standard guidance (docs/knowledge/ethos/harm-weighted-priority-standard.md).\n\nMinimal artifact: Harm Weighted Priority Standard summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "diplomacy-repair-stack"
+        }
+      ]
+    },
+    {
+      "id": "scarcity-justice",
+      "slug": "scarcity-justice",
+      "title": "Scarcity Justice",
+      "excerpt": "Guidance on Scarcity Justice.",
+      "bodyMD": "Scarcity Justice guidance (docs/knowledge/ethos/scarcity-justice.md).\n\nMinimal artifact: Scarcity Justice summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "diplomacy-repair-stack"
+        }
+      ]
+    },
+    {
+      "id": "reciprocity-contract",
+      "slug": "reciprocity-contract",
+      "title": "Reciprocity Contract",
+      "excerpt": "Guidance on Reciprocity Contract.",
+      "bodyMD": "Reciprocity Contract guidance (docs/knowledge/ethos/reciprocity-contract.md).\n\nMinimal artifact: Reciprocity Contract summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "diplomacy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "diplomacy-repair-stack"
+        }
+      ]
+    },
+    {
+      "id": "beginners-mind",
+      "slug": "beginners-mind",
+      "title": "Beginners Mind",
+      "excerpt": "Guidance on Beginners Mind.",
+      "bodyMD": "Beginners Mind guidance (docs/knowledge/ethos/beginners-mind.md).\n\nMinimal artifact: Beginners Mind summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "bodhisattva-craft",
+      "slug": "bodhisattva-craft",
+      "title": "Bodhisattva Craft",
+      "excerpt": "Guidance on Bodhisattva Craft.",
+      "bodyMD": "Bodhisattva Craft guidance (docs/knowledge/ethos/bodhisattva-craft.md).\n\nMinimal artifact: Bodhisattva Craft summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "devotion-course",
+      "slug": "devotion-course",
+      "title": "Devotion Course",
+      "excerpt": "Guidance on Devotion Course.",
+      "bodyMD": "Devotion Course guidance (docs/knowledge/ethos/devotion-course.md).\n\nMinimal artifact: Devotion Course summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "inner-spark",
+      "slug": "inner-spark",
+      "title": "Inner Spark",
+      "excerpt": "Guidance on Inner Spark.",
+      "bodyMD": "Inner Spark guidance (docs/knowledge/ethos/inner-spark.md).\n\nMinimal artifact: Inner Spark summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "interbeing-systems",
+      "slug": "interbeing-systems",
+      "title": "Interbeing Systems",
+      "excerpt": "Guidance on Interbeing Systems.",
+      "bodyMD": "Interbeing Systems guidance (docs/knowledge/ethos/interbeing-systems.md).\n\nMinimal artifact: Interbeing Systems summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "impermanence-by-design",
+      "slug": "impermanence-by-design",
+      "title": "Impermanence By Design",
+      "excerpt": "Guidance on Impermanence By Design.",
+      "bodyMD": "Impermanence By Design guidance (docs/knowledge/ethos/impermanence-by-design.md).\n\nMinimal artifact: Impermanence By Design summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "habit-pressure-break",
+      "slug": "habit-pressure-break",
+      "title": "Habit Pressure Break",
+      "excerpt": "Guidance on Habit Pressure Break.",
+      "bodyMD": "Habit Pressure Break guidance (docs/knowledge/ethos/habit-pressure-break.md).\n\nMinimal artifact: Habit Pressure Break summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "phoenix-averaging",
+      "slug": "phoenix-averaging",
+      "title": "Phoenix Averaging",
+      "excerpt": "Guidance on Phoenix Averaging.",
+      "bodyMD": "Phoenix Averaging guidance (docs/knowledge/ethos/phoenix-averaging.md).\n\nMinimal artifact: Phoenix Averaging summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "solitude-to-signal",
+      "slug": "solitude-to-signal",
+      "title": "Solitude To Signal",
+      "excerpt": "Guidance on Solitude To Signal.",
+      "bodyMD": "Solitude To Signal guidance (docs/knowledge/ethos/solitude-to-signal.md).\n\nMinimal artifact: Solitude To Signal summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "struggle-testament",
+      "slug": "struggle-testament",
+      "title": "Struggle Testament",
+      "excerpt": "Guidance on Struggle Testament.",
+      "bodyMD": "Struggle Testament guidance (docs/knowledge/ethos/struggle-testament.md).\n\nMinimal artifact: Struggle Testament summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "feedback-loop-hygiene",
+      "slug": "feedback-loop-hygiene",
+      "title": "Feedback Loop Hygiene",
+      "excerpt": "Guidance on Feedback Loop Hygiene.",
+      "bodyMD": "Feedback Loop Hygiene guidance (docs/knowledge/ethos/feedback-loop-hygiene.md).\n\nMinimal artifact: Feedback Loop Hygiene summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "practice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "practice-culture-stack"
+        }
+      ]
+    },
+    {
+      "id": "capture-resistance",
+      "slug": "capture-resistance",
+      "title": "Capture Resistance",
+      "excerpt": "Guidance on Capture Resistance.",
+      "bodyMD": "Capture Resistance guidance (docs/knowledge/ethos/capture-resistance.md).\n\nMinimal artifact: Capture Resistance summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "resilience"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-resilience-stack"
+        }
+      ]
+    },
+    {
+      "id": "compromised-channel-response",
+      "slug": "compromised-channel-response",
+      "title": "Compromised Channel Response",
+      "excerpt": "Guidance on Compromised Channel Response.",
+      "bodyMD": "Compromised Channel Response guidance (docs/knowledge/ethos/compromised-channel-response.md).\n\nMinimal artifact: Compromised Channel Response summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "resilience"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-resilience-stack"
+        }
+      ]
+    },
+    {
+      "id": "shadow-rail-interdiction",
+      "slug": "shadow-rail-interdiction",
+      "title": "Shadow Rail Interdiction",
+      "excerpt": "Guidance on Shadow Rail Interdiction.",
+      "bodyMD": "Shadow Rail Interdiction guidance (docs/knowledge/ethos/shadow-rail-interdiction.md).\n\nMinimal artifact: Shadow Rail Interdiction summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "resilience"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-resilience-stack"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "rootId": "brick-lattice-dataflow-tree",
+  "nodes": [
+    {
+      "id": "brick-lattice-dataflow-tree",
+      "slug": "brick-lattice-dataflow-tree",
+      "title": "Brick and Lattice Dataflow Tree",
+      "excerpt": "Stress-energy, curvature, and lattice bricks from backend to UI.",
+      "bodyMD": "This tree maps the brick dataflow used to transport stress-energy, curvature, and lattice volumes into visualization panels.\n\nMinimal artifact: brick-to-lattice dataflow map.",
+      "tags": [
+        "physics",
+        "brick",
+        "lattice",
+        "dataflow"
+      ],
+      "children": [
+        "brick-stress-energy",
+        "brick-curvature",
+        "brick-gr-evolve",
+        "brick-gr-initial",
+        "brick-brick-serialization",
+        "brick-client-lattice",
+        "brick-client-hooks",
+        "brick-ui-panels",
+        "brick-constraints-tests"
+      ],
+      "links": []
+    },
+    {
+      "id": "brick-stress-energy",
+      "slug": "brick-stress-energy",
+      "title": "Stress-Energy Brick",
+      "excerpt": "Stress-energy brick build and stats.",
+      "bodyMD": "Stress-energy brick generation (server/stress-energy-brick.ts) feeds energy and GR pipelines.\n\nMinimal artifact: stress-energy brick schema and stats.",
+      "tags": [
+        "brick",
+        "stress-energy",
+        "physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    },
+    {
+      "id": "brick-curvature",
+      "slug": "brick-curvature",
+      "title": "Curvature Brick",
+      "excerpt": "Curvature brick build and serialization.",
+      "bodyMD": "Curvature brick build/serialization (server/curvature-brick.ts) defines payloads for client visualization.\n\nMinimal artifact: curvature brick payload.",
+      "tags": [
+        "brick",
+        "curvature",
+        "physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    },
+    {
+      "id": "brick-gr-evolve",
+      "slug": "brick-gr-evolve",
+      "title": "GR Evolve Brick",
+      "excerpt": "GR evolution brick and constraint diagnostics.",
+      "bodyMD": "GR evolve brick packaging and diagnostics (server/gr-evolve-brick.ts) carry constraints, lapse, and shift data.\n\nMinimal artifact: GR evolve brick summary.",
+      "tags": [
+        "brick",
+        "gr",
+        "evolution"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    },
+    {
+      "id": "brick-gr-initial",
+      "slug": "brick-gr-initial",
+      "title": "GR Initial Brick",
+      "excerpt": "Initial conditions brick for GR runs.",
+      "bodyMD": "GR initial brick packaging (server/gr-initial-brick.ts) defines initial conditions and stats.\n\nMinimal artifact: initial brick payload.",
+      "tags": [
+        "brick",
+        "gr",
+        "initial"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    },
+    {
+      "id": "brick-brick-serialization",
+      "slug": "brick-brick-serialization",
+      "title": "Brick Serialization",
+      "excerpt": "Binary and JSON brick serialization formats.",
+      "bodyMD": "Serialization helpers in server/curvature-brick.ts and server/stress-energy-brick.ts define JSON/binary transports for bricks.\n\nMinimal artifact: serialize/deserialize contract.",
+      "tags": [
+        "brick",
+        "serialization",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    },
+    {
+      "id": "brick-client-lattice",
+      "slug": "brick-client-lattice",
+      "title": "Client Lattice Utilities",
+      "excerpt": "Client lattice frame, SDF, and surface adapters.",
+      "bodyMD": "Client lattice utilities (client/src/lib/lattice-frame.ts, client/src/lib/lattice-sdf.ts, client/src/lib/lattice-surface.ts, client/src/lib/lattice-export.ts) decode bricks into lattice surfaces.\n\nMinimal artifact: lattice decode flow.",
+      "tags": [
+        "lattice",
+        "client",
+        "utils"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    },
+    {
+      "id": "brick-client-hooks",
+      "slug": "brick-client-hooks",
+      "title": "Client Brick Hooks",
+      "excerpt": "Hooks that fetch and hydrate brick payloads.",
+      "bodyMD": "Brick hooks (client/src/hooks/useGrBrick.ts, client/src/hooks/useGrEvolveBrick.ts, client/src/hooks/useStressEnergyBrick.ts, client/src/hooks/useLapseBrick.ts) hydrate payloads for panels.\n\nMinimal artifact: hook dataflow map.",
+      "tags": [
+        "hooks",
+        "brick",
+        "client"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    },
+    {
+      "id": "brick-ui-panels",
+      "slug": "brick-ui-panels",
+      "title": "Brick Visualization Panels",
+      "excerpt": "Panels rendering bricks and lattice views.",
+      "bodyMD": "Panels rendering bricks (client/src/components/CurvatureTensorPanel.tsx, client/src/components/CurvatureSlicePanel.tsx, client/src/components/QiLatticePanel.tsx, client/src/components/SliceViewer.tsx, client/src/components/TimeDilationLatticePanel.tsx).\n\nMinimal artifact: brick panel map.",
+      "tags": [
+        "ui",
+        "brick",
+        "visualization"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    },
+    {
+      "id": "brick-constraints-tests",
+      "slug": "brick-constraints-tests",
+      "title": "Constraints and Tests",
+      "excerpt": "Constraint gates and brick tests.",
+      "bodyMD": "Brick-related constraint tests (tests/stress-energy-brick.spec.ts, tests/gr-constraint-gate.spec.ts, tests/gr-constraint-network.spec.ts) validate the GR brick flow.\n\nMinimal artifact: brick test summary.",
+      "tags": [
+        "tests",
+        "constraints",
+        "brick"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "rootId": "trace-system-tree",
+  "nodes": [
+    {
+      "id": "trace-system-tree",
+      "slug": "trace-system-tree",
+      "title": "Trace and Essence System Tree",
+      "excerpt": "Trace capture, essence profiles, and AGI refinement pipelines.",
+      "bodyMD": "Trace system map for capture, storage, and refinement.\n\nMinimal artifact: TRACE API + essence schemas.",
+      "tags": [
+        "trace",
+        "essence",
+        "agi"
+      ],
+      "children": [
+        "trace-api-stack",
+        "trace-training-stack",
+        "trace-storage-stack",
+        "essence-schema-stack",
+        "essence-profile-stack",
+        "agi-refinery-stack",
+        "agi-routing-stack",
+        "collapse-benchmark-stack",
+        "essence-telemetry-stack",
+        "agi-client-stack"
+      ],
+      "links": []
+    },
+    {
+      "id": "trace-api-stack",
+      "slug": "trace-api-stack",
+      "title": "Trace API Stack",
+      "excerpt": "Trace API routes and contracts.",
+      "bodyMD": "Trace API contracts and routes (docs/TRACE-API.md, server/routes/agi.trace.ts, server/routes/agi.memory.trace.ts).\n\nMinimal artifact: trace API contract.",
+      "tags": [
+        "trace",
+        "api"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "trace-training-stack",
+      "slug": "trace-training-stack",
+      "title": "Training Trace Stack",
+      "excerpt": "Training trace export and storage.",
+      "bodyMD": "Training trace contracts and storage (docs/TRAINING-TRACE-API.md, server/routes/training-trace.ts, server/services/observability/training-trace-store.ts, server/__tests__/training-trace.test.ts).\n\nMinimal artifact: training trace export.",
+      "tags": [
+        "trace",
+        "training"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "trace-storage-stack",
+      "slug": "trace-storage-stack",
+      "title": "Trace Storage Stack",
+      "excerpt": "Database models and migrations for traces.",
+      "bodyMD": "Trace storage models and migrations (server/db/agi.ts, server/db/essence.ts, server/db/essenceProfile.ts, server/db/essence-activity.ts, server/db/profileSummaries.ts, server/db/migrations/004_trace_manifest.ts, server/db/migrations/012_trace_sealed_snapshots.ts, server/db/migrations/013_trace_prompts.ts, server/db/migrations/015_trace_reasoning.ts, server/db/migrations/016_trace_collapse.ts, server/db/migrations/018_trace_collapse_strategy.ts, server/db/migrations/020_trace_debate_id.ts).\n\nMinimal artifact: trace schema summary.",
+      "tags": [
+        "trace",
+        "storage",
+        "db"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "essence-schema-stack",
+      "slug": "essence-schema-stack",
+      "title": "Essence Schema Stack",
+      "excerpt": "Shared essence schemas and prompts.",
+      "bodyMD": "Essence schemas and prompts (shared/essence-schema.ts, shared/essence-physics.ts, shared/essence-persona.ts, shared/essence-prompts.ts, shared/essence-debate.ts, shared/essence-activity.ts, shared/essence-themes.ts, shared/inferenceProfile.ts).\n\nMinimal artifact: essence schema snapshot.",
+      "tags": [
+        "essence",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "essence-profile-stack",
+      "slug": "essence-profile-stack",
+      "title": "Essence Profile Stack",
+      "excerpt": "Profile policy, summarization, and panel integration.",
+      "bodyMD": "Essence profiles and summarization (docs/ESSENCE_PROFILE_POLICY.md, server/routes/agi.profile.ts, server/routes/agi.persona.ts, server/routes/agi.memory.ts, server/routes/essence.ts, server/routes/essence.prompts.ts, server/services/profile-summarizer.ts, server/services/profile-summarizer-job.ts, server/routes/proposals.profile-panel.ts, server/services/proposals/profile-panel-proposals.ts, server/services/panels/profile-panel-from-profile.ts).\n\nMinimal artifact: profile policy summary.",
+      "tags": [
+        "essence",
+        "profiles"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-refinery-stack",
+      "slug": "agi-refinery-stack",
+      "title": "AGI Refinery Stack",
+      "excerpt": "Refinery workflows, policies, and exports.",
+      "bodyMD": "AGI refinery workflows and roadmaps (docs/AGI-ROADMAP.md, docs/agi-answerer-training.md, docs/agi-index-exclusions-rc0.md, docs/PERSONAL_AGI_NEXT.md, docs/refinery-progress.md, server/routes/agi.refinery.ts, server/services/agi/refinery-axes.ts, server/services/agi/refinery-export.ts, server/services/agi/refinery-gates.ts, server/services/agi/refinery-holdout.ts, server/services/agi/refinery-identity.ts, server/services/agi/refinery-policy.ts, server/services/agi/refinery-summary.ts, server/services/agi/refinery-trajectory.ts, server/services/agi/refinery-variants.ts).\n\nMinimal artifact: refinery roadmap summary.",
+      "tags": [
+        "agi",
+        "refinery"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-routing-stack",
+      "slug": "agi-routing-stack",
+      "title": "AGI Routing Stack",
+      "excerpt": "Core AGI routes and control flows.",
+      "bodyMD": "AGI routes and control flows (server/routes/agi.plan.ts, server/routes/agi.adapter.ts, server/routes/agi.chat.ts, server/routes/agi.eval.ts, server/routes/agi.debate.ts, server/routes/agi.contributions.ts, server/routes/agi.specialists.ts, server/routes/agi.constraint-packs.ts, server/routes/agi.star.ts, server/routes/agi.refinery.ts).\n\nMinimal artifact: AGI route map.",
+      "tags": [
+        "agi",
+        "routes"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "collapse-benchmark-stack",
+      "slug": "collapse-benchmark-stack",
+      "title": "Collapse Benchmark Stack",
+      "excerpt": "Collapse benchmarking and trace links.",
+      "bodyMD": "Collapse benchmarks and trace links (docs/collapse-benchmark-backend-roadmap.md, server/routes/benchmarks.collapse.ts, server/services/collapse-benchmark.ts, shared/collapse-benchmark.ts, server/services/mixer/collapse.ts, server/services/contributions/trace-links.ts).\n\nMinimal artifact: benchmark summary.",
+      "tags": [
+        "collapse",
+        "benchmark"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "essence-telemetry-stack",
+      "slug": "essence-telemetry-stack",
+      "title": "Essence Telemetry Stack",
+      "excerpt": "Solar and tokamak ingestion pipelines.",
+      "bodyMD": "Essence telemetry ingest and coherence pipelines (docs/ESSENCE-CONSOLE_PATCH-PLAN.md, docs/ESSENCE-CONSOLE_GAP-REPORT.md, server/services/essence/solar-energy-adapter.ts, server/services/essence/tokamak-energy-adapter.ts, server/services/essence/solar-events-hek.ts, server/services/essence/solar-forecast.ts, server/services/essence/solar-guardrails.ts, server/services/essence/solar-spectrum-ingest.ts, server/services/essence/solar-spectrum-models.ts, server/services/essence/solar-surface-coherence.ts, server/services/essence/solar-video-coherence.ts, server/services/essence/sunpy-coherence-bridge.ts, server/services/essence/phase-detector.ts, server/services/essence/ingest-jobs.ts, server/services/essence/events.ts, server/services/essence/environment.ts, server/services/essence/store.ts, server/services/essence/memory-store.ts, server/services/essence/activity-log.ts, server/services/essence/mix.ts, server/services/essence/nightly-proposals.ts, server/services/essence/template-synthesizer.ts, server/services/essence/themes.ts, server/services/essence/prompt-variants.ts, server/services/essence/preferences.ts).\n\nMinimal artifact: telemetry ingest summary.",
+      "tags": [
+        "essence",
+        "telemetry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-client-stack",
+      "slug": "agi-client-stack",
+      "title": "AGI Client Stack",
+      "excerpt": "Client integration for AGI APIs.",
+      "bodyMD": "Client integration for AGI APIs (client/src/lib/agi/api.ts, client/src/lib/agi/adapter.ts, client/src/lib/agi/orchestrator.ts, client/src/lib/agi/knowledge-store.ts, client/src/lib/agi/jobs.ts, client/src/lib/agi/promptVariants.ts, client/src/lib/agi/preferences.ts, client/src/lib/agi/contributions.ts, client/src/lib/agi/consoleTelemetry.ts, client/src/lib/agi/adapter.ts, client/src/lib/agi/debate.ts, client/src/lib/agi/panelControl.ts, client/src/lib/agi/localCallSpec.ts, client/src/store/useAgiChatStore.ts, client/src/hooks/useEssenceProfile.ts, client/src/hooks/useEssenceThemes.ts).\n\nMinimal artifact: client integration summary.",
+      "tags": [
+        "agi",
+        "client"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        }
+      ]
+    }
+  ]
+}

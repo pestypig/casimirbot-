@@ -1,0 +1,271 @@
+{
+  "version": 1,
+  "rootId": "simulation-systems-tree",
+  "nodes": [
+    {
+      "id": "simulation-systems-tree",
+      "slug": "simulation-systems-tree",
+      "title": "Simulation Systems Tree",
+      "excerpt": "Simulation-only pipeline from contracts to UI surfaces.",
+      "bodyMD": "This tree maps simulation-only systems: contracts, APIs, modules, and UI surfaces used to run and visualize simulations.\n\nMinimal artifact: simulation pipeline map.",
+      "tags": [
+        "simulation",
+        "physics",
+        "pipeline"
+      ],
+      "children": [
+        "simulation-contracts",
+        "simulation-api",
+        "simulation-storage",
+        "simulation-core-modules",
+        "simulation-geometry-mesh",
+        "simulation-scuffem-service",
+        "simulation-dynamic-casimir",
+        "simulation-warp-module",
+        "simulation-tsn",
+        "simulation-parametric-sweeps",
+        "simulation-ui-surfaces",
+        "simulation-streaming",
+        "simulation-artifacts"
+      ],
+      "links": []
+    },
+    {
+      "id": "simulation-contracts",
+      "slug": "simulation-contracts",
+      "title": "Simulation Contracts",
+      "excerpt": "Schema contracts for simulation parameters and results.",
+      "bodyMD": "Simulation contracts live in shared schemas (shared/schema.ts simulationParametersSchema and simulationResultSchema).\n\nMinimal artifact: simulation schema summary.",
+      "tags": [
+        "simulation",
+        "schema",
+        "contracts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-api",
+      "slug": "simulation-api",
+      "title": "Simulation API",
+      "excerpt": "REST and client API helpers for simulations.",
+      "bodyMD": "Simulation API endpoints and client helpers (server/routes.ts, client/src/lib/simulation-api.ts).\n\nMinimal artifact: API route list.",
+      "tags": [
+        "simulation",
+        "api"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-storage",
+      "slug": "simulation-storage",
+      "title": "Simulation Storage",
+      "excerpt": "Simulation persistence and migrations.",
+      "bodyMD": "Simulation persistence (server/db/simulations.ts, server/db/migrations/021_simulations.ts).\n\nMinimal artifact: storage schema summary.",
+      "tags": [
+        "simulation",
+        "storage"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-core-modules",
+      "slug": "simulation-core-modules",
+      "title": "Simulation Core Modules",
+      "excerpt": "Core simulation modules and registry.",
+      "bodyMD": "Core modules (modules/sim_core/README.md, modules/sim_core/static-casimir.ts, modules/sim_core/casimir-inference.ts, modules/core/module-registry.ts).\n\nMinimal artifact: module registry list.",
+      "tags": [
+        "simulation",
+        "modules"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-geometry-mesh",
+      "slug": "simulation-geometry-mesh",
+      "title": "Geometry and Mesh",
+      "excerpt": "Geometry and mesh generation for simulations.",
+      "bodyMD": "Geometry and mesh generation (modules/geom/README.md, server/services/gmsh.ts).\n\nMinimal artifact: geometry mesh flow.",
+      "tags": [
+        "simulation",
+        "geometry",
+        "mesh"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-scuffem-service",
+      "slug": "simulation-scuffem-service",
+      "title": "SCUFF-EM Service",
+      "excerpt": "SCUFF-EM adapter and file generation.",
+      "bodyMD": "SCUFF-EM service and file generation (server/services/scuffem.ts).\n\nMinimal artifact: SCUFF-EM pipeline summary.",
+      "tags": [
+        "simulation",
+        "scuffem"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-dynamic-casimir",
+      "slug": "simulation-dynamic-casimir",
+      "title": "Dynamic Casimir Simulation",
+      "excerpt": "Dynamic Casimir simulation module.",
+      "bodyMD": "Dynamic Casimir module and gates (modules/dynamic/dynamic-casimir.ts, modules/dynamic/README.md, modules/dynamic/gates/*).\n\nMinimal artifact: dynamic simulation flow.",
+      "tags": [
+        "simulation",
+        "dynamic",
+        "casimir"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-warp-module",
+      "slug": "simulation-warp-module",
+      "title": "Warp Simulation Module",
+      "excerpt": "Warp module simulation parameter bridge.",
+      "bodyMD": "Warp module simulation mapping (modules/warp/warp-module.ts).\n\nMinimal artifact: warp simulation parameter mapping.",
+      "tags": [
+        "simulation",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-tsn",
+      "slug": "simulation-tsn",
+      "title": "TSN Simulation",
+      "excerpt": "Time-sensitive networking simulation.",
+      "bodyMD": "TSN simulation logic (simulations/tsn-sim.ts, shared/tsn-sim.ts).\n\nMinimal artifact: TSN sim summary.",
+      "tags": [
+        "simulation",
+        "tsn"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-parametric-sweeps",
+      "slug": "simulation-parametric-sweeps",
+      "title": "Parametric Sweeps",
+      "excerpt": "Parametric sweep simulation helpers.",
+      "bodyMD": "Parametric sweep helpers (client/src/lib/parametric-sweep.ts, client/src/components/ParametricSweepPanel.tsx).\n\nMinimal artifact: sweep pipeline summary.",
+      "tags": [
+        "simulation",
+        "sweep"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-ui-surfaces",
+      "slug": "simulation-ui-surfaces",
+      "title": "Simulation UI Surfaces",
+      "excerpt": "Client surfaces that run and visualize simulations.",
+      "bodyMD": "Simulation UI surfaces (client/src/pages/simulation.tsx, client/src/components/TokamakSimulationPanel.tsx).\n\nMinimal artifact: simulation UI layout.",
+      "tags": [
+        "simulation",
+        "ui"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-streaming",
+      "slug": "simulation-streaming",
+      "title": "Simulation Streaming",
+      "excerpt": "WebSocket and SSE simulation telemetry.",
+      "bodyMD": "Simulation streaming endpoints and WS support (server/routes.ts).\n\nMinimal artifact: simulation stream endpoint list.",
+      "tags": [
+        "simulation",
+        "streaming"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    },
+    {
+      "id": "simulation-artifacts",
+      "slug": "simulation-artifacts",
+      "title": "Simulation Artifacts",
+      "excerpt": "Generated files and simulation outputs.",
+      "bodyMD": "Simulation artifacts written under simulations/ with mesh, log, and output files.\n\nMinimal artifact: artifact inventory.",
+      "tags": [
+        "simulation",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        }
+      ]
+    }
+  ]
+}

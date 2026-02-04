@@ -1,0 +1,569 @@
+{
+  "version": 1,
+  "rootId": "uncertainty-mechanics-tree",
+  "nodes": [
+    {
+      "id": "uncertainty-mechanics-tree",
+      "slug": "uncertainty-mechanics-tree",
+      "title": "Uncertainty Mechanics Tree",
+      "excerpt": "Classical, statistical, and quantum-stochastic uncertainty mapped to physics constraints.",
+      "bodyMD": "This tree maps how uncertainty is defined, propagated, and bounded across classical, statistical, and quantum-stochastic workflows.\n\nMinimal artifact: uncertainty map with propagation and constraint notes.",
+      "tags": [
+        "uncertainty",
+        "physics",
+        "constraints",
+        "analysis"
+      ],
+      "children": [
+        "uncertainty-classical-stack",
+        "uncertainty-statistical-stack",
+        "uncertainty-data-contracts",
+        "uncertainty-quantum-stochastic",
+        "uncertainty-approximation-ladders",
+        "uncertainty-collapse-constraints",
+        "uncertainty-reality-bounds"
+      ],
+      "links": []
+    },
+    {
+      "id": "uncertainty-classical-stack",
+      "slug": "uncertainty-classical-stack",
+      "title": "Classical Uncertainty Stack",
+      "excerpt": "Model error, boundary conditions, and numerical precision limits.",
+      "bodyMD": "Classical uncertainty is driven by model assumptions, boundary conditions, discretization, and precision limits.\n\nMinimal artifact: error budget and boundary-condition justification.",
+      "tags": [
+        "uncertainty",
+        "classical",
+        "numerics"
+      ],
+      "children": [
+        "uncertainty-boundary-conditions",
+        "uncertainty-discretization",
+        "uncertainty-numerical-precision",
+        "uncertainty-timestep-stability"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-tree"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-boundary-conditions",
+      "slug": "uncertainty-boundary-conditions",
+      "title": "Boundary Conditions",
+      "excerpt": "Boundary choices define admissible modes and error bands.",
+      "bodyMD": "Boundary condition choices set mode structure and error profiles (docs/knowledge/physics/boundary-conditions-modes.md).\n\nMinimal artifact: boundary condition choice log.",
+      "tags": [
+        "uncertainty",
+        "boundary",
+        "modes"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-classical-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-discretization",
+      "slug": "uncertainty-discretization",
+      "title": "Discretization and Mesh",
+      "excerpt": "Mesh resolution and discretization error control uncertainty.",
+      "bodyMD": "Discretization and mesh resolution set numerical error bands (docs/knowledge/physics/discretization-mesh.md).\n\nMinimal artifact: mesh resolution plan.",
+      "tags": [
+        "uncertainty",
+        "discretization",
+        "mesh"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-classical-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-numerical-precision",
+      "slug": "uncertainty-numerical-precision",
+      "title": "Numerical Precision",
+      "excerpt": "Floating point precision limits error floors.",
+      "bodyMD": "Precision budgets constrain achievable error floors (docs/knowledge/physics/numerical-precision.md).\n\nMinimal artifact: precision budget note.",
+      "tags": [
+        "uncertainty",
+        "precision",
+        "numerics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-classical-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-timestep-stability",
+      "slug": "uncertainty-timestep-stability",
+      "title": "Stability and Timestep",
+      "excerpt": "Stability bounds constrain timestep error growth.",
+      "bodyMD": "Timestep stability bounds limit error accumulation (docs/knowledge/physics/stability-timestep.md).\n\nMinimal artifact: stability bound summary.",
+      "tags": [
+        "uncertainty",
+        "stability",
+        "timestep"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-classical-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-statistical-stack",
+      "slug": "uncertainty-statistical-stack",
+      "title": "Statistical Uncertainty Stack",
+      "excerpt": "Sampling noise, distributions, and stochastic variance.",
+      "bodyMD": "Statistical uncertainty captures sampling variance and Monte Carlo spreads.\n\nMinimal artifact: sampling distribution with propagated bands.",
+      "tags": [
+        "uncertainty",
+        "statistical",
+        "sampling"
+      ],
+      "children": [
+        "uncertainty-sampling-bounds",
+        "uncertainty-monte-carlo-bands",
+        "uncertainty-propagated-bands"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-tree"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-sampling-bounds",
+      "slug": "uncertainty-sampling-bounds",
+      "title": "Sampling Time Bounds",
+      "excerpt": "Sampling windows bound valid averages.",
+      "bodyMD": "Sampling windows must respect system timescales (docs/knowledge/physics/sampling-time-bounds.md).\n\nMinimal artifact: sampling window justification.",
+      "tags": [
+        "uncertainty",
+        "sampling",
+        "bounds"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-statistical-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-monte-carlo-bands",
+      "slug": "uncertainty-monte-carlo-bands",
+      "title": "Monte Carlo Bands",
+      "excerpt": "Monte Carlo spreads define statistical error bands.",
+      "bodyMD": "Monte Carlo bands show distribution spread (server/energy-pipeline.ts).\n\nMinimal artifact: Monte Carlo band output.",
+      "tags": [
+        "uncertainty",
+        "monte-carlo",
+        "bands"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-statistical-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-propagated-bands",
+      "slug": "uncertainty-propagated-bands",
+      "title": "Propagated Bands",
+      "excerpt": "Uncertainty propagation across geometry and energy bands.",
+      "bodyMD": "Uncertainty propagation flows through geometry and energy bands (server/energy-pipeline.ts).\n\nMinimal artifact: propagated band summary.",
+      "tags": [
+        "uncertainty",
+        "propagation",
+        "bands"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-statistical-stack"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-data-contracts",
+      "slug": "uncertainty-data-contracts",
+      "title": "Uncertainty Data Contracts",
+      "excerpt": "Shared schemas for values, sigmas, and bands.",
+      "bodyMD": "Shared uncertainty fields define value, sigma, and band contracts (shared/physics.ts, shared/schema.ts, server/energy-pipeline.ts).\n\nMinimal artifact: schema field list.",
+      "tags": [
+        "uncertainty",
+        "schema",
+        "contracts"
+      ],
+      "children": [
+        "uncertainty-1sigma-container",
+        "uncertainty-band-fields"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-tree"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-1sigma-container",
+      "slug": "uncertainty-1sigma-container",
+      "title": "1-Sigma Containers",
+      "excerpt": "Explicit 1-sigma value containers.",
+      "bodyMD": "Uncertainty containers encode 1-sigma values (shared/physics.ts).\n\nMinimal artifact: Uncertainty1D / Vec3Uncertainty fields.",
+      "tags": [
+        "uncertainty",
+        "schema",
+        "sigma"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-data-contracts"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-band-fields",
+      "slug": "uncertainty-band-fields",
+      "title": "Band Fields",
+      "excerpt": "Min/max bands for propagated ranges.",
+      "bodyMD": "Band fields encode min/max ranges for propagated uncertainty (shared/schema.ts, server/energy-pipeline.ts).\n\nMinimal artifact: band field examples.",
+      "tags": [
+        "uncertainty",
+        "bands",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-data-contracts"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-quantum-stochastic",
+      "slug": "uncertainty-quantum-stochastic",
+      "title": "Quantum-Stochastic Bridge",
+      "excerpt": "Noise-kernel constraints for semiclassical sourcing.",
+      "bodyMD": "Quantum-stochastic uncertainty uses renormalized stress-energy with noise models and coherence windows (docs/quantum-gr-bridge.md).\n\nMinimal artifact: stochastic source contract and tau/r_c bounds.",
+      "tags": [
+        "uncertainty",
+        "quantum",
+        "stochastic"
+      ],
+      "children": [
+        "uncertainty-quantum-gr-bridge",
+        "uncertainty-coherence-window"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-tree"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-quantum-gr-bridge",
+      "slug": "uncertainty-quantum-gr-bridge",
+      "title": "Quantum-GR Bridge",
+      "excerpt": "Semiclassical interface with uncertainty propagation.",
+      "bodyMD": "Bridge contract for <T_mu_nu>_ren and uncertainty propagation (docs/quantum-gr-bridge.md).\n\nMinimal artifact: bridge contract summary.",
+      "tags": [
+        "quantum",
+        "gr",
+        "uncertainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-quantum-stochastic"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-coherence-window",
+      "slug": "uncertainty-coherence-window",
+      "title": "Coherence Window",
+      "excerpt": "Tau and r_c set the causal sampling window.",
+      "bodyMD": "Coherence windows define causal sampling and stochastic limits (docs/quantum-gr-bridge.md, docs/DP_COLLAPSE_DERIVATION.md, shared/dp-collapse.ts).\n\nMinimal artifact: tau/r_c bound note.",
+      "tags": [
+        "uncertainty",
+        "coherence",
+        "bounds"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-quantum-stochastic"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-approximation-ladders",
+      "slug": "uncertainty-approximation-ladders",
+      "title": "Approximation Ladders",
+      "excerpt": "Approximation ladders bridge classical and statistical models.",
+      "bodyMD": "Approximation ladders bridge classical estimates and statistical bands for transient energy models.\n\nMinimal artifact: approximation ladder and band justification.",
+      "tags": [
+        "uncertainty",
+        "approximation",
+        "energy"
+      ],
+      "children": [
+        "uncertainty-axisymmetric-approximations",
+        "uncertainty-pfa-geometry",
+        "uncertainty-casimir-bands",
+        "uncertainty-dynamic-transients"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-tree"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-axisymmetric-approximations",
+      "slug": "uncertainty-axisymmetric-approximations",
+      "title": "Axisymmetric Approximations",
+      "excerpt": "Closed-form approximations and Monte Carlo deltas.",
+      "bodyMD": "Axisymmetric surface-area approximations and Monte Carlo deltas define bands (server/energy-pipeline.ts).\n\nMinimal artifact: approximation delta report.",
+      "tags": [
+        "uncertainty",
+        "approximation",
+        "geometry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-approximation-ladders"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-pfa-geometry",
+      "slug": "uncertainty-pfa-geometry",
+      "title": "PFA and Geometry Approximations",
+      "excerpt": "PFA and geometry approximations for Casimir models.",
+      "bodyMD": "Casimir geometry approximations (PFA, spherical caps) define model spread (modules/sim_core/static-casimir.ts).\n\nMinimal artifact: PFA approximation note.",
+      "tags": [
+        "uncertainty",
+        "casimir",
+        "geometry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-approximation-ladders"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-casimir-bands",
+      "slug": "uncertainty-casimir-bands",
+      "title": "Casimir Model Bands",
+      "excerpt": "Material models define banded ranges.",
+      "bodyMD": "Material model bands (ideal/Drude/plasma/Hamaker) set energy spreads (docs/casimir-tile-mechanism.md, server/energy-pipeline.ts).\n\nMinimal artifact: model band summary.",
+      "tags": [
+        "uncertainty",
+        "casimir",
+        "bands"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-approximation-ladders"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-dynamic-transients",
+      "slug": "uncertainty-dynamic-transients",
+      "title": "Dynamic Casimir Transients",
+      "excerpt": "Transient energy approximations for time-varying boundaries.",
+      "bodyMD": "Dynamic Casimir simulations add transient approximation layers (modules/dynamic/dynamic-casimir.ts).\n\nMinimal artifact: transient approximation summary.",
+      "tags": [
+        "uncertainty",
+        "dynamic",
+        "transients"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-approximation-ladders"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-collapse-constraints",
+      "slug": "uncertainty-collapse-constraints",
+      "title": "Collapse Constraints",
+      "excerpt": "Causal collapse benchmarks and policy gating.",
+      "bodyMD": "Collapse benchmarks define causal tau/r_c limits and policy gates (docs/collapse-benchmark-backend-roadmap.md, shared/collapse-benchmark.ts, modules/policies/coherence-governor.ts).\n\nMinimal artifact: collapse benchmark run and causal footprint report.",
+      "tags": [
+        "uncertainty",
+        "collapse",
+        "constraints"
+      ],
+      "children": [
+        "uncertainty-collapse-benchmark",
+        "uncertainty-coherence-policy"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-tree"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-collapse-benchmark",
+      "slug": "uncertainty-collapse-benchmark",
+      "title": "Collapse Benchmark",
+      "excerpt": "Benchmark contract for causal collapse estimates.",
+      "bodyMD": "Collapse benchmark contracts define tau/r_c and hazard rates (docs/collapse-benchmark-backend-roadmap.md, shared/collapse-benchmark.ts).\n\nMinimal artifact: benchmark input/output payload.",
+      "tags": [
+        "uncertainty",
+        "collapse",
+        "benchmark"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-collapse-constraints"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-coherence-policy",
+      "slug": "uncertainty-coherence-policy",
+      "title": "Coherence Governor",
+      "excerpt": "Policy gating tied to collapse confidence.",
+      "bodyMD": "Coherence governor ties collapse pressure to policy actions (modules/policies/coherence-governor.ts).\n\nMinimal artifact: coherence decision summary.",
+      "tags": [
+        "uncertainty",
+        "policy",
+        "coherence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-collapse-constraints"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-reality-bounds",
+      "slug": "uncertainty-reality-bounds",
+      "title": "Reality Constraint Bounds",
+      "excerpt": "Energy conditions and quantum inequality limits.",
+      "bodyMD": "Reality constraints bound uncertainty handling through energy conditions and QI limits.\n\nMinimal artifact: constraint checklist.",
+      "tags": [
+        "uncertainty",
+        "constraints",
+        "physics"
+      ],
+      "children": [
+        "uncertainty-energy-conditions",
+        "uncertainty-quantum-inequality",
+        "uncertainty-sampling-window"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-tree"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-energy-conditions",
+      "slug": "uncertainty-energy-conditions",
+      "title": "Energy Conditions",
+      "excerpt": "Classical energy conditions bound admissible stress-energy.",
+      "bodyMD": "Energy condition definitions (docs/knowledge/physics/energy-conditions.md).\n\nMinimal artifact: condition checklist.",
+      "tags": [
+        "uncertainty",
+        "energy",
+        "conditions"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-reality-bounds"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-quantum-inequality",
+      "slug": "uncertainty-quantum-inequality",
+      "title": "Quantum Inequality",
+      "excerpt": "QI bounds constrain magnitude and duration of negative energy.",
+      "bodyMD": "Ford-Roman QI bounds (docs/knowledge/physics/ford-roman-quantum-inequality.md).\n\nMinimal artifact: QI bound summary.",
+      "tags": [
+        "uncertainty",
+        "quantum-inequality",
+        "bounds"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-reality-bounds"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-sampling-window",
+      "slug": "uncertainty-sampling-window",
+      "title": "Sampling Window Constraints",
+      "excerpt": "Sampling windows must respect system coherence times.",
+      "bodyMD": "Sampling window bounds and coherence constraints (docs/knowledge/physics/sampling-time-bounds.md).\n\nMinimal artifact: sampling window note.",
+      "tags": [
+        "uncertainty",
+        "sampling",
+        "bounds"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-reality-bounds"
+        }
+      ]
+    }
+  ]
+}

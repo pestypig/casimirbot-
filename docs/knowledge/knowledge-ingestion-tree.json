@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "rootId": "knowledge-ingestion-tree",
+  "nodes": [
+    {
+      "id": "knowledge-ingestion-tree",
+      "slug": "knowledge-ingestion-tree",
+      "title": "Knowledge Ingestion Tree",
+      "excerpt": "Knowledge ingestion, vectorization, and retrieval pipeline.",
+      "bodyMD": "This tree maps ingestion, validation, vectorization, and retrieval for knowledge projects and RAG pipelines.\n\nMinimal artifact: knowledge ingestion flow map.",
+      "tags": [
+        "knowledge",
+        "ingestion",
+        "rag"
+      ],
+      "children": [
+        "knowledge-corpus",
+        "knowledge-validation",
+        "knowledge-merge",
+        "knowledge-citations",
+        "knowledge-vectorizer",
+        "knowledge-search",
+        "knowledge-client-tools",
+        "knowledge-ui-panels",
+        "knowledge-storage"
+      ],
+      "links": []
+    },
+    {
+      "id": "knowledge-corpus",
+      "slug": "knowledge-corpus",
+      "title": "Knowledge Corpus",
+      "excerpt": "Corpus ingestion and attachment handling.",
+      "bodyMD": "Corpus ingestion and parsing (server/services/knowledge/corpus.ts, server/routes/knowledge.ts).\n\nMinimal artifact: corpus ingest summary.",
+      "tags": [
+        "knowledge",
+        "corpus",
+        "ingestion"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    },
+    {
+      "id": "knowledge-validation",
+      "slug": "knowledge-validation",
+      "title": "Knowledge Validation",
+      "excerpt": "Validation rules for knowledge bundles.",
+      "bodyMD": "Knowledge validation rules (server/services/knowledge/validation.ts).\n\nMinimal artifact: validation rule summary.",
+      "tags": [
+        "knowledge",
+        "validation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    },
+    {
+      "id": "knowledge-merge",
+      "slug": "knowledge-merge",
+      "title": "Knowledge Merge",
+      "excerpt": "Merge logic for knowledge bundles.",
+      "bodyMD": "Knowledge merge logic (server/services/knowledge/merge.ts).\n\nMinimal artifact: merge flow summary.",
+      "tags": [
+        "knowledge",
+        "merge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    },
+    {
+      "id": "knowledge-citations",
+      "slug": "knowledge-citations",
+      "title": "Citations",
+      "excerpt": "Citation formatting and enforcement.",
+      "bodyMD": "Citation formatting helpers (server/services/knowledge/citations.ts).\n\nMinimal artifact: citation formatting summary.",
+      "tags": [
+        "knowledge",
+        "citations"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    },
+    {
+      "id": "knowledge-vectorizer",
+      "slug": "knowledge-vectorizer",
+      "title": "Vectorizer",
+      "excerpt": "Vectorization routes and services.",
+      "bodyMD": "Vectorizer service and routes (server/services/vectorizer.ts, server/routes/vectorizer.ts).\n\nMinimal artifact: vectorizer workflow.",
+      "tags": [
+        "knowledge",
+        "vectorizer"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    },
+    {
+      "id": "knowledge-search",
+      "slug": "knowledge-search",
+      "title": "Search and Retrieval",
+      "excerpt": "Search routing and repository indexing.",
+      "bodyMD": "Search routes and repository index (server/routes/search.ts, server/services/search/repo-index.ts).\n\nMinimal artifact: retrieval flow summary.",
+      "tags": [
+        "knowledge",
+        "search",
+        "retrieval"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    },
+    {
+      "id": "knowledge-client-tools",
+      "slug": "knowledge-client-tools",
+      "title": "Client Knowledge Tools",
+      "excerpt": "Client knowledge extraction and curation tools.",
+      "bodyMD": "Client knowledge tools (client/src/lib/knowledge/atom-extraction.ts, client/src/lib/knowledge/atom-curation.ts).\n\nMinimal artifact: client knowledge tool map.",
+      "tags": [
+        "knowledge",
+        "client"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    },
+    {
+      "id": "knowledge-ui-panels",
+      "slug": "knowledge-ui-panels",
+      "title": "Knowledge UI Panels",
+      "excerpt": "Panels that surface knowledge bundles.",
+      "bodyMD": "Knowledge UI panels (client/src/components/CoreKnowledgePanel.tsx, client/src/components/DocViewerPanel.tsx, client/src/components/AgiKnowledgePanel.tsx).\n\nMinimal artifact: knowledge UI map.",
+      "tags": [
+        "knowledge",
+        "ui"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    },
+    {
+      "id": "knowledge-storage",
+      "slug": "knowledge-storage",
+      "title": "Knowledge Storage",
+      "excerpt": "Database storage for knowledge assets.",
+      "bodyMD": "Knowledge storage schema (server/db/knowledge.ts, server/db/migrations/010_knowledge_corpus.ts).\n\nMinimal artifact: knowledge storage schema.",
+      "tags": [
+        "knowledge",
+        "storage"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        }
+      ]
+    }
+  ]
+}

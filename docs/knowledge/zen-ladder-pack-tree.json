@@ -1,0 +1,303 @@
+{
+  "version": 1,
+  "rootId": "zen-ladder-pack-tree",
+  "nodes": [
+    {
+      "id": "zen-ladder-pack-tree",
+      "slug": "zen-ladder-pack-tree",
+      "title": "Zen Ladder Pack Tree",
+      "excerpt": "Deck, memo, and template artifacts for ladder pack.",
+      "bodyMD": "Zen ladder pack docs and templates.\n\nMinimal artifact: docs/zen-ladder-pack/*.md.",
+      "tags": [
+        "zen",
+        "ladder",
+        "governance"
+      ],
+      "children": [
+        "zen-ladder-core",
+        "zen-ladder-deck",
+        "zen-ladder-memo",
+        "zen-ladder-artifacts",
+        "zen-ladder-receipts"
+      ],
+      "links": []
+    },
+    {
+      "id": "zen-ladder-core",
+      "slug": "zen-ladder-core",
+      "title": "Zen Ladder Core",
+      "excerpt": "Core ladder pack overview.",
+      "bodyMD": "Ladder pack overview (docs/zen-ladder-pack/README.md).\n\nMinimal artifact: ladder overview summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "core"
+      ],
+      "children": [
+        "zen-ladder-readme"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-pack-tree"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-readme",
+      "slug": "zen-ladder-readme",
+      "title": "Zen Ladder README",
+      "excerpt": "Overview of the ladder pack.",
+      "bodyMD": "Ladder pack README (docs/zen-ladder-pack/README.md).\n\nMinimal artifact: README summary.",
+      "tags": [
+        "zen",
+        "ladder"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-core"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-deck",
+      "slug": "zen-ladder-deck",
+      "title": "Zen Ladder Deck",
+      "excerpt": "Deck outline for ladder pack.",
+      "bodyMD": "Deck outline (docs/zen-ladder-pack/deck/deck-outline.md).\n\nMinimal artifact: deck outline summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "deck"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-pack-tree"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-memo",
+      "slug": "zen-ladder-memo",
+      "title": "Zen Ladder Memo",
+      "excerpt": "Policy memo for ladder pack.",
+      "bodyMD": "Policy memo (docs/zen-ladder-pack/memo/policy-memo.md).\n\nMinimal artifact: memo summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "memo"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-pack-tree"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-artifacts",
+      "slug": "zen-ladder-artifacts",
+      "title": "Zen Ladder Artifacts",
+      "excerpt": "Artifact templates for ladder pack.",
+      "bodyMD": "Artifact templates (docs/zen-ladder-pack/templates/artifacts/*.md).\n\nMinimal artifact: artifact template list.",
+      "tags": [
+        "zen",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [
+        "zen-ladder-coi-disclosure",
+        "zen-ladder-interview-log",
+        "zen-ladder-pilot-log",
+        "zen-ladder-privacy-minimization",
+        "zen-ladder-safety-precheck",
+        "zen-ladder-unit-econ"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-pack-tree"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-coi-disclosure",
+      "slug": "zen-ladder-coi-disclosure",
+      "title": "Coi Disclosure",
+      "excerpt": "Artifact template for Coi Disclosure.",
+      "bodyMD": "Coi Disclosure artifact template (docs/zen-ladder-pack/templates/artifacts/coi-disclosure.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-interview-log",
+      "slug": "zen-ladder-interview-log",
+      "title": "Interview Log",
+      "excerpt": "Artifact template for Interview Log.",
+      "bodyMD": "Interview Log artifact template (docs/zen-ladder-pack/templates/artifacts/interview-log.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-pilot-log",
+      "slug": "zen-ladder-pilot-log",
+      "title": "Pilot Log",
+      "excerpt": "Artifact template for Pilot Log.",
+      "bodyMD": "Pilot Log artifact template (docs/zen-ladder-pack/templates/artifacts/pilot-log.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-privacy-minimization",
+      "slug": "zen-ladder-privacy-minimization",
+      "title": "Privacy Minimization",
+      "excerpt": "Artifact template for Privacy Minimization.",
+      "bodyMD": "Privacy Minimization artifact template (docs/zen-ladder-pack/templates/artifacts/privacy-minimization.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-safety-precheck",
+      "slug": "zen-ladder-safety-precheck",
+      "title": "Safety Precheck",
+      "excerpt": "Artifact template for Safety Precheck.",
+      "bodyMD": "Safety Precheck artifact template (docs/zen-ladder-pack/templates/artifacts/safety-precheck.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-unit-econ",
+      "slug": "zen-ladder-unit-econ",
+      "title": "Unit Econ",
+      "excerpt": "Artifact template for Unit Econ.",
+      "bodyMD": "Unit Econ artifact template (docs/zen-ladder-pack/templates/artifacts/unit-econ.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-artifacts"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-receipts",
+      "slug": "zen-ladder-receipts",
+      "title": "Zen Ladder Receipts",
+      "excerpt": "Receipt templates for ladder pack.",
+      "bodyMD": "Receipt templates (docs/zen-ladder-pack/templates/receipts/*.md).\n\nMinimal artifact: receipt template list.",
+      "tags": [
+        "zen",
+        "ladder",
+        "receipts"
+      ],
+      "children": [
+        "zen-ladder-curiosity-receipt",
+        "zen-ladder-rung-decision-receipt"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-pack-tree"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-curiosity-receipt",
+      "slug": "zen-ladder-curiosity-receipt",
+      "title": "Curiosity Receipt",
+      "excerpt": "Receipt template for Curiosity Receipt.",
+      "bodyMD": "Curiosity Receipt receipt template (docs/zen-ladder-pack/templates/receipts/curiosity-receipt.md).\n\nMinimal artifact: receipt template summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "receipts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-receipts"
+        }
+      ]
+    },
+    {
+      "id": "zen-ladder-rung-decision-receipt",
+      "slug": "zen-ladder-rung-decision-receipt",
+      "title": "Rung Decision Receipt",
+      "excerpt": "Receipt template for Rung Decision Receipt.",
+      "bodyMD": "Rung Decision Receipt receipt template (docs/zen-ladder-pack/templates/receipts/rung-decision-receipt.md).\n\nMinimal artifact: receipt template summary.",
+      "tags": [
+        "zen",
+        "ladder",
+        "receipts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-receipts"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "rootId": "essence-luma-noise-tree",
+  "nodes": [
+    {
+      "id": "essence-luma-noise-tree",
+      "slug": "essence-luma-noise-tree",
+      "title": "Essence, Luma, and Noise Tree",
+      "excerpt": "Essence ingestion, luma generation, and noise pipelines.",
+      "bodyMD": "This tree maps essence storage, luma generation, and noise pipelines end-to-end.\n\nMinimal artifact: essence and luma pipeline map.",
+      "tags": [
+        "essence",
+        "luma",
+        "noise"
+      ],
+      "children": [
+        "essence-schema",
+        "essence-store",
+        "essence-ingest-jobs",
+        "essence-mix",
+        "luma-services",
+        "luma-client",
+        "noisegen-services",
+        "noisegen-ui",
+        "essence-ui"
+      ],
+      "links": []
+    },
+    {
+      "id": "essence-schema",
+      "slug": "essence-schema",
+      "title": "Essence Schemas",
+      "excerpt": "Core essence schemas and persona fields.",
+      "bodyMD": "Essence schemas define envelope and persona contracts (shared/essence-schema.ts, shared/essence-persona.ts).\n\nMinimal artifact: essence schema summary.",
+      "tags": [
+        "essence",
+        "schema"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    },
+    {
+      "id": "essence-store",
+      "slug": "essence-store",
+      "title": "Essence Store",
+      "excerpt": "Essence storage and memory stores.",
+      "bodyMD": "Essence store and memory (server/services/essence/store.ts, server/services/essence/memory-store.ts).\n\nMinimal artifact: essence storage flow.",
+      "tags": [
+        "essence",
+        "store"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    },
+    {
+      "id": "essence-ingest-jobs",
+      "slug": "essence-ingest-jobs",
+      "title": "Essence Ingest Jobs",
+      "excerpt": "Async ingest and job scheduling.",
+      "bodyMD": "Essence ingest jobs (server/services/essence/ingest-jobs.ts, server/queue/index.ts).\n\nMinimal artifact: ingest job flow.",
+      "tags": [
+        "essence",
+        "jobs"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    },
+    {
+      "id": "essence-mix",
+      "slug": "essence-mix",
+      "title": "Essence Mix",
+      "excerpt": "Mixing and collapse fusion.",
+      "bodyMD": "Essence mix pipeline (server/services/essence/mix.ts, server/services/mixer/collapse.ts).\n\nMinimal artifact: mix/collapse summary.",
+      "tags": [
+        "essence",
+        "mix"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    },
+    {
+      "id": "luma-services",
+      "slug": "luma-services",
+      "title": "Luma Services",
+      "excerpt": "Luma generation services and routes.",
+      "bodyMD": "Luma services and routes (server/services/luma.ts, server/routes/luma.ts, server/routes/luma-hce.ts).\n\nMinimal artifact: luma service map.",
+      "tags": [
+        "luma",
+        "services"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    },
+    {
+      "id": "luma-client",
+      "slug": "luma-client",
+      "title": "Luma Client",
+      "excerpt": "Client Luma panels and helpers.",
+      "bodyMD": "Luma client surfaces (client/src/components/LumaPanel.tsx, client/src/components/LumaWhisper.tsx, client/src/components/LumaWhisperBubble.tsx).\n\nMinimal artifact: luma UI map.",
+      "tags": [
+        "luma",
+        "ui"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    },
+    {
+      "id": "noisegen-services",
+      "slug": "noisegen-services",
+      "title": "Noisegen Services",
+      "excerpt": "Noise generation services and routes.",
+      "bodyMD": "Noisegen services (server/services/noisegen-store.ts, server/services/noisegen-intent.ts, server/routes/noise-gens.ts).\n\nMinimal artifact: noisegen service flow.",
+      "tags": [
+        "noise",
+        "services"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    },
+    {
+      "id": "noisegen-ui",
+      "slug": "noisegen-ui",
+      "title": "Noisegen UI",
+      "excerpt": "Noise generation UI surfaces.",
+      "bodyMD": "Noisegen UI (client/src/pages/helix-noise-gens.tsx, client/src/components/noise-gen/ProjectAlbumPanel.tsx, client/src/components/noise-gens/OriginalsPlayer.tsx).\n\nMinimal artifact: noisegen UI map.",
+      "tags": [
+        "noise",
+        "ui"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    },
+    {
+      "id": "essence-ui",
+      "slug": "essence-ui",
+      "title": "Essence UI",
+      "excerpt": "Essence panels and render surfaces.",
+      "bodyMD": "Essence UI surfaces (client/src/components/essence/DresscodePanel.tsx, client/src/pages/essence-render.tsx).\n\nMinimal artifact: essence UI map.",
+      "tags": [
+        "essence",
+        "ui"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "essence-luma-noise-tree"
+        }
+      ]
+    }
+  ]
+}

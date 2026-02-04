@@ -1,11 +1,18 @@
 {
   "version": 1,
+  "pack": {
+    "maxTrees": 3,
+    "minScore": 6,
+    "minScoreRatio": 0.25
+  },
   "trees": [
     {
       "id": "ideology",
       "label": "Mission Ethos Tree",
       "path": "docs/ethos/ideology.json",
-      "topicTags": ["ideology"],
+      "topicTags": [
+        "ideology"
+      ],
       "maxAnchors": 3,
       "maxDepth": 2,
       "maxNodes": 8,
@@ -21,7 +28,10 @@
       "id": "math",
       "label": "Math Maturity + Verification Walk",
       "path": "docs/knowledge/physics/math-tree.json",
-      "topicTags": ["physics", "warp"],
+      "topicTags": [
+        "physics",
+        "warp"
+      ],
       "matchers": [
         "math maturity",
         "math status",
@@ -44,13 +54,14 @@
         "parent": 2,
         "see-also": 1
       }
-    }
-    ,
+    },
     {
       "id": "physics-foundations",
       "label": "Physics Foundations Walk",
       "path": "docs/knowledge/physics/physics-foundations-tree.json",
-      "topicTags": ["physics"],
+      "topicTags": [
+        "physics"
+      ],
       "matchers": [
         "spacetime metric",
         "curvature",
@@ -81,7 +92,9 @@
       "id": "warp-mechanics",
       "label": "Warp Mechanics Walk",
       "path": "docs/knowledge/warp/warp-mechanics-tree.json",
-      "topicTags": ["warp"],
+      "topicTags": [
+        "warp"
+      ],
       "matchers": [
         "warp mechanics",
         "warp geometry",
@@ -109,7 +122,9 @@
       "id": "gr-solver",
       "label": "GR Solver Walk",
       "path": "docs/knowledge/physics/gr-solver-tree.json",
-      "topicTags": ["physics"],
+      "topicTags": [
+        "physics"
+      ],
       "matchers": [
         "gr solver",
         "bssn",
@@ -133,7 +148,10 @@
       "id": "casimir-tiles",
       "label": "Casimir Tiles Walk",
       "path": "docs/knowledge/casimir-tiles-tree.json",
-      "topicTags": ["physics", "warp"],
+      "topicTags": [
+        "physics",
+        "warp"
+      ],
       "matchers": [
         "casimir tiles",
         "casimir tile",
@@ -157,7 +175,9 @@
       "id": "dp-collapse",
       "label": "DP Collapse Walk",
       "path": "docs/knowledge/dp-collapse-tree.json",
-      "topicTags": ["physics"],
+      "topicTags": [
+        "physics"
+      ],
       "matchers": [
         "dp collapse",
         "diosi-penrose",
@@ -182,7 +202,9 @@
       "id": "pipeline-ledger",
       "label": "Pipeline + Ledger Walk",
       "path": "docs/knowledge/pipeline-ledger-tree.json",
-      "topicTags": ["ledger"],
+      "topicTags": [
+        "ledger"
+      ],
       "matchers": [
         "pipeline ledger",
         "curvature ledger",
@@ -208,7 +230,9 @@
       "id": "stellar-restoration",
       "label": "Stellar Restoration Walk",
       "path": "docs/knowledge/stellar-restoration-tree.json",
-      "topicTags": ["star"],
+      "topicTags": [
+        "star"
+      ],
       "matchers": [
         "stellar restoration",
         "solar restoration",
@@ -233,7 +257,9 @@
       "id": "analysis-loops",
       "label": "Analysis Loops Walk",
       "path": "docs/knowledge/analysis-loops-tree.json",
-      "topicTags": ["concepts"],
+      "topicTags": [
+        "concepts"
+      ],
       "matchers": [
         "analysis loop",
         "analysis loops",
@@ -241,6 +267,532 @@
         "diffusion loop",
         "belief graph loop",
         "constraint loop"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "concepts",
+      "label": "Concepts and Methods Walk",
+      "path": "docs/knowledge/concepts-tree.json",
+      "topicTags": [
+        "concepts"
+      ],
+      "matchers": [
+        "epistemology",
+        "falsifiability",
+        "scientific method",
+        "platonic reasoning",
+        "morphospace",
+        "halobank"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "ethos-knowledge",
+      "label": "Ethos Knowledge Walk",
+      "path": "docs/knowledge/ethos/ethos-knowledge-tree.json",
+      "topicTags": [
+        "ideology"
+      ],
+      "matchers": [
+        "integrity protocols",
+        "verification checklist",
+        "two-key approval",
+        "dignified exit",
+        "verification-based diplomacy",
+        "stewardship ledger",
+        "capture resistance",
+        "shadow rail"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "resonance",
+      "label": "Resonance and Code-Lattice Walk",
+      "path": "docs/knowledge/resonance-tree.json",
+      "topicTags": [
+        "resonance"
+      ],
+      "matchers": [
+        "resonance",
+        "code lattice",
+        "casimir resonance",
+        "lattice resonance"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "trace-system",
+      "label": "Trace and Essence System Walk",
+      "path": "docs/knowledge/trace-system-tree.json",
+      "topicTags": [
+        "trace"
+      ],
+      "matchers": [
+        "trace api",
+        "training trace",
+        "essence profile",
+        "agi refinery",
+        "trace storage",
+        "trace manifest",
+        "collapse benchmark"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "helix-ask",
+      "label": "Helix Ask System Walk",
+      "path": "docs/knowledge/helix-ask-tree.json",
+      "topicTags": [
+        "helix_ask"
+      ],
+      "matchers": [
+        "helix ask",
+        "ask ladder",
+        "ask flow",
+        "evidence gate",
+        "anchor and walk",
+        "graph resolver"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "zen-society",
+      "label": "Zen Society Walk",
+      "path": "docs/knowledge/zen-society-tree.json",
+      "topicTags": [
+        "ideology"
+      ],
+      "matchers": [
+        "zen society",
+        "governance spine",
+        "public safety governance",
+        "zen gates",
+        "pillar dignity",
+        "signatory registry"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "zen-ladder-pack",
+      "label": "Zen Ladder Pack Walk",
+      "path": "docs/knowledge/zen-ladder-pack-tree.json",
+      "topicTags": [
+        "ideology"
+      ],
+      "matchers": [
+        "zen ladder",
+        "ladder pack",
+        "policy memo",
+        "deck outline",
+        "curiosity receipt",
+        "rung decision receipt"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "certainty-framework",
+      "label": "Degree of Certainty Walk",
+      "path": "docs/knowledge/certainty-framework-tree.json",
+      "topicTags": [
+        "helix_ask",
+        "concepts",
+        "physics"
+      ],
+      "matchers": [
+        "degree of certainty",
+        "certainty framework",
+        "confidence",
+        "uncertainty register",
+        "belief gate",
+        "coverage gate",
+        "rattling",
+        "claim ledger",
+        "retrieval confidence",
+        "uncertainty",
+        "uncertainty mechanics",
+        "statistical uncertainty",
+        "classical uncertainty",
+        "uncertainty propagation",
+        "uncertainty band",
+        "energy band",
+        "monte carlo",
+        "noise kernel",
+        "stochastic source",
+        "collapse benchmark"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "uncertainty-mechanics",
+      "label": "Uncertainty Mechanics Walk",
+      "path": "docs/knowledge/physics/uncertainty-mechanics-tree.json",
+      "topicTags": [
+        "physics",
+        "uncertainty"
+      ],
+      "matchers": [
+        "uncertainty mechanics",
+        "classical uncertainty",
+        "statistical uncertainty",
+        "uncertainty band",
+        "uncertainty propagation",
+        "monte carlo",
+        "noise kernel",
+        "coherence window",
+        "tau",
+        "r_c",
+        "quantum inequality",
+        "energy conditions"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "ui-components",
+      "label": "UI Components Walk",
+      "path": "docs/knowledge/ui-components-tree.json",
+      "topicTags": [
+        "ui",
+        "frontend",
+        "client"
+      ],
+      "matchers": [
+        "ui components",
+        "frontend",
+        "panels",
+        "helix core",
+        "desktop",
+        "hud",
+        "ui primitives",
+        "warp bubble",
+        "panel registry",
+        "luma panel",
+        "casimir panel",
+        "curvature panel"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "simulation-systems",
+      "label": "Simulation Systems Walk",
+      "path": "docs/knowledge/physics/simulation-systems-tree.json",
+      "topicTags": [
+        "physics",
+        "simulation"
+      ],
+      "matchers": [
+        "simulation",
+        "simulations",
+        "simulation api",
+        "simulation parameters",
+        "scuffem",
+        "gmsh",
+        "parametric sweep",
+        "dynamic casimir simulation",
+        "tsn sim",
+        "simulation storage",
+        "simulation stream"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "ui-backend-binding",
+      "label": "UI Backend Binding Walk",
+      "path": "docs/knowledge/ui-backend-binding-tree.json",
+      "topicTags": [
+        "ui",
+        "physics",
+        "backend"
+      ],
+      "matchers": [
+        "backend binding",
+        "ui backend",
+        "panel dataflow",
+        "energy pipeline ui",
+        "curvature panel",
+        "warp panel",
+        "collapse hud",
+        "simulation ui",
+        "hardware ui"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "brick-lattice-dataflow",
+      "label": "Brick and Lattice Dataflow Walk",
+      "path": "docs/knowledge/physics/brick-lattice-dataflow-tree.json",
+      "topicTags": [
+        "physics",
+        "brick",
+        "lattice"
+      ],
+      "matchers": [
+        "brick dataflow",
+        "curvature brick",
+        "stress-energy brick",
+        "gr evolve brick",
+        "lattice frame",
+        "lattice sdf",
+        "brick serialization",
+        "brick panel"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "knowledge-ingestion",
+      "label": "Knowledge Ingestion Walk",
+      "path": "docs/knowledge/knowledge-ingestion-tree.json",
+      "topicTags": [
+        "knowledge",
+        "rag"
+      ],
+      "matchers": [
+        "knowledge ingestion",
+        "knowledge corpus",
+        "vectorizer",
+        "rag",
+        "retrieval",
+        "knowledge search",
+        "knowledge panel"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "essence-luma-noise",
+      "label": "Essence, Luma, and Noise Walk",
+      "path": "docs/knowledge/essence-luma-noise-tree.json",
+      "topicTags": [
+        "essence",
+        "luma",
+        "noise"
+      ],
+      "matchers": [
+        "essence",
+        "luma",
+        "noise gen",
+        "noisegens",
+        "essence ingest",
+        "luma panel",
+        "noise panel"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "hardware-telemetry",
+      "label": "Hardware Telemetry Walk",
+      "path": "docs/knowledge/hardware-telemetry-tree.json",
+      "topicTags": [
+        "hardware",
+        "telemetry"
+      ],
+      "matchers": [
+        "hardware telemetry",
+        "hardware ingest",
+        "sector state",
+        "spectrum tuner",
+        "vacuum gap sweep",
+        "hardware feeds",
+        "hardware bus"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "queue-orchestration",
+      "label": "Queue and Orchestration Walk",
+      "path": "docs/knowledge/queue-orchestration-tree.json",
+      "topicTags": [
+        "queue",
+        "jobs"
+      ],
+      "matchers": [
+        "queue",
+        "jobs",
+        "orchestration",
+        "job engine",
+        "ingest jobs",
+        "scheduler",
+        "payouts"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      }
+    },
+    {
+      "id": "ops-deployment",
+      "label": "Ops and Deployment Walk",
+      "path": "docs/knowledge/ops-deployment-tree.json",
+      "topicTags": [
+        "ops",
+        "ci"
+      ],
+      "matchers": [
+        "ci",
+        "deployment",
+        "observability",
+        "casimir verify",
+        "verification gate",
+        "release packages",
+        "prometheus"
       ],
       "maxAnchors": 3,
       "maxDepth": 2,

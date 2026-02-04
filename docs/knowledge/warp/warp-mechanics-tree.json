@@ -320,7 +320,8 @@
         "warp-pulsed-power",
         "warpfield-mesh-patch-plan",
         "warpfield-visualization-roadmap",
-        "warp-console-architecture"
+        "warp-console-architecture",
+        "warp-llm-contracts"
       ],
       "links": [
         {
@@ -453,6 +454,25 @@
         "warp",
         "architecture",
         "console"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        }
+      ]
+    },
+    {
+      "id": "warp-llm-contracts",
+      "slug": "warp-llm-contracts",
+      "title": "Warp LLM Contracts",
+      "excerpt": "Contract assumptions for warp LLM interactions.",
+      "bodyMD": "Warp LLM contract notes define interface expectations (docs/warp-llm-contracts.md).\n\nMinimal artifact: contract summary.",
+      "tags": [
+        "warp",
+        "llm",
+        "contracts"
       ],
       "children": [],
       "links": [
