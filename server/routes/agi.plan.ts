@@ -11420,11 +11420,11 @@ const executeHelixAsk = async ({
         ? blockSearchSeed
         : rawQuestion || baseQuestion;
     const slotPreviewCandidates = listConceptCandidates(slotPreviewSeed, 4);
-    sessionMemory =
-      sessionMemoryForTags ??
-      (HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId
+    sessionMemoryForTags =
+      HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId
         ? getHelixAskSessionMemory(parsed.data.sessionId)
-        : null);
+        : null;
+    sessionMemory = sessionMemoryForTags;
     memorySeedSlots = buildMemorySeedSlots(slotPreviewSeed, sessionMemory);
     const headingSeedSlots = buildDocHeadingSeedSlots(slotPreviewSeed);
     memoryPinnedFiles = sessionMemory?.pinnedFiles ?? [];
@@ -12022,10 +12022,12 @@ const executeHelixAsk = async ({
       blockScoped && blockSearchSeed ? blockSearchSeed : baseQuestion,
       parsed.data.searchQuery,
     );
-    const sessionMemoryForTags =
-      HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId
-        ? getHelixAskSessionMemory(parsed.data.sessionId)
-        : null;
+    if (!sessionMemoryForTags) {
+      sessionMemoryForTags =
+        HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId
+          ? getHelixAskSessionMemory(parsed.data.sessionId)
+          : null;
+    }
     if (sessionMemoryForTags?.recentTopics?.length) {
       topicTags = Array.from(new Set([...topicTags, ...sessionMemoryForTags.recentTopics]));
     }
@@ -12916,6 +12918,7 @@ const executeHelixAsk = async ({
     let slotPlanPass: HelixAskSlotPlanPass | null = null;
     let slotPlanPassSlots: HelixAskSlotPlanEntry[] = [];
     let sessionMemory: HelixAskSessionMemory | null = null;
+    let sessionMemoryForTags: HelixAskSessionMemory | null = null;
     let memorySeedSlots: HelixAskSlotPlanEntry[] = [];
     let slotPlanHeadingSeedSlots: HelixAskSlotPlanEntry[] = [];
     let memoryPinnedFiles: string[] = [];
