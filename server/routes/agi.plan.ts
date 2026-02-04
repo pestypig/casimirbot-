@@ -10868,6 +10868,7 @@ const executeHelixAsk = async ({
     const debugPayload: {
       two_pass: boolean;
       micro_pass?: boolean;
+      micro_pass_enabled?: boolean;
       micro_pass_auto?: boolean;
       micro_pass_reason?: string;
       scaffold?: string;
@@ -10875,6 +10876,9 @@ const executeHelixAsk = async ({
       query_hints?: string[];
       queries?: string[];
       context_files?: string[];
+      context_files_count?: number;
+      block_scoped?: boolean;
+      is_repo_question?: boolean;
       prompt_ingested?: boolean;
       prompt_ingest_source?: string;
       prompt_ingest_reason?: string;
@@ -10937,6 +10941,12 @@ const executeHelixAsk = async ({
         evidence_match_preview?: string[];
         topic_tags?: string[];
         context_files?: string[];
+        context_files_count?: number;
+        block_scoped?: boolean;
+        micro_pass?: boolean;
+        micro_pass_enabled?: boolean;
+        plan_pass_forced?: boolean;
+        is_repo_question?: boolean;
         retrieval_confidence?: number;
         retrieval_doc_share?: number;
         retrieval_context_file_count?: number;
@@ -10957,6 +10967,7 @@ const executeHelixAsk = async ({
         slot_doc_hit_rate?: number;
         slot_alias_coverage_rate?: number;
         duration_ms?: number;
+        prefetch_files_count?: number;
       }>;
       report_metrics?: {
         block_count: number;
@@ -11478,6 +11489,9 @@ const executeHelixAsk = async ({
       : [];
     const coverageSlotsFromRequest = requestCoverageSlots.length > 0;
     const blockScoped = coverageSlotsFromRequest;
+    if (debugPayload) {
+      debugPayload.block_scoped = blockScoped;
+    }
     const blockSearchSeed =
       blockScoped && parsed.data.searchQuery?.trim()
         ? parsed.data.searchQuery.trim()
@@ -11791,6 +11805,51 @@ const executeHelixAsk = async ({
           blockSearchQuery ||
           (block.slotId ? block.slotId.replace(/-/g, " ") : blockTextForQuestion);
         const blockHeadingSeedSlots = buildDocHeadingSeedSlots(blockSearchSeed);
+        let blockPrefetchContext: { context: string; files: string[] } | null = null;
+        if (blockRepoContext && blockSearchSeed) {
+          const prefetchStart = Date.now();
+          const blockTopicTags = inferHelixAskTopicTags(blockSearchSeed, blockSearchSeed);
+          const blockTopicProfile = buildHelixAskTopicProfile(blockTopicTags);
+          const basePrefetchQueries = buildHelixAskSearchQueries(blockSearchSeed, blockTopicTags);
+          const prefetchHints = [
+            ...(block.slotAliases ?? []),
+            ...(block.slotEvidenceCriteria ?? []),
+            ...blockAnchorFiles,
+          ];
+          const prefetchQueries = mergeHelixAskQueries(
+            basePrefetchQueries,
+            prefetchHints,
+            HELIX_ASK_QUERY_MERGE_MAX,
+          );
+          if (prefetchQueries.length > 0) {
+            const prefetchOptions = mergedBlockScopeOverride
+              ? {
+                  allowlistTiers: mergedBlockScopeOverride.allowlistTiers,
+                  avoidlist: mergedBlockScopeOverride.avoidlist,
+                  overrideAllowlist: mergedBlockScopeOverride.overrideAllowlist,
+                }
+              : undefined;
+            const prefetchResult = await buildAskContextFromQueries(
+              blockQuestion,
+              prefetchQueries,
+              parsed.data.topK,
+              blockTopicProfile,
+              prefetchOptions,
+            );
+            if (prefetchResult.context) {
+              blockPrefetchContext = {
+                context: prefetchResult.context,
+                files: prefetchResult.files.slice(),
+              };
+            }
+          }
+          logEvent(
+            "Report block prefetch",
+            blockPrefetchContext ? "ok" : "miss",
+            `files=${blockPrefetchContext?.files.length ?? 0}`,
+            prefetchStart,
+          );
+        }
         logEvent(
           "Report block",
           "start",
@@ -11824,6 +11883,7 @@ const executeHelixAsk = async ({
             prompt: undefined,
             traceId: blockTraceId,
             debug: debugEnabled,
+            context: blockPrefetchContext?.context,
             searchQuery: blockSearchSeed,
             coverageSlots: block.slotId ? [block.slotId] : undefined,
           },
@@ -11867,6 +11927,12 @@ const executeHelixAsk = async ({
               intent_id?: string;
               topic_tags?: string[];
               context_files?: string[];
+              context_files_count?: number;
+              block_scoped?: boolean;
+              micro_pass?: boolean;
+              micro_pass_enabled?: boolean;
+              plan_pass_forced?: boolean;
+              is_repo_question?: boolean;
               retrieval_confidence?: number;
               retrieval_doc_share?: number;
               retrieval_context_file_count?: number;
@@ -12026,6 +12092,16 @@ const executeHelixAsk = async ({
             evidence_match_preview: blockDebug?.evidence_match_preview,
             topic_tags: blockDebug?.topic_tags,
             context_files: blockDebug?.context_files?.slice(0, 6) ?? [],
+            context_files_count:
+              blockDebug?.context_files_count ??
+              blockDebug?.retrieval_context_file_count ??
+              blockDebug?.context_files?.length ??
+              0,
+            block_scoped: blockDebug?.block_scoped,
+            micro_pass: blockDebug?.micro_pass,
+            micro_pass_enabled: blockDebug?.micro_pass_enabled,
+            plan_pass_forced: blockDebug?.plan_pass_forced,
+            is_repo_question: blockDebug?.is_repo_question,
             block_citation_fallback: citationFallbackApplied,
             block_paths_scrubbed: scrubbedPaths.slice(0, 4),
             block_dedupe_applied: dedupeApplied,
@@ -12049,6 +12125,7 @@ const executeHelixAsk = async ({
             slot_doc_hit_rate: blockDebug?.slot_doc_hit_rate,
             slot_alias_coverage_rate: blockDebug?.slot_alias_coverage_rate,
             duration_ms: blockDuration,
+            prefetch_files_count: blockPrefetchContext?.files.length ?? 0,
           });
         }
         logEvent(
@@ -12434,6 +12511,9 @@ const executeHelixAsk = async ({
     }
     if (blockScoped && intentStrategy !== "constraint_report" && intentProfile.evidencePolicy.allowRepoCitations) {
       isRepoQuestion = true;
+    }
+    if (debugPayload) {
+      debugPayload.is_repo_question = isRepoQuestion;
     }
     const longPromptCandidate = resolveLongPromptCandidate({
       prompt,
@@ -12854,6 +12934,7 @@ const executeHelixAsk = async ({
     }
     const deferAutoContext =
       isRepoQuestion &&
+      !blockScoped &&
       (repoExpectationLevel !== "low" || requiresRepoEvidence) &&
       !promptIngested;
     if (debugPayload) {
@@ -12950,6 +13031,9 @@ const executeHelixAsk = async ({
     const skipMicroPass = intentStrategy === "constraint_report" || mathSolverOk;
     const microPassEnabled =
       !skipMicroPass && (microPassDecision.enabled || promptIngested || forcePlanPass);
+    if (debugPayload) {
+      debugPayload.micro_pass_enabled = microPassEnabled;
+    }
     const microPassReason =
       forcePlanPass && !microPassDecision.enabled && !promptIngested
         ? "repo_expectation"
@@ -13762,9 +13846,10 @@ const executeHelixAsk = async ({
               contextStart,
             );
           }
-          if (debugPayload && (contextFiles.length > 0 || blockScoped)) {
-            debugPayload.context_files = contextFiles.slice();
-          }
+        if (debugPayload && (contextFiles.length > 0 || blockScoped)) {
+          debugPayload.context_files = contextFiles.slice();
+          debugPayload.context_files_count = contextFiles.length;
+        }
           if (debugPayload) {
             if (contextResult.topicTier) {
               debugPayload.topic_tier = contextResult.topicTier;
