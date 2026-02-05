@@ -17354,6 +17354,7 @@ const executeHelixAsk = async ({
       logProgress("Answer ready", "concept", answerStart);
       answerPath.push("answer:forced");
     } else {
+      const generalEvidenceForBudget = promptScaffold || generalScaffold;
       const answerBudget = computeAnswerTokenBudget({
         verbosity,
         format: formatSpec.format,
@@ -17362,7 +17363,7 @@ const executeHelixAsk = async ({
         definitionFocus,
         composite: compositeRequest.enabled,
         hasRepoEvidence: Boolean(repoScaffold?.trim()),
-        hasGeneralEvidence: Boolean(generalEvidence?.trim()),
+        hasGeneralEvidence: Boolean(generalEvidenceForBudget?.trim()),
         maxTokensOverride: parsed.data.max_tokens,
       });
       const answerMaxTokens = answerBudget.tokens;
