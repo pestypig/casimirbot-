@@ -2585,6 +2585,8 @@ const HELIX_ASK_SCAFFOLD_CONTEXT_CHARS = Math.max(
 const HELIX_ASK_TWO_PASS =
   String(process.env.HELIX_ASK_TWO_PASS ?? process.env.VITE_HELIX_ASK_TWO_PASS ?? "")
     .trim() === "1";
+const HELIX_ASK_SINGLE_LLM =
+  String(process.env.HELIX_ASK_SINGLE_LLM ?? "1").trim() !== "0";
 const HELIX_ASK_SCAFFOLD_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_SCAFFOLD_TOKENS ?? process.env.VITE_HELIX_ASK_SCAFFOLD_TOKENS, 1024),
   64,
@@ -7854,7 +7856,10 @@ const EVIDENCE_BULLET_RE = /^\s*(\d+\.\s+|[-*]\s+)/;
   return kept.map((group) => group.join("\n")).join("\n");
 }
 
-function buildDefinitionDocBullet(block: { path: string; block: string }): string {
+function buildDocEvidenceBullet(
+  block: { path: string; block: string },
+  label: "Definition" | "Evidence",
+): string {
   const lines = block.block.split(/\r?\n/).slice(1);
   const referenceLines = lines.filter((line) =>
     DOC_PROOF_SPAN_RE.test(line) || DOC_SECTION_LINE_RE.test(line),
@@ -7866,8 +7871,26 @@ function buildDefinitionDocBullet(block: { path: string; block: string }): strin
     .trim();
   const snippet = clipAskText(content, 240);
   const prefix = referenceLines.length ? `${referenceLines.join(" ")} ` : "";
-  const summary = snippet ? ensureSentence(snippet) : "See the documentation for the definition.";
-  return `- Definition: ${prefix}${summary} (see ${block.path})`;
+  const summary =
+    snippet ? ensureSentence(snippet) : "See the documentation for more detail.";
+  return `- ${label}: ${prefix}${summary} (see ${block.path})`;
+}
+
+function buildDefinitionDocBullet(block: { path: string; block: string }): string {
+  return buildDocEvidenceBullet(block, "Definition");
+}
+
+function buildDocEvidenceScaffold(
+  blocks: Array<{ path: string; block: string }>,
+  options: { maxBlocks: number; definitionFocus: boolean },
+): string {
+  if (!blocks.length || options.maxBlocks <= 0) return "";
+  const selected = blocks.slice(0, options.maxBlocks);
+  const bullets = selected.map((block, index) => {
+    const label = options.definitionFocus && index === 0 ? "Definition" : "Evidence";
+    return buildDocEvidenceBullet(block, label);
+  });
+  return bullets.join("\n");
 }
 
 type HelixAskTreeWalkMetrics = {
@@ -11705,6 +11728,7 @@ const executeHelixAsk = async ({
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
   const dryRun = parsed.data.dryRun === true;
   const debugEnabled = parsed.data.debug === true;
+  const skipReportModeEffective = Boolean(skipReportMode || HELIX_ASK_SINGLE_LLM);
   const debugLogsEnabled = process.env.HELIX_ASK_DEBUG === "1";
   const logDebug = (message: string, detail?: Record<string, unknown>): void => {
     if (!debugLogsEnabled) return;
@@ -11953,6 +11977,7 @@ const executeHelixAsk = async ({
     );
     const debugPayload: {
       two_pass: boolean;
+      single_llm?: boolean;
       micro_pass?: boolean;
       micro_pass_enabled?: boolean;
       micro_pass_auto?: boolean;
@@ -12687,6 +12712,7 @@ const executeHelixAsk = async ({
       );
     }
     if (debugPayload) {
+      debugPayload.single_llm = HELIX_ASK_SINGLE_LLM;
       debugPayload.definition_focus = definitionFocus;
       debugPayload.evidence_tokens = evidenceTokens;
     }
@@ -12748,6 +12774,7 @@ const executeHelixAsk = async ({
     const slotPreviewWeakOnly = slotPreview.slots.length > 0 && slotPreview.slots.every((slot) => isWeakSlot(slot));
     if (
       HELIX_ASK_SLOT_PLAN_PASS &&
+      !HELIX_ASK_SINGLE_LLM &&
       !dryRun &&
       !blockScoped &&
       baseQuestion &&
@@ -12864,7 +12891,7 @@ const executeHelixAsk = async ({
         }));
       }
     }
-    if (reportDecision.enabled && !skipReportMode && baseQuestion) {
+    if (reportDecision.enabled && !skipReportModeEffective && baseQuestion) {
       const slotBlocks =
         slotPreview.coverageSlots.length > 0 ? buildSlotReportBlocks(slotPreview, baseQuestion) : [];
       const reportBlocks = slotBlocks.length ? slotBlocks : buildReportBlocks(baseQuestion);
@@ -14847,7 +14874,14 @@ const executeHelixAsk = async ({
       if (isRepoQuestion) {
         let queryHints: string[] = [];
         if (!dryRun) {
-          if (conceptFastPath) {
+          if (HELIX_ASK_SINGLE_LLM) {
+            const queryStart = Date.now();
+            queryHints = [];
+            planDirectives = null;
+            logProgress("Query hints ready", "skipped", queryStart);
+            logEvent("LLM query hints", "skipped", "single_llm", queryStart);
+            logEvent("Query hints ready", "single_llm", "0 hints", queryStart);
+          } else if (conceptFastPath) {
             logEvent("Query hints ready", "skipped", "concept_fast_path");
           } else if (blockScoped && !HELIX_ASK_QUERY_HINTS_BLOCKS) {
             const queryStart = Date.now();
@@ -17053,89 +17087,115 @@ const executeHelixAsk = async ({
             evidenceStart,
           );
         } else if (evidenceContext) {
-          const evidenceStart = logStepStart(
-            "LLM evidence cards",
-            "repo",
-            {
-              maxTokens: evidenceTokens,
-              fn: "runHelixAskLocalWithOverflowRetry",
-              label: "evidence_cards",
-              prompt: "buildHelixAskEvidencePrompt",
-            },
-          );
-          const evidencePrompt = buildHelixAskEvidencePrompt(
-            baseQuestion,
-            evidenceContext,
-            formatSpec.format,
-            formatSpec.stageTags,
-            compositeRequest.enabled,
-            verificationAnchorRequired ? verificationAnchorHints : [],
-          );
-          const { result: evidenceResult, overflow: evidenceOverflow } =
-            await runHelixAskLocalWithOverflowRetry(
-              {
-                prompt: evidencePrompt,
-                max_tokens: evidenceTokens,
-                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                seed: parsed.data.seed,
-                stop: parsed.data.stop,
-              },
-              {
-                personaId,
-                sessionId: parsed.data.sessionId,
-                traceId: askTraceId,
-              },
-              {
-                fallbackMaxTokens: evidenceTokens,
-                allowContextDrop: true,
-                label: "repo_evidence",
-              },
-            );
-          recordOverflow("repo_evidence", evidenceOverflow);
-          repoScaffold = normalizeScaffoldText(
-            stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
-          );
-          if (repoScaffold && !formatSpec.stageTags) {
-            repoScaffold = stripStageTags(repoScaffold);
-          }
-          if (repoScaffold) {
-            const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
-            const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
-            repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
-          }
-          if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
-            const missing = compositeRequiredFiles.filter(
-              (entry) => entry && !repoScaffold.toLowerCase().includes(entry.toLowerCase()),
-            );
-            if (missing.length) {
-              debugPayload.composite_topics = [
-                ...(debugPayload.composite_topics ?? []),
-                "missing_anchors",
-              ];
+          if (HELIX_ASK_SINGLE_LLM) {
+            const evidenceStart = Date.now();
+            const scaffoldBlocks = definitionFocus ? definitionDocBlocks : docBlocks;
+            const docScaffoldMax = Math.min(Math.max(minDocEvidenceCards, 1), 6);
+            repoScaffold = buildDocEvidenceScaffold(scaffoldBlocks, {
+              maxBlocks: docScaffoldMax,
+              definitionFocus,
+            });
+            if (repoScaffold) {
+              const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+              const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
+              repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
             }
+            logProgress(
+              "Evidence cards ready",
+              repoScaffold ? "deterministic" : "empty",
+              evidenceStart,
+            );
+            logEvent(
+              "Evidence cards ready",
+              repoScaffold ? "deterministic" : "empty",
+              repoScaffold,
+              evidenceStart,
+            );
+          } else {
+            const evidenceStart = logStepStart(
+              "LLM evidence cards",
+              "repo",
+              {
+                maxTokens: evidenceTokens,
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "evidence_cards",
+                prompt: "buildHelixAskEvidencePrompt",
+              },
+            );
+            const evidencePrompt = buildHelixAskEvidencePrompt(
+              baseQuestion,
+              evidenceContext,
+              formatSpec.format,
+              formatSpec.stageTags,
+              compositeRequest.enabled,
+              verificationAnchorRequired ? verificationAnchorHints : [],
+            );
+            const { result: evidenceResult, overflow: evidenceOverflow } =
+              await runHelixAskLocalWithOverflowRetry(
+                {
+                  prompt: evidencePrompt,
+                  max_tokens: evidenceTokens,
+                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                  seed: parsed.data.seed,
+                  stop: parsed.data.stop,
+                },
+                {
+                  personaId,
+                  sessionId: parsed.data.sessionId,
+                  traceId: askTraceId,
+                },
+                {
+                  fallbackMaxTokens: evidenceTokens,
+                  allowContextDrop: true,
+                  label: "repo_evidence",
+                },
+              );
+            recordOverflow("repo_evidence", evidenceOverflow);
+            repoScaffold = normalizeScaffoldText(
+              stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+            );
+            if (repoScaffold && !formatSpec.stageTags) {
+              repoScaffold = stripStageTags(repoScaffold);
+            }
+            if (repoScaffold) {
+              const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+              const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
+              repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
+            }
+            if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
+              const missing = compositeRequiredFiles.filter(
+                (entry) => entry && !repoScaffold.toLowerCase().includes(entry.toLowerCase()),
+              );
+              if (missing.length) {
+                debugPayload.composite_topics = [
+                  ...(debugPayload.composite_topics ?? []),
+                  "missing_anchors",
+                ];
+              }
+            }
+            logProgress(
+              "Evidence cards ready",
+              repoScaffold ? "ok" : "empty",
+              evidenceStart,
+            );
+            logEvent(
+              "Evidence cards ready",
+              repoScaffold ? "repo" : "empty",
+              repoScaffold,
+              evidenceStart,
+            );
+            logStepEnd(
+              "LLM evidence cards",
+              `cards=${repoScaffold ? "ok" : "empty"}`,
+              evidenceStart,
+              true,
+              {
+                textLength: repoScaffold.length,
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "evidence_cards",
+              },
+            );
           }
-          logProgress(
-            "Evidence cards ready",
-            repoScaffold ? "ok" : "empty",
-            evidenceStart,
-          );
-          logEvent(
-            "Evidence cards ready",
-            repoScaffold ? "repo" : "empty",
-            repoScaffold,
-            evidenceStart,
-          );
-          logStepEnd(
-            "LLM evidence cards",
-            `cards=${repoScaffold ? "ok" : "empty"}`,
-            evidenceStart,
-            true,
-            {
-              textLength: repoScaffold.length,
-              fn: "runHelixAskLocalWithOverflowRetry",
-              label: "evidence_cards",
-            },
-          );
         }
       }
 
@@ -17168,75 +17228,84 @@ const executeHelixAsk = async ({
 
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
         if (promptContextText) {
-          const evidenceStart = logStepStart(
-            "LLM prompt cards",
-            "prompt",
-            {
-              maxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
-              fn: "runHelixAskLocalWithOverflowRetry",
-              label: "prompt_cards",
-              prompt: "buildHelixAskPromptEvidencePrompt",
-            },
-          );
-          const evidencePrompt = buildHelixAskPromptEvidencePrompt(
-            baseQuestion,
-            promptContextText,
-            formatSpec.format,
-            formatSpec.stageTags,
-          );
-          const { result: evidenceResult, overflow: promptOverflow } =
-            await runHelixAskLocalWithOverflowRetry(
+          if (HELIX_ASK_SINGLE_LLM) {
+            promptScaffold = clipAskText(promptContextText, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
+            logEvent(
+              "Prompt context cards ready",
+              promptScaffold ? "single_llm" : "empty",
+              formatFileList(promptContextFiles) ?? promptScaffold,
+            );
+          } else {
+            const evidenceStart = logStepStart(
+              "LLM prompt cards",
+              "prompt",
               {
-                prompt: evidencePrompt,
-                max_tokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
-                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                seed: parsed.data.seed,
-                stop: parsed.data.stop,
-              },
-              {
-                personaId,
-                sessionId: parsed.data.sessionId,
-                traceId: askTraceId,
-              },
-              {
-                fallbackMaxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
-                allowContextDrop: true,
-                label: "prompt_evidence",
+                maxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "prompt_cards",
+                prompt: "buildHelixAskPromptEvidencePrompt",
               },
             );
-          recordOverflow("prompt_evidence", promptOverflow);
-          promptScaffold = normalizeScaffoldText(
-            stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
-          );
-          if (promptScaffold && !formatSpec.stageTags) {
-            promptScaffold = stripStageTags(promptScaffold);
+            const evidencePrompt = buildHelixAskPromptEvidencePrompt(
+              baseQuestion,
+              promptContextText,
+              formatSpec.format,
+              formatSpec.stageTags,
+            );
+            const { result: evidenceResult, overflow: promptOverflow } =
+              await runHelixAskLocalWithOverflowRetry(
+                {
+                  prompt: evidencePrompt,
+                  max_tokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                  seed: parsed.data.seed,
+                  stop: parsed.data.stop,
+                },
+                {
+                  personaId,
+                  sessionId: parsed.data.sessionId,
+                  traceId: askTraceId,
+                },
+                {
+                  fallbackMaxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+                  allowContextDrop: true,
+                  label: "prompt_evidence",
+                },
+              );
+            recordOverflow("prompt_evidence", promptOverflow);
+            promptScaffold = normalizeScaffoldText(
+              stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+            );
+            if (promptScaffold && !formatSpec.stageTags) {
+              promptScaffold = stripStageTags(promptScaffold);
+            }
+            logProgress(
+              "Prompt context cards ready",
+              promptScaffold ? "ok" : "empty",
+              evidenceStart,
+            );
+            const promptRefs = formatFileList(promptContextFiles);
+            const promptEventText = [promptScaffold, promptRefs ? `Prompt refs:\n${promptRefs}` : ""]
+              .filter(Boolean)
+              .join("\n\n");
+            logEvent(
+              "Prompt context cards ready",
+              promptScaffold ? "ok" : "empty",
+              promptEventText,
+              evidenceStart,
+            );
+            logStepEnd(
+              "LLM prompt cards",
+              `cards=${promptScaffold ? "ok" : "empty"}`,
+              evidenceStart,
+              true,
+              {
+                textLength: promptScaffold.length,
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "prompt_cards",
+              },
+            );
           }
-          logProgress(
-            "Prompt context cards ready",
-            promptScaffold ? "ok" : "empty",
-            evidenceStart,
-          );
-          const promptRefs = formatFileList(promptContextFiles);
-          const promptEventText = [promptScaffold, promptRefs ? `Prompt refs:\n${promptRefs}` : ""]
-            .filter(Boolean)
-            .join("\n\n");
-          logEvent(
-            "Prompt context cards ready",
-            promptScaffold ? "ok" : "empty",
-            promptEventText,
-            evidenceStart,
-          );
-          logStepEnd(
-            "LLM prompt cards",
-            `cards=${promptScaffold ? "ok" : "empty"}`,
-            evidenceStart,
-            true,
-            {
-              textLength: promptScaffold.length,
-              fn: "runHelixAskLocalWithOverflowRetry",
-              label: "prompt_cards",
-            },
-          );
           if (debugPayload && promptContextFiles.length > 0) {
             const existing = new Set(debugPayload.context_files ?? []);
             promptContextFiles.forEach((entry) => existing.add(entry));
@@ -17247,7 +17316,7 @@ const executeHelixAsk = async ({
             promptContextFiles.forEach((entry) => merged.add(entry));
             contextFiles = Array.from(merged);
           }
-        } else if (!hasConceptScaffold) {
+        } else if (!hasConceptScaffold && !HELIX_ASK_SINGLE_LLM) {
           const evidenceStart = logStepStart(
             "LLM reasoning scaffold",
             "general",
@@ -17639,7 +17708,7 @@ const executeHelixAsk = async ({
           buildGeneralAskPrompt(baseQuestion, formatSpec.format, formatSpec.stageTags, verbosity),
         );
       }
-    } else if (!skipMicroPass && !dryRun) {
+    } else if (!skipMicroPass && !dryRun && !HELIX_ASK_SINGLE_LLM) {
       const useTwoPass =
         HELIX_ASK_TWO_PASS &&
         Boolean(questionValue) &&
@@ -17824,6 +17893,7 @@ const executeHelixAsk = async ({
       let answerMeta = isShortAnswer(answerText, verbosity);
       let retryApplied = false;
       const retryEligible =
+        !HELIX_ASK_SINGLE_LLM &&
         HELIX_ASK_SHORT_ANSWER_RETRY_MAX > 0 &&
         answerMeta.short &&
         !answerBudget.override &&
@@ -17965,6 +18035,7 @@ const executeHelixAsk = async ({
         }
       const baselineCleaned = cleaned;
       const allowCitationRepair =
+        !HELIX_ASK_SINGLE_LLM &&
         (microPassEnabled || intentStrategy === "constraint_report") &&
         intentProfile.id !== "repo.ideology_reference";
       if (allowCitationRepair) {
@@ -18338,6 +18409,7 @@ const executeHelixAsk = async ({
       let driftRepairImproved = false;
       if (
         HELIX_ASK_DRIFT_REPAIR &&
+        !HELIX_ASK_SINGLE_LLM &&
         HELIX_ASK_DRIFT_REPAIR_MAX > 0 &&
         (platonicResult.beliefGateApplied || platonicResult.rattlingGateApplied) &&
         !platonicResult.coverageGateApplied &&
