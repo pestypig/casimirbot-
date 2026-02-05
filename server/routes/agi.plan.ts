@@ -6037,8 +6037,8 @@ const buildCanonicalSlotPlan = (args: {
     }
   }
   const slots = slotOrder.map((id) => slotMap.get(id)).filter(Boolean) as HelixAskSlotPlanEntry[];
-  const strongSlots = slots.filter((slot) => !isWeakSlot(slot));
-  return { slots, coverageSlots: strongSlots.map((slot) => slot.id) };
+  const requiredSlots = slots.filter((slot) => slot.required && !isWeakSlot(slot));
+  return { slots, coverageSlots: requiredSlots.map((slot) => slot.id) };
 };
 
 const restrictSlotPlanToCoverage = (
