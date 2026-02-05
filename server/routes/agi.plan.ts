@@ -11089,6 +11089,26 @@ const executeHelixAsk = async ({
       text: body ? `${header}\n${body}` : header,
     });
   };
+  const logStepStart = (
+    stage: string,
+    detail?: string,
+    meta?: Record<string, unknown>,
+  ): number => {
+    const startedAt = Date.now();
+    logProgress(stage, "start", startedAt);
+    logEvent(stage, "start", detail, undefined, true, meta);
+    return startedAt;
+  };
+  const logStepEnd = (
+    stage: string,
+    detail: string | undefined,
+    startedAt: number,
+    ok = true,
+    meta?: Record<string, unknown>,
+  ): void => {
+    logProgress(stage, ok ? "done" : "error", startedAt, ok);
+    logEvent(stage, ok ? "done" : "error", detail, startedAt, ok, meta);
+  };
   const streamEmitter = createHelixAskStreamEmitter({ sessionId: askSessionId, traceId: askTraceId, onChunk: streamChunk });
   try {
     logDebug("executeHelixAsk START", {
@@ -11847,6 +11867,12 @@ const executeHelixAsk = async ({
       baseQuestion &&
       (slotPreviewWeakOnly || slotPreview.coverageSlots.length < 2)
     ) {
+      const slotPlanTokens = HELIX_ASK_SLOT_PLAN_PASS_TOKENS;
+      const slotPlanStart = logStepStart(
+        "LLM slot plan pass",
+        `tokens=${slotPlanTokens}`,
+        { maxTokens: slotPlanTokens },
+      );
       try {
         const slotPlanPrompt = buildHelixAskSlotPlanPrompt(baseQuestion, {
           conceptCandidates: slotPreviewCandidates,
@@ -11854,7 +11880,7 @@ const executeHelixAsk = async ({
         const { result: slotPlanResult } = await runHelixAskLocalWithOverflowRetry(
           {
             prompt: slotPlanPrompt,
-            max_tokens: HELIX_ASK_SLOT_PLAN_PASS_TOKENS,
+            max_tokens: slotPlanTokens,
             temperature: Math.min(parsed.data.temperature ?? 0.2, 0.35),
             seed: parsed.data.seed,
             stop: parsed.data.stop,
@@ -11865,7 +11891,7 @@ const executeHelixAsk = async ({
             traceId: askTraceId,
           },
           {
-            fallbackMaxTokens: HELIX_ASK_SLOT_PLAN_PASS_TOKENS,
+            fallbackMaxTokens: slotPlanTokens,
             allowContextDrop: true,
             label: "slot_plan_pass",
           },
@@ -11879,7 +11905,16 @@ const executeHelixAsk = async ({
             seedSlots: [...memorySeedSlots, ...headingSeedSlots, ...slotPlanPassSlots],
           });
         }
-      } catch {
+        logStepEnd(
+          "LLM slot plan pass",
+          `slots=${slotPlanPassSlots.length}`,
+          slotPlanStart,
+          true,
+          { slotCount: slotPlanPassSlots.length },
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logStepEnd("LLM slot plan pass", message, slotPlanStart, false);
         slotPlanPass = null;
         slotPlanPassSlots = [];
       }
@@ -12617,37 +12652,53 @@ const executeHelixAsk = async ({
         const summary = buildAmbiguityClusterSummary(snapshot.candidates, ambiguityTargetSpan);
         if (summary) {
           ambiguityClusterSummary = summary;
-          if (summary.clusters.length > 0) {
-            if (HELIX_ASK_AMBIGUITY_LABEL_LLM) {
-              try {
-                const labeled = await labelAmbiguityClustersWithLlm({
-                  question: baseQuestion,
-                  targetSpan: ambiguityTargetSpan,
-                  clusters: summary.clusters,
-                  personaId,
-                  sessionId: parsed.data.sessionId,
-                  traceId: askTraceId,
-                });
-                ambiguityClusterSummary = {
-                  ...summary,
-                  clusters: labeled.clusters,
-                };
-                if (labeled.overflow) {
-                  recordOverflow("ambiguity_labels", labeled.overflow);
+            if (summary.clusters.length > 0) {
+              if (HELIX_ASK_AMBIGUITY_LABEL_LLM) {
+                let labelStart: number | null = null;
+                try {
+                  labelStart = logStepStart(
+                    "LLM ambiguity labels",
+                    `clusters=${summary.clusters.length}`,
+                    { clusterCount: summary.clusters.length },
+                  );
+                  const labeled = await labelAmbiguityClustersWithLlm({
+                    question: baseQuestion,
+                    targetSpan: ambiguityTargetSpan,
+                    clusters: summary.clusters,
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  });
+                  logStepEnd(
+                    "LLM ambiguity labels",
+                    labeled.applied ? "ok" : "fallback",
+                    labelStart,
+                    true,
+                    { applied: labeled.applied },
+                  );
+                  ambiguityClusterSummary = {
+                    ...summary,
+                    clusters: labeled.clusters,
+                  };
+                  if (labeled.overflow) {
+                    recordOverflow("ambiguity_labels", labeled.overflow);
+                  }
+                  logEvent(
+                    "Ambiguity labels",
+                    labeled.applied ? "llm" : "fallback",
+                    labeled.clusters
+                      .slice(0, 3)
+                      .map((cluster) => cluster.label)
+                      .join(", "),
+                  );
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : String(error);
+                  if (labelStart) {
+                    logStepEnd("LLM ambiguity labels", message, labelStart, false);
+                  }
+                  logEvent("Ambiguity labels", "error", message);
                 }
-                logEvent(
-                  "Ambiguity labels",
-                  labeled.applied ? "llm" : "fallback",
-                  labeled.clusters
-                    .slice(0, 3)
-                    .map((cluster) => cluster.label)
-                    .join(", "),
-                );
-              } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                logEvent("Ambiguity labels", "error", message);
               }
-            }
             const finalSummary = ambiguityClusterSummary ?? summary;
             const detail = [
               `clusters=${finalSummary.clusters.length}`,
@@ -13281,7 +13332,6 @@ const executeHelixAsk = async ({
       !forcedAnswer &&
       !contextText;
     if (preflightEnabled) {
-      const preflightStart = Date.now();
       const preflightSearchSeed = parsed.data.searchQuery?.trim() || baseQuestion;
       const preflightBaseQueries = buildHelixAskSearchQueries(preflightSearchSeed, topicTags);
       if (!blockScoped && conceptMatch?.card.sourcePath) {
@@ -13296,6 +13346,14 @@ const executeHelixAsk = async ({
         preflightBaseQueries,
         preflightHints,
         HELIX_ASK_QUERY_MERGE_MAX,
+      );
+      const preflightStart = logStepStart(
+        "Preflight retrieval",
+        `queries=${preflightQueries.length}`,
+        {
+          queryCount: preflightQueries.length,
+          topK: HELIX_ASK_PREFLIGHT_TOPK,
+        },
       );
       if (preflightQueries.length > 0) {
         const preflightResult = await buildAskContextFromQueries(
@@ -13822,7 +13880,6 @@ const executeHelixAsk = async ({
             logEvent("Query hints ready", "block_scoped", "0 hints", queryStart);
           } else {
             try {
-              const queryStart = Date.now();
               const conceptSkeleton =
                 intentProfile.id === "hybrid.concept_plus_system_mapping"
                   ? buildHybridConceptSkeleton(baseQuestion, conceptMatch)
@@ -13832,6 +13889,11 @@ const executeHelixAsk = async ({
                 anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
               });
               const queryMaxTokens = blockScoped ? HELIX_ASK_QUERY_TOKENS_BLOCK : HELIX_ASK_QUERY_TOKENS;
+              const queryStart = logStepStart(
+                "LLM query hints",
+                `tokens=${queryMaxTokens}`,
+                { maxTokens: queryMaxTokens },
+              );
               const { result: queryResult, overflow: queryOverflow } =
                 await runHelixAskLocalWithOverflowRetry(
                   {
@@ -14139,7 +14201,12 @@ const executeHelixAsk = async ({
         let minDocEvidenceCards = 0;
 
         if (!contextText) {
-          const contextStart = Date.now();
+          const scope = planScope ?? undefined;
+          const contextStart = logStepStart(
+            "Retrieval",
+            scope?.docsFirst ? "docs-first" : "mixed",
+            { docsFirst: Boolean(scope?.docsFirst), queries: queries.length },
+          );
           const fallbackLimit = clampNumber(
             parsed.data.topK ?? HELIX_ASK_CONTEXT_FILES,
             1,
@@ -14161,7 +14228,6 @@ const executeHelixAsk = async ({
               }
             | undefined;
           let docsFirstOk = false;
-          const scope = planScope ?? undefined;
           if (scope?.docsFirst && scope.docsAllowlist?.length) {
             const docsScope = await buildAskContextFromQueries(
               baseQuestion,
@@ -14280,6 +14346,18 @@ const executeHelixAsk = async ({
               proofSpanRate,
             );
           }
+          logStepEnd(
+            "Retrieval",
+            `files=${contextFiles.length} docs=${docBlocks.length}`,
+            contextStart,
+            true,
+            {
+              files: contextFiles.length,
+              docBlocks: docBlocks.length,
+              queryHits: contextMeta?.queryHitCount ?? 0,
+              topicTier: contextMeta?.topicTier ?? 0,
+            },
+          );
           const docContextText = docBlocks.map((block) => block.block).join("\n\n");
           coverageSlotSummary = evaluateCoverageSlots({
             question: baseQuestion,
@@ -15342,7 +15420,6 @@ const executeHelixAsk = async ({
           canAgentAct();
         let retryMissingSlots: string[] = [];
         if (shouldRetryRetrieval) {
-          const retryStart = Date.now();
           const retrySlotTargets =
             docSlotSummary?.missingSlots?.length
               ? docSlotSummary.missingSlots
@@ -15364,6 +15441,15 @@ const executeHelixAsk = async ({
             HELIX_ASK_CONTEXT_FILES,
             (parsed.data.topK ?? HELIX_ASK_CONTEXT_FILES) + retryTopKBonus,
           );
+          const retryStart = logStepStart(
+            "Retrieval retry",
+            `slots=${retrySlotTargets.length} queries=${retryQueries.length}`,
+            {
+              slotCount: retrySlotTargets.length,
+              queryCount: retryQueries.length,
+              topK: retryTopK,
+            },
+          );
           const retryResult = await buildAskContextFromQueries(
             baseQuestion,
             retryQueries,
@@ -15380,6 +15466,16 @@ const executeHelixAsk = async ({
           );
           const retryDurationMs = Date.now() - retryStart;
           if (retryApplied.applied) {
+            logStepEnd(
+              "Retrieval retry",
+              `files=${retryResult.files.length}`,
+              retryStart,
+              true,
+              {
+                files: retryResult.files.length,
+                missingSlots: retryApplied.missingSlots,
+              },
+            );
             retryMissingSlots = retryApplied.missingSlots;
             recordAgentAction(
               "slot_local_retry",
@@ -15405,7 +15501,6 @@ const executeHelixAsk = async ({
           (coverageSlotSummary?.missingSlots?.length ?? 0) > 0 ||
           retryMissingSlots.length > 0;
         if (HELIX_ASK_AGENT_CODE_FIRST && missingSlotsForCodeFirst && canAgentAct()) {
-          const codeStart = Date.now();
           const codeSlotTargets =
             docSlotSummary?.missingSlots?.length
               ? docSlotSummary.missingSlots
@@ -15424,6 +15519,14 @@ const executeHelixAsk = async ({
             HELIX_ASK_QUERY_MERGE_MAX + 2,
           );
           const codeScope = buildCodeFirstPlanScopeOverride(planScope ?? undefined);
+          const codeStart = logStepStart(
+            "Retrieval code-first",
+            `slots=${codeSlotTargets.length} queries=${codeQueries.length}`,
+            {
+              slotCount: codeSlotTargets.length,
+              queryCount: codeQueries.length,
+            },
+          );
           const codeResult = await buildAskContextFromQueries(
             baseQuestion,
             codeQueries,
@@ -15440,6 +15543,16 @@ const executeHelixAsk = async ({
           );
           const codeDurationMs = Date.now() - codeStart;
           if (codeApplied.applied) {
+            logStepEnd(
+              "Retrieval code-first",
+              `files=${codeResult.files.length}`,
+              codeStart,
+              true,
+              {
+                files: codeResult.files.length,
+                missingSlots: codeApplied.missingSlots,
+              },
+            );
             recordAgentAction(
               "retrieve_code_first",
               "slot_missing",
@@ -15737,7 +15850,11 @@ const executeHelixAsk = async ({
             evidenceStart,
           );
         } else if (evidenceContext) {
-          const evidenceStart = Date.now();
+          const evidenceStart = logStepStart(
+            "LLM evidence cards",
+            "repo",
+            { maxTokens: evidenceTokens },
+          );
           const evidencePrompt = buildHelixAskEvidencePrompt(
             baseQuestion,
             evidenceContext,
@@ -15807,7 +15924,11 @@ const executeHelixAsk = async ({
 
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
         if (promptContextText) {
-          const evidenceStart = Date.now();
+          const evidenceStart = logStepStart(
+            "LLM prompt cards",
+            "prompt",
+            { maxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS },
+          );
           const evidencePrompt = buildHelixAskPromptEvidencePrompt(
             baseQuestion,
             promptContextText,
@@ -15867,7 +15988,11 @@ const executeHelixAsk = async ({
             contextFiles = Array.from(merged);
           }
         } else if (!hasConceptScaffold) {
-          const evidenceStart = Date.now();
+          const evidenceStart = logStepStart(
+            "LLM reasoning scaffold",
+            "general",
+            { maxTokens: evidenceTokens },
+          );
           const evidencePrompt = buildGeneralAskEvidencePrompt(
             baseQuestion,
             formatSpec.format,
@@ -16221,7 +16346,6 @@ const executeHelixAsk = async ({
         }
         const extractedContext = extractContextFromPrompt(prompt);
         if (extractedContext) {
-          const scaffoldStart = Date.now();
           const scaffoldContext = clipAskText(extractedContext, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
           const scaffoldPrompt = buildHelixAskScaffoldPrompt(
             questionValue ?? "",
@@ -16232,6 +16356,11 @@ const executeHelixAsk = async ({
           const scaffoldMaxTokens = Math.min(
             scaffoldTokens,
             parsed.data.max_tokens ?? scaffoldTokens,
+          );
+          const scaffoldStart = logStepStart(
+            "LLM two-pass scaffold",
+            `tokens=${scaffoldMaxTokens}`,
+            { maxTokens: scaffoldMaxTokens },
           );
           const { result: scaffoldResult, overflow: scaffoldOverflow } =
             await runHelixAskLocalWithOverflowRetry(
@@ -16316,6 +16445,11 @@ const executeHelixAsk = async ({
         temperature: parsed.data.temperature ?? null,
       });
       const answerFallbackTokens = parsed.data.max_tokens ?? scaffoldTokens;
+      const llmAnswerStart = logStepStart(
+        "LLM answer",
+        `tokens=${answerFallbackTokens}`,
+        { maxTokens: answerFallbackTokens },
+      );
       const { result: answerResult, overflow: answerOverflow } =
         await runHelixAskLocalWithOverflowRetry(
           {
@@ -16342,6 +16476,13 @@ const executeHelixAsk = async ({
       logDebug("llmLocalHandler MAIN complete", {
         textLength: typeof result.text === "string" ? result.text.length : 0,
       });
+      logStepEnd(
+        "LLM answer",
+        `tokens=${answerFallbackTokens}`,
+        llmAnswerStart,
+        true,
+        { textLength: typeof result.text === "string" ? result.text.length : 0 },
+      );
       logProgress("Answer ready", undefined, answerStart);
       answerPath.push("answer:llm");
     }
@@ -16380,7 +16521,11 @@ const executeHelixAsk = async ({
         const hasEvidencePaths = extractFilePathsFromText(evidenceText).length > 0;
         const hasAnswerPaths = extractFilePathsFromText(cleaned).length > 0;
         if (hasEvidencePaths && !hasAnswerPaths) {
-          const repairStart = Date.now();
+          const repairStart = logStepStart(
+            "LLM citation repair",
+            `tokens=${repairTokens}`,
+            { maxTokens: repairTokens },
+          );
           logDebug("llmLocalHandler CITATION_REPAIR start", {
             maxTokens: repairTokens,
             temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
@@ -16719,7 +16864,11 @@ const executeHelixAsk = async ({
         evidenceText.trim().length > 0 &&
         (platonicDomain === "repo" || platonicDomain === "hybrid" || platonicDomain === "falsifiable")
       ) {
-        const repairStart = Date.now();
+        const repairStart = logStepStart(
+          "LLM drift repair",
+          `tokens=${repairTokens}`,
+          { maxTokens: repairTokens },
+        );
         driftRepairAttempts += 1;
         try {
           const repairEvidence = appendEvidenceSources(evidenceText, contextFiles, 8, contextText);
