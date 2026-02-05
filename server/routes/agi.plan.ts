@@ -11005,7 +11005,15 @@ const executeHelixAsk = async ({
   ): HelixAskTraceSummary[] => {
     if (!events.length) return [];
     return events
-      .filter((entry) => typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs))
+      .filter((entry) => {
+        const fn = (entry.meta as { fn?: unknown } | undefined)?.fn;
+        return (
+          typeof entry.durationMs === "number" &&
+          Number.isFinite(entry.durationMs) &&
+          typeof fn === "string" &&
+          fn.trim().length > 0
+        );
+      })
       .sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0))
       .slice(0, limit)
       .map((entry) => ({
@@ -13917,6 +13925,7 @@ const executeHelixAsk = async ({
             logProgress("Query hints ready", "0 hints", queryStart);
             logEvent("Query hints ready", "block_scoped", "0 hints", queryStart);
           } else {
+            let queryStart: number | null = null;
             try {
               const conceptSkeleton =
                 intentProfile.id === "hybrid.concept_plus_system_mapping"
@@ -13927,7 +13936,7 @@ const executeHelixAsk = async ({
                 anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
               });
               const queryMaxTokens = blockScoped ? HELIX_ASK_QUERY_TOKENS_BLOCK : HELIX_ASK_QUERY_TOKENS;
-              const queryStart = logStepStart(
+              queryStart = logStepStart(
                 "LLM query hints",
                 `tokens=${queryMaxTokens}`,
                 {
@@ -14000,7 +14009,30 @@ const executeHelixAsk = async ({
                   .join(" | ");
                 logEvent("Plan directives", "ok", directiveSummary || "none", queryStart);
               }
-            } catch {
+              if (queryStart) {
+                logStepEnd(
+                  "LLM query hints",
+                  `hints=${queryHints.length}`,
+                  queryStart,
+                  true,
+                  {
+                    hintCount: queryHints.length,
+                    fn: "runHelixAskLocalWithOverflowRetry",
+                    label: "query_hints",
+                  },
+                );
+              }
+            } catch (error) {
+              if (queryStart) {
+                const message = error instanceof Error ? error.message : String(error);
+                logStepEnd(
+                  "LLM query hints",
+                  message,
+                  queryStart,
+                  false,
+                  { fn: "runHelixAskLocalWithOverflowRetry", label: "query_hints" },
+                );
+              }
               queryHints = [];
             }
           }
@@ -15993,6 +16025,17 @@ const executeHelixAsk = async ({
             repoScaffold,
             evidenceStart,
           );
+          logStepEnd(
+            "LLM evidence cards",
+            `cards=${repoScaffold ? "ok" : "empty"}`,
+            evidenceStart,
+            true,
+            {
+              textLength: repoScaffold.length,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "evidence_cards",
+            },
+          );
         }
       }
 
@@ -16060,6 +16103,17 @@ const executeHelixAsk = async ({
             promptEventText,
             evidenceStart,
           );
+          logStepEnd(
+            "LLM prompt cards",
+            `cards=${promptScaffold ? "ok" : "empty"}`,
+            evidenceStart,
+            true,
+            {
+              textLength: promptScaffold.length,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "prompt_cards",
+            },
+          );
           if (debugPayload && promptContextFiles.length > 0) {
             const existing = new Set(debugPayload.context_files ?? []);
             promptContextFiles.forEach((entry) => existing.add(entry));
@@ -16123,6 +16177,17 @@ const executeHelixAsk = async ({
             generalScaffold ? "ok" : "empty",
             generalScaffold,
             evidenceStart,
+          );
+          logStepEnd(
+            "LLM reasoning scaffold",
+            `scaffold=${generalScaffold ? "ok" : "empty"}`,
+            evidenceStart,
+            true,
+            {
+              textLength: generalScaffold.length,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "general_evidence",
+            },
           );
         }
       }
@@ -16497,6 +16562,17 @@ const executeHelixAsk = async ({
               ),
             );
           }
+          logStepEnd(
+            "LLM two-pass scaffold",
+            `scaffold=${scaffoldText ? "ok" : "empty"}`,
+            scaffoldStart,
+            true,
+            {
+              textLength: scaffoldText.length,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "two_pass_scaffold",
+            },
+          );
         }
       }
     }
