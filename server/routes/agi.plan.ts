@@ -12842,6 +12842,8 @@ const executeHelixAsk = async ({
       contextText = extractContextFromPrompt(prompt);
     }
     let contextFiles = extractFilePathsFromText(contextText);
+    let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+    let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
     const providedContextFiles = Array.isArray((parsed.data as any).contextFiles)
       ? (parsed.data as any).contextFiles
       : [];
@@ -14110,8 +14112,8 @@ const executeHelixAsk = async ({
               channelHits: initAskChannelStats(),
               channelTopScores: initAskChannelStats(),
             };
-        let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
-        let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+        coverageSlotSummary = null;
+        docSlotSummary = null;
         let docSlotTargets: string[] = [];
         let docBlocks: Array<{ path: string; block: string }> = [];
         let minDocEvidenceCards = 0;
