@@ -13083,6 +13083,9 @@ const executeHelixAsk = async ({
     let contextFiles = extractFilePathsFromText(contextText);
     let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
     let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+    let docSlotTargets: string[] = [];
+    let docBlocks: Array<{ path: string; block: string }> = [];
+    let minDocEvidenceCards = 0;
     const providedContextFiles = Array.isArray((parsed.data as any).contextFiles)
       ? (parsed.data as any).contextFiles
       : [];
@@ -14443,9 +14446,9 @@ const executeHelixAsk = async ({
             };
         coverageSlotSummary = null;
         docSlotSummary = null;
-        let docSlotTargets: string[] = [];
-        let docBlocks: Array<{ path: string; block: string }> = [];
-        let minDocEvidenceCards = 0;
+        docSlotTargets = [];
+        docBlocks = [];
+        minDocEvidenceCards = 0;
 
         if (!contextText) {
           const scope = planScope ?? undefined;
@@ -15037,7 +15040,7 @@ const executeHelixAsk = async ({
         }
         if (!docSlotSummary) {
           const selectedDocs = selectDocBlocks(contextText, definitionFocus);
-          const docBlocks = selectedDocs.docBlocks;
+          docBlocks = selectedDocs.docBlocks;
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
@@ -15195,7 +15198,7 @@ const executeHelixAsk = async ({
         }
         if (docSlotSummary) {
           const selectedDocs = selectDocBlocks(contextText, definitionFocus);
-          const docBlocks = selectedDocs.docBlocks;
+          docBlocks = selectedDocs.docBlocks;
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
