@@ -16334,11 +16334,9 @@ const executeHelixAsk = async ({
 
       if (definitionFocus && repoScaffold) {
         const filtered = filterEvidenceBulletsByPath(repoScaffold, isDefinitionDocPath);
-        if (filtered) {
-          repoScaffold = filtered;
-        }
+        repoScaffold = filtered;
         const docEvidencePaths = extractFilePathsFromText(repoScaffold).filter(isDefinitionDocPath);
-        if (docEvidencePaths.length === 0 && docBlocks.length > 0) {
+        if ((!repoScaffold || docEvidencePaths.length === 0) && docBlocks.length > 0) {
           const fallbackBullet = buildDefinitionDocBullet(docBlocks[0]);
           repoScaffold = mergeEvidenceScaffolds(fallbackBullet, repoScaffold);
         }
