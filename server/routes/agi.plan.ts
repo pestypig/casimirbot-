@@ -10936,6 +10936,25 @@ type HelixAskAgentAction = {
   ts: string;
 };
 
+type HelixAskTraceEvent = {
+  ts: string;
+  tool: string;
+  stage: string;
+  detail?: string;
+  ok?: boolean;
+  durationMs?: number;
+  text?: string;
+  meta?: Record<string, unknown>;
+};
+
+type HelixAskTraceSummary = {
+  stage: string;
+  detail?: string;
+  ok?: boolean;
+  durationMs?: number;
+  meta?: Record<string, unknown>;
+};
+
 const executeHelixAsk = async ({
   request,
   personaId,
@@ -10969,23 +10988,8 @@ const executeHelixAsk = async ({
     240,
   );
   const captureLiveHistory = debugEnabled || process.env.HELIX_ASK_LIVE_HISTORY_ALWAYS === "1";
-  const liveEventHistory: Array<{
-    ts: string;
-    tool: string;
-    stage: string;
-    detail?: string;
-    ok?: boolean;
-    durationMs?: number;
-    text?: string;
-  }> = [];
-  const pushLiveEvent = (entry: {
-    tool: string;
-    stage: string;
-    detail?: string;
-    ok?: boolean;
-    durationMs?: number;
-    text?: string;
-  }): void => {
+  const liveEventHistory: HelixAskTraceEvent[] = [];
+  const pushLiveEvent = (entry: Omit<HelixAskTraceEvent, "ts">): void => {
     if (!captureLiveHistory) return;
     liveEventHistory.push({
       ts: new Date().toISOString(),
@@ -10994,6 +10998,23 @@ const executeHelixAsk = async ({
     if (liveEventHistory.length > HELIX_ASK_EVENT_HISTORY_LIMIT) {
       liveEventHistory.splice(0, liveEventHistory.length - HELIX_ASK_EVENT_HISTORY_LIMIT);
     }
+  };
+  const buildTraceSummary = (
+    events: HelixAskTraceEvent[],
+    limit = 12,
+  ): HelixAskTraceSummary[] => {
+    if (!events.length) return [];
+    return events
+      .filter((entry) => typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs))
+      .sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0))
+      .slice(0, limit)
+      .map((entry) => ({
+        stage: entry.stage,
+        detail: entry.detail,
+        ok: entry.ok,
+        durationMs: entry.durationMs,
+        meta: entry.meta,
+      }));
   };
   const logProgress = (stage: string, detail?: string, startedAt?: number, ok?: boolean): void => {
     logHelixAskProgress({
@@ -11013,6 +11034,7 @@ const executeHelixAsk = async ({
       ok,
       durationMs: typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0,
       text: clipEventText(label),
+      meta: typeof startedAt === "number" ? { elapsedMs: Math.max(0, Date.now() - startedAt) } : undefined,
     });
   };
   const HELIX_ASK_EVENT_TOOL = "helix.ask.event";
@@ -11087,6 +11109,7 @@ const executeHelixAsk = async ({
       ok,
       durationMs: typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0,
       text: body ? `${header}\n${body}` : header,
+      meta: mergedMeta,
     });
   };
   const logStepStart = (
@@ -11670,18 +11693,20 @@ const executeHelixAsk = async ({
         };
       };
       answer_path?: string[];
-      live_events?: Array<{
-        ts: string;
-        tool: string;
-        stage: string;
-        detail?: string;
-        ok?: boolean;
-        durationMs?: number;
-        text?: string;
-      }>;
+      trace_id?: string;
+      session_id?: string;
+      live_events?: HelixAskTraceEvent[];
+      trace_events?: HelixAskTraceEvent[];
+      trace_summary?: HelixAskTraceSummary[];
     } | undefined = debugEnabled
       ? { two_pass: false, micro_pass: false }
       : undefined;
+    if (debugPayload) {
+      debugPayload.trace_id = askTraceId;
+      if (askSessionId) {
+        debugPayload.session_id = askSessionId;
+      }
+    }
     const agentLoopEnabled = HELIX_ASK_AGENT_LOOP;
     const agentLoopMaxSteps = HELIX_ASK_AGENT_LOOP_MAX_STEPS;
     const agentActionBudgetMs = HELIX_ASK_AGENT_ACTION_BUDGET_MS;
@@ -11871,7 +11896,12 @@ const executeHelixAsk = async ({
       const slotPlanStart = logStepStart(
         "LLM slot plan pass",
         `tokens=${slotPlanTokens}`,
-        { maxTokens: slotPlanTokens },
+        {
+          maxTokens: slotPlanTokens,
+          fn: "runHelixAskLocalWithOverflowRetry",
+          label: "slot_plan_pass",
+          prompt: "buildHelixAskSlotPlanPrompt",
+        },
       );
       try {
         const slotPlanPrompt = buildHelixAskSlotPlanPrompt(baseQuestion, {
@@ -11910,11 +11940,21 @@ const executeHelixAsk = async ({
           `slots=${slotPlanPassSlots.length}`,
           slotPlanStart,
           true,
-          { slotCount: slotPlanPassSlots.length },
+          {
+            slotCount: slotPlanPassSlots.length,
+            fn: "runHelixAskLocalWithOverflowRetry",
+            label: "slot_plan_pass",
+          },
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        logStepEnd("LLM slot plan pass", message, slotPlanStart, false);
+        logStepEnd(
+          "LLM slot plan pass",
+          message,
+          slotPlanStart,
+          false,
+          { fn: "runHelixAskLocalWithOverflowRetry", label: "slot_plan_pass" },
+        );
         slotPlanPass = null;
         slotPlanPassSlots = [];
       }
@@ -12024,15 +12064,7 @@ const executeHelixAsk = async ({
         return;
       }
       const blockResults: HelixAskReportBlockResult[] = [];
-      const reportLiveEvents: Array<{
-        ts: string;
-        tool: string;
-        stage: string;
-        detail?: string;
-        ok?: boolean;
-        durationMs?: number;
-        text?: string;
-      }> = [];
+      const reportLiveEvents: HelixAskTraceEvent[] = [];
       const reportBlockDetails: Array<{
         id: string;
         label?: string;
@@ -12321,15 +12353,7 @@ const executeHelixAsk = async ({
             }
           | undefined;
         const blockLiveEvents = resolvedBlockPayload?.payload?.debug?.live_events as
-          | Array<{
-              ts: string;
-              tool: string;
-              stage: string;
-              detail?: string;
-              ok?: boolean;
-              durationMs?: number;
-              text?: string;
-            }>
+          | HelixAskTraceEvent[]
           | undefined;
         if (Array.isArray(blockLiveEvents)) {
           reportLiveEvents.push(...blockLiveEvents);
@@ -12522,7 +12546,10 @@ const executeHelixAsk = async ({
         debugPayload.report_blocks = reportPayload.report_blocks as any;
         debugPayload.report_blocks_detail = reportBlockDetails as any;
         debugPayload.report_metrics = reportMetrics as any;
-        debugPayload.live_events = [...liveEventHistory, ...reportLiveEvents];
+        const combinedEvents = [...liveEventHistory, ...reportLiveEvents];
+        debugPayload.live_events = combinedEvents;
+        debugPayload.trace_events = combinedEvents;
+        debugPayload.trace_summary = buildTraceSummary(combinedEvents);
       }
       responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
       return;
@@ -12659,7 +12686,10 @@ const executeHelixAsk = async ({
                   labelStart = logStepStart(
                     "LLM ambiguity labels",
                     `clusters=${summary.clusters.length}`,
-                    { clusterCount: summary.clusters.length },
+                    {
+                      clusterCount: summary.clusters.length,
+                      fn: "labelAmbiguityClustersWithLlm",
+                    },
                   );
                   const labeled = await labelAmbiguityClustersWithLlm({
                     question: baseQuestion,
@@ -12674,7 +12704,7 @@ const executeHelixAsk = async ({
                     labeled.applied ? "ok" : "fallback",
                     labelStart,
                     true,
-                    { applied: labeled.applied },
+                    { applied: labeled.applied, fn: "labelAmbiguityClustersWithLlm" },
                   );
                   ambiguityClusterSummary = {
                     ...summary,
@@ -12694,7 +12724,13 @@ const executeHelixAsk = async ({
                 } catch (error) {
                   const message = error instanceof Error ? error.message : String(error);
                   if (labelStart) {
-                    logStepEnd("LLM ambiguity labels", message, labelStart, false);
+                    logStepEnd(
+                      "LLM ambiguity labels",
+                      message,
+                      labelStart,
+                      false,
+                      { fn: "labelAmbiguityClustersWithLlm" },
+                    );
                   }
                   logEvent("Ambiguity labels", "error", message);
                 }
@@ -13353,6 +13389,8 @@ const executeHelixAsk = async ({
         {
           queryCount: preflightQueries.length,
           topK: HELIX_ASK_PREFLIGHT_TOPK,
+          fn: "buildAskContextFromQueries",
+          phase: "preflight",
         },
       );
       if (preflightQueries.length > 0) {
@@ -13892,7 +13930,12 @@ const executeHelixAsk = async ({
               const queryStart = logStepStart(
                 "LLM query hints",
                 `tokens=${queryMaxTokens}`,
-                { maxTokens: queryMaxTokens },
+                {
+                  maxTokens: queryMaxTokens,
+                  fn: "runHelixAskLocalWithOverflowRetry",
+                  label: "query_hints",
+                  prompt: "buildHelixAskQueryPrompt",
+                },
               );
               const { result: queryResult, overflow: queryOverflow } =
                 await runHelixAskLocalWithOverflowRetry(
@@ -14223,7 +14266,12 @@ const executeHelixAsk = async ({
           const contextStart = logStepStart(
             "Retrieval",
             scope?.docsFirst ? "docs-first" : "mixed",
-            { docsFirst: Boolean(scope?.docsFirst), queries: queries.length },
+            {
+              docsFirst: Boolean(scope?.docsFirst),
+              queries: queries.length,
+              fn: "buildAskContextFromQueries",
+              phase: scope?.docsFirst ? "docsFirst" : "mixed",
+            },
           );
           const fallbackLimit = clampNumber(
             parsed.data.topK ?? HELIX_ASK_CONTEXT_FILES,
@@ -14374,6 +14422,7 @@ const executeHelixAsk = async ({
               docBlocks: docBlocks.length,
               queryHits: contextMeta?.queryHitCount ?? 0,
               topicTier: contextMeta?.topicTier ?? 0,
+              fn: "buildAskContextFromQueries",
             },
           );
           const docContextText = docBlocks.map((block) => block.block).join("\n\n");
@@ -15466,6 +15515,8 @@ const executeHelixAsk = async ({
               slotCount: retrySlotTargets.length,
               queryCount: retryQueries.length,
               topK: retryTopK,
+              fn: "buildAskContextFromQueries",
+              phase: "retry",
             },
           );
           const retryResult = await buildAskContextFromQueries(
@@ -15492,6 +15543,7 @@ const executeHelixAsk = async ({
               {
                 files: retryResult.files.length,
                 missingSlots: retryApplied.missingSlots,
+                fn: "buildAskContextFromQueries",
               },
             );
             retryMissingSlots = retryApplied.missingSlots;
@@ -15543,6 +15595,8 @@ const executeHelixAsk = async ({
             {
               slotCount: codeSlotTargets.length,
               queryCount: codeQueries.length,
+              fn: "buildAskContextFromQueries",
+              phase: "codeFirst",
             },
           );
           const codeResult = await buildAskContextFromQueries(
@@ -15569,6 +15623,7 @@ const executeHelixAsk = async ({
               {
                 files: codeResult.files.length,
                 missingSlots: codeApplied.missingSlots,
+                fn: "buildAskContextFromQueries",
               },
             );
             recordAgentAction(
@@ -15871,7 +15926,12 @@ const executeHelixAsk = async ({
           const evidenceStart = logStepStart(
             "LLM evidence cards",
             "repo",
-            { maxTokens: evidenceTokens },
+            {
+              maxTokens: evidenceTokens,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "evidence_cards",
+              prompt: "buildHelixAskEvidencePrompt",
+            },
           );
           const evidencePrompt = buildHelixAskEvidencePrompt(
             baseQuestion,
@@ -15945,7 +16005,12 @@ const executeHelixAsk = async ({
           const evidenceStart = logStepStart(
             "LLM prompt cards",
             "prompt",
-            { maxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS },
+            {
+              maxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "prompt_cards",
+              prompt: "buildHelixAskPromptEvidencePrompt",
+            },
           );
           const evidencePrompt = buildHelixAskPromptEvidencePrompt(
             baseQuestion,
@@ -16009,7 +16074,12 @@ const executeHelixAsk = async ({
           const evidenceStart = logStepStart(
             "LLM reasoning scaffold",
             "general",
-            { maxTokens: evidenceTokens },
+            {
+              maxTokens: evidenceTokens,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "general_evidence",
+              prompt: "buildGeneralAskEvidencePrompt",
+            },
           );
           const evidencePrompt = buildGeneralAskEvidencePrompt(
             baseQuestion,
@@ -16378,7 +16448,12 @@ const executeHelixAsk = async ({
           const scaffoldStart = logStepStart(
             "LLM two-pass scaffold",
             `tokens=${scaffoldMaxTokens}`,
-            { maxTokens: scaffoldMaxTokens },
+            {
+              maxTokens: scaffoldMaxTokens,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "two_pass_scaffold",
+              prompt: "buildHelixAskScaffoldPrompt",
+            },
           );
           const { result: scaffoldResult, overflow: scaffoldOverflow } =
             await runHelixAskLocalWithOverflowRetry(
@@ -16466,7 +16541,11 @@ const executeHelixAsk = async ({
       const llmAnswerStart = logStepStart(
         "LLM answer",
         `tokens=${answerFallbackTokens}`,
-        { maxTokens: answerFallbackTokens },
+        {
+          maxTokens: answerFallbackTokens,
+          fn: "runHelixAskLocalWithOverflowRetry",
+          label: "answer",
+        },
       );
       const { result: answerResult, overflow: answerOverflow } =
         await runHelixAskLocalWithOverflowRetry(
@@ -16499,7 +16578,11 @@ const executeHelixAsk = async ({
         `tokens=${answerFallbackTokens}`,
         llmAnswerStart,
         true,
-        { textLength: typeof result.text === "string" ? result.text.length : 0 },
+        {
+          textLength: typeof result.text === "string" ? result.text.length : 0,
+          fn: "runHelixAskLocalWithOverflowRetry",
+          label: "answer",
+        },
       );
       logProgress("Answer ready", undefined, answerStart);
       answerPath.push("answer:llm");
@@ -16542,7 +16625,12 @@ const executeHelixAsk = async ({
           const repairStart = logStepStart(
             "LLM citation repair",
             `tokens=${repairTokens}`,
-            { maxTokens: repairTokens },
+            {
+              maxTokens: repairTokens,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "citation_repair",
+              prompt: "buildHelixAskCitationRepairPrompt",
+            },
           );
           logDebug("llmLocalHandler CITATION_REPAIR start", {
             maxTokens: repairTokens,
@@ -16885,7 +16973,12 @@ const executeHelixAsk = async ({
         const repairStart = logStepStart(
           "LLM drift repair",
           `tokens=${repairTokens}`,
-          { maxTokens: repairTokens },
+          {
+            maxTokens: repairTokens,
+            fn: "runHelixAskLocalWithOverflowRetry",
+            label: "drift_repair",
+            prompt: "buildHelixAskDriftRepairPrompt",
+          },
         );
         driftRepairAttempts += 1;
         try {
@@ -17373,7 +17466,10 @@ const executeHelixAsk = async ({
       }
     }
     if (debugPayload && captureLiveHistory) {
-      debugPayload.live_events = liveEventHistory.slice();
+      const traceEvents = liveEventHistory.slice();
+      debugPayload.live_events = traceEvents;
+      debugPayload.trace_events = traceEvents;
+      debugPayload.trace_summary = buildTraceSummary(traceEvents);
     }
     if (debugPayload && overflowHistory.length > 0) {
       const steps = overflowHistory.flatMap((entry) => entry.steps);

@@ -35,6 +35,26 @@ Notes:
 - Always generate the JSON with `jq -n` to avoid invalid JSON errors.
 - `sessionId` and `traceId` must match when you fetch logs.
 
+## 2b) Trace Summary From Debug Response
+
+If you only need the slowest steps, use the trace summary embedded in the response:
+
+```bash
+curl -sS "$BASE/api/agi/ask" \
+  -H "Content-Type: application/json" \
+  -d "$payload" \
+| jq -r '.debug.trace_summary[] | "\(.durationMs)ms | \(.stage) | fn=\(.meta.fn // "-") | \(.detail // "")"'
+```
+
+For a full timeline, inspect `debug.trace_events`:
+
+```bash
+curl -sS "$BASE/api/agi/ask" \
+  -H "Content-Type: application/json" \
+  -d "$payload" \
+| jq -r '.debug.trace_events[] | "\(.ts) | \(.stage) | fn=\(.meta.fn // "-") | \(.detail // "")"'
+```
+
 ## 3) Get the Latest SessionId (No Streaming)
 
 ```bash
