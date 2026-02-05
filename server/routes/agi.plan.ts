@@ -2585,7 +2585,7 @@ const HELIX_ASK_TWO_PASS =
   String(process.env.HELIX_ASK_TWO_PASS ?? process.env.VITE_HELIX_ASK_TWO_PASS ?? "")
     .trim() === "1";
 const HELIX_ASK_SCAFFOLD_TOKENS = clampNumber(
-  readNumber(process.env.HELIX_ASK_SCAFFOLD_TOKENS ?? process.env.VITE_HELIX_ASK_SCAFFOLD_TOKENS, 512),
+  readNumber(process.env.HELIX_ASK_SCAFFOLD_TOKENS ?? process.env.VITE_HELIX_ASK_SCAFFOLD_TOKENS, 1024),
   64,
   2048,
 );
@@ -2664,9 +2664,38 @@ const HELIX_ASK_QUERY_TOKENS_BLOCK = clampNumber(
   256,
 );
 const HELIX_ASK_EVIDENCE_TOKENS = clampNumber(
-  readNumber(process.env.HELIX_ASK_EVIDENCE_TOKENS ?? process.env.VITE_HELIX_ASK_EVIDENCE_TOKENS, 384),
+  readNumber(process.env.HELIX_ASK_EVIDENCE_TOKENS ?? process.env.VITE_HELIX_ASK_EVIDENCE_TOKENS, 512),
   64,
   1024,
+);
+const HELIX_ASK_ANSWER_MAX_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_ANSWER_MAX_TOKENS ??
+      process.env.VITE_HELIX_ASK_MAX_TOKENS ??
+      process.env.LLM_LOCAL_MAX_TOKENS,
+    2048,
+  ),
+  256,
+  8192,
+);
+const HELIX_ASK_SHORT_ANSWER_RETRY_MAX = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_SHORT_ANSWER_RETRY_MAX ??
+      process.env.VITE_HELIX_ASK_SHORT_ANSWER_RETRY_MAX,
+    1,
+  ),
+  0,
+  2,
+);
+const HELIX_ASK_SHORT_ANSWER_MIN_SENTENCES = readNumber(
+  process.env.HELIX_ASK_SHORT_ANSWER_MIN_SENTENCES ??
+    process.env.VITE_HELIX_ASK_SHORT_ANSWER_MIN_SENTENCES,
+  0,
+);
+const HELIX_ASK_SHORT_ANSWER_MIN_TOKENS = readNumber(
+  process.env.HELIX_ASK_SHORT_ANSWER_MIN_TOKENS ??
+    process.env.VITE_HELIX_ASK_SHORT_ANSWER_MIN_TOKENS,
+  0,
 );
 const HELIX_ASK_DEFINITION_EVIDENCE_BOOST = clampNumber(
   readNumber(
@@ -3053,13 +3082,63 @@ const HELIX_ASK_COMPOSITE_ALLOWLIST =
 
 type HelixAskVerbosity = "brief" | "normal" | "extended";
 
+const HELIX_ASK_DEFAULT_VERBOSITY = (() => {
+  const raw = String(
+    process.env.HELIX_ASK_DEFAULT_VERBOSITY ??
+      process.env.VITE_HELIX_ASK_DEFAULT_VERBOSITY ??
+      "extended",
+  )
+    .trim()
+    .toLowerCase();
+  if (raw === "brief" || raw === "normal" || raw === "extended") {
+    return raw as HelixAskVerbosity;
+  }
+  return "extended";
+})();
+
+type HelixAskVerbositySpec = {
+  steps: {
+    count: string;
+    sentences: string;
+    inPractice: string;
+  };
+  paragraphs: {
+    count: string;
+    sentences: string;
+    inPractice: string;
+  };
+  compareBullets: string;
+};
+
+const HELIX_ASK_VERBOSITY_SPECS: Record<HelixAskVerbosity, HelixAskVerbositySpec> = {
+  brief: {
+    steps: { count: "6-9", sentences: "2-3", inPractice: "2-3" },
+    paragraphs: { count: "2-3", sentences: "2-3", inPractice: "2-3" },
+    compareBullets: "3-5",
+  },
+  normal: {
+    steps: { count: "7-10", sentences: "2-4", inPractice: "2-4" },
+    paragraphs: { count: "3-4", sentences: "2-4", inPractice: "2-4" },
+    compareBullets: "4-6",
+  },
+  extended: {
+    steps: { count: "9-12", sentences: "3-5", inPractice: "3-5" },
+    paragraphs: { count: "4-6", sentences: "3-5", inPractice: "3-5" },
+    compareBullets: "5-7",
+  },
+};
+
+const resolveHelixAskVerbositySpec = (verbosity: HelixAskVerbosity): HelixAskVerbositySpec =>
+  HELIX_ASK_VERBOSITY_SPECS[verbosity] ?? HELIX_ASK_VERBOSITY_SPECS.brief;
+
 function resolveHelixAskVerbosity(
   question: string,
   intentProfile: HelixAskIntentProfile,
   requested?: HelixAskVerbosity,
 ): HelixAskVerbosity {
   if (requested) return requested;
-  if (intentProfile.strategy !== "constraint_report") return "brief";
+  const fallbackVerbosity = HELIX_ASK_DEFAULT_VERBOSITY;
+  if (intentProfile.strategy !== "constraint_report") return fallbackVerbosity;
   const normalized = question.toLowerCase();
   if (/\bintegrity(_ok)?\b/.test(normalized)) {
     return "extended";
@@ -3074,7 +3153,7 @@ function resolveHelixAskVerbosity(
   if (/\b(decide|issue)\b/.test(normalized) && /\b(certificate|viability)\b/.test(normalized)) {
     return "extended";
   }
-  return "brief";
+  return fallbackVerbosity;
 }
 
 function shouldHelixAskCompositeSynthesis(
@@ -4167,6 +4246,139 @@ const estimateTokenCount = (text: string): number => {
   const trimmed = text.trim();
   if (!trimmed) return 0;
   return Math.max(1, Math.ceil(trimmed.length / 4));
+};
+
+type HelixAskAnswerBudget = {
+  tokens: number;
+  cap: number;
+  base: number;
+  boosts: string[];
+  reason: string;
+  override: boolean;
+};
+
+const HELIX_ASK_SHORT_SENTENCE_TARGET: Record<HelixAskVerbosity, number> = {
+  brief: 4,
+  normal: 6,
+  extended: 8,
+};
+
+const HELIX_ASK_SHORT_TOKEN_TARGET: Record<HelixAskVerbosity, number> = {
+  brief: 140,
+  normal: 240,
+  extended: 360,
+};
+
+const resolveShortAnswerThreshold = (verbosity: HelixAskVerbosity): { sentences: number; tokens: number } => {
+  const baseSentences = HELIX_ASK_SHORT_SENTENCE_TARGET[verbosity] ?? 4;
+  const baseTokens = HELIX_ASK_SHORT_TOKEN_TARGET[verbosity] ?? 140;
+  const sentences =
+    HELIX_ASK_SHORT_ANSWER_MIN_SENTENCES > 0
+      ? HELIX_ASK_SHORT_ANSWER_MIN_SENTENCES
+      : baseSentences;
+  const tokens =
+    HELIX_ASK_SHORT_ANSWER_MIN_TOKENS > 0
+      ? HELIX_ASK_SHORT_ANSWER_MIN_TOKENS
+      : baseTokens;
+  return {
+    sentences: clampNumber(sentences, 2, 32),
+    tokens: clampNumber(tokens, 60, 1400),
+  };
+};
+
+const computeAnswerTokenBudget = ({
+  verbosity,
+  format,
+  scaffoldTokens,
+  evidenceText,
+  definitionFocus,
+  composite,
+  hasRepoEvidence,
+  hasGeneralEvidence,
+  maxTokensOverride,
+}: {
+  verbosity: HelixAskVerbosity;
+  format: HelixAskFormat;
+  scaffoldTokens: number;
+  evidenceText?: string;
+  definitionFocus?: boolean;
+  composite?: boolean;
+  hasRepoEvidence?: boolean;
+  hasGeneralEvidence?: boolean;
+  maxTokensOverride?: number | null;
+}): HelixAskAnswerBudget => {
+  if (typeof maxTokensOverride === "number" && Number.isFinite(maxTokensOverride) && maxTokensOverride > 0) {
+    const capped = clampNumber(maxTokensOverride, 64, HELIX_ASK_ANSWER_MAX_TOKENS);
+    return {
+      tokens: capped,
+      cap: HELIX_ASK_ANSWER_MAX_TOKENS,
+      base: capped,
+      boosts: ["request_override"],
+      reason: "request_override",
+      override: true,
+    };
+  }
+  let base =
+    verbosity === "extended"
+      ? 2800
+      : verbosity === "normal"
+      ? 1800
+      : 1100;
+  const boosts: string[] = [];
+  if (format === "steps") {
+    base += 150;
+    boosts.push("steps");
+  }
+  if (definitionFocus) {
+    base += 250;
+    boosts.push("definition");
+  }
+  if (composite) {
+    base += 300;
+    boosts.push("composite");
+  }
+  if (hasRepoEvidence && hasGeneralEvidence) {
+    base += 200;
+    boosts.push("hybrid");
+  }
+  const evidenceTokens = estimateTokenCount(evidenceText ?? "");
+  if (evidenceTokens > 600) {
+    base += 200;
+    boosts.push("evidence>600");
+  }
+  if (evidenceTokens > 1000) {
+    base += 200;
+    boosts.push("evidence>1000");
+  }
+  if (evidenceTokens > 1400) {
+    base += 200;
+    boosts.push("evidence>1400");
+  }
+  base = Math.max(base, scaffoldTokens);
+  const capped = clampNumber(base, 256, HELIX_ASK_ANSWER_MAX_TOKENS);
+  return {
+    tokens: capped,
+    cap: HELIX_ASK_ANSWER_MAX_TOKENS,
+    base,
+    boosts,
+    reason: boosts.length ? `auto:${boosts.join(",")}` : "auto:base",
+    override: false,
+  };
+};
+
+const isShortAnswer = (
+  text: string,
+  verbosity: HelixAskVerbosity,
+): { short: boolean; sentences: number; tokens: number } => {
+  if (!text.trim()) return { short: true, sentences: 0, tokens: 0 };
+  const sentences = splitGroundedSentences(text);
+  const tokenCount = estimateTokenCount(text);
+  const threshold = resolveShortAnswerThreshold(verbosity);
+  return {
+    short: sentences.length < threshold.sentences || tokenCount < threshold.tokens,
+    sentences: sentences.length,
+    tokens: tokenCount,
+  };
 };
 
 const tokenizePromptText = (text: string): string[] => dedupeTokens(tokenizeAskQuery(text));
@@ -7375,6 +7587,7 @@ function buildGroundedAskPrompt(
   context: string,
   format: HelixAskFormat,
   stageTags: boolean,
+  verbosity: HelixAskVerbosity,
 ): string {
   const lines = [
     "You are Helix Ask, a repo-grounded assistant.",
@@ -7382,28 +7595,46 @@ function buildGroundedAskPrompt(
     "If the context is insufficient, say what is missing and ask a concise follow-up.",
     "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
   ];
+  const spec = resolveHelixAskVerbositySpec(verbosity);
+  const paragraphDescriptor = verbosity === "brief" ? "short " : "";
   if (format === "steps") {
-    lines.push("Start directly with a numbered list using `1.` style; use 6-9 steps and no preamble.");
-    lines.push("Each step should be 2-3 sentences and grounded in repo details; cite file paths when relevant.");
+    lines.push(
+      `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
+    );
+    lines.push(
+      `Each step should be ${spec.steps.sentences} sentences and grounded in repo details; cite file paths when relevant.`,
+    );
     if (stageTags) {
       lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
     } else {
       lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     }
-    lines.push("After the steps, add a short paragraph starting with \"In practice,\" (2-3 sentences).");
+    lines.push(
+      `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
+    );
   } else if (format === "compare") {
-    lines.push("Answer in 2-3 short paragraphs; do not use numbered steps.");
-    lines.push("If the question is comparative, include a short bullet list (3-5 items) of concrete differences grounded in repo details.");
+    lines.push(
+      `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`,
+    );
+    lines.push(
+      `If the question is comparative, include a short bullet list (${spec.compareBullets} items) of concrete differences grounded in repo details.`,
+    );
     lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (2-3 sentences).");
+    lines.push(
+      `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+    );
   } else {
-    lines.push("Answer in 2-3 short paragraphs; do not use numbered steps unless explicitly requested.");
+    lines.push(
+      `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps unless explicitly requested.`,
+    );
     lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (2-3 sentences).");
+    lines.push(
+      `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+    );
   }
   lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
   lines.push("Do not include the words \"Question:\" or \"Context sources\".");
-  lines.push("Keep paragraphs short (2-3 sentences) and separate sections with blank lines.");
+  lines.push("Keep paragraphs focused and separate sections with blank lines.");
   lines.push("Do not repeat the question or include headings like Question or Context.");
   lines.push("Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.");
   lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
@@ -7422,27 +7653,44 @@ function buildGeneralAskPrompt(
   question: string,
   format: HelixAskFormat,
   stageTags: boolean,
+  verbosity: HelixAskVerbosity,
 ): string {
   const lines = [
     "You are Helix Ask.",
     "Answer using general knowledge; do not cite file paths or repo details.",
   ];
+  const spec = resolveHelixAskVerbositySpec(verbosity);
+  const paragraphDescriptor = verbosity === "brief" ? "short " : "";
   if (format === "steps") {
-    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
-    lines.push("Each step should be 1-2 sentences.");
+    lines.push(
+      `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
+    );
+    lines.push(`Each step should be ${spec.steps.sentences} sentences.`);
     if (stageTags) {
       lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
     } else {
       lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     }
-    lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    lines.push(
+      `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
+    );
   } else if (format === "compare") {
-    lines.push("Answer in 1-2 short paragraphs; do not use numbered steps.");
-    lines.push("If the question is comparative, include a short bullet list (2-4 items) of concrete differences.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    lines.push(
+      `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`,
+    );
+    lines.push(
+      `If the question is comparative, include a short bullet list (${spec.compareBullets} items) of concrete differences.`,
+    );
+    lines.push(
+      `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+    );
   } else {
-    lines.push("Answer in 1-2 short paragraphs; do not use numbered steps unless explicitly requested.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    lines.push(
+      `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps unless explicitly requested.`,
+    );
+    lines.push(
+      `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+    );
   }
   lines.push("Avoid repetition; do not repeat the question.");
   lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
@@ -7788,12 +8036,15 @@ function buildHelixAskSynthesisPrompt(
   scaffold: string,
   format: HelixAskFormat,
   stageTags: boolean,
+  verbosity: HelixAskVerbosity,
   softExpansionSentences = 0,
 ): string {
   const lines = [
     "You are Helix Ask, a repo-grounded assistant.",
   ];
   const twoParagraphContract = hasTwoParagraphContract(question);
+  const spec = resolveHelixAskVerbositySpec(verbosity);
+  const paragraphDescriptor = verbosity === "brief" ? "short " : "";
   if (format === "steps") {
     lines.push("Use only the evidence steps below. Do not add new steps.");
     if (stageTags) {
@@ -7801,25 +8052,33 @@ function buildHelixAskSynthesisPrompt(
     } else {
       lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     }
-    lines.push("Start directly with a numbered list using `1.` style; use 6-9 steps and no preamble.");
-    lines.push("Each step should be 2-3 sentences and cite file paths or gate/certificate ids from the evidence steps.");
+    lines.push(
+      `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
+    );
+    lines.push(
+      `Each step should be ${spec.steps.sentences} sentences and cite file paths or gate/certificate ids from the evidence steps.`,
+    );
     if (!twoParagraphContract) {
-      lines.push("After the steps, add a short paragraph starting with \"In practice,\" (2-3 sentences).");
+      lines.push(
+        `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
+      );
     }
     lines.push("Evidence steps:");
   } else {
     lines.push("Use only the evidence bullets below. Do not add new claims.");
     lines.push(
       twoParagraphContract
-        ? "Answer in two short paragraphs; do not use numbered steps."
-        : "Answer in 2-3 short paragraphs; do not use numbered steps.",
+        ? `Answer in two ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`
+        : `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`,
     );
     lines.push(
-      "If the question is comparative, include a short bullet list (3-5 items) of concrete differences grounded in repo details.",
+      `If the question is comparative, include a short bullet list (${spec.compareBullets} items) of concrete differences grounded in repo details.`,
     );
     lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     if (!twoParagraphContract) {
-      lines.push("End with a short paragraph starting with \"In practice,\" (2-3 sentences).");
+      lines.push(
+        `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+      );
     }
     lines.push("Evidence bullets:");
   }
@@ -7846,12 +8105,15 @@ function buildHelixAskPromptSynthesisPrompt(
   scaffold: string,
   format: HelixAskFormat,
   stageTags: boolean,
+  verbosity: HelixAskVerbosity,
   softExpansionSentences = 0,
 ): string {
   const lines = [
     "You are Helix Ask, a grounded assistant.",
   ];
   const twoParagraphContract = hasTwoParagraphContract(question);
+  const spec = resolveHelixAskVerbositySpec(verbosity);
+  const paragraphDescriptor = verbosity === "brief" ? "short " : "";
   if (format === "steps") {
     lines.push("Use only the evidence steps below. Do not add new steps.");
     if (stageTags) {
@@ -7859,22 +8121,32 @@ function buildHelixAskPromptSynthesisPrompt(
     } else {
       lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     }
-    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
-    lines.push("Each step should be 1-2 sentences and cite file paths or prompt chunk ids from the evidence steps.");
+    lines.push(
+      `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
+    );
+    lines.push(
+      `Each step should be ${spec.steps.sentences} sentences and cite file paths or prompt chunk ids from the evidence steps.`,
+    );
     if (!twoParagraphContract) {
-      lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+      lines.push(
+        `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
+      );
     }
     lines.push("Evidence steps:");
   } else {
     lines.push("Use only the evidence bullets below. Do not add new claims.");
     lines.push(
       twoParagraphContract
-        ? "Answer in two short paragraphs; do not use numbered steps."
-        : "Answer in 1-2 short paragraphs; do not use numbered steps.",
+        ? `Answer in two ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`
+        : `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`,
     );
-    lines.push("If the question is comparative, include a short bullet list (2-4 items) of concrete differences.");
+    lines.push(
+      `If the question is comparative, include a short bullet list (${spec.compareBullets} items) of concrete differences.`,
+    );
     if (!twoParagraphContract) {
-      lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+      lines.push(
+        `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+      );
     }
     lines.push("Evidence bullets:");
   }
@@ -7902,6 +8174,7 @@ function buildHelixAskHybridPrompt(
   hasRepoEvidence: boolean,
   format: HelixAskFormat,
   stageTags: boolean,
+  verbosity: HelixAskVerbosity,
   constraintEvidence?: string,
   composite = false,
 ): string {
@@ -7911,8 +8184,12 @@ function buildHelixAskHybridPrompt(
   ];
   const twoParagraphContract = hasTwoParagraphContract(question);
   const hasConstraintEvidence = Boolean(constraintEvidence?.trim());
+  const spec = resolveHelixAskVerbositySpec(verbosity);
+  const paragraphDescriptor = verbosity === "brief" ? "short " : "";
   if (format === "steps") {
-    lines.push("Start directly with a numbered list using `1.` style; use 5-7 steps and no preamble.");
+    lines.push(
+      `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
+    );
     lines.push("First 1-2 steps define the general concept (no citations).");
     if (hasRepoEvidence) {
       lines.push("Remaining steps map to this system and must cite repo file paths from the repo evidence section.");
@@ -7930,15 +8207,15 @@ function buildHelixAskHybridPrompt(
       lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     }
     if (!twoParagraphContract) {
-      lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+      lines.push(
+        `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
+      );
     }
   } else {
     lines.push(
       twoParagraphContract
-        ? "Write two short paragraphs."
-        : composite
-        ? "Write two paragraphs with 2-3 sentences each (aim for 5-7 sentences total)."
-        : "Write two short paragraphs.",
+        ? `Write two ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each.`
+        : `Write two ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each.`,
     );
     lines.push("Paragraph 1: general explanation using only the general reasoning bullets (no citations).");
     if (hasRepoEvidence) {
@@ -7952,7 +8229,9 @@ function buildHelixAskHybridPrompt(
       );
     }
     if (!composite && !twoParagraphContract) {
-      lines.push("If the question is comparative, include a short bullet list (2-4 items) after paragraph 2.");
+      lines.push(
+        `If the question is comparative, include a short bullet list (${spec.compareBullets} items) after paragraph 2.`,
+      );
     }
     if (composite) {
       lines.push(
@@ -7962,8 +8241,10 @@ function buildHelixAskHybridPrompt(
       lines.push("Avoid listing file names without explaining their role.");
       lines.push("Do not mention evidence bullets, anchors, or the prompt structure.");
     }
-    if (!composite && !twoParagraphContract) {
-      lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    if (!twoParagraphContract) {
+      lines.push(
+        `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+      );
     }
   }
   lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
@@ -7990,9 +8271,12 @@ function buildGeneralAskSynthesisPrompt(
   scaffold: string,
   format: HelixAskFormat,
   stageTags: boolean,
+  verbosity: HelixAskVerbosity,
 ): string {
   const lines = ["You are Helix Ask."];
   const twoParagraphContract = hasTwoParagraphContract(question);
+  const spec = resolveHelixAskVerbositySpec(verbosity);
+  const paragraphDescriptor = verbosity === "brief" ? "short " : "";
   if (format === "steps") {
     lines.push("Use only the reasoning steps below. Do not add new steps.");
     if (stageTags) {
@@ -8000,22 +8284,30 @@ function buildGeneralAskSynthesisPrompt(
     } else {
       lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     }
-    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
-    lines.push("Each step should be 1-2 sentences.");
+    lines.push(
+      `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
+    );
+    lines.push(`Each step should be ${spec.steps.sentences} sentences.`);
     if (!twoParagraphContract) {
-      lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+      lines.push(
+        `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
+      );
     }
     lines.push("Reasoning steps:");
   } else {
     lines.push("Use only the reasoning bullets below. Do not add new claims.");
     lines.push(
       twoParagraphContract
-        ? "Answer in two short paragraphs; do not use numbered steps."
-        : "Answer in 1-2 short paragraphs; do not use numbered steps.",
+        ? `Answer in two ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`
+        : `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`,
     );
-    lines.push("If the question is comparative, include a short bullet list (2-4 items) of concrete differences.");
+    lines.push(
+      `If the question is comparative, include a short bullet list (${spec.compareBullets} items) of concrete differences.`,
+    );
     if (!twoParagraphContract) {
-      lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+      lines.push(
+        `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+      );
     }
     lines.push("Reasoning bullets:");
   }
@@ -8036,22 +8328,34 @@ function buildHelixAskConstraintPrompt(
   evidence: string,
   format: HelixAskFormat,
   stageTags: boolean,
+  verbosity: HelixAskVerbosity,
 ): string {
   const lines = [
     "You are Helix Ask, a constraint-grounded assistant.",
     "Use only the evidence below. Do not speculate beyond the gate or certificate data.",
     "Cite gate ids (gate:...) or certificate ids (certificate:...) when referencing residuals or viability.",
   ];
+  const spec = resolveHelixAskVerbositySpec(verbosity);
   if (format === "steps") {
-    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
-    lines.push("Each step should be 1-2 sentences and cite the relevant gate or certificate.");
+    lines.push(
+      `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
+    );
+    lines.push(
+      `Each step should be ${spec.steps.sentences} sentences and cite the relevant gate or certificate.`,
+    );
     if (stageTags) {
       lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
     }
-    lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    lines.push(
+      `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
+    );
   } else {
-    lines.push("Answer in 1-2 short paragraphs; do not use numbered steps.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
+    lines.push(
+      `Answer in ${spec.paragraphs.count} ${verbosity === "brief" ? "short " : ""}paragraphs with ${spec.paragraphs.sentences} sentences each; do not use numbered steps.`,
+    );
+    lines.push(
+      `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
+    );
   }
   lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
   lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
@@ -11602,6 +11906,16 @@ const executeHelixAsk = async ({
       scaffold_tokens?: number;
       evidence_tokens?: number;
       repair_tokens?: number;
+      answer_token_budget?: number;
+      answer_token_cap?: number;
+      answer_token_base?: number;
+      answer_token_boosts?: string[];
+      answer_token_reason?: string;
+      answer_retry_applied?: boolean;
+      answer_retry_reason?: string;
+      answer_retry_max_tokens?: number;
+      answer_short_sentences?: number;
+      answer_short_tokens?: number;
       arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
       arbiter_reason?: string;
       arbiter_strictness?: "low" | "med" | "high";
@@ -13237,7 +13551,17 @@ const executeHelixAsk = async ({
       contextText,
       hasQuestion: Boolean(questionValue ?? question),
     });
-    const answerTokenBudget = Math.min(parsed.data.max_tokens ?? scaffoldTokens, 8192);
+    const answerTokenBudgetEstimate = computeAnswerTokenBudget({
+      verbosity,
+      format: formatSpec.format,
+      scaffoldTokens,
+      evidenceText: contextText,
+      definitionFocus,
+      composite: compositeRequest.enabled,
+      hasRepoEvidence: isRepoQuestion,
+      hasGeneralEvidence: !isRepoQuestion,
+      maxTokensOverride: parsed.data.max_tokens,
+    });
     let promptIngested = false;
     let promptIngestReason: string | undefined;
     let promptIngestSource: string | undefined;
@@ -13249,7 +13573,8 @@ const executeHelixAsk = async ({
     let promptUsedSections: string[] = [];
     if (longPromptCandidate) {
       const estimatedTokens = estimateTokenCount(longPromptCandidate.text);
-      const estimatedTotal = estimatedTokens + answerTokenBudget + HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS;
+      const estimatedTotal =
+        estimatedTokens + answerTokenBudgetEstimate.tokens + HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS;
       if (
         estimatedTokens >= HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS ||
         estimatedTotal > HELIX_ASK_LOCAL_CONTEXT_TOKENS
@@ -13318,6 +13643,7 @@ const executeHelixAsk = async ({
     let verificationAnchorRequired = false;
     let verificationAnchorHints: string[] = [];
     let forcedAnswer: string | null = null;
+    let forcedAnswerIsHard = false;
     if (preIntentClarify) {
       if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
         const scientific = buildScientificMicroReport({
@@ -13330,6 +13656,7 @@ const executeHelixAsk = async ({
           requiresRepoEvidence,
         });
         forcedAnswer = scientific.text;
+        forcedAnswerIsHard = true;
         if (debugPayload) {
           debugPayload.scientific_response_applied = true;
           debugPayload.next_evidence_count = scientific.nextEvidence.length;
@@ -13339,6 +13666,7 @@ const executeHelixAsk = async ({
         }
       } else {
         forcedAnswer = preIntentClarify;
+        forcedAnswerIsHard = true;
       }
       answerPath.push("clarify:pre_intent");
       if (debugPayload) {
@@ -13867,6 +14195,7 @@ const executeHelixAsk = async ({
     const mathSolverOk = mathSolveResult?.ok === true;
     if (mathSolveResult && mathSolveResult.ok) {
       forcedAnswer = buildHelixAskMathAnswer(mathSolveResult);
+      forcedAnswerIsHard = true;
       answerPath.push("forcedAnswer:math_solver");
     }
     if (conceptFastPath && conceptMatch && !forcedAnswer) {
@@ -13932,6 +14261,7 @@ const executeHelixAsk = async ({
           const traceAnswer = buildWarpConstraintAnswer(evidenceText, baseQuestion, verbosity);
           if (traceAnswer) {
             forcedAnswer = traceAnswer;
+            forcedAnswerIsHard = true;
             answerPath.push("forcedAnswer:constraint_report");
           }
         }
@@ -13941,6 +14271,7 @@ const executeHelixAsk = async ({
             evidenceText,
             formatSpec.format,
             formatSpec.stageTags,
+            verbosity,
           ),
         );
       } else if (compositeConstraintRequested && constraintEvidenceText) {
@@ -14044,8 +14375,8 @@ const executeHelixAsk = async ({
           }
         }
       const basePrompt = isRepoQuestion
-        ? buildGroundedAskPrompt(question, contextText, formatSpec.format, formatSpec.stageTags)
-        : buildGeneralAskPrompt(question, formatSpec.format, formatSpec.stageTags);
+        ? buildGroundedAskPrompt(question, contextText, formatSpec.format, formatSpec.stageTags, verbosity)
+        : buildGeneralAskPrompt(question, formatSpec.format, formatSpec.stageTags, verbosity);
       prompt = ensureFinalMarker(basePrompt);
     }
     if (!prompt) {
@@ -16652,6 +16983,7 @@ const executeHelixAsk = async ({
             requiresRepoEvidence,
           });
           forcedAnswer = scientific.text;
+          forcedAnswerIsHard = true;
           if (debugPayload) {
             debugPayload.scientific_response_applied = true;
             debugPayload.next_evidence_count = scientific.nextEvidence.length;
@@ -16662,6 +16994,7 @@ const executeHelixAsk = async ({
           recordAgentAction("render_scientific_micro_report", "ambiguity_gate", "return_scaffold");
         } else {
           forcedAnswer = clarifyLine;
+          forcedAnswerIsHard = true;
         }
         answerPath.push("clarify:ambiguity");
         if (debugPayload) {
@@ -16722,6 +17055,7 @@ const executeHelixAsk = async ({
             requiresRepoEvidence,
           });
           forcedAnswer = scientific.text;
+          forcedAnswerIsHard = true;
           if (debugPayload) {
             debugPayload.scientific_response_applied = true;
             debugPayload.next_evidence_count = scientific.nextEvidence.length;
@@ -16736,6 +17070,7 @@ const executeHelixAsk = async ({
           recordAgentAction("render_scientific_micro_report", "fail_closed", "return_scaffold");
         } else {
           forcedAnswer = clarifyLine;
+          forcedAnswerIsHard = true;
         }
         answerPath.push(`failClosed:${failLabel}`);
         logEvent("Fail-closed", failLabel, clarifyLine);
@@ -16791,6 +17126,7 @@ const executeHelixAsk = async ({
           hasRepoEvidence,
           formatSpec.format,
           formatSpec.stageTags,
+          verbosity,
           constraintEvidenceText,
           compositeRequest.enabled,
         );
@@ -16837,6 +17173,7 @@ const executeHelixAsk = async ({
             repoScaffold,
             formatSpec.format,
             formatSpec.stageTags,
+            verbosity,
             softExpansionBudget,
           ),
         );
@@ -16856,6 +17193,7 @@ const executeHelixAsk = async ({
             promptScaffold,
             formatSpec.format,
             formatSpec.stageTags,
+            verbosity,
             softExpansionBudget,
           ),
         );
@@ -16875,6 +17213,7 @@ const executeHelixAsk = async ({
             generalScaffold,
             formatSpec.format,
             formatSpec.stageTags,
+            verbosity,
           ),
         );
         if (debugPayload && generalScaffold) {
@@ -16886,7 +17225,9 @@ const executeHelixAsk = async ({
           generalScaffold,
         );
       } else if (baseQuestion) {
-        prompt = ensureFinalMarker(buildGeneralAskPrompt(baseQuestion, formatSpec.format, formatSpec.stageTags));
+        prompt = ensureFinalMarker(
+          buildGeneralAskPrompt(baseQuestion, formatSpec.format, formatSpec.stageTags, verbosity),
+        );
       }
     } else if (!skipMicroPass && !dryRun) {
       const useTwoPass =
@@ -16958,6 +17299,7 @@ const executeHelixAsk = async ({
                 scaffoldText,
                 formatSpec.format,
                 formatSpec.stageTags,
+                verbosity,
                 softExpansionBudget,
               ),
             );
@@ -17004,21 +17346,43 @@ const executeHelixAsk = async ({
     }
     const answerStart = Date.now();
     logProgress("Generating answer");
-    if (conceptAnswer || forcedAnswer) {
-      result = { text: forcedAnswer ?? conceptAnswer ?? "" } as LocalAskResult;
+    const fallbackAnswer = forcedAnswer ?? conceptAnswer ?? "";
+    const shouldShortCircuitAnswer =
+      Boolean(fallbackAnswer) && (forcedAnswerIsHard || !prompt);
+    if (shouldShortCircuitAnswer) {
+      result = { text: fallbackAnswer } as LocalAskResult;
       logProgress("Answer ready", "concept", answerStart);
       answerPath.push("answer:forced");
     } else {
+      const answerBudget = computeAnswerTokenBudget({
+        verbosity,
+        format: formatSpec.format,
+        scaffoldTokens,
+        evidenceText: evidenceText || repoScaffold || generalScaffold || contextText,
+        definitionFocus,
+        composite: compositeRequest.enabled,
+        hasRepoEvidence: Boolean(repoScaffold?.trim()),
+        hasGeneralEvidence: Boolean(generalEvidence?.trim()),
+        maxTokensOverride: parsed.data.max_tokens,
+      });
+      const answerMaxTokens = answerBudget.tokens;
+      if (debugPayload) {
+        debugPayload.answer_token_budget = answerMaxTokens;
+        debugPayload.answer_token_cap = answerBudget.cap;
+        debugPayload.answer_token_base = answerBudget.base;
+        debugPayload.answer_token_boosts = answerBudget.boosts;
+        debugPayload.answer_token_reason = answerBudget.reason;
+      }
       logDebug("llmLocalHandler MAIN start", {
-        maxTokens: parsed.data.max_tokens ?? null,
+        maxTokens: answerMaxTokens,
         temperature: parsed.data.temperature ?? null,
       });
-      const answerFallbackTokens = parsed.data.max_tokens ?? scaffoldTokens;
+      const answerFallbackTokens = answerMaxTokens;
       const llmAnswerStart = logStepStart(
         "LLM answer",
-        `tokens=${answerFallbackTokens}`,
+        `tokens=${answerMaxTokens}`,
         {
-          maxTokens: answerFallbackTokens,
+          maxTokens: answerMaxTokens,
           fn: "runHelixAskLocalWithOverflowRetry",
           label: "answer",
         },
@@ -17027,7 +17391,7 @@ const executeHelixAsk = async ({
         await runHelixAskLocalWithOverflowRetry(
           {
             prompt,
-            max_tokens: parsed.data.max_tokens,
+            max_tokens: answerMaxTokens,
             temperature: parsed.data.temperature,
             seed: parsed.data.seed,
             stop: parsed.data.stop,
@@ -17045,7 +17409,92 @@ const executeHelixAsk = async ({
           },
         );
       recordOverflow("answer", answerOverflow);
-      result = answerResult as LocalAskResult;
+      let answerText = (answerResult as LocalAskResult)?.text ?? "";
+      let answerMeta = isShortAnswer(answerText, verbosity);
+      let retryApplied = false;
+      if (
+        HELIX_ASK_SHORT_ANSWER_RETRY_MAX > 0 &&
+        answerMeta.short &&
+        evidenceGateOk &&
+        !slotCoverageFailed &&
+        !docSlotCoverageFailed &&
+        !answerBudget.override
+      ) {
+        const retryBudget = clampNumber(
+          Math.min(Math.round(answerMaxTokens * 1.35), answerBudget.cap),
+          128,
+          answerBudget.cap,
+        );
+        if (retryBudget > answerMaxTokens) {
+          const retryStart = logStepStart(
+            "LLM answer retry",
+            `tokens=${retryBudget}`,
+            {
+              maxTokens: retryBudget,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "answer_retry",
+            },
+          );
+          const { result: retryResult, overflow: retryOverflow } =
+            await runHelixAskLocalWithOverflowRetry(
+              {
+                prompt,
+                max_tokens: retryBudget,
+                temperature: parsed.data.temperature,
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+                onToken: streamEmitter.onToken,
+              },
+              {
+                fallbackMaxTokens: retryBudget,
+                allowContextDrop: true,
+                label: "answer_retry",
+              },
+            );
+          recordOverflow("answer_retry", retryOverflow);
+          logStepEnd(
+            "LLM answer retry",
+            "done",
+            retryStart,
+            true,
+            {
+              textLength: typeof retryResult?.text === "string" ? retryResult.text.length : 0,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "answer_retry",
+            },
+          );
+          answerText = (retryResult as LocalAskResult)?.text ?? answerText;
+          answerMeta = isShortAnswer(answerText, verbosity);
+          retryApplied = true;
+          if (debugPayload) {
+            debugPayload.answer_retry_applied = true;
+            debugPayload.answer_retry_reason = "short_answer";
+            debugPayload.answer_retry_max_tokens = retryBudget;
+          }
+          result = retryResult as LocalAskResult;
+        } else {
+          result = answerResult as LocalAskResult;
+        }
+      } else {
+        result = answerResult as LocalAskResult;
+      }
+      if ((!result?.text || !result.text.trim()) && fallbackAnswer) {
+        result = { text: fallbackAnswer } as LocalAskResult;
+        answerText = fallbackAnswer;
+        answerPath.push("answer:fallback");
+      }
+      if (debugPayload) {
+        debugPayload.answer_short_sentences = answerMeta.sentences;
+        debugPayload.answer_short_tokens = answerMeta.tokens;
+        if (!retryApplied) {
+          debugPayload.answer_retry_applied = false;
+        }
+      }
       logDebug("llmLocalHandler MAIN complete", {
         textLength: typeof result.text === "string" ? result.text.length : 0,
       });
