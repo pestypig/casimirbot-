@@ -14034,6 +14034,24 @@ const executeHelixAsk = async ({
             `${slotPlan.slots.length} slots`,
             `${slotLabels.join(", ")}${suffix}`,
           );
+          const optionalSlots = slotPlan.slots
+            .filter((slot) => !slot.required && !isWeakSlot(slot))
+            .map((slot) => slot.id);
+          const weakSlots = slotPlan.slots.filter((slot) => isWeakSlot(slot)).map((slot) => slot.id);
+          const requiredPreview = requiredSlotIds.slice(0, 8).join(", ");
+          const optionalPreview = optionalSlots.slice(0, 8).join(", ");
+          const requirementLines = [
+            requiredSlotIds.length ? `required: ${requiredPreview}` : "required: none",
+            optionalSlots.length ? `optional: ${optionalPreview}` : "optional: none",
+            weakSlots.length ? `weak=${weakSlots.length}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+          logEvent(
+            "Slot requirements",
+            `required=${requiredSlotIds.length} optional=${optionalSlots.length}`,
+            requirementLines,
+          );
         }
         if (debugPayload) {
           debugPayload.slot_plan = slotPlan.slots.map((slot) => ({
