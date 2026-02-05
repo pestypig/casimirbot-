@@ -14039,6 +14039,7 @@ const executeHelixAsk = async ({
     let slotAliases: string[] = [];
     let slotEvidenceHints: string[] = [];
     let slotAliasMap: Record<string, string[]> | null = null;
+    let coverageSlotAliasMap: Record<string, string[]> | null = null;
     let slotCoverageOk = true;
     let slotCoverageFailed = false;
     let docSlotCoverageFailed = false;
@@ -14261,6 +14262,14 @@ const executeHelixAsk = async ({
           slotAliases = collectSlotAliasHints(slotPlan);
           slotEvidenceHints = collectSlotEvidenceHints(slotPlan);
           slotAliasMap = buildSlotAliasMap(slotPlan);
+          coverageSlotAliasMap =
+            slotAliasMap && coverageSlots.length > 0
+              ? Object.fromEntries(
+                  Object.entries(slotAliasMap).filter(([slotId]) =>
+                    coverageSlots.includes(slotId),
+                  ),
+                )
+              : null;
           if (debugPayload) {
             const tierCounts = { A: 0, B: 0, C: 0 } as { A: number; B: number; C: number };
             const tierList = slotPlan.slots.map((slot) => {
@@ -14675,7 +14684,7 @@ const executeHelixAsk = async ({
             conceptMatch,
             domain: intentDomain,
             explicitSlots: coverageSlots,
-            slotAliases: slotAliasMap ?? undefined,
+            slotAliases: coverageSlotAliasMap ?? undefined,
             includeQuestionTokens: coverageSlots.length === 0,
           });
           const docRequiredSlots = resolveDocRequiredSlots(slotPlan);
@@ -14711,7 +14720,7 @@ const executeHelixAsk = async ({
                     conceptMatch,
                     domain: intentDomain,
                     explicitSlots: coverageSlots,
-                    slotAliases: slotAliasMap ?? undefined,
+                    slotAliases: coverageSlotAliasMap ?? undefined,
                     includeQuestionTokens: coverageSlots.length === 0,
                   })
                 : coverageSlotSummary;
@@ -14868,7 +14877,7 @@ const executeHelixAsk = async ({
               conceptMatch,
               domain: intentDomain,
               explicitSlots: coverageSlots,
-              slotAliases: slotAliasMap ?? undefined,
+              slotAliases: coverageSlotAliasMap ?? undefined,
               includeQuestionTokens: coverageSlots.length === 0,
             });
             if (slotPlan && docSlotTargets.length > 0) {
@@ -14883,7 +14892,7 @@ const executeHelixAsk = async ({
                       conceptMatch,
                       domain: intentDomain,
                       explicitSlots: coverageSlots,
-                      slotAliases: slotAliasMap ?? undefined,
+                      slotAliases: coverageSlotAliasMap ?? undefined,
                       includeQuestionTokens: coverageSlots.length === 0,
                     })
                   : coverageSlotSummary;
@@ -15084,7 +15093,7 @@ const executeHelixAsk = async ({
             conceptMatch,
             domain: intentDomain,
             explicitSlots: coverageSlots,
-            slotAliases: slotAliasMap ?? undefined,
+            slotAliases: coverageSlotAliasMap ?? undefined,
             includeQuestionTokens: coverageSlots.length === 0,
           });
         }
@@ -15117,7 +15126,7 @@ const executeHelixAsk = async ({
               conceptMatch,
               domain: intentDomain,
               explicitSlots: coverageSlots,
-              slotAliases: slotAliasMap ?? undefined,
+              slotAliases: coverageSlotAliasMap ?? undefined,
               includeQuestionTokens: coverageSlots.length === 0,
             });
           }
@@ -15242,7 +15251,7 @@ const executeHelixAsk = async ({
             conceptMatch,
             domain: intentDomain,
             explicitSlots: coverageSlots,
-            slotAliases: slotAliasMap ?? undefined,
+            slotAliases: coverageSlotAliasMap ?? undefined,
             includeQuestionTokens: coverageSlots.length === 0,
           });
         }
@@ -15270,7 +15279,7 @@ const executeHelixAsk = async ({
               conceptMatch,
               domain: intentDomain,
               explicitSlots: coverageSlots,
-              slotAliases: slotAliasMap ?? undefined,
+              slotAliases: coverageSlotAliasMap ?? undefined,
               includeQuestionTokens: coverageSlots.length === 0,
             });
           }
@@ -15571,7 +15580,7 @@ const executeHelixAsk = async ({
             conceptMatch,
             domain: intentDomain,
             explicitSlots: coverageSlots,
-            slotAliases: slotAliasMap ?? undefined,
+            slotAliases: coverageSlotAliasMap ?? undefined,
             includeQuestionTokens: coverageSlots.length === 0,
           });
           const attemptDocSelection = selectDocBlocks(contextText, definitionFocus);
@@ -15603,7 +15612,7 @@ const executeHelixAsk = async ({
               conceptMatch,
               domain: intentDomain,
               explicitSlots: coverageSlots,
-              slotAliases: slotAliasMap ?? undefined,
+              slotAliases: coverageSlotAliasMap ?? undefined,
               includeQuestionTokens: coverageSlots.length === 0,
             });
           }
@@ -17295,7 +17304,7 @@ const executeHelixAsk = async ({
         evidenceGateOk,
         requiresRepoEvidence,
         coverageSlots: coverageSlots.length > 0 ? coverageSlots : undefined,
-        coverageSlotAliases: slotAliasMap ?? undefined,
+        coverageSlotAliases: coverageSlotAliasMap ?? undefined,
         generalScaffold,
         repoScaffold,
         promptScaffold,
@@ -17402,7 +17411,7 @@ const executeHelixAsk = async ({
               evidenceGateOk,
               requiresRepoEvidence,
               coverageSlots: coverageSlots.length > 0 ? coverageSlots : undefined,
-              coverageSlotAliases: slotAliasMap ?? undefined,
+              coverageSlotAliases: coverageSlotAliasMap ?? undefined,
               generalScaffold,
               repoScaffold,
               promptScaffold,
@@ -17479,7 +17488,7 @@ const executeHelixAsk = async ({
         evidenceGateOk,
         requiresRepoEvidence,
         coverageSlots: coverageSlots.length > 0 ? coverageSlots : undefined,
-        coverageSlotAliases: slotAliasMap ?? undefined,
+        coverageSlotAliases: coverageSlotAliasMap ?? undefined,
         generalScaffold,
         repoScaffold,
         promptScaffold,
