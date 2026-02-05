@@ -415,6 +415,9 @@ const PROOF_POINTER_RE = /\b(?:Span:\s*L\d+|Section:\s+|symbol=)\b/i;
 const hasProofPointer = (text?: string): boolean =>
   Boolean(text && PROOF_POINTER_RE.test(text));
 
+const shouldAllowTokenSupport = (input: HelixAskPlatonicInput): boolean =>
+  input.domain === "general" && input.requiresRepoEvidence !== true;
+
 const buildClaimLedger = (
   input: HelixAskPlatonicInput,
   claims: ClaimNode[],
@@ -431,12 +434,15 @@ const buildClaimLedger = (
   const ledger: HelixAskClaimLedgerEntry[] = [];
   const uncertainty: HelixAskUncertaintyEntry[] = [];
   const enforceEvidenceRefs = input.requiresRepoEvidence === true;
+  const allowTokenSupport = shouldAllowTokenSupport(input);
   const proofPointerPresent = hasProofPointer(evidenceText);
   const globalEvidenceRefs = ensureUnique(extractFilePathsFromText(input.answer)).slice(0, 3);
   for (const claim of claims) {
     const claimEvidenceRefs =
       claim.evidenceRefs.length > 0 ? claim.evidenceRefs : globalEvidenceRefs;
-    const supportedByTokens = isClaimSupported(claim.tokens, evidenceTokens);
+    const supportedByTokens = allowTokenSupport
+      ? isClaimSupported(claim.tokens, evidenceTokens)
+      : false;
     const supported = enforceEvidenceRefs
       ? claimEvidenceRefs.length > 0 && proofPointerPresent
       : claimEvidenceRefs.length > 0 || supportedByTokens;
@@ -1123,6 +1129,7 @@ function computeBeliefSummary(input: HelixAskPlatonicInput): HelixAskBeliefSumma
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
   const questionTokens = toTokenSet(input.question);
   const enforceEvidenceRefs = input.requiresRepoEvidence === true;
+  const allowTokenSupport = shouldAllowTokenSupport(input);
   const proofPointerPresent = hasProofPointer(evidenceText);
   const globalEvidenceRefs = extractFilePathsFromText(input.answer);
   let supportedCount = 0;
@@ -1140,6 +1147,10 @@ function computeBeliefSummary(input: HelixAskPlatonicInput): HelixAskBeliefSumma
     }
     if (hasEvidenceRef) {
       supportedCount += 1;
+      continue;
+    }
+    if (!allowTokenSupport) {
+      unsupportedCount += 1;
       continue;
     }
     if (evidenceTokens.size === 0) {
@@ -1210,6 +1221,7 @@ function buildBeliefGraphSummary(
     .filter((line) => CONSTRAINT_LINE_RE.test(line));
   const constraintCount = constraintLines.length;
   const enforceEvidenceRefs = input.requiresRepoEvidence === true;
+  const allowTokenSupport = shouldAllowTokenSupport(input);
   let supports = 0;
   let mapsTo = 0;
   let dependsOn = 0;
@@ -1224,7 +1236,9 @@ function buildBeliefGraphSummary(
     if (hasEvidenceRef) {
       mapsTo += claimEvidenceRefs.length;
     }
-    const supportedByTokens = isClaimSupported(claim.tokens, evidenceTokens);
+    const supportedByTokens = allowTokenSupport
+      ? isClaimSupported(claim.tokens, evidenceTokens)
+      : false;
     const supported = enforceEvidenceRefs
       ? hasEvidenceRef && proofPointerPresent
       : hasEvidenceRef || supportedByTokens;
@@ -1454,6 +1468,7 @@ const chooseVariantCandidate = (
   const evidenceTokens = evidenceText ? toTokenSet(evidenceText) : new Set<string>();
   const proofPointerPresent = hasProofPointer(evidenceText);
   const enforceEvidenceRefs = input.requiresRepoEvidence === true;
+  const allowTokenSupport = shouldAllowTokenSupport(input);
   const globalEvidenceRefs = ensureUnique(extractFilePathsFromText(input.answer)).slice(0, 3);
   if (evidenceTokens.size === 0) {
     return {
@@ -1471,7 +1486,8 @@ const chooseVariantCandidate = (
       if (enforceEvidenceRefs) {
         return claimEvidenceRefs.length > 0 && proofPointerPresent;
       }
-      return claimEvidenceRefs.length > 0 || isClaimSupported(claim.tokens, evidenceTokens);
+      if (claimEvidenceRefs.length > 0) return true;
+      return allowTokenSupport && isClaimSupported(claim.tokens, evidenceTokens);
     })(),
     questionAligned: isQuestionAligned(claim.tokens, questionTokens),
   }));
