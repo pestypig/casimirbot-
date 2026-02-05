@@ -7852,6 +7852,92 @@ function buildDefinitionDocBullet(block: { path: string; block: string }): strin
   return `- Definition: ${prefix}${summary} (see ${block.path})`;
 }
 
+type HelixAskTreeWalkMetrics = {
+  treeCount: number;
+  nodeCount: number;
+  nodesWithText: number;
+  nodesWithoutText: number;
+  stepCount: number;
+  treeIds: string[];
+  primaryTreeId?: string;
+};
+
+const normalizeTreeWalkKey = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+
+function buildHelixAskTreeWalk(
+  pack: HelixAskGraphPack | null,
+): { text: string; metrics: HelixAskTreeWalkMetrics | null } {
+  if (!pack?.frameworks?.length) {
+    return { text: "", metrics: null };
+  }
+  const lines: string[] = [];
+  let nodeCount = 0;
+  let nodesWithText = 0;
+  let nodesWithoutText = 0;
+  for (const framework of pack.frameworks) {
+    const label = framework.treeLabel ?? framework.treeId;
+    const header = `Tree Walk: ${label} (tree-derived; source: ${framework.sourcePath})`;
+    lines.push(header);
+    const anchorIds = new Set(framework.anchors.map((node) => node.id));
+    framework.path.forEach((node, idx) => {
+      nodeCount += 1;
+      const title = node.title ?? node.id;
+      const roleLabel = node.role
+        ? `Role:${node.role}`
+        : anchorIds.has(node.id)
+          ? "Anchor"
+          : "Walk";
+      const idSuffix =
+        node.id && normalizeTreeWalkKey(title) !== normalizeTreeWalkKey(node.id)
+          ? ` (${node.id})`
+          : "";
+      let detail = node.excerpt?.trim() ?? "";
+      if (!detail && node.artifact) {
+        detail = `Minimal artifact: ${node.artifact.trim()}`;
+      }
+      if (detail) {
+        nodesWithText += 1;
+        detail = ensureSentence(clipAskText(detail, 200));
+      } else {
+        nodesWithoutText += 1;
+        detail = "No detail provided in the tree node.";
+      }
+      lines.push(
+        `${idx + 1}. ${roleLabel}: ${title}${idSuffix} — ${detail} (${framework.sourcePath})`,
+      );
+    });
+    lines.push("");
+  }
+  const trimmed = lines.join("\n").trim();
+  const metrics: HelixAskTreeWalkMetrics = {
+    treeCount: pack.frameworks.length,
+    nodeCount,
+    nodesWithText,
+    nodesWithoutText,
+    stepCount: nodeCount,
+    treeIds: pack.treeIds,
+    primaryTreeId: pack.primaryTreeId,
+  };
+  return { text: trimmed, metrics };
+}
+
+function ensureTreeWalkInAnswer(
+  answerText: string,
+  treeWalkBlock: string,
+): { text: string; injected: boolean } {
+  const trimmedWalk = treeWalkBlock.trim();
+  if (!trimmedWalk) return { text: answerText, injected: false };
+  const current = answerText ?? "";
+  const hasTreeWalk =
+    /(^|\n)\s*Tree Walk:/i.test(current) ||
+    current.includes(trimmedWalk.split(/\r?\n/)[0] ?? "");
+  if (hasTreeWalk) return { text: current, injected: false };
+  const base = current.trim();
+  if (!base) return { text: trimmedWalk, injected: true };
+  return { text: `${base}\n\n${trimmedWalk}`, injected: true };
+}
+
 function appendContextBlock(contextText: string, block: string): string {
   const trimmedBlock = block?.trim() ?? "";
   if (!trimmedBlock) return contextText;
@@ -8063,6 +8149,9 @@ function buildHelixAskSynthesisPrompt(
         `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
       );
     }
+    lines.push(
+      "If the evidence includes a block starting with \"Tree Walk:\", include that block verbatim after the steps (keep its numbering and header).",
+    );
     lines.push("Evidence steps:");
   } else {
     lines.push("Use only the evidence bullets below. Do not add new claims.");
@@ -8073,6 +8162,9 @@ function buildHelixAskSynthesisPrompt(
     );
     lines.push(
       `If the question is comparative, include a short bullet list (${spec.compareBullets} items) of concrete differences grounded in repo details.`,
+    );
+    lines.push(
+      "If the evidence includes a block starting with \"Tree Walk:\", include that block verbatim after the first paragraph (keep its numbering and header).",
     );
     lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     if (!twoParagraphContract) {
@@ -8211,6 +8303,9 @@ function buildHelixAskHybridPrompt(
         `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
       );
     }
+    lines.push(
+      "If the repo evidence includes a block starting with \"Tree Walk:\", include that block verbatim after the steps (keep its numbering and header).",
+    );
   } else {
     lines.push(
       twoParagraphContract
@@ -8241,6 +8336,9 @@ function buildHelixAskHybridPrompt(
       lines.push("Avoid listing file names without explaining their role.");
       lines.push("Do not mention evidence bullets, anchors, or the prompt structure.");
     }
+    lines.push(
+      "If the repo evidence includes a block starting with \"Tree Walk:\", include that block verbatim after paragraph 1 (keep its numbering and header).",
+    );
     if (!twoParagraphContract) {
       lines.push(
         `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
@@ -13638,6 +13736,8 @@ const executeHelixAsk = async ({
     }
     let conceptMatch: HelixAskConceptMatch | null = null;
     let graphPack: HelixAskGraphPack | null = null;
+    let treeWalkBlock = "";
+    let treeWalkMetrics: HelixAskTreeWalkMetrics | null = null;
     let graphResolverPreferred = false;
     let mathSolveResult: HelixAskMathSolveResult | null = null;
     let verificationAnchorRequired = false;
@@ -13839,6 +13939,16 @@ const executeHelixAsk = async ({
             score: framework.rankScore ?? null,
           })),
         };
+      }
+      const treeWalk = buildHelixAskTreeWalk(graphPack);
+      treeWalkBlock = treeWalk.text;
+      treeWalkMetrics = treeWalk.metrics;
+      if (debugPayload && treeWalkMetrics) {
+        debugPayload.tree_walk = treeWalkMetrics;
+        debugPayload.tree_walk_lines = treeWalkBlock
+          ? treeWalkBlock.split(/\r?\n/).filter((line) => line.trim()).length
+          : 0;
+        debugPayload.tree_walk_block_present = Boolean(treeWalkBlock);
       }
     }
     const baseEvidenceSignalTokens = Array.from(
@@ -16755,26 +16865,30 @@ const executeHelixAsk = async ({
         }
       }
 
-      if (graphPack?.scaffoldText && (isRepoQuestion || wantsHybrid)) {
-        repoScaffold = mergeEvidenceScaffolds(repoScaffold, graphPack.scaffoldText);
+      if (definitionFocus && repoScaffold) {
+        const filtered = filterEvidenceBulletsByPath(repoScaffold, isDefinitionDocPath);
+        repoScaffold = filtered;
+        const docEvidencePaths = extractFilePathsFromText(repoScaffold).filter(isDefinitionDocPath);
+        const definitionDocBlocks = resolveDefinitionDocBlocks(
+          docBlocks,
+          conceptMatch,
+          definitionFocus,
+        );
+        if ((!repoScaffold || docEvidencePaths.length === 0) && definitionDocBlocks.length > 0) {
+          const fallbackBullet = buildDefinitionDocBullet(definitionDocBlocks[0]);
+          repoScaffold = mergeEvidenceScaffolds(fallbackBullet, repoScaffold);
+        }
+        if (debugPayload) {
+          debugPayload.definition_doc_filtered = Boolean(filtered);
+          debugPayload.definition_doc_paths = docEvidencePaths.slice(0, 6);
+        }
       }
 
-        if (definitionFocus && repoScaffold) {
-          const filtered = filterEvidenceBulletsByPath(repoScaffold, isDefinitionDocPath);
-          repoScaffold = filtered;
-          const docEvidencePaths = extractFilePathsFromText(repoScaffold).filter(isDefinitionDocPath);
-          const definitionDocBlocks = resolveDefinitionDocBlocks(
-            docBlocks,
-            conceptMatch,
-            definitionFocus,
-          );
-          if ((!repoScaffold || docEvidencePaths.length === 0) && definitionDocBlocks.length > 0) {
-            const fallbackBullet = buildDefinitionDocBullet(definitionDocBlocks[0]);
-            repoScaffold = mergeEvidenceScaffolds(fallbackBullet, repoScaffold);
-          }
-          if (debugPayload) {
-            debugPayload.definition_doc_filtered = Boolean(filtered);
-            debugPayload.definition_doc_paths = docEvidencePaths.slice(0, 6);
+      if (isRepoQuestion || wantsHybrid) {
+        if (treeWalkBlock) {
+          repoScaffold = mergeEvidenceScaffolds(repoScaffold, treeWalkBlock);
+        } else if (graphPack?.scaffoldText) {
+          repoScaffold = mergeEvidenceScaffolds(repoScaffold, graphPack.scaffoldText);
         }
       }
 
@@ -17498,6 +17612,19 @@ const executeHelixAsk = async ({
         result = { text: fallbackAnswer } as LocalAskResult;
         answerText = fallbackAnswer;
         answerPath.push("answer:fallback");
+      }
+      if (treeWalkBlock && typeof result?.text === "string") {
+        const treeWalkApplied = ensureTreeWalkInAnswer(result.text, treeWalkBlock);
+        if (treeWalkApplied.injected) {
+          result.text = treeWalkApplied.text;
+          answerText = treeWalkApplied.text;
+          answerMeta = isShortAnswer(answerText, verbosity);
+          if (debugPayload) {
+            debugPayload.tree_walk_injected = true;
+          }
+        } else if (debugPayload) {
+          debugPayload.tree_walk_in_answer = true;
+        }
       }
       if (debugPayload) {
         debugPayload.answer_short_sentences = answerMeta.sentences;
