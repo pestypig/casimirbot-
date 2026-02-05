@@ -7488,30 +7488,42 @@ function appendEvidenceSources(
 
 const EVIDENCE_BULLET_RE = /^\s*(\d+\.\s+|[-*]\s+)/;
 
-function filterEvidenceBulletsByPath(
-  text: string,
-  allowPath: (path: string) => boolean,
-): string {
-  const trimmed = text?.trim() ?? "";
-  if (!trimmed) return "";
-  const lines = trimmed.split(/\r?\n/);
-  const groups: string[][] = [];
-  let current: string[] = [];
-  for (const line of lines) {
-    if (EVIDENCE_BULLET_RE.test(line)) {
-      if (current.length) groups.push(current);
-      current = [line];
-      continue;
+  function filterEvidenceBulletsByPath(
+    text: string,
+    allowPath: (path: string) => boolean,
+  ): string {
+    const trimmed = text?.trim() ?? "";
+    if (!trimmed) return "";
+    const lines = trimmed.split(/\r?\n/);
+    const groups: string[][] = [];
+    let current: string[] = [];
+    let preamble: string[] = [];
+    let sawBullet = false;
+    for (const line of lines) {
+      if (EVIDENCE_BULLET_RE.test(line)) {
+        if (!sawBullet && preamble.length) {
+          groups.push(preamble);
+          preamble = [];
+        }
+        sawBullet = true;
+        if (current.length) groups.push(current);
+        current = [line];
+        continue;
+      }
+      if (current.length) {
+        current.push(line);
+        continue;
+      }
+      if (!sawBullet) {
+        preamble.push(line);
+      }
     }
-    if (current.length) {
-      current.push(line);
+    if (current.length) groups.push(current);
+    if (!sawBullet && preamble.length) groups.push(preamble);
+    if (groups.length === 0) {
+      const paths = extractFilePathsFromText(trimmed);
+      return paths.some((path) => allowPath(path)) ? trimmed : "";
     }
-  }
-  if (current.length) groups.push(current);
-  if (groups.length === 0) {
-    const paths = extractFilePathsFromText(trimmed);
-    return paths.some((path) => allowPath(path)) ? trimmed : "";
-  }
   const kept = groups.filter((group) => {
     const paths = extractFilePathsFromText(group.join("\n"));
     return paths.some((path) => allowPath(path));
