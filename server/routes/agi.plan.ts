@@ -15498,18 +15498,18 @@ const executeHelixAsk = async ({
             slotAliases: slotAliasMap ?? undefined,
             includeQuestionTokens: coverageSlots.length === 0,
           });
-          const attemptDocs = selectDocBlocks(contextText, definitionFocus);
-          const attemptDocBlocks = attemptDocs.docBlocks;
+          const attemptDocSelection = selectDocBlocks(contextText, definitionFocus);
+          const attemptDocBlocks = attemptDocSelection.docBlocks;
           const attemptDocText = attemptDocBlocks.map((block) => block.block).join("\n\n");
           docBlocks = attemptDocBlocks;
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
-              attemptDocs.proofSpanRate,
+              attemptDocSelection.proofSpanRate,
             );
             if (definitionFocus) {
               debugPayload.definition_doc_blocks = attemptDocBlocks.length;
-              debugPayload.definition_doc_span_rate = attemptDocs.proofSpanRate;
+              debugPayload.definition_doc_span_rate = attemptDocSelection.proofSpanRate;
             }
           }
           if (!coverageSlotsFromRequest && slotPlan && docSlotTargets.length === 0) {
@@ -15546,8 +15546,8 @@ const executeHelixAsk = async ({
           const attemptScoreGap = result.scoreGap ?? 0;
           const attemptChannelHits = result.channelHits ?? initAskChannelStats();
           const attemptChannelTopScores = result.channelTopScores ?? initAskChannelStats();
-          const attemptDocs = attemptFiles.filter((filePath) => /(^|\/)docs\//i.test(filePath));
-          const attemptDocShare = attemptFiles.length ? attemptDocs.length / attemptFiles.length : 0;
+          const attemptDocFiles = attemptFiles.filter((filePath) => /(^|\/)docs\//i.test(filePath));
+          const attemptDocShare = attemptFiles.length ? attemptDocFiles.length / attemptFiles.length : 0;
           const attemptChannelCoverage =
             HELIX_ASK_CHANNELS.filter((channel) => attemptChannelHits[channel] > 0).length /
             HELIX_ASK_CHANNELS.length;
@@ -15572,7 +15572,7 @@ const executeHelixAsk = async ({
             debugPayload.queries = queries;
             debugPayload.retrieval_confidence = retrievalConfidence;
             debugPayload.retrieval_doc_share = attemptDocShare;
-            debugPayload.retrieval_doc_hits = attemptDocs.length;
+            debugPayload.retrieval_doc_hits = attemptDocFiles.length;
             debugPayload.retrieval_context_file_count = attemptFiles.length;
             debugPayload.retrieval_query_hit_count = attemptQueryHits;
             debugPayload.retrieval_top_score = attemptTopScore;
