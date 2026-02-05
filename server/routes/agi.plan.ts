@@ -7486,6 +7486,56 @@ function appendEvidenceSources(
   return `${trimmed}\n\nSources: ${sources.join(", ")}`;
 }
 
+const EVIDENCE_BULLET_RE = /^\s*(\d+\.\s+|[-*]\s+)/;
+
+function filterEvidenceBulletsByPath(
+  text: string,
+  allowPath: (path: string) => boolean,
+): string {
+  const trimmed = text?.trim() ?? "";
+  if (!trimmed) return "";
+  const lines = trimmed.split(/\r?\n/);
+  const groups: string[][] = [];
+  let current: string[] = [];
+  for (const line of lines) {
+    if (EVIDENCE_BULLET_RE.test(line)) {
+      if (current.length) groups.push(current);
+      current = [line];
+      continue;
+    }
+    if (current.length) {
+      current.push(line);
+    }
+  }
+  if (current.length) groups.push(current);
+  if (groups.length === 0) {
+    const paths = extractFilePathsFromText(trimmed);
+    return paths.some((path) => allowPath(path)) ? trimmed : "";
+  }
+  const kept = groups.filter((group) => {
+    const paths = extractFilePathsFromText(group.join("\n"));
+    return paths.some((path) => allowPath(path));
+  });
+  if (kept.length === 0) return "";
+  return kept.map((group) => group.join("\n")).join("\n");
+}
+
+function buildDefinitionDocBullet(block: { path: string; block: string }): string {
+  const lines = block.block.split(/\r?\n/).slice(1);
+  const referenceLines = lines.filter((line) =>
+    DOC_PROOF_SPAN_RE.test(line) || DOC_SECTION_LINE_RE.test(line),
+  );
+  const content = lines
+    .filter((line) => !DOC_PROOF_SPAN_RE.test(line))
+    .filter((line) => !DOC_SECTION_LINE_RE.test(line))
+    .join(" ")
+    .trim();
+  const snippet = clipAskText(content, 240);
+  const prefix = referenceLines.length ? `${referenceLines.join(" ")} ` : "";
+  const summary = snippet ? ensureSentence(snippet) : "See the documentation for the definition.";
+  return `- Definition: ${prefix}${summary} (see ${block.path})`;
+}
+
 function appendContextBlock(contextText: string, block: string): string {
   const trimmedBlock = block?.trim() ?? "";
   if (!trimmedBlock) return contextText;
@@ -16271,6 +16321,22 @@ const executeHelixAsk = async ({
 
       if (graphPack?.scaffoldText && (isRepoQuestion || wantsHybrid)) {
         repoScaffold = mergeEvidenceScaffolds(repoScaffold, graphPack.scaffoldText);
+      }
+
+      if (definitionFocus && repoScaffold) {
+        const filtered = filterEvidenceBulletsByPath(repoScaffold, isDefinitionDocPath);
+        if (filtered) {
+          repoScaffold = filtered;
+        }
+        const docEvidencePaths = extractFilePathsFromText(repoScaffold).filter(isDefinitionDocPath);
+        if (docEvidencePaths.length === 0 && docBlocks.length > 0) {
+          const fallbackBullet = buildDefinitionDocBullet(docBlocks[0]);
+          repoScaffold = mergeEvidenceScaffolds(fallbackBullet, repoScaffold);
+        }
+        if (debugPayload) {
+          debugPayload.definition_doc_filtered = Boolean(filtered);
+          debugPayload.definition_doc_paths = docEvidencePaths.slice(0, 6);
+        }
       }
 
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
