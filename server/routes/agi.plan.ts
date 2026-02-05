@@ -14868,6 +14868,15 @@ const executeHelixAsk = async ({
             return true;
           });
         }
+        if (definitionFocus && requiredSlots.length > 0) {
+          const wantsRepoMapping =
+            /where|which\s+(file|doc|module|path)|file\s+is|docs?\//i.test(baseQuestion);
+          requiredSlots = requiredSlots.filter((slot) => {
+            if (slot === "definition") return false;
+            if (slot === "repo_mapping" && !wantsRepoMapping) return false;
+            return true;
+          });
+        }
 
         const preflightMeta = preflightReuseApplied ? preflightContext : null;
         let contextMeta: {
