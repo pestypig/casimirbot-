@@ -4808,15 +4808,15 @@ const buildSlotPlanPassEntries = (
       if (cleaned) aliases.add(cleaned);
     });
     const surfaces = coerceSlotPlanSurfaces(slot.surfaces);
-    out.push({
-      id,
-      label,
-      required: slot.required ?? index < 2,
-      source: "plan_pass",
-      weak: false,
-      aliases: Array.from(aliases).slice(0, SLOT_ALIAS_MAX),
-      surfaces: surfaces.length ? surfaces : undefined,
-    });
+      out.push({
+        id,
+        label,
+        required: Boolean(slot.required),
+        source: "plan_pass",
+        weak: false,
+        aliases: Array.from(aliases).slice(0, SLOT_ALIAS_MAX),
+        surfaces: surfaces.length ? surfaces : undefined,
+      });
   }
   return out;
 };
