@@ -11010,6 +11010,7 @@ const executeHelixAsk = async ({
         return (
           typeof entry.durationMs === "number" &&
           Number.isFinite(entry.durationMs) &&
+          entry.durationMs > 0 &&
           typeof fn === "string" &&
           fn.trim().length > 0
         );
