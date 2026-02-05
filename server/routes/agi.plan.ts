@@ -5983,24 +5983,25 @@ const buildCanonicalSlotPlan = (args: {
     ...(directives?.conceptSlots ?? []),
     ...(directives?.requiredSlots ?? []).filter((slot) => !STRUCTURAL_SLOTS.has(normalizeSlotName(slot))),
   ];
-  for (const slot of planSlots) {
-    const conceptCard = resolveConceptCardForSlot(slot);
-    const aliasSources = conceptCard
-      ? [conceptCard.sourcePath, ...(conceptCard.mustIncludeFiles ?? [])].filter(Boolean)
-      : [];
-    const derivedAliases = collectAliasesFromPaths(aliasSources);
-    const aliases = Array.from(
-      new Set([...(conceptCard?.aliases ?? []), ...derivedAliases]),
-    );
-    addSlot({
-      id: slot,
-      label: conceptCard?.label ?? slot,
-      required: true,
-      source: conceptCard ? "concept" : "plan",
-      weak: false,
-      aliases,
-      surfaces: conceptCard
-        ? deriveSlotSurfaces(conceptCard.sourcePath, conceptCard.mustIncludeFiles)
+    for (const slot of planSlots) {
+      const conceptCard = resolveConceptCardForSlot(slot);
+      const aliasSources = conceptCard
+        ? [conceptCard.sourcePath, ...(conceptCard.mustIncludeFiles ?? [])].filter(Boolean)
+        : [];
+      const derivedAliases = collectAliasesFromPaths(aliasSources);
+      const aliases = Array.from(
+        new Set([...(conceptCard?.aliases ?? []), ...derivedAliases]),
+      );
+      addSlot({
+        id: slot,
+        label: conceptCard?.label ?? slot,
+        // Plan directives are advisory; do not promote them to required coverage slots.
+        required: false,
+        source: conceptCard ? "concept" : "plan",
+        weak: false,
+        aliases,
+        surfaces: conceptCard
+          ? deriveSlotSurfaces(conceptCard.sourcePath, conceptCard.mustIncludeFiles)
         : undefined,
     });
   }
