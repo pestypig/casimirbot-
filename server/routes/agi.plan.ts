@@ -3560,15 +3560,38 @@ const isHelixAskCircuitOpen = (): boolean => {
   return false;
 };
 
-const buildHelixAskCircuitPayload = () => {
+const buildHelixAskCircuitPayload = (debug?: boolean) => {
   const retryAfterMs = Math.max(0, helixAskCircuit.openedUntil - Date.now());
-  return {
+  const payload: {
+    ok: boolean;
+    error: string;
+    message: string;
+    retryAfterMs: number;
+    status: number;
+    debug?: {
+      circuit_open: boolean;
+      failures: number;
+      last_error: string | null;
+      last_failure_at: string | null;
+    };
+  } = {
     ok: false,
     error: "helix_ask_temporarily_unavailable",
     message: "Helix Ask is cooling down after a runtime error. Please retry shortly.",
     retryAfterMs,
     status: 503,
   };
+  if (debug) {
+    payload.debug = {
+      circuit_open: true,
+      failures: helixAskCircuit.failures,
+      last_error: helixAskCircuit.lastError ?? null,
+      last_failure_at: helixAskCircuit.lastFailureAt
+        ? new Date(helixAskCircuit.lastFailureAt).toISOString()
+        : null,
+    };
+  }
+  return payload;
 };
 
 function stripStageTags(value: string): string {
@@ -17775,7 +17798,7 @@ planRouter.post("/ask", async (req, res) => {
     return res.status(403).json({ error: "forbidden" });
   }
   if (isHelixAskCircuitOpen()) {
-    const payload = buildHelixAskCircuitPayload();
+    const payload = buildHelixAskCircuitPayload(parsed.data.debug === true);
     const retryAfterSeconds = Math.ceil(payload.retryAfterMs / 1000);
     if (retryAfterSeconds > 0) {
       res.setHeader("Retry-After", String(retryAfterSeconds));
