@@ -17422,14 +17422,12 @@ const executeHelixAsk = async ({
       let answerText = (answerResult as LocalAskResult)?.text ?? "";
       let answerMeta = isShortAnswer(answerText, verbosity);
       let retryApplied = false;
-      if (
+      const retryEligible =
         HELIX_ASK_SHORT_ANSWER_RETRY_MAX > 0 &&
         answerMeta.short &&
-        evidenceGateOk &&
-        !slotCoverageFailed &&
-        !docSlotCoverageFailed &&
-        !answerBudget.override
-      ) {
+        !answerBudget.override &&
+        Boolean(prompt);
+      if (retryEligible) {
         const retryBudget = clampNumber(
           Math.min(Math.round(answerMaxTokens * 1.35), answerBudget.cap),
           128,
@@ -17492,6 +17490,9 @@ const executeHelixAsk = async ({
         }
       } else {
         result = answerResult as LocalAskResult;
+        if (debugPayload && !retryApplied) {
+          debugPayload.answer_retry_applied = false;
+        }
       }
       if ((!result?.text || !result.text.trim()) && fallbackAnswer) {
         result = { text: fallbackAnswer } as LocalAskResult;
