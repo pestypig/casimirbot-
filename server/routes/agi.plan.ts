@@ -9388,11 +9388,17 @@ const buildNextEvidenceHints = (args: {
   missingSlots?: string[];
   slotPlan?: HelixAskSlotPlan | null;
   anchorFiles?: string[];
+  searchedTerms?: string[];
+  searchedFiles?: string[];
+  includeSearchSummary?: boolean;
   planClarify?: string;
   headingSeedSlots?: HelixAskSlotPlanEntry[];
   limit?: number;
 }): string[] => {
-  const limit = Math.max(1, args.limit ?? 4);
+  const limit = Math.max(
+    1,
+    (args.limit ?? 4) + (args.includeSearchSummary ? 2 : 0),
+  );
   const hints: string[] = [];
   const seen = new Set<string>();
   const pushHint = (value: string) => {
@@ -9406,6 +9412,22 @@ const buildNextEvidenceHints = (args: {
   const planClarify = (args.planClarify ?? "").trim();
   if (planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)) {
     pushHint(`Clarify: ${planClarify}`);
+  }
+  if (args.includeSearchSummary) {
+    const terms = (args.searchedTerms ?? [])
+      .map((entry) => entry.trim())
+      .filter((entry) => entry && !entry.includes("/") && entry.length <= 60)
+      .slice(0, 4);
+    if (terms.length > 0) {
+      pushHint(`Searched terms: ${terms.join(", ")}`);
+    }
+    const files = (args.searchedFiles ?? [])
+      .map((entry) => entry.trim())
+      .filter((entry) => entry && entry.length <= 120)
+      .slice(0, 4);
+    if (files.length > 0) {
+      pushHint(`Checked files: ${files.join(", ")}`);
+    }
   }
   const dirHints = Array.from(
     new Set(
@@ -9463,6 +9485,9 @@ const buildScientificMicroReport = (args: {
   missingSlots?: string[];
   slotPlan?: HelixAskSlotPlan | null;
   anchorFiles?: string[];
+  searchedTerms?: string[];
+  searchedFiles?: string[];
+  includeSearchSummary?: boolean;
   planClarify?: string;
   headingSeedSlots?: HelixAskSlotPlanEntry[];
   hypothesisEnabled?: boolean;
@@ -9535,6 +9560,9 @@ const buildScientificMicroReport = (args: {
     missingSlots: args.missingSlots,
     slotPlan: args.slotPlan,
     anchorFiles: args.anchorFiles,
+    searchedTerms: args.searchedTerms,
+    searchedFiles: args.searchedFiles,
+    includeSearchSummary: args.includeSearchSummary,
     planClarify: args.planClarify,
     headingSeedSlots: args.headingSeedSlots,
     limit: 4,
@@ -11653,6 +11681,17 @@ type HelixAskTraceSummary = {
   meta?: Record<string, unknown>;
 };
 
+type HelixAskControllerStep = {
+  step: string;
+  action?: string;
+  reason?: string;
+  evidenceOk?: boolean;
+  slotCoverageOk?: boolean;
+  docCoverageOk?: boolean;
+  missingSlots?: string[];
+  retrievalConfidence?: number;
+};
+
 const executeHelixAsk = async ({
   request,
   personaId,
@@ -12039,6 +12078,9 @@ const executeHelixAsk = async ({
       agent_stop_reason?: string;
       agent_action_counts?: Record<string, number>;
       agent_attempts?: string[];
+      controller_steps?: HelixAskControllerStep[];
+      controller_stop_reason?: string;
+      controller_attempts?: number;
       plan_scope_allowlist_tiers?: number;
       plan_scope_avoidlist?: number;
       plan_scope_must_include?: number;
@@ -12546,6 +12588,47 @@ const executeHelixAsk = async ({
           .join(" | "),
       );
     };
+    const controllerSteps: HelixAskControllerStep[] = [];
+    let controllerStopLogged = false;
+    const buildControllerDetail = (step: HelixAskControllerStep): string => {
+      const missing =
+        step.missingSlots && step.missingSlots.length > 0
+          ? step.missingSlots.slice(0, 3).join(",")
+          : "";
+      return [
+        step.action ? `action=${step.action}` : "",
+        step.reason ? `reason=${step.reason}` : "",
+        typeof step.evidenceOk === "boolean" ? `evidence=${step.evidenceOk ? "ok" : "fail"}` : "",
+        typeof step.slotCoverageOk === "boolean"
+          ? `slots=${step.slotCoverageOk ? "ok" : "missing"}`
+          : "",
+        typeof step.docCoverageOk === "boolean"
+          ? `docs=${step.docCoverageOk ? "ok" : "missing"}`
+          : "",
+        typeof step.retrievalConfidence === "number"
+          ? `conf=${step.retrievalConfidence.toFixed(2)}`
+          : "",
+        missing ? `missing=${missing}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+    };
+    const recordControllerStep = (step: HelixAskControllerStep): void => {
+      controllerSteps.push(step);
+      if (debugPayload) {
+        debugPayload.controller_steps = controllerSteps.slice();
+        debugPayload.controller_attempts = controllerSteps.length;
+      }
+      logEvent("Controller step", step.step, buildControllerDetail(step));
+    };
+    const recordControllerStop = (reason: string, detail?: string): void => {
+      if (controllerStopLogged) return;
+      controllerStopLogged = true;
+      if (debugPayload) {
+        debugPayload.controller_stop_reason = reason;
+      }
+      logEvent("Controller stop", reason, detail);
+    };
     const getAgentBlockReason = (): string | null => {
       if (!agentLoopEnabled) return null;
       if (agentActionOverBudget) return "action_budget_exhausted";
@@ -12558,6 +12641,7 @@ const executeHelixAsk = async ({
       if (!reason || agentStopReason) return;
       agentStopReason = reason;
       updateAgentDebug();
+      recordControllerStop(reason, "blocked");
     };
     const canAgentAct = (): boolean => {
       if (!agentLoopEnabled) return false;
@@ -13193,6 +13277,9 @@ const executeHelixAsk = async ({
               missingSlots: clarifyTerms,
               slotPlan: slotPreview,
               anchorFiles: blockAnchorFiles,
+              searchedTerms: blockHints.hintIds,
+              searchedFiles: blockAnchorFiles,
+              includeSearchSummary: Boolean(blockRepoContext),
               planClarify: clarifyLine,
               headingSeedSlots:
                 blockHeadingSeedSlots.length > 0 ? blockHeadingSeedSlots : headingSeedSlots,
@@ -13868,6 +13955,8 @@ const executeHelixAsk = async ({
     let verificationAnchorHints: string[] = [];
     let forcedAnswer: string | null = null;
     let forcedAnswerIsHard = false;
+    let retrievalQueries: string[] = [];
+    let retrievalFilesSnapshot: string[] = [];
     if (preIntentClarify) {
       if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
         const scientific = buildScientificMicroReport({
@@ -15039,6 +15128,7 @@ const executeHelixAsk = async ({
           mergeHints,
           HELIX_ASK_QUERY_MERGE_MAX,
         );
+        retrievalQueries = queries.slice();
         if (debugPayload && queries.length > 0) {
           debugPayload.queries = queries;
         }
@@ -15805,6 +15895,7 @@ const executeHelixAsk = async ({
           }
         }
         const contextFilesSnapshot = extractFilePathsFromText(contextText);
+        retrievalFilesSnapshot = contextFilesSnapshot.slice();
         const planMustIncludeMissing = resolveMustIncludeMissing(planScope, contextFilesSnapshot);
         const planMustIncludeOk =
           planScope?.mustIncludeGlobs?.length
@@ -16163,6 +16254,17 @@ const executeHelixAsk = async ({
             )},fuz:${channelTopScores.fuzzy.toFixed(2)}`,
           ].join(" | "),
         );
+        recordControllerStep({
+          step: "initial",
+          evidenceOk: evidenceGateOk,
+          slotCoverageOk,
+          docCoverageOk: !docSlotCoverageFailed,
+          missingSlots:
+            docSlotSummary?.missingSlots?.length
+              ? docSlotSummary.missingSlots
+              : coverageSlotSummary?.missingSlots ?? [],
+          retrievalConfidence,
+        });
         const applyContextAttempt = (
           label: string,
           result: Awaited<ReturnType<typeof buildAskContextFromQueries>>,
@@ -16504,6 +16606,16 @@ const executeHelixAsk = async ({
               retryDurationMs,
             );
           }
+          recordControllerStep({
+            step: "retry",
+            action: retryApplied.applied ? "applied" : "no_context",
+            reason: retryApplied.applied ? "slot_missing" : "no_context",
+            evidenceOk: evidenceGateOk,
+            slotCoverageOk,
+            docCoverageOk: !docSlotCoverageFailed,
+            missingSlots: retryApplied.missingSlots,
+            retrievalConfidence,
+          });
         }
         const missingSlotsForCodeFirst =
           (docSlotSummary?.missingSlots?.length ?? 0) > 0 ||
@@ -16583,6 +16695,16 @@ const executeHelixAsk = async ({
               codeDurationMs,
             );
           }
+          recordControllerStep({
+            step: "code_first",
+            action: codeApplied.applied ? "applied" : "no_context",
+            reason: codeApplied.applied ? "slot_missing" : "no_context",
+            evidenceOk: evidenceGateOk,
+            slotCoverageOk,
+            docCoverageOk: !docSlotCoverageFailed,
+            missingSlots: codeApplied.missingSlots,
+            retrievalConfidence,
+          });
         } else if (!canAgentAct() && missingSlotsForCodeFirst) {
           markAgentStopIfBlocked();
         }
@@ -16632,6 +16754,9 @@ const executeHelixAsk = async ({
             agentStopReason = getAgentBlockReason() ?? "budget_exhausted";
           }
           updateAgentDebug();
+          if (agentStopReason) {
+            recordControllerStop(agentStopReason);
+          }
         }
         if (
           HELIX_ASK_SESSION_MEMORY &&
@@ -17248,6 +17373,9 @@ const executeHelixAsk = async ({
           const scientific = buildScientificMicroReport({
             question: baseQuestion,
             slotPlan,
+            searchedTerms: retrievalQueries,
+            searchedFiles: retrievalFilesSnapshot,
+            includeSearchSummary: true,
             planClarify: clarifyLine,
             headingSeedSlots,
             hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
@@ -17276,6 +17404,7 @@ const executeHelixAsk = async ({
         recordAgentAction("ask_slot_clarify", "ambiguity_gate", "request_user_disambiguation");
         agentStopReason = "user_clarify_required";
         updateAgentDebug();
+        recordControllerStop(agentStopReason, "ambiguity_gate");
       }
         if (failClosedRepoEvidence && !forcedAnswer && intentStrategy !== "constraint_report") {
           const planClarify = (clarifyOverride ?? planDirectives?.clarifyQuestion ?? "").trim();
@@ -17320,6 +17449,9 @@ const executeHelixAsk = async ({
             missingSlots: clarifySlots,
             slotPlan,
             anchorFiles: contextFiles,
+            searchedTerms: retrievalQueries,
+            searchedFiles: retrievalFilesSnapshot,
+            includeSearchSummary: true,
             planClarify: clarifyLine,
             headingSeedSlots,
             hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
@@ -17353,6 +17485,7 @@ const executeHelixAsk = async ({
         recordAgentAction("ask_slot_clarify", "fail_closed", "request_missing_evidence");
         agentStopReason = "user_clarify_required";
         updateAgentDebug();
+        recordControllerStop(agentStopReason, "fail_closed");
       }
 
       const generalEvidence = promptScaffold || generalScaffold;
@@ -18059,6 +18192,9 @@ const executeHelixAsk = async ({
             missingSlots,
             slotPlan,
             anchorFiles: contextFiles,
+            searchedTerms: retrievalQueries,
+            searchedFiles: retrievalFilesSnapshot,
+            includeSearchSummary: true,
             planClarify:
               "Repo evidence was available but the answer could not be grounded with file citations.",
             headingSeedSlots: slotPlanHeadingSeedSlots.length ? slotPlanHeadingSeedSlots : headingSeedSlots,
@@ -18316,6 +18452,9 @@ const executeHelixAsk = async ({
         missingSlots,
         slotPlan,
         anchorFiles: contextFiles,
+        searchedTerms: retrievalQueries,
+        searchedFiles: retrievalFilesSnapshot,
+        includeSearchSummary: true,
         planClarify: planDirectives?.clarifyQuestion,
         headingSeedSlots: slotPlanHeadingSeedSlots.length ? slotPlanHeadingSeedSlots : headingSeedSlots,
         hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
