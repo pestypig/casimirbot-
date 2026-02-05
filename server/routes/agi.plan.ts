@@ -7429,19 +7429,35 @@ function extractContextFromPrompt(prompt: string): string {
   return context.trim();
 }
 
-const SCAFFOLD_JUNK_LINE_RE = [
-  /^",?\s*no headings\./i,
-  /^general reasoning\s*:/i,
-  /^repo evidence\s*:/i,
-  /^evidence\s*:/i,
+  const SCAFFOLD_JUNK_LINE_RE = [
+    /^",?\s*no headings\./i,
+    /^general reasoning\s*:/i,
+    /^repo evidence\s*:/i,
+    /^evidence\s*:/i,
   /^ts[x]?[`.)\s]/i,
-  /^(md|json|html)[`.)\s]/i,
-];
+    /^(md|json|html)[`.)\s]/i,
+  ];
 
-function normalizeScaffoldText(value: string): string {
-  const lines = value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
+  const INLINE_JSON_TEXT_RE = /\{\s*"text"\s*:\s*"([^"]+)"[^}]*\}/g;
+
+  function stripInlineJsonArtifacts(value: string): string {
+    if (!value) return value;
+    return value.replace(INLINE_JSON_TEXT_RE, (_match, text: string) => {
+      const decoded = text
+        .replace(/\\"/g, '"')
+        .replace(/\\n/g, " ")
+        .replace(/\\r/g, " ")
+        .replace(/\\t/g, " ")
+        .replace(/\\\\/g, "\\")
+        .trim();
+      return decoded || text;
+    });
+  }
+
+  function normalizeScaffoldText(value: string): string {
+    const lines = value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .filter((line) => !/^(error:|srv\s+send_error)/i.test(line))
     .filter((line) => !/request\s*\(\d+\s+tokens\)\s+exceeds/i.test(line))
@@ -16987,12 +17003,13 @@ const executeHelixAsk = async ({
     let cleanedText: string | undefined;
     if (typeof result.text === "string" && result.text.trim()) {
       let cleaned = formatHelixAskAnswer(stripPromptEchoFromAnswer(result.text, baseQuestion));
-      const rawPreview = clipAskText(
-        stripPromptEchoFromAnswer(result.text, baseQuestion)
-          .replace(/\s+/g, " ")
-          .trim(),
-        240,
-      );
+        cleaned = stripInlineJsonArtifacts(cleaned);
+        const rawPreview = clipAskText(
+          stripInlineJsonArtifacts(stripPromptEchoFromAnswer(result.text, baseQuestion))
+            .replace(/\s+/g, " ")
+            .trim(),
+          240,
+        );
       if (rawPreview) {
         logEvent("Answer raw preview", "llm", rawPreview, answerStart);
       }
@@ -17002,11 +17019,12 @@ const executeHelixAsk = async ({
         cleaned = enforceHelixAskAnswerFormat(cleaned, formatSpec.format, baseQuestion);
       }
       cleaned = stripTruncationMarkers(cleaned);
-      if (!cleaned.trim()) {
-        const fallback = stripPromptEchoFromAnswer(result.text, baseQuestion);
-        cleaned = fallback.trim() ? fallback.trim() : result.text.trim();
-        cleaned = stripTruncationMarkers(cleaned);
-      }
+        if (!cleaned.trim()) {
+          const fallback = stripPromptEchoFromAnswer(result.text, baseQuestion);
+          cleaned = fallback.trim() ? fallback.trim() : result.text.trim();
+          cleaned = stripTruncationMarkers(cleaned);
+          cleaned = stripInlineJsonArtifacts(cleaned);
+        }
       const allowCitationRepair =
         (microPassEnabled || intentStrategy === "constraint_report") &&
         intentProfile.id !== "repo.ideology_reference";
@@ -17161,10 +17179,11 @@ const executeHelixAsk = async ({
           answerPath.push("hybridFallback:repoEvidence");
         }
       }
-      if (!formatSpec.stageTags) {
-        cleaned = stripStageTags(cleaned);
-      }
-      cleaned = stripCitationRepairArtifacts(cleaned);
+        if (!formatSpec.stageTags) {
+          cleaned = stripStageTags(cleaned);
+        }
+        cleaned = stripCitationRepairArtifacts(cleaned);
+        cleaned = stripInlineJsonArtifacts(cleaned);
       const allowedSourcePaths = resolveEvidencePaths(evidenceText, contextFiles, contextText, 12);
       cleaned = sanitizeSourcesLine(
         cleaned,
