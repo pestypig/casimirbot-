@@ -17366,7 +17366,12 @@ const executeHelixAsk = async ({
         !promptIngested &&
         (intentDomain === "repo" || intentDomain === "hybrid") &&
         requiresRepoEvidence &&
-        (claimGateFailed || (!evidenceGateOk && ambiguityTerms.length > 0));
+        ((claimGateFailed &&
+          (!evidenceGateOk ||
+            definitionDocMissing ||
+            slotCoverageFailed ||
+            docSlotCoverageFailed)) ||
+          (!evidenceGateOk && ambiguityTerms.length > 0));
       if (shouldClarifyNow && !forcedAnswer && intentStrategy !== "constraint_report") {
         const clarifyLine = clarifyOverride ?? buildAmbiguityClarifyLine([]);
         if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
