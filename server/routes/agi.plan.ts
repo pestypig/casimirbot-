@@ -2664,9 +2664,18 @@ const HELIX_ASK_QUERY_TOKENS_BLOCK = clampNumber(
   256,
 );
 const HELIX_ASK_EVIDENCE_TOKENS = clampNumber(
-  readNumber(process.env.HELIX_ASK_EVIDENCE_TOKENS ?? process.env.VITE_HELIX_ASK_EVIDENCE_TOKENS, 256),
+  readNumber(process.env.HELIX_ASK_EVIDENCE_TOKENS ?? process.env.VITE_HELIX_ASK_EVIDENCE_TOKENS, 384),
   64,
-  768,
+  1024,
+);
+const HELIX_ASK_DEFINITION_EVIDENCE_BOOST = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_DEFINITION_EVIDENCE_BOOST ??
+      process.env.VITE_HELIX_ASK_DEFINITION_EVIDENCE_BOOST,
+    128,
+  ),
+  0,
+  512,
 );
 const HELIX_ASK_REPAIR_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_REPAIR_TOKENS ?? process.env.VITE_HELIX_ASK_REPAIR_TOKENS, 192),
@@ -2988,6 +2997,8 @@ const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
 const HELIX_ASK_WARP_PATH_BOOST =
   /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline|docs\/knowledge\/warp)/i;
 const HELIX_ASK_CONCEPTUAL_FOCUS = /\b(what is|what's|define|definition|meaning|concept|theory)\b/i;
+const HELIX_ASK_DEFINITION_FOCUS =
+  /\b(what does\b[^?]{0,80}\bmean\b|what is|what's|define|definition|meaning|concept|theory)\b/i;
 const HELIX_ASK_CONCEPT_FAST_PATH_INTENTS = new Set([
   "repo.warp_definition_docs_first",
   "repo.warp_conceptual_explain",
@@ -3009,6 +3020,7 @@ const HELIX_ASK_REPO_HINT =
 const HELIX_ASK_ENDPOINT_HINT_RE = /\/api\/[a-z0-9/_-]+/gi;
 const HELIX_ASK_ENDPOINT_GUARD =
   String(process.env.HELIX_ASK_ENDPOINT_GUARD ?? "1").trim() !== "0";
+const HELIX_ASK_INDEX_ONLY_PATHS: RegExp[] = [/server\/_generated\/code-lattice\.json/i];
 const HELIX_ASK_VIABILITY_FOCUS =
   /\b(viability|certificate|constraint gate|constraint gates|admissible|warp viability)\b/i;
 const HELIX_ASK_VIABILITY_PATHS =
@@ -5291,9 +5303,11 @@ function buildPlanScope({
     sanitizeMustIncludeGlobs(rawMustInclude);
   const mustIncludeGlobs = new Set<string>(sanitizedMustInclude);
   const avoidSurfaces = new Set<string>(directives?.avoidSurfaces ?? []);
+  const definitionFocus = isDefinitionQuestion(question);
   const wantsDocsFirst =
-    HELIX_ASK_CONCEPTUAL_FOCUS.test(question) &&
-    topicTags.some((tag) => tag === "warp" || tag === "concepts");
+    definitionFocus ||
+    (HELIX_ASK_CONCEPTUAL_FOCUS.test(question) &&
+      topicTags.some((tag) => tag === "warp" || tag === "concepts"));
   const docsFirst =
     repoExpectationLevel !== "low" &&
     (wantsDocsFirst || topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star"));
@@ -7080,8 +7094,31 @@ function splitAskContextBlocks(context: string): Array<{ path: string; block: st
     .filter((entry) => entry.path.length > 0);
 }
 
+const isIndexOnlyPath = (filePath: string): boolean =>
+  HELIX_ASK_INDEX_ONLY_PATHS.some((re) => re.test(filePath));
+
+const isDefinitionDocPath = (filePath: string): boolean => {
+  const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+  return normalized.startsWith("docs/") && normalized.endsWith(".md");
+};
+
+const isDefinitionQuestion = (question: string): boolean =>
+  HELIX_ASK_DEFINITION_FOCUS.test(question);
+
 const DOC_PROOF_SPAN_RE = /\bSpan:\s*L\d+/i;
 const DOC_SECTION_LINE_RE = /\bSection:\s+/i;
+
+const selectDocBlocks = (
+  contextText: string,
+  definitionFocus: boolean,
+): { docBlocks: Array<{ path: string; block: string }>; proofSpanRate: number } => {
+  const blocks = splitAskContextBlocks(contextText);
+  const docBlocksAll = blocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+  const docBlocks = definitionFocus
+    ? docBlocksAll.filter((block) => isDefinitionDocPath(block.path))
+    : docBlocksAll;
+  return { docBlocks, proofSpanRate: computeProofSpanRate(docBlocks) };
+};
 
 const computeProofSpanRate = (docBlocks: Array<{ path: string; block: string }>): number => {
   if (!docBlocks.length) return 0;
@@ -7216,6 +7253,9 @@ function finalizeAskContext({
     preview = clipAskText(preview, HELIX_ASK_CONTEXT_CHARS);
     if (!preview) continue;
     const normalizedPath = entry.filePath.replace(/\\/g, "/");
+    if (isIndexOnlyPath(normalizedPath)) {
+      continue;
+    }
     lines.push(`${normalizedPath}\n${preview}`);
     files.push(normalizedPath);
   }
@@ -7490,6 +7530,7 @@ function buildHelixAskEvidencePrompt(
   composite = false,
   anchorHints: string[] = [],
 ): string {
+  const definitionFocus = isDefinitionQuestion(question);
   const lines = [
     "You are Helix Ask evidence distiller.",
     "Use only the evidence in the context below. Do not speculate.",
@@ -7511,13 +7552,18 @@ function buildHelixAskEvidencePrompt(
     }
     lines.push("Each step should be 1-2 sentences and cite at least one file path or prompt chunk id from the context.");
   } else {
-    const count = composite ? "4-6" : "6-9";
+    const count = composite ? "4-6" : definitionFocus ? "8-12" : "6-9";
     lines.push(`Return ${count} short evidence bullets grounded in the context.`);
     lines.push("Each bullet should be 1-2 sentences and cite at least one file path or prompt chunk id from the context.");
     lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
     if (composite) {
       lines.push("Prefer evidence from domain docs (ethos/knowledge) and core GR viability files over UI or prompt infrastructure.");
       lines.push("Do not mention 'anchors' or list files without tying them to the question.");
+    }
+    if (definitionFocus) {
+      lines.push("Include at least one bullet that directly defines the term using a docs/*.md source (not *-tree.json).");
+      lines.push("If a context block includes Section/Span lines, preserve them verbatim in that definition bullet.");
+      lines.push("Treat graph/tree JSON as derivation hints only; bind them to .md docs before citing.");
     }
   }
   lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
@@ -11215,12 +11261,12 @@ const executeHelixAsk = async ({
       64,
       2048,
     );
-    const evidenceTokens = clampNumber(
+    let evidenceTokens = clampNumber(
       typeof tuningOverrides?.evidence_tokens === "number"
         ? tuningOverrides.evidence_tokens
         : HELIX_ASK_EVIDENCE_TOKENS,
       64,
-      768,
+      1024,
     );
     const repairTokens = clampNumber(
       typeof tuningOverrides?.repair_tokens === "number"
@@ -11276,6 +11322,11 @@ const executeHelixAsk = async ({
       docs_grep_hits?: number;
       slot_doc_coverage_rate?: number;
       proof_span_rate?: number;
+      definition_focus?: boolean;
+      definition_doc_required?: boolean;
+      definition_doc_ok?: boolean;
+      definition_doc_blocks?: number;
+      definition_doc_span_rate?: number;
       claim_ref_rate?: number;
       report_mode?: boolean;
       report_mode_reason?: string;
@@ -11875,6 +11926,18 @@ const executeHelixAsk = async ({
       }
     }
     const baseQuestion = (questionValue ?? question ?? "").trim();
+    const definitionFocus = isDefinitionQuestion(baseQuestion);
+    if (definitionFocus) {
+      evidenceTokens = clampNumber(
+        evidenceTokens + HELIX_ASK_DEFINITION_EVIDENCE_BOOST,
+        64,
+        1024,
+      );
+    }
+    if (debugPayload) {
+      debugPayload.definition_focus = definitionFocus;
+      debugPayload.evidence_tokens = evidenceTokens;
+    }
     const rawQuestion = (request.question ?? request.prompt ?? "").trim();
     const requestCoverageSlots = Array.isArray(parsed.data.coverageSlots)
       ? parsed.data.coverageSlots.map(normalizeSlotId)
@@ -13518,9 +13581,15 @@ const executeHelixAsk = async ({
             });
             if (repoSearchPlan) {
               const repoSearchResult = await runRepoSearch(repoSearchPlan);
-              preflightRepoSearchHits = repoSearchResult.hits.length;
-              if (repoSearchResult.hits.length > 0) {
-                const formatted = formatRepoSearchEvidence(repoSearchResult);
+              const repoSearchHits = repoSearchResult.hits.filter(
+                (hit) => !isIndexOnlyPath(hit.filePath ?? ""),
+              );
+              preflightRepoSearchHits = repoSearchHits.length;
+              if (repoSearchHits.length > 0) {
+                const formatted = formatRepoSearchEvidence({
+                  ...repoSearchResult,
+                  hits: repoSearchHits,
+                });
                 preflightText = [preflightText, formatted.evidenceText].filter(Boolean).join("\n\n");
                 if (formatted.filePaths.length > 0) {
                   preflightFiles = Array.from(new Set([...preflightFiles, ...formatted.filePaths]));
@@ -13536,7 +13605,7 @@ const executeHelixAsk = async ({
                 debugPayload.preflight_repo_search_terms = repoSearchPlan.terms;
                 debugPayload.preflight_repo_search_paths = repoSearchPlan.paths;
                 debugPayload.preflight_repo_search_reason = repoSearchPlan.reason;
-                debugPayload.preflight_repo_search_hits = repoSearchResult.hits.length;
+                debugPayload.preflight_repo_search_hits = repoSearchHits.length;
                 debugPayload.preflight_repo_search_truncated = repoSearchResult.truncated;
                 if (repoSearchResult.error) {
                   debugPayload.preflight_repo_search_error = repoSearchResult.error;
@@ -14497,14 +14566,17 @@ const executeHelixAsk = async ({
                 (debugPayload.doc_header_injected ?? 0) + contextResult.docHeaderInjected;
             }
           }
-          const contextBlocks = splitAskContextBlocks(contextText);
-          docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+          const selectedDocs = selectDocBlocks(contextText, definitionFocus);
+          docBlocks = selectedDocs.docBlocks;
           if (debugPayload) {
-            const proofSpanRate = computeProofSpanRate(docBlocks);
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
-              proofSpanRate,
+              selectedDocs.proofSpanRate,
             );
+            if (definitionFocus) {
+              debugPayload.definition_doc_blocks = docBlocks.length;
+              debugPayload.definition_doc_span_rate = selectedDocs.proofSpanRate;
+            }
           }
           logStepEnd(
             "Retrieval",
@@ -14577,7 +14649,9 @@ const executeHelixAsk = async ({
           const slotCountForDocs =
             docSlotSummary?.slots.length ??
             (coverageSlots.length > 0 ? coverageSlots.length : coverageSlotSummary?.slots.length ?? 0);
-          minDocEvidenceCards = Math.max(2, Math.min(slotCountForDocs || 0, 4) || 2);
+          minDocEvidenceCards = definitionFocus
+            ? Math.max(1, Math.min(slotCountForDocs || 0, 3) || 1)
+            : Math.max(2, Math.min(slotCountForDocs || 0, 4) || 2);
           if (debugPayload && planScope?.docsFirst) {
             debugPayload.docs_first_evidence_cards = docBlocks.length;
             debugPayload.docs_first_min_cards = minDocEvidenceCards;
@@ -14694,17 +14768,18 @@ const executeHelixAsk = async ({
                 }
               }
             }
-            const refreshedBlocks = splitAskContextBlocks(contextText);
-            const refreshedDocBlocks = refreshedBlocks.filter((block) =>
-              /(^|\/)docs\//i.test(block.path),
-            );
+            const refreshedDocs = selectDocBlocks(contextText, definitionFocus);
+            const refreshedDocBlocks = refreshedDocs.docBlocks;
             docBlocks = refreshedDocBlocks;
             if (debugPayload) {
-              const proofSpanRate = computeProofSpanRate(refreshedDocBlocks);
               debugPayload.proof_span_rate = Math.max(
                 debugPayload.proof_span_rate ?? 0,
-                proofSpanRate,
+                refreshedDocs.proofSpanRate,
               );
+              if (definitionFocus) {
+                debugPayload.definition_doc_blocks = refreshedDocBlocks.length;
+                debugPayload.definition_doc_span_rate = refreshedDocs.proofSpanRate;
+              }
             }
             const refreshedDocText = refreshedDocBlocks.map((block) => block.block).join("\n\n");
             if (debugPayload && planScope?.docsFirst) {
@@ -14938,14 +15013,17 @@ const executeHelixAsk = async ({
           });
         }
         if (!docSlotSummary) {
-          const contextBlocks = splitAskContextBlocks(contextText);
-          const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+          const selectedDocs = selectDocBlocks(contextText, definitionFocus);
+          const docBlocks = selectedDocs.docBlocks;
           if (debugPayload) {
-            const proofSpanRate = computeProofSpanRate(docBlocks);
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
-              proofSpanRate,
+              selectedDocs.proofSpanRate,
             );
+            if (definitionFocus) {
+              debugPayload.definition_doc_blocks = docBlocks.length;
+              debugPayload.definition_doc_span_rate = selectedDocs.proofSpanRate;
+            }
           }
           const docContextText = docBlocks.map((block) => block.block).join("\n\n");
           if (!coverageSlotsFromRequest && slotPlan && docSlotTargets.length === 0) {
@@ -15018,8 +15096,14 @@ const executeHelixAsk = async ({
             searchStart,
           );
           const repoSearchResult: RepoSearchResult = await runRepoSearch(repoSearchPlan);
-          if (repoSearchResult.hits.length > 0) {
-            const formatted = formatRepoSearchEvidence(repoSearchResult);
+          const repoSearchHits = repoSearchResult.hits.filter(
+            (hit) => !isIndexOnlyPath(hit.filePath ?? ""),
+          );
+          if (repoSearchHits.length > 0) {
+            const formatted = formatRepoSearchEvidence({
+              ...repoSearchResult,
+              hits: repoSearchHits,
+            });
             contextText = [contextText, formatted.evidenceText].filter(Boolean).join("\n\n");
             if (formatted.filePaths.length > 0) {
               contextFiles = Array.from(new Set([...contextFiles, ...formatted.filePaths]));
@@ -15055,7 +15139,7 @@ const executeHelixAsk = async ({
             logEvent(
               "Repo search",
               repoSearchResult.truncated ? "truncated" : "ok",
-              `hits=${repoSearchResult.hits.length}`,
+              `hits=${repoSearchHits.length}`,
               searchStart,
             );
           } else {
@@ -15067,7 +15151,7 @@ const executeHelixAsk = async ({
             debugPayload.repo_search_paths = repoSearchPlan.paths;
             debugPayload.repo_search_reason = repoSearchPlan.reason;
             debugPayload.repo_search_explicit = repoSearchPlan.explicit;
-            debugPayload.repo_search_hits = repoSearchResult.hits.length;
+            debugPayload.repo_search_hits = repoSearchHits.length;
             debugPayload.repo_search_truncated = repoSearchResult.truncated;
             if (repoSearchResult.error) {
               debugPayload.repo_search_error = repoSearchResult.error;
@@ -15087,14 +15171,17 @@ const executeHelixAsk = async ({
           });
         }
         if (docSlotSummary) {
-          const contextBlocks = splitAskContextBlocks(contextText);
-          const docBlocks = contextBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+          const selectedDocs = selectDocBlocks(contextText, definitionFocus);
+          const docBlocks = selectedDocs.docBlocks;
           if (debugPayload) {
-            const proofSpanRate = computeProofSpanRate(docBlocks);
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
-              proofSpanRate,
+              selectedDocs.proofSpanRate,
             );
+            if (definitionFocus) {
+              debugPayload.definition_doc_blocks = docBlocks.length;
+              debugPayload.definition_doc_span_rate = selectedDocs.proofSpanRate;
+            }
           }
           const docContextText = docBlocks.map((block) => block.block).join("\n\n");
           if (slotPlan && docSlotTargets.length > 0) {
@@ -15411,13 +15498,19 @@ const executeHelixAsk = async ({
             slotAliases: slotAliasMap ?? undefined,
             includeQuestionTokens: coverageSlots.length === 0,
           });
-          const attemptBlocks = splitAskContextBlocks(contextText);
-          const attemptDocBlocks = attemptBlocks.filter((block) => /(^|\/)docs\//i.test(block.path));
+          const attemptDocs = selectDocBlocks(contextText, definitionFocus);
+          const attemptDocBlocks = attemptDocs.docBlocks;
           const attemptDocText = attemptDocBlocks.map((block) => block.block).join("\n\n");
           docBlocks = attemptDocBlocks;
           if (debugPayload) {
-            const proofSpanRate = computeProofSpanRate(attemptDocBlocks);
-            debugPayload.proof_span_rate = Math.max(debugPayload.proof_span_rate ?? 0, proofSpanRate);
+            debugPayload.proof_span_rate = Math.max(
+              debugPayload.proof_span_rate ?? 0,
+              attemptDocs.proofSpanRate,
+            );
+            if (definitionFocus) {
+              debugPayload.definition_doc_blocks = attemptDocBlocks.length;
+              debugPayload.definition_doc_span_rate = attemptDocs.proofSpanRate;
+            }
           }
           if (!coverageSlotsFromRequest && slotPlan && docSlotTargets.length === 0) {
             const docRequiredSlots = resolveDocRequiredSlots(slotPlan);
@@ -15746,11 +15839,19 @@ const executeHelixAsk = async ({
           intentDomain === "repo" ||
           intentDomain === "hybrid" ||
           intentDomain === "falsifiable";
+        const definitionDocRequired = definitionFocus && repoDocsRequired;
+        const definitionDocOk = !definitionDocRequired || docBlocks.length > 0;
+        const definitionDocMissing = definitionDocRequired && !definitionDocOk;
+        if (debugPayload) {
+          debugPayload.definition_doc_required = definitionDocRequired;
+          debugPayload.definition_doc_ok = definitionDocOk;
+        }
         docSlotCoverageFailed =
-          repoDocsRequired &&
-          docSlotTargets.length > 0 &&
-          ((docSlotSummary?.missingSlots?.length ?? 0) > 0 ||
-            (minDocEvidenceCards > 0 && docBlocks.length < minDocEvidenceCards));
+          (repoDocsRequired &&
+            docSlotTargets.length > 0 &&
+            ((docSlotSummary?.missingSlots?.length ?? 0) > 0 ||
+              (minDocEvidenceCards > 0 && docBlocks.length < minDocEvidenceCards))) ||
+          definitionDocMissing;
         if (docSlotCoverageFailed) {
           mustIncludeOk = false;
           evidenceGate = { ...evidenceGate, ok: false };
@@ -15844,7 +15945,9 @@ const executeHelixAsk = async ({
           intentDomain === "falsifiable" || requiresRepoEvidence;
         failClosedReason = null;
         if (requiresRepoEvidence && intentStrategy !== "constraint_report") {
-          if (slotCoverageFailed) {
+          if (definitionDocMissing) {
+            failClosedReason = "definition_doc_missing";
+          } else if (slotCoverageFailed) {
             failClosedReason = "slot_coverage_failed";
           } else if (docSlotCoverageFailed) {
             failClosedReason = "doc_slot_missing";
@@ -15997,7 +16100,22 @@ const executeHelixAsk = async ({
         const combinedContext = wantsHybrid
           ? contextText
           : [promptContextText, contextText].filter(Boolean).join("\n\n");
-        const evidenceContext = clipAskText(combinedContext, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
+        let evidenceContextSource = combinedContext;
+        if (definitionFocus) {
+          const definitionDocContext = docBlocks.length
+            ? docBlocks.map((block) => block.block).join("\n\n")
+            : "";
+          const mergedDefinitionContext = [promptContextText, definitionDocContext]
+            .filter(Boolean)
+            .join("\n\n");
+          if (mergedDefinitionContext.trim()) {
+            evidenceContextSource = mergedDefinitionContext;
+          }
+        }
+        const evidenceContext = clipAskText(
+          evidenceContextSource,
+          HELIX_ASK_SCAFFOLD_CONTEXT_CHARS,
+        );
         if (conceptFastPath && conceptMatch) {
           const evidenceStart = Date.now();
           const conceptScaffold = buildConceptScaffold(conceptMatch);
@@ -16345,10 +16463,13 @@ const executeHelixAsk = async ({
             docSlotSummary?.missingSlots?.length
               ? docSlotSummary.missingSlots
               : coverageSlotSummary?.missingSlots ?? [];
-        const clarifySlots = filterClarifySlots(missingSlots);
-        if (HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId && clarifySlots.length > 0) {
-          recordHelixAskSessionMemory({
-            sessionId: parsed.data.sessionId,
+          const clarifySlots = filterClarifySlots(missingSlots);
+          const definitionClarify = definitionDocMissing
+            ? "Definition questions require at least one docs/*.md span. Please point to the relevant doc file."
+            : "";
+          if (HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId && clarifySlots.length > 0) {
+            recordHelixAskSessionMemory({
+              sessionId: parsed.data.sessionId,
             lastClarifySlots: clarifySlots,
             openSlots: clarifySlots,
             attempts: agentActions.map((entry) => entry.action),
@@ -16359,9 +16480,11 @@ const executeHelixAsk = async ({
               verbosity: parsed.data.verbosity,
               citationsRequired: requiresRepoEvidence,
             },
-          });
-        }
-        const clarifyLine = clarifySlots.length
+            });
+          }
+        const clarifyLine = definitionClarify
+          ? definitionClarify
+          : clarifySlots.length
           ? buildSlotClarifyLine({
               missingSlots: clarifySlots,
               slotPlan,
