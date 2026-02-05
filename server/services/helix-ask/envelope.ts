@@ -39,6 +39,51 @@ const splitParagraphs = (value: string): string[] =>
     .map((entry) => entry.trim())
     .filter(Boolean);
 
+const TREE_WALK_HEADER = /^Tree Walk:/i;
+const TREE_WALK_LINE = /^\s*\d+\.\s+/;
+
+const extractTreeWalkBlock = (
+  value: string,
+): { block?: string; stripped: string } => {
+  const text = value ?? "";
+  const lines = text.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => TREE_WALK_HEADER.test(line.trim()));
+  if (startIndex < 0) {
+    return { stripped: text.trim() };
+  }
+  let endIndex = startIndex + 1;
+  for (; endIndex < lines.length; endIndex += 1) {
+    const line = lines[endIndex];
+    const trimmed = line.trim();
+    if (!trimmed) {
+      const nextIndex = lines
+        .slice(endIndex + 1)
+        .findIndex((entry) => entry.trim().length > 0);
+      if (nextIndex < 0) {
+        endIndex = lines.length;
+        break;
+      }
+      const nextLine = lines[endIndex + 1 + nextIndex].trim();
+      if (TREE_WALK_HEADER.test(nextLine) || TREE_WALK_LINE.test(nextLine)) {
+        continue;
+      }
+      break;
+    }
+    if (TREE_WALK_HEADER.test(trimmed) || TREE_WALK_LINE.test(trimmed)) {
+      continue;
+    }
+    break;
+  }
+  const blockLines = lines.slice(startIndex, endIndex);
+  const remainingLines = [...lines.slice(0, startIndex), ...lines.slice(endIndex)];
+  const stripped = remainingLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  const block = blockLines.join("\n").trim();
+  return {
+    block: block.length ? block : undefined,
+    stripped,
+  };
+};
+
 const splitAnswerForEnvelope = (
   text: string,
   format: HelixAskFormat,
@@ -128,6 +173,23 @@ const buildDetailSections = (
   return sections;
 };
 
+const buildTreeWalkSection = (
+  treeWalk: string | undefined,
+  mode: HelixAskEnvelopeMode,
+): HelixAskEnvelopeSection | null => {
+  if (!treeWalk?.trim()) return null;
+  const citations = ensureUnique(extractFilePathsFromText(treeWalk)).filter(
+    (value) => !isProofRef(value),
+  );
+  return {
+    title: "Tree Walk",
+    body: treeWalk.trim(),
+    citations: citations.length ? citations : undefined,
+    layer: "details",
+    defaultOpen: mode === "extended",
+  };
+};
+
 const buildKeyFilesSection = (
   answer: string,
   details: string | undefined,
@@ -171,14 +233,18 @@ const buildProofSection = (
 export const buildHelixAskEnvelope = (
   input: HelixAskEnvelopeBuildInput,
 ): HelixAskResponseEnvelope => {
-  const summarySplit = splitAnswerForEnvelope(input.answer, input.format);
+  const treeWalkExtract = extractTreeWalkBlock(input.answer);
+  const answerText = treeWalkExtract.stripped || input.answer;
+  const summarySplit = splitAnswerForEnvelope(answerText, input.format);
   const summary = summarySplit.summary.trim();
   const details = summarySplit.details?.trim();
   const sections: HelixAskEnvelopeSection[] = [];
+  const treeWalkSection = buildTreeWalkSection(treeWalkExtract.block, input.mode);
+  if (treeWalkSection) sections.push(treeWalkSection);
   sections.push(...buildDetailSections(details, input.tier, input.mode));
 
   if (input.tier !== "F0") {
-    const keyFiles = buildKeyFilesSection(input.answer, details, input.evidenceText);
+    const keyFiles = buildKeyFilesSection(answerText, details, input.evidenceText);
     if (keyFiles) sections.push(keyFiles);
   }
 
@@ -204,7 +270,7 @@ export const buildHelixAskEnvelope = (
     mode: input.mode,
     tier: input.tier,
     secondaryTier: input.secondaryTier,
-    answer: summary || input.answer.trim(),
+    answer: summary || answerText.trim() || input.answer.trim(),
     sections: sections.length ? sections : undefined,
     proof,
   };

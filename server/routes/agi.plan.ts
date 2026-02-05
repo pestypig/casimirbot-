@@ -2517,8 +2517,9 @@ const PlanRequest = z.object({
   refinery: agiRefineryRequestSchema.optional(),
 });
 
-const readNumber = (value: string | undefined, fallback: number): number => {
-  const parsed = Number(value);
+const readNumber = (value: string | number | undefined, fallback: number): number => {
+  if (value === undefined || value === null) return fallback;
+  const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -2667,6 +2668,12 @@ const HELIX_ASK_EVIDENCE_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_EVIDENCE_TOKENS ?? process.env.VITE_HELIX_ASK_EVIDENCE_TOKENS, 512),
   64,
   1024,
+);
+const HELIX_ASK_TREE_WALK_MODE_RAW = String(process.env.HELIX_ASK_TREE_WALK_MODE ?? "full").trim();
+const HELIX_ASK_TREE_WALK_MAX_STEPS = clampNumber(
+  readNumber(process.env.HELIX_ASK_TREE_WALK_MAX_STEPS ?? 0, 0),
+  0,
+  60,
 );
 const HELIX_ASK_ANSWER_MAX_TOKENS = clampNumber(
   readNumber(
@@ -5105,6 +5112,7 @@ type AskCandidate = {
 type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path";
 type AskCandidateChannelStats = Record<AskCandidateChannel, number>;
 type AskCandidateChannelList = { channel: AskCandidateChannel; candidates: AskCandidate[] };
+type EvidenceEligibility = ReturnType<typeof evaluateEvidenceEligibility>;
 
 type AmbiguityCluster = {
   key: string;
@@ -5628,7 +5636,15 @@ type HelixAskSlotPlanEntry = {
   id: string;
   label: string;
   required: boolean;
-  source: "concept" | "plan" | "plan_pass" | "memory" | "heading" | "graph" | "token";
+  source:
+    | "concept"
+    | "plan"
+    | "plan_pass"
+    | "memory"
+    | "memory_resolved"
+    | "heading"
+    | "graph"
+    | "token";
   weak?: boolean;
   surfaces?: string[];
   aliases?: string[];
@@ -6170,6 +6186,7 @@ const buildCanonicalSlotPlan = (args: {
     concept: 4,
     plan_pass: 3,
     memory: 3,
+    memory_resolved: 3,
     plan: 2,
     heading: 2,
     graph: 2,
@@ -7153,6 +7170,7 @@ async function buildAskContextFromQueries(
   channelHits?: AskCandidateChannelStats;
   channelTopScores?: AskCandidateChannelStats;
   channelWeights?: AskCandidateChannelStats;
+  docHeaderInjected?: number;
 }> {
   const snapshot = await loadCodeLattice();
   if (!snapshot) return { context: "", files: [] };
@@ -7862,11 +7880,28 @@ type HelixAskTreeWalkMetrics = {
   primaryTreeId?: string;
 };
 
+type HelixAskTreeWalkMode = "full" | "root_to_anchor" | "root_only" | "anchor_only";
+
 const normalizeTreeWalkKey = (value: string): string =>
   value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
 
+const resolveHelixAskTreeWalkMode = (
+  raw: string,
+  verbosity: HelixAskVerbosity,
+): HelixAskTreeWalkMode => {
+  const normalized = raw.trim().toLowerCase().replace(/-/g, "_");
+  if (normalized === "auto") {
+    return verbosity === "brief" ? "root_to_anchor" : "full";
+  }
+  if (normalized === "root" || normalized === "root_only") return "root_only";
+  if (normalized === "anchor" || normalized === "anchor_only") return "anchor_only";
+  if (normalized === "root_to_anchor" || normalized === "root2anchor") return "root_to_anchor";
+  return "full";
+};
+
 function buildHelixAskTreeWalk(
   pack: HelixAskGraphPack | null,
+  options: { mode: HelixAskTreeWalkMode; maxSteps: number },
 ): { text: string; metrics: HelixAskTreeWalkMetrics | null } {
   if (!pack?.frameworks?.length) {
     return { text: "", metrics: null };
@@ -7875,12 +7910,60 @@ function buildHelixAskTreeWalk(
   let nodeCount = 0;
   let nodesWithText = 0;
   let nodesWithoutText = 0;
+  const stepCap = options.maxSteps > 0 ? options.maxSteps : null;
   for (const framework of pack.frameworks) {
     const label = framework.treeLabel ?? framework.treeId;
     const header = `Tree Walk: ${label} (tree-derived; source: ${framework.sourcePath})`;
     lines.push(header);
     const anchorIds = new Set(framework.anchors.map((node) => node.id));
-    framework.path.forEach((node, idx) => {
+    const path = framework.path ?? [];
+    if (!path.length) {
+      lines.push("1. Walk: (no nodes resolved) - no tree path available.");
+      lines.push("");
+      continue;
+    }
+    const rootIndexFromId = framework.rootId
+      ? path.findIndex((node) => node.id === framework.rootId)
+      : -1;
+    const minDepth = path.reduce(
+      (min, node) => Math.min(min, node.depth ?? 0),
+      Number.POSITIVE_INFINITY,
+    );
+    const rootIndexFromDepth = path.findIndex((node) => (node.depth ?? 0) === minDepth);
+    const rootIndex =
+      rootIndexFromId >= 0
+        ? rootIndexFromId
+        : rootIndexFromDepth >= 0
+          ? rootIndexFromDepth
+          : 0;
+    const anchorIndex = path.findIndex(
+      (node, idx) => idx >= rootIndex && anchorIds.has(node.id),
+    );
+    let selected = path.slice();
+    switch (options.mode) {
+      case "anchor_only":
+        selected = path.filter((node) => anchorIds.has(node.id));
+        break;
+      case "root_only":
+        selected = [path[rootIndex] ?? path[0]];
+        break;
+      case "root_to_anchor":
+        if (anchorIndex >= 0) {
+          selected = path.slice(rootIndex, anchorIndex + 1);
+        }
+        break;
+      case "full":
+      default:
+        selected = path.slice();
+        break;
+    }
+    if (selected.length === 0) {
+      selected = path.slice();
+    }
+    if (stepCap && selected.length > stepCap) {
+      selected = selected.slice(0, stepCap);
+    }
+    selected.forEach((node, idx) => {
       nodeCount += 1;
       const title = node.title ?? node.id;
       const roleLabel = node.role
@@ -7904,7 +7987,7 @@ function buildHelixAskTreeWalk(
         detail = "No detail provided in the tree node.";
       }
       lines.push(
-        `${idx + 1}. ${roleLabel}: ${title}${idSuffix} — ${detail} (${framework.sourcePath})`,
+        `${idx + 1}. ${roleLabel}: ${title}${idSuffix} - ${detail} (${framework.sourcePath})`,
       );
     });
     lines.push("");
@@ -11842,6 +11925,7 @@ const executeHelixAsk = async ({
       context_files?: string[];
       context_files_count?: number;
       block_scoped?: boolean;
+      block_scoped_source?: string;
       is_repo_question?: boolean;
       prompt_ingested?: boolean;
       prompt_ingest_source?: string;
@@ -12052,6 +12136,26 @@ const executeHelixAsk = async ({
         requested?: string[];
         applied?: string[];
       };
+      graph_framework?: {
+        primary?: string;
+        locked?: string[];
+        trees: Array<{
+          tree: string;
+          anchors: string[];
+          nodes: string[];
+          source: string;
+          score?: number | null;
+        }>;
+      };
+      graph_framework_applied?: boolean;
+      graph_hint_terms?: string[];
+      tree_walk?: HelixAskTreeWalkMetrics;
+      tree_walk_mode?: HelixAskTreeWalkMode;
+      tree_walk_max_steps?: number;
+      tree_walk_lines?: number;
+      tree_walk_block_present?: boolean;
+      tree_walk_injected?: boolean;
+      tree_walk_in_answer?: boolean;
       plan_directives?: HelixAskPlanDirectives;
       slot_plan?: Array<{
         id: string;
@@ -12111,21 +12215,21 @@ const executeHelixAsk = async ({
       retrieval_channel_top_scores?: AskCandidateChannelStats;
       retrieval_channel_weights?: AskCandidateChannelStats;
       doc_header_injected?: number;
-        slot_coverage_required?: string[];
-        slot_coverage_missing?: string[];
-        slot_coverage_ratio?: number;
-        slot_coverage_ok?: boolean;
-        hard_required_slots?: string[];
-        hard_required_slot_count?: number;
-        coverage_slots_source?: "request" | "concept" | "none";
-        slot_tiers?: Array<{
-          id: string;
-          label: string;
-          source: HelixAskSlotPlanEntry["source"];
-          required: boolean;
-          tier: "A" | "B" | "C";
-        }>;
-        slot_tier_counts?: { A: number; B: number; C: number };
+      slot_coverage_required?: string[];
+      slot_coverage_missing?: string[];
+      slot_coverage_ratio?: number;
+      slot_coverage_ok?: boolean;
+      hard_required_slots?: string[];
+      hard_required_slot_count?: number;
+      coverage_slots_source?: "request" | "concept" | "none";
+      slot_tiers?: Array<{
+        id: string;
+        label: string;
+        source: HelixAskSlotPlanEntry["source"];
+        required: boolean;
+        tier: "A" | "B" | "C";
+      }>;
+      slot_tier_counts?: { A: number; B: number; C: number };
       slot_doc_hit_rate?: number;
       slot_alias_coverage_rate?: number;
       slot_dominance_margin?: number;
@@ -12136,15 +12240,6 @@ const executeHelixAsk = async ({
       hypothesis_rate?: number;
       next_evidence_count?: number;
       next_evidence_coverage?: number;
-      agent_loop_enabled?: boolean;
-      agent_loop_max_steps?: number;
-      agent_loop_budget_ms?: number;
-      agent_action_budget_ms?: number;
-      agent_loop_steps?: number;
-      agent_loop_actions?: HelixAskAgentAction[];
-      agent_stop_reason?: string;
-      agent_action_counts?: Record<string, number>;
-      agent_attempts?: string[];
       ambiguity_clarify_rate?: number;
       clarify_precision?: number;
       coverage_slots_required?: string[];
@@ -12158,6 +12253,20 @@ const executeHelixAsk = async ({
       repo_search_hits?: number;
       repo_search_truncated?: boolean;
       repo_search_error?: string;
+      preflight_repo_search_terms?: string[];
+      preflight_repo_search_paths?: string[];
+      preflight_repo_search_reason?: string;
+      preflight_repo_search_hits?: number;
+      preflight_repo_search_truncated?: boolean;
+      preflight_repo_search_error?: string;
+      preflight_queries?: string[];
+      preflight_files?: string[];
+      preflight_file_count?: number;
+      preflight_doc_share?: number;
+      preflight_evidence_ok?: boolean;
+      preflight_evidence_ratio?: number;
+      preflight_retrieval_upgrade?: boolean;
+      preflight_reuse?: boolean;
       endpoint_hints?: string[];
       endpoint_anchor_paths?: string[];
       endpoint_anchor_violation?: boolean;
@@ -12189,6 +12298,12 @@ const executeHelixAsk = async ({
       coverage_missing_keys?: string[];
       coverage_gate_applied?: boolean;
       coverage_gate_reason?: string;
+      definition_doc_filtered?: boolean;
+      definition_doc_paths?: string[];
+      report_mode_bypass?: {
+        reason?: string;
+        block_count?: number;
+      };
       claim_ledger?: Array<{
         id: string;
         type: string;
@@ -12751,6 +12866,12 @@ const executeHelixAsk = async ({
         evidence_match_preview?: string[];
         topic_tags?: string[];
         context_files?: string[];
+        context_files_count?: number;
+        block_scoped?: boolean;
+        micro_pass?: boolean;
+        micro_pass_enabled?: boolean;
+        plan_pass_forced?: boolean;
+        is_repo_question?: boolean;
         block_citation_fallback?: boolean;
         block_paths_scrubbed?: string[];
         block_dedupe_applied?: boolean;
@@ -12774,6 +12895,7 @@ const executeHelixAsk = async ({
         slot_doc_hit_rate?: number;
         slot_alias_coverage_rate?: number;
         duration_ms?: number;
+        prefetch_files_count?: number;
       }> = [];
       for (let index = 0; index < limitedBlocks.length; index += 1) {
         const block = limitedBlocks[index];
@@ -13233,7 +13355,9 @@ const executeHelixAsk = async ({
           : null;
     }
     if (sessionMemoryForTags?.recentTopics?.length) {
-      topicTags = Array.from(new Set([...topicTags, ...sessionMemoryForTags.recentTopics]));
+      topicTags = Array.from(
+        new Set([...topicTags, ...sessionMemoryForTags.recentTopics]),
+      ) as HelixAskTopicTag[];
     }
     logEvent(
       "Topic tags",
@@ -13940,15 +14064,33 @@ const executeHelixAsk = async ({
           })),
         };
       }
-      const treeWalk = buildHelixAskTreeWalk(graphPack);
+      const treeWalkMode = resolveHelixAskTreeWalkMode(HELIX_ASK_TREE_WALK_MODE_RAW, verbosity);
+      const treeWalk = buildHelixAskTreeWalk(graphPack, {
+        mode: treeWalkMode,
+        maxSteps: HELIX_ASK_TREE_WALK_MAX_STEPS,
+      });
       treeWalkBlock = treeWalk.text;
       treeWalkMetrics = treeWalk.metrics;
-      if (debugPayload && treeWalkMetrics) {
-        debugPayload.tree_walk = treeWalkMetrics;
-        debugPayload.tree_walk_lines = treeWalkBlock
-          ? treeWalkBlock.split(/\r?\n/).filter((line) => line.trim()).length
-          : 0;
-        debugPayload.tree_walk_block_present = Boolean(treeWalkBlock);
+      if (treeWalkMetrics) {
+        const treeWalkDetail = [
+          `mode=${treeWalkMode}`,
+          treeWalkMetrics.stepCount ? `steps=${treeWalkMetrics.stepCount}` : null,
+          treeWalkMetrics.treeCount ? `trees=${treeWalkMetrics.treeCount}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+        logEvent("Tree walk", "ready", treeWalkDetail);
+      }
+      if (debugPayload) {
+        debugPayload.tree_walk_mode = treeWalkMode;
+        debugPayload.tree_walk_max_steps = HELIX_ASK_TREE_WALK_MAX_STEPS;
+        if (treeWalkMetrics) {
+          debugPayload.tree_walk = treeWalkMetrics;
+          debugPayload.tree_walk_lines = treeWalkBlock
+            ? treeWalkBlock.split(/\r?\n/).filter((line) => line.trim()).length
+            : 0;
+          debugPayload.tree_walk_block_present = Boolean(treeWalkBlock);
+        }
       }
     }
     const baseEvidenceSignalTokens = Array.from(
@@ -14429,6 +14571,12 @@ const executeHelixAsk = async ({
             formatFileList(extractFilePathsFromText(contextText)),
             contextStart,
           );
+          logEvent(
+            "Allowlist tier",
+            "auto",
+            topicProfile ? "auto context (no tier)" : "no topic profile",
+            contextStart,
+          );
         } else if (!contextText && isRepoQuestion && deferAutoContext) {
           logEvent(
             "Context deferred",
@@ -14552,6 +14700,7 @@ const executeHelixAsk = async ({
     let slotCoverageOk = true;
     let slotCoverageFailed = false;
     let docSlotCoverageFailed = false;
+    let definitionDocMissing = false;
     let slotEvidenceLogged = false;
     let slotEvidenceRates: { docHitRate: number; aliasHitRate: number } | null = null;
     let blockMustIncludeOk: boolean | undefined;
@@ -16449,7 +16598,7 @@ const executeHelixAsk = async ({
             definitionFocus,
           );
           const definitionDocOk = !definitionDocRequired || definitionDocBlocks.length > 0;
-          const definitionDocMissing = definitionDocRequired && !definitionDocOk;
+          definitionDocMissing = definitionDocRequired && !definitionDocOk;
           if (debugPayload) {
             debugPayload.definition_doc_required = definitionDocRequired;
             debugPayload.definition_doc_ok = definitionDocOk;

@@ -176,7 +176,7 @@ describe("helix ask platonic gates", () => {
     const result = applyHelixAskPlatonicGates({
       question: "How does the Helix Ask pipeline work?",
       answer:
-        "The Helix Ask pipeline uses the intent directory, evidence gate, and format step before building the envelope. " +
+        "The Helix Ask pipeline uses the intent directory, evidence gate, and format step before building the envelope in server/routes/agi.plan.ts. " +
         "Astrophysics and cicadas dominate the rest of the discussion. " +
         "Plasma storms and sand dunes are unrelated digressions. " +
         "The narrative then jumps to ancient calendars and mythic rivers. " +
