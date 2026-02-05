@@ -17539,6 +17539,7 @@ const executeHelixAsk = async ({
           cleaned = stripTruncationMarkers(cleaned);
           cleaned = stripInlineJsonArtifacts(cleaned);
         }
+      const baselineCleaned = cleaned;
       const allowCitationRepair =
         (microPassEnabled || intentStrategy === "constraint_report") &&
         intentProfile.id !== "repo.ideology_reference";
@@ -17612,6 +17613,18 @@ const executeHelixAsk = async ({
             evidenceText,
           );
           repairedText = sanitized.text;
+          repairedText = stripInlineJsonArtifacts(repairedText);
+          repairedText = stripTruncationMarkers(repairedText);
+          const baselineTrimmed = baselineCleaned.trim();
+          const repairedTrimmed = repairedText.trim();
+          const repairedHasPaths =
+            extractFilePathsFromText(repairedTrimmed).length > 0 || hasSourcesLine(repairedTrimmed);
+          const baselineHasPaths =
+            extractFilePathsFromText(baselineTrimmed).length > 0 || hasSourcesLine(baselineTrimmed);
+          const repairedTooShort =
+            baselineTrimmed.length > 0 &&
+            repairedTrimmed.length > 0 &&
+            repairedTrimmed.length < baselineTrimmed.length * 0.6;
           if (parsedRepair && repairedText) {
             const allowedTokenSet = new Set(
               extractCitationTokensFromText(evidenceText).map((token) => token.toLowerCase()),
@@ -17637,7 +17650,10 @@ const executeHelixAsk = async ({
               repairedText = `${repairedText}\n\nSources: ${filteredSources.join(", ")}`;
             }
           }
-          if (repairedText.trim()) {
+          if (
+            repairedTrimmed &&
+            !(repairedTooShort && baselineHasPaths && !repairedHasPaths)
+          ) {
             cleaned = repairedText;
             if (debugPayload) {
               debugPayload.citation_repair = true;
@@ -17650,6 +17666,8 @@ const executeHelixAsk = async ({
               formatFileList(extractFilePathsFromText(cleaned)),
               repairStart,
             );
+          } else {
+            answerPath.push("citationRepair:skipped(degraded)");
           }
         } else {
           answerPath.push(hasAnswerPaths ? "citationRepair:skipped(grounded)" : "citationRepair:skipped(no_evidence)");
