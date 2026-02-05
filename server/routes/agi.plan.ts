@@ -13266,7 +13266,10 @@ const executeHelixAsk = async ({
         preflightBaseQueries.push(conceptMatch.card.sourcePath);
       }
       const preflightHeadingSeeds = buildDocHeadingSeedSlots(baseQuestion);
-      const preflightHints = [...graphHintTerms, ...preflightHeadingSeeds];
+      const preflightHeadingTerms = preflightHeadingSeeds.flatMap((slot) => buildSlotQueryTerms(slot));
+      const preflightHints = [...graphHintTerms, ...preflightHeadingTerms].filter(
+        (value): value is string => typeof value === "string",
+      );
       preflightQueries = mergeHelixAskQueries(
         preflightBaseQueries,
         preflightHints,
