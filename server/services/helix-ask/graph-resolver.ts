@@ -47,6 +47,7 @@ type GraphResolverTreeConfig = {
   path: string;
   topicTags?: HelixAskTopicTag[];
   matchers?: string[];
+  weight?: number;
   maxAnchors?: number;
   maxDepth?: number;
   maxNodes?: number;
@@ -115,6 +116,7 @@ const DEFAULT_MAX_PACK_TREES = 3;
 const DEFAULT_PACK_MIN_SCORE = 6;
 const DEFAULT_PACK_MIN_SCORE_RATIO = 0.25;
 const MAX_PACK_TREES_LIMIT = 6;
+const LOCKED_TREE_SCORE_BONUS = 4;
 
 type GraphConfigCache = { config: GraphResolverConfig; path: string; mtimeMs: number };
 let graphConfigCache: GraphConfigCache | null = null;
@@ -483,11 +485,15 @@ const mergeContextBlocks = (blocks: string[]): string => {
   return trimmed.join("\n\n");
 };
 
+const resolveTreeWeight = (value: unknown): number =>
+  clampNumber(coerceNumber(value, 1), 0.1, 5);
+
 const buildFrameworkCandidate = (
   tree: GraphTree,
   tokens: string[],
   questionNorm: string,
   conceptBoosts: string[],
+  options?: { locked?: boolean },
 ): GraphFrameworkCandidate | null => {
   const nodeScores = tree.nodes
     .map((node) => ({
@@ -570,7 +576,10 @@ const buildFrameworkCandidate = (
   const anchorScore = resolvedAnchors.reduce((sum, node) => sum + Math.max(0, node.score), 0);
   const pathScore = withRoles.reduce((sum, node) => sum + Math.max(0, node.score), 0);
   const hitCount = nodeScores.length;
-  const treeScore = scoreGraphCandidate(anchorScore, pathScore, hitCount);
+  const baseScore = scoreGraphCandidate(anchorScore, pathScore, hitCount);
+  const weightedScore =
+    baseScore * resolveTreeWeight(tree.config.weight) +
+    (options?.locked ? LOCKED_TREE_SCORE_BONUS : 0);
   const framework: HelixAskGraphFramework = {
     treeId: tree.id,
     treeLabel: tree.label,
@@ -581,17 +590,18 @@ const buildFrameworkCandidate = (
     scaffoldText,
     contextText,
     preferGraph: treeConfig.preferGraph !== false,
-    rankScore: treeScore,
+    rankScore: weightedScore,
     anchorScore,
     pathScore,
   };
-  return { framework, score: treeScore, anchorScore, pathScore, hitCount };
+  return { framework, score: weightedScore, anchorScore, pathScore, hitCount };
 };
 
 export function resolveHelixAskGraphPack(input: {
   question: string;
   topicTags: HelixAskTopicTag[];
   conceptMatch?: HelixAskConceptMatch | null;
+  lockedTreeIds?: string[];
 }): HelixAskGraphPack | null {
   const config = loadGraphResolverConfig();
   if (!config?.trees?.length) return null;
@@ -611,16 +621,33 @@ export function resolveHelixAskGraphPack(input: {
   if (!question) return null;
   const trees = config.trees.filter((tree) => tree && tree.id && tree.path);
   if (trees.length === 0) return null;
+  const lockedTreeIds = new Set(
+    (input.lockedTreeIds ?? []).map((entry) => entry.trim()).filter(Boolean),
+  );
   const matchingTrees = trees.filter((tree) => shouldUseTree(tree, question, input.topicTags));
-  if (matchingTrees.length === 0) return null;
+  const combinedTrees = new Map<string, GraphResolverTreeConfig>();
+  for (const tree of matchingTrees) {
+    combinedTrees.set(tree.id, tree);
+  }
+  if (lockedTreeIds.size > 0) {
+    for (const tree of trees) {
+      if (lockedTreeIds.has(tree.id)) {
+        combinedTrees.set(tree.id, tree);
+      }
+    }
+  }
+  const selectedTrees = Array.from(combinedTrees.values());
+  if (selectedTrees.length === 0) return null;
   const questionNorm = normalizeText(question);
   const tokens = extractQuestionTokens(question);
   const conceptBoosts = extractConceptBoosts(input.conceptMatch);
   const candidates: GraphFrameworkCandidate[] = [];
-  for (const treeConfig of matchingTrees) {
+  for (const treeConfig of selectedTrees) {
     const tree = loadGraphTree(treeConfig);
     if (!tree) continue;
-    const candidate = buildFrameworkCandidate(tree, tokens, questionNorm, conceptBoosts);
+    const candidate = buildFrameworkCandidate(tree, tokens, questionNorm, conceptBoosts, {
+      locked: lockedTreeIds.has(treeConfig.id),
+    });
     if (candidate) candidates.push(candidate);
   }
   if (candidates.length === 0) return null;
@@ -636,8 +663,28 @@ export function resolveHelixAskGraphPack(input: {
   const threshold = Math.max(minPackScore, topScore * minPackScoreRatio);
   let filtered = sorted.filter((candidate) => candidate.score >= threshold);
   if (filtered.length === 0) filtered = [sorted[0]];
-  const maxTrees = Math.min(maxPackTrees, filtered.length);
-  const selected = filtered.slice(0, maxTrees).map((candidate) => candidate.framework);
+  const maxTrees = Math.min(maxPackTrees, sorted.length);
+  const selected: HelixAskGraphFramework[] = [];
+  const selectedIds = new Set<string>();
+  const lockedCandidates = sorted
+    .filter((candidate) => lockedTreeIds.has(candidate.framework.treeId))
+    .sort((a, b) => b.score - a.score);
+  const addCandidate = (candidate: GraphFrameworkCandidate): void => {
+    if (selected.length >= maxTrees) return;
+    const id = candidate.framework.treeId;
+    if (selectedIds.has(id)) return;
+    selectedIds.add(id);
+    selected.push(candidate.framework);
+  };
+  for (const candidate of lockedCandidates) {
+    addCandidate(candidate);
+  }
+  for (const candidate of filtered) {
+    addCandidate(candidate);
+  }
+  if (selected.length === 0) {
+    addCandidate(sorted[0]);
+  }
   const scaffoldText = mergeScaffoldText(selected.map((framework) => framework.scaffoldText));
   const contextText = mergeContextBlocks(selected.map((framework) => framework.contextText));
   const preferGraph = selected.some((framework) => framework.preferGraph);

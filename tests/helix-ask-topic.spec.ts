@@ -134,4 +134,89 @@ describe("Helix Ask topic routing", () => {
     const tags = inferHelixAskTopicTags("What is the Casimir effect?");
     expect(tags).toContain("physics");
   });
+
+  it("tags ui prompts as ui", () => {
+    const tags = inferHelixAskTopicTags("Map the UI components for the Helix desktop panels.");
+    expect(tags).toContain("ui");
+  });
+
+  it("tags simulation prompts as simulation", () => {
+    const tags = inferHelixAskTopicTags("How do the simulation systems stream results into the app?");
+    expect(tags).toContain("simulation");
+  });
+
+  it("tags uncertainty mechanics prompts as uncertainty", () => {
+    const tags = inferHelixAskTopicTags("Walk the uncertainty mechanics tree and its anchors.");
+    expect(tags).toContain("uncertainty");
+  });
+
+  it("tags knowledge ingestion prompts as knowledge", () => {
+    const tags = inferHelixAskTopicTags("Describe the knowledge ingestion and RAG pipeline.");
+    expect(tags).toContain("knowledge");
+  });
+
+  it("tags ops prompts as ops", () => {
+    const tags = inferHelixAskTopicTags("What CI and deployment runbooks exist for releases?");
+    expect(tags).toContain("ops");
+  });
+
+  it("tags hardware telemetry prompts as hardware", () => {
+    const tags = inferHelixAskTopicTags("Show the hardware telemetry flow into the panels.");
+    expect(tags).toContain("hardware");
+  });
+
+  it("tags llm runtime prompts as llm", () => {
+    const tags = inferHelixAskTopicTags("Explain the local LLM worker and tokenizer guardrails.");
+    expect(tags).toContain("llm");
+  });
+
+  it("tags debate prompts as debate", () => {
+    const tags = inferHelixAskTopicTags("Walk the debate referee loop and telemetry.");
+    expect(tags).toContain("debate");
+  });
+
+  it("tags specialists prompts as specialists", () => {
+    const tags = inferHelixAskTopicTags("List the specialists solvers and verifiers.");
+    expect(tags).toContain("specialists");
+  });
+
+  it("tags security prompts as security", () => {
+    const tags = inferHelixAskTopicTags("What does the hull guardrail enforce in HULL_MODE?");
+    expect(tags).toContain("security");
+  });
+
+  it("tags skills prompts as skills", () => {
+    const tags = inferHelixAskTopicTags("Where is the tool registry and skills catalog defined?");
+    expect(tags).toContain("skills");
+  });
+
+  it("tags console telemetry prompts as console", () => {
+    const tags = inferHelixAskTopicTags("How does console telemetry get captured and summarized?");
+    expect(tags).toContain("console");
+  });
+
+  it("tags materials prompts as materials", () => {
+    const tags = inferHelixAskTopicTags("Summarize the needle hull materials stack.");
+    expect(tags).toContain("materials");
+  });
+
+  it("tags environment prompts as environment", () => {
+    const tags = inferHelixAskTopicTags("Describe the environment model and environment tags.");
+    expect(tags).toContain("environment");
+  });
+
+  it("tags sdk prompts as sdk", () => {
+    const tags = inferHelixAskTopicTags("Show the TypeScript SDK client and runtime helpers.");
+    expect(tags).toContain("sdk");
+  });
+
+  it("tags packages prompts as packages", () => {
+    const tags = inferHelixAskTopicTags("How does create-casimir-verifier package scaffold work?");
+    expect(tags).toContain("packages");
+  });
+
+  it("tags external prompts as external", () => {
+    const tags = inferHelixAskTopicTags("List the external dependencies like llama.cpp and sunpy.");
+    expect(tags).toContain("external");
+  });
 });

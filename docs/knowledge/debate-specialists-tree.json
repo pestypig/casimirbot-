@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "rootId": "debate-specialists-tree",
+  "nodes": [
+    {
+      "id": "debate-specialists-tree",
+      "slug": "debate-specialists-tree",
+      "title": "Debate and Specialists Tree",
+      "excerpt": "Debate orchestration, specialist runners, and verification loops.",
+      "bodyMD": "This tree maps debate orchestration, specialist execution, and the supporting telemetry and scripts.\n\nMinimal artifact: debate + specialists lifecycle map.",
+      "tags": [
+        "debate",
+        "specialists",
+        "verification"
+      ],
+      "children": [
+        "debate-core",
+        "debate-contracts",
+        "debate-telemetry",
+        "debate-routes",
+        "debate-skills",
+        "specialists-runtime",
+        "debate-harness"
+      ],
+      "links": []
+    },
+    {
+      "id": "debate-core",
+      "slug": "debate-core",
+      "title": "Debate Orchestration",
+      "excerpt": "Debate loop orchestration, prompts, and warp helpers.",
+      "bodyMD": "Debate core services (server/services/debate/orchestrator.ts, server/services/debate/prompts.ts, server/services/debate/types.ts, server/services/debate/warpPromptHelpers.ts).\n\nMinimal artifact: debate loop stages.",
+      "tags": [
+        "debate",
+        "orchestration",
+        "runtime"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-specialists-tree"
+        }
+      ]
+    },
+    {
+      "id": "debate-contracts",
+      "slug": "debate-contracts",
+      "title": "Debate Contracts",
+      "excerpt": "Schemas and shared grounding payloads.",
+      "bodyMD": "Shared debate schemas and grounding payloads (shared/essence-debate.ts).\n\nMinimal artifact: debate schema summary.",
+      "tags": [
+        "debate",
+        "schemas",
+        "contracts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-specialists-tree"
+        }
+      ]
+    },
+    {
+      "id": "debate-telemetry",
+      "slug": "debate-telemetry",
+      "title": "Debate Telemetry",
+      "excerpt": "Telemetry capture and storage for debates.",
+      "bodyMD": "Debate telemetry store and snapshots (server/services/debate/telemetry-store.ts, server/_generated/debate-telemetry.json).\n\nMinimal artifact: telemetry snapshot format.",
+      "tags": [
+        "debate",
+        "telemetry",
+        "observability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-specialists-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "telemetry-console-tree"
+        }
+      ]
+    },
+    {
+      "id": "debate-routes",
+      "slug": "debate-routes",
+      "title": "Debate Routes",
+      "excerpt": "HTTP routes for debate and specialist execution.",
+      "bodyMD": "Debate and specialists HTTP routes (server/routes/agi.debate.ts, server/routes/agi.specialists.ts).\n\nMinimal artifact: debate route map.",
+      "tags": [
+        "debate",
+        "routes",
+        "api"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-specialists-tree"
+        }
+      ]
+    },
+    {
+      "id": "debate-skills",
+      "slug": "debate-skills",
+      "title": "Debate Skills",
+      "excerpt": "Debate tool implementations and checklist tooling.",
+      "bodyMD": "Debate skills (server/skills/debate.run.ts, server/skills/debate.checklist.generate.ts, server/skills/debate.checklist.score.ts, server/skills/debate.claim.extract.ts).\n\nMinimal artifact: debate tool catalog.",
+      "tags": [
+        "debate",
+        "skills",
+        "tools"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-specialists-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "skills-tooling-tree"
+        }
+      ]
+    },
+    {
+      "id": "specialists-runtime",
+      "slug": "specialists-runtime",
+      "title": "Specialists Runtime",
+      "excerpt": "Specialist registry, solvers, and verifiers.",
+      "bodyMD": "Specialists runtime and registry (server/services/specialists/executor.ts, server/specialists/bootstrap.ts, server/specialists/solvers/*, server/specialists/verifiers/*, server/specialists/tasks.seed.json, shared/agi-specialists.ts).\n\nMinimal artifact: specialist plan execution flow.",
+      "tags": [
+        "specialists",
+        "runtime",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-specialists-tree"
+        }
+      ]
+    },
+    {
+      "id": "debate-harness",
+      "slug": "debate-harness",
+      "title": "Harnesses and Tests",
+      "excerpt": "Debate harness scripts and regression tests.",
+      "bodyMD": "Debate harness scripts and tests (scripts/debate-harness.mjs, scripts/plan-exec-with-debate.mjs, scripts/specialists-mini-loop.ts, tests/debate-*.spec.ts, tests/specialists.*.spec.ts).\n\nMinimal artifact: debate harness checklist.",
+      "tags": [
+        "debate",
+        "tests",
+        "harness"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-specialists-tree"
+        }
+      ]
+    }
+  ]
+}

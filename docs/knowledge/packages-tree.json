@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "rootId": "packages-tree",
+  "nodes": [
+    {
+      "id": "packages-tree",
+      "slug": "packages-tree",
+      "title": "Packages Tree",
+      "excerpt": "Monorepo packages, templates, and scaffolds.",
+      "bodyMD": "This tree maps the internal packages and scaffolding used by the system.\n\nMinimal artifact: packages map with templates and entrypoints.",
+      "tags": [
+        "packages",
+        "monorepo",
+        "tooling"
+      ],
+      "children": [
+        "packages-create-verifier",
+        "packages-app-native",
+        "packages-templates",
+        "packages-docs"
+      ],
+      "links": []
+    },
+    {
+      "id": "packages-create-verifier",
+      "slug": "packages-create-verifier",
+      "title": "Create Casimir Verifier",
+      "excerpt": "Scaffold package for verifier adapters.",
+      "bodyMD": "Casimir verifier scaffold package (packages/create-casimir-verifier/package.json, packages/create-casimir-verifier/README.md, packages/create-casimir-verifier/bin/create-casimir-verifier.mjs, packages/create-casimir-verifier/create-casimir-verifier.mjs).\n\nMinimal artifact: scaffold CLI summary.",
+      "tags": [
+        "packages",
+        "scaffold",
+        "verifier"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "packages-tree"
+        }
+      ]
+    },
+    {
+      "id": "packages-app-native",
+      "slug": "packages-app-native",
+      "title": "App Native Bundle",
+      "excerpt": "Native bundle configuration package.",
+      "bodyMD": "Native bundle configuration (packages/app-native/bundle.env).\n\nMinimal artifact: native bundle env config.",
+      "tags": [
+        "packages",
+        "native",
+        "bundle"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "packages-tree"
+        }
+      ]
+    },
+    {
+      "id": "packages-templates",
+      "slug": "packages-templates",
+      "title": "Package Templates",
+      "excerpt": "Template payloads and workflow hooks.",
+      "bodyMD": "Package templates and workflows (packages/create-casimir-verifier/template/adapter-request.json, packages/create-casimir-verifier/.github/workflows/hello-verifier.yml).\n\nMinimal artifact: template payload map.",
+      "tags": [
+        "packages",
+        "templates",
+        "workflows"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "packages-tree"
+        }
+      ]
+    },
+    {
+      "id": "packages-docs",
+      "slug": "packages-docs",
+      "title": "Package Docs",
+      "excerpt": "Package documentation and examples.",
+      "bodyMD": "Package docs and examples (packages/create-casimir-verifier/README.md, packages/create-casimir-verifier/sdk-example.mjs).\n\nMinimal artifact: package usage summary.",
+      "tags": [
+        "packages",
+        "docs",
+        "examples"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "packages-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sdk-integration-tree"
+        }
+      ]
+    }
+  ]
+}

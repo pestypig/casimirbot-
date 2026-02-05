@@ -8,7 +8,37 @@ export type HelixAskTopicTag =
   | "ideology"
   | "ledger"
   | "star"
-  | "concepts";
+  | "concepts"
+  | "ui"
+  | "frontend"
+  | "client"
+  | "backend"
+  | "simulation"
+  | "uncertainty"
+  | "brick"
+  | "lattice"
+  | "knowledge"
+  | "rag"
+  | "essence"
+  | "luma"
+  | "noise"
+  | "hardware"
+  | "telemetry"
+  | "console"
+  | "llm"
+  | "debate"
+  | "specialists"
+  | "security"
+  | "skills"
+  | "materials"
+  | "environment"
+  | "sdk"
+  | "packages"
+  | "external"
+  | "queue"
+  | "jobs"
+  | "ops"
+  | "ci";
 
 export type HelixAskTopicProfile = {
   tags: HelixAskTopicTag[];
@@ -38,6 +68,43 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
     /\b(ledger|sun ledger|stellar ledger|warp ledger|curvature ledger|kappa[_\s-]?drive|kappa[_\s-]?body|kappa proxy|curvature proxy|kappa ledger|potato threshold|e[_\s-]?potato|qi bounds?|qi widget|qi auto[-\s]?tuner|quantum inequality|ford[-\s]?roman)\b/i,
   star:
     /\b(star hydrostatic|stellar hydrostatic|polytrope|gamow window|potato threshold|hr map|hr diagram|stellar ledger|solar restoration|sun restoration|restore the sun|save the sun|save-the-sun|saving the sun|saving-the-sun|savingthesun|red giant|red giant phase|stellar evolution)\b/i,
+  ui: /\b(ui|user interface|frontend|front[-\s]?end|panel|panels|dashboard|hud|viewport|component tree|ui components|desktop panel)\b/i,
+  frontend: /\b(frontend|front[-\s]?end|client[-\s]?side|browser|tsx|react)\b/i,
+  client: /\b(client|client[-\s]?side|browser|desktop app|ui client)\b/i,
+  backend: /\b(backend|back[-\s]?end|server[-\s]?side|api|endpoint|service|worker)\b/i,
+  simulation:
+    /\b(simulation|simulator|sim systems?|parametric sweep|finite element|scuffem|gmsh|simulation api)\b/i,
+  uncertainty:
+    /\b(uncertainty|confidence interval|error bars?|error propagation|monte carlo|stochastic|noise kernel)\b/i,
+  brick: /\b(brick|brick lattice|brick dataflow|brick pipeline|brick mesh)\b/i,
+  lattice: /\b(lattice|grid|voxel|sdf|signed distance)\b/i,
+  knowledge:
+    /\b(knowledge (ingestion|corpus|base)|knowledge graph|rag|retrieval|vector store|embedding)\b/i,
+  rag: /\b(rag|retrieval augmented generation|vector store|embeddings?)\b/i,
+  essence: /\b(essence|persona|essence profile|essence mix|essence ingest)\b/i,
+  luma: /\b(luma|luma panel|luma whispers|image generation)\b/i,
+  noise: /\b(noise gen|noise field|noise kernel|noise panel|noise profile|noisegen)\b/i,
+  hardware: /\b(hardware|instrument|device|pump driver|spectrum tuner|vacuum gap)\b/i,
+  telemetry: /\b(telemetry|metrics|observability|panel telemetry|telemetry stream)\b/i,
+  console:
+    /\b(console|warp console|essence console|console telemetry|console snapshot|panel telemetry)\b/i,
+  llm: /\b(llm|language model|local model|tokenizer|ollama|small-llm)\b/i,
+  debate: /\b(debate|referee|proponent|skeptic|debate loop|debate telemetry)\b/i,
+  specialists: /\b(specialists?|solver|verifier|specialist plan)\b/i,
+  security:
+    /\b(security|guardrail|guardrails|hull guard|hull mode|tenant|authorization|auth guard|concurrency guard)\b/i,
+  skills: /\b(skills?|tool registry|tooling|tool spec|skill catalog|tool manifest)\b/i,
+  materials: /\b(materials?|hull materials|needle hull|dlc|diamond stack|hull glb)\b/i,
+  environment: /\b(environment model|environment tags?|environment alignment|essence environment)\b/i,
+  sdk: /\b(sdk|client sdk|api client|sdk example|sdk runtime|typescript sdk)\b/i,
+  packages:
+    /\b(packages tree|create-casimir-verifier|package scaffold|monorepo package|app native bundle)\b/i,
+  external:
+    /\b(external dependencies?|third[-\s]?party|vendor|llama\.cpp|sunpy|whisper|audiocraft)\b/i,
+  queue: /\b(queue|job queue|scheduler|orchestration|pipeline jobs?)\b/i,
+  jobs: /\b(job|jobs|scheduler|orchestration|worker pool)\b/i,
+  ops: /\b(ops|operations|deployment|release|runbook|observability|infra|sre)\b/i,
+  ci: /\b(ci|cd|github actions|build pipeline|release pipeline)\b/i,
 };
 
 const HELIX_ASK_CORE_PATHS: RegExp[] = [
@@ -228,6 +295,225 @@ const STAR_CORE_FILES: string[] = [
   "docs/curvature-unit-solar-notes.md",
 ];
 
+const UI_PATHS: RegExp[] = [
+  /client\/src\/components\//i,
+  /client\/src\/pages\//i,
+  /client\/src\/hooks\//i,
+  /client\/src\/lib\//i,
+  /client\/src\/assets\//i,
+  /client\/src\/index\.css/i,
+  /client\/src\/App\.tsx/i,
+  /client\/src\/main\.tsx/i,
+  /ui\//i,
+];
+
+const BACKEND_PATHS: RegExp[] = [
+  /server\//i,
+  /modules\//i,
+  /shared\//i,
+  /cli\//i,
+  /sdk\//i,
+];
+
+const SIMULATION_PATHS: RegExp[] = [
+  /simulations\//i,
+  /sim_core\//i,
+  /modules\/analysis\//i,
+  /docs\/knowledge\/physics\//i,
+  /client\/src\/physics\//i,
+];
+
+const UNCERTAINTY_PATHS: RegExp[] = [
+  /docs\/knowledge\/physics\/uncertainty-mechanics-tree\.json/i,
+  /docs\/knowledge\/physics\/math-tree\.json/i,
+  /docs\/knowledge\/physics\//i,
+];
+
+const BRICK_PATHS: RegExp[] = [
+  /docs\/knowledge\/physics\/brick-lattice-dataflow-tree\.json/i,
+  /modules\/analysis\//i,
+  /server\/services\/code-lattice\//i,
+];
+
+const LATTICE_PATHS: RegExp[] = [
+  /docs\/knowledge\/physics\/brick-lattice-dataflow-tree\.json/i,
+  /docs\/knowledge\/resonance-tree\.json/i,
+  /server\/services\/code-lattice\//i,
+];
+
+const KNOWLEDGE_PATHS: RegExp[] = [
+  /docs\/knowledge\//i,
+  /server\/services\/knowledge\//i,
+  /server\/config\/knowledge\.ts/i,
+  /datasets\//i,
+  /data\//i,
+];
+
+const ESSENCE_PATHS: RegExp[] = [
+  /shared\/essence-/i,
+  /server\/db\/essence/i,
+  /server\/routes\/essence/i,
+  /server\/services\/essence/i,
+  /client\/src\/pages\/essence/i,
+  /client\/src\/components\/agi\/essence\.tsx/i,
+];
+
+const LUMA_PATHS: RegExp[] = [
+  /server\/services\/luma/i,
+  /server\/routes\/luma/i,
+  /client\/src\/pages\/luma/i,
+  /client\/src\/lib\/luma/i,
+  /client\/public\/luma/i,
+  /docs\/knowledge\/essence-luma-noise-tree\.json/i,
+];
+
+const NOISE_PATHS: RegExp[] = [
+  /server\/services\/noisegen/i,
+  /server\/routes\/noise-gens/i,
+  /client\/src\/pages\/noise/i,
+  /client\/src\/types\/noise/i,
+  /client\/src\/lib\/api\/noiseGens\.ts/i,
+  /modules\/analysis\/noise-field-loop\.ts/i,
+  /docs\/knowledge\/essence-luma-noise-tree\.json/i,
+];
+
+const HARDWARE_PATHS: RegExp[] = [
+  /server\/helix-core\.ts/i,
+  /server\/energy-pipeline\.ts/i,
+  /server\/services\/hardware\//i,
+  /server\/instruments\//i,
+  /client\/src\/hooks\/useHardware/i,
+  /client\/src\/components\/Hardware/i,
+  /docs\/knowledge\/hardware-telemetry-tree\.json/i,
+];
+
+const TELEMETRY_PATHS: RegExp[] = [
+  /telemetry/i,
+  /server\/services\/observability\//i,
+  /server\/skills\/telemetry/i,
+  /shared\/.*telemetry/i,
+  /docs\/knowledge\/hardware-telemetry-tree\.json/i,
+];
+
+const CONSOLE_PATHS: RegExp[] = [
+  /server\/services\/console-telemetry\//i,
+  /server\/_generated\/console-telemetry\.json/i,
+  /client\/src\/lib\/agi\/consoleTelemetry\.ts/i,
+  /client\/src\/lib\/desktop\//i,
+  /docs\/warp-console-architecture\.md/i,
+  /server\/routes\/agi\.plan\.ts/i,
+];
+
+const LLM_PATHS: RegExp[] = [
+  /server\/routes\/small-llm\.ts/i,
+  /server\/services\/small-llm\.ts/i,
+  /server\/services\/llm\//i,
+  /server\/skills\/llm\./i,
+  /client\/src\/workers\/llm-worker\.ts/i,
+  /client\/src\/lib\/llm\//i,
+  /client\/src\/lib\/weights\//i,
+  /docs\/warp-llm-contracts\.md/i,
+  /docs\/local-llm-windows\.md/i,
+  /docs\/tokenizer-guardrails\.md/i,
+  /server\/config\/tokenizer-registry\.json/i,
+  /tools\/tokenizer-verify\.ts/i,
+  /tools\/generate-tokenizer-canary\.ts/i,
+  /tests\/tokenizer-canary\.spec\.ts/i,
+];
+
+const DEBATE_PATHS: RegExp[] = [
+  /server\/services\/debate\//i,
+  /server\/routes\/agi\.debate\.ts/i,
+  /shared\/essence-debate\.ts/i,
+  /server\/skills\/debate\./i,
+  /tests\/debate-/i,
+  /scripts\/debate-/i,
+  /scripts\/plan-exec-with-debate\.mjs/i,
+];
+
+const SPECIALISTS_PATHS: RegExp[] = [
+  /server\/services\/specialists\//i,
+  /server\/specialists\//i,
+  /server\/routes\/agi\.specialists\.ts/i,
+  /shared\/agi-specialists\.ts/i,
+  /tests\/specialists/i,
+  /scripts\/specialists-/i,
+];
+
+const SECURITY_PATHS: RegExp[] = [
+  /server\/security\//i,
+  /server\/auth\//i,
+  /server\/middleware\/concurrency-guard\.ts/i,
+  /server\/routes\/hull\./i,
+  /shared\/hull-basis\.ts/i,
+  /client\/src\/lib\/hull-/i,
+  /docs\/needle-hull-/i,
+  /docs\/hull-glb-/i,
+  /docs\/guarded-casimir-/i,
+  /docs\/qi-guard-/i,
+  /docs\/knowledge\/ethos\/no-bypass-guardrail\.md/i,
+  /docs\/knowledge\/ethos\/metric-integrity-guardrail\.md/i,
+];
+
+const SKILLS_PATHS: RegExp[] = [
+  /server\/skills\//i,
+  /shared\/skills\.ts/i,
+  /cli\//i,
+  /tools\//i,
+  /scripts\//i,
+  /skills\//i,
+];
+
+const MATERIALS_PATHS: RegExp[] = [
+  /docs\/needle-hull-materials\.md/i,
+  /docs\/needle-hull-mainframe\.md/i,
+  /docs\/hull-glb-next-steps\.md/i,
+  /client\/src\/lib\/hull-metrics\.ts/i,
+  /client\/src\/lib\/hull-assets\.ts/i,
+  /client\/src\/lib\/resolve-hull-dims\.ts/i,
+  /client\/src\/components\/needle-hull-preset\.tsx/i,
+];
+
+const ENVIRONMENT_PATHS: RegExp[] = [
+  /shared\/environment-model\.ts/i,
+  /server\/services\/essence\/environment\.ts/i,
+  /server\/db\/migrations\/009_essence_environment\.ts/i,
+];
+
+const SDK_PATHS: RegExp[] = [
+  /sdk\//i,
+  /sdk\/src\//i,
+  /packages\/create-casimir-verifier\/sdk-example\.mjs/i,
+  /examples\/hello-verifier\/adapter-request\.json/i,
+];
+
+const PACKAGES_PATHS: RegExp[] = [
+  /packages\//i,
+  /packages\/create-casimir-verifier\//i,
+  /packages\/app-native\//i,
+];
+
+const EXTERNAL_PATHS: RegExp[] = [
+  /external\//i,
+];
+
+const QUEUE_PATHS: RegExp[] = [
+  /server\/services\/jobs\//i,
+  /server\/services\/queue\//i,
+  /server\/services\/scheduler\//i,
+  /ops\/queue/i,
+  /docs\/knowledge\/queue-orchestration-tree\.json/i,
+];
+
+const OPS_PATHS: RegExp[] = [
+  /\.github\/workflows\//i,
+  /ops\//i,
+  /scripts\//i,
+  /docker/i,
+  /server\/services\/observability\//i,
+  /docs\/knowledge\/ops-deployment-tree\.json/i,
+];
+
 const normalizePath = (value: string): string => value.replace(/\\/g, "/");
 
 export function pathMatchesAny(value: string, patterns: RegExp[] = []): boolean {
@@ -366,6 +652,123 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
     deboostPaths.push(...PHYSICS_NOISE_PATHS);
     mustIncludePaths.push(...PHYSICS_PATHS);
     minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  const uiTagged = tags.some((tag) => tag === "ui" || tag === "frontend" || tag === "client");
+  if (uiTagged) {
+    boostPaths.push(...UI_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("backend")) {
+    boostPaths.push(...BACKEND_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("simulation")) {
+    boostPaths.push(...SIMULATION_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("uncertainty")) {
+    boostPaths.push(...UNCERTAINTY_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("brick")) {
+    boostPaths.push(...BRICK_PATHS);
+  }
+
+  if (tags.includes("lattice")) {
+    boostPaths.push(...LATTICE_PATHS);
+  }
+
+  if (tags.includes("knowledge") || tags.includes("rag")) {
+    boostPaths.push(...KNOWLEDGE_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("essence")) {
+    boostPaths.push(...ESSENCE_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("luma")) {
+    boostPaths.push(...LUMA_PATHS);
+  }
+
+  if (tags.includes("noise")) {
+    boostPaths.push(...NOISE_PATHS);
+  }
+
+  if (tags.includes("hardware")) {
+    boostPaths.push(...HARDWARE_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("telemetry")) {
+    boostPaths.push(...TELEMETRY_PATHS);
+  }
+
+  if (tags.includes("console")) {
+    boostPaths.push(...CONSOLE_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("llm")) {
+    boostPaths.push(...LLM_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("debate")) {
+    boostPaths.push(...DEBATE_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("specialists")) {
+    boostPaths.push(...SPECIALISTS_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("security")) {
+    boostPaths.push(...SECURITY_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("skills")) {
+    boostPaths.push(...SKILLS_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("materials")) {
+    boostPaths.push(...MATERIALS_PATHS);
+  }
+
+  if (tags.includes("environment")) {
+    boostPaths.push(...ENVIRONMENT_PATHS);
+  }
+
+  if (tags.includes("sdk")) {
+    boostPaths.push(...SDK_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("packages")) {
+    boostPaths.push(...PACKAGES_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("external")) {
+    boostPaths.push(...EXTERNAL_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("queue") || tags.includes("jobs")) {
+    boostPaths.push(...QUEUE_PATHS);
+  }
+
+  if (tags.includes("ops") || tags.includes("ci")) {
+    boostPaths.push(...OPS_PATHS);
   }
 
   if (tags.includes("energy_pipeline")) {

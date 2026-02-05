@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "rootId": "llm-runtime-tree",
+  "nodes": [
+    {
+      "id": "llm-runtime-tree",
+      "slug": "llm-runtime-tree",
+      "title": "LLM Runtime Tree",
+      "excerpt": "Local and remote LLM runtime, tool backends, and tokenizer safeguards.",
+      "bodyMD": "This tree maps the LLM runtime surfaces, backend adapters, and guardrails that keep LLM outputs aligned with the physics console.\n\nMinimal artifact: LLM runtime map with backend + guardrails.",
+      "tags": [
+        "llm",
+        "runtime",
+        "inference"
+      ],
+      "children": [
+        "llm-runtime-core",
+        "llm-runtime-backends",
+        "llm-runtime-artifacts",
+        "llm-runtime-worker",
+        "llm-runtime-rag",
+        "llm-runtime-tokenizer",
+        "llm-runtime-contracts"
+      ],
+      "links": []
+    },
+    {
+      "id": "llm-runtime-core",
+      "slug": "llm-runtime-core",
+      "title": "Runtime Routes and Services",
+      "excerpt": "Small LLM routing and service glue.",
+      "bodyMD": "LLM runtime service entry points (server/routes/small-llm.ts, server/services/small-llm.ts).\n\nMinimal artifact: LLM service routing summary.",
+      "tags": [
+        "llm",
+        "routes",
+        "backend"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "llm-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "llm-runtime-backends",
+      "slug": "llm-runtime-backends",
+      "title": "Backend Adapters",
+      "excerpt": "HTTP and local LLM backends exposed as tools.",
+      "bodyMD": "LLM tool backends (server/skills/llm.http.ts, server/skills/llm.local.ts, server/skills/llm.local.spawn.ts).\n\nMinimal artifact: backend selection map.",
+      "tags": [
+        "llm",
+        "skills",
+        "backend"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "llm-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "skills-tooling-tree"
+        }
+      ]
+    },
+    {
+      "id": "llm-runtime-artifacts",
+      "slug": "llm-runtime-artifacts",
+      "title": "Runtime Artifacts",
+      "excerpt": "Runtime artifact hydration and integrity checks.",
+      "bodyMD": "Runtime artifact hydration (server/services/llm/runtime-artifacts.ts).\n\nMinimal artifact: artifact hydration checklist.",
+      "tags": [
+        "llm",
+        "artifacts",
+        "runtime"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "llm-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "llm-runtime-worker",
+      "slug": "llm-runtime-worker",
+      "title": "Client LLM Worker",
+      "excerpt": "Browser-side local inference and model loading.",
+      "bodyMD": "Client LLM worker and generators (client/src/workers/llm-worker.ts, client/src/lib/llm/local-generator.ts, client/src/lib/weights/*).\n\nMinimal artifact: local worker dataflow.",
+      "tags": [
+        "llm",
+        "client",
+        "worker"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "llm-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "llm-runtime-rag",
+      "slug": "llm-runtime-rag",
+      "title": "Local RAG Support",
+      "excerpt": "Local retrieval utilities for LLM generation.",
+      "bodyMD": "Local RAG helpers (client/src/lib/rag/*) and knowledge anchors.\n\nMinimal artifact: local retrieval pipeline summary.",
+      "tags": [
+        "llm",
+        "rag",
+        "retrieval"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "llm-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "knowledge-ingestion"
+        }
+      ]
+    },
+    {
+      "id": "llm-runtime-tokenizer",
+      "slug": "llm-runtime-tokenizer",
+      "title": "Tokenizer Guardrails",
+      "excerpt": "Tokenizer registry, canaries, and verification tools.",
+      "bodyMD": "Tokenizer guardrails and verification tooling (docs/tokenizer-guardrails.md, server/config/tokenizer-registry.json, tools/tokenizer-verify.ts, tools/generate-tokenizer-canary.ts, tests/tokenizer-canary.spec.ts, tests/fixtures/tokenizer-canary.json).\n\nMinimal artifact: tokenizer guardrail checklist.",
+      "tags": [
+        "llm",
+        "tokenizer",
+        "guardrails"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "llm-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "llm-runtime-contracts",
+      "slug": "llm-runtime-contracts",
+      "title": "LLM Contracts",
+      "excerpt": "LLM behavior contracts and local setup notes.",
+      "bodyMD": "LLM role contracts and setup notes (docs/warp-llm-contracts.md, docs/local-llm-windows.md, docs/warp-console-architecture.md).\n\nMinimal artifact: LLM contract summary.",
+      "tags": [
+        "llm",
+        "contracts",
+        "policy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "llm-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "telemetry-console-tree"
+        }
+      ]
+    }
+  ]
+}

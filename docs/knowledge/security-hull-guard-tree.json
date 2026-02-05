@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "rootId": "security-hull-guard-tree",
+  "nodes": [
+    {
+      "id": "security-hull-guard-tree",
+      "slug": "security-hull-guard-tree",
+      "title": "Security and Hull Guard Tree",
+      "excerpt": "Tenant safeguards, hull guardrails, and enforcement tests.",
+      "bodyMD": "This tree maps security guards, tenant enforcement, and hull safety rails for the physics console.\n\nMinimal artifact: security and hull guard map.",
+      "tags": [
+        "security",
+        "hull",
+        "guardrails"
+      ],
+      "children": [
+        "security-tenant-auth",
+        "security-hull-guard",
+        "security-hull-routes",
+        "security-hull-client",
+        "security-guard-docs",
+        "security-concurrency",
+        "security-guard-tests"
+      ],
+      "links": []
+    },
+    {
+      "id": "security-tenant-auth",
+      "slug": "security-tenant-auth",
+      "title": "Tenant and Auth Guards",
+      "excerpt": "Tenant isolation, auth policy, and request gating.",
+      "bodyMD": "Tenant and auth guards (server/auth/tenant.ts, server/auth/policy.ts).\n\nMinimal artifact: tenant guard decision tree.",
+      "tags": [
+        "security",
+        "tenant",
+        "auth"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-hull-guard-tree"
+        }
+      ]
+    },
+    {
+      "id": "security-hull-guard",
+      "slug": "security-hull-guard",
+      "title": "Hull Guardrails",
+      "excerpt": "Outbound access control and hull enforcement.",
+      "bodyMD": "Hull mode guardrails (server/security/hull-guard.ts, shared/hull-basis.ts).\n\nMinimal artifact: hull allowlist policy.",
+      "tags": [
+        "security",
+        "hull",
+        "guardrails"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-hull-guard-tree"
+        }
+      ]
+    },
+    {
+      "id": "security-hull-routes",
+      "slug": "security-hull-routes",
+      "title": "Hull Routes",
+      "excerpt": "Hull status, capsules, and preview endpoints.",
+      "bodyMD": "Hull API routes (server/routes/hull.status.ts, server/routes/hull.capsules.ts, server/routes/hull-preview.ts).\n\nMinimal artifact: hull endpoint map.",
+      "tags": [
+        "security",
+        "hull",
+        "routes"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-hull-guard-tree"
+        }
+      ]
+    },
+    {
+      "id": "security-hull-client",
+      "slug": "security-hull-client",
+      "title": "Client Guardrails",
+      "excerpt": "Hull UI guardrails and metrics capture.",
+      "bodyMD": "Client hull guardrails and metrics (client/src/lib/hull-guardrails.ts, client/src/lib/hull-hud.ts, client/src/lib/hull-metrics.ts, client/src/lib/resolve-hull-dims.ts, client/src/lib/hull-assets.ts).\n\nMinimal artifact: client hull guard summary.",
+      "tags": [
+        "security",
+        "hull",
+        "client"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-hull-guard-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "security-guard-docs",
+      "slug": "security-guard-docs",
+      "title": "Guardrail Docs",
+      "excerpt": "Guardrail documentation and operator notes.",
+      "bodyMD": "Guardrail references (docs/guarded-casimir-tile-code-mapped.md, docs/qi-guard-consolidation.md, docs/needle-hull-materials.md, docs/needle-hull-mainframe.md, docs/zen-society/templates/artifacts/metric-integrity-guardrail.md, docs/knowledge/ethos/no-bypass-guardrail.md).\n\nMinimal artifact: guardrail doc index.",
+      "tags": [
+        "security",
+        "docs",
+        "guardrails"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-hull-guard-tree"
+        }
+      ]
+    },
+    {
+      "id": "security-concurrency",
+      "slug": "security-concurrency",
+      "title": "Concurrency Guard",
+      "excerpt": "Concurrency limits and overload protection.",
+      "bodyMD": "Concurrency guard middleware (server/middleware/concurrency-guard.ts).\n\nMinimal artifact: concurrency guard thresholds.",
+      "tags": [
+        "security",
+        "concurrency",
+        "guardrails"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-hull-guard-tree"
+        }
+      ]
+    },
+    {
+      "id": "security-guard-tests",
+      "slug": "security-guard-tests",
+      "title": "Guardrail Tests",
+      "excerpt": "Hull guardrail and QI enforcement tests.",
+      "bodyMD": "Guardrail tests (tests/hull-guard.spec.ts, tests/hull-capsules.spec.ts, tests/hull-tools.spec.ts, tests/hull-status.spec.ts, tests/qi-guardrail.spec.ts, tests/pipeline-ts-qi-guard.spec.ts).\n\nMinimal artifact: guardrail test checklist.",
+      "tags": [
+        "security",
+        "tests",
+        "guardrails"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-hull-guard-tree"
+        }
+      ]
+    }
+  ]
+}

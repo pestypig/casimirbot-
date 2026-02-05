@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "rootId": "star-materials-environment-tree",
+  "nodes": [
+    {
+      "id": "star-materials-environment-tree",
+      "slug": "star-materials-environment-tree",
+      "title": "Star Materials and Environment Tree",
+      "excerpt": "Star runtime, solar guardrails, and materials context.",
+      "bodyMD": "This tree maps star runtime APIs, solar guardrails, and the materials and environment models that drive star and hull reasoning.\n\nMinimal artifact: star and materials navigation map.",
+      "tags": [
+        "star",
+        "materials",
+        "environment"
+      ],
+      "children": [
+        "star-runtime-routes",
+        "star-models-telemetry",
+        "solar-adapters-guardrails",
+        "environment-model",
+        "star-panels",
+        "hull-materials"
+      ],
+      "links": []
+    },
+    {
+      "id": "star-runtime-routes",
+      "slug": "star-runtime-routes",
+      "title": "Star Runtime Routes",
+      "excerpt": "Star and watcher API routes.",
+      "bodyMD": "Star and watcher routes (server/routes/star.ts, server/routes/star-watcher.ts, server/routes/agi.star.ts).\n\nMinimal artifact: star route map.",
+      "tags": [
+        "star",
+        "routes",
+        "api"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "star-materials-environment-tree"
+        }
+      ]
+    },
+    {
+      "id": "star-models-telemetry",
+      "slug": "star-models-telemetry",
+      "title": "Star Models and Telemetry",
+      "excerpt": "Star model and telemetry schemas.",
+      "bodyMD": "Star models and telemetry (client/src/models/star.ts, shared/star-telemetry.ts, server/__tests__/star-equilibrium.spec.ts).\n\nMinimal artifact: star telemetry schema.",
+      "tags": [
+        "star",
+        "telemetry",
+        "models"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "star-materials-environment-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "telemetry-console-tree"
+        }
+      ]
+    },
+    {
+      "id": "solar-adapters-guardrails",
+      "slug": "solar-adapters-guardrails",
+      "title": "Solar Adapters and Guardrails",
+      "excerpt": "Solar energy adapters and guardrail definitions.",
+      "bodyMD": "Solar guardrails and adapters (server/services/essence/solar-energy-adapter.ts, server/services/essence/solar-guardrails.ts, shared/solar-guardrails.ts, configs/solar-guardrails.v1.json, client/src/lib/solar-adapter.ts).\n\nMinimal artifact: solar guardrail summary.",
+      "tags": [
+        "star",
+        "guardrails",
+        "solar"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "star-materials-environment-tree"
+        }
+      ]
+    },
+    {
+      "id": "environment-model",
+      "slug": "environment-model",
+      "title": "Environment Model",
+      "excerpt": "Environment schema and persistence.",
+      "bodyMD": "Environment model and persistence (shared/environment-model.ts, server/services/essence/environment.ts, server/db/migrations/009_essence_environment.ts).\n\nMinimal artifact: environment model schema.",
+      "tags": [
+        "environment",
+        "schema",
+        "storage"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "star-materials-environment-tree"
+        }
+      ]
+    },
+    {
+      "id": "star-panels",
+      "slug": "star-panels",
+      "title": "Star Panels",
+      "excerpt": "Star UI panels and docs.",
+      "bodyMD": "Star UI surfaces (client/src/pages/star-hydrostatic-panel.tsx, client/src/pages/star-watcher-panel.tsx, client/src/pages/start.tsx, docs/knowledge/star-hydrostatic.md).\n\nMinimal artifact: star UI surface map.",
+      "tags": [
+        "star",
+        "ui",
+        "panels"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "star-materials-environment-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "hull-materials",
+      "slug": "hull-materials",
+      "title": "Hull Materials and Geometry",
+      "excerpt": "Needle hull materials, GLB handling, and geometry helpers.",
+      "bodyMD": "Hull materials and geometry docs (docs/needle-hull-materials.md, docs/needle-hull-mainframe.md, docs/hull-glb-next-steps.md, client/src/lib/hull-metrics.ts, client/src/lib/hull-assets.ts, client/src/components/needle-hull-preset.tsx).\n\nMinimal artifact: hull materials references.",
+      "tags": [
+        "materials",
+        "hull",
+        "geometry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "star-materials-environment-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "security-hull-guard-tree"
+        }
+      ]
+    }
+  ]
+}

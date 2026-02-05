@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "rootId": "external-integrations-tree",
+  "nodes": [
+    {
+      "id": "external-integrations-tree",
+      "slug": "external-integrations-tree",
+      "title": "External Integrations Tree",
+      "excerpt": "Third-party dependencies and vendor integrations.",
+      "bodyMD": "This tree maps external vendor code and reference integrations used by the system.\n\nMinimal artifact: external dependency map with usage notes.",
+      "tags": [
+        "external",
+        "vendors",
+        "dependencies"
+      ],
+      "children": [
+        "external-llm-stack",
+        "external-audio-stack",
+        "external-physics-stack",
+        "external-solar-stack",
+        "external-webgpu-stack",
+        "external-hardware-stack",
+        "external-architecture-stack"
+      ],
+      "links": []
+    },
+    {
+      "id": "external-llm-stack",
+      "slug": "external-llm-stack",
+      "title": "LLM Vendors",
+      "excerpt": "LLM inference backends and adapters.",
+      "bodyMD": "LLM vendor integrations (external/llama.cpp, external/whisplay-ai-chatbot).\n\nMinimal artifact: LLM vendor inventory.",
+      "tags": [
+        "external",
+        "llm",
+        "vendors"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "external-integrations-tree"
+        }
+      ]
+    },
+    {
+      "id": "external-audio-stack",
+      "slug": "external-audio-stack",
+      "title": "Audio and Speech Vendors",
+      "excerpt": "Audio and speech processing dependencies.",
+      "bodyMD": "Audio/speech vendors (external/whisper, external/piper1-gpl, external/audiocraft).\n\nMinimal artifact: speech/audio vendor list.",
+      "tags": [
+        "external",
+        "audio",
+        "speech"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "external-integrations-tree"
+        }
+      ]
+    },
+    {
+      "id": "external-physics-stack",
+      "slug": "external-physics-stack",
+      "title": "Physics References",
+      "excerpt": "External physics and visualization references.",
+      "bodyMD": "Physics reference repositories (external/geodesic_raytracing, external/black-hole-skymap, external/WarpFactory, external/warp-engine-archive).\n\nMinimal artifact: physics reference index.",
+      "tags": [
+        "external",
+        "physics",
+        "references"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "external-integrations-tree"
+        }
+      ]
+    },
+    {
+      "id": "external-solar-stack",
+      "slug": "external-solar-stack",
+      "title": "Solar Tooling",
+      "excerpt": "Solar data tooling dependencies.",
+      "bodyMD": "Solar tooling dependency (external/sunpy).\n\nMinimal artifact: solar tooling reference.",
+      "tags": [
+        "external",
+        "solar",
+        "tooling"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "external-integrations-tree"
+        }
+      ]
+    },
+    {
+      "id": "external-webgpu-stack",
+      "slug": "external-webgpu-stack",
+      "title": "WebGPU References",
+      "excerpt": "WebGPU volume rendering references.",
+      "bodyMD": "WebGPU volume rendering references (external/webgpu-volume-pathtracer).\n\nMinimal artifact: WebGPU reference note.",
+      "tags": [
+        "external",
+        "webgpu",
+        "rendering"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "external-integrations-tree"
+        }
+      ]
+    },
+    {
+      "id": "external-hardware-stack",
+      "slug": "external-hardware-stack",
+      "title": "Hardware References",
+      "excerpt": "Hardware utility dependencies.",
+      "bodyMD": "Hardware utility dependencies (external/piSugar-power-manager).\n\nMinimal artifact: hardware dependency note.",
+      "tags": [
+        "external",
+        "hardware",
+        "utility"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "external-integrations-tree"
+        }
+      ]
+    },
+    {
+      "id": "external-architecture-stack",
+      "slug": "external-architecture-stack",
+      "title": "Architecture References",
+      "excerpt": "External architectural references and notes.",
+      "bodyMD": "Architecture references (external/agentic-architectures).\n\nMinimal artifact: architecture reference note.",
+      "tags": [
+        "external",
+        "architecture",
+        "references"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "external-integrations-tree"
+        }
+      ]
+    }
+  ]
+}

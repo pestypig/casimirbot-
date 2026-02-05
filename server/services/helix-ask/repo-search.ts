@@ -13,6 +13,7 @@ export type RepoSearchPlan = {
   paths: string[];
   explicit: boolean;
   reason: string;
+  mode?: "fallback" | "preflight" | "explicit";
 };
 
 export type RepoSearchHit = {
@@ -33,6 +34,12 @@ const REPO_SEARCH_EXPLICIT_ENABLED =
   String(process.env.HELIX_ASK_REPO_SEARCH_EXPLICIT ?? "1").trim() !== "0";
 const REPO_SEARCH_ON_EVIDENCE_FAIL =
   String(process.env.HELIX_ASK_REPO_SEARCH_ON_EVIDENCE_FAIL ?? "1").trim() !== "0";
+const REPO_SEARCH_PREFLIGHT_ENABLED =
+  String(process.env.HELIX_ASK_REPO_SEARCH_PREFLIGHT ?? "1").trim() !== "0";
+const REPO_SEARCH_PREFLIGHT_MAX_TERMS = Math.max(
+  1,
+  Number(process.env.HELIX_ASK_REPO_SEARCH_PREFLIGHT_MAX_TERMS ?? 2),
+);
 const REPO_SEARCH_MAX_TERMS = Math.max(1, Number(process.env.HELIX_ASK_REPO_SEARCH_MAX_TERMS ?? 4));
 const REPO_SEARCH_MAX_PER_TERM = Math.max(
   1,
@@ -73,6 +80,199 @@ const REPO_SEARCH_PATHS_BY_TAG: Record<HelixAskTopicTag, string[]> = {
   energy_pipeline: ["server/energy-pipeline.ts", "client/src/components/energy-pipeline.tsx"],
   trace: ["docs/TRACE-API.md", "server/db/agi", "client/src/components/agi"],
   resonance: ["server/_generated", "docs/knowledge", "client/src/components/Resonance"],
+  ui: [
+    "client/src/components",
+    "client/src/pages",
+    "client/src/hooks",
+    "client/src/lib",
+    "ui",
+    "docs/knowledge/ui-components-tree.json",
+    "docs/knowledge/ui-backend-binding-tree.json",
+  ],
+  frontend: [
+    "client/src/components",
+    "client/src/pages",
+    "client/src/hooks",
+    "client/src/lib",
+    "ui",
+  ],
+  client: [
+    "client/src/components",
+    "client/src/pages",
+    "client/src/hooks",
+    "client/src/lib",
+    "ui",
+  ],
+  backend: ["server", "modules", "shared", "server/helix-core.ts", "server/routes.ts"],
+  simulation: [
+    "simulations",
+    "sim_core",
+    "modules/analysis",
+    "docs/knowledge/physics",
+    "client/src/physics",
+  ],
+  uncertainty: [
+    "docs/knowledge/physics",
+    "docs/knowledge/physics/uncertainty-mechanics-tree.json",
+    "docs/knowledge/certainty-framework-tree.json",
+  ],
+  brick: [
+    "docs/knowledge/physics/brick-lattice-dataflow-tree.json",
+    "modules/analysis",
+    "server/services/code-lattice",
+  ],
+  lattice: [
+    "server/services/code-lattice",
+    "docs/knowledge/resonance-tree.json",
+    "docs/knowledge/physics/brick-lattice-dataflow-tree.json",
+  ],
+  knowledge: [
+    "docs/knowledge",
+    "server/services/knowledge",
+    "server/config/knowledge.ts",
+    "datasets",
+    "data",
+  ],
+  rag: ["docs/knowledge", "server/services/knowledge", "datasets", "data"],
+  essence: [
+    "shared/essence-schema.ts",
+    "shared/essence-persona.ts",
+    "server/db/essence.ts",
+    "server/db/essenceProfile.ts",
+    "server/routes/essence.ts",
+    "server/routes/essence.prompts.ts",
+    "server/services/essence",
+    "client/src/pages/essence-render.tsx",
+  ],
+  luma: [
+    "server/services/luma.ts",
+    "server/routes/luma.ts",
+    "client/src/pages/luma.tsx",
+    "client/src/lib/luma-client.ts",
+    "docs/knowledge/essence-luma-noise-tree.json",
+  ],
+  noise: [
+    "server/services/noisegen-store.ts",
+    "server/routes/noise-gens.ts",
+    "client/src/pages/noisegen.tsx",
+    "client/src/pages/helix-noise-gens.tsx",
+    "client/src/types/noise-gens.ts",
+    "modules/analysis/noise-field-loop.ts",
+    "docs/knowledge/essence-luma-noise-tree.json",
+  ],
+  hardware: [
+    "server/helix-core.ts",
+    "server/energy-pipeline.ts",
+    "server/services/hardware",
+    "server/instruments",
+    "client/src/hooks/useHardwareFeeds.ts",
+    "client/src/components/HardwareConnectModal.tsx",
+    "docs/knowledge/hardware-telemetry-tree.json",
+  ],
+  telemetry: [
+    "server/services/observability",
+    "server/skills/telemetry.badges.ts",
+    "server/skills/telemetry.panels.ts",
+    "shared/badge-telemetry.ts",
+    "shared/star-telemetry.ts",
+    "docs/knowledge/hardware-telemetry-tree.json",
+  ],
+  console: [
+    "server/services/console-telemetry",
+    "server/_generated/console-telemetry.json",
+    "client/src/lib/agi/consoleTelemetry.ts",
+    "client/src/lib/desktop",
+    "docs/warp-console-architecture.md",
+  ],
+  llm: [
+    "server/routes/small-llm.ts",
+    "server/services/small-llm.ts",
+    "server/services/llm",
+    "server/skills/llm.local.ts",
+    "server/skills/llm.http.ts",
+    "server/skills/llm.local.spawn.ts",
+    "client/src/workers/llm-worker.ts",
+    "client/src/lib/llm",
+    "client/src/lib/weights",
+    "docs/warp-llm-contracts.md",
+    "docs/tokenizer-guardrails.md",
+    "server/config/tokenizer-registry.json",
+    "tools/tokenizer-verify.ts",
+  ],
+  debate: [
+    "server/services/debate",
+    "server/routes/agi.debate.ts",
+    "shared/essence-debate.ts",
+    "server/skills/debate.run.ts",
+    "server/skills/debate.checklist.generate.ts",
+    "server/skills/debate.checklist.score.ts",
+    "tests/debate-search.spec.ts",
+    "tests/debate-orchestrator.spec.ts",
+    "tests/debate-sse.spec.ts",
+    "scripts/debate-harness.mjs",
+  ],
+  specialists: [
+    "server/specialists",
+    "server/services/specialists",
+    "server/routes/agi.specialists.ts",
+    "shared/agi-specialists.ts",
+    "tests/specialists.evolution.spec.ts",
+    "tests/specialists.math.spec.ts",
+    "scripts/specialists-mini-loop.ts",
+  ],
+  security: [
+    "server/security",
+    "server/auth",
+    "server/middleware/concurrency-guard.ts",
+    "server/routes/hull.status.ts",
+    "server/routes/hull.capsules.ts",
+    "server/routes/hull-preview.ts",
+    "shared/hull-basis.ts",
+    "client/src/lib/hull-guardrails.ts",
+    "docs/qi-guard-consolidation.md",
+    "docs/guarded-casimir-tile-code-mapped.md",
+    "docs/needle-hull-materials.md",
+    "docs/needle-hull-mainframe.md",
+  ],
+  skills: ["server/skills", "shared/skills.ts", "cli", "tools", "scripts"],
+  materials: [
+    "docs/needle-hull-materials.md",
+    "docs/needle-hull-mainframe.md",
+    "docs/hull-glb-next-steps.md",
+    "client/src/lib/hull-metrics.ts",
+    "client/src/lib/hull-assets.ts",
+    "client/src/components/needle-hull-preset.tsx",
+  ],
+  environment: [
+    "shared/environment-model.ts",
+    "server/services/essence/environment.ts",
+    "server/db/migrations/009_essence_environment.ts",
+  ],
+  sdk: [
+    "sdk",
+    "sdk/src",
+    "sdk/README.md",
+    "packages/create-casimir-verifier/sdk-example.mjs",
+    "examples/hello-verifier/adapter-request.json",
+  ],
+  packages: [
+    "packages",
+    "packages/create-casimir-verifier",
+    "packages/app-native",
+  ],
+  external: [
+    "external",
+  ],
+  queue: ["server/services/jobs", "ops", "docs/knowledge/queue-orchestration-tree.json"],
+  jobs: ["server/services/jobs", "ops", "docs/knowledge/queue-orchestration-tree.json"],
+  ops: [
+    ".github/workflows",
+    "ops",
+    "scripts",
+    "docker-compose.observability.yml",
+    "docs/knowledge/ops-deployment-tree.json",
+  ],
+  ci: [".github/workflows", "scripts", "ops"],
 };
 
 const EXCLUDE_GLOBS: string[] = [
@@ -159,23 +359,30 @@ export function buildRepoSearchPlan(input: {
   evidenceGateOk: boolean;
   promptIngested?: boolean;
   topicProfile?: HelixAskTopicProfile | null;
+  mode?: "fallback" | "preflight" | "explicit";
 }): RepoSearchPlan | null {
   if (!REPO_SEARCH_ENABLED) return null;
   const explicit = REPO_SEARCH_EXPLICIT_ENABLED && EXPLICIT_SEARCH_RE.test(input.question);
-  if (input.promptIngested && !explicit) return null;
+  const mode = explicit ? "explicit" : input.mode ?? "fallback";
+  if (mode === "preflight" && !REPO_SEARCH_PREFLIGHT_ENABLED) return null;
+  if (input.promptIngested && !explicit && mode !== "preflight") return null;
+  if (input.promptIngested && mode === "preflight" && !explicit) return null;
   const domainOk = input.intentDomain === "repo" || input.intentDomain === "hybrid";
   const fallbackOk = REPO_SEARCH_ON_EVIDENCE_FAIL && !input.evidenceGateOk;
-  if (!explicit && !fallbackOk) return null;
-  if (!explicit && !domainOk) return null;
+  if (!explicit && mode === "fallback" && !fallbackOk) return null;
+  if (!explicit && mode === "fallback" && !domainOk) return null;
   const terms = extractRepoSearchTerms(input.question, input.conceptMatch);
   if (terms.length === 0) return null;
+  const clippedTerms =
+    mode === "preflight" ? terms.slice(0, REPO_SEARCH_PREFLIGHT_MAX_TERMS) : terms;
   const paths = selectRepoSearchPaths(input.topicTags, input.topicProfile?.mustIncludeFiles);
   if (paths.length === 0) return null;
   return {
-    terms,
+    terms: clippedTerms,
     paths,
     explicit,
-    reason: explicit ? "explicit_request" : "evidence_gate_fail",
+    reason: explicit ? "explicit_request" : mode === "preflight" ? "preflight" : "evidence_gate_fail",
+    mode,
   };
 }
 

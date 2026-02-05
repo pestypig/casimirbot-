@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "rootId": "skills-tooling-tree",
+  "nodes": [
+    {
+      "id": "skills-tooling-tree",
+      "slug": "skills-tooling-tree",
+      "title": "Skills and Tooling Tree",
+      "excerpt": "Tool registry, skill implementations, and CLI utilities.",
+      "bodyMD": "This tree maps the skills system, tool registry, and CLI tooling used by Helix Ask and related runtimes.\n\nMinimal artifact: skills catalog with wiring map.",
+      "tags": [
+        "skills",
+        "tools",
+        "registry"
+      ],
+      "children": [
+        "skills-registry",
+        "skills-routing",
+        "skills-physics",
+        "skills-docs-repo",
+        "skills-media",
+        "skills-telemetry",
+        "skills-cli-tools"
+      ],
+      "links": []
+    },
+    {
+      "id": "skills-registry",
+      "slug": "skills-registry",
+      "title": "Tool Registry",
+      "excerpt": "Tool specs, safety profiles, and registry helpers.",
+      "bodyMD": "Tool specs and registry wiring (shared/skills.ts, server/skills/index.ts).\n\nMinimal artifact: tool registry summary.",
+      "tags": [
+        "skills",
+        "registry",
+        "safety"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "skills-tooling-tree"
+        }
+      ]
+    },
+    {
+      "id": "skills-routing",
+      "slug": "skills-routing",
+      "title": "Tool Routing",
+      "excerpt": "Tool registration and runtime dispatch.",
+      "bodyMD": "Tool registration and routing (server/routes/agi.plan.ts).\n\nMinimal artifact: tool registration map.",
+      "tags": [
+        "skills",
+        "routing",
+        "runtime"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "skills-tooling-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "skills-physics",
+      "slug": "skills-physics",
+      "title": "Physics Skills",
+      "excerpt": "Warp, GR grounding, and curvature tools.",
+      "bodyMD": "Physics tools (server/skills/physics.warp.ask.ts, server/skills/physics.warp.viability.ts, server/skills/physics.gr.assistant.ts, server/skills/physics.gr.grounding.ts, server/skills/physics.curvature.ts).\n\nMinimal artifact: physics tool catalog.",
+      "tags": [
+        "skills",
+        "physics",
+        "tools"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "skills-tooling-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations"
+        }
+      ]
+    },
+    {
+      "id": "skills-docs-repo",
+      "slug": "skills-docs-repo",
+      "title": "Docs and Repo Skills",
+      "excerpt": "Docs extraction, citation checks, and repo tools.",
+      "bodyMD": "Docs and repo tools (server/skills/docs.readme.ts, server/skills/docs.heading.section.md.ts, server/skills/docs.table.extract.ts, server/skills/docs.contradiction.scan.ts, server/skills/docs.evidence.search.md.ts, server/skills/docs.evidence.search.pdf.ts, server/skills/repo.graph.search.ts, server/skills/repo.diff.review.ts, server/skills/repo.patch.simulate.ts, server/skills/citation.verify.span.ts, server/skills/numeric.extract.units.ts).\n\nMinimal artifact: documentation tool catalog.",
+      "tags": [
+        "skills",
+        "docs",
+        "repo"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "skills-tooling-tree"
+        }
+      ]
+    },
+    {
+      "id": "skills-media",
+      "slug": "skills-media",
+      "title": "Media Skills",
+      "excerpt": "Luma, noise, vision, speech, and fashion tools.",
+      "bodyMD": "Media tools (server/skills/luma.generate.ts, server/skills/luma.http.ts, server/skills/noise.gen.cover.ts, server/skills/noise.gen.fingerprint.ts, server/skills/stt.whisper.ts, server/skills/stt.whisper.http.ts, server/skills/vision.http.ts, server/skills/fashion.looks.ts).\n\nMinimal artifact: media tool catalog.",
+      "tags": [
+        "skills",
+        "media",
+        "tools"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "skills-tooling-tree"
+        }
+      ]
+    },
+    {
+      "id": "skills-telemetry",
+      "slug": "skills-telemetry",
+      "title": "Telemetry Skills",
+      "excerpt": "Telemetry snapshots and crosschecks.",
+      "bodyMD": "Telemetry tools (server/skills/telemetry.badges.ts, server/skills/telemetry.panels.ts, server/skills/telemetry.crosscheck.docs.ts).\n\nMinimal artifact: telemetry tool catalog.",
+      "tags": [
+        "skills",
+        "telemetry",
+        "tools"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "skills-tooling-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "telemetry-console-tree"
+        }
+      ]
+    },
+    {
+      "id": "skills-cli-tools",
+      "slug": "skills-cli-tools",
+      "title": "CLI and Tooling",
+      "excerpt": "CLI utilities and tooling scripts.",
+      "bodyMD": "CLI utilities and tooling (cli/casimir-verify.ts, cli/physics-ask.ts, cli/physics-validate.ts, cli/gr-agent-loop.ts, tools/tokenizer-verify.ts, tools/generate-tokenizer-canary.ts, scripts/llm-local-smoke.ts).\n\nMinimal artifact: CLI toolbox map.",
+      "tags": [
+        "skills",
+        "cli",
+        "tools"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "skills-tooling-tree"
+        }
+      ]
+    }
+  ]
+}

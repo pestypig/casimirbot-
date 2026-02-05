@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "rootId": "sdk-integration-tree",
+  "nodes": [
+    {
+      "id": "sdk-integration-tree",
+      "slug": "sdk-integration-tree",
+      "title": "SDK Integration Tree",
+      "excerpt": "SDK clients, runtime helpers, and integration examples.",
+      "bodyMD": "This tree maps the SDK surface area for external integrations and client usage.\n\nMinimal artifact: SDK surface map and example flow.",
+      "tags": [
+        "sdk",
+        "integration",
+        "api"
+      ],
+      "children": [
+        "sdk-core",
+        "sdk-runtime",
+        "sdk-config",
+        "sdk-docs",
+        "sdk-examples"
+      ],
+      "links": []
+    },
+    {
+      "id": "sdk-core",
+      "slug": "sdk-core",
+      "title": "SDK Core Surface",
+      "excerpt": "SDK client entrypoints and shared types.",
+      "bodyMD": "SDK core modules (sdk/index.ts, sdk/client.ts, sdk/types.ts, sdk/src/index.ts, sdk/src/client.ts, sdk/src/types.ts).\n\nMinimal artifact: SDK entrypoints list.",
+      "tags": [
+        "sdk",
+        "client",
+        "types"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sdk-integration-tree"
+        }
+      ]
+    },
+    {
+      "id": "sdk-runtime",
+      "slug": "sdk-runtime",
+      "title": "SDK Runtime",
+      "excerpt": "Runtime helpers and transport wiring.",
+      "bodyMD": "SDK runtime helpers (sdk/runtime.ts, sdk/src/runtime.ts).\n\nMinimal artifact: runtime helper map.",
+      "tags": [
+        "sdk",
+        "runtime",
+        "transport"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sdk-integration-tree"
+        }
+      ]
+    },
+    {
+      "id": "sdk-config",
+      "slug": "sdk-config",
+      "title": "SDK Config",
+      "excerpt": "SDK package configuration and build settings.",
+      "bodyMD": "SDK package configuration (sdk/package.json, sdk/tsconfig.json).\n\nMinimal artifact: SDK build config summary.",
+      "tags": [
+        "sdk",
+        "config",
+        "build"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sdk-integration-tree"
+        }
+      ]
+    },
+    {
+      "id": "sdk-docs",
+      "slug": "sdk-docs",
+      "title": "SDK Docs",
+      "excerpt": "SDK README and usage notes.",
+      "bodyMD": "SDK documentation (sdk/README.md).\n\nMinimal artifact: SDK usage summary.",
+      "tags": [
+        "sdk",
+        "docs",
+        "usage"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sdk-integration-tree"
+        }
+      ]
+    },
+    {
+      "id": "sdk-examples",
+      "slug": "sdk-examples",
+      "title": "SDK Examples",
+      "excerpt": "SDK usage examples and adapter payloads.",
+      "bodyMD": "SDK examples and adapter payloads (packages/create-casimir-verifier/sdk-example.mjs, packages/create-casimir-verifier/template/adapter-request.json, examples/hello-verifier/adapter-request.json).\n\nMinimal artifact: SDK example walkthrough.",
+      "tags": [
+        "sdk",
+        "examples",
+        "adapters"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sdk-integration-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "packages-tree"
+        }
+      ]
+    }
+  ]
+}

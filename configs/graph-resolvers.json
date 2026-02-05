@@ -22,7 +22,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.2
     },
     {
       "id": "math",
@@ -53,7 +54,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.1
     },
     {
       "id": "physics-foundations",
@@ -86,7 +88,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.1
     },
     {
       "id": "warp-mechanics",
@@ -116,7 +119,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.1
     },
     {
       "id": "gr-solver",
@@ -142,7 +146,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "casimir-tiles",
@@ -169,7 +174,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.05
     },
     {
       "id": "dp-collapse",
@@ -196,7 +202,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "pipeline-ledger",
@@ -224,7 +231,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.05
     },
     {
       "id": "stellar-restoration",
@@ -251,7 +259,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "analysis-loops",
@@ -277,7 +286,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "concepts",
@@ -303,7 +313,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "ethos-knowledge",
@@ -331,7 +342,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.1
     },
     {
       "id": "resonance",
@@ -355,7 +367,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "trace-system",
@@ -382,7 +395,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "helix-ask",
@@ -408,7 +422,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.1
     },
     {
       "id": "zen-society",
@@ -434,7 +449,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "zen-ladder-pack",
@@ -460,7 +476,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "certainty-framework",
@@ -502,7 +519,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.1
     },
     {
       "id": "uncertainty-mechanics",
@@ -535,7 +553,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.05
     },
     {
       "id": "ui-components",
@@ -569,7 +588,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "simulation-systems",
@@ -601,7 +621,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.05
     },
     {
       "id": "ui-backend-binding",
@@ -632,7 +653,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1.05
     },
     {
       "id": "brick-lattice-dataflow",
@@ -662,7 +684,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "knowledge-ingestion",
@@ -690,7 +713,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "essence-luma-noise",
@@ -719,7 +743,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "hardware-telemetry",
@@ -747,7 +772,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "queue-orchestration",
@@ -775,7 +801,8 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
     },
     {
       "id": "ops-deployment",
@@ -803,7 +830,285 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
-      }
+      },
+      "weight": 1
+    },
+    {
+      "id": "agi-runtime",
+      "label": "AGI Runtime Walk",
+      "path": "docs/knowledge/agi-runtime-tree.json",
+      "matchers": [
+        "agi runtime",
+        "plan execute",
+        "planner",
+        "chat-b",
+        "refinery",
+        "agent map",
+        "knowledge compositor",
+        "constraint packs",
+        "trace memory",
+        "plan router"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.05
+    },
+    {
+      "id": "llm-runtime",
+      "label": "LLM Runtime Walk",
+      "path": "docs/knowledge/llm-runtime-tree.json",
+      "topicTags": [
+        "llm"
+      ],
+      "matchers": [
+        "llm",
+        "local model",
+        "ollama",
+        "tokenizer",
+        "small-llm",
+        "llm worker",
+        "language model"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.05
+    },
+    {
+      "id": "debate-specialists",
+      "label": "Debate and Specialists Walk",
+      "path": "docs/knowledge/debate-specialists-tree.json",
+      "topicTags": [
+        "debate",
+        "specialists"
+      ],
+      "matchers": [
+        "debate",
+        "proponent",
+        "skeptic",
+        "referee",
+        "specialists",
+        "verifier",
+        "solver"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.05
+    },
+    {
+      "id": "security-hull-guard",
+      "label": "Security and Hull Guard Walk",
+      "path": "docs/knowledge/security-hull-guard-tree.json",
+      "topicTags": [
+        "security"
+      ],
+      "matchers": [
+        "hull guard",
+        "hull mode",
+        "tenant",
+        "authorization",
+        "guardrail",
+        "guardrails",
+        "qi guard",
+        "concurrency guard"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.05
+    },
+    {
+      "id": "skills-tooling",
+      "label": "Skills and Tooling Walk",
+      "path": "docs/knowledge/skills-tooling-tree.json",
+      "topicTags": [
+        "skills"
+      ],
+      "matchers": [
+        "skills registry",
+        "tool registry",
+        "tooling",
+        "tool spec",
+        "tool specs",
+        "skill catalog"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.05
+    },
+    {
+      "id": "telemetry-console",
+      "label": "Telemetry and Console Walk",
+      "path": "docs/knowledge/telemetry-console-tree.json",
+      "topicTags": [
+        "telemetry",
+        "console"
+      ],
+      "matchers": [
+        "console telemetry",
+        "panel telemetry",
+        "badge telemetry",
+        "console snapshot",
+        "console summary",
+        "observability"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.05
+    },
+    {
+      "id": "star-materials-environment",
+      "label": "Star Materials and Environment Walk",
+      "path": "docs/knowledge/star-materials-environment-tree.json",
+      "topicTags": [
+        "materials",
+        "environment"
+      ],
+      "matchers": [
+        "needle hull",
+        "hull materials",
+        "hull glb",
+        "solar guardrails",
+        "star watcher",
+        "environment model",
+        "environment tags"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.05
+    },
+    {
+      "id": "sdk-integration",
+      "label": "SDK Integration Walk",
+      "path": "docs/knowledge/sdk-integration-tree.json",
+      "topicTags": [
+        "sdk"
+      ],
+      "matchers": [
+        "sdk",
+        "client sdk",
+        "api client",
+        "sdk example",
+        "adapter request"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1
+    },
+    {
+      "id": "packages",
+      "label": "Packages Walk",
+      "path": "docs/knowledge/packages-tree.json",
+      "topicTags": [
+        "packages"
+      ],
+      "matchers": [
+        "packages tree",
+        "create-casimir-verifier",
+        "package scaffold",
+        "monorepo package"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1
+    },
+    {
+      "id": "external-integrations",
+      "label": "External Integrations Walk",
+      "path": "docs/knowledge/external-integrations-tree.json",
+      "topicTags": [
+        "external"
+      ],
+      "matchers": [
+        "external dependencies",
+        "third-party",
+        "vendor",
+        "llama.cpp",
+        "sunpy",
+        "whisper",
+        "audiocraft"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1
     }
   ]
 }

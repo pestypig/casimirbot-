@@ -186,6 +186,9 @@ import {
 } from "../services/helix-ask/job-store";
 import {
   getHelixAskSessionMemory,
+  getHelixAskSessionGraphLock,
+  setHelixAskSessionGraphLock,
+  clearHelixAskSessionGraphLock,
   recordHelixAskSessionMemory,
   type HelixAskSessionMemory,
 } from "../services/helix-ask/session-memory";
@@ -2539,6 +2542,25 @@ const HELIX_ASK_CONTEXT_CHARS = clampNumber(
   120,
   2400,
 );
+const HELIX_ASK_PREFLIGHT_ENABLED =
+  String(process.env.HELIX_ASK_PREFLIGHT ?? "1").trim() !== "0";
+const HELIX_ASK_PREFLIGHT_REUSE =
+  String(process.env.HELIX_ASK_PREFLIGHT_REUSE ?? "1").trim() !== "0";
+const HELIX_ASK_PREFLIGHT_TOPK = clampNumber(
+  readNumber(process.env.HELIX_ASK_PREFLIGHT_TOPK ?? 6, 6),
+  2,
+  16,
+);
+const HELIX_ASK_PREFLIGHT_MIN_FILES = clampNumber(
+  readNumber(process.env.HELIX_ASK_PREFLIGHT_MIN_FILES ?? 2, 2),
+  1,
+  10,
+);
+const HELIX_ASK_PREFLIGHT_DOC_SHARE = clampNumber(
+  readNumber(process.env.HELIX_ASK_PREFLIGHT_DOC_SHARE ?? 0.3, 0.3),
+  0,
+  1,
+);
 const HELIX_ASK_HTTP_KEEPALIVE =
   String(process.env.HELIX_ASK_HTTP_KEEPALIVE ?? "1").trim() !== "0";
 const HELIX_ASK_HTTP_KEEPALIVE_MS = clampNumber(
@@ -4553,6 +4575,68 @@ function buildHelixAskSearchQueries(
     push("server/services/observability/training-trace-store.ts");
     push("server/services/agi/refinery-gates.ts");
     push("server/services/agi/refinery-policy.ts");
+  }
+  if (hasTopic("ui") || hasTopic("frontend") || hasTopic("client") || /ui|panel|dashboard|hud|frontend/i.test(normalized)) {
+    push("docs/knowledge/ui-components-tree.json");
+    push("docs/knowledge/ui-backend-binding-tree.json");
+    push("client/src/components");
+    push("client/src/pages");
+    push("client/src/hooks");
+    push("helix desktop panels");
+  }
+  if (hasTopic("backend") || /backend|api|endpoint|service/i.test(normalized)) {
+    push("server/helix-core.ts");
+    push("server/routes.ts");
+    push("server/services");
+  }
+  if (hasTopic("simulation") || /simulation|simulator|sweep/i.test(normalized)) {
+    push("docs/knowledge/physics/simulation-systems-tree.json");
+    push("simulations");
+    push("sim_core");
+    push("modules/analysis");
+  }
+  if (hasTopic("uncertainty") || /uncertainty|error bars|confidence interval/i.test(normalized)) {
+    push("docs/knowledge/physics/uncertainty-mechanics-tree.json");
+    push("docs/knowledge/certainty-framework-tree.json");
+  }
+  if (hasTopic("knowledge") || hasTopic("rag") || /knowledge ingestion|rag|retrieval/i.test(normalized)) {
+    push("docs/knowledge/knowledge-ingestion-tree.json");
+    push("server/services/knowledge");
+    push("server/config/knowledge.ts");
+  }
+  if (hasTopic("essence") || /essence profile|essence mix/i.test(normalized)) {
+    push("docs/knowledge/essence-luma-noise-tree.json");
+    push("server/routes/essence.ts");
+    push("shared/essence-persona.ts");
+  }
+  if (hasTopic("luma") || /luma/i.test(normalized)) {
+    push("docs/knowledge/essence-luma-noise-tree.json");
+    push("server/services/luma.ts");
+    push("client/src/pages/luma.tsx");
+  }
+  if (hasTopic("noise") || /noise gen|noise field|noisegen/i.test(normalized)) {
+    push("docs/knowledge/essence-luma-noise-tree.json");
+    push("server/services/noisegen-store.ts");
+    push("client/src/pages/noisegen.tsx");
+  }
+  if (hasTopic("hardware") || /hardware telemetry|hardware feed/i.test(normalized)) {
+    push("docs/knowledge/hardware-telemetry-tree.json");
+    push("server/helix-core.ts");
+    push("client/src/hooks/useHardwareFeeds.ts");
+  }
+  if (hasTopic("telemetry") || /telemetry|observability|metrics/i.test(normalized)) {
+    push("docs/knowledge/hardware-telemetry-tree.json");
+    push("server/services/observability");
+    push("server/skills/telemetry.panels.ts");
+  }
+  if (hasTopic("queue") || hasTopic("jobs") || /queue|scheduler|orchestration/i.test(normalized)) {
+    push("docs/knowledge/queue-orchestration-tree.json");
+    push("server/services/jobs");
+  }
+  if (hasTopic("ops") || hasTopic("ci") || /deployment|release|ci|cd|runbook/i.test(normalized)) {
+    push("docs/knowledge/ops-deployment-tree.json");
+    push(".github/workflows/casimir-verify.yml");
+    push("ops");
   }
   if (normalized.includes("solve") || normalized.includes("solver")) {
     push("warp solver");
@@ -8062,6 +8146,17 @@ const HelixAskTuningOverrides = z
   })
   .partial();
 
+const HelixAskGraphLockRequest = z.object({
+  sessionId: z.string().min(1),
+  treeIds: z.array(z.string().min(1)).optional(),
+  mode: z.enum(["replace", "merge", "clear"]).optional(),
+});
+
+const normalizeGraphLockSessionId = (value: unknown): string => {
+  if (typeof value !== "string") return "";
+  return value.trim();
+};
+
   const LocalAskRequest = z
   .object({
     prompt: z.string().min(1).optional(),
@@ -10750,6 +10845,58 @@ planRouter.post("/mood-hint", async (req, res) => {
   }
 });
 
+planRouter.get("/helix-ask/graph-lock", (req, res) => {
+  if (!HELIX_ASK_SESSION_MEMORY) {
+    return res.status(404).json({ error: "session_memory_disabled", status: 404 });
+  }
+  const sessionId = normalizeGraphLockSessionId(req.query.sessionId);
+  if (!sessionId) {
+    return res.status(400).json({ error: "bad_request", message: "sessionId required" });
+  }
+  const treeIds = getHelixAskSessionGraphLock(sessionId);
+  return res.json({ sessionId, treeIds, locked: treeIds.length > 0 });
+});
+
+planRouter.post("/helix-ask/graph-lock", (req, res) => {
+  if (!HELIX_ASK_SESSION_MEMORY) {
+    return res.status(404).json({ error: "session_memory_disabled", status: 404 });
+  }
+  const parsed = HelixAskGraphLockRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const sessionId = parsed.data.sessionId.trim();
+  const mode = parsed.data.mode ?? "replace";
+  if (mode === "clear") {
+    clearHelixAskSessionGraphLock(sessionId);
+    return res.json({ ok: true, sessionId, treeIds: [], locked: false, mode: "clear" });
+  }
+  const treeIds = parsed.data.treeIds ?? [];
+  if (treeIds.length === 0) {
+    return res.status(400).json({ error: "bad_request", message: "treeIds required" });
+  }
+  const next = setHelixAskSessionGraphLock({
+    sessionId,
+    treeIds,
+    mode: mode === "merge" ? "merge" : "replace",
+  });
+  return res.json({ ok: true, sessionId, treeIds: next, locked: next.length > 0, mode });
+});
+
+planRouter.delete("/helix-ask/graph-lock", (req, res) => {
+  if (!HELIX_ASK_SESSION_MEMORY) {
+    return res.status(404).json({ error: "session_memory_disabled", status: 404 });
+  }
+  const sessionId =
+    normalizeGraphLockSessionId(req.query.sessionId) ||
+    normalizeGraphLockSessionId((req.body as { sessionId?: string } | undefined)?.sessionId);
+  if (!sessionId) {
+    return res.status(400).json({ error: "bad_request", message: "sessionId required" });
+  }
+  clearHelixAskSessionGraphLock(sessionId);
+  return res.json({ ok: true, sessionId, treeIds: [], locked: false });
+});
+
 
 type HelixAskResponder = {
   send: (status: number, payload: unknown) => void;
@@ -10937,6 +11084,7 @@ const executeHelixAsk = async ({
     let slotPlanHeadingSeedSlots: HelixAskSlotPlanEntry[] = [];
     let graphSeedSlots: HelixAskSlotPlanEntry[] = [];
     let memoryPinnedFiles: string[] = [];
+    let graphTreeLock: string[] = [];
     let slotPlanPass: HelixAskSlotPlanPass | null = null;
     let slotPlanPassSlots: HelixAskSlotPlanEntry[] = [];
     let graphHintTerms: string[] = [];
@@ -11198,6 +11346,10 @@ const executeHelixAsk = async ({
         aliases?: string[];
       }>;
       session_memory_last_clarify?: string[];
+      graph_pack_lock?: {
+        requested?: string[];
+        applied?: string[];
+      };
       plan_directives?: HelixAskPlanDirectives;
       slot_plan?: Array<{
         id: string;
@@ -11646,6 +11798,7 @@ const executeHelixAsk = async ({
     memorySeedSlots = buildMemorySeedSlots(slotPreviewSeed, sessionMemory);
     const headingSeedSlots = buildDocHeadingSeedSlots(slotPreviewSeed);
     memoryPinnedFiles = sessionMemory?.pinnedFiles ?? [];
+    graphTreeLock = sessionMemoryForTags?.graphTreeIds?.slice() ?? [];
     if (headingSeedSlots.length > 0) {
       recordAgentAction("expand_heading_aliases", "doc_heading_seed_slots", "seed_slot_aliases");
     }
@@ -12583,7 +12736,7 @@ const executeHelixAsk = async ({
     if (compositeConstraintRequested) {
       intentSecondaryTier = "F3";
     }
-    const verbosity = resolveHelixAskVerbosity(
+    let verbosity = resolveHelixAskVerbosity(
       baseQuestion,
       intentProfile,
       parsed.data.verbosity as HelixAskVerbosity | undefined,
@@ -12613,7 +12766,34 @@ const executeHelixAsk = async ({
       debugPayload.intent_strategy = intentStrategy;
       debugPayload.intent_reason = intentReason;
     };
-    updateIntentDebug();
+    const applyIntentProfile = (profile: HelixAskIntentProfile, reasonSuffix?: string) => {
+      intentProfile = profile;
+      intentDomain = intentProfile.domain;
+      intentTier = intentProfile.tier;
+      intentSecondaryTier = intentProfile.secondaryTier;
+      intentStrategy = intentProfile.strategy;
+      formatSpec = resolveHelixAskFormat(baseQuestion, intentProfile, debugEnabled);
+      if (hasTwoParagraphContract(baseQuestion)) {
+        formatSpec = { format: "compare", stageTags: false };
+      }
+      if (intentStrategy === "hybrid_explain" && formatSpec.format !== "steps") {
+        formatSpec = { ...formatSpec, stageTags: false };
+      }
+      if (compositeConstraintRequested) {
+        intentSecondaryTier = "F3";
+      }
+      verbosity = resolveHelixAskVerbosity(
+        baseQuestion,
+        intentProfile,
+        parsed.data.verbosity as HelixAskVerbosity | undefined,
+      );
+      intentReason = reasonSuffix ? `${intentReasonBase}|${reasonSuffix}` : intentReasonBase;
+      if (compositeConstraintRequested) {
+        intentReason = `${intentReason}|composite:constraint`;
+      }
+      updateIntentDebug();
+    };
+    applyIntentProfile(intentProfile);
     logEvent(
       "Intent resolved",
       "ok",
@@ -12812,6 +12992,25 @@ const executeHelixAsk = async ({
         "ledger",
         "star",
         "concepts",
+        "ui",
+        "frontend",
+        "client",
+        "backend",
+        "simulation",
+        "uncertainty",
+        "brick",
+        "lattice",
+        "knowledge",
+        "rag",
+        "essence",
+        "luma",
+        "noise",
+        "hardware",
+        "telemetry",
+        "queue",
+        "jobs",
+        "ops",
+        "ci",
       ]);
       return tags
         .map((tag) => tag.trim().toLowerCase())
@@ -12889,10 +13088,17 @@ const executeHelixAsk = async ({
       question: baseQuestion,
       topicTags,
       conceptMatch,
+      lockedTreeIds: graphTreeLock.length > 0 ? graphTreeLock : undefined,
     });
     graphResolverPreferred = Boolean(graphPack?.preferGraph);
     graphHintTerms = collectGraphHintTerms(graphPack);
     graphSeedSlots = buildGraphSeedSlots(graphPack);
+    if (debugPayload) {
+      debugPayload.graph_pack_lock = {
+        requested: graphTreeLock.length > 0 ? graphTreeLock.slice() : [],
+        applied: graphPack?.treeIds ?? [],
+      };
+    }
     if (graphPack) {
       const treeCount = graphPack.frameworks.length;
       const anchorCount = graphPack.frameworks.reduce((sum, framework) => sum + framework.anchors.length, 0);
@@ -12911,6 +13117,7 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         debugPayload.graph_framework = {
           primary: graphPack.primaryTreeId,
+          locked: graphTreeLock.length > 0 ? graphTreeLock : undefined,
           trees: graphPack.frameworks.map((framework) => ({
             tree: framework.treeId,
             anchors: framework.anchors.map((node) => node.id),
@@ -12999,6 +13206,234 @@ const executeHelixAsk = async ({
     }
     if (debugPayload) {
       debugPayload.verification_anchor_required = verificationAnchorRequired;
+    }
+    let preflightContext:
+      | {
+          context: string;
+          files: string[];
+          topicTier?: number;
+          topicMustIncludeOk?: boolean;
+          queryHitCount?: number;
+          topScore?: number;
+          scoreGap?: number;
+          channelHits?: AskCandidateChannelStats;
+          channelTopScores?: AskCandidateChannelStats;
+          channelWeights?: AskCandidateChannelStats;
+          docHeaderInjected?: number;
+        }
+      | null = null;
+    let preflightEvidence: EvidenceEligibility | null = null;
+    let preflightQueries: string[] = [];
+    let preflightDocShare = 0;
+    let preflightRepoSearchHits = 0;
+    let preflightSignalsOk = false;
+    let preflightReuseApplied = false;
+    let retrievalOverrideApplied = false;
+    const preflightEnabled =
+      HELIX_ASK_PREFLIGHT_ENABLED &&
+      !promptIngested &&
+      intentStrategy !== "constraint_report" &&
+      !forcedAnswer &&
+      !contextText;
+    if (preflightEnabled) {
+      const preflightStart = Date.now();
+      const preflightSearchSeed = parsed.data.searchQuery?.trim() || baseQuestion;
+      const preflightBaseQueries = buildHelixAskSearchQueries(preflightSearchSeed, topicTags);
+      if (!blockScoped && conceptMatch?.card.sourcePath) {
+        preflightBaseQueries.push(conceptMatch.card.sourcePath);
+      }
+      const preflightHeadingSeeds = buildDocHeadingSeedSlots(baseQuestion);
+      const preflightHints = [...graphHintTerms, ...preflightHeadingSeeds];
+      preflightQueries = mergeHelixAskQueries(
+        preflightBaseQueries,
+        preflightHints,
+        HELIX_ASK_QUERY_MERGE_MAX,
+      );
+      if (preflightQueries.length > 0) {
+        const preflightResult = await buildAskContextFromQueries(
+          baseQuestion,
+          preflightQueries,
+          HELIX_ASK_PREFLIGHT_TOPK,
+          topicProfile,
+        );
+        preflightContext = preflightResult;
+        let preflightText = preflightResult.context;
+        let preflightFiles = preflightResult.files.slice();
+        if (!preflightText) {
+          const grepCandidates = collectDocsGrepCandidates(preflightQueries, baseQuestion, {
+            allowlist: topicProfile?.allowlistTiers?.[0] ?? [],
+            limit: 120,
+          });
+          if (grepCandidates.length > 0) {
+            const selected = selectCandidatesWithMmr(
+              grepCandidates,
+              HELIX_ASK_PREFLIGHT_TOPK,
+              HELIX_ASK_MMR_LAMBDA,
+            );
+            const topScore = selected[0]?.score ?? 0;
+            const scoreGap =
+              selected.length >= 2 ? Math.max(0, topScore - selected[1].score) : topScore;
+            const normalizedTop = topScore > 0 ? Math.min(1, topScore / 100) : 0;
+            const normalizedGap = scoreGap > 0 ? Math.min(1, scoreGap / 100) : 0;
+            const channelHits = initAskChannelStats();
+            channelHits.lexical = selected.length ? 1 : 0;
+            const channelTopScores = initAskChannelStats();
+            channelTopScores.lexical = normalizedTop;
+            preflightContext = buildAskContextFromCandidates({
+              selected,
+              topicTier: 0,
+              topicMustIncludeOk: true,
+              queryHitCount: selected.length ? 1 : 0,
+              topScore: normalizedTop,
+              scoreGap: normalizedGap,
+              channelHits,
+              channelTopScores,
+              channelWeights: scaleAskChannelWeights(HELIX_ASK_RRF_CHANNEL_WEIGHTS, channelTopScores),
+            });
+            preflightText = preflightContext.context;
+            preflightFiles = preflightContext.files.slice();
+            logEvent(
+              "Preflight docs grep",
+              "ok",
+              `hits=${grepCandidates.length}`,
+              preflightStart,
+            );
+          } else {
+            logEvent("Preflight docs grep", "miss", "hits=0", preflightStart);
+          }
+        }
+        if (graphPack?.contextText) {
+          preflightText = appendContextBlock(preflightText, graphPack.contextText);
+          if (graphPack.sourcePaths.length > 0) {
+            preflightFiles = Array.from(new Set([...preflightFiles, ...graphPack.sourcePaths]));
+          }
+        }
+        if (preflightText) {
+          preflightEvidence = evaluateEvidenceEligibility(baseQuestion, preflightText, {
+            minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+            minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+            signalTokens: evidenceSignalTokens,
+            useQuestionTokens: true,
+          });
+          if (!preflightEvidence.ok) {
+            const repoSearchPlan = buildRepoSearchPlan({
+              question: baseQuestion,
+              topicTags,
+              conceptMatch,
+              intentDomain,
+              evidenceGateOk: preflightEvidence.ok,
+              promptIngested,
+              topicProfile,
+              mode: "preflight",
+            });
+            if (repoSearchPlan) {
+              const repoSearchResult = await runRepoSearch(repoSearchPlan);
+              preflightRepoSearchHits = repoSearchResult.hits.length;
+              if (repoSearchResult.hits.length > 0) {
+                const formatted = formatRepoSearchEvidence(repoSearchResult);
+                preflightText = [preflightText, formatted.evidenceText].filter(Boolean).join("\n\n");
+                if (formatted.filePaths.length > 0) {
+                  preflightFiles = Array.from(new Set([...preflightFiles, ...formatted.filePaths]));
+                }
+                preflightEvidence = evaluateEvidenceEligibility(baseQuestion, preflightText, {
+                  minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+                  minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+                  signalTokens: evidenceSignalTokens,
+                  useQuestionTokens: true,
+                });
+              }
+              if (debugPayload) {
+                debugPayload.preflight_repo_search_terms = repoSearchPlan.terms;
+                debugPayload.preflight_repo_search_paths = repoSearchPlan.paths;
+                debugPayload.preflight_repo_search_reason = repoSearchPlan.reason;
+                debugPayload.preflight_repo_search_hits = repoSearchResult.hits.length;
+                debugPayload.preflight_repo_search_truncated = repoSearchResult.truncated;
+                if (repoSearchResult.error) {
+                  debugPayload.preflight_repo_search_error = repoSearchResult.error;
+                }
+              }
+            }
+          }
+          preflightContext = {
+            ...(preflightContext ?? preflightResult),
+            context: preflightText,
+            files: preflightFiles,
+          };
+          const docHits = preflightFiles.filter((filePath) => /(^|\/)docs\//i.test(filePath));
+          preflightDocShare = preflightFiles.length
+            ? docHits.length / preflightFiles.length
+            : 0;
+          preflightSignalsOk =
+            Boolean(preflightEvidence?.ok) ||
+            (preflightFiles.length >= HELIX_ASK_PREFLIGHT_MIN_FILES &&
+              preflightDocShare >= HELIX_ASK_PREFLIGHT_DOC_SHARE);
+          const retrievalUpgradeEligible =
+            intentDomain === "general" &&
+            preflightSignalsOk &&
+            (repoExpectationLevel !== "low" ||
+              tagSignals.length > 0 ||
+              Boolean(graphPack?.frameworks.length) ||
+              Boolean(conceptMatch));
+          if (retrievalUpgradeEligible) {
+            const fallbackProfile = resolveFallbackIntentProfile("hybrid");
+            applyIntentProfile(fallbackProfile, "retrieval_preflight");
+            retrievalOverrideApplied = true;
+            answerPath.push("intent:retrieval_preflight");
+            answerPath.push(`intent_override:${fallbackProfile.id}`);
+            answerPath.push(`domain_override:${fallbackProfile.domain}`);
+            logEvent(
+              "Intent override",
+              "retrieval_preflight",
+              `profile=${fallbackProfile.id}`,
+              preflightStart,
+            );
+          }
+          if (!isRepoQuestion && preflightSignalsOk && intentStrategy !== "constraint_report") {
+            isRepoQuestion = true;
+          }
+          if (debugPayload) {
+            debugPayload.preflight_queries = preflightQueries.slice(0, 12);
+            debugPayload.preflight_files = preflightFiles.slice(0, 12);
+            debugPayload.preflight_file_count = preflightFiles.length;
+            debugPayload.preflight_doc_share = preflightDocShare;
+            debugPayload.preflight_evidence_ok = preflightEvidence?.ok ?? false;
+            debugPayload.preflight_evidence_ratio = preflightEvidence?.matchRatio ?? 0;
+            debugPayload.preflight_repo_search_hits = preflightRepoSearchHits;
+            debugPayload.preflight_retrieval_upgrade = retrievalOverrideApplied;
+          }
+          logEvent(
+            "Preflight retrieval",
+            preflightSignalsOk ? "ok" : "weak",
+            [
+              `files=${preflightFiles.length}`,
+              `docShare=${preflightDocShare.toFixed(2)}`,
+              preflightEvidence ? `match=${preflightEvidence.matchCount}/${preflightEvidence.tokenCount}` : "",
+            ]
+              .filter(Boolean)
+              .join(" | "),
+            preflightStart,
+          );
+        } else {
+          logEvent("Preflight retrieval", "empty", "no_context", preflightStart);
+        }
+      }
+    }
+    if (debugPayload) {
+      debugPayload.is_repo_question = isRepoQuestion;
+    }
+    if (
+      preflightContext?.context &&
+      HELIX_ASK_PREFLIGHT_REUSE &&
+      preflightSignalsOk &&
+      isRepoQuestion &&
+      !contextText
+    ) {
+      contextText = preflightContext.context;
+      contextFiles = preflightContext.files.slice();
+      preflightReuseApplied = true;
+      if (debugPayload) {
+        debugPayload.preflight_reuse = true;
+      }
     }
     if (!promptIngested && intentDomain === "general" && baseQuestion) {
       mathSolveResult = await solveHelixAskMathQuestion(baseQuestion);
@@ -13613,6 +14048,7 @@ const executeHelixAsk = async ({
           });
         }
 
+        const preflightMeta = preflightReuseApplied ? preflightContext : null;
         let contextMeta: {
           files: string[];
           topicTier?: number;
@@ -13624,14 +14060,27 @@ const executeHelixAsk = async ({
           channelTopScores?: AskCandidateChannelStats;
           channelWeights?: AskCandidateChannelStats;
           docHeaderInjected?: number;
-        } = {
-          files: contextFiles.slice(),
-          queryHitCount: 0,
-          topScore: 0,
-          scoreGap: 0,
-          channelHits: initAskChannelStats(),
-          channelTopScores: initAskChannelStats(),
-        };
+        } = preflightMeta
+          ? {
+              files: contextFiles.slice(),
+              topicTier: preflightMeta.topicTier,
+              topicMustIncludeOk: preflightMeta.topicMustIncludeOk,
+              queryHitCount: preflightMeta.queryHitCount,
+              topScore: preflightMeta.topScore,
+              scoreGap: preflightMeta.scoreGap,
+              channelHits: preflightMeta.channelHits ?? initAskChannelStats(),
+              channelTopScores: preflightMeta.channelTopScores ?? initAskChannelStats(),
+              channelWeights: preflightMeta.channelWeights,
+              docHeaderInjected: preflightMeta.docHeaderInjected,
+            }
+          : {
+              files: contextFiles.slice(),
+              queryHitCount: 0,
+              topScore: 0,
+              scoreGap: 0,
+              channelHits: initAskChannelStats(),
+              channelTopScores: initAskChannelStats(),
+            };
         let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
         let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
         let docSlotTargets: string[] = [];
@@ -14261,6 +14710,7 @@ const executeHelixAsk = async ({
           evidenceGateOk: evidenceGate.ok,
           promptIngested,
           topicProfile,
+          mode: "fallback",
         });
         if (repoSearchPlan) {
           const searchStart = Date.now();
@@ -14968,6 +15418,7 @@ const executeHelixAsk = async ({
               slots: slotsToRecord,
               pinnedFiles: contextFiles,
               resolvedConcepts,
+              graphTreeIds: graphPack?.treeIds,
               openSlots:
                 docSlotSummary?.missingSlots?.length
                   ? docSlotSummary.missingSlots
@@ -15461,6 +15912,7 @@ const executeHelixAsk = async ({
             openSlots: clarifySlots,
             attempts: agentActions.map((entry) => entry.action),
             recentTopics: topicTags,
+            graphTreeIds: graphPack?.treeIds,
             userPrefs: {
               hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
               verbosity: parsed.data.verbosity,

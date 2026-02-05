@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "rootId": "agi-runtime-tree",
+  "nodes": [
+    {
+      "id": "agi-runtime-tree",
+      "slug": "agi-runtime-tree",
+      "title": "AGI Runtime Tree",
+      "excerpt": "Planning, execution, refinement, and trace capture for AGI runs.",
+      "bodyMD": "This tree maps the plan/execute runtime and its supporting services, including planner logic, refinery gates, and trace capture.\n\nMinimal artifact: AGI runtime flow map.",
+      "tags": [
+        "agi",
+        "planner",
+        "runtime"
+      ],
+      "children": [
+        "agi-plan-execute",
+        "agi-planner-core",
+        "agi-refinery",
+        "agi-trace-memory",
+        "agi-evaluation",
+        "agi-adapter",
+        "agi-chat-sessions",
+        "agi-contributions",
+        "agi-constraint-packs",
+        "agi-resilience",
+        "agi-learning-loop",
+        "agi-knowledge-compositor"
+      ],
+      "links": []
+    },
+    {
+      "id": "agi-plan-execute",
+      "slug": "agi-plan-execute",
+      "title": "Plan + Execute Router",
+      "excerpt": "Plan/execute entrypoints and Helix Ask runtime.",
+      "bodyMD": "Plan/execute endpoints, Helix Ask orchestration, and evidence handling (server/routes/agi.plan.ts).\n\nMinimal artifact: plan/execute routing map.",
+      "tags": [
+        "agi",
+        "planner",
+        "router"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "helix-ask-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-planner-core",
+      "slug": "agi-planner-core",
+      "title": "Planner Core",
+      "excerpt": "Plan synthesis, grounding, and agent routing.",
+      "bodyMD": "Planner core logic (server/services/planner/chat-b.ts, server/services/planner/grounding.ts, server/services/planner/agent-map.ts, server/services/planner/why-belongs.ts, server/services/planner/supplements.ts).\n\nMinimal artifact: planner decision flow.",
+      "tags": [
+        "planner",
+        "grounding"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-refinery",
+      "slug": "agi-refinery",
+      "title": "Refinery Gates",
+      "excerpt": "Refinery gates, variants, and trajectory capture.",
+      "bodyMD": "Refinery gates and trajectory capture (server/services/agi/refinery-gates.ts, server/services/agi/refinery-trajectory.ts, server/services/agi/refinery-variants.ts, server/services/agi/refinery-policy.ts, server/routes/agi.refinery.ts).\n\nMinimal artifact: refinery gate map.",
+      "tags": [
+        "agi",
+        "refinery",
+        "gates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-trace-memory",
+      "slug": "agi-trace-memory",
+      "title": "Trace + Memory",
+      "excerpt": "Trace capture, memory, and audit trails.",
+      "bodyMD": "Trace and memory APIs (server/routes/agi.trace.ts, server/routes/agi.memory.ts, server/routes/agi.memory.trace.ts) and training trace storage (server/services/observability/training-trace-store.ts).\n\nMinimal artifact: trace and memory flow.",
+      "tags": [
+        "trace",
+        "memory",
+        "observability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "trace-system"
+        }
+      ]
+    },
+    {
+      "id": "agi-evaluation",
+      "slug": "agi-evaluation",
+      "title": "Evaluation",
+      "excerpt": "Eval smoke runs and regression harnesses.",
+      "bodyMD": "Evaluation workflow (server/services/agi/eval-smoke.ts, server/routes/agi.eval.ts).\n\nMinimal artifact: eval smoke checklist.",
+      "tags": [
+        "eval",
+        "regression"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-adapter",
+      "slug": "agi-adapter",
+      "title": "Adapter Bridge",
+      "excerpt": "Adapter endpoint and contract mapping.",
+      "bodyMD": "Adapter endpoint and contract docs (server/routes/agi.adapter.ts, docs/ADAPTER-CONTRACT.md, cli/casimir-verify.ts).\n\nMinimal artifact: adapter contract map.",
+      "tags": [
+        "adapter",
+        "contract"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-chat-sessions",
+      "slug": "agi-chat-sessions",
+      "title": "Chat Sessions",
+      "excerpt": "Chat session storage and rendering.",
+      "bodyMD": "Chat session routes and renderer (server/routes/agi.chat.ts, server/services/agi/chat-render.ts, server/db/chatSessions).\n\nMinimal artifact: chat session lifecycle.",
+      "tags": [
+        "chat",
+        "sessions"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-contributions",
+      "slug": "agi-contributions",
+      "title": "Contributions",
+      "excerpt": "Contribution intake and tracking.",
+      "bodyMD": "Contribution routes and service layer (server/routes/agi.contributions.ts, server/services/contributions).\n\nMinimal artifact: contribution intake map.",
+      "tags": [
+        "contributions",
+        "intake"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-constraint-packs",
+      "slug": "agi-constraint-packs",
+      "title": "Constraint Packs",
+      "excerpt": "Constraint pack routing and validation.",
+      "bodyMD": "Constraint pack endpoints and services (server/routes/agi.constraint-packs.ts, server/services/constraint-packs).\n\nMinimal artifact: constraint pack registry.",
+      "tags": [
+        "constraints",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-resilience",
+      "slug": "agi-resilience",
+      "title": "Resilience",
+      "excerpt": "Circuit breaker and failure controls.",
+      "bodyMD": "Circuit breaker controls (server/services/resilience/circuit-breaker.ts).\n\nMinimal artifact: resilience guard summary.",
+      "tags": [
+        "resilience",
+        "circuit"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-learning-loop",
+      "slug": "agi-learning-loop",
+      "title": "Learning Loop",
+      "excerpt": "Reflection and learning hooks.",
+      "bodyMD": "Learning reflection helpers (server/services/learning/reflect.ts).\n\nMinimal artifact: reflection loop summary.",
+      "tags": [
+        "learning",
+        "reflection"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        }
+      ]
+    },
+    {
+      "id": "agi-knowledge-compositor",
+      "slug": "agi-knowledge-compositor",
+      "title": "Knowledge Compositor",
+      "excerpt": "Knowledge bundles and prompt composition.",
+      "bodyMD": "Knowledge composition (server/services/planner/knowledge-compositor.ts, server/services/knowledge/merge.ts, server/config/knowledge.ts).\n\nMinimal artifact: knowledge compositor flow.",
+      "tags": [
+        "knowledge",
+        "compositor"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "knowledge-ingestion"
+        }
+      ]
+    }
+  ]
+}

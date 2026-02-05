@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "rootId": "telemetry-console-tree",
+  "nodes": [
+    {
+      "id": "telemetry-console-tree",
+      "slug": "telemetry-console-tree",
+      "title": "Telemetry and Console Tree",
+      "excerpt": "Console telemetry capture, storage, and observability hooks.",
+      "bodyMD": "This tree maps console telemetry capture, storage, and observability summaries that feed Helix Ask.\n\nMinimal artifact: telemetry dataflow map.",
+      "tags": [
+        "telemetry",
+        "console",
+        "observability"
+      ],
+      "children": [
+        "telemetry-console-routing",
+        "telemetry-console-storage",
+        "telemetry-console-client",
+        "telemetry-badges-panels",
+        "telemetry-observability",
+        "telemetry-casimir",
+        "telemetry-tests"
+      ],
+      "links": []
+    },
+    {
+      "id": "telemetry-console-routing",
+      "slug": "telemetry-console-routing",
+      "title": "Console Telemetry Routes",
+      "excerpt": "Telemetry endpoints for console snapshots.",
+      "bodyMD": "Console telemetry endpoints (server/routes/agi.plan.ts).\n\nMinimal artifact: console telemetry API map.",
+      "tags": [
+        "telemetry",
+        "routes",
+        "api"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "telemetry-console-tree"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-console-storage",
+      "slug": "telemetry-console-storage",
+      "title": "Console Telemetry Storage",
+      "excerpt": "Telemetry persistence and snapshot formats.",
+      "bodyMD": "Console telemetry storage (server/services/console-telemetry/store.ts, server/services/console-telemetry/persist.ts, server/services/console-telemetry/summarize.ts, server/_generated/console-telemetry.json, shared/desktop.ts).\n\nMinimal artifact: telemetry snapshot schema.",
+      "tags": [
+        "telemetry",
+        "storage",
+        "schemas"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "telemetry-console-tree"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-console-client",
+      "slug": "telemetry-console-client",
+      "title": "Client Telemetry Capture",
+      "excerpt": "Panel telemetry capture and push from the desktop UI.",
+      "bodyMD": "Client telemetry capture (client/src/lib/agi/consoleTelemetry.ts, client/src/lib/desktop/panelRegistry.ts, client/src/lib/desktop/panelTelemetryBus.ts).\n\nMinimal artifact: client telemetry capture flow.",
+      "tags": [
+        "telemetry",
+        "client",
+        "ui"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "telemetry-console-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-components-tree"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-badges-panels",
+      "slug": "telemetry-badges-panels",
+      "title": "Telemetry Badges and Panels",
+      "excerpt": "Telemetry summarizers and badge pipelines.",
+      "bodyMD": "Telemetry summarizers and panel utilities (server/services/telemetry/badges.ts, server/services/telemetry/panels.ts, server/skills/telemetry.badges.ts, server/skills/telemetry.panels.ts, shared/badge-telemetry.ts, shared/star-telemetry.ts).\n\nMinimal artifact: badge telemetry summary.",
+      "tags": [
+        "telemetry",
+        "badges",
+        "panels"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "telemetry-console-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "skills-tooling-tree"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-observability",
+      "slug": "telemetry-observability",
+      "title": "Observability Core",
+      "excerpt": "Telemetry adapters and observability stores.",
+      "bodyMD": "Observability services (server/services/observability/*, server/services/observability/constraint-pack-telemetry.ts, server/services/observability/tool-event-adapters.ts).\n\nMinimal artifact: observability store map.",
+      "tags": [
+        "telemetry",
+        "observability",
+        "stores"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "telemetry-console-tree"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-casimir",
+      "slug": "telemetry-casimir",
+      "title": "Casimir Telemetry",
+      "excerpt": "Casimir telemetry ingestion and persistence.",
+      "bodyMD": "Casimir telemetry integration (server/services/casimir/telemetry.ts, server/services/casimir/__tests__/casimir-telemetry.spec.ts).\n\nMinimal artifact: Casimir telemetry summary.",
+      "tags": [
+        "telemetry",
+        "casimir",
+        "physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "telemetry-console-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-tree"
+        }
+      ]
+    },
+    {
+      "id": "telemetry-tests",
+      "slug": "telemetry-tests",
+      "title": "Telemetry Tests",
+      "excerpt": "Telemetry regressions and console summary tests.",
+      "bodyMD": "Telemetry tests (tests/console-summary.spec.ts, server/services/casimir/__tests__/casimir-telemetry.spec.ts).\n\nMinimal artifact: telemetry test checklist.",
+      "tags": [
+        "telemetry",
+        "tests",
+        "console"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "telemetry-console-tree"
+        }
+      ]
+    }
+  ]
+}

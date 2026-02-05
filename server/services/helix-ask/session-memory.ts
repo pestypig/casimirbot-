@@ -35,6 +35,7 @@ export type HelixAskSessionMemory = {
   openSlots: string[];
   attemptHistory: HelixAskSessionAttempt[];
   recentTopics: string[];
+  graphTreeIds: string[];
   userPrefs: HelixAskSessionPrefs;
   updatedAt: number;
 };
@@ -88,10 +89,29 @@ const HELIX_ASK_SESSION_MAX_TOPICS = clampNumber(
   2,
   24,
 );
+const HELIX_ASK_SESSION_MAX_GRAPH_TREES = clampNumber(
+  readNumber(process.env.HELIX_ASK_SESSION_MAX_GRAPH_TREES, 6),
+  1,
+  12,
+);
 const HELIX_ASK_SESSION_PERSIST_PATH = process.env.HELIX_ASK_SESSION_PERSIST_PATH?.trim();
 
 const memory = new Map<string, HelixAskSessionMemory>();
 let persistInFlight: Promise<void> | null = null;
+
+const buildEmptyMemory = (now: number): HelixAskSessionMemory =>
+  ({
+    slots: {},
+    pinnedFiles: [],
+    lastClarifySlots: [],
+    resolvedConcepts: {},
+    openSlots: [],
+    attemptHistory: [],
+    recentTopics: [],
+    graphTreeIds: [],
+    userPrefs: {},
+    updatedAt: now,
+  } satisfies HelixAskSessionMemory);
 
 const safeParseMemory = (raw: string): Record<string, HelixAskSessionMemory> | null => {
   try {
@@ -153,6 +173,58 @@ export const getHelixAskSessionMemory = (
   return memory.get(sessionId) ?? null;
 };
 
+const normalizeGraphTreeIds = (treeIds: string[]): string[] =>
+  Array.from(new Set(treeIds.map((entry) => entry.trim()).filter(Boolean))).slice(
+    0,
+    HELIX_ASK_SESSION_MAX_GRAPH_TREES,
+  );
+
+const ensureSessionMemory = (sessionId: string): HelixAskSessionMemory => {
+  pruneMemory();
+  const existing = memory.get(sessionId);
+  if (existing) return existing;
+  const now = Date.now();
+  const fresh = buildEmptyMemory(now);
+  memory.set(sessionId, fresh);
+  return fresh;
+};
+
+export const getHelixAskSessionGraphLock = (sessionId?: string): string[] => {
+  if (!sessionId) return [];
+  pruneMemory();
+  const entry = memory.get(sessionId);
+  return entry?.graphTreeIds?.slice() ?? [];
+};
+
+export const setHelixAskSessionGraphLock = (args: {
+  sessionId?: string;
+  treeIds: string[];
+  mode?: "replace" | "merge";
+}): string[] => {
+  if (!args.sessionId) return [];
+  const record = ensureSessionMemory(args.sessionId);
+  const incoming = normalizeGraphTreeIds(args.treeIds);
+  const mode = args.mode ?? "replace";
+  const next =
+    mode === "merge"
+      ? normalizeGraphTreeIds([...(record.graphTreeIds ?? []), ...incoming])
+      : incoming;
+  record.graphTreeIds = next;
+  record.updatedAt = Date.now();
+  memory.set(args.sessionId, record);
+  persistMemoryToDisk();
+  return next;
+};
+
+export const clearHelixAskSessionGraphLock = (sessionId?: string): void => {
+  if (!sessionId) return;
+  const record = ensureSessionMemory(sessionId);
+  record.graphTreeIds = [];
+  record.updatedAt = Date.now();
+  memory.set(sessionId, record);
+  persistMemoryToDisk();
+};
+
 export const recordHelixAskSessionMemory = (args: {
   sessionId?: string;
   slots?: Array<{ id: string; label: string; aliases?: string[] }>;
@@ -162,24 +234,14 @@ export const recordHelixAskSessionMemory = (args: {
   openSlots?: string[];
   attempts?: string[];
   recentTopics?: string[];
+  graphTreeIds?: string[];
   userPrefs?: HelixAskSessionPrefs;
 }): void => {
   if (!args.sessionId) return;
   pruneMemory();
   const now = Date.now();
   const existing =
-    memory.get(args.sessionId) ??
-    ({
-      slots: {},
-      pinnedFiles: [],
-      lastClarifySlots: [],
-      resolvedConcepts: {},
-      openSlots: [],
-      attemptHistory: [],
-      recentTopics: [],
-      userPrefs: {},
-      updatedAt: now,
-    } satisfies HelixAskSessionMemory);
+    memory.get(args.sessionId) ?? buildEmptyMemory(now);
 
   const slots = { ...existing.slots };
   for (const slot of args.slots ?? []) {
@@ -255,6 +317,10 @@ export const recordHelixAskSessionMemory = (args: {
     new Set([...(existing.recentTopics ?? []), ...(args.recentTopics ?? [])].filter(Boolean)),
   ).slice(0, HELIX_ASK_SESSION_MAX_TOPICS);
 
+  const incomingGraphTrees = normalizeGraphTreeIds(args.graphTreeIds ?? []);
+  const graphTreeIds =
+    incomingGraphTrees.length > 0 ? incomingGraphTrees : existing.graphTreeIds ?? [];
+
   const userPrefs: HelixAskSessionPrefs = {
     ...(existing.userPrefs ?? {}),
     ...(args.userPrefs ?? {}),
@@ -268,6 +334,7 @@ export const recordHelixAskSessionMemory = (args: {
     openSlots,
     attemptHistory,
     recentTopics,
+    graphTreeIds,
     userPrefs,
     updatedAt: now,
   });
