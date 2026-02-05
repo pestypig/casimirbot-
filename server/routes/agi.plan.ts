@@ -11914,6 +11914,28 @@ const executeHelixAsk = async ({
       const reportBlocks = slotBlocks.length ? slotBlocks : buildReportBlocks(baseQuestion);
       const limitedBlocks = reportBlocks.slice(0, HELIX_ASK_REPORT_MAX_BLOCKS);
       const omittedCount = Math.max(0, reportBlocks.length - limitedBlocks.length);
+      const inferredReportReason = reportDecision.reason ?? "enabled";
+      const bypassSingleBlock =
+        (inferredReportReason === "multi_slot" || inferredReportReason === "slot_plan") &&
+        limitedBlocks.length <= 1;
+      if (bypassSingleBlock) {
+        if (debugPayload) {
+          debugPayload.report_mode = false;
+          debugPayload.report_mode_reason = "single_block_bypass";
+          debugPayload.report_blocks_count = limitedBlocks.length;
+          debugPayload.report_mode_bypass = {
+            reason: inferredReportReason,
+            block_count: limitedBlocks.length,
+          };
+        }
+        reportDecision = {
+          ...reportDecision,
+          enabled: false,
+          reason: "single_block_bypass",
+          blockCount: limitedBlocks.length,
+        };
+      }
+      if (!bypassSingleBlock) {
       const reportExplicitRepo =
         HELIX_ASK_REPO_FORCE.test(rawQuestion) ||
         HELIX_ASK_REPO_EXPECTS.test(rawQuestion) ||
@@ -12449,6 +12471,7 @@ const executeHelixAsk = async ({
       }
       responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
       return;
+      }
     }
     const hasFilePathHints = HELIX_ASK_FILE_HINT.test(baseQuestion);
     const explicitRepoExpectation =
