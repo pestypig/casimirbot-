@@ -6321,12 +6321,12 @@ const buildSlotQueryTerms = (slot: HelixAskSlotPlanEntry): string[] => {
 const hasDocSurface = (slot: HelixAskSlotPlanEntry): boolean =>
   Boolean(slot.surfaces?.some((surface) => DOC_SURFACES.has(surface)));
 
-const resolveDocRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
-  if (!slotPlan) return [];
-  return slotPlan.slots
-    .filter((slot) => slot.required && hasDocSurface(slot))
-    .map((slot) => slot.id);
-};
+  const resolveDocRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
+    if (!slotPlan) return [];
+    return slotPlan.slots
+      .filter((slot) => slot.required && hasDocSurface(slot) && isHardRequiredSlot(slot))
+      .map((slot) => slot.id);
+  };
 
   const resolveRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
     if (!slotPlan) return [];
