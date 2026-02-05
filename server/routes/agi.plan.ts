@@ -7128,13 +7128,53 @@ const isDefinitionDocPath = (filePath: string): boolean => {
 const isDefinitionQuestion = (question: string): boolean =>
   HELIX_ASK_DEFINITION_FOCUS.test(question);
 
-const DOC_PROOF_SPAN_RE = /\bSpan:\s*L\d+/i;
-const DOC_SECTION_LINE_RE = /\b(Section|Title|Heading|Subheading|Doc):\s+/i;
+  const DOC_PROOF_SPAN_RE = /\bSpan:\s*L\d+/i;
+  const DOC_SECTION_LINE_RE = /\b(Section|Title|Heading|Subheading|Doc):\s+/i;
 
-const selectDocBlocks = (
-  contextText: string,
-  definitionFocus: boolean,
-): { docBlocks: Array<{ path: string; block: string }>; proofSpanRate: number } => {
+  const resolveDefinitionDocBlocks = (
+    docBlocks: Array<{ path: string; block: string }>,
+    conceptMatch: HelixAskConceptMatch | null,
+    definitionFocus: boolean,
+  ): Array<{ path: string; block: string }> => {
+    if (!definitionFocus || docBlocks.length === 0) return docBlocks;
+    const normalize = (value: string) => value.replace(/\\/g, "/").toLowerCase();
+    const preferredPaths = new Set<string>();
+    if (conceptMatch?.card.sourcePath && isDefinitionDocPath(conceptMatch.card.sourcePath)) {
+      preferredPaths.add(normalize(conceptMatch.card.sourcePath));
+    }
+    if (preferredPaths.size > 0) {
+      const byPath = docBlocks.filter((block) =>
+        preferredPaths.has(normalize(block.path)),
+      );
+      if (byPath.length > 0) return byPath;
+    }
+    const termSet = new Set<string>();
+    const pushTerm = (term?: string) => {
+      const trimmed = term?.trim();
+      if (trimmed) termSet.add(trimmed);
+    };
+    if (conceptMatch?.card) {
+      pushTerm(conceptMatch.card.id);
+      pushTerm(conceptMatch.card.label);
+      (conceptMatch.card.aliases ?? []).forEach((alias) => pushTerm(alias));
+    }
+    const terms = Array.from(termSet).filter((term) => term.length > 2);
+    if (terms.length === 0) return docBlocks;
+    const escaped = terms
+      .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|");
+    if (!escaped) return docBlocks;
+    const termRe = new RegExp(`\\b(?:${escaped})\\b`, "i");
+    const byTerm = docBlocks.filter(
+      (block) => termRe.test(block.block) || termRe.test(block.path),
+    );
+    return byTerm.length > 0 ? byTerm : docBlocks;
+  };
+
+  const selectDocBlocks = (
+    contextText: string,
+    definitionFocus: boolean,
+  ): { docBlocks: Array<{ path: string; block: string }>; proofSpanRate: number } => {
   const blocks = splitAskContextBlocks(contextText);
   const docBlocksAll = blocks.filter((block) => /(^|\/)docs\//i.test(block.path));
   const docBlocks = definitionFocus
@@ -15947,24 +15987,31 @@ const executeHelixAsk = async ({
         } else if (!canAgentAct() && missingSlotsForCodeFirst) {
           markAgentStopIfBlocked();
         }
-        const repoDocsRequired =
-          requiresRepoEvidence ||
-          intentDomain === "repo" ||
-          intentDomain === "hybrid" ||
-          intentDomain === "falsifiable";
-        const definitionDocRequired = definitionFocus && repoDocsRequired;
-        const definitionDocOk = !definitionDocRequired || docBlocks.length > 0;
-        const definitionDocMissing = definitionDocRequired && !definitionDocOk;
-        if (debugPayload) {
-          debugPayload.definition_doc_required = definitionDocRequired;
-          debugPayload.definition_doc_ok = definitionDocOk;
-        }
-        docSlotCoverageFailed =
-          (repoDocsRequired &&
-            docSlotTargets.length > 0 &&
-            ((docSlotSummary?.missingSlots?.length ?? 0) > 0 ||
-              (minDocEvidenceCards > 0 && docBlocks.length < minDocEvidenceCards))) ||
-          definitionDocMissing;
+          const repoDocsRequired =
+            requiresRepoEvidence ||
+            intentDomain === "repo" ||
+            intentDomain === "hybrid" ||
+            intentDomain === "falsifiable";
+          const definitionDocRequired = definitionFocus && repoDocsRequired;
+          const definitionDocBlocks = resolveDefinitionDocBlocks(
+            docBlocks,
+            conceptMatch,
+            definitionFocus,
+          );
+          const definitionDocOk = !definitionDocRequired || definitionDocBlocks.length > 0;
+          const definitionDocMissing = definitionDocRequired && !definitionDocOk;
+          if (debugPayload) {
+            debugPayload.definition_doc_required = definitionDocRequired;
+            debugPayload.definition_doc_ok = definitionDocOk;
+            debugPayload.definition_doc_blocks = definitionDocBlocks.length;
+          }
+          docSlotCoverageFailed =
+            (repoDocsRequired &&
+              docSlotTargets.length > 0 &&
+              ((docSlotSummary?.missingSlots?.length ?? 0) > 0 ||
+                (minDocEvidenceCards > 0 &&
+                  definitionDocBlocks.length < minDocEvidenceCards))) ||
+            definitionDocMissing;
         if (docSlotCoverageFailed) {
           mustIncludeOk = false;
           evidenceGate = { ...evidenceGate, ok: false };
@@ -16214,34 +16261,46 @@ const executeHelixAsk = async ({
           ? contextText
           : [promptContextText, contextText].filter(Boolean).join("\n\n");
         let evidenceContextSource = combinedContext;
-        if (definitionFocus) {
-          const definitionDocContext = docBlocks.length
-            ? docBlocks.map((block) => block.block).join("\n\n")
-            : "";
-          const mergedDefinitionContext = [promptContextText, definitionDocContext]
-            .filter(Boolean)
-            .join("\n\n");
-          if (mergedDefinitionContext.trim()) {
-            evidenceContextSource = mergedDefinitionContext;
+          if (definitionFocus) {
+            const definitionDocBlocks = resolveDefinitionDocBlocks(
+              docBlocks,
+              conceptMatch,
+              definitionFocus,
+            );
+            const definitionDocContext = definitionDocBlocks.length
+              ? definitionDocBlocks.map((block) => block.block).join("\n\n")
+              : "";
+            const mergedDefinitionContext = [promptContextText, definitionDocContext]
+              .filter(Boolean)
+              .join("\n\n");
+            if (mergedDefinitionContext.trim()) {
+              evidenceContextSource = mergedDefinitionContext;
+            }
           }
-        }
-        const evidenceContext = clipAskText(
-          evidenceContextSource,
-          HELIX_ASK_SCAFFOLD_CONTEXT_CHARS,
-        );
-        const definitionEvidenceFiles = definitionFocus
-          ? contextFiles.filter((filePath) => isDefinitionDocPath(filePath))
-          : contextFiles;
-        const definitionEvidenceContext = definitionFocus
-          ? docBlocks.length
-            ? docBlocks.map((block) => block.block).join("\n\n")
-            : ""
-          : "";
-        const allowConceptFastPath =
-          conceptFastPath &&
-          conceptMatch &&
-          (!definitionFocus ||
-            (conceptMatch.card.sourcePath && isDefinitionDocPath(conceptMatch.card.sourcePath)));
+          const evidenceContext = clipAskText(
+            evidenceContextSource,
+            HELIX_ASK_SCAFFOLD_CONTEXT_CHARS,
+          );
+          const definitionDocBlocks = resolveDefinitionDocBlocks(
+            docBlocks,
+            conceptMatch,
+            definitionFocus,
+          );
+          const definitionEvidenceFiles = definitionFocus
+            ? definitionDocBlocks.length
+              ? definitionDocBlocks.map((block) => block.path)
+              : contextFiles.filter((filePath) => isDefinitionDocPath(filePath))
+            : contextFiles;
+          const definitionEvidenceContext = definitionFocus
+            ? definitionDocBlocks.length
+              ? definitionDocBlocks.map((block) => block.block).join("\n\n")
+              : ""
+            : "";
+          const allowConceptFastPath =
+            conceptFastPath &&
+            conceptMatch &&
+            (!definitionFocus ||
+              (conceptMatch.card.sourcePath && isDefinitionDocPath(conceptMatch.card.sourcePath)));
         if (allowConceptFastPath && conceptMatch) {
           const evidenceStart = Date.now();
           const conceptScaffold = buildConceptScaffold(conceptMatch);
@@ -16360,17 +16419,22 @@ const executeHelixAsk = async ({
         repoScaffold = mergeEvidenceScaffolds(repoScaffold, graphPack.scaffoldText);
       }
 
-      if (definitionFocus && repoScaffold) {
-        const filtered = filterEvidenceBulletsByPath(repoScaffold, isDefinitionDocPath);
-        repoScaffold = filtered;
-        const docEvidencePaths = extractFilePathsFromText(repoScaffold).filter(isDefinitionDocPath);
-        if ((!repoScaffold || docEvidencePaths.length === 0) && docBlocks.length > 0) {
-          const fallbackBullet = buildDefinitionDocBullet(docBlocks[0]);
-          repoScaffold = mergeEvidenceScaffolds(fallbackBullet, repoScaffold);
-        }
-        if (debugPayload) {
-          debugPayload.definition_doc_filtered = Boolean(filtered);
-          debugPayload.definition_doc_paths = docEvidencePaths.slice(0, 6);
+        if (definitionFocus && repoScaffold) {
+          const filtered = filterEvidenceBulletsByPath(repoScaffold, isDefinitionDocPath);
+          repoScaffold = filtered;
+          const docEvidencePaths = extractFilePathsFromText(repoScaffold).filter(isDefinitionDocPath);
+          const definitionDocBlocks = resolveDefinitionDocBlocks(
+            docBlocks,
+            conceptMatch,
+            definitionFocus,
+          );
+          if ((!repoScaffold || docEvidencePaths.length === 0) && definitionDocBlocks.length > 0) {
+            const fallbackBullet = buildDefinitionDocBullet(definitionDocBlocks[0]);
+            repoScaffold = mergeEvidenceScaffolds(fallbackBullet, repoScaffold);
+          }
+          if (debugPayload) {
+            debugPayload.definition_doc_filtered = Boolean(filtered);
+            debugPayload.definition_doc_paths = docEvidencePaths.slice(0, 6);
         }
       }
 
