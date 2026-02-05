@@ -13901,9 +13901,12 @@ const executeHelixAsk = async ({
             ...graphSeedSlots,
           ],
         });
+        const requiredSlotIds = resolveRequiredSlots(slotPlan);
         coverageSlots = coverageSlotsFromRequest
           ? requestCoverageSlots
-          : slotPlan.coverageSlots.slice();
+          : requiredSlotIds.length > 0
+            ? requiredSlotIds
+            : slotPlan.coverageSlots.slice();
         if (coverageSlotsFromRequest) {
           const scopedPlan = restrictSlotPlanToCoverage(slotPlan, coverageSlots);
           if (scopedPlan) {
