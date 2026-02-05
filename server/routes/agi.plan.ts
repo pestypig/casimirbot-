@@ -3289,14 +3289,19 @@ function logHelixAskProgress({
   if (!sessionId) return;
   const cleanedDetail = detail?.trim();
   const label = cleanedDetail ? `Helix Ask: ${stage} - ${cleanedDetail}` : `Helix Ask: ${stage}`;
+  const elapsedMs = typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0;
   appendToolLog({
     tool: HELIX_ASK_PROGRESS_TOOL,
     version: HELIX_ASK_PROGRESS_VERSION,
     paramsHash: hashHelixAskProgress(`${stage}:${cleanedDetail ?? ""}`),
-    durationMs: typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0,
+    durationMs: elapsedMs,
     sessionId,
     traceId,
     ok,
+    stage,
+    detail: cleanedDetail,
+    message: label,
+    meta: startedAt ? { elapsedMs } : undefined,
     text: label,
   });
 }
@@ -10084,6 +10089,10 @@ const ToolLogRecordSchema = z
     text: z.string().optional(),
     debateId: z.string().optional(),
     strategy: z.string().optional(),
+    stage: z.string().optional(),
+    detail: z.string().optional(),
+    message: z.string().optional(),
+    meta: z.record(z.unknown()).optional(),
   })
   .passthrough();
 const ToolEventSchema = z
@@ -11045,19 +11054,30 @@ const executeHelixAsk = async ({
     text?: string,
     startedAt?: number,
     ok = true,
+    meta?: Record<string, unknown>,
   ): void => {
     if (!askSessionId) return;
     const cleanedDetail = detail?.trim();
     const header = cleanedDetail ? `Helix Ask: ${stage} - ${cleanedDetail}` : `Helix Ask: ${stage}`;
     const body = clipEventText(text);
+    const elapsedMs = typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0;
+    const baseMeta =
+      reportContext?.blockIndex !== undefined
+        ? { blockIndex: reportContext.blockIndex, blockCount: reportContext.blockCount }
+        : undefined;
+    const mergedMeta = meta ? { ...(baseMeta ?? {}), ...meta } : baseMeta;
     appendToolLog({
       tool: HELIX_ASK_EVENT_TOOL,
       version: HELIX_ASK_EVENT_VERSION,
       paramsHash: hashHelixAskProgress(`event:${stage}:${cleanedDetail ?? ""}`),
-      durationMs: typeof startedAt === "number" ? Math.max(0, Date.now() - startedAt) : 0,
+      durationMs: elapsedMs,
       sessionId: askSessionId,
       traceId: askTraceId,
       ok,
+      stage,
+      detail: cleanedDetail,
+      message: header,
+      meta: mergedMeta,
       text: body ? `${header}\n${body}` : header,
     });
     pushLiveEvent({
@@ -14283,7 +14303,14 @@ const executeHelixAsk = async ({
               : [];
           }
           if (planScope?.docsFirst && docSlotTargets.length > 0) {
-            logEvent("Docs-first slots", `${docSlotTargets.length} slots`, docSlotTargets.join(","));
+            logEvent(
+              "Docs-first slots",
+              `${docSlotTargets.length} slots`,
+              docSlotTargets.join(","),
+              undefined,
+              true,
+              { slots: docSlotTargets.slice(0, 12) },
+            );
           }
           if (slotPlan && docSlotTargets.length > 0) {
             docSlotSummary = evaluateDocSlotCoverage(slotPlan, docBlocks, docSlotTargets);
@@ -14884,6 +14911,27 @@ const executeHelixAsk = async ({
           }
         }
         evidenceGateOk = evidenceGate.ok;
+        logEvent(
+          "Evidence gate",
+          evidenceGate.ok ? "ok" : "fail",
+          [
+            `ratio=${evidenceGate.matchRatio.toFixed(2)}`,
+            `count=${evidenceGate.matchCount}`,
+            `tokens=${evidenceGate.tokenCount}`,
+            `confidence=${retrievalConfidence.toFixed(2)}`,
+          ].join(" | "),
+          undefined,
+          evidenceGate.ok,
+          {
+            ratio: Number(evidenceGate.matchRatio.toFixed(3)),
+            count: evidenceGate.matchCount,
+            tokenCount: evidenceGate.tokenCount,
+            retrievalConfidence: Number(retrievalConfidence.toFixed(3)),
+            docShare: Number(docShare.toFixed(3)),
+            docHits: docsHits.length,
+            queryHitCount,
+          },
+        );
         if (debugPayload) {
           const evidenceTokensPreview = buildEvidenceEligibilityTokens(
             baseQuestion,
@@ -14947,6 +14995,13 @@ const executeHelixAsk = async ({
                   "Slot evidence",
                   "ok",
                   `docHits=${docHits}/${slotEvidence.length} aliasHits=${aliasHits}/${slotEvidence.length}`,
+                  undefined,
+                  true,
+                  {
+                    docHits,
+                    aliasHits,
+                    slotCount: slotEvidence.length,
+                  },
                 );
                 slotEvidenceLogged = true;
               }
@@ -14969,18 +15024,33 @@ const executeHelixAsk = async ({
               `ratio=${slotCoverage.ratio.toFixed(2)}`,
               slotCoverage.missing.length ? `missing=${slotCoverage.missing.join(",")}` : "missing=none",
             ].join(" | "),
+            undefined,
+            slotCoverageOk,
+            {
+              ratio: Number(slotCoverage.ratio.toFixed(3)),
+              missing: slotCoverage.missing,
+              required: slotCoverage.required,
+            },
           );
         }
         if (coverageSlotSummary && coverageSlotSummary.slots.length > 0) {
+          const coverageOk = coverageSlotSummary.missingSlots.length === 0;
           logEvent(
             "Coverage slots",
-            coverageSlotSummary.missingSlots.length ? "missing" : "ok",
+            coverageOk ? "ok" : "missing",
             [
               `ratio=${coverageSlotSummary.ratio.toFixed(2)}`,
               coverageSlotSummary.missingSlots.length
                 ? `missing=${coverageSlotSummary.missingSlots.join(",")}`
                 : "missing=none",
             ].join(" | "),
+            undefined,
+            coverageOk,
+            {
+              ratio: Number(coverageSlotSummary.ratio.toFixed(3)),
+              missing: coverageSlotSummary.missingSlots,
+              required: coverageSlotSummary.slots,
+            },
           );
         }
         logEvent(

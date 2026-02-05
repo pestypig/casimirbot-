@@ -1400,7 +1400,10 @@ export function HelixAskPill({
         });
         return;
       }
-      let text = (event.text ?? "").toString().trim();
+      let text = (event.message ?? event.text ?? "").toString().trim();
+      if (!text && event.stage) {
+        text = event.detail ? `${event.stage}: ${event.detail}` : event.stage;
+      }
       if (!text) {
         text = toolName || "Helix Ask update";
       }

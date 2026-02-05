@@ -24,6 +24,10 @@ export type ToolLogRecord = {
   sessionId?: string;
   traceId?: string;
   stepId?: string;
+  stage?: string;
+  detail?: string;
+  message?: string;
+  meta?: Record<string, unknown>;
   seed?: unknown;
   ok: boolean;
   error?: string;
@@ -105,6 +109,10 @@ export function appendToolLog(event: AppendEvent): ToolLogRecord {
     sessionId: event.sessionId,
     traceId: event.traceId,
     stepId: event.stepId,
+    stage: event.stage,
+    detail: event.detail,
+    message: event.message,
+    meta: event.meta,
     seed: normalizeSeed(event.seed),
     ok: event.ok,
     error: event.error,

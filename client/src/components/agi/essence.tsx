@@ -511,9 +511,15 @@ export default function EssenceConsole() {
         setDebateId(event.debateId);
       }
       const label =
-        typeof event.text === "string" && event.text.trim()
-          ? event.text.trim()
-          : `${event.tool ?? "tool"} ${event.ok === false ? "failed" : "finished"}`;
+        typeof event.message === "string" && event.message.trim()
+          ? event.message.trim()
+          : typeof event.text === "string" && event.text.trim()
+            ? event.text.trim()
+            : event.stage
+              ? event.detail
+                ? `${event.stage}: ${event.detail}`
+                : event.stage
+              : `${event.tool ?? "tool"} ${event.ok === false ? "failed" : "finished"}`;
       pushActivity(label, event.ok === false ? "error" : "info", "tool");
     });
     return stop;

@@ -11,6 +11,10 @@ export type ToolLogEvent = {
   essenceIds: string[];
   latency_ms?: number;
   debateId?: string;
+  stage?: string;
+  detail?: string;
+  message?: string;
+  meta?: Record<string, unknown>;
 };
 
 export function roleFromTool(tool?: string): DebateRole {
@@ -37,6 +41,16 @@ export function roleFromTool(tool?: string): DebateRole {
 export function normalizeEvent(e: any, activeTraceId?: string): ToolLogEvent | null {
   // Supports current tool-log SSE shape: {time, traceId, tool, status, text, essenceIds?, stepId?, latency_ms?}
   if (activeTraceId && e?.traceId && e.traceId !== activeTraceId) return null;
+  const message =
+    typeof e?.message === "string" && e.message.trim()
+      ? e.message
+      : typeof e?.text === "string" && e.text.trim()
+        ? e.text
+        : e?.stage
+          ? e.detail
+            ? `${e.stage}: ${e.detail}`
+            : e.stage
+          : JSON.stringify(e);
   return {
     id: e?.id ?? Date.now(),
     at: e?.time ?? new Date().toISOString(),
@@ -44,9 +58,13 @@ export function normalizeEvent(e: any, activeTraceId?: string): ToolLogEvent | n
     stepId: e?.stepId,
     tool: e?.tool ?? "tool",
     status: (e?.status === "ok" || e?.ok) ? "ok" : (e?.status === "error" ? "error" : "info"),
-    text: typeof e?.text === "string" ? e.text : JSON.stringify(e),
+    text: message,
     essenceIds: Array.isArray(e?.essenceIds) ? e.essenceIds : [],
     latency_ms: e?.latency_ms,
     debateId: typeof e?.debateId === "string" ? e.debateId : undefined,
+    stage: e?.stage,
+    detail: e?.detail,
+    message: e?.message,
+    meta: e?.meta,
   };
 }

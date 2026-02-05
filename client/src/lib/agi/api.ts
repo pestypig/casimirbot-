@@ -249,6 +249,10 @@ export type ToolLogEvent = {
   tool?: string;
   ok?: boolean;
   text?: string;
+  stage?: string;
+  detail?: string;
+  message?: string;
+  meta?: Record<string, unknown>;
   debateId?: string;
   promptHash?: string;
   paramsHash?: string;
