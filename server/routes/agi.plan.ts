@@ -5422,14 +5422,23 @@ const SLOT_PLAN_PASS_SCHEMA = z.object({
   clarify_candidates: z.array(z.string().min(1).max(120)).max(6).optional(),
 });
 
-const STRUCTURAL_SLOTS = new Set([
-  "definition",
-  "repo_mapping",
-  "verification",
-  "failure_path",
-  "flow",
-  "pipeline",
-]);
+  const STRUCTURAL_SLOTS = new Set([
+    "definition",
+    "repo_mapping",
+    "verification",
+    "failure_path",
+    "flow",
+    "pipeline",
+  ]);
+  
+  // Only sources with hard evidence can force required coverage slots.
+  const HARD_REQUIRED_SLOT_SOURCES = new Set<HelixAskSlotPlanEntry["source"]>([
+    "concept",
+    "memory",
+  ]);
+
+  const isHardRequiredSlot = (slot: HelixAskSlotPlanEntry): boolean =>
+    slot.required && !isWeakSlot(slot) && HARD_REQUIRED_SLOT_SOURCES.has(slot.source);
 
 const DOC_SURFACES = new Set(["docs", "knowledge", "ethos"]);
 const SLOT_PLAN_SURFACES = new Set([
@@ -6038,9 +6047,9 @@ const buildCanonicalSlotPlan = (args: {
     }
   }
   const slots = slotOrder.map((id) => slotMap.get(id)).filter(Boolean) as HelixAskSlotPlanEntry[];
-  const requiredSlots = slots.filter((slot) => slot.required && !isWeakSlot(slot));
-  return { slots, coverageSlots: requiredSlots.map((slot) => slot.id) };
-};
+    const requiredSlots = slots.filter(isHardRequiredSlot);
+    return { slots, coverageSlots: requiredSlots.map((slot) => slot.id) };
+  };
 
 const restrictSlotPlanToCoverage = (
   slotPlan: HelixAskSlotPlan | null,
@@ -6266,10 +6275,10 @@ const resolveDocRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] =>
     .map((slot) => slot.id);
 };
 
-const resolveRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
-  if (!slotPlan) return [];
-  return slotPlan.slots.filter((slot) => slot.required).map((slot) => slot.id);
-};
+  const resolveRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
+    if (!slotPlan) return [];
+    return slotPlan.slots.filter(isHardRequiredSlot).map((slot) => slot.id);
+  };
 
 const countSlotDocHits = (
   slot: HelixAskSlotPlanEntry,
@@ -14142,7 +14151,7 @@ const executeHelixAsk = async ({
             evidence_criteria: (slot.evidenceCriteria ?? []).slice(0, 4),
           }));
           debugPayload.slot_count = slotPlan.slots.length;
-          debugPayload.slot_required_count = slotPlan.slots.filter((slot) => slot.required).length;
+          debugPayload.slot_required_count = slotPlan.slots.filter(isHardRequiredSlot).length;
         }
 
         const searchSeed = blockScoped

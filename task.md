@@ -91,6 +91,23 @@ Acceptance:
 - claim_ledger marks a claim supported only if evidence_refs is non-empty.
 - telemetry reports grounded_rate, hypothesis_rate, clarify_rate, and clarify_resolved rate.
 
+### Phase 4 - Reasoning Contract (Hard vs Soft Signals)
+Goal: prevent noisy planner hints from forcing fail-closed coverage while keeping falsifiability strict.
+
+Contract:
+- **Hard required slots** only from concept matches or explicit `coverageSlots` in the request.
+- **Soft signals** (plan directives, headings, graph hints, query hints) can steer retrieval but never gate coverage.
+- Coverage gates operate on hard required slots only; soft signals affect ranking, not pass/fail.
+
+Implementation:
+- Filter required coverage slots by source (`concept`, explicit request).
+- Keep plan/directive slots advisory unless the user explicitly requests them.
+- Expose hard-required slots in debug to audit gating.
+
+Acceptance:
+- No fail-closed due to plan-pass or planner directives alone.
+- Coverage failures only when concept slots are missing evidence.
+
 ## Implementation Notes
 - Run a cheap preflight retrieval universally (trees + section index + shallow lexical).
 - Widen to full repo search only when coverage or evidence gates fail.
