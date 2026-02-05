@@ -7129,7 +7129,7 @@ const isDefinitionQuestion = (question: string): boolean =>
   HELIX_ASK_DEFINITION_FOCUS.test(question);
 
 const DOC_PROOF_SPAN_RE = /\bSpan:\s*L\d+/i;
-const DOC_SECTION_LINE_RE = /\bSection:\s+/i;
+const DOC_SECTION_LINE_RE = /\b(Section|Title|Heading|Subheading|Doc):\s+/i;
 
 const selectDocBlocks = (
   contextText: string,
@@ -16142,7 +16142,20 @@ const executeHelixAsk = async ({
           evidenceContextSource,
           HELIX_ASK_SCAFFOLD_CONTEXT_CHARS,
         );
-        if (conceptFastPath && conceptMatch) {
+        const definitionEvidenceFiles = definitionFocus
+          ? contextFiles.filter((filePath) => isDefinitionDocPath(filePath))
+          : contextFiles;
+        const definitionEvidenceContext = definitionFocus
+          ? docBlocks.length
+            ? docBlocks.map((block) => block.block).join("\n\n")
+            : ""
+          : "";
+        const allowConceptFastPath =
+          conceptFastPath &&
+          conceptMatch &&
+          (!definitionFocus ||
+            (conceptMatch.card.sourcePath && isDefinitionDocPath(conceptMatch.card.sourcePath)));
+        if (allowConceptFastPath && conceptMatch) {
           const evidenceStart = Date.now();
           const conceptScaffold = buildConceptScaffold(conceptMatch);
           const conceptSources = conceptMatch.card.sourcePath ? [conceptMatch.card.sourcePath] : [];
@@ -16152,7 +16165,16 @@ const executeHelixAsk = async ({
               debugPayload.context_files = contextFiles.slice();
             }
           }
-          repoScaffold = appendEvidenceSources(conceptScaffold, contextFiles, 6, contextText);
+          const conceptEvidenceFiles = definitionFocus
+            ? definitionEvidenceFiles
+            : contextFiles;
+          const conceptEvidenceContext = definitionFocus ? definitionEvidenceContext : contextText;
+          repoScaffold = appendEvidenceSources(
+            conceptScaffold,
+            conceptEvidenceFiles,
+            6,
+            conceptEvidenceContext,
+          );
           logProgress("Evidence cards ready", repoScaffold ? "concept" : "empty", evidenceStart);
           logEvent(
             "Evidence cards ready",
@@ -16207,7 +16229,9 @@ const executeHelixAsk = async ({
             repoScaffold = stripStageTags(repoScaffold);
           }
           if (repoScaffold) {
-            repoScaffold = appendEvidenceSources(repoScaffold, contextFiles, 6, contextText);
+            const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+            const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
+            repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
           }
           if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
             const missing = compositeRequiredFiles.filter(
