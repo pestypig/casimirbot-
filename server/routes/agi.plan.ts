@@ -5430,11 +5430,27 @@ const SLOT_PLAN_PASS_SCHEMA = z.object({
     "flow",
     "pipeline",
   ]);
-  
+
+  // Slot tiers for reasoning contract (A=hard, B=strong, C=soft).
+  const SLOT_TIER_SOURCES: Record<HelixAskSlotPlanEntry["source"], "A" | "B" | "C"> = {
+    concept: "A",
+    memory: "A",
+    memory_resolved: "A",
+    heading: "B",
+    graph: "B",
+    plan: "C",
+    plan_pass: "C",
+    token: "C",
+  };
+
+  const resolveSlotTier = (slot: HelixAskSlotPlanEntry): "A" | "B" | "C" =>
+    SLOT_TIER_SOURCES[slot.source] ?? "C";
+
   // Only sources with hard evidence can force required coverage slots.
   const HARD_REQUIRED_SLOT_SOURCES = new Set<HelixAskSlotPlanEntry["source"]>([
     "concept",
     "memory",
+    "memory_resolved",
   ]);
 
   const isHardRequiredSlot = (slot: HelixAskSlotPlanEntry): boolean =>
@@ -11491,10 +11507,21 @@ const executeHelixAsk = async ({
       retrieval_channel_top_scores?: AskCandidateChannelStats;
       retrieval_channel_weights?: AskCandidateChannelStats;
       doc_header_injected?: number;
-      slot_coverage_required?: string[];
-      slot_coverage_missing?: string[];
-      slot_coverage_ratio?: number;
-      slot_coverage_ok?: boolean;
+        slot_coverage_required?: string[];
+        slot_coverage_missing?: string[];
+        slot_coverage_ratio?: number;
+        slot_coverage_ok?: boolean;
+        hard_required_slots?: string[];
+        hard_required_slot_count?: number;
+        coverage_slots_source?: "request" | "concept" | "none";
+        slot_tiers?: Array<{
+          id: string;
+          label: string;
+          source: HelixAskSlotPlanEntry["source"];
+          required: boolean;
+          tier: "A" | "B" | "C";
+        }>;
+        slot_tier_counts?: { A: number; B: number; C: number };
       slot_doc_hit_rate?: number;
       slot_alias_coverage_rate?: number;
       slot_dominance_margin?: number;
@@ -14086,13 +14113,29 @@ const executeHelixAsk = async ({
             }
           }
         }
-        slotAliases = collectSlotAliasHints(slotPlan);
-        slotEvidenceHints = collectSlotEvidenceHints(slotPlan);
-        slotAliasMap = buildSlotAliasMap(slotPlan);
-        if (coverageSlotsFromRequest) {
-          const coverageSlotAliases = collectCoverageSlotAliases(slotAliasMap, coverageSlots);
-          if (
-            coverageSlotAliases.length > 0 ||
+          slotAliases = collectSlotAliasHints(slotPlan);
+          slotEvidenceHints = collectSlotEvidenceHints(slotPlan);
+          slotAliasMap = buildSlotAliasMap(slotPlan);
+          if (debugPayload) {
+            const tierCounts = { A: 0, B: 0, C: 0 } as { A: number; B: number; C: number };
+            const tierList = slotPlan.slots.map((slot) => {
+              const tier = resolveSlotTier(slot);
+              tierCounts[tier] += 1;
+              return {
+                id: slot.id,
+                label: slot.label,
+                source: slot.source,
+                required: slot.required,
+                tier,
+              };
+            });
+            debugPayload.slot_tiers = tierList.slice(0, 12);
+            debugPayload.slot_tier_counts = tierCounts;
+          }
+          if (coverageSlotsFromRequest) {
+            const coverageSlotAliases = collectCoverageSlotAliases(slotAliasMap, coverageSlots);
+            if (
+              coverageSlotAliases.length > 0 ||
             slotEvidenceHints.length > 0 ||
             graphHintTerms.length > 0
           ) {
@@ -14110,16 +14153,16 @@ const executeHelixAsk = async ({
             graphHintTerms,
           );
         }
-        if (slotPlan.slots.length > 0) {
-          const slotLabels = slotPlan.slots
-            .slice(0, 6)
-            .map((slot) => `${slot.id}${slot.required ? "" : "?"}`);
-          const suffix = slotPlan.slots.length > 6 ? "..." : "";
-          logEvent(
-            "Slot plan",
-            `${slotPlan.slots.length} slots`,
-            `${slotLabels.join(", ")}${suffix}`,
-          );
+          if (slotPlan.slots.length > 0) {
+            const slotLabels = slotPlan.slots
+              .slice(0, 6)
+              .map((slot) => `${slot.id}${slot.required ? "" : "?"}`);
+            const suffix = slotPlan.slots.length > 6 ? "..." : "";
+            logEvent(
+              "Slot plan",
+              `${slotPlan.slots.length} slots`,
+              `${slotLabels.join(", ")}${suffix}`,
+            );
           const optionalSlots = slotPlan.slots
             .filter((slot) => !slot.required && !isWeakSlot(slot))
             .map((slot) => slot.id);
@@ -14151,8 +14194,16 @@ const executeHelixAsk = async ({
             evidence_criteria: (slot.evidenceCriteria ?? []).slice(0, 4),
           }));
           debugPayload.slot_count = slotPlan.slots.length;
-          debugPayload.slot_required_count = slotPlan.slots.filter(isHardRequiredSlot).length;
-        }
+            const hardRequiredSlots = coverageSlots.slice(0, 12);
+            debugPayload.slot_required_count = slotPlan.slots.filter(isHardRequiredSlot).length;
+            debugPayload.hard_required_slots = hardRequiredSlots;
+            debugPayload.hard_required_slot_count = hardRequiredSlots.length;
+            debugPayload.coverage_slots_source = coverageSlotsFromRequest
+              ? "request"
+              : requiredSlotIds.length > 0
+                ? "concept"
+                : "none";
+          }
 
         const searchSeed = blockScoped
           ? blockSearchSeed || coverageSlots.join(" ")
