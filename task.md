@@ -103,6 +103,7 @@ Implementation:
 - Filter required coverage slots by source (`concept`, explicit request).
 - Keep plan/directive slots advisory unless the user explicitly requests them.
 - Expose hard-required slots in debug to audit gating.
+- Add slot tier observability (A/B/C) in debug payload.
 
 Acceptance:
 - No fail-closed due to plan-pass or planner directives alone.
