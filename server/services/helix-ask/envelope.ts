@@ -1,4 +1,5 @@
 import type {
+  HelixAskAnswerExtension,
   HelixAskEnvelopeMode,
   HelixAskEnvelopeSection,
   HelixAskProofEnvelope,
@@ -17,6 +18,8 @@ type HelixAskEnvelopeBuildInput = {
   evidenceText?: string;
   traceId?: string;
   treeWalk?: string;
+  extensionText?: string;
+  extensionCitations?: string[];
 };
 
 const isProofRef = (value: string) =>
@@ -231,6 +234,24 @@ const buildProofSection = (
   };
 };
 
+const buildExtensionEnvelope = (
+  extensionText: string | undefined,
+  extensionCitations: string[] | undefined,
+): HelixAskAnswerExtension | undefined => {
+  const body = extensionText?.trim();
+  if (!body) return undefined;
+  const refs = extensionCitations?.length
+    ? extensionCitations
+    : extractFilePathsFromText(body);
+  const citations = ensureUnique(refs).filter((value) => !isProofRef(value));
+  return {
+    available: true,
+    title: "Additional Repo Context",
+    body,
+    citations: citations.length ? citations : undefined,
+  };
+};
+
 export const buildHelixAskEnvelope = (
   input: HelixAskEnvelopeBuildInput,
 ): HelixAskResponseEnvelope => {
@@ -267,6 +288,7 @@ export const buildHelixAskEnvelope = (
           trace_ids: input.traceId ? [input.traceId] : undefined,
         }
       : undefined;
+  const extension = buildExtensionEnvelope(input.extensionText, input.extensionCitations);
 
   return {
     mode: input.mode,
@@ -275,6 +297,7 @@ export const buildHelixAskEnvelope = (
     answer: summary || answerText.trim() || input.answer.trim(),
     sections: sections.length ? sections : undefined,
     proof,
+    extension,
   };
 };
 

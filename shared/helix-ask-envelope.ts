@@ -26,6 +26,13 @@ export type HelixAskProofEnvelope = {
   trace_ids?: string[];
 };
 
+export type HelixAskAnswerExtension = {
+  available: boolean;
+  title?: string;
+  body?: string;
+  citations?: string[];
+};
+
 export type HelixAskResponseEnvelope = {
   mode: HelixAskEnvelopeMode;
   tier: HelixAskEnvelopeTier;
@@ -33,4 +40,5 @@ export type HelixAskResponseEnvelope = {
   answer: string;
   sections?: HelixAskEnvelopeSection[];
   proof?: HelixAskProofEnvelope;
+  extension?: HelixAskAnswerExtension;
 };

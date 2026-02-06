@@ -1304,6 +1304,9 @@ export default function DesktopPage() {
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
   const [askMoodBroken, setAskMoodBroken] = useState(false);
+  const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
+    {},
+  );
   const [askReplies, setAskReplies] = useState<
     Array<{
       id: string;
@@ -1778,7 +1781,7 @@ export default function DesktopPage() {
   );
 
   const renderHelixAskEnvelope = useCallback(
-    (reply: { content: string; envelope?: HelixAskResponseEnvelope }) => {
+    (reply: { id?: string; content: string; envelope?: HelixAskResponseEnvelope }) => {
       if (!reply.envelope) {
         return (
           <p className="whitespace-pre-wrap leading-relaxed">
@@ -1789,11 +1792,46 @@ export default function DesktopPage() {
       const sections = reply.envelope.sections ?? [];
       const detailSections = sections.filter((section) => section.layer !== "proof");
       const proofSections = sections.filter((section) => section.layer === "proof");
+      const extension = reply.envelope.extension;
+      const extensionBody = extension?.body?.trim() ?? "";
+      const extensionCitations = extension?.citations ?? [];
+      const extensionAvailable = Boolean(extension?.available && extensionBody);
+      const replyId = reply.id ?? "";
+      const extensionOpen = replyId ? Boolean(askExtensionOpenByReply[replyId]) : false;
       return (
         <div className="space-y-3">
           <p className="whitespace-pre-wrap leading-relaxed">
             {renderHelixAskContent(reply.envelope.answer)}
           </p>
+          {extensionAvailable ? (
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+              <button
+                type="button"
+                className="text-[10px] uppercase tracking-[0.22em] text-slate-400 hover:text-slate-200"
+                onClick={() => {
+                  if (!replyId) return;
+                  setAskExtensionOpenByReply((prev) => ({
+                    ...prev,
+                    [replyId]: !prev[replyId],
+                  }));
+                }}
+              >
+                {extensionOpen ? "Hide Additional Repo Context" : "Expand With Retrieved Evidence"}
+              </button>
+              {extensionOpen ? (
+                <div className="mt-2 space-y-1">
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    {renderHelixAskContent(extensionBody)}
+                  </p>
+                  {extensionCitations.length > 0 ? (
+                    <p className="text-[11px] text-slate-400">
+                      Sources: {renderHelixAskContent(extensionCitations.join(", "))}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {detailSections.length > 0 ? (
             <details
               open
@@ -1819,7 +1857,7 @@ export default function DesktopPage() {
         </div>
       );
     },
-    [renderEnvelopeSections, renderHelixAskContent],
+    [askExtensionOpenByReply, renderEnvelopeSections, renderHelixAskContent],
   );
 
   const buildCopyText = useCallback(
@@ -1830,6 +1868,10 @@ export default function DesktopPage() {
       const detailSections = sections.filter((section) => section.layer !== "proof");
       const proofSections = sections.filter((section) => section.layer === "proof");
       const chunks: string[] = [reply.envelope.answer];
+      const extensionBody = reply.envelope.extension?.body?.trim();
+      if (extensionBody) {
+        chunks.push(`Additional Repo Context\n${extensionBody}`);
+      }
       if (detailSections.length > 0) {
         const detailText = formatEnvelopeSectionsForCopy(detailSections, "Details");
         if (detailText) {
