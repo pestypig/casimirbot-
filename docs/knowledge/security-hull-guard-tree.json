@@ -48,7 +48,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/security-hull-guard-tree.json"
+          "path": "docs/knowledge/security-hull-guard-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5df465f01c91845b2a96fcee98417d529648accfd064c309810f494492c97471"
         }
       ]
     },
@@ -75,11 +77,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/auth/tenant.ts"
+          "path": "server/auth/tenant.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e3002bb5215f7170382146304f5e415ae561d72292c1c0ab45c565d823d80c09"
         },
         {
           "type": "code",
-          "path": "server/auth/policy.ts"
+          "path": "server/auth/policy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6df2822ec7f0315aa379efd03aeb54e1e9fadfe0d95c7042b5d48d8d3ec9bcde"
         }
       ],
       "inputs": [],
@@ -126,11 +132,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/security/hull-guard.ts"
+          "path": "server/security/hull-guard.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3e33733155ad8006f5ca7cf379315d58e2089992e18abb8cb2d3c844da2cfcaa"
         },
         {
           "type": "code",
-          "path": "shared/hull-basis.ts"
+          "path": "shared/hull-basis.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f19365f9bfce9303b0061b6835f42f55413e3686aa3242f06197760f6f3ad2b6"
         }
       ],
       "inputs": [],
@@ -177,15 +187,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/hull.status.ts"
+          "path": "server/routes/hull.status.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:afda7f3b93adb7c2ec3897676ad1383b0949b0f08398b09034c58c36a585f3f9"
         },
         {
           "type": "code",
-          "path": "server/routes/hull.capsules.ts"
+          "path": "server/routes/hull.capsules.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:67dc59f9bf63af3362a92e63986fb12be83ce86f8c35de8d8de09e8b7b4f338e"
         },
         {
           "type": "code",
-          "path": "server/routes/hull-preview.ts"
+          "path": "server/routes/hull-preview.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bf6a4589238604c53633b3305eb9d869a7adaa4b9cc6612173639f3ed3f6b53b"
         }
       ],
       "inputs": [],
@@ -236,23 +252,33 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/lib/hull-guardrails.ts"
+          "path": "client/src/lib/hull-guardrails.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:90daa7c41a1c7474bdf10ac3b421be17d47819a17dcb5d915f91f10a30969f10"
         },
         {
           "type": "code",
-          "path": "client/src/lib/hull-hud.ts"
+          "path": "client/src/lib/hull-hud.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e4d3cf1645a2ece36f64c6f69b3a896b856b3d10ce19f356268d5ab14ebbeff4"
         },
         {
           "type": "code",
-          "path": "client/src/lib/hull-metrics.ts"
+          "path": "client/src/lib/hull-metrics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:de23d3205304a7c91174ff82294a240e4139c1ebcc4ad4aa204ffe7ac189ca24"
         },
         {
           "type": "code",
-          "path": "client/src/lib/resolve-hull-dims.ts"
+          "path": "client/src/lib/resolve-hull-dims.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4bb3584a8a0e774044e9d4c22928a8fa76fa90369772d83f540c01c6fcb838c6"
         },
         {
           "type": "code",
-          "path": "client/src/lib/hull-assets.ts"
+          "path": "client/src/lib/hull-assets.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc000f4a1f3b6116440920ed7b4cecda1de29475c9089b47829c9d336747c52"
         }
       ],
       "inputs": [],
@@ -299,27 +325,39 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/guarded-casimir-tile-code-mapped.md"
+          "path": "docs/guarded-casimir-tile-code-mapped.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c89daf1192841702019265493aa762724e7110caef2c5bfdbd7e9a8624d16013"
         },
         {
           "type": "doc",
-          "path": "docs/qi-guard-consolidation.md"
+          "path": "docs/qi-guard-consolidation.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e115fb0bbecf347f9e6413ec8aae30f81a4a5f23d50cd24f34053b62656dddc3"
         },
         {
           "type": "doc",
-          "path": "docs/needle-hull-materials.md"
+          "path": "docs/needle-hull-materials.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8da2ac247398167001d7713e0b914d01db685f2ac9dd5ef491f41394df84579b"
         },
         {
           "type": "doc",
-          "path": "docs/needle-hull-mainframe.md"
+          "path": "docs/needle-hull-mainframe.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2c451d31bbd554b5a3dd10bfabf958613a275a78c76d9e846d5adc193baf15cf"
         },
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/metric-integrity-guardrail.md"
+          "path": "docs/zen-society/templates/artifacts/metric-integrity-guardrail.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:08e8318367d52c5d222bd2735fc8bbf62522a016b91fe2abd0d73a3a496549fa"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/no-bypass-guardrail.md"
+          "path": "docs/knowledge/ethos/no-bypass-guardrail.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:be17b7cba352865717f31d299349f4374204378b6d2b6bcf50c34b9ca5c9b02b"
         }
       ],
       "inputs": [],
@@ -366,7 +404,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/middleware/concurrency-guard.ts"
+          "path": "server/middleware/concurrency-guard.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7ec1e95118c09860e44a609bc73df6ad58f22ad8a7fdd549841ac68bbd864bdc"
         }
       ],
       "inputs": [],
@@ -413,27 +453,39 @@
       "evidence": [
         {
           "type": "test",
-          "path": "tests/hull-guard.spec.ts"
+          "path": "tests/hull-guard.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d77668cf3d0347d078d15266efc8996471c1f240ecb6f3a3dbea5d86aed0ff16"
         },
         {
           "type": "test",
-          "path": "tests/hull-capsules.spec.ts"
+          "path": "tests/hull-capsules.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e56991435adb6110b70d3708057c42a0937c06cf30f07dfc925b4d8b2c5cab75"
         },
         {
           "type": "test",
-          "path": "tests/hull-tools.spec.ts"
+          "path": "tests/hull-tools.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7db3cae679e7f1e9a6faecfe117763c099965b7009ed937d5353d6088a53a8af"
         },
         {
           "type": "test",
-          "path": "tests/hull-status.spec.ts"
+          "path": "tests/hull-status.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1e276115da6f79ea7730e777bbe403febf0db9cebe8e7da4b674bb06c22219ff"
         },
         {
           "type": "test",
-          "path": "tests/qi-guardrail.spec.ts"
+          "path": "tests/qi-guardrail.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3f6dc2f23682bf79c5b540d0b33610f0319f271d58bcb58766724b1023e1df41"
         },
         {
           "type": "test",
-          "path": "tests/pipeline-ts-qi-guard.spec.ts"
+          "path": "tests/pipeline-ts-qi-guard.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0d0eb32651ea425f329b16bc4e6502c1e1181550b6e29e0e7447af43805090bb"
         }
       ],
       "inputs": [],

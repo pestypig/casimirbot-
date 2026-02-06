@@ -46,7 +46,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/zen-ladder-pack-tree.json"
+          "path": "docs/knowledge/zen-ladder-pack-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fda31e688a2a4f57ec6396fee49cfd55ccfb3b72755f77e1c33ed3bce8e04a59"
         }
       ]
     },
@@ -75,7 +77,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/README.md"
+          "path": "docs/zen-ladder-pack/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:82dc22a90d64f81990b2cf9300d0991ba29858934803e4cc9840172a4359d672"
         }
       ],
       "inputs": [],
@@ -121,7 +125,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/README.md"
+          "path": "docs/zen-ladder-pack/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:82dc22a90d64f81990b2cf9300d0991ba29858934803e4cc9840172a4359d672"
         }
       ],
       "inputs": [],
@@ -168,7 +174,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/deck/deck-outline.md"
+          "path": "docs/zen-ladder-pack/deck/deck-outline.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:65ab40db79cab25d6cc419a10f2d340ec2fb07d58495922c3a493bc6502b6f0f"
         }
       ],
       "inputs": [],
@@ -215,7 +223,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/memo/policy-memo.md"
+          "path": "docs/zen-ladder-pack/memo/policy-memo.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ca1d230502c54f508589bba7cad0ff3d81bb95fe2309e86c64e4077c3665303e"
         }
       ],
       "inputs": [],
@@ -289,7 +299,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/zen-ladder-pack-tree.json"
+          "path": "docs/knowledge/zen-ladder-pack-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fda31e688a2a4f57ec6396fee49cfd55ccfb3b72755f77e1c33ed3bce8e04a59"
         }
       ]
     },
@@ -316,7 +328,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/templates/artifacts/coi-disclosure.md"
+          "path": "docs/zen-ladder-pack/templates/artifacts/coi-disclosure.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6d9b72553328dcff72f9f33d468b0bdc8e8655e7daa03c53a39c8ac9c85ec9dd"
         }
       ],
       "inputs": [],
@@ -363,7 +377,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/templates/artifacts/interview-log.md"
+          "path": "docs/zen-ladder-pack/templates/artifacts/interview-log.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:076a84abd9ca2125ba22d67f3b5909b6784c15fe7cbabf2eaa4ce4fe59384f05"
         }
       ],
       "inputs": [],
@@ -410,7 +426,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/templates/artifacts/pilot-log.md"
+          "path": "docs/zen-ladder-pack/templates/artifacts/pilot-log.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f06f9b85354ca053ce8fa7d3bf197695b7b2ad3660190784df217ebe5818521e"
         }
       ],
       "inputs": [],
@@ -457,7 +475,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/templates/artifacts/privacy-minimization.md"
+          "path": "docs/zen-ladder-pack/templates/artifacts/privacy-minimization.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:69aef0f4a852ddb68e5a1a923840fc45ee9bfb081b654af7656a894fbaa677b8"
         }
       ],
       "inputs": [],
@@ -504,7 +524,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/templates/artifacts/safety-precheck.md"
+          "path": "docs/zen-ladder-pack/templates/artifacts/safety-precheck.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8bd11bac1def72f9de34f652fecd5568ce2da4af61a1b14dacd069d536247c62"
         }
       ],
       "inputs": [],
@@ -551,7 +573,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/templates/artifacts/unit-econ.md"
+          "path": "docs/zen-ladder-pack/templates/artifacts/unit-econ.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bd1c387d431fc19d525a5d80708aa2ee1f011685117a10a9a2344c9dce807e5d"
         }
       ],
       "inputs": [],
@@ -621,7 +645,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/zen-ladder-pack-tree.json"
+          "path": "docs/knowledge/zen-ladder-pack-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fda31e688a2a4f57ec6396fee49cfd55ccfb3b72755f77e1c33ed3bce8e04a59"
         }
       ]
     },
@@ -648,7 +674,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/templates/receipts/curiosity-receipt.md"
+          "path": "docs/zen-ladder-pack/templates/receipts/curiosity-receipt.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:222a515db4263de590f0e1e944a5b07ee47a389f6c72002d19fbbd64a88a77f3"
         }
       ],
       "inputs": [],
@@ -695,7 +723,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-ladder-pack/templates/receipts/rung-decision-receipt.md"
+          "path": "docs/zen-ladder-pack/templates/receipts/rung-decision-receipt.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6956057401a48933fbae827c17c261f0902098e062a6a7eeb7ea25a421a42d3d"
         }
       ],
       "inputs": [],

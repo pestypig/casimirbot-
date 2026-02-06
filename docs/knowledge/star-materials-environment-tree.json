@@ -47,7 +47,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/star-materials-environment-tree.json"
+          "path": "docs/knowledge/star-materials-environment-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ad9f9072fab58ff18a329f94027ae8a54ab1e560919b00b30e32f6bef77e5c57"
         }
       ]
     },
@@ -74,15 +76,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/star.ts"
+          "path": "server/routes/star.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d2fd65713453c2bcbe3e25c7f65e513e53d0f157e0baffe77baefb00c271e3e4"
         },
         {
           "type": "code",
-          "path": "server/routes/star-watcher.ts"
+          "path": "server/routes/star-watcher.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d6c0835d61b79e6852a0bd4c2f4a1e21718075e0df49ad23fde3ebf027ae232e"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.star.ts"
+          "path": "server/routes/agi.star.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:75f944a7c59bb1dcfc542c652f740057987ba6e4b1886f97f778718db4f11014"
         }
       ],
       "inputs": [],
@@ -133,15 +141,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/models/star.ts"
+          "path": "client/src/models/star.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f426b13a034079b58ab04e3a4515ab5256d6cbe0f1e0aff0c3533f9d55dad02f"
         },
         {
           "type": "code",
-          "path": "shared/star-telemetry.ts"
+          "path": "shared/star-telemetry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:08cee2fa3d4507f29eb57fb6eb010e5dd26cd30f7338172d34c7322c5e2f494f"
         },
         {
           "type": "code",
-          "path": "server/__tests__/star-equilibrium.spec.ts"
+          "path": "server/__tests__/star-equilibrium.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:47e86e17665923c85026cbef024fd7bed5bb5378e536c441a8ced17a733a2df7"
         }
       ],
       "inputs": [],
@@ -188,15 +202,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/essence/solar-energy-adapter.ts"
+          "path": "server/services/essence/solar-energy-adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d697f8b19c99424e313b84427e746ee062be1f01d39b2b9ee88ffeba934133fe"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-guardrails.ts"
+          "path": "server/services/essence/solar-guardrails.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9330dbfb31220ec2fdacc69e7aca4b40e5d9d6c67d7b848e18f4c559668c0041"
         },
         {
           "type": "code",
-          "path": "shared/solar-guardrails.ts"
+          "path": "shared/solar-guardrails.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6762c0e3631ae1650783541de2f385c9c56765c7b478f89e825c837512bde4d4"
         },
         {
           "type": "code",
@@ -204,7 +224,9 @@
         },
         {
           "type": "code",
-          "path": "client/src/lib/solar-adapter.ts"
+          "path": "client/src/lib/solar-adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:473a13474352385ca1a92d17ad62b5c667bbd55fde5c7c91cc61e05be05419a5"
         }
       ],
       "inputs": [],
@@ -251,15 +273,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/environment-model.ts"
+          "path": "shared/environment-model.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:87fa01e4cb5084d81245857b39a6da10043b9fa8069a84c27e679cc5d914454a"
         },
         {
           "type": "code",
-          "path": "server/services/essence/environment.ts"
+          "path": "server/services/essence/environment.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a5ef85d8c2b5fe415161ff99d729604d62d65a6807986f6df832436bc521d9ef"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/009_essence_environment.ts"
+          "path": "server/db/migrations/009_essence_environment.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f3798b5b7c7bd48bec829463419f8693d2c9b2e888644349937543cf0e1ef105"
         }
       ],
       "inputs": [],
@@ -322,7 +350,9 @@
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/star-hydrostatic.md"
+          "path": "docs/knowledge/star-hydrostatic.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f4793a3af3a501f7be4c63f466779eda81866914aa4a6d7222afbfc829c16a4a"
         }
       ],
       "inputs": [],
@@ -373,23 +403,33 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/needle-hull-materials.md"
+          "path": "docs/needle-hull-materials.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8da2ac247398167001d7713e0b914d01db685f2ac9dd5ef491f41394df84579b"
         },
         {
           "type": "doc",
-          "path": "docs/needle-hull-mainframe.md"
+          "path": "docs/needle-hull-mainframe.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2c451d31bbd554b5a3dd10bfabf958613a275a78c76d9e846d5adc193baf15cf"
         },
         {
           "type": "doc",
-          "path": "docs/hull-glb-next-steps.md"
+          "path": "docs/hull-glb-next-steps.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7da33dd676b1921562c45b2194708444a3bd1e0f3aeaa439d4ab66b64309ab45"
         },
         {
           "type": "code",
-          "path": "client/src/lib/hull-metrics.ts"
+          "path": "client/src/lib/hull-metrics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:de23d3205304a7c91174ff82294a240e4139c1ebcc4ad4aa204ffe7ac189ca24"
         },
         {
           "type": "code",
-          "path": "client/src/lib/hull-assets.ts"
+          "path": "client/src/lib/hull-assets.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc000f4a1f3b6116440920ed7b4cecda1de29475c9089b47829c9d336747c52"
         },
         {
           "type": "code",

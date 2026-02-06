@@ -46,7 +46,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/ethos-knowledge-tree.json"
+          "path": "docs/knowledge/ethos/ethos-knowledge-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5c11bf4664208fe19b5008f5459bd985bc19cb0eb21508727d13b0d4f7a520d0"
         }
       ]
     },
@@ -364,7 +366,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/integrity-protocols.md"
+          "path": "docs/knowledge/ethos/integrity-protocols.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a35405bee0b19374f820829e5a3fbdac0bfdcf1f23dc1a1ec1d54fe15690362b"
         }
       ],
       "inputs": [],
@@ -411,7 +415,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/metric-integrity-guardrail.md"
+          "path": "docs/knowledge/ethos/metric-integrity-guardrail.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3227eacb5188ddb0c20f94f357bf0df4b07dcc2b5b4e66c4eec122671b2b0782"
         }
       ],
       "inputs": [],
@@ -458,7 +464,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/external-interface-integrity.md"
+          "path": "docs/knowledge/ethos/external-interface-integrity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4dbe3bf00252b2ca03c7bf5bcc9b920bd2667a8bc9e4cb34a34be5a7b2d2c2e0"
         }
       ],
       "inputs": [],
@@ -505,7 +513,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/voice-integrity.md"
+          "path": "docs/knowledge/ethos/voice-integrity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:599c14556fad1acd3fa9b1bccfa75bf0f8cd0628a4dbd8b318a8cce97c913781"
         }
       ],
       "inputs": [],
@@ -552,7 +562,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/worldview-integrity.md"
+          "path": "docs/knowledge/ethos/worldview-integrity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7760a1af5913d3e2c70af37b4ba8f349376397d72837636fd2208377bf60f913"
         }
       ],
       "inputs": [],
@@ -599,7 +611,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/dream-integrity.md"
+          "path": "docs/knowledge/ethos/dream-integrity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:564cab48d380b6a95330d2a2434667fb11265e91e0dc74d92601706e4bc80a65"
         }
       ],
       "inputs": [],
@@ -646,7 +660,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/verification-checklist.md"
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
         }
       ],
       "inputs": [],
@@ -693,7 +709,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/training-certification-gate.md"
+          "path": "docs/knowledge/ethos/training-certification-gate.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1cf1b7ed15d34899c3fa363469494515bb1d9e0e732c1fd29d2fb10c481584d6"
         }
       ],
       "inputs": [],
@@ -740,7 +758,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/provenance-protocol.md"
+          "path": "docs/knowledge/ethos/provenance-protocol.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:506cfb8f8b513d95dec6b81113b47fb01ec5361ec17d4f0a06eb1414bc608e31"
         }
       ],
       "inputs": [],
@@ -787,7 +807,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/no-bypass-guardrail.md"
+          "path": "docs/knowledge/ethos/no-bypass-guardrail.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:be17b7cba352865717f31d299349f4374204378b6d2b6bcf50c34b9ca5c9b02b"
         }
       ],
       "inputs": [],
@@ -834,7 +856,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/lawful-interface-protocol.md"
+          "path": "docs/knowledge/ethos/lawful-interface-protocol.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2c522a3b1a0513a58a9fdc93f09935c72612cdbc59371082e430130e6cc03af6"
         }
       ],
       "inputs": [],
@@ -881,7 +905,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/liveness-or-it-didnt-happen.md"
+          "path": "docs/knowledge/ethos/liveness-or-it-didnt-happen.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0684221604b6d811d301cfee2e2938c0151415b094227076fb329a3fed9f76c9"
         }
       ],
       "inputs": [],
@@ -928,7 +954,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/data-dignity.md"
+          "path": "docs/knowledge/ethos/data-dignity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:080756827847a4893e3a088677a7a69ad1ba4ef424ec58f19f2c24218d532b53"
         }
       ],
       "inputs": [],
@@ -975,7 +1003,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/values-over-images.md"
+          "path": "docs/knowledge/ethos/values-over-images.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b0ec20ceb420b45ec1cb67d4615490961f2ecfae92020f045cb2c4fd975af77b"
         }
       ],
       "inputs": [],
@@ -1022,7 +1052,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/capability-ambition-gradient.md"
+          "path": "docs/knowledge/ethos/capability-ambition-gradient.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:451cb93e5e8668cae9d39e30e0b7734b36a5d1dfb275f587d3d71587123a4b81"
         }
       ],
       "inputs": [],
@@ -1069,7 +1101,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/mission-ethos.md"
+          "path": "docs/knowledge/ethos/mission-ethos.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9fe08823eba41a68bb24b3ebe5386725326d1cef354528c816f1edebfd870615"
         }
       ],
       "inputs": [],
@@ -1116,7 +1150,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/integration-ladder.md"
+          "path": "docs/knowledge/ethos/integration-ladder.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a399f7dbc43fd92422044933f4a9e9990ad0ee067a9a759c54422f20fc25fc62"
         }
       ],
       "inputs": [],
@@ -1163,7 +1199,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/two-key-approval.md"
+          "path": "docs/knowledge/ethos/two-key-approval.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:451da0b0334bd39044c02e5de63631fada478357cccab62e56cf1e4791df51b3"
         }
       ],
       "inputs": [],
@@ -1210,7 +1248,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/stewardship-ledger.md"
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
         }
       ],
       "inputs": [],
@@ -1257,7 +1297,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/lifetime-trust-ledger.md"
+          "path": "docs/knowledge/ethos/lifetime-trust-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3d5e07d9426d91d980b08bcc893ab1ea27ab4ae84222b63db762500341281f63"
         }
       ],
       "inputs": [],
@@ -1304,7 +1346,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/citizens-arc.md"
+          "path": "docs/knowledge/ethos/citizens-arc.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f3732ab491c7296289d0b35ce7bc8f30cc741e29cc634541323ce476c75af7fe"
         }
       ],
       "inputs": [],
@@ -1351,7 +1395,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/citizens-arc-anti-mutation.md"
+          "path": "docs/knowledge/ethos/citizens-arc-anti-mutation.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f42f8ae7405d13b4873db3277350df620b4d837596d8a01cfe58029edcc5aa64"
         }
       ],
       "inputs": [],
@@ -1398,7 +1444,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/citizens-arc-stress-test.md"
+          "path": "docs/knowledge/ethos/citizens-arc-stress-test.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c917e9eb24ad5b16a646132a85c39ccce544213c0f2695f8783ac6f2b6897581"
         }
       ],
       "inputs": [],
@@ -1445,7 +1493,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/civic-memory-continuity.md"
+          "path": "docs/knowledge/ethos/civic-memory-continuity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fac01558c24165a1d1cad5cbb23fd9cf254c6679d499f51d7e48490a78f06b84"
         }
       ],
       "inputs": [],
@@ -1492,7 +1542,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/civic-signal-loop.md"
+          "path": "docs/knowledge/ethos/civic-signal-loop.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6b10216435a6f548b15ae26119c3be4eb4851a6fb1517095ed1518de67608b81"
         }
       ],
       "inputs": [],
@@ -1539,7 +1591,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/federal-civic-listening-circuit.md"
+          "path": "docs/knowledge/ethos/federal-civic-listening-circuit.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4ee885b8ba91b114215a5e1cab2ec6035c80c5f2181201de5a4a701720167a96"
         }
       ],
       "inputs": [],
@@ -1586,7 +1640,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/jurisdictional-floor.md"
+          "path": "docs/knowledge/ethos/jurisdictional-floor.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:21d94fdec461d77c66278b653507a52e8930c834f40573d80155df3bc4779173"
         }
       ],
       "inputs": [],
@@ -1633,7 +1689,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/local-stability-compact.md"
+          "path": "docs/knowledge/ethos/local-stability-compact.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:31bf366310d262de02939711a941bce50e1b0fb18ff97c69863ff38e0320c6be"
         }
       ],
       "inputs": [],
@@ -1680,7 +1738,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/koan-governance.md"
+          "path": "docs/knowledge/ethos/koan-governance.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:928337d38dfcf3e6d3f5e0255c0744b26a259f9ea63ad1285379718637ad0af1"
         }
       ],
       "inputs": [],
@@ -1727,7 +1787,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/sangha-architecture.md"
+          "path": "docs/knowledge/ethos/sangha-architecture.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d3a9389b2457e3f56499e99c588f97e2e25c6e553ef16721e4a08c866f22fda7"
         }
       ],
       "inputs": [],
@@ -1774,7 +1836,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/right-speech-infrastructure.md"
+          "path": "docs/knowledge/ethos/right-speech-infrastructure.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2076c8ccd3793568a9f53be1917e188c1dd34e262fc24c6909af5404e2173ed2"
         }
       ],
       "inputs": [],
@@ -1821,7 +1885,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/three-tenets-loop.md"
+          "path": "docs/knowledge/ethos/three-tenets-loop.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:37406e0de296ce5ac83b23c301a3c342b3f544e33c063c65ee010ebaa82b8a4a"
         }
       ],
       "inputs": [],
@@ -1868,7 +1934,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/promise-trials.md"
+          "path": "docs/knowledge/ethos/promise-trials.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:55680f076b9d8b3795eff76562571ddcabd67ffebe15b2cb6a86d54256e97d3e"
         }
       ],
       "inputs": [],
@@ -1915,7 +1983,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/access-to-counsel-pathway.md"
+          "path": "docs/knowledge/ethos/access-to-counsel-pathway.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f34efcdd0291a484265bb79417dd6dc122ff8e2a2205256194abde2e37cf1ba4"
         }
       ],
       "inputs": [],
@@ -1962,7 +2032,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/verification-based-diplomacy.md"
+          "path": "docs/knowledge/ethos/verification-based-diplomacy.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f6ad57980c5da30718de4978402359c2c1b18b18a6ae3d2dea957ce2668b2584"
         }
       ],
       "inputs": [],
@@ -2009,7 +2081,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/dignified-exit-design.md"
+          "path": "docs/knowledge/ethos/dignified-exit-design.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1e3b45517ccf623b3fefd194687a4fdb2ec09772bb40d44ad12fcd9ce6a28ed8"
         }
       ],
       "inputs": [],
@@ -2056,7 +2130,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/skillful-mediation.md"
+          "path": "docs/knowledge/ethos/skillful-mediation.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f804419b5c15a1f1c15c43c8ec21aead53c140bceb4a4aab9726890a9a41a603"
         }
       ],
       "inputs": [],
@@ -2103,7 +2179,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/repair-debt-compact.md"
+          "path": "docs/knowledge/ethos/repair-debt-compact.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c1123be26bbca6449108c33c9736f630a280bb04e7f7c90657b4be1a09b3e014"
         }
       ],
       "inputs": [],
@@ -2150,7 +2228,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/restorative-harm-repair.md"
+          "path": "docs/knowledge/ethos/restorative-harm-repair.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:01a47ae389ffb501352964501a611a4453f9157e64032c6b00f5920823754606"
         }
       ],
       "inputs": [],
@@ -2197,7 +2277,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/harm-weighted-priority-standard.md"
+          "path": "docs/knowledge/ethos/harm-weighted-priority-standard.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:11fc95ac1247dec24548fc4833e877a4b24ed43feba6eb5cc52a9319c036f26c"
         }
       ],
       "inputs": [],
@@ -2244,7 +2326,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/scarcity-justice.md"
+          "path": "docs/knowledge/ethos/scarcity-justice.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:eec47f6b8acaf83556f6d7d9d1fb5552a83865274db2a58774bf37c2b74b4a94"
         }
       ],
       "inputs": [],
@@ -2291,7 +2375,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/reciprocity-contract.md"
+          "path": "docs/knowledge/ethos/reciprocity-contract.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a7f77e73bb989cc924108025a42acb00d0441f628fcf6fe396a49e4574f1e9e8"
         }
       ],
       "inputs": [],
@@ -2338,7 +2424,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/beginners-mind.md"
+          "path": "docs/knowledge/ethos/beginners-mind.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:89fac18f0c7a5d1161d3e3a93c46527d27654cdac0f0fc944bd09fee95a25ecc"
         }
       ],
       "inputs": [],
@@ -2385,7 +2473,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/bodhisattva-craft.md"
+          "path": "docs/knowledge/ethos/bodhisattva-craft.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:93e92662d860c758ee7e58fb8125697104720176619efb8381d128029d9c4388"
         }
       ],
       "inputs": [],
@@ -2432,7 +2522,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/devotion-course.md"
+          "path": "docs/knowledge/ethos/devotion-course.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d2c988bc71588b31d471c32865f8f0ca5f82c48a0dfc2a623708f8d2defb6ad8"
         }
       ],
       "inputs": [],
@@ -2479,7 +2571,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/inner-spark.md"
+          "path": "docs/knowledge/ethos/inner-spark.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ad6b51fc8ebe63170ac7d1f7ca4c0f3019d86121e52fdfe57003501cb34df538"
         }
       ],
       "inputs": [],
@@ -2526,7 +2620,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/interbeing-systems.md"
+          "path": "docs/knowledge/ethos/interbeing-systems.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f5907acb36e5a75cb5bf982fb5b3b790dd77901cea9bce677733c7eb91c2360d"
         }
       ],
       "inputs": [],
@@ -2573,7 +2669,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/impermanence-by-design.md"
+          "path": "docs/knowledge/ethos/impermanence-by-design.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6dacef128861b9e37988ff90fd78658b31778f1f1775e0ee8aeeac8a50695058"
         }
       ],
       "inputs": [],
@@ -2620,7 +2718,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/habit-pressure-break.md"
+          "path": "docs/knowledge/ethos/habit-pressure-break.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:81f4b746ecfa94dca070f2295280961d80815d5f52d82d88e6da7f196ab91d58"
         }
       ],
       "inputs": [],
@@ -2667,7 +2767,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/phoenix-averaging.md"
+          "path": "docs/knowledge/ethos/phoenix-averaging.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e5c9b5e64edef0997c1cf147741ce327a11dee0675c63331faa0a3589ad47589"
         }
       ],
       "inputs": [],
@@ -2714,7 +2816,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/solitude-to-signal.md"
+          "path": "docs/knowledge/ethos/solitude-to-signal.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1557846b128044b24f8bafd1e104a986f008ed009354d789c1b3fc25030c480"
         }
       ],
       "inputs": [],
@@ -2761,7 +2865,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/struggle-testament.md"
+          "path": "docs/knowledge/ethos/struggle-testament.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5093febbc1d4a32f91ac9e13d03e4799f226efa63ad86628fd10a9a2ae586c01"
         }
       ],
       "inputs": [],
@@ -2808,7 +2914,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/feedback-loop-hygiene.md"
+          "path": "docs/knowledge/ethos/feedback-loop-hygiene.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e47a431c98b66f8d89c03b1796106a8fe7e80a4d399b95934d055efd28410508"
         }
       ],
       "inputs": [],
@@ -2855,7 +2963,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/capture-resistance.md"
+          "path": "docs/knowledge/ethos/capture-resistance.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:42ebfe2cc400dd27e385ae8f968a4c2a33a093d989bbcb47829f7fcd1c9551bc"
         }
       ],
       "inputs": [],
@@ -2902,7 +3012,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/compromised-channel-response.md"
+          "path": "docs/knowledge/ethos/compromised-channel-response.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ba7f3361b7dabcefb7e5eb62b70fac6e098affc67b11e4431bf2dcb3f10f73c8"
         }
       ],
       "inputs": [],
@@ -2949,7 +3061,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ethos/shadow-rail-interdiction.md"
+          "path": "docs/knowledge/ethos/shadow-rail-interdiction.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:03b0d23ae2da11f8b4348d0f19bd8585eeea4a999cb8b7593216b48ba75034cd"
         }
       ],
       "inputs": [],

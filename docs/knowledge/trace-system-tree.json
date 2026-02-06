@@ -51,7 +51,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/trace-system-tree.json"
+          "path": "docs/knowledge/trace-system-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:61e46046915181beac3df02355b863fee9c247386b2409d6c360c301f6bcbdc6"
         }
       ]
     },
@@ -77,15 +79,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/TRACE-API.md"
+          "path": "docs/TRACE-API.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c1b290a7c21e223bf333bc1858e9835b8cba66d96a61094b233e1936af7aa939"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.trace.ts"
+          "path": "server/routes/agi.trace.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:93fb8a815424e0b816bb8c7afa080571d98c14996d770535b6ec6146667033c7"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.memory.trace.ts"
+          "path": "server/routes/agi.memory.trace.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2ec988f35146667e8a7fdba10578a95cd198476d871246473b0bac39e0ffd854"
         }
       ],
       "inputs": [],
@@ -131,19 +139,27 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/TRAINING-TRACE-API.md"
+          "path": "docs/TRAINING-TRACE-API.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:04fd53586d1a60ec57157204d6162cbf14ceea14c79a0517749ea624f377f515"
         },
         {
           "type": "code",
-          "path": "server/routes/training-trace.ts"
+          "path": "server/routes/training-trace.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:640ebd4db038adc95708a0e007d906f787dc7c882b6bba07ba902eb720f029c3"
         },
         {
           "type": "code",
-          "path": "server/services/observability/training-trace-store.ts"
+          "path": "server/services/observability/training-trace-store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:43adcf455f0aa7cd01fd9baa3fcb0ff8858c7ca2613544c6315dcc313666c4a3"
         },
         {
           "type": "code",
-          "path": "server/__tests__/training-trace.test.ts"
+          "path": "server/__tests__/training-trace.test.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:958b0bfbefa2d76e84c5fb8e676c48f4b627bc25a438c4fdf3fa244cd164cb52"
         }
       ],
       "inputs": [],
@@ -190,51 +206,75 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/db/agi.ts"
+          "path": "server/db/agi.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:176400ece3145ee07a27048414fa67bf95490c314807fcc379e505b8146349ff"
         },
         {
           "type": "code",
-          "path": "server/db/essence.ts"
+          "path": "server/db/essence.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d354ac89495203e55bb73ec392ebaae79d76d4d7258627fbb9dea6cbe3814611"
         },
         {
           "type": "code",
-          "path": "server/db/essenceProfile.ts"
+          "path": "server/db/essenceProfile.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:07f7bcb0082d1d157fe2501d9905cbf79c22eba4d60e75afd93293030ec7657c"
         },
         {
           "type": "code",
-          "path": "server/db/essence-activity.ts"
+          "path": "server/db/essence-activity.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:89882c2ae5f7687efd138c25cb83672453059bf3276d34b4fe8a779a270a9e22"
         },
         {
           "type": "code",
-          "path": "server/db/profileSummaries.ts"
+          "path": "server/db/profileSummaries.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5b803dd5cbdc027fa5de002a8559b556f7e0c5341f7669cbb136fa144127dfc4"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/004_trace_manifest.ts"
+          "path": "server/db/migrations/004_trace_manifest.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4b7281866bccd348ba356438cb3951d2797b76e808f9d118880946575f5b570b"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/012_trace_sealed_snapshots.ts"
+          "path": "server/db/migrations/012_trace_sealed_snapshots.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2724ce9be91261f87274bd278f7227e0dd11194321d5985af244760f7668dffb"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/013_trace_prompts.ts"
+          "path": "server/db/migrations/013_trace_prompts.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2b01295ee076baffe86ca6ae42630020b8fbcbc6566e211bcf76def4eb4ecd17"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/015_trace_reasoning.ts"
+          "path": "server/db/migrations/015_trace_reasoning.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a81c5b01c8cc0d8a9a0b6c3c7f7abb980a761d18bb6d1b42cfc46c3fb1be6473"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/016_trace_collapse.ts"
+          "path": "server/db/migrations/016_trace_collapse.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:38e98548c1c97dbe8114b12ce0c796cb129cbc49365ce1bf8ccbda056d914937"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/018_trace_collapse_strategy.ts"
+          "path": "server/db/migrations/018_trace_collapse_strategy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:53492e6aa8a0692de0ad860ef0e2026d44c531abbf8e8d702b3dca4ecef1fbee"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/020_trace_debate_id.ts"
+          "path": "server/db/migrations/020_trace_debate_id.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:153880e5c70fb9234ff545565ccd43b9ae81e0dad5e05b13fb50442edfa32276"
         }
       ],
       "inputs": [],
@@ -280,35 +320,51 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/essence-schema.ts"
+          "path": "shared/essence-schema.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:11837b2019b9c9b9efba967e6052bf4cb338ae09142375bfbb085b95d067383f"
         },
         {
           "type": "code",
-          "path": "shared/essence-physics.ts"
+          "path": "shared/essence-physics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d610c6d9c2a1aef1bd305152649876ff1a458e62e4f421d480d94d1a9e24d3e1"
         },
         {
           "type": "code",
-          "path": "shared/essence-persona.ts"
+          "path": "shared/essence-persona.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3dec9f6ae75cc57fa2d786fd7d2d38b76769c0e91fa4dcefcb2e27cba76f2d80"
         },
         {
           "type": "code",
-          "path": "shared/essence-prompts.ts"
+          "path": "shared/essence-prompts.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1c4e7866f140c83f5535218a669d0ceb5ac9a81665cea69ce8ce3562ce03cb62"
         },
         {
           "type": "code",
-          "path": "shared/essence-debate.ts"
+          "path": "shared/essence-debate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8bfc2219e6bbaac740b86e31dbd36a28526de92e8d78522ae5a2398293c857c1"
         },
         {
           "type": "code",
-          "path": "shared/essence-activity.ts"
+          "path": "shared/essence-activity.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:96c39c3dd38e7200437fd38d1831e896434e5e758fb9dac87903e72fe25e69ad"
         },
         {
           "type": "code",
-          "path": "shared/essence-themes.ts"
+          "path": "shared/essence-themes.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2c822660c043c4ee87fcee33c1b8126ed1e2ef47ba0e2263024ef11c1f638596"
         },
         {
           "type": "code",
-          "path": "shared/inferenceProfile.ts"
+          "path": "shared/inferenceProfile.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:52aaa4c566853c7ca22f055956f613d8bd93bd8755b355a6f1136d7d6b75f997"
         }
       ],
       "inputs": [],
@@ -354,47 +410,69 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/ESSENCE_PROFILE_POLICY.md"
+          "path": "docs/ESSENCE_PROFILE_POLICY.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ff84b5927beb77d57a04505805cb848e3200e583dbb7be9f3b0aace0d03bd46f"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.profile.ts"
+          "path": "server/routes/agi.profile.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:50b4208067e2953437d9cc996e7662c5f4e751a46b0243c9ac5b11ea63e7b4f7"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.persona.ts"
+          "path": "server/routes/agi.persona.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f8ba478f62bc7092d3531d353fb491a632991d24b600faeace496ed0a1a5b06d"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.memory.ts"
+          "path": "server/routes/agi.memory.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b7af03d95aac09a76e8c9b493f488dec41eaf00f187f910f0eecddddf70cdf3b"
         },
         {
           "type": "code",
-          "path": "server/routes/essence.ts"
+          "path": "server/routes/essence.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:07888138537b805a4f1cf8c13913525f2e00d2cc4e0a1c45a5c4d238e4a5e8ae"
         },
         {
           "type": "code",
-          "path": "server/routes/essence.prompts.ts"
+          "path": "server/routes/essence.prompts.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:183a293685cf186e017b4e8b2c8d4ff956957478d2be96fb85027ccaa38f23a4"
         },
         {
           "type": "code",
-          "path": "server/services/profile-summarizer.ts"
+          "path": "server/services/profile-summarizer.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d2a115959a12bc17d9cc1dee44d5333724991390d751a2c3347bc219eaa9ca24"
         },
         {
           "type": "code",
-          "path": "server/services/profile-summarizer-job.ts"
+          "path": "server/services/profile-summarizer-job.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b46dd24e9c55e45e83167892d85d33dc3f387df04987ade2b2ef19e6e4162693"
         },
         {
           "type": "code",
-          "path": "server/routes/proposals.profile-panel.ts"
+          "path": "server/routes/proposals.profile-panel.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:dbd465b6f00f2b381bd1b16fb84a0a8b431e40e2cc6dc9526f1c686cd85a0607"
         },
         {
           "type": "code",
-          "path": "server/services/proposals/profile-panel-proposals.ts"
+          "path": "server/services/proposals/profile-panel-proposals.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9ea29c4831daad0e76c86fcd881da0956ce4de888d7d1fa869bb2c6f257811d7"
         },
         {
           "type": "code",
-          "path": "server/services/panels/profile-panel-from-profile.ts"
+          "path": "server/services/panels/profile-panel-from-profile.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:18415afbcf65a3d891c67121feab7502382e9a248bbb4ff0fa3b27552535e852"
         }
       ],
       "inputs": [],
@@ -440,63 +518,93 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/AGI-ROADMAP.md"
+          "path": "docs/AGI-ROADMAP.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8cd936c77b0c30bba819855f1889713ec5fce3bbcd83c3f3a90ab86a16c8758f"
         },
         {
           "type": "doc",
-          "path": "docs/agi-answerer-training.md"
+          "path": "docs/agi-answerer-training.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d3cce9b6013886d2cf23c810c28d1012b592a753031246d6a614d2376f1b8864"
         },
         {
           "type": "doc",
-          "path": "docs/agi-index-exclusions-rc0.md"
+          "path": "docs/agi-index-exclusions-rc0.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:80210964b188dca77b1b4b48b37c2d6476b13d413d22fb997b6c30c3ccd17da5"
         },
         {
           "type": "doc",
-          "path": "docs/PERSONAL_AGI_NEXT.md"
+          "path": "docs/PERSONAL_AGI_NEXT.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9567754cbce30d4d174c0944392b3e58bc1a70a34b20cc9830cfcaf31c6f5190"
         },
         {
           "type": "doc",
-          "path": "docs/refinery-progress.md"
+          "path": "docs/refinery-progress.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1a714d54ea3fe8d00fddbb9916e1efcfb61d53a6e2764d90c444292ee14528a"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.refinery.ts"
+          "path": "server/routes/agi.refinery.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:76dc0dd7ba736f1715eaabb4c3b85177bbeaf3838a65482797a7a367b1c24f93"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-axes.ts"
+          "path": "server/services/agi/refinery-axes.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2119ae2e8ff8847162439d79888d628a4fb85adec9a6be28e77e90587012effa"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-export.ts"
+          "path": "server/services/agi/refinery-export.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3ce0ac7dd67b490db5da8f4afbd7df63f3099351408f38437f1856daccdce9a2"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-gates.ts"
+          "path": "server/services/agi/refinery-gates.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e99e6151a402ec84ad48e41a81b4e896b28e549ff6d30bcff0f5c28313586026"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-holdout.ts"
+          "path": "server/services/agi/refinery-holdout.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1d9f3b5cc5adca053586a66d2f6ea24b86ed8b37022433e8d7e77270a766bad9"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-identity.ts"
+          "path": "server/services/agi/refinery-identity.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3c554d206478e5fe1597ed3fed065e2587490596eee8a00cfdb6bb7181e3192c"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-policy.ts"
+          "path": "server/services/agi/refinery-policy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:15a2a53f34f844a61d9d02382188bdc0d2bbd16e6880c85ecb59da4e194bbc34"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-summary.ts"
+          "path": "server/services/agi/refinery-summary.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0769edfa2f24b0628379f706d4581cdd5d0c6f1cc65a4d488447f5d34c76e065"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-trajectory.ts"
+          "path": "server/services/agi/refinery-trajectory.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:95da97f4f0e2905258ac19be8b1f270bc8ac15e21769a62cab12ef9dd7be32a8"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-variants.ts"
+          "path": "server/services/agi/refinery-variants.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fa1aade417385aa178f8c440b381b7634aeefb792ca20e96a7562a9e2717a7b6"
         }
       ],
       "inputs": [],
@@ -542,43 +650,63 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.plan.ts"
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.adapter.ts"
+          "path": "server/routes/agi.adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1ead09a322c50ae3834ca1510213b3e3e2468b297e8ea656acadfdc81f8aec64"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.chat.ts"
+          "path": "server/routes/agi.chat.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5cfdc68a4c4e153cf8310c15a085644d591aa46eb3993f8b4d14a1361fd34fd4"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.eval.ts"
+          "path": "server/routes/agi.eval.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d413d98cc913066ca64a1b8e4daea59f9fc078da9325cd7913c5533230ba9da4"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.debate.ts"
+          "path": "server/routes/agi.debate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:97ec3dbb0d9bb2982ff2cb9b4ddacd03576f86fcf6ddcfd82070a4bd18130ae0"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.contributions.ts"
+          "path": "server/routes/agi.contributions.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fcb9ce731bb6def8e61688e2b06b234c978177553d55f3a87bf437cd7c6e8897"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.specialists.ts"
+          "path": "server/routes/agi.specialists.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0c80ff489aedf512c01eb4bbf1f20b5f35d1a1aae691405af50c027c0c71690f"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.constraint-packs.ts"
+          "path": "server/routes/agi.constraint-packs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:54171e728cc38123b3d4a474531b619ac761c6cbdf9cf11a73b0ccc854629463"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.star.ts"
+          "path": "server/routes/agi.star.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:75f944a7c59bb1dcfc542c652f740057987ba6e4b1886f97f778718db4f11014"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.refinery.ts"
+          "path": "server/routes/agi.refinery.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:76dc0dd7ba736f1715eaabb4c3b85177bbeaf3838a65482797a7a367b1c24f93"
         }
       ],
       "inputs": [],
@@ -624,27 +752,39 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/collapse-benchmark-backend-roadmap.md"
+          "path": "docs/collapse-benchmark-backend-roadmap.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9fd9fc79f8a2c9d0c9525502b66cb61a841358860dca72e92121530e9ae6b77b"
         },
         {
           "type": "code",
-          "path": "server/routes/benchmarks.collapse.ts"
+          "path": "server/routes/benchmarks.collapse.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5874c515d90c53d637e985bd060bd45c0dc1e0ed0811e61913c4a6a1bc541896"
         },
         {
           "type": "code",
-          "path": "server/services/collapse-benchmark.ts"
+          "path": "server/services/collapse-benchmark.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b10fbedd94d80194bf8ad919ffade583f0456f02e40b3b377449ccd42181f91b"
         },
         {
           "type": "code",
-          "path": "shared/collapse-benchmark.ts"
+          "path": "shared/collapse-benchmark.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3f0560fee01d8206a6aa50e5d8981b4879dfdb133056ca6372b21b6253c39d84"
         },
         {
           "type": "code",
-          "path": "server/services/mixer/collapse.ts"
+          "path": "server/services/mixer/collapse.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:188b59e325e9e23c9bdfaa92022b102838b657951e06e66b2b3976c226857f41"
         },
         {
           "type": "code",
-          "path": "server/services/contributions/trace-links.ts"
+          "path": "server/services/contributions/trace-links.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6cd20a7e8d74d87a43b64e01d9e029d6c0b7f824d4c98789607499ff24443576"
         }
       ],
       "inputs": [],
@@ -690,103 +830,153 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/ESSENCE-CONSOLE_PATCH-PLAN.md"
+          "path": "docs/ESSENCE-CONSOLE_PATCH-PLAN.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:27c91358e5847a0edd9cb867adc7e978b2fd2901143a7393e7d7eb0948d7294b"
         },
         {
           "type": "doc",
-          "path": "docs/ESSENCE-CONSOLE_GAP-REPORT.md"
+          "path": "docs/ESSENCE-CONSOLE_GAP-REPORT.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d9f9ef8802bfd0275babe83b1b720b5723ec9f3b037da0129b01056cdcf709e0"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-energy-adapter.ts"
+          "path": "server/services/essence/solar-energy-adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d697f8b19c99424e313b84427e746ee062be1f01d39b2b9ee88ffeba934133fe"
         },
         {
           "type": "code",
-          "path": "server/services/essence/tokamak-energy-adapter.ts"
+          "path": "server/services/essence/tokamak-energy-adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:747e11bca62696c64bc6752c710ab23724cab512ecfbf591f68a5463c998cab1"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-events-hek.ts"
+          "path": "server/services/essence/solar-events-hek.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:22415bbd0c385430b182242f0a45a2c628ca4623608afa837486e92c60db1cb8"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-forecast.ts"
+          "path": "server/services/essence/solar-forecast.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7585ab1c85f05ae1e9e02e9173855c45f8d4a737748a2d999a37982f249a82f9"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-guardrails.ts"
+          "path": "server/services/essence/solar-guardrails.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9330dbfb31220ec2fdacc69e7aca4b40e5d9d6c67d7b848e18f4c559668c0041"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-spectrum-ingest.ts"
+          "path": "server/services/essence/solar-spectrum-ingest.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f64b7d6a27f9e92e162fbca31ce7dfa117d626dad061e7b630b8de728f57eb4a"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-spectrum-models.ts"
+          "path": "server/services/essence/solar-spectrum-models.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:57af3c8f7d468ef38735a51d53613cf89ea1c0c5e95fff9430770f7226890d76"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-surface-coherence.ts"
+          "path": "server/services/essence/solar-surface-coherence.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b1f1a3e8b907d64a6fc43bf6c0270d462a0def20555154d6661ef973a84581c4"
         },
         {
           "type": "code",
-          "path": "server/services/essence/solar-video-coherence.ts"
+          "path": "server/services/essence/solar-video-coherence.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bea8700d5db68b6b28938083f2e7598eb139775bd88482ed5c9c186de25d28f9"
         },
         {
           "type": "code",
-          "path": "server/services/essence/sunpy-coherence-bridge.ts"
+          "path": "server/services/essence/sunpy-coherence-bridge.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d83217747356f19249be127433f165b11cbe4a4d85ce27034adb4472b0034541"
         },
         {
           "type": "code",
-          "path": "server/services/essence/phase-detector.ts"
+          "path": "server/services/essence/phase-detector.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:58f1aba8c12ed67062a2b391132da8ab7149b461dafbfb65f2493c1e45841ebd"
         },
         {
           "type": "code",
-          "path": "server/services/essence/ingest-jobs.ts"
+          "path": "server/services/essence/ingest-jobs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e4669bde47c8d130ab9cc767069321497611a9242524311927a1d1a474481c96"
         },
         {
           "type": "code",
-          "path": "server/services/essence/events.ts"
+          "path": "server/services/essence/events.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:36543934c9dfdb03a2a1736556ea1ea747f3c1b29131ae7fd5b70be53e00eac6"
         },
         {
           "type": "code",
-          "path": "server/services/essence/environment.ts"
+          "path": "server/services/essence/environment.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a5ef85d8c2b5fe415161ff99d729604d62d65a6807986f6df832436bc521d9ef"
         },
         {
           "type": "code",
-          "path": "server/services/essence/store.ts"
+          "path": "server/services/essence/store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1848b7994a728b460cd855afa33214d65be4e1d8bc67adb4678b0bf188c92723"
         },
         {
           "type": "code",
-          "path": "server/services/essence/memory-store.ts"
+          "path": "server/services/essence/memory-store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:078f26cf9af5ed89228c130d33833625e49a96c6bf394f2f9f971433f97eb4a8"
         },
         {
           "type": "code",
-          "path": "server/services/essence/activity-log.ts"
+          "path": "server/services/essence/activity-log.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:af0a80ec957905c6e077e3ce9b9ec28a3f914d779e1aa28dc9784337e05c70a9"
         },
         {
           "type": "code",
-          "path": "server/services/essence/mix.ts"
+          "path": "server/services/essence/mix.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:908823379234964550f0e5155f0e31e83b47070209a1ccf57733b82d68a0893b"
         },
         {
           "type": "code",
-          "path": "server/services/essence/nightly-proposals.ts"
+          "path": "server/services/essence/nightly-proposals.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:41ba72cc46b0c88a3de9d5ca07bdf9c2347cc83f7918d79ba8065ded70d7a331"
         },
         {
           "type": "code",
-          "path": "server/services/essence/template-synthesizer.ts"
+          "path": "server/services/essence/template-synthesizer.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:81593bf144713b59605ca2a6c41d69c4ebcf423eb8e24c49c6f55dcc24082698"
         },
         {
           "type": "code",
-          "path": "server/services/essence/themes.ts"
+          "path": "server/services/essence/themes.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b1d5c9332b977a4e85f9bc1ae58e6da4341cdcf69d44398e85794765217b3f4f"
         },
         {
           "type": "code",
-          "path": "server/services/essence/prompt-variants.ts"
+          "path": "server/services/essence/prompt-variants.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e3e6943a638a7d3e436ed7ecf3b2719f701e79700bcdf684185da83a201801b9"
         },
         {
           "type": "code",
-          "path": "server/services/essence/preferences.ts"
+          "path": "server/services/essence/preferences.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f7a6a6f7444a8b28b0f2d70ceda3cb50ac8bbb79e2b8c6dd10f9f710f25562ce"
         }
       ],
       "inputs": [],
@@ -832,63 +1022,93 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/lib/agi/api.ts"
+          "path": "client/src/lib/agi/api.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:42bb6f940bc77221bf385ad4a818b8e2f990eb039afb699f3ca24880c6cce8d2"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/adapter.ts"
+          "path": "client/src/lib/agi/adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:018191a3df24bc4f82854878b64b1cd2ad3827e5ca611ae3d0f26075c42a32df"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/orchestrator.ts"
+          "path": "client/src/lib/agi/orchestrator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:70a6674ef409f88b8eea65c3e8817f1c634ef94a7819ac323f4e8158dcc60437"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/knowledge-store.ts"
+          "path": "client/src/lib/agi/knowledge-store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:946f3a8f4862ab6e86220a7aef4c2fb814acc205e899add2b8456ab535c96d0c"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/jobs.ts"
+          "path": "client/src/lib/agi/jobs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0867f12a36ea11a1e52b9a5b5c36b6add9d628476577ed4a99f6a25b75088d7b"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/promptVariants.ts"
+          "path": "client/src/lib/agi/promptVariants.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8386c0a87763edb0ff5a13d5de45ed998c02db59f43a8c3e4c689ed7dcde409d"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/preferences.ts"
+          "path": "client/src/lib/agi/preferences.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:86495e497a127a3d65ba8f50f7cce5edd42dcde6356f32f5a9c8fc9875d2bbef"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/contributions.ts"
+          "path": "client/src/lib/agi/contributions.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4ebeb472b494028915be241672141debe8f6737be5132c31763bd55ffe282933"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/consoleTelemetry.ts"
+          "path": "client/src/lib/agi/consoleTelemetry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7f3e8baa87cc1f1f5901bff35f501e87bb54747bf5c0990a399af137230ae56f"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/debate.ts"
+          "path": "client/src/lib/agi/debate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7af1a9fdca41a9595b05920609badcdff6008271cbfe0ff073abe7ee7b596c58"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/panelControl.ts"
+          "path": "client/src/lib/agi/panelControl.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8843b4836fcc239063d903391e751f7d70ab369e6ee16e772310dbe7282d5096"
         },
         {
           "type": "code",
-          "path": "client/src/lib/agi/localCallSpec.ts"
+          "path": "client/src/lib/agi/localCallSpec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:718ebf04ee18206f092e2b1b1f1d1592fd5c54bfc7bf4d32b635a10186fbd1f6"
         },
         {
           "type": "code",
-          "path": "client/src/store/useAgiChatStore.ts"
+          "path": "client/src/store/useAgiChatStore.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0d5aae03997dd9d5e80db010454523a0fdf44e8cd8f275dbef4b4fe38b893135"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useEssenceProfile.ts"
+          "path": "client/src/hooks/useEssenceProfile.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6b35d214aa07059a776812e1b02f62f816dc6f0ff0f3fbdb36564225a8260dea"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useEssenceThemes.ts"
+          "path": "client/src/hooks/useEssenceThemes.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c37f7d0b461ed9223c435bc9582b56d3b5fd99392134ea92922bc18b87659ef6"
         }
       ],
       "inputs": [],

@@ -47,7 +47,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/math-maturity-stages.md"
+          "path": "docs/knowledge/physics/math-maturity-stages.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         }
       ]
     },
@@ -80,7 +82,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/math-stage.ts"
+          "path": "shared/math-stage.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7858bef29c7f0cf50f8e8a700359c35e58b6bf05dd15fa3db3df7f6d414e3639"
         }
       ],
       "inputs": [],
@@ -148,7 +152,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/math-maturity-stages.md"
+          "path": "docs/knowledge/physics/math-maturity-stages.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         }
       ]
     },
@@ -196,7 +202,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/math-maturity-stages.md"
+          "path": "docs/knowledge/physics/math-maturity-stages.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         }
       ]
     },
@@ -244,7 +252,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/math-maturity-stages.md"
+          "path": "docs/knowledge/physics/math-maturity-stages.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         }
       ]
     },
@@ -300,11 +310,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/math-maturity-stages.md"
+          "path": "docs/knowledge/physics/math-maturity-stages.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         },
         {
           "type": "doc",
-          "path": "WARP_AGENTS.md"
+          "path": "WARP_AGENTS.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ea15b50192ab5837923460268e2cf14a528ef7cbcc542a0bad31e56494a36e8d"
         }
       ]
     },
@@ -359,7 +373,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/gr-solver-tree.json"
+          "path": "docs/knowledge/physics/gr-solver-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ed887d7c2f0e727373cae717c79ffdb9c0c626641f354bed5d775871de86a33b"
         }
       ]
     },
@@ -397,7 +413,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/energy-pipeline.ts"
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         }
       ],
       "inputs": [],
@@ -454,11 +472,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/stress-energy-brick.ts"
+          "path": "server/stress-energy-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1a79a1ddd1873ecf5031860ddae0cd106448d9f46490bd92ac1d18b0da161f2e"
         },
         {
           "type": "code",
-          "path": "server/gr/evolution/stress-energy.ts"
+          "path": "server/gr/evolution/stress-energy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e028fce91cab163847455c7ad9f8adff69dcac17b3a51033e3e1bd2f6012ec98"
         }
       ],
       "inputs": [],
@@ -519,11 +541,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/evolution/solver.ts"
+          "path": "server/gr/evolution/solver.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a37c1de776730ffc8c8608e9799a35459eb2ad792dd1b42bab5f61102593e752"
         },
         {
           "type": "code",
-          "path": "server/gr-evolve-brick.ts"
+          "path": "server/gr-evolve-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:60729772df9bb52a622e5fb4b7450b05a6e74a9273a27701b96c2c6248923654"
         }
       ],
       "inputs": [],
@@ -578,15 +604,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/constraint-evaluator.ts"
+          "path": "server/gr/constraint-evaluator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:58f921a7dc19cb9e7d86b3fd8148cd7d371be85af493e33131664bbb591a9755"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/viability-definition.md"
+          "path": "docs/knowledge/physics/viability-definition.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:409025ccc5f7268d4112bdc21c3d1fd716bbf0bcbd15bbcee1c403fa500b950b"
         },
         {
           "type": "test",
-          "path": "tests/gr-constraint-gate.spec.ts"
+          "path": "tests/gr-constraint-gate.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bd73c7623295f4551b7e822a2ed4e7c36fb4854288ba690fd43d169a62958cf7"
         }
       ],
       "inputs": [
@@ -700,11 +732,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "tools/warpViability.ts"
+          "path": "tools/warpViability.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cd7c8fbaf82d248b9f9ecd08799f2e047606668d33b25bcd3a49112c2c6e7ea6"
         },
         {
           "type": "code",
-          "path": "modules/physics/warpAgents.ts"
+          "path": "modules/physics/warpAgents.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ae1c954c0e5e5ecb509fddcf17625fe0f9fc26fe93b23ab8e8aa444b1d88dd0c"
         }
       ],
       "inputs": [],
@@ -758,7 +794,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "tools/warpViabilityCertificate.ts"
+          "path": "tools/warpViabilityCertificate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bd9aeebd3a880874cb0760311b704b1d3484000fe0947ca883592cf64d100c69"
         }
       ],
       "inputs": [],
@@ -835,11 +873,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "WARP_AGENTS.md"
+          "path": "WARP_AGENTS.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ea15b50192ab5837923460268e2cf14a528ef7cbcc542a0bad31e56494a36e8d"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/certificate-integrity.md"
+          "path": "docs/knowledge/physics/certificate-integrity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:15f0af7ebbc8cb6535b3fd5fbbcb8e2d47a0d983f8454ad7f8d3d45b6e876842"
         }
       ]
     },
@@ -891,23 +933,33 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "math.config.json"
+          "path": "math.config.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7da27fdc5bea5d3bea9b76976282a89382719bd6cfde2d0f6dd81974ce5abf06"
         },
         {
           "type": "doc",
-          "path": "math.evidence.json"
+          "path": "math.evidence.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5dba10c5135fe0c47aace8d467cf251318317de9283ccc17f9044ad8c71317e3"
         },
         {
           "type": "doc",
-          "path": "math.waivers.json"
+          "path": "math.waivers.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8c6836380e0c2b480fd269d4b1a223ee17707d086db7dbfab8a8eade12ba7573"
         },
         {
           "type": "doc",
-          "path": "MATH_GRAPH.json"
+          "path": "MATH_GRAPH.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c784a59a43983618fcb097adbb2eae0bd9475ab8ad47fa025191bd208697b094"
         },
         {
           "type": "doc",
-          "path": "MATH_STATUS.md"
+          "path": "MATH_STATUS.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a02ea545d0d36b04fb8998d88858ae5dd99dd00e1fcee34adff1bdb5ef16107a"
         }
       ]
     },
@@ -935,7 +987,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/energy-pipeline.ts"
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         }
       ],
       "inputs": [],
@@ -1007,7 +1061,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/dynamic-casimir-effect.md"
+          "path": "docs/knowledge/physics/dynamic-casimir-effect.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5e64dd98a978169f5aa81ff831b8363a604d1d66f493436c2b480cf14d7cb692"
         }
       ]
     },
@@ -1034,7 +1090,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/dynamic/dynamic-casimir.ts"
+          "path": "modules/dynamic/dynamic-casimir.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ed1243546ca5dabbdcfcd34003b9fd3e6eae9c4345ae115b2d68e6c8e102f0df"
         }
       ],
       "inputs": [],
@@ -1081,7 +1139,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/dynamic/natario-metric.ts"
+          "path": "modules/dynamic/natario-metric.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:50779b574187c5feba75e5b5575d2e970ede3705416671dca76f2e6b08bbec39"
         }
       ],
       "inputs": [],
@@ -1128,7 +1188,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/sim_core/static-casimir.ts"
+          "path": "modules/sim_core/static-casimir.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e67c3f5375b9a51bd95ea8b6d6877633a467c8f1d3141d9136e6f595e8911e3e"
         }
       ],
       "inputs": [],
@@ -1175,7 +1237,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/sim_core/casimir-inference.ts"
+          "path": "modules/sim_core/casimir-inference.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5b5a67475368becfc5089736b04e499c9aeb41ffc9027ce3515797607e1ed8af"
         }
       ],
       "inputs": [],
@@ -1250,7 +1314,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7ca013891c69a6f8bb7b051555aab6e11101d638bc8eefd672c27769a5ae43dd"
         }
       ]
     },
@@ -1277,7 +1343,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/qi/qi-bounds.ts"
+          "path": "server/qi/qi-bounds.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c763b0ce2a0b08e52584da32525313353dae3d6f88e54fc8b460b081754d8d5e"
         }
       ],
       "inputs": [],
@@ -1324,7 +1392,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/qi/qi-monitor.ts"
+          "path": "server/qi/qi-monitor.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0b30e0afd2298a630fe6413f85936efd2084f61131b0df77224f6421eee7e553"
         }
       ],
       "inputs": [],
@@ -1371,7 +1441,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/qi/qi-saturation.ts"
+          "path": "server/qi/qi-saturation.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:44fc6ab7073f988b403221d7937b8121aaf2cb7cb13b9395d7f023568c5efba3"
         }
       ],
       "inputs": [],
@@ -1418,15 +1490,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/qi/pipeline-qi-stream.ts"
+          "path": "server/qi/pipeline-qi-stream.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2ab8c29a7b461b7faf0948748670f4c15f032ac251eff35b39dc08f35fd909a4"
         },
         {
           "type": "code",
-          "path": "server/qi/qi-snap-source.ts"
+          "path": "server/qi/qi-snap-source.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f11874b01e0bb973a1caa6620d0cba1b4a0b992d56d4613586c2e9595af586de"
         },
         {
           "type": "code",
-          "path": "server/qi/qi-snap-broadcaster.ts"
+          "path": "server/qi/qi-snap-broadcaster.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:738842a2b3918e1a66260f2e18c2e7dc87f24383d64b7ecbe4ce7e4c3f6a06c3"
         }
       ],
       "inputs": [],
@@ -1473,7 +1551,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/controls/qi-autoscale.ts"
+          "path": "server/controls/qi-autoscale.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f0ae7e883af710cf137af8d9b8a5a4aabe1f4efd3ae42cca5f3bd001e42c0d14"
         }
       ],
       "inputs": [],
@@ -1520,7 +1600,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/controls/qi-autothrottle.ts"
+          "path": "server/controls/qi-autothrottle.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7f59c99578767ef6d2b1f124f617ee51cc81a52d50f70ea487cd5b7b9bfa40f4"
         }
       ],
       "inputs": [],
@@ -1567,7 +1649,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/qi-diagnostics.ts"
+          "path": "shared/qi-diagnostics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8a2ed57bfeba3b160fac320746462eeca117d7d144ee93e37f3880a02350297c"
         }
       ],
       "inputs": [],
@@ -1639,11 +1723,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/energy/phase-scheduler.ts"
+          "path": "server/energy/phase-scheduler.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8ed6ee4775c0ba10e20236fba461a5140feced7b639758d10eae55cabc323155"
         },
         {
           "type": "code",
-          "path": "server/utils/phase-calibration.ts"
+          "path": "server/utils/phase-calibration.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d15ae186f8b765690c3baee80f12026f10b413482cd8481eb2dc9c03cb63affc"
         }
       ]
     },
@@ -1670,7 +1758,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/energy/phase-scheduler.ts"
+          "path": "server/energy/phase-scheduler.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8ed6ee4775c0ba10e20236fba461a5140feced7b639758d10eae55cabc323155"
         }
       ],
       "inputs": [],
@@ -1717,7 +1807,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/utils/phase-calibration.ts"
+          "path": "server/utils/phase-calibration.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d15ae186f8b765690c3baee80f12026f10b413482cd8481eb2dc9c03cb63affc"
         },
         {
           "type": "code",
@@ -1768,11 +1860,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/instruments/pump.ts"
+          "path": "server/instruments/pump.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a1cafcd0545d1f8e7ab5bc16d4278e82f622f6e94cbcd229228df143f16ef423"
         },
         {
           "type": "code",
-          "path": "server/instruments/pump-multitone.ts"
+          "path": "server/instruments/pump-multitone.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ead7e5dfb76acdff228a1ccc83a3be73d29edaf2c8155d7e4ee7fcef0f0e0a29"
         }
       ],
       "inputs": [],
@@ -1819,7 +1915,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/ts/ts-autoscale.ts"
+          "path": "server/ts/ts-autoscale.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:05d4e74e22c50d656fe643d99e50304fcc4a8aa2cc2b68519ce434a7729afba0"
         }
       ],
       "inputs": [],
@@ -1893,11 +1991,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/raster-energy-field.ts"
+          "path": "shared/raster-energy-field.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b6c6997404d4062a5d5bdd1340ff27037d7e4f48b3ef80961778dbd0383643a5"
         },
         {
           "type": "code",
-          "path": "shared/tokamak-energy-field.ts"
+          "path": "shared/tokamak-energy-field.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:99363b878655d0793ec6d9e33fce358614d4539cf7fc877c7291252e63d04145"
         }
       ]
     },
@@ -1924,7 +2026,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/raster-energy-field.ts"
+          "path": "shared/raster-energy-field.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b6c6997404d4062a5d5bdd1340ff27037d7e4f48b3ef80961778dbd0383643a5"
         }
       ],
       "inputs": [],
@@ -1971,7 +2075,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/tokamak-energy-field.ts"
+          "path": "shared/tokamak-energy-field.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:99363b878655d0793ec6d9e33fce358614d4539cf7fc877c7291252e63d04145"
         }
       ],
       "inputs": [],
@@ -2018,7 +2124,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/solar-energy-calibration.ts"
+          "path": "shared/solar-energy-calibration.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a80481c2c390e078004758bade64b3c25bf48214732ac495d54a959c63371595"
         }
       ],
       "inputs": [],
@@ -2065,7 +2173,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/tokamak-synthetic-diagnostics.ts"
+          "path": "shared/tokamak-synthetic-diagnostics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f2d58f704c2f6e09ad5b26f5dd480c54599cb9c0765b0da062e541e6a8e31acd"
         }
       ],
       "inputs": [],
@@ -2112,7 +2222,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/essence/solar-energy-adapter.ts"
+          "path": "server/services/essence/solar-energy-adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d697f8b19c99424e313b84427e746ee062be1f01d39b2b9ee88ffeba934133fe"
         }
       ],
       "inputs": [],
@@ -2159,7 +2271,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/essence/tokamak-energy-adapter.ts"
+          "path": "server/services/essence/tokamak-energy-adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:747e11bca62696c64bc6752c710ab23724cab512ecfbf591f68a5463c998cab1"
         }
       ],
       "inputs": [],
@@ -2206,15 +2320,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/dynamic/stress-energy-equations.ts"
+          "path": "modules/dynamic/stress-energy-equations.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:93d21fcc38afab8cb31bd0c2586880fb653f91ac47c76464c0d444c4ef7db99c"
         },
         {
           "type": "doc",
-          "path": "docs/alcubierre-alignment.md"
+          "path": "docs/alcubierre-alignment.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:215b1905d1820928a27824faa41183af5ac1ac9826248de9b1079026606f4114"
         },
         {
           "type": "test",
-          "path": "tests/stress-energy-equations.spec.ts"
+          "path": "tests/stress-energy-equations.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4fb67951d97c35a322071b81f4f87681a96303d8a4e769fb0e7fb535759b861e"
         }
       ],
       "inputs": [
@@ -2348,19 +2468,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/stress-energy-brick.ts"
+          "path": "server/stress-energy-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1a79a1ddd1873ecf5031860ddae0cd106448d9f46490bd92ac1d18b0da161f2e"
         },
         {
           "type": "doc",
-          "path": "docs/alcubierre-alignment.md"
+          "path": "docs/alcubierre-alignment.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:215b1905d1820928a27824faa41183af5ac1ac9826248de9b1079026606f4114"
         },
         {
           "type": "doc",
-          "path": "docs/gr-solver-progress.md"
+          "path": "docs/gr-solver-progress.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2cdb431e8047772cff50ef1aa17c1d3821c85f5907639399343c3eaeb5724d49"
         },
         {
           "type": "test",
-          "path": "tests/stress-energy-brick.spec.ts"
+          "path": "tests/stress-energy-brick.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5c33bb7b66d252d2f435603fefdf6bb13b87e4ce997390fc2f330a76148acd6e"
         }
       ],
       "inputs": [
@@ -2531,19 +2659,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/stress-energy.ts"
+          "path": "modules/gr/stress-energy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e81b426f011036603535a1acd775238bceea2cbdaf15637168839c7d8f59997e"
         },
         {
           "type": "code",
-          "path": "server/gr/evolution/stress-energy.ts"
+          "path": "server/gr/evolution/stress-energy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e028fce91cab163847455c7ad9f8adff69dcac17b3a51033e3e1bd2f6012ec98"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:19cff33aa85b85791c4069def797748b931dd812da9dc3dabb1bf263f084de7a"
         },
         {
           "type": "test",
-          "path": "tests/stress-energy-units.spec.ts"
+          "path": "tests/stress-energy-units.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0260089e099a17bf4d56203a12d37aa3519d3c510f6ccc2207bd70b5499e659f"
         }
       ],
       "inputs": [
@@ -2651,15 +2787,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/stress-energy-integrals.ts"
+          "path": "modules/gr/stress-energy-integrals.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e4cb7d92064040e6701e76b568eaac158a9764f7d4bc61b787c85f61f84fb499"
         },
         {
           "type": "doc",
-          "path": "docs/mass-semantics.md"
+          "path": "docs/mass-semantics.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:80e2ea46dbad40df9544971143bd293069f3ae37df0115212f31a33e2c6c19b8"
         },
         {
           "type": "test",
-          "path": "tests/stress-energy-integrals.spec.ts"
+          "path": "tests/stress-energy-integrals.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:83d4dfbc178d525315b88f9155f70c753425573c18e72ef930dbcec5425364f6"
         }
       ],
       "inputs": [
@@ -2778,11 +2920,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/evolution/initial-data.ts"
+          "path": "server/gr/evolution/initial-data.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:777d6c276debabdd947943bbfd25a5eea2bf9d5fd25fd35a8855ecfdbed6a06d"
         },
         {
           "type": "code",
-          "path": "server/gr-initial-brick.ts"
+          "path": "server/gr-initial-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ae6fbe227e8182d60c074fb894651c7e6336b38918644333434ed23bd0e44b1a"
         }
       ],
       "inputs": [],
@@ -2829,7 +2975,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/evolution/solver.ts"
+          "path": "server/gr/evolution/solver.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a37c1de776730ffc8c8608e9799a35459eb2ad792dd1b42bab5f61102593e752"
         }
       ],
       "inputs": [],
@@ -2876,11 +3024,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/evolution/brick.ts"
+          "path": "server/gr/evolution/brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2177ed423cc5d52be46ca3b0513836e5589ecd08b20440243586db6fcfe0db53"
         },
         {
           "type": "code",
-          "path": "server/gr-evolve-brick.ts"
+          "path": "server/gr-evolve-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:60729772df9bb52a622e5fb4b7450b05a6e74a9273a27701b96c2c6248923654"
         }
       ],
       "inputs": [],
@@ -2927,7 +3079,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/bssn-state.ts"
+          "path": "modules/gr/bssn-state.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:23140509ae9989dc7d13cf24e903fce9e3cf3a76ec891c6edcaa8b45bb75be4f"
         }
       ],
       "inputs": [],
@@ -2974,7 +3128,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/bssn-evolve.ts"
+          "path": "modules/gr/bssn-evolve.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:005333fef06936ba8dce8e87cc44fe4b85b6ef9751cbc33c11d35ffca697ec9a"
         }
       ],
       "inputs": [],
@@ -3021,7 +3177,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/rk4.ts"
+          "path": "modules/gr/rk4.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:eb78ab9e1e91c51e16c761d65b0bfe8b44000696a3613fabc9054d7519b9249f"
         }
       ],
       "inputs": [],
@@ -3068,7 +3226,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/stencils.ts"
+          "path": "modules/gr/stencils.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4a75421d917849191ad6d88d393690e6a985c40802ea5a81c5ebc499b964eb91"
         }
       ],
       "inputs": [],
@@ -3115,7 +3275,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/gr-diagnostics.ts"
+          "path": "modules/gr/gr-diagnostics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:aa214909c47355620546fbd59f17fcfd24fdc4911b9256ca3b5d9ba9fe791f7a"
         }
       ],
       "inputs": [],
@@ -3162,11 +3324,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-constraint-policy.ts"
+          "path": "server/gr/gr-constraint-policy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:43dccc4a3dafd165b36c4c1a2fecace77a0740e91ee0f0523536394ebd8c36e9"
         },
         {
           "type": "doc",
-          "path": "WARP_AGENTS.md"
+          "path": "WARP_AGENTS.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ea15b50192ab5837923460268e2cf14a528ef7cbcc542a0bad31e56494a36e8d"
         }
       ],
       "inputs": [
@@ -3245,11 +3411,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-constraint-network.ts"
+          "path": "server/gr/gr-constraint-network.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:42350d38712d298bab68f6a50e0e65068c4227f6657ca4416842383de1b262ed"
         },
         {
           "type": "test",
-          "path": "tests/gr-constraint-network.spec.ts"
+          "path": "tests/gr-constraint-network.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:18f690ecc03a52d9b71d6d34a4d899000e49d273244648b3861c02c313301f2c"
         }
       ],
       "inputs": [
@@ -3393,7 +3563,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "sim_core/viability.ts"
+          "path": "sim_core/viability.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:aadae048c512c5b125e12d2a0f66b2c28165d3a31797fe5f6212a7df30a31ab2"
         }
       ],
       "inputs": [],
@@ -3440,7 +3612,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "tools/verifyCertificate.ts"
+          "path": "tools/verifyCertificate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:62804b400352642b2beac22aaf588c1e6b6048a5c9f9ed70459163f61608b94e"
         }
       ],
       "inputs": [],
@@ -3487,11 +3661,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/CONSTRAINT-PACKS.md"
+          "path": "docs/CONSTRAINT-PACKS.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c9fce7a8284c7d8b115b413959edc2313ce240f1c7467ee4cf4051fa5105052f"
         },
         {
           "type": "code",
-          "path": "shared/constraint-packs.ts"
+          "path": "shared/constraint-packs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b859e6ce1e343478c1b6f21d110de0460ed14099cbc0ba6bd19909bc3ef7a226"
         }
       ],
       "inputs": [],
@@ -3538,11 +3716,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/constraint-packs/constraint-pack-policy.ts"
+          "path": "server/services/constraint-packs/constraint-pack-policy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3d49b73327f8c785b5ff038e4b192ea41656bafaab67a3677f8b604994e415c1"
         },
         {
           "type": "code",
-          "path": "server/services/constraint-packs/constraint-pack-policy-store.ts"
+          "path": "server/services/constraint-packs/constraint-pack-policy-store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:eaf3c666909e2962a134e439735c547a2c011398b84e0bb1688e9bc88b760ecd"
         }
       ],
       "inputs": [],
@@ -3589,11 +3771,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/observability/constraint-pack-evaluator.ts"
+          "path": "server/services/observability/constraint-pack-evaluator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d74648fc247f032b0f7afd62e3f2751df979b18b1aada96b49a381f1c68b1f2e"
         },
         {
           "type": "code",
-          "path": "server/services/observability/constraint-pack-normalizer.ts"
+          "path": "server/services/observability/constraint-pack-normalizer.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:62f65c0e57573995bfdf5eef776cc52df688895eff7c3e0f6dc6fe50d31932ac"
         }
       ],
       "inputs": [],
@@ -3640,7 +3826,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/observability/constraint-pack-telemetry.ts"
+          "path": "server/services/observability/constraint-pack-telemetry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a8ce69548e53c3ff295c04a65a4133a224b0837b5dfe01d45de72b59c9557de3"
         }
       ],
       "inputs": [],
@@ -3687,11 +3875,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "tools/validate-phase-diagram.ts"
+          "path": "tools/validate-phase-diagram.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2d77e282119e19da2409d7b48f549889a25ceeb07543d06aa24b11da76a4c7a3"
         },
         {
           "type": "test",
-          "path": "tests/viability-validation.ts"
+          "path": "tests/viability-validation.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:733fcdacbd74bd365d066c4d3ddc3b2abbcb6c36c8c18edb47cb8bb17438969a"
         }
       ],
       "inputs": [],

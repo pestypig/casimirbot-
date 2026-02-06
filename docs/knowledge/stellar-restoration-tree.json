@@ -35,7 +35,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/solar-restoration.md"
+          "path": "docs/knowledge/solar-restoration.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:acd9d5f26eff13797063abf2bdfddf3f246639aaae330bd51d4deccf7aa7bf0b"
         }
       ],
       "predictability": {
@@ -84,11 +86,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/star-hydrostatic.md"
+          "path": "docs/knowledge/star-hydrostatic.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f4793a3af3a501f7be4c63f466779eda81866914aa4a6d7222afbfc829c16a4a"
         },
         {
           "type": "code",
-          "path": "client/src/physics/polytrope.ts"
+          "path": "client/src/physics/polytrope.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d5764b57d1f76a8cf3f344962d8d4cb65c8853a4948a91556cc7dd78914e2af0"
         }
       ],
       "predictability": {
@@ -127,7 +133,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/star-hydrostatic.md"
+          "path": "docs/knowledge/star-hydrostatic.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f4793a3af3a501f7be4c63f466779eda81866914aa4a6d7222afbfc829c16a4a"
         }
       ],
       "inputs": [],
@@ -184,7 +192,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/red-giant-phase.md"
+          "path": "docs/knowledge/red-giant-phase.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1c835f172c353119a9d6e7f3f8cc52c692d75012f01fe7081431020c0b4fd730"
         }
       ],
       "predictability": {
@@ -223,7 +233,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/red-giant-phase.md"
+          "path": "docs/knowledge/red-giant-phase.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1c835f172c353119a9d6e7f3f8cc52c692d75012f01fe7081431020c0b4fd730"
         }
       ],
       "inputs": [],
@@ -281,7 +293,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/stellar-ledger.md"
+          "path": "docs/knowledge/stellar-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:97085a2390e8f5172f36e81feb07118279d79d211519a3b4c8e63421ef4fe56d"
         }
       ],
       "predictability": {
@@ -320,7 +334,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/stellar-ledger.md"
+          "path": "docs/knowledge/stellar-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:97085a2390e8f5172f36e81feb07118279d79d211519a3b4c8e63421ef4fe56d"
         }
       ],
       "inputs": [],
@@ -367,7 +383,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/sun-ledger.md"
+          "path": "docs/knowledge/sun-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4f8cf66831ca7a90c4ecff7c4c371ab818ac1c0225cd4b1e7326e4e32bac766c"
         }
       ],
       "inputs": [],
@@ -426,11 +444,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/pages/star-watcher-panel.tsx"
+          "path": "client/src/pages/star-watcher-panel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:aeef349c058d84df544080b6458feb2782dc547eacfcf2198252298f506f0763"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/stellar-ledger.md"
+          "path": "docs/knowledge/stellar-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:97085a2390e8f5172f36e81feb07118279d79d211519a3b4c8e63421ef4fe56d"
         }
       ],
       "predictability": {
@@ -469,7 +491,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/sun-5-minute-bins.md"
+          "path": "docs/sun-5-minute-bins.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a8deacf059c647efc978950a7f13ad29694f9a59cd050f2935cfae9857e1db51"
         }
       ],
       "inputs": [],
@@ -516,7 +540,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/curvature-unit-solar-notes.md"
+          "path": "docs/curvature-unit-solar-notes.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b493a2690483a958767cf234c3f707e4e551ee62f19f21a8ba52a4474275200a"
         }
       ],
       "inputs": [],
@@ -563,7 +589,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/solar-pipeline.md"
+          "path": "docs/solar-pipeline.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3f400e33b8612dfee08c69b9bb12f013c081c326ddca8c54c0887e0695d47c8a"
         }
       ],
       "inputs": [],
@@ -614,7 +642,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/solar-restoration.md"
+          "path": "docs/knowledge/solar-restoration.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:acd9d5f26eff13797063abf2bdfddf3f246639aaae330bd51d4deccf7aa7bf0b"
         }
       ],
       "inputs": [],

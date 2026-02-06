@@ -54,11 +54,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/simulation-systems-tree.json"
+          "path": "docs/knowledge/physics/simulation-systems-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d0664357b50c0ee288952e50cf7eeeb0ea2cef64258cc63fc8420668e2a9f6d0"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/discretization-mesh.md"
+          "path": "docs/knowledge/physics/discretization-mesh.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7e497860b0d131d22e24f69394f3865824aab5d7146c2c55da36fefb08354ff9"
         }
       ]
     },
@@ -85,7 +89,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/schema.ts"
+          "path": "shared/schema.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:031ed9cce6805b96b67408dc0602956993f2b7707d44e7ef8187902e09843752"
         }
       ],
       "inputs": [],
@@ -131,11 +137,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes.ts"
+          "path": "server/routes.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0dcc6da8765d93d821cdfdec3a55581ee6b8923855881341fc1184c87b41f41a"
         },
         {
           "type": "code",
-          "path": "client/src/lib/simulation-api.ts"
+          "path": "client/src/lib/simulation-api.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9476100cb5d89f7350c694272b88e55a1a995dd932c2d7ec877c27dc2df82475"
         }
       ],
       "inputs": [],
@@ -181,11 +191,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/db/simulations.ts"
+          "path": "server/db/simulations.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7d8ef5fd06bed8ef620bc4fcafaeb34e4320e010e398b8e34376efa509336a92"
         },
         {
           "type": "code",
-          "path": "server/db/migrations/021_simulations.ts"
+          "path": "server/db/migrations/021_simulations.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:23552e256cd7ade017a707ccae691156eef6bdf17ef5a0ef2be1ec5ecb7b1117"
         }
       ],
       "inputs": [],
@@ -231,19 +245,27 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "modules/sim_core/README.md"
+          "path": "modules/sim_core/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d8dfd543b8ef9af8d6a20bab2a631e45035807072819bde89727c98c96e2301e"
         },
         {
           "type": "code",
-          "path": "modules/sim_core/static-casimir.ts"
+          "path": "modules/sim_core/static-casimir.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e67c3f5375b9a51bd95ea8b6d6877633a467c8f1d3141d9136e6f595e8911e3e"
         },
         {
           "type": "code",
-          "path": "modules/sim_core/casimir-inference.ts"
+          "path": "modules/sim_core/casimir-inference.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5b5a67475368becfc5089736b04e499c9aeb41ffc9027ce3515797607e1ed8af"
         },
         {
           "type": "code",
-          "path": "modules/core/module-registry.ts"
+          "path": "modules/core/module-registry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8b0e4174e8368c66628d2c7beea2a8bdd5d714d4fb8482f8c74facabdec27375"
         }
       ],
       "inputs": [],
@@ -290,11 +312,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "modules/geom/README.md"
+          "path": "modules/geom/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:00064b60c7e67a139fb4fab9a243c3bd75b0c8aa6fbf7b920767acacd745b49b"
         },
         {
           "type": "code",
-          "path": "server/services/gmsh.ts"
+          "path": "server/services/gmsh.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:24ba21fc27123851082f94cdddea4bac16c72ad1de3c1d010e2f83d9e0d098a9"
         }
       ],
       "inputs": [],
@@ -340,7 +366,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/scuffem.ts"
+          "path": "server/services/scuffem.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ae7fe285bff08d61a69fe727136b37da34f56d51038b6a9e4e9f1246d5cd1604"
         }
       ],
       "inputs": [],
@@ -387,11 +415,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/dynamic/dynamic-casimir.ts"
+          "path": "modules/dynamic/dynamic-casimir.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ed1243546ca5dabbdcfcd34003b9fd3e6eae9c4345ae115b2d68e6c8e102f0df"
         },
         {
           "type": "doc",
-          "path": "modules/dynamic/README.md"
+          "path": "modules/dynamic/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:11a1d5130d7d626aae6bcd10d6ab712a0a0ec7cafc79e90de061d21bd8c91a15"
         }
       ],
       "inputs": [],
@@ -437,7 +469,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/warp/warp-module.ts"
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
         }
       ],
       "inputs": [],
@@ -483,11 +517,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "simulations/tsn-sim.ts"
+          "path": "simulations/tsn-sim.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b5b0c13ba3d9a6f6accbce3875c4c13611a18aa9d33c1ef164295d47bfea19a3"
         },
         {
           "type": "code",
-          "path": "shared/tsn-sim.ts"
+          "path": "shared/tsn-sim.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:afe84db543a84a2ddac5b0307f1d94102a8920623a4fb198092a6cb3fb595496"
         }
       ],
       "inputs": [],
@@ -533,7 +571,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/lib/parametric-sweep.ts"
+          "path": "client/src/lib/parametric-sweep.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a70f1defb1136b569406cd50fd67a1092878cdab1e43c17ad2bdcae0b992c0fd"
         },
         {
           "type": "code",
@@ -633,7 +673,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes.ts"
+          "path": "server/routes.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0dcc6da8765d93d821cdfdec3a55581ee6b8923855881341fc1184c87b41f41a"
         }
       ],
       "inputs": [],
@@ -699,7 +741,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/simulation-systems-tree.json"
+          "path": "docs/knowledge/physics/simulation-systems-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d0664357b50c0ee288952e50cf7eeeb0ea2cef64258cc63fc8420668e2a9f6d0"
         }
       ]
     }

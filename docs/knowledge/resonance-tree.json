@@ -44,7 +44,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/resonance-tree.json"
+          "path": "docs/knowledge/resonance-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b03196c0937d869378ee03900c2de255e5d7a1dcea29595be828fe887ff93cd4"
         }
       ]
     },
@@ -72,7 +74,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/code-lattice.ts"
+          "path": "shared/code-lattice.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:beeb725467f02b2de7eceb23f98296fd864da71711e9f45943cb88880f61b129"
         }
       ],
       "inputs": [],
@@ -118,7 +122,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/code-lattice.ts"
+          "path": "shared/code-lattice.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:beeb725467f02b2de7eceb23f98296fd864da71711e9f45943cb88880f61b129"
         }
       ],
       "inputs": [],
@@ -167,11 +173,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/code-lattice/resonance.ts"
+          "path": "server/services/code-lattice/resonance.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:52b2dd83154833f540976b86255d9aca0d4aa1842fd566e6658af602e5e74513"
         },
         {
           "type": "code",
-          "path": "server/services/code-lattice/resonance.constants.ts"
+          "path": "server/services/code-lattice/resonance.constants.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:56c8e37ee5419b9f64a9d9cad6e269a27c1f58b881f9890bf0f4995d201d60ca"
         }
       ],
       "inputs": [],
@@ -217,7 +227,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/code-lattice/resonance.constants.ts"
+          "path": "server/services/code-lattice/resonance.constants.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:56c8e37ee5419b9f64a9d9cad6e269a27c1f58b881f9890bf0f4995d201d60ca"
         }
       ],
       "inputs": [],
@@ -263,7 +275,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/code-lattice/resonance.ts"
+          "path": "server/services/code-lattice/resonance.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:52b2dd83154833f540976b86255d9aca0d4aa1842fd566e6658af602e5e74513"
         }
       ],
       "inputs": [],
@@ -314,19 +328,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/code-lattice/loader.ts"
+          "path": "server/services/code-lattice/loader.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:234893ac0f957c388d4ea54b356cd4414d8c017ff91cc3c47942959bba12fd20"
         },
         {
           "type": "code",
-          "path": "server/services/code-lattice/builders.ts"
+          "path": "server/services/code-lattice/builders.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e5a0c9330bc091406f7a8fda7bc14e353b22b6efa401b29470a074fcb79a0766"
         },
         {
           "type": "code",
-          "path": "server/services/code-lattice/watcher.ts"
+          "path": "server/services/code-lattice/watcher.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2fa6910891eac735b1c247c0a72c1431fb01b85bf0481eb6f3441eecbf14fdbd"
         },
         {
           "type": "code",
-          "path": "server/routes/code-lattice.ts"
+          "path": "server/routes/code-lattice.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4d5c4ef5bf46d878fa7b8f34ef004408c2c45fda19a31c297517e35d62efaf79"
         }
       ],
       "inputs": [],
@@ -372,7 +394,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/code-lattice/loader.ts"
+          "path": "server/services/code-lattice/loader.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:234893ac0f957c388d4ea54b356cd4414d8c017ff91cc3c47942959bba12fd20"
         }
       ],
       "inputs": [],
@@ -418,7 +442,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/code-lattice/builders.ts"
+          "path": "server/services/code-lattice/builders.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e5a0c9330bc091406f7a8fda7bc14e353b22b6efa401b29470a074fcb79a0766"
         }
       ],
       "inputs": [],
@@ -464,7 +490,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/code-lattice/watcher.ts"
+          "path": "server/services/code-lattice/watcher.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2fa6910891eac735b1c247c0a72c1431fb01b85bf0481eb6f3441eecbf14fdbd"
         }
       ],
       "inputs": [],
@@ -510,7 +538,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/code-lattice.ts"
+          "path": "server/routes/code-lattice.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4d5c4ef5bf46d878fa7b8f34ef004408c2c45fda19a31c297517e35d62efaf79"
         }
       ],
       "inputs": [],
@@ -556,11 +586,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/code-lattice/__tests__/resonance.casimir.spec.ts"
+          "path": "server/services/code-lattice/__tests__/resonance.casimir.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:db8f238939886e377c394c263994bf664b27c44f9c4245c2ae265258468a45dd"
         },
         {
           "type": "code",
-          "path": "server/services/code-lattice/__tests__/casimir-resonance.spec.ts"
+          "path": "server/services/code-lattice/__tests__/casimir-resonance.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7ab8d175557991d6f2c92dd74a032c4f248383ad299d97ed20b237072d6f0395"
         }
       ],
       "inputs": [],

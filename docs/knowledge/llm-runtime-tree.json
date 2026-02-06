@@ -48,7 +48,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/llm-runtime-tree.json"
+          "path": "docs/knowledge/llm-runtime-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0023838af9df893e02f7991c2576e8198233ef1562cb5e5d729819f8f9f61e73"
         }
       ]
     },
@@ -75,11 +77,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/small-llm.ts"
+          "path": "server/routes/small-llm.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3ee80c1419f92c2ff38d564d3bb516d00c61e0f7375954875ae60c890510cc62"
         },
         {
           "type": "code",
-          "path": "server/services/small-llm.ts"
+          "path": "server/services/small-llm.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d23e3bf27aebfe925ef981183941a3a5ae8e7e009ff43d17f2cb199188bc213e"
         }
       ],
       "inputs": [],
@@ -130,15 +136,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/llm.http.ts"
+          "path": "server/skills/llm.http.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e594539458a5717ea2302f737c63b21083dc5e866468e3eb1636dfddd015b1ce"
         },
         {
           "type": "code",
-          "path": "server/skills/llm.local.ts"
+          "path": "server/skills/llm.local.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5cab5c3f4a582f662251f6a92035f00d2ade2196affeaf0161bf317a573ba318"
         },
         {
           "type": "code",
-          "path": "server/skills/llm.local.spawn.ts"
+          "path": "server/skills/llm.local.spawn.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3d135661974d3adc2f5ea3c9ea6355c9908e938e2b05f8824f4251c24546a944"
         }
       ],
       "inputs": [],
@@ -185,7 +197,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/llm/runtime-artifacts.ts"
+          "path": "server/services/llm/runtime-artifacts.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:17cc2a5ed5bfe1df556beffb1ba0da2cc7caa741f2b8dbe81247f53c2412ea48"
         }
       ],
       "inputs": [],
@@ -232,11 +246,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/workers/llm-worker.ts"
+          "path": "client/src/workers/llm-worker.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bdbdc8b108b72d1af04923fe5c7025713f99dcca0e0ee3f8063ace2fa9b2712b"
         },
         {
           "type": "code",
-          "path": "client/src/lib/llm/local-generator.ts"
+          "path": "client/src/lib/llm/local-generator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:749939e5140fc383cacb161e5e9445aa8d0721d7660e1906583570c1c3fcf581"
         }
       ],
       "inputs": [],
@@ -307,7 +325,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/llm-runtime-tree.json"
+          "path": "docs/knowledge/llm-runtime-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0023838af9df893e02f7991c2576e8198233ef1562cb5e5d729819f8f9f61e73"
         }
       ]
     },
@@ -334,7 +354,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/tokenizer-guardrails.md"
+          "path": "docs/tokenizer-guardrails.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:00198877ec11fa63bfefb34b461dc91b1e0172a6145f72f0cbd707fb95d10044"
         },
         {
           "type": "code",
@@ -342,15 +364,21 @@
         },
         {
           "type": "code",
-          "path": "tools/tokenizer-verify.ts"
+          "path": "tools/tokenizer-verify.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f30fe5df06438c0092dd79dfdc471d61dfb16fe29c66a7313593ed6646714771"
         },
         {
           "type": "code",
-          "path": "tools/generate-tokenizer-canary.ts"
+          "path": "tools/generate-tokenizer-canary.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1677524f9bec96c49293284d7a4216a8000b517e24a10cc288db4f3c07ffb7e7"
         },
         {
           "type": "test",
-          "path": "tests/tokenizer-canary.spec.ts"
+          "path": "tests/tokenizer-canary.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:181b5bea1fa7929aaf4dcf90e4460ed2022409f72cff8e029491fe55c7230747"
         },
         {
           "type": "test",
@@ -405,15 +433,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/warp-llm-contracts.md"
+          "path": "docs/warp-llm-contracts.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a47847b6346a6a6c024af85ddf7d52757fdaf6a324f99576659211ac3fb1c5d0"
         },
         {
           "type": "doc",
-          "path": "docs/local-llm-windows.md"
+          "path": "docs/local-llm-windows.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0de98f086883d93bce635aba376c2793144e2f7359a72d8804aee0d620b703de"
         },
         {
           "type": "doc",
-          "path": "docs/warp-console-architecture.md"
+          "path": "docs/warp-console-architecture.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:47b77a13241ba6fcf417d3590697c7211199f8c9f02f6db33557163a25fb1a15"
         }
       ],
       "inputs": [],

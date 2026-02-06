@@ -48,7 +48,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/debate-specialists-tree.json"
+          "path": "docs/knowledge/debate-specialists-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c89889cca060ee46db820b8dce1ee482de993a86359c5f5475233eb57c406cca"
         }
       ]
     },
@@ -75,19 +77,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/debate/orchestrator.ts"
+          "path": "server/services/debate/orchestrator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f46bc4c08c01be4795a852d1a82e3338ef1d7cc3093ee50ef25d6859b1579ab7"
         },
         {
           "type": "code",
-          "path": "server/services/debate/prompts.ts"
+          "path": "server/services/debate/prompts.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6091854d0e3d83ea1906277b5656142dcd92306a1f8327413cddc72217882dec"
         },
         {
           "type": "code",
-          "path": "server/services/debate/types.ts"
+          "path": "server/services/debate/types.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1068fafb97cfb20ba56fc9d03f50b18517447334e460a6f702020e49ff87e3f5"
         },
         {
           "type": "code",
-          "path": "server/services/debate/warpPromptHelpers.ts"
+          "path": "server/services/debate/warpPromptHelpers.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f056d689a3572c194cb6403ab0af9be756e9b35efaa74fc391c1c7289eed8150"
         }
       ],
       "inputs": [],
@@ -134,7 +144,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/essence-debate.ts"
+          "path": "shared/essence-debate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8bfc2219e6bbaac740b86e31dbd36a28526de92e8d78522ae5a2398293c857c1"
         }
       ],
       "inputs": [],
@@ -185,7 +197,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/debate/telemetry-store.ts"
+          "path": "server/services/debate/telemetry-store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7feb5c484e4fdc20eda9bd7fd02e85b81f356a27bb0b6fbbe000172e981ccb74"
         },
         {
           "type": "code",
@@ -236,11 +250,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.debate.ts"
+          "path": "server/routes/agi.debate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:97ec3dbb0d9bb2982ff2cb9b4ddacd03576f86fcf6ddcfd82070a4bd18130ae0"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.specialists.ts"
+          "path": "server/routes/agi.specialists.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0c80ff489aedf512c01eb4bbf1f20b5f35d1a1aae691405af50c027c0c71690f"
         }
       ],
       "inputs": [],
@@ -291,19 +309,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/debate.run.ts"
+          "path": "server/skills/debate.run.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ebb870e1e0b3608dee5043b70383f599f72858ee4d44b388a493522d1b8432d"
         },
         {
           "type": "code",
-          "path": "server/skills/debate.checklist.generate.ts"
+          "path": "server/skills/debate.checklist.generate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:58566586778f21b77974381efa3e7be743a75c8af1e80d0b1dbcd66752080814"
         },
         {
           "type": "code",
-          "path": "server/skills/debate.checklist.score.ts"
+          "path": "server/skills/debate.checklist.score.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:eb61fd14f501dbbc49bce240d11b5313582f2a1d258e0ff020d905f63c9d0ddb"
         },
         {
           "type": "code",
-          "path": "server/skills/debate.claim.extract.ts"
+          "path": "server/skills/debate.claim.extract.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:86da89001dc925e3000b7fe9653f33c8c27354c73a250409e1eae470543bd55b"
         }
       ],
       "inputs": [],
@@ -350,11 +376,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/specialists/executor.ts"
+          "path": "server/services/specialists/executor.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a2719e65257e0a6eb9148b7ba2c0eb85987f31bdf41edf62db6d9cab1c0468e8"
         },
         {
           "type": "code",
-          "path": "server/specialists/bootstrap.ts"
+          "path": "server/specialists/bootstrap.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2fa3f15714e921dba351a1f14085218096c5e1c444ad4130fcff617c3657750e"
         },
         {
           "type": "code",
@@ -362,7 +392,9 @@
         },
         {
           "type": "code",
-          "path": "shared/agi-specialists.ts"
+          "path": "shared/agi-specialists.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:000ca77c5637c116ce625d040e17553bd5e2256dfbdf2fcbeee218d334672bd2"
         }
       ],
       "inputs": [],
@@ -409,7 +441,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "scripts/specialists-mini-loop.ts"
+          "path": "scripts/specialists-mini-loop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a4252fdae206b8cbcb3674bcc42f3da1901be2134bfece0bdd907d1517e7439a"
         }
       ],
       "inputs": [],

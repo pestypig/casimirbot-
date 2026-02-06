@@ -43,7 +43,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/casimir-tiles.md"
+          "path": "docs/knowledge/casimir-tiles.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:825bcbb7a9462ca2d651850cc22f7abac3d21d3932440a50cae0a45e3da1d7e0"
         }
       ],
       "predictability": {
@@ -74,7 +76,9 @@
         {
           "type": "doc",
           "path": "docs/knowledge/casimir-tiles.md",
-          "contains": "Definition"
+          "contains": "Definition",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:825bcbb7a9462ca2d651850cc22f7abac3d21d3932440a50cae0a45e3da1d7e0"
         }
       ],
       "children": [],
@@ -122,7 +126,9 @@
         {
           "type": "doc",
           "path": "docs/casimir-tile-mechanism.md",
-          "heading": "1) Mechanism in one view"
+          "heading": "1) Mechanism in one view",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:100ded5f8596d639ff80e36473c85cba62d96d2b1af158948a9165e5a0e1d100"
         }
       ],
       "children": [],
@@ -178,7 +184,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/casimir-tile-roadmap.md"
+          "path": "docs/casimir-tile-roadmap.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d1a250a2ec5656dee5bdea1d39854519be8a56795d3ddedc79dec3264459a0bd"
         }
       ],
       "inputs": [],
@@ -225,7 +233,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/casimir-tile-schematic-roadmap.md"
+          "path": "docs/casimir-tile-schematic-roadmap.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:064ea58b34bba655d204f76905a01ad882c9fa26225ec4d4923a6600d0e2b3c2"
         }
       ],
       "inputs": [],
@@ -264,12 +274,16 @@
         {
           "type": "doc",
           "path": "docs/guarded-casimir-tile-code-mapped.md",
-          "heading": "2.1 Ideal parallel-plate Casimir energy and pressure"
+          "heading": "2.1 Ideal parallel-plate Casimir energy and pressure",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c89daf1192841702019265493aa762724e7110caef2c5bfdbd7e9a8624d16013"
         },
         {
           "type": "code",
           "path": "server/energy-pipeline.ts",
-          "symbol": "casimirPressure_Pa"
+          "symbol": "casimirPressure_Pa",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         }
       ],
       "children": [],
@@ -325,7 +339,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/qi-guard-consolidation.md"
+          "path": "docs/qi-guard-consolidation.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e115fb0bbecf347f9e6413ec8aae30f81a4a5f23d50cd24f34053b62656dddc3"
         }
       ],
       "inputs": [],
@@ -372,7 +388,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/qi-homogenization-addendum.md"
+          "path": "docs/qi-homogenization-addendum.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3a3b50bd77c162cd46c956c22754bf78f80567b9f601835f8cc0dd4ba773dfdb"
         }
       ],
       "inputs": [],
@@ -419,7 +437,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/qi-ops-runbook.md"
+          "path": "docs/qi-ops-runbook.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:faabf55fa0d985faaf8e413c630fbf1da2bcfc921c4e65d23951e22038eff2a3"
         }
       ],
       "inputs": [],
@@ -481,11 +501,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/guarded-casimir-tile-code-mapped.md"
+          "path": "docs/guarded-casimir-tile-code-mapped.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c89daf1192841702019265493aa762724e7110caef2c5bfdbd7e9a8624d16013"
         },
         {
           "type": "code",
-          "path": "server/energy-pipeline.ts"
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         }
       ],
       "predictability": {
@@ -516,7 +540,9 @@
         {
           "type": "code",
           "path": "modules/sim_core/static-casimir.ts",
-          "symbol": "calculateCasimirEnergy"
+          "symbol": "calculateCasimirEnergy",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e67c3f5375b9a51bd95ea8b6d6877633a467c8f1d3141d9136e6f595e8911e3e"
         }
       ],
       "children": [],
@@ -614,7 +640,9 @@
         {
           "type": "code",
           "path": "server/energy-pipeline.ts",
-          "symbol": "casimirPressure_Pa"
+          "symbol": "casimirPressure_Pa",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         },
         {
           "type": "telemetry",
@@ -623,7 +651,9 @@
         {
           "type": "doc",
           "path": "docs/guarded-casimir-tile-code-mapped.md",
-          "heading": "2.1 Ideal parallel-plate Casimir energy and pressure"
+          "heading": "2.1 Ideal parallel-plate Casimir energy and pressure",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c89daf1192841702019265493aa762724e7110caef2c5bfdbd7e9a8624d16013"
         }
       ],
       "children": [],
@@ -660,7 +690,9 @@
         {
           "type": "code",
           "path": "modules/dynamic/dynamic-casimir.ts",
-          "symbol": "calculateDynamicCasimir"
+          "symbol": "calculateDynamicCasimir",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ed1243546ca5dabbdcfcd34003b9fd3e6eae9c4345ae115b2d68e6c8e102f0df"
         }
       ],
       "children": [],
@@ -708,7 +740,9 @@
         {
           "type": "code",
           "path": "modules/sim_core/casimir-inference.ts",
-          "symbol": "inferEnergyFromForceSeries"
+          "symbol": "inferEnergyFromForceSeries",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5b5a67475368becfc5089736b04e499c9aeb41ffc9027ce3515797607e1ed8af"
         }
       ],
       "children": [],
@@ -756,7 +790,9 @@
         {
           "type": "code",
           "path": "modules/dynamic/natario-metric.ts",
-          "symbol": "natarioFromPipeline"
+          "symbol": "natarioFromPipeline",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:50779b574187c5feba75e5b5575d2e970ede3705416671dca76f2e6b08bbec39"
         }
       ],
       "children": [],
@@ -804,7 +840,9 @@
         {
           "type": "code",
           "path": "modules/dynamic/stress-energy-equations.ts",
-          "symbol": "stressEnergyFromDensity"
+          "symbol": "stressEnergyFromDensity",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:93d21fcc38afab8cb31bd0c2586880fb653f91ac47c76464c0d444c4ef7db99c"
         }
       ],
       "children": [],

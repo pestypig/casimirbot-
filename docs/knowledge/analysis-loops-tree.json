@@ -27,7 +27,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/analysis-loops.md"
+          "path": "docs/knowledge/analysis-loops.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:54ba7f5189c2449ae2a123a22d8f401a32afc1b29608cbe76f6f8e275ea7bd7e"
         }
       ],
       "inputs": [],
@@ -74,7 +76,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/analysis-loops.md"
+          "path": "docs/knowledge/analysis-loops.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:54ba7f5189c2449ae2a123a22d8f401a32afc1b29608cbe76f6f8e275ea7bd7e"
         }
       ],
       "inputs": [],
@@ -121,7 +125,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/analysis/noise-field-loop.ts"
+          "path": "modules/analysis/noise-field-loop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d686909ed26ded718f43887e9dbd4e4cb88986ca4da246b59233757afeb9772b"
         }
       ],
       "inputs": [],
@@ -168,7 +174,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/analysis/diffusion-loop.ts"
+          "path": "modules/analysis/diffusion-loop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a599165a76626ab994f7de1f32da5703709fd70bd0d22a82ddb0f13632898f17"
         }
       ],
       "inputs": [],
@@ -215,7 +223,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/analysis/belief-graph-loop.ts"
+          "path": "modules/analysis/belief-graph-loop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4d790782d87cf0f7b3018a05a46b357d7f08a9b71a61514f9c3afde2ecc35656"
         }
       ],
       "inputs": [],
@@ -262,7 +272,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/analysis/constraint-loop.ts"
+          "path": "modules/analysis/constraint-loop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5fbe01dfe8ae053545e490728211f34f2b3b0b4ac58e8a58f6c4a5b1a21f6b43"
         }
       ],
       "inputs": [],
@@ -309,7 +321,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/analysis-loops.ts"
+          "path": "server/routes/analysis-loops.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e15a1bfca18ed5a3a6353cc067cade026673c0ab8372de1d429d6951dbb9b26e"
         }
       ],
       "inputs": [],

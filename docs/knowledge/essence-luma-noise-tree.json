@@ -50,7 +50,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/essence-luma-noise-tree.json"
+          "path": "docs/knowledge/essence-luma-noise-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c1d412ca4477c6bf0343fbf3c770d2d25dae595e11ca9b9d5c4aa257f75cf686"
         }
       ]
     },
@@ -76,11 +78,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/essence-schema.ts"
+          "path": "shared/essence-schema.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:11837b2019b9c9b9efba967e6052bf4cb338ae09142375bfbb085b95d067383f"
         },
         {
           "type": "code",
-          "path": "shared/essence-persona.ts"
+          "path": "shared/essence-persona.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3dec9f6ae75cc57fa2d786fd7d2d38b76769c0e91fa4dcefcb2e27cba76f2d80"
         }
       ],
       "inputs": [],
@@ -126,11 +132,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/essence/store.ts"
+          "path": "server/services/essence/store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1848b7994a728b460cd855afa33214d65be4e1d8bc67adb4678b0bf188c92723"
         },
         {
           "type": "code",
-          "path": "server/services/essence/memory-store.ts"
+          "path": "server/services/essence/memory-store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:078f26cf9af5ed89228c130d33833625e49a96c6bf394f2f9f971433f97eb4a8"
         }
       ],
       "inputs": [],
@@ -176,11 +186,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/essence/ingest-jobs.ts"
+          "path": "server/services/essence/ingest-jobs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e4669bde47c8d130ab9cc767069321497611a9242524311927a1d1a474481c96"
         },
         {
           "type": "code",
-          "path": "server/queue/index.ts"
+          "path": "server/queue/index.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bdb919aeb2e0914f7dae27eae8c9996f73e89cea45c79f9615a6a4615cce0bce"
         }
       ],
       "inputs": [],
@@ -226,11 +240,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/essence/mix.ts"
+          "path": "server/services/essence/mix.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:908823379234964550f0e5155f0e31e83b47070209a1ccf57733b82d68a0893b"
         },
         {
           "type": "code",
-          "path": "server/services/mixer/collapse.ts"
+          "path": "server/services/mixer/collapse.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:188b59e325e9e23c9bdfaa92022b102838b657951e06e66b2b3976c226857f41"
         }
       ],
       "inputs": [],
@@ -276,15 +294,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/luma.ts"
+          "path": "server/services/luma.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4425a2fe50cf77e350109c0ef3a3816658ed06fc6407c5294f4cb3309fee33ce"
         },
         {
           "type": "code",
-          "path": "server/routes/luma.ts"
+          "path": "server/routes/luma.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7ab855b1831ccb042dbdbedb8e5b61b74ac545d38de56c8abd9350e07ee70cbf"
         },
         {
           "type": "code",
-          "path": "server/routes/luma-hce.ts"
+          "path": "server/routes/luma-hce.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:36201174d53e2761194aab1ff761c3889851c8309ad709e0b9dc9d75600fdaad"
         }
       ],
       "inputs": [],
@@ -384,15 +408,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/noisegen-store.ts"
+          "path": "server/services/noisegen-store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4d00de661aff8b39b8e21a29ddef4cb540ab291a78a4b3848f7920187d69821a"
         },
         {
           "type": "code",
-          "path": "server/services/noisegen-intent.ts"
+          "path": "server/services/noisegen-intent.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a716f78aeb9544cc99b9f23112f7a5b08917abd50b1b987615d468ecb8b31cc5"
         },
         {
           "type": "code",
-          "path": "server/routes/noise-gens.ts"
+          "path": "server/routes/noise-gens.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:35b6360535189d286fb2fcfe02756317d816bb9d94cbf273c30f84b19f2fe213"
         }
       ],
       "inputs": [],

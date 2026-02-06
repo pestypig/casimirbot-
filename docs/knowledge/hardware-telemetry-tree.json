@@ -47,7 +47,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/hardware-telemetry-tree.json"
+          "path": "docs/knowledge/hardware-telemetry-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c007cc9453e35ed004111d2801d48268a298d520bfdad90ea77be632d22374a7"
         }
       ]
     },
@@ -73,7 +75,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/helix-core.ts"
+          "path": "server/helix-core.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:df54877e753629e1410478685b192cbbe3794cd9946823a79fc4724231f1a97d"
         }
       ],
       "inputs": [],
@@ -119,11 +123,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/lib/hardware-sector-bus.ts"
+          "path": "client/src/lib/hardware-sector-bus.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2d61cdd97fdffd32b556b73de67986c8c623e11c303284bee126ceb98d0dde4c"
         },
         {
           "type": "code",
-          "path": "server/helix-core.ts"
+          "path": "server/helix-core.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:df54877e753629e1410478685b192cbbe3794cd9946823a79fc4724231f1a97d"
         }
       ],
       "inputs": [],
@@ -170,11 +178,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/hooks/useHardwareFeeds.ts"
+          "path": "client/src/hooks/useHardwareFeeds.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f6be5c34a283b9ed015fd25a7eafb1d4361a9bf7966b9934da6c54704269119f"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useSectorStateBusRelay.ts"
+          "path": "client/src/hooks/useSectorStateBusRelay.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:42a2d2240b8857d7f780beb0d59f362539fa81c9412bb8831df820000e26e164"
         }
       ],
       "inputs": [],
@@ -282,15 +294,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/hardware/gpu-scheduler.ts"
+          "path": "server/services/hardware/gpu-scheduler.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:723b815d500a2ad73ebe712c540bea86478406f05b315cfee354aa4996155d23"
         },
         {
           "type": "code",
-          "path": "server/instruments/pump.ts"
+          "path": "server/instruments/pump.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a1cafcd0545d1f8e7ab5bc16d4278e82f622f6e94cbcd229228df143f16ef423"
         },
         {
           "type": "code",
-          "path": "server/instruments/pump-multitone.ts"
+          "path": "server/instruments/pump-multitone.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ead7e5dfb76acdff228a1ccc83a3be73d29edaf2c8155d7e4ee7fcef0f0e0a29"
         }
       ],
       "inputs": [],
@@ -336,7 +354,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/energy-pipeline.ts"
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         }
       ],
       "inputs": [],

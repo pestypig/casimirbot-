@@ -44,7 +44,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/concepts-tree.json"
+          "path": "docs/knowledge/concepts-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f32137bee9de2290a6670d830fc6578e2cd80940f182a85e921f48c081995c67"
         }
       ]
     },
@@ -94,7 +96,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/concepts-tree.json"
+          "path": "docs/knowledge/concepts-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f32137bee9de2290a6670d830fc6578e2cd80940f182a85e921f48c081995c67"
         }
       ]
     },
@@ -120,7 +124,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/epistemology.md"
+          "path": "docs/knowledge/epistemology.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:238877b7bedd6dcc706e0187f3248d749a1ee553bd3ca3eb6b8db11b3be48300"
         }
       ],
       "inputs": [],
@@ -166,7 +172,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/scientific-method.md"
+          "path": "docs/knowledge/scientific-method.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a5e0f37019f2687786599248e31334603080979a44762e5807139d28ff6fdf2f"
         }
       ],
       "inputs": [],
@@ -212,7 +220,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/falsifiability.md"
+          "path": "docs/knowledge/falsifiability.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e5bf0a59a820aae372deae3658f524bddc0d266506413e9986c931617f020e95"
         }
       ],
       "inputs": [],
@@ -282,7 +292,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/concepts-tree.json"
+          "path": "docs/knowledge/concepts-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f32137bee9de2290a6670d830fc6578e2cd80940f182a85e921f48c081995c67"
         }
       ]
     },
@@ -308,7 +320,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/platonic-reasoning.md"
+          "path": "docs/knowledge/platonic-reasoning.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1daf73dacf82b1c1a14c617f34e60c105d13b609c4188f4a51de3f58fb887e78"
         }
       ],
       "inputs": [],
@@ -354,7 +368,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/halobank.md"
+          "path": "docs/knowledge/halobank.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:102597986fd5390356634b342c11e4649b041ca8f487e7fff4c52972664e01d9"
         }
       ],
       "inputs": [],
@@ -422,7 +438,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/concepts-tree.json"
+          "path": "docs/knowledge/concepts-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f32137bee9de2290a6670d830fc6578e2cd80940f182a85e921f48c081995c67"
         }
       ]
     },
@@ -448,7 +466,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/morphospace-attractors.md"
+          "path": "docs/knowledge/morphospace-attractors.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7194186594154ed900191a23bd4bd52512729cdab8fd0eaaa479fe0a04ff3797"
         }
       ],
       "inputs": [],
