@@ -155,8 +155,26 @@ GR solver components move from evolution to diagnostics and gate decisions. Mini
 - type: bridge
 - summary: Cross-reference between GR Solver Progress and GR Solver Robustness within this tree. Minimal artifact: left/right evidence anchors.
 
+### Node: GR Constraint Gate <-> Verification Checklist
+- id: bridge-gr-constraint-gate-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and gr-constraint-gate (verification-anchor).
+
+### Node: GR Constraint Network <-> Stewardship Ledger
+- id: bridge-gr-constraint-network-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and gr-constraint-network (stewardship-guardrail).
+
 ## Bridges
 
 ### Bridge: GR Solver Progress <-> GR Solver Robustness
 - relation: Cross-reference between GR Solver Progress and GR Solver Robustness.
 - summary: Cross-reference between GR Solver Progress and GR Solver Robustness within this tree. Minimal artifact: left/right evidence anchors.
+
+### Bridge: verification-checklist <-> GR Constraint Gate
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and gr-constraint-gate (verification-anchor).
+
+### Bridge: stewardship-ledger <-> GR Constraint Network
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and gr-constraint-network (stewardship-guardrail).

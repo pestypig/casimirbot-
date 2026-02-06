@@ -140,8 +140,26 @@ Warp mechanics connect geometry choices to proxy constraints and operational con
 - type: concept
 - summary: Warp LLM contract notes define interface expectations (docs/warp-llm-contracts.md). Minimal artifact: contract summary.
 
+### Node: Warp Geometry Stack <-> Stewardship Ledger
+- id: bridge-warp-geometry-stack-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and warp-geometry-stack (stewardship-guardrail).
+
+### Node: Warp Control Stack <-> Verification Checklist
+- id: bridge-warp-control-stack-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and warp-control-stack (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Casimir Lattice <-> Natario Zero-Expansion
 - relation: Casimir lattice strobing relies on Natario zero-expansion geometry.
 - summary: Connects the Casimir lattice proxy to Natario zero-expansion geometry and implementation hooks. Minimal artifact: cross-reference between Casimir lattice strobing and Natario geometry.
+
+### Bridge: stewardship-ledger <-> Warp Geometry Stack
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and warp-geometry-stack (stewardship-guardrail).
+
+### Bridge: verification-checklist <-> Warp Control Stack
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and warp-control-stack (verification-anchor).

@@ -99,7 +99,8 @@
         "natario-zero-expansion",
         "shift-vector-expansion-scalar",
         "bubble-wall-thickness",
-        "vdb-compression-factor"
+        "vdb-compression-factor",
+        "bridge-warp-geometry-stack-stewardship-ledger"
       ],
       "links": [
         {
@@ -799,7 +800,8 @@
       ],
       "children": [
         "sector-strobes-duty-cycle",
-        "active-fraction"
+        "active-fraction",
+        "bridge-warp-control-stack-verification-checklist"
       ],
       "links": [
         {
@@ -1637,6 +1639,150 @@
       "environment": null,
       "dependencies": [
         "warp-implementation-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "bridge-warp-geometry-stack-stewardship-ledger",
+      "slug": "bridge-warp-geometry-stack-stewardship-ledger",
+      "title": "Warp Geometry Stack <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and warp-geometry-stack.",
+      "bodyMD": "Bridge between stewardship-ledger and warp-geometry-stack (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-geometry-stack"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "warp-geometry-stack",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "warp-geometry-stack"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "doc",
+          "path": "docs/warp-console-architecture.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:47b77a13241ba6fcf417d3590697c7211199f8c9f02f6db33557163a25fb1a15"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "bridge-warp-control-stack-verification-checklist",
+      "slug": "bridge-warp-control-stack-verification-checklist",
+      "title": "Warp Control Stack <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and warp-control-stack.",
+      "bodyMD": "Bridge between verification-checklist and warp-control-stack (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-control-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-control-stack"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "warp-control-stack",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "warp-control-stack"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "doc",
+          "path": "docs/warp-pulsed-power.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:7562ce1f1a33ae4b00fae4111d295f36acbda9b1f5009d6d39d4c4fd5de6fa42"
+        }
       ],
       "predictability": {
         "status": "partial",
