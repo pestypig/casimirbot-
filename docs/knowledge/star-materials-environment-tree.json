@@ -44,7 +44,21 @@
         }
       ],
       "summary": "Star and watcher API routes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/star.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/star-watcher.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.star.ts"
+        }
+      ]
     },
     {
       "id": "star-models-telemetry",
@@ -69,7 +83,21 @@
         }
       ],
       "summary": "Star model and telemetry schemas.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/models/star.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/star-telemetry.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/__tests__/star-equilibrium.spec.ts"
+        }
+      ]
     },
     {
       "id": "solar-adapters-guardrails",
@@ -90,7 +118,29 @@
         }
       ],
       "summary": "Solar energy adapters and guardrail definitions.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-energy-adapter.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-guardrails.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/solar-guardrails.ts"
+        },
+        {
+          "type": "code",
+          "path": "configs/solar-guardrails.v1.js"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/solar-adapter.ts"
+        }
+      ]
     },
     {
       "id": "environment-model",
@@ -111,7 +161,21 @@
         }
       ],
       "summary": "Environment schema and persistence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/environment-model.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/environment.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/009_essence_environment.ts"
+        }
+      ]
     },
     {
       "id": "star-panels",
@@ -136,7 +200,25 @@
         }
       ],
       "summary": "Star UI panels and docs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/star-hydrostatic-panel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/star-watcher-panel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/start.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/star-hydrostatic.md"
+        }
+      ]
     },
     {
       "id": "hull-materials",
@@ -161,7 +243,33 @@
         }
       ],
       "summary": "Needle hull materials, GLB handling, and geometry helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/needle-hull-materials.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/needle-hull-mainframe.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/hull-glb-next-steps.md"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/hull-metrics.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/hull-assets.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/needle-hull-preset.ts"
+        }
+      ]
     }
   ],
   "schema": {

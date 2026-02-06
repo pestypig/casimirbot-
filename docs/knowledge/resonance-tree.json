@@ -42,7 +42,13 @@
         }
       ],
       "summary": "Shared schema and base lattice definitions.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/code-lattice.ts"
+        }
+      ]
     },
     {
       "id": "code-lattice-schema",
@@ -62,7 +68,13 @@
         }
       ],
       "summary": "Schema definitions for code-lattice data.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/code-lattice.ts"
+        }
+      ]
     },
     {
       "id": "resonance-runtime",
@@ -85,7 +97,17 @@
         }
       ],
       "summary": "Resonance calculations and constants.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/resonance.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/resonance.constants.ts"
+        }
+      ]
     },
     {
       "id": "resonance-constants",
@@ -105,7 +127,13 @@
         }
       ],
       "summary": "Constants for resonance evaluation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/resonance.constants.ts"
+        }
+      ]
     },
     {
       "id": "resonance-engine",
@@ -125,7 +153,13 @@
         }
       ],
       "summary": "Core resonance computation engine.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/resonance.ts"
+        }
+      ]
     },
     {
       "id": "resonance-io",
@@ -150,7 +184,25 @@
         }
       ],
       "summary": "Loaders, builders, watchers, and routes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/loader.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/builders.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/watcher.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/code-lattice.ts"
+        }
+      ]
     },
     {
       "id": "resonance-loader",
@@ -170,7 +222,13 @@
         }
       ],
       "summary": "Load lattice inputs for resonance.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/loader.ts"
+        }
+      ]
     },
     {
       "id": "resonance-builders",
@@ -190,7 +248,13 @@
         }
       ],
       "summary": "Build lattice structures for resonance.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/builders.ts"
+        }
+      ]
     },
     {
       "id": "resonance-watcher",
@@ -210,7 +274,13 @@
         }
       ],
       "summary": "Watchers for resonance updates.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/watcher.ts"
+        }
+      ]
     },
     {
       "id": "resonance-routes",
@@ -230,7 +300,13 @@
         }
       ],
       "summary": "HTTP routes for resonance access.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/code-lattice.ts"
+        }
+      ]
     },
     {
       "id": "resonance-tests",
@@ -250,7 +326,17 @@
         }
       ],
       "summary": "Casimir resonance test cases.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/__tests__/resonance.casimir.spec.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/__tests__/casimir-resonance.spec.ts"
+        }
+      ]
     }
   ],
   "schema": {

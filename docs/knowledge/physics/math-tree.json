@@ -50,7 +50,13 @@
         }
       ],
       "summary": "Stages define which claims are allowed and which checks are required.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/math-stage.ts"
+        }
+      ]
     },
     {
       "id": "stage-exploratory",
@@ -207,7 +213,13 @@
         }
       ],
       "summary": "Compute dynamic Casimir and warp proxy inputs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "pipeline-stress-energy",
@@ -238,7 +250,17 @@
         }
       ],
       "summary": "Map pipeline outputs into stress-energy fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/stress-energy-brick.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr/evolution/stress-energy.ts"
+        }
+      ]
     },
     {
       "id": "pipeline-gr-evolution",
@@ -273,7 +295,17 @@
         }
       ],
       "summary": "Evolve BSSN fields and compute diagnostics.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/evolution/solver.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr-evolve-brick.ts"
+        }
+      ]
     },
     {
       "id": "pipeline-constraint-gate",
@@ -302,7 +334,13 @@
         }
       ],
       "summary": "Evaluate constraints against threshold policies.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/constraint-evaluator.ts"
+        }
+      ]
     },
     {
       "id": "pipeline-viability",
@@ -331,7 +369,17 @@
         }
       ],
       "summary": "Combine pipeline outputs with guardrails to evaluate viability.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "tools/warpViability.ts"
+        },
+        {
+          "type": "code",
+          "path": "modules/physics/warpAgents.ts"
+        }
+      ]
     },
     {
       "id": "pipeline-certificate",
@@ -359,7 +407,13 @@
         }
       ],
       "summary": "Issue certificate with integrity checks and policy gates.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "tools/warpViabilityCertificate.ts"
+        }
+      ]
     },
     {
       "id": "math-verification-gates",
@@ -438,7 +492,13 @@
         }
       ],
       "summary": "Central pipeline calculations and state assembly.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "dynamic-casimir-stack",
@@ -485,7 +545,13 @@
         }
       ],
       "summary": "Compute dynamic Casimir energy and sweep curves.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/dynamic/dynamic-casimir.ts"
+        }
+      ]
     },
     {
       "id": "natario-metric-engine",
@@ -506,7 +572,13 @@
         }
       ],
       "summary": "Compute Natario metric helpers for dynamic Casimir.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/dynamic/natario-metric.ts"
+        }
+      ]
     },
     {
       "id": "static-casimir-engine",
@@ -527,7 +599,13 @@
         }
       ],
       "summary": "Compute static Casimir energy baseline.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/sim_core/static-casimir.ts"
+        }
+      ]
     },
     {
       "id": "casimir-inference-engine",
@@ -548,7 +626,13 @@
         }
       ],
       "summary": "Infer energy from force series and datasets.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/sim_core/casimir-inference.ts"
+        }
+      ]
     },
     {
       "id": "qi-guardrails-stack",
@@ -598,7 +682,13 @@
         }
       ],
       "summary": "Compute Ford-Roman quantum inequality bounds.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/qi/qi-bounds.ts"
+        }
+      ]
     },
     {
       "id": "qi-monitor-engine",
@@ -619,7 +709,13 @@
         }
       ],
       "summary": "Kernel-based QI monitor for running averages.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/qi/qi-monitor.ts"
+        }
+      ]
     },
     {
       "id": "qi-saturation-window",
@@ -640,7 +736,13 @@
         }
       ],
       "summary": "Sampling window and saturation estimates.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/qi/qi-saturation.ts"
+        }
+      ]
     },
     {
       "id": "qi-stream",
@@ -661,7 +763,21 @@
         }
       ],
       "summary": "Live QI telemetry aggregation and snapshots.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/qi/pipeline-qi-stream.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/qi/qi-snap-source.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/qi/qi-snap-broadcaster.ts"
+        }
+      ]
     },
     {
       "id": "qi-autoscale",
@@ -682,7 +798,13 @@
         }
       ],
       "summary": "Autoscale QI controls to hold guardrail margins.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/controls/qi-autoscale.ts"
+        }
+      ]
     },
     {
       "id": "qi-autothrottle",
@@ -703,7 +825,13 @@
         }
       ],
       "summary": "Throttle controls to prevent guardrail breaches.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/controls/qi-autothrottle.ts"
+        }
+      ]
     },
     {
       "id": "qi-diagnostics",
@@ -724,7 +852,13 @@
         }
       ],
       "summary": "Schema for QI diagnostic payloads.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/qi-diagnostics.ts"
+        }
+      ]
     },
     {
       "id": "phase-control-stack",
@@ -771,7 +905,13 @@
         }
       ],
       "summary": "Compute sector phase offsets and pulse alignment.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy/phase-scheduler.ts"
+        }
+      ]
     },
     {
       "id": "phase-calibration",
@@ -792,7 +932,17 @@
         }
       ],
       "summary": "Record calibration snapshots for phase tuning.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/utils/phase-calibration.ts"
+        },
+        {
+          "type": "code",
+          "path": "sim_core/phase_calibration.js"
+        }
+      ]
     },
     {
       "id": "pump-controls",
@@ -813,7 +963,17 @@
         }
       ],
       "summary": "Drive pump command generation for pulses.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/instruments/pump.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/instruments/pump-multitone.ts"
+        }
+      ]
     },
     {
       "id": "ts-autoscale",
@@ -834,7 +994,13 @@
         }
       ],
       "summary": "Autoscale TS ratio to stabilize cadence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/ts/ts-autoscale.ts"
+        }
+      ]
     },
     {
       "id": "energy-field-inputs",
@@ -883,7 +1049,13 @@
         }
       ],
       "summary": "Canonical raster energy-field contract.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/raster-energy-field.ts"
+        }
+      ]
     },
     {
       "id": "tokamak-energy-field",
@@ -904,7 +1076,13 @@
         }
       ],
       "summary": "Tokamak channel manifests and energy fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/tokamak-energy-field.ts"
+        }
+      ]
     },
     {
       "id": "solar-energy-calibration",
@@ -925,7 +1103,13 @@
         }
       ],
       "summary": "Calibration for solar intensity to energy density.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/solar-energy-calibration.ts"
+        }
+      ]
     },
     {
       "id": "tokamak-synthetic-diagnostics",
@@ -946,7 +1130,13 @@
         }
       ],
       "summary": "Synthetic diagnostic schema for tokamak inputs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/tokamak-synthetic-diagnostics.ts"
+        }
+      ]
     },
     {
       "id": "solar-energy-adapter",
@@ -967,7 +1157,13 @@
         }
       ],
       "summary": "Adapter for solar telemetry to energy fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-energy-adapter.ts"
+        }
+      ]
     },
     {
       "id": "tokamak-energy-adapter",
@@ -988,7 +1184,13 @@
         }
       ],
       "summary": "Adapter for tokamak telemetry to energy fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/essence/tokamak-energy-adapter.ts"
+        }
+      ]
     },
     {
       "id": "stress-energy-equations",
@@ -1009,7 +1211,13 @@
         }
       ],
       "summary": "Compute stress-energy tensors from pipeline fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/dynamic/stress-energy-equations.ts"
+        }
+      ]
     },
     {
       "id": "stress-energy-brick",
@@ -1030,7 +1238,13 @@
         }
       ],
       "summary": "Brick that packages stress-energy for GR.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/stress-energy-brick.ts"
+        }
+      ]
     },
     {
       "id": "gr-stress-energy-fields",
@@ -1051,7 +1265,17 @@
         }
       ],
       "summary": "GR stress-energy field representation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/stress-energy.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr/evolution/stress-energy.ts"
+        }
+      ]
     },
     {
       "id": "stress-energy-integrals",
@@ -1072,7 +1296,13 @@
         }
       ],
       "summary": "Compute integrals over stress-energy fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/stress-energy-integrals.ts"
+        }
+      ]
     },
     {
       "id": "gr-initial-data",
@@ -1093,7 +1323,17 @@
         }
       ],
       "summary": "Initialize GR fields for evolution.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/evolution/initial-data.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr-initial-brick.ts"
+        }
+      ]
     },
     {
       "id": "gr-evolution-solver",
@@ -1114,7 +1354,13 @@
         }
       ],
       "summary": "Orchestrate GR evolution steps.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/evolution/solver.ts"
+        }
+      ]
     },
     {
       "id": "gr-evolution-brick",
@@ -1135,7 +1381,17 @@
         }
       ],
       "summary": "Brick wrapper for GR evolution runs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/evolution/brick.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr-evolve-brick.ts"
+        }
+      ]
     },
     {
       "id": "bssn-state",
@@ -1156,7 +1412,13 @@
         }
       ],
       "summary": "State containers for BSSN fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/bssn-state.ts"
+        }
+      ]
     },
     {
       "id": "bssn-evolution-core",
@@ -1177,7 +1439,13 @@
         }
       ],
       "summary": "Core BSSN evolution step.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/bssn-evolve.ts"
+        }
+      ]
     },
     {
       "id": "rk4-integrator",
@@ -1198,7 +1466,13 @@
         }
       ],
       "summary": "Runge-Kutta integrator for BSSN fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/rk4.ts"
+        }
+      ]
     },
     {
       "id": "stencils",
@@ -1219,7 +1493,13 @@
         }
       ],
       "summary": "Stencil operators for derivatives and boundaries.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/stencils.ts"
+        }
+      ]
     },
     {
       "id": "gr-diagnostics",
@@ -1240,7 +1520,13 @@
         }
       ],
       "summary": "Diagnostics for shift stiffness and stability.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/gr-diagnostics.ts"
+        }
+      ]
     },
     {
       "id": "gr-constraint-policy",
@@ -1261,7 +1547,13 @@
         }
       ],
       "summary": "Constraint policy thresholds and modes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-constraint-policy.ts"
+        }
+      ]
     },
     {
       "id": "gr-constraint-network",
@@ -1282,7 +1574,13 @@
         }
       ],
       "summary": "Compute constraint residuals for GR.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-constraint-network.ts"
+        }
+      ]
     },
     {
       "id": "warp-viability-sim",
@@ -1303,7 +1601,13 @@
         }
       ],
       "summary": "Simplified viability calculation for pipeline sanity checks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "sim_core/viability.ts"
+        }
+      ]
     },
     {
       "id": "certificate-verify",
@@ -1324,7 +1628,13 @@
         }
       ],
       "summary": "Verify certificate hashes and integrity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "tools/verifyCertificate.ts"
+        }
+      ]
     },
     {
       "id": "constraint-packs",
@@ -1345,7 +1655,17 @@
         }
       ],
       "summary": "Constraint pack definitions and ladder tiers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/CONSTRAINT-PACKS.md"
+        },
+        {
+          "type": "code",
+          "path": "shared/constraint-packs.ts"
+        }
+      ]
     },
     {
       "id": "constraint-pack-policy",
@@ -1366,7 +1686,17 @@
         }
       ],
       "summary": "Policy profiles for constraint packs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/constraint-packs/constraint-pack-policy.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/constraint-packs/constraint-pack-policy-store.ts"
+        }
+      ]
     },
     {
       "id": "constraint-pack-evaluator",
@@ -1387,7 +1717,17 @@
         }
       ],
       "summary": "Evaluate telemetry against pack constraints.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/observability/constraint-pack-evaluator.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/observability/constraint-pack-normalizer.ts"
+        }
+      ]
     },
     {
       "id": "constraint-pack-telemetry",
@@ -1408,7 +1748,13 @@
         }
       ],
       "summary": "Telemetry ingestion for constraint evaluation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/observability/constraint-pack-telemetry.ts"
+        }
+      ]
     },
     {
       "id": "phase-diagram-validation",
@@ -1429,7 +1775,17 @@
         }
       ],
       "summary": "Validate viability outputs against phase diagram expectations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "tools/validate-phase-diagram.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/viability-validation.ts"
+        }
+      ]
     }
   ],
   "schema": {

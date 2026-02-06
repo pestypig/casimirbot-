@@ -108,7 +108,13 @@
         }
       ],
       "summary": "Roadmap for proof and development milestones.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/casimir-tile-roadmap.md"
+        }
+      ]
     },
     {
       "id": "casimir-tile-schematic-roadmap",
@@ -129,7 +135,13 @@
         }
       ],
       "summary": "Schematic steps and verification hooks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/casimir-tile-schematic-roadmap.md"
+        }
+      ]
     },
     {
       "id": "guarded-casimir-tile-code-mapped",
@@ -183,7 +195,13 @@
         }
       ],
       "summary": "Quantum inequality guardrail consolidation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/qi-guard-consolidation.md"
+        }
+      ]
     },
     {
       "id": "qi-homogenization-addendum",
@@ -204,7 +222,13 @@
         }
       ],
       "summary": "Homogenization notes for quantum inequality handling.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/qi-homogenization-addendum.md"
+        }
+      ]
     },
     {
       "id": "qi-ops-runbook",
@@ -225,7 +249,13 @@
         }
       ],
       "summary": "Operational runbook for QI guardrails.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/qi-ops-runbook.md"
+        }
+      ]
     },
     {
       "id": "casimir-calculation-stack",
@@ -330,15 +360,15 @@
       ],
       "validity": {
         "gap_m": {
-          "min": 1e-09,
-          "max": 1e-06
+          "min": 1e-9,
+          "max": 0.000001
         },
         "notes": "Outside range, correction models required."
       },
       "deterministic": true,
       "tolerance": {
-        "rel": 1e-09,
-        "abs": 1e-06
+        "rel": 1e-9,
+        "abs": 0.000001
       },
       "dependencies": [
         "casimir-static-engine",

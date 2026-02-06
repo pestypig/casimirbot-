@@ -46,7 +46,17 @@
         }
       ],
       "summary": "Core essence schemas and persona fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/essence-schema.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/essence-persona.ts"
+        }
+      ]
     },
     {
       "id": "essence-store",
@@ -66,7 +76,17 @@
         }
       ],
       "summary": "Essence storage and memory stores.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/essence/store.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/memory-store.ts"
+        }
+      ]
     },
     {
       "id": "essence-ingest-jobs",
@@ -86,7 +106,17 @@
         }
       ],
       "summary": "Async ingest and job scheduling.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/essence/ingest-jobs.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/queue/index.ts"
+        }
+      ]
     },
     {
       "id": "essence-mix",
@@ -106,7 +136,17 @@
         }
       ],
       "summary": "Mixing and collapse fusion.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/essence/mix.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/mixer/collapse.ts"
+        }
+      ]
     },
     {
       "id": "luma-services",
@@ -126,7 +166,21 @@
         }
       ],
       "summary": "Luma generation services and routes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/luma.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/luma.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/luma-hce.ts"
+        }
+      ]
     },
     {
       "id": "luma-client",
@@ -146,7 +200,21 @@
         }
       ],
       "summary": "Client Luma panels and helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/LumaPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/LumaWhisper.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/LumaWhisperBubble.ts"
+        }
+      ]
     },
     {
       "id": "noisegen-services",
@@ -166,7 +234,21 @@
         }
       ],
       "summary": "Noise generation services and routes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/noisegen-store.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/noisegen-intent.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/noise-gens.ts"
+        }
+      ]
     },
     {
       "id": "noisegen-ui",
@@ -186,7 +268,21 @@
         }
       ],
       "summary": "Noise generation UI surfaces.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-noise-gens.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/noise-gen/ProjectAlbumPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/noise-gens/OriginalsPlayer.ts"
+        }
+      ]
     },
     {
       "id": "essence-ui",
@@ -206,7 +302,17 @@
         }
       ],
       "summary": "Essence panels and render surfaces.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/essence/DresscodePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/essence-render.ts"
+        }
+      ]
     }
   ],
   "schema": {

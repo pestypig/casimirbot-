@@ -43,7 +43,33 @@
         }
       ],
       "summary": "SDK client entrypoints and shared types.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "sdk/index.ts"
+        },
+        {
+          "type": "code",
+          "path": "sdk/client.ts"
+        },
+        {
+          "type": "code",
+          "path": "sdk/types.ts"
+        },
+        {
+          "type": "code",
+          "path": "sdk/src/index.ts"
+        },
+        {
+          "type": "code",
+          "path": "sdk/src/client.ts"
+        },
+        {
+          "type": "code",
+          "path": "sdk/src/types.ts"
+        }
+      ]
     },
     {
       "id": "sdk-runtime",
@@ -64,7 +90,17 @@
         }
       ],
       "summary": "Runtime helpers and transport wiring.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "sdk/runtime.ts"
+        },
+        {
+          "type": "code",
+          "path": "sdk/src/runtime.ts"
+        }
+      ]
     },
     {
       "id": "sdk-config",
@@ -85,7 +121,17 @@
         }
       ],
       "summary": "SDK package configuration and build settings.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "sdk/package.js"
+        },
+        {
+          "type": "code",
+          "path": "sdk/tsconfig.js"
+        }
+      ]
     },
     {
       "id": "sdk-docs",
@@ -106,7 +152,13 @@
         }
       ],
       "summary": "SDK README and usage notes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "sdk/README.md"
+        }
+      ]
     },
     {
       "id": "sdk-examples",
@@ -131,7 +183,17 @@
         }
       ],
       "summary": "SDK usage examples and adapter payloads.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "packages/create-casimir-verifier/template/adapter-request.js"
+        },
+        {
+          "type": "code",
+          "path": "examples/hello-verifier/adapter-request.js"
+        }
+      ]
     }
   ],
   "schema": {

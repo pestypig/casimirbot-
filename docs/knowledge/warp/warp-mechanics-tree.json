@@ -71,7 +71,13 @@
         }
       ],
       "summary": "Define the bubble geometry and boundary choices.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/warp-bubble.md"
+        }
+      ]
     },
     {
       "id": "alcubierre-metric",
@@ -92,7 +98,13 @@
         }
       ],
       "summary": "Classic warp metric with expansion and contraction regions.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/alcubierre-metric.md"
+        }
+      ]
     },
     {
       "id": "natario-zero-expansion",
@@ -113,7 +125,13 @@
         }
       ],
       "summary": "Zero-expansion warp metric variants.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/natario-zero-expansion.md"
+        }
+      ]
     },
     {
       "id": "shift-vector-expansion-scalar",
@@ -134,7 +152,13 @@
         }
       ],
       "summary": "Shift vector choices drive expansion properties.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/shift-vector-expansion-scalar.md"
+        }
+      ]
     },
     {
       "id": "bubble-wall-thickness",
@@ -155,7 +179,13 @@
         }
       ],
       "summary": "Wall thickness controls gradients and energy needs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/bubble-wall-thickness.md"
+        }
+      ]
     },
     {
       "id": "vdb-compression-factor",
@@ -176,7 +206,13 @@
         }
       ],
       "summary": "Compression factor trades bubble interior for reduced energy.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/vdb-compression-factor.md"
+        }
+      ]
     },
     {
       "id": "warp-proxy-stack",
@@ -222,7 +258,13 @@
         }
       ],
       "summary": "Lattice configurations as negative-energy proxies.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/casimir-lattice.md"
+        }
+      ]
     },
     {
       "id": "ford-roman-proxy",
@@ -243,7 +285,13 @@
         }
       ],
       "summary": "Proxy bounds from quantum inequality constraints.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/ford-roman-proxy.md"
+        }
+      ]
     },
     {
       "id": "power-mass-ladders",
@@ -264,7 +312,13 @@
         }
       ],
       "summary": "Scaling ladders for energy and mass requirements.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/power-mass-ladders.md"
+        }
+      ]
     },
     {
       "id": "warp-control-stack",
@@ -309,7 +363,13 @@
         }
       ],
       "summary": "Duty cycle controls temporal averaging in warp drives.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/sector-strobes-duty-cycle.md"
+        }
+      ]
     },
     {
       "id": "active-fraction",
@@ -330,7 +390,13 @@
         }
       ],
       "summary": "Active fraction defines how much of the system is energized at once.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/active-fraction.md"
+        }
+      ]
     },
     {
       "id": "warp-implementation-stack",
@@ -381,7 +447,13 @@
         }
       ],
       "summary": "Module integrating Natario warp calculations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        }
+      ]
     },
     {
       "id": "natario-warp-implementation",
@@ -402,7 +474,13 @@
         }
       ],
       "summary": "Natario zero-expansion warp computations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/warp/natario-warp.ts"
+        }
+      ]
     },
     {
       "id": "theta-semantics",
@@ -423,7 +501,13 @@
         }
       ],
       "summary": "Theta definitions and calibration semantics.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/theta-semantics.md"
+        }
+      ]
     },
     {
       "id": "warp-pulsed-power",
@@ -444,7 +528,13 @@
         }
       ],
       "summary": "Pulsed power assumptions for warp operations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warp-pulsed-power.md"
+        }
+      ]
     },
     {
       "id": "warpfield-mesh-patch-plan",
@@ -465,7 +555,13 @@
         }
       ],
       "summary": "Mesh plan for warpfield sampling.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warpfield-mesh-patch-plan.md"
+        }
+      ]
     },
     {
       "id": "warpfield-visualization-roadmap",
@@ -486,7 +582,13 @@
         }
       ],
       "summary": "Visualization plan for warpfield outputs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warpfield-visualization-roadmap.md"
+        }
+      ]
     },
     {
       "id": "warp-console-architecture",
@@ -507,7 +609,13 @@
         }
       ],
       "summary": "Architecture overview for warp console.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warp-console-architecture.md"
+        }
+      ]
     },
     {
       "id": "warp-llm-contracts",
@@ -528,7 +636,13 @@
         }
       ],
       "summary": "Contract assumptions for warp LLM interactions.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warp-llm-contracts.md"
+        }
+      ]
     }
   ],
   "schema": {

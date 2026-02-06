@@ -43,7 +43,13 @@
         }
       ],
       "summary": "Hardware ingest endpoints and normalization.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/helix-core.ts"
+        }
+      ]
     },
     {
       "id": "hardware-bus",
@@ -63,7 +69,17 @@
         }
       ],
       "summary": "Hardware sector bus and broadcast channels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/hardware-sector-bus.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/helix-core.ts"
+        }
+      ]
     },
     {
       "id": "hardware-hooks",
@@ -84,7 +100,17 @@
         }
       ],
       "summary": "Client hooks for hardware feeds.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/hooks/useHardwareFeeds.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useSectorStateBusRelay.ts"
+        }
+      ]
     },
     {
       "id": "hardware-panels",
@@ -104,7 +130,29 @@
         }
       ],
       "summary": "UI surfaces for hardware control and monitoring.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/HardwareConnectModal.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/HardwareConnectButton.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SpectrumTunerPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/VacuumGapSweepHUD.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/LightSpeedStrobeScale.ts"
+        }
+      ]
     },
     {
       "id": "hardware-scheduler",
@@ -124,7 +172,21 @@
         }
       ],
       "summary": "Scheduling and pump control helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/hardware/gpu-scheduler.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/instruments/pump.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/instruments/pump-multitone.ts"
+        }
+      ]
     },
     {
       "id": "hardware-provenance",
@@ -144,7 +206,13 @@
         }
       ],
       "summary": "Hardware truth signals feeding physics pipelines.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     }
   ],
   "schema": {

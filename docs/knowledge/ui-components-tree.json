@@ -58,7 +58,17 @@
         }
       ],
       "summary": "Global UI shell and routing entry points.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/App.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/main.ts"
+        }
+      ]
     },
     {
       "id": "ui-page-surfaces",
@@ -109,7 +119,25 @@
         }
       ],
       "summary": "Primary Helix core surface and panel hub.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-core.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-core.panels.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-observables.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-noise-gens.ts"
+        }
+      ]
     },
     {
       "id": "ui-page-desktop",
@@ -129,7 +157,13 @@
         }
       ],
       "summary": "Desktop layout and panel stacking.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/desktop.ts"
+        }
+      ]
     },
     {
       "id": "ui-page-simulation",
@@ -149,7 +183,13 @@
         }
       ],
       "summary": "Simulation UI surface and controls.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/simulation.ts"
+        }
+      ]
     },
     {
       "id": "ui-page-star",
@@ -169,7 +209,17 @@
         }
       ],
       "summary": "Star monitoring and hydrostatic pages.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/star-watcher-panel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/star-hydrostatic-panel.ts"
+        }
+      ]
     },
     {
       "id": "ui-page-ideology",
@@ -189,7 +239,17 @@
         }
       ],
       "summary": "Ideology render and supporting pages.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/ideology-render.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/why.ts"
+        }
+      ]
     },
     {
       "id": "ui-page-agi",
@@ -209,7 +269,21 @@
         }
       ],
       "summary": "AGI administration and refinery pages.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/agi-refinery.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/code-admin.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/rag-admin.ts"
+        }
+      ]
     },
     {
       "id": "ui-page-docs",
@@ -229,7 +303,17 @@
         }
       ],
       "summary": "Docs and ingest pages.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/documentation.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/ingest.ts"
+        }
+      ]
     },
     {
       "id": "ui-page-start",
@@ -249,7 +333,21 @@
         }
       ],
       "summary": "Start and home pages.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/start.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/home.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/station.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-registry",
@@ -273,7 +371,17 @@
         }
       ],
       "summary": "Panel mounting and registration.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-core.panels.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/desktop.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-registry-helix",
@@ -294,7 +402,13 @@
         }
       ],
       "summary": "Helix panel registration and docking.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-core.panels.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-registry-desktop",
@@ -315,7 +429,13 @@
         }
       ],
       "summary": "Desktop panel layouts.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/desktop.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-physics-core",
@@ -364,7 +484,17 @@
         }
       ],
       "summary": "Drive guardrails and capability displays.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/DriveGuardsPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SpeedCapabilityPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-parameter-sweep",
@@ -385,7 +515,21 @@
         }
       ],
       "summary": "Parameter sweep controls and visualization.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ParametricSweepPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/parameter-panel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/dynamic-controls.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-energy-flux",
@@ -406,7 +550,21 @@
         }
       ],
       "summary": "Energy flux and pipeline indicators.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/EnergyFluxPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/energy-pipeline.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/live-energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-observables",
@@ -426,7 +584,17 @@
         }
       ],
       "summary": "Observables and field sampling views.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ObservablesPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/PhysicsFieldSampler.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-qi-controls",
@@ -447,7 +615,29 @@
         }
       ],
       "summary": "QI guardrails and tuning widgets.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/QiAutoTunerPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/QiWidget.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/QiGuardBadge.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/QiTileGuardBands.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/QiLatticePanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-metrics-dashboard",
@@ -467,7 +657,21 @@
         }
       ],
       "summary": "Metrics dashboards and KPI widgets.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/metrics-dashboard.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/NearZeroWidget.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/FuelGauge.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-warp-drive",
@@ -515,7 +719,17 @@
         }
       ],
       "summary": "Primary Alcubierre surface panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/AlcubierrePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/WarpEngineContainer.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-warp-bubble",
@@ -536,7 +750,21 @@
         }
       ],
       "summary": "Warp bubble visualization and diagnostics.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/WarpBubbleGLPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/WarpBubbleLivePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/WarpRenderInspector.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-warp-proof",
@@ -557,7 +785,17 @@
         }
       ],
       "summary": "Warp proof and experiment ladder panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/WarpProofPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/WarpExperimentLadderPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-warp-ledger",
@@ -578,7 +816,13 @@
         }
       ],
       "summary": "Warp ledger and accounting UI.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/WarpLedgerPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-shift-vector",
@@ -599,7 +843,13 @@
         }
       ],
       "summary": "Shift vector diagnostic UI.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ShiftVectorPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-casimir-energy",
@@ -648,7 +898,13 @@
         }
       ],
       "summary": "Casimir tile grid and lattice views.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CasimirTileGridPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-cavity-mechanism",
@@ -669,7 +925,25 @@
         }
       ],
       "summary": "Cavity geometry and cross-section panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CavityMechanismPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CavityCrossSectionSplit.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CavityFrameView.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CavitySideView.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-energy-pipeline",
@@ -690,7 +964,17 @@
         }
       ],
       "summary": "Energy pipeline and live pipeline views.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/energy-pipeline.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/live-energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-casimir-amplifier",
@@ -711,7 +995,21 @@
         }
       ],
       "summary": "Amplification and metric pockets.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/HelixCasimirAmplifier.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/AmplificationPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MetricAmplificationPocket.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-pipeline-proof",
@@ -732,7 +1030,21 @@
         }
       ],
       "summary": "Proof overlays and provenance panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/PipelineProofPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MassProvenancePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CardProofOverlay.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-vacuum",
@@ -753,7 +1065,21 @@
         }
       ],
       "summary": "Vacuum gap heatmaps and contracts.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/VacuumGapHeatmap.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/VacuumGapSweepHUD.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/VacuumContractBadge.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-curvature-gr",
@@ -800,7 +1126,21 @@
         }
       ],
       "summary": "Curvature ledger and tensor views.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureLedgerPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureTensorPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CurvaturePhysicsPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-curvature-slices",
@@ -821,7 +1161,17 @@
         }
       ],
       "summary": "Curvature slices and sampling views.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureSlicePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SliceViewer.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-gr-agent-loop",
@@ -842,7 +1192,21 @@
         }
       ],
       "summary": "GR agent loop audit and learning panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/GrAgentLoopAuditPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/GrAgentLoopKpiPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/GrAgentLoopLearningPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-time-dilation",
@@ -863,7 +1227,17 @@
         }
       ],
       "summary": "Time dilation lattice and strobe visuals.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/TimeDilationLatticePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/LightSpeedStrobeScale.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-proof-verification",
@@ -888,7 +1262,17 @@
         }
       ],
       "summary": "Verification panels and audit trees.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/MathMaturityTreePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/UniversalAuditTreePanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-math-maturity",
@@ -909,7 +1293,13 @@
         }
       ],
       "summary": "Math maturity tree displays.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/MathMaturityTreePanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-universal-audit",
@@ -930,7 +1320,21 @@
         }
       ],
       "summary": "Audit trees and knowledge panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/UniversalAuditTreePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CoreKnowledgePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/AgiKnowledgePanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-verification-tab",
@@ -951,7 +1355,21 @@
         }
       ],
       "summary": "Verification tab and proof charts.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/verification-tab.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/visual-proof-charts.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/FrontProofsLedger.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-knowledge-ideology",
@@ -976,7 +1394,21 @@
         }
       ],
       "summary": "Panels for ideology and knowledge navigation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/DocViewerPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-ideology",
@@ -996,7 +1428,17 @@
         }
       ],
       "summary": "Ideology and ethos surfaces.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-knowledge-docs",
@@ -1017,7 +1459,17 @@
         }
       ],
       "summary": "Document viewer and definition chips.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/DocViewerPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/DefinitionChip.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-halobank",
@@ -1037,7 +1489,17 @@
         }
       ],
       "summary": "Halobank and spore timeline panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/HalobankPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SporeTimeline.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-stellar-solar",
@@ -1063,7 +1525,25 @@
         }
       ],
       "summary": "Solar and stellar monitoring panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SolarGlobePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SolarDiskCanvas.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SolarMap.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/StellarLsrPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-solar-globe",
@@ -1083,7 +1563,25 @@
         }
       ],
       "summary": "Solar globe and navigation panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SolarGlobePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SolarDiskCanvas.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SolarNavViewer.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SolarMap.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-stellar-lsr",
@@ -1103,7 +1601,13 @@
         }
       ],
       "summary": "Local standard of rest displays.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/StellarLsrPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-deep-mixing",
@@ -1124,7 +1628,13 @@
         }
       ],
       "summary": "Deep mixing solar visuals.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/DeepMixingSolarView.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-tokamak",
@@ -1145,7 +1655,13 @@
         }
       ],
       "summary": "Tokamak simulation UI.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/TokamakSimulationPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-lattice-time-dilation",
@@ -1170,7 +1686,17 @@
         }
       ],
       "summary": "Hull, lattice, and needle panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/Hull3DRenderer.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/HullMetricsVisPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-hull3d",
@@ -1191,7 +1717,21 @@
         }
       ],
       "summary": "Hull 3D renderer and metrics panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/Hull3DRenderer.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/HullMetricsVisPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/HelixHullCardsPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-lattice",
@@ -1211,7 +1751,21 @@
         }
       ],
       "summary": "Lattice and slice viewing panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/QiLatticePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SliceViewer.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/VolumeModeToggle.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-needle",
@@ -1231,7 +1785,25 @@
         }
       ],
       "summary": "Needle bubble, worksheet, and roadmap panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/NeedleCavityBubblePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/NeedleIpeakWorksheetPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/NeedleWorldRoadmap.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/PhoenixNeedlePanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-noise-essence",
@@ -1257,7 +1829,17 @@
         }
       ],
       "summary": "Noise generation, Luma, and essence panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/LumaPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/essence/DresscodePanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-noise-gen",
@@ -1277,7 +1859,17 @@
         }
       ],
       "summary": "Noise generation project panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/noise-gen/ProjectAlbumPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/noise-gen/StemDaw.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-noise-gens",
@@ -1297,7 +1889,21 @@
         }
       ],
       "summary": "Noise gen libraries and players.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/noise-gens/CoverCreator.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/noise-gens/OriginalsPlayer.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/noise-gens/NoiseFieldPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-luma",
@@ -1317,7 +1923,25 @@
         }
       ],
       "summary": "Luma overlays and mood visuals.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/LumaPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/LumaWhisper.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/LumaWhisperBubble.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/BackgroundLuma.ts"
+        }
+      ]
     },
     {
       "id": "ui-panel-essence",
@@ -1337,7 +1961,13 @@
         }
       ],
       "summary": "Essence dresscode and profile panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/essence/DresscodePanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-renderers-3d",
@@ -1383,7 +2013,13 @@
         }
       ],
       "summary": "Hull 3D renderer and overlays.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/Hull3DRenderer.ts"
+        }
+      ]
     },
     {
       "id": "ui-renderer-warp-bubble",
@@ -1404,7 +2040,17 @@
         }
       ],
       "summary": "Warp bubble GL renderer.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/WarpBubbleGLPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/WebGLDiagnostics.ts"
+        }
+      ]
     },
     {
       "id": "ui-renderer-galaxy",
@@ -1425,7 +2071,17 @@
         }
       ],
       "summary": "Galaxy map and deep zoom views.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/GalaxyMapPanZoom.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/GalaxyDeepZoom.ts"
+        }
+      ]
     },
     {
       "id": "ui-hud-overlays",
@@ -1450,7 +2106,21 @@
         }
       ],
       "summary": "HUD overlays and live indicators.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CollapseBenchmarkHUD.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SectorRolesHud.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/NavPoseHUD.ts"
+        }
+      ]
     },
     {
       "id": "ui-hud-collapse",
@@ -1471,7 +2141,17 @@
         }
       ],
       "summary": "Collapse benchmark HUD surface.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CollapseBenchmarkHUD.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CollapseBenchmarkHUDPanel.ts"
+        }
+      ]
     },
     {
       "id": "ui-hud-sector",
@@ -1492,7 +2172,21 @@
         }
       ],
       "summary": "Sector grid and role HUDs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SectorGridRing.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SectorRolesHud.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SectorLegend.ts"
+        }
+      ]
     },
     {
       "id": "ui-hud-nav",
@@ -1513,7 +2207,13 @@
         }
       ],
       "summary": "Navigation pose HUD elements.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/NavPoseHUD.ts"
+        }
+      ]
     },
     {
       "id": "ui-hooks-state",
@@ -1559,7 +2259,21 @@
         }
       ],
       "summary": "Physics data hooks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-energy-pipeline.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useGrBrick.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useStressEnergyBrick.ts"
+        }
+      ]
     },
     {
       "id": "ui-stores",
@@ -1580,7 +2294,21 @@
         }
       ],
       "summary": "State stores for panels and routing.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/store/useDesktopStore.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/store/useFlightDirectorStore.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/store/useAgiChatStore.ts"
+        }
+      ]
     },
     {
       "id": "ui-lib-adapters",
@@ -1601,7 +2329,21 @@
         }
       ],
       "summary": "Client library adapters and physics bridges.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/simulation-api.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/warp-pipeline-adapter.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/curvature-brick.ts"
+        }
+      ]
     },
     {
       "id": "ui-primitives",
@@ -1664,7 +2406,13 @@
         }
       ],
       "summary": "Mobile start surface and components.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/mobile-start.ts"
+        }
+      ]
     },
     {
       "id": "ui-legacy-warp-web",
@@ -1709,7 +2457,25 @@
         }
       ],
       "summary": "Charts and visual helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/chart-visualization.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/mesh-visualization.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/phase-diagram.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/dynamic-visualization.ts"
+        }
+      ]
     },
     {
       "id": "ui-vis-charts",
@@ -1729,7 +2495,17 @@
         }
       ],
       "summary": "Chart and plot helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/chart-visualization.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/visual-proof-charts.ts"
+        }
+      ]
     },
     {
       "id": "ui-vis-mesh",
@@ -1749,7 +2525,17 @@
         }
       ],
       "summary": "Mesh and surface visualization helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/mesh-visualization.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/ShellOutlineVisualizer.ts"
+        }
+      ]
     },
     {
       "id": "ui-vis-phase-diagram",
@@ -1769,7 +2555,17 @@
         }
       ],
       "summary": "Phase diagram visualization.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/phase-diagram.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/phase-diagram-validator.ts"
+        }
+      ]
     },
     {
       "id": "ui-backend-binding",
@@ -1798,7 +2594,13 @@
         }
       ],
       "summary": "Backend-to-UI dataflow map for physics surfaces.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-backend-binding-tree.js"
+        }
+      ]
     }
   ],
   "schema": {

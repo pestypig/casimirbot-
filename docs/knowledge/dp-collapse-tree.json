@@ -45,7 +45,13 @@
         }
       ],
       "summary": "Derivation and assumptions for DP collapse estimates.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/DP_COLLAPSE_DERIVATION.md"
+        }
+      ]
     },
     {
       "id": "dp-collapse-estimator",
@@ -66,7 +72,13 @@
         }
       ],
       "summary": "Estimator for DeltaE and collapse timing.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/dp-collapse.ts"
+        }
+      ]
     },
     {
       "id": "dp-adapters",
@@ -87,7 +99,13 @@
         }
       ],
       "summary": "Adapters map stress-energy fields into DP inputs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/dp-adapters.ts"
+        }
+      ]
     },
     {
       "id": "dp-adapter-build",
@@ -108,7 +126,13 @@
         }
       ],
       "summary": "Construct adapter inputs from GR bricks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/dp-adapter-build.ts"
+        }
+      ]
     },
     {
       "id": "dp-planner-schema",
@@ -129,7 +153,13 @@
         }
       ],
       "summary": "Schema for collapse planning inputs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/dp-planner.ts"
+        }
+      ]
     },
     {
       "id": "dp-planner-service",
@@ -150,7 +180,13 @@
         }
       ],
       "summary": "Service for collapse planning calculations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/dp-planner.ts"
+        }
+      ]
     }
   ],
   "schema": {

@@ -43,7 +43,13 @@
         }
       ],
       "summary": "Queue registry and dispatch.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/queue/index.ts"
+        }
+      ]
     },
     {
       "id": "queue-routes",
@@ -63,7 +69,13 @@
         }
       ],
       "summary": "HTTP routes for job dispatch and status.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/jobs.ts"
+        }
+      ]
     },
     {
       "id": "queue-job-services",
@@ -83,7 +95,25 @@
         }
       ],
       "summary": "Job execution and budget policies.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/jobs/engine.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/jobs/payouts.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/jobs/token-budget.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/jobs/proposals.ts"
+        }
+      ]
     },
     {
       "id": "queue-essence-ingest",
@@ -103,7 +133,17 @@
         }
       ],
       "summary": "Essence ingest job pipeline.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/essence/ingest-jobs.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/queue/index.ts"
+        }
+      ]
     },
     {
       "id": "queue-profile-summarizer",
@@ -123,7 +163,17 @@
         }
       ],
       "summary": "Profile summarizer job and schedules.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/profile-summarizer-job.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/profile-summarizer.ts"
+        }
+      ]
     },
     {
       "id": "queue-orchestrator",
@@ -143,7 +193,17 @@
         }
       ],
       "summary": "Orchestration routes and services.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/orchestrator.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/orchestrator.ts"
+        }
+      ]
     }
   ],
   "schema": {

@@ -63,7 +63,21 @@
         }
       ],
       "summary": "Casimir verification CLI and adapter contracts.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "cli/casimir-verify.ts"
+        },
+        {
+          "type": "code",
+          "path": "cli/casimir-collect.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/ADAPTER-CONTRACT.md"
+        }
+      ]
     },
     {
       "id": "ops-observability",
@@ -83,7 +97,13 @@
         }
       ],
       "summary": "Observability config and compose stacks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/observability.client-error.ts"
+        }
+      ]
     },
     {
       "id": "ops-env-config",
@@ -123,7 +143,13 @@
         }
       ],
       "summary": "Scripts, tools, and CLI helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "cli/README.md"
+        }
+      ]
     },
     {
       "id": "ops-release-packaging",
@@ -143,7 +169,13 @@
         }
       ],
       "summary": "Packaging and release assets.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "cli/package.js"
+        }
+      ]
     }
   ],
   "schema": {

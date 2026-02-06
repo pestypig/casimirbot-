@@ -45,7 +45,17 @@
         }
       ],
       "summary": "Tool specs, safety profiles, and registry helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/skills.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/index.ts"
+        }
+      ]
     },
     {
       "id": "skills-routing",
@@ -70,7 +80,13 @@
         }
       ],
       "summary": "Tool registration and runtime dispatch.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts"
+        }
+      ]
     },
     {
       "id": "skills-physics",
@@ -95,7 +111,29 @@
         }
       ],
       "summary": "Warp, GR grounding, and curvature tools.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/skills/physics.warp.ask.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/physics.warp.viability.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/physics.gr.assistant.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/physics.gr.grounding.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/physics.curvature.ts"
+        }
+      ]
     },
     {
       "id": "skills-docs-repo",
@@ -116,7 +154,53 @@
         }
       ],
       "summary": "Docs extraction, citation checks, and repo tools.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/skills/docs.readme.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/docs.heading.section.md.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/docs.table.extract.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/docs.contradiction.scan.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/docs.evidence.search.md.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/docs.evidence.search.pdf.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/repo.graph.search.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/repo.diff.review.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/repo.patch.simulate.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/citation.verify.span.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/numeric.extract.units.ts"
+        }
+      ]
     },
     {
       "id": "skills-media",
@@ -137,7 +221,41 @@
         }
       ],
       "summary": "Luma, noise, vision, speech, and fashion tools.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/skills/luma.generate.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/luma.http.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/noise.gen.cover.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/noise.gen.fingerprint.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/stt.whisper.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/stt.whisper.http.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/vision.http.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/fashion.looks.ts"
+        }
+      ]
     },
     {
       "id": "skills-telemetry",
@@ -162,7 +280,21 @@
         }
       ],
       "summary": "Telemetry snapshots and crosschecks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/skills/telemetry.badges.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/telemetry.panels.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/telemetry.crosscheck.docs.ts"
+        }
+      ]
     },
     {
       "id": "skills-cli-tools",
@@ -183,7 +315,37 @@
         }
       ],
       "summary": "CLI utilities and tooling scripts.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "cli/casimir-verify.ts"
+        },
+        {
+          "type": "code",
+          "path": "cli/physics-ask.ts"
+        },
+        {
+          "type": "code",
+          "path": "cli/physics-validate.ts"
+        },
+        {
+          "type": "code",
+          "path": "cli/gr-agent-loop.ts"
+        },
+        {
+          "type": "code",
+          "path": "tools/tokenizer-verify.ts"
+        },
+        {
+          "type": "code",
+          "path": "tools/generate-tokenizer-canary.ts"
+        },
+        {
+          "type": "code",
+          "path": "scripts/llm-local-smoke.ts"
+        }
+      ]
     }
   ],
   "schema": {

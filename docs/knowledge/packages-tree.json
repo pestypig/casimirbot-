@@ -42,7 +42,17 @@
         }
       ],
       "summary": "Scaffold package for verifier adapters.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "packages/create-casimir-verifier/package.js"
+        },
+        {
+          "type": "doc",
+          "path": "packages/create-casimir-verifier/README.md"
+        }
+      ]
     },
     {
       "id": "packages-app-native",
@@ -84,7 +94,13 @@
         }
       ],
       "summary": "Template payloads and workflow hooks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "packages/create-casimir-verifier/template/adapter-request.js"
+        }
+      ]
     },
     {
       "id": "packages-docs",
@@ -109,7 +125,13 @@
         }
       ],
       "summary": "Package documentation and examples.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "packages/create-casimir-verifier/README.md"
+        }
+      ]
     }
   ],
   "schema": {

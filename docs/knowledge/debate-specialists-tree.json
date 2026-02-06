@@ -45,7 +45,25 @@
         }
       ],
       "summary": "Debate loop orchestration, prompts, and warp helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/debate/orchestrator.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/debate/prompts.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/debate/types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/debate/warpPromptHelpers.ts"
+        }
+      ]
     },
     {
       "id": "debate-contracts",
@@ -66,7 +84,13 @@
         }
       ],
       "summary": "Schemas and shared grounding payloads.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/essence-debate.ts"
+        }
+      ]
     },
     {
       "id": "debate-telemetry",
@@ -91,7 +115,17 @@
         }
       ],
       "summary": "Telemetry capture and storage for debates.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/debate/telemetry-store.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/_generated/debate-telemetry.js"
+        }
+      ]
     },
     {
       "id": "debate-routes",
@@ -112,7 +146,17 @@
         }
       ],
       "summary": "HTTP routes for debate and specialist execution.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.debate.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.specialists.ts"
+        }
+      ]
     },
     {
       "id": "debate-skills",
@@ -137,7 +181,25 @@
         }
       ],
       "summary": "Debate tool implementations and checklist tooling.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/skills/debate.run.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/debate.checklist.generate.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/debate.checklist.score.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/debate.claim.extract.ts"
+        }
+      ]
     },
     {
       "id": "specialists-runtime",
@@ -158,7 +220,25 @@
         }
       ],
       "summary": "Specialist registry, solvers, and verifiers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/specialists/executor.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/specialists/bootstrap.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/specialists/tasks.seed.js"
+        },
+        {
+          "type": "code",
+          "path": "shared/agi-specialists.ts"
+        }
+      ]
     },
     {
       "id": "debate-harness",
@@ -179,7 +259,13 @@
         }
       ],
       "summary": "Debate harness scripts and regression tests.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "scripts/specialists-mini-loop.ts"
+        }
+      ]
     }
   ],
   "schema": {

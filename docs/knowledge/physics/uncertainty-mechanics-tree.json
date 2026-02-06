@@ -72,7 +72,13 @@
         }
       ],
       "summary": "Boundary choices define admissible modes and error bands.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/boundary-conditions-modes.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-discretization",
@@ -93,7 +99,13 @@
         }
       ],
       "summary": "Mesh resolution and discretization error control uncertainty.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/discretization-mesh.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-numerical-precision",
@@ -114,7 +126,13 @@
         }
       ],
       "summary": "Floating point precision limits error floors.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/numerical-precision.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-timestep-stability",
@@ -135,7 +153,13 @@
         }
       ],
       "summary": "Stability bounds constrain timestep error growth.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stability-timestep.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-statistical-stack",
@@ -181,7 +205,13 @@
         }
       ],
       "summary": "Sampling windows bound valid averages.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-monte-carlo-bands",
@@ -202,7 +232,13 @@
         }
       ],
       "summary": "Monte Carlo spreads define statistical error bands.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-propagated-bands",
@@ -223,7 +259,13 @@
         }
       ],
       "summary": "Uncertainty propagation across geometry and energy bands.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-data-contracts",
@@ -247,7 +289,21 @@
         }
       ],
       "summary": "Shared schemas for values, sigmas, and bands.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/physics.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/schema.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-1sigma-container",
@@ -268,7 +324,13 @@
         }
       ],
       "summary": "Explicit 1-sigma value containers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/physics.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-band-fields",
@@ -289,7 +351,17 @@
         }
       ],
       "summary": "Min/max bands for propagated ranges.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/schema.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-quantum-stochastic",
@@ -313,7 +385,13 @@
         }
       ],
       "summary": "Noise-kernel constraints for semiclassical sourcing.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/quantum-gr-bridge.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-quantum-gr-bridge",
@@ -334,7 +412,13 @@
         }
       ],
       "summary": "Semiclassical interface with uncertainty propagation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/quantum-gr-bridge.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-coherence-window",
@@ -355,7 +439,21 @@
         }
       ],
       "summary": "Tau and r_c set the causal sampling window.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/quantum-gr-bridge.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/DP_COLLAPSE_DERIVATION.md"
+        },
+        {
+          "type": "code",
+          "path": "shared/dp-collapse.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-approximation-ladders",
@@ -402,7 +500,13 @@
         }
       ],
       "summary": "Closed-form approximations and Monte Carlo deltas.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-pfa-geometry",
@@ -423,7 +527,13 @@
         }
       ],
       "summary": "PFA and geometry approximations for Casimir models.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/sim_core/static-casimir.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-casimir-bands",
@@ -444,7 +554,17 @@
         }
       ],
       "summary": "Material models define banded ranges.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/casimir-tile-mechanism.md"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-dynamic-transients",
@@ -465,7 +585,13 @@
         }
       ],
       "summary": "Transient energy approximations for time-varying boundaries.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/dynamic/dynamic-casimir.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-collapse-constraints",
@@ -489,7 +615,21 @@
         }
       ],
       "summary": "Causal collapse benchmarks and policy gating.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/collapse-benchmark-backend-roadmap.md"
+        },
+        {
+          "type": "code",
+          "path": "shared/collapse-benchmark.ts"
+        },
+        {
+          "type": "code",
+          "path": "modules/policies/coherence-governor.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-collapse-benchmark",
@@ -510,7 +650,17 @@
         }
       ],
       "summary": "Benchmark contract for causal collapse estimates.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/collapse-benchmark-backend-roadmap.md"
+        },
+        {
+          "type": "code",
+          "path": "shared/collapse-benchmark.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-coherence-policy",
@@ -531,7 +681,13 @@
         }
       ],
       "summary": "Policy gating tied to collapse confidence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/policies/coherence-governor.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-reality-bounds",
@@ -577,7 +733,13 @@
         }
       ],
       "summary": "Classical energy conditions bound admissible stress-energy.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/energy-conditions.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-quantum-inequality",
@@ -598,7 +760,13 @@
         }
       ],
       "summary": "QI bounds constrain magnitude and duration of negative energy.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-sampling-window",
@@ -619,7 +787,13 @@
         }
       ],
       "summary": "Sampling windows must respect system coherence times.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+        }
+      ]
     }
   ],
   "schema": {

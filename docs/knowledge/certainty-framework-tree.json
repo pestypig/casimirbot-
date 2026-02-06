@@ -47,7 +47,13 @@
         }
       ],
       "summary": "Why graded certainty and verification gates matter.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/BUSINESS_MODEL.md"
+        }
+      ]
     },
     {
       "id": "platonic-reasoning-bridge",
@@ -68,7 +74,17 @@
         }
       ],
       "summary": "Concept registry and platonic gates as certainty scaffolds.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/platonic-reasoning.md"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        }
+      ]
     },
     {
       "id": "helix-ask-certainty-stack",
@@ -97,7 +113,17 @@
         }
       ],
       "summary": "Gates and registers that grade answer certainty.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-ladder.md"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        }
+      ]
     },
     {
       "id": "retrieval-confidence",
@@ -118,7 +144,13 @@
         }
       ],
       "summary": "Repository retrieval confidence signals.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-ladder.md"
+        }
+      ]
     },
     {
       "id": "claim-ledger",
@@ -139,7 +171,13 @@
         }
       ],
       "summary": "Ledger of claims and support status.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-register",
@@ -160,7 +198,13 @@
         }
       ],
       "summary": "Register of uncertainties per claim.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        }
+      ]
     },
     {
       "id": "coverage-gate",
@@ -181,7 +225,13 @@
         }
       ],
       "summary": "Ensure required slots are covered by evidence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        }
+      ]
     },
     {
       "id": "belief-gate",
@@ -202,7 +252,13 @@
         }
       ],
       "summary": "Belief graph checks for support and contradictions.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        }
+      ]
     },
     {
       "id": "rattling-gate",
@@ -223,7 +279,13 @@
         }
       ],
       "summary": "Stability check via perturbation tests.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        }
+      ]
     },
     {
       "id": "variant-selection",
@@ -244,7 +306,13 @@
         }
       ],
       "summary": "Choose variants based on alignment and evidence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        }
+      ]
     },
     {
       "id": "debate-confidence-stack",
@@ -291,7 +359,13 @@
         }
       ],
       "summary": "Confidence fields in debate schema.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/essence-debate.ts"
+        }
+      ]
     },
     {
       "id": "debate-run-skill",
@@ -312,7 +386,13 @@
         }
       ],
       "summary": "Debate.run returns confidence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/skills/debate.run.ts"
+        }
+      ]
     },
     {
       "id": "debate-checklist-skill",
@@ -333,7 +413,13 @@
         }
       ],
       "summary": "Checklist generation with confidence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/skills/debate.checklist.generate.ts"
+        }
+      ]
     },
     {
       "id": "debate-planner-logging",
@@ -354,7 +440,13 @@
         }
       ],
       "summary": "Planner logging of debate confidence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/planner/chat-b.ts"
+        }
+      ]
     },
     {
       "id": "rationale-confidence-stack",
@@ -377,7 +469,13 @@
         }
       ],
       "summary": "Evidence/inference tags with optional confidence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/rationale.ts"
+        }
+      ]
     },
     {
       "id": "rationale-schema",
@@ -398,7 +496,13 @@
         }
       ],
       "summary": "Rationale tags and confidence fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/rationale.ts"
+        }
+      ]
     },
     {
       "id": "coherence-confidence-stack",
@@ -422,7 +526,13 @@
         }
       ],
       "summary": "Coherence and collapse confidence scores.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/policies/coherence-governor.ts"
+        }
+      ]
     },
     {
       "id": "coherence-governor",
@@ -443,7 +553,13 @@
         }
       ],
       "summary": "Collapse confidence and action policy.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/policies/coherence-governor.ts"
+        }
+      ]
     },
     {
       "id": "noisegen-confidence",
@@ -464,7 +580,13 @@
         }
       ],
       "summary": "Planner confidence for noisegen proposals.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/noisegen-planner-model.ts"
+        }
+      ]
     },
     {
       "id": "schema-confidence-stack",
@@ -487,7 +609,13 @@
         }
       ],
       "summary": "Shared confidence/weight fields used across telemetry.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/schema.ts"
+        }
+      ]
     },
     {
       "id": "shared-schema-confidence",
@@ -507,7 +635,13 @@
         }
       ],
       "summary": "Confidence/weight fields in shared schema.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/schema.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-mechanics-stack",
@@ -557,7 +691,21 @@
         }
       ],
       "summary": "Model error, discretization, and boundary-condition uncertainty.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/boundary-conditions-modes.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/discretization-mesh.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/numerical-precision.md"
+        }
+      ]
     },
     {
       "id": "statistical-uncertainty",
@@ -578,7 +726,17 @@
         }
       ],
       "summary": "Sampling noise, distributions, and stochastic variance.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-data-contracts",
@@ -599,7 +757,21 @@
         }
       ],
       "summary": "Shared schemas for values, sigmas, and bands.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/physics.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/schema.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "quantum-stochastic-bridge",
@@ -620,7 +792,21 @@
         }
       ],
       "summary": "Noise-kernel and coherence-window constraints for semiclassical sourcing.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/quantum-gr-bridge.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/DP_COLLAPSE_DERIVATION.md"
+        },
+        {
+          "type": "code",
+          "path": "shared/dp-collapse.ts"
+        }
+      ]
     },
     {
       "id": "transient-energy-approximations",
@@ -641,7 +827,21 @@
         }
       ],
       "summary": "Approximation ladders and energy bands bridging classical and statistical models.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        },
+        {
+          "type": "code",
+          "path": "modules/sim_core/static-casimir.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/casimir-tile-mechanism.md"
+        }
+      ]
     },
     {
       "id": "collapse-framework-constraints",
@@ -662,7 +862,21 @@
         }
       ],
       "summary": "Causal collapse benchmarks and policy gating.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/collapse-benchmark-backend-roadmap.md"
+        },
+        {
+          "type": "code",
+          "path": "shared/collapse-benchmark.ts"
+        },
+        {
+          "type": "code",
+          "path": "modules/policies/coherence-governor.ts"
+        }
+      ]
     },
     {
       "id": "uncertainty-reality-constraints",
@@ -683,7 +897,21 @@
         }
       ],
       "summary": "Energy conditions, quantum inequality limits, and sampling bounds.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/energy-conditions.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+        }
+      ]
     }
   ],
   "schema": {

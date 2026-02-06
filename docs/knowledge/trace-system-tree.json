@@ -47,7 +47,21 @@
         }
       ],
       "summary": "Trace API routes and contracts.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/TRACE-API.md"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.trace.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.memory.trace.ts"
+        }
+      ]
     },
     {
       "id": "trace-training-stack",
@@ -67,7 +81,25 @@
         }
       ],
       "summary": "Training trace export and storage.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/TRAINING-TRACE-API.md"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/training-trace.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/observability/training-trace-store.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/__tests__/training-trace.test.ts"
+        }
+      ]
     },
     {
       "id": "trace-storage-stack",
@@ -88,7 +120,57 @@
         }
       ],
       "summary": "Database models and migrations for traces.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/db/agi.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/essence.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/essenceProfile.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/essence-activity.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/profileSummaries.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/004_trace_manifest.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/012_trace_sealed_snapshots.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/013_trace_prompts.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/015_trace_reasoning.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/016_trace_collapse.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/018_trace_collapse_strategy.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/020_trace_debate_id.ts"
+        }
+      ]
     },
     {
       "id": "essence-schema-stack",
@@ -108,7 +190,41 @@
         }
       ],
       "summary": "Shared essence schemas and prompts.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/essence-schema.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/essence-physics.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/essence-persona.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/essence-prompts.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/essence-debate.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/essence-activity.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/essence-themes.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/inferenceProfile.ts"
+        }
+      ]
     },
     {
       "id": "essence-profile-stack",
@@ -128,7 +244,53 @@
         }
       ],
       "summary": "Profile policy, summarization, and panel integration.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ESSENCE_PROFILE_POLICY.md"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.profile.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.persona.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.memory.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/essence.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/essence.prompts.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/profile-summarizer.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/profile-summarizer-job.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/proposals.profile-panel.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/proposals/profile-panel-proposals.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/panels/profile-panel-from-profile.ts"
+        }
+      ]
     },
     {
       "id": "agi-refinery-stack",
@@ -148,7 +310,69 @@
         }
       ],
       "summary": "Refinery workflows, policies, and exports.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/AGI-ROADMAP.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/agi-answerer-training.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/agi-index-exclusions-rc0.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/PERSONAL_AGI_NEXT.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/refinery-progress.md"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.refinery.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-axes.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-export.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-gates.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-holdout.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-identity.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-policy.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-summary.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-trajectory.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-variants.ts"
+        }
+      ]
     },
     {
       "id": "agi-routing-stack",
@@ -168,7 +392,49 @@
         }
       ],
       "summary": "Core AGI routes and control flows.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.adapter.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.chat.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.eval.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.debate.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.contributions.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.specialists.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.constraint-packs.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.star.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.refinery.ts"
+        }
+      ]
     },
     {
       "id": "collapse-benchmark-stack",
@@ -188,7 +454,33 @@
         }
       ],
       "summary": "Collapse benchmarking and trace links.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/collapse-benchmark-backend-roadmap.md"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/benchmarks.collapse.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/collapse-benchmark.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/collapse-benchmark.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/mixer/collapse.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/contributions/trace-links.ts"
+        }
+      ]
     },
     {
       "id": "essence-telemetry-stack",
@@ -208,7 +500,109 @@
         }
       ],
       "summary": "Solar and tokamak ingestion pipelines.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ESSENCE-CONSOLE_PATCH-PLAN.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/ESSENCE-CONSOLE_GAP-REPORT.md"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-energy-adapter.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/tokamak-energy-adapter.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-events-hek.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-forecast.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-guardrails.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-spectrum-ingest.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-spectrum-models.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-surface-coherence.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/solar-video-coherence.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/sunpy-coherence-bridge.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/phase-detector.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/ingest-jobs.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/events.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/environment.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/store.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/memory-store.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/activity-log.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/mix.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/nightly-proposals.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/template-synthesizer.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/themes.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/prompt-variants.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/essence/preferences.ts"
+        }
+      ]
     },
     {
       "id": "agi-client-stack",
@@ -228,7 +622,69 @@
         }
       ],
       "summary": "Client integration for AGI APIs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/api.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/adapter.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/orchestrator.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/knowledge-store.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/jobs.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/promptVariants.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/preferences.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/contributions.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/consoleTelemetry.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/debate.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/panelControl.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/localCallSpec.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/store/useAgiChatStore.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useEssenceProfile.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useEssenceThemes.ts"
+        }
+      ]
     }
   ],
   "schema": {

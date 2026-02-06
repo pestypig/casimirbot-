@@ -45,7 +45,21 @@
         }
       ],
       "summary": "Core governance spine and gates.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/README.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/zen-society/gates.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/zen-society/public-safety-governance-spine.md"
+        }
+      ]
     },
     {
       "id": "zen-society-readme",
@@ -65,7 +79,13 @@
         }
       ],
       "summary": "Overview of zen society docs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/README.md"
+        }
+      ]
     },
     {
       "id": "zen-society-gates",
@@ -86,7 +106,13 @@
         }
       ],
       "summary": "Gate definitions for zen society governance.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/gates.md"
+        }
+      ]
     },
     {
       "id": "zen-society-spine",
@@ -107,7 +133,13 @@
         }
       ],
       "summary": "Public safety governance spine.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/public-safety-governance-spine.md"
+        }
+      ]
     },
     {
       "id": "zen-society-templates",
@@ -157,7 +189,13 @@
         }
       ],
       "summary": "Template for Decision Log.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/decision-log.md"
+        }
+      ]
     },
     {
       "id": "zen-pillar-01-dignity",
@@ -177,7 +215,13 @@
         }
       ],
       "summary": "Template for Pillar 01 Dignity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/pillar-01-dignity.md"
+        }
+      ]
     },
     {
       "id": "zen-pillar-02-services",
@@ -197,7 +241,13 @@
         }
       ],
       "summary": "Template for Pillar 02 Services.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/pillar-02-services.md"
+        }
+      ]
     },
     {
       "id": "zen-pillar-03-contracts",
@@ -217,7 +267,13 @@
         }
       ],
       "summary": "Template for Pillar 03 Contracts.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/pillar-03-contracts.md"
+        }
+      ]
     },
     {
       "id": "zen-pillar-04-finance",
@@ -237,7 +293,13 @@
         }
       ],
       "summary": "Template for Pillar 04 Finance.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/pillar-04-finance.md"
+        }
+      ]
     },
     {
       "id": "zen-pillar-05-consent",
@@ -257,7 +319,13 @@
         }
       ],
       "summary": "Template for Pillar 05 Consent.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/pillar-05-consent.md"
+        }
+      ]
     },
     {
       "id": "zen-pillar-06-verification",
@@ -277,7 +345,13 @@
         }
       ],
       "summary": "Template for Pillar 06 Verification.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/pillar-06-verification.md"
+        }
+      ]
     },
     {
       "id": "zen-signatory-registry",
@@ -297,7 +371,13 @@
         }
       ],
       "summary": "Template for Signatory Registry.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/signatory-registry.md"
+        }
+      ]
     },
     {
       "id": "zen-society-artifacts",
@@ -352,7 +432,13 @@
         }
       ],
       "summary": "Artifact template for Access To Counsel Pathway.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/access-to-counsel-pathway.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-charter",
@@ -372,7 +458,13 @@
         }
       ],
       "summary": "Artifact template for Charter.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/charter.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-civic-signal-survey",
@@ -392,7 +484,13 @@
         }
       ],
       "summary": "Artifact template for Civic Signal Survey.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/civic-signal-survey.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-dashboard",
@@ -412,7 +510,13 @@
         }
       ],
       "summary": "Artifact template for Dashboard.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/dashboard.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-federal-civic-listening-circuit",
@@ -432,7 +536,13 @@
         }
       ],
       "summary": "Artifact template for Federal Civic Listening Circuit.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/federal-civic-listening-circuit.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-harm-weighted-priority-standard",
@@ -452,7 +562,13 @@
         }
       ],
       "summary": "Artifact template for Harm Weighted Priority Standard.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/harm-weighted-priority-standard.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-integration-ladder",
@@ -472,7 +588,13 @@
         }
       ],
       "summary": "Artifact template for Integration Ladder.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/integration-ladder.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-lawful-interface-protocol",
@@ -492,7 +614,13 @@
         }
       ],
       "summary": "Artifact template for Lawful Interface Protocol.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/lawful-interface-protocol.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-ledger",
@@ -512,7 +640,13 @@
         }
       ],
       "summary": "Artifact template for Ledger.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/ledger.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-local-stability-compact",
@@ -532,7 +666,13 @@
         }
       ],
       "summary": "Artifact template for Local Stability Compact.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/local-stability-compact.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-metric-integrity-guardrail",
@@ -552,7 +692,13 @@
         }
       ],
       "summary": "Artifact template for Metric Integrity Guardrail.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/metric-integrity-guardrail.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-protocol",
@@ -572,7 +718,13 @@
         }
       ],
       "summary": "Artifact template for Protocol.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/protocol.md"
+        }
+      ]
     },
     {
       "id": "zen-artifact-training-certification-gate",
@@ -592,7 +744,13 @@
         }
       ],
       "summary": "Artifact template for Training Certification Gate.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/training-certification-gate.md"
+        }
+      ]
     }
   ],
   "schema": {

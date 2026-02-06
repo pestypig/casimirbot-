@@ -45,7 +45,17 @@
         }
       ],
       "summary": "Small LLM routing and service glue.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/small-llm.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/small-llm.ts"
+        }
+      ]
     },
     {
       "id": "llm-runtime-backends",
@@ -70,7 +80,21 @@
         }
       ],
       "summary": "HTTP and local LLM backends exposed as tools.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/skills/llm.http.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/llm.local.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/llm.local.spawn.ts"
+        }
+      ]
     },
     {
       "id": "llm-runtime-artifacts",
@@ -91,7 +115,13 @@
         }
       ],
       "summary": "Runtime artifact hydration and integrity checks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/llm/runtime-artifacts.ts"
+        }
+      ]
     },
     {
       "id": "llm-runtime-worker",
@@ -112,7 +142,17 @@
         }
       ],
       "summary": "Browser-side local inference and model loading.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/workers/llm-worker.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/llm/local-generator.ts"
+        }
+      ]
     },
     {
       "id": "llm-runtime-rag",
@@ -158,7 +198,33 @@
         }
       ],
       "summary": "Tokenizer registry, canaries, and verification tools.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/tokenizer-guardrails.md"
+        },
+        {
+          "type": "code",
+          "path": "server/config/tokenizer-registry.js"
+        },
+        {
+          "type": "code",
+          "path": "tools/tokenizer-verify.ts"
+        },
+        {
+          "type": "code",
+          "path": "tools/generate-tokenizer-canary.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/tokenizer-canary.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/fixtures/tokenizer-canary.js"
+        }
+      ]
     },
     {
       "id": "llm-runtime-contracts",
@@ -183,7 +249,21 @@
         }
       ],
       "summary": "LLM behavior contracts and local setup notes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warp-llm-contracts.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/local-llm-windows.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/warp-console-architecture.md"
+        }
+      ]
     }
   ],
   "schema": {

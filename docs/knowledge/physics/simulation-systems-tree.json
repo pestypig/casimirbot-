@@ -51,7 +51,13 @@
         }
       ],
       "summary": "Schema contracts for simulation parameters and results.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/schema.ts"
+        }
+      ]
     },
     {
       "id": "simulation-api",
@@ -71,7 +77,17 @@
         }
       ],
       "summary": "REST and client API helpers for simulations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/simulation-api.ts"
+        }
+      ]
     },
     {
       "id": "simulation-storage",
@@ -91,7 +107,17 @@
         }
       ],
       "summary": "Simulation persistence and migrations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/db/simulations.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/021_simulations.ts"
+        }
+      ]
     },
     {
       "id": "simulation-core-modules",
@@ -111,7 +137,25 @@
         }
       ],
       "summary": "Core simulation modules and registry.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "modules/sim_core/README.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/sim_core/static-casimir.ts"
+        },
+        {
+          "type": "code",
+          "path": "modules/sim_core/casimir-inference.ts"
+        },
+        {
+          "type": "code",
+          "path": "modules/core/module-registry.ts"
+        }
+      ]
     },
     {
       "id": "simulation-geometry-mesh",
@@ -132,7 +176,17 @@
         }
       ],
       "summary": "Geometry and mesh generation for simulations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "modules/geom/README.md"
+        },
+        {
+          "type": "code",
+          "path": "server/services/gmsh.ts"
+        }
+      ]
     },
     {
       "id": "simulation-scuffem-service",
@@ -152,7 +206,13 @@
         }
       ],
       "summary": "SCUFF-EM adapter and file generation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/scuffem.ts"
+        }
+      ]
     },
     {
       "id": "simulation-dynamic-casimir",
@@ -173,7 +233,17 @@
         }
       ],
       "summary": "Dynamic Casimir simulation module.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/dynamic/dynamic-casimir.ts"
+        },
+        {
+          "type": "doc",
+          "path": "modules/dynamic/README.md"
+        }
+      ]
     },
     {
       "id": "simulation-warp-module",
@@ -193,7 +263,13 @@
         }
       ],
       "summary": "Warp module simulation parameter bridge.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        }
+      ]
     },
     {
       "id": "simulation-tsn",
@@ -213,7 +289,17 @@
         }
       ],
       "summary": "Time-sensitive networking simulation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "simulations/tsn-sim.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/tsn-sim.ts"
+        }
+      ]
     },
     {
       "id": "simulation-parametric-sweeps",
@@ -233,7 +319,17 @@
         }
       ],
       "summary": "Parametric sweep simulation helpers.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/parametric-sweep.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/ParametricSweepPanel.ts"
+        }
+      ]
     },
     {
       "id": "simulation-ui-surfaces",
@@ -253,7 +349,17 @@
         }
       ],
       "summary": "Client surfaces that run and visualize simulations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/simulation.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/TokamakSimulationPanel.ts"
+        }
+      ]
     },
     {
       "id": "simulation-streaming",
@@ -273,7 +379,13 @@
         }
       ],
       "summary": "WebSocket and SSE simulation telemetry.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes.ts"
+        }
+      ]
     },
     {
       "id": "simulation-artifacts",

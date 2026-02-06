@@ -50,7 +50,13 @@
         }
       ],
       "summary": "Status and milestones for solver development.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/gr-solver-progress.md"
+        }
+      ]
     },
     {
       "id": "gr-solver-robustness",
@@ -71,7 +77,13 @@
         }
       ],
       "summary": "Robustness checks and failure modes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/gr-solver-robustness.md"
+        }
+      ]
     },
     {
       "id": "bssn-evolution",
@@ -99,7 +111,13 @@
         }
       ],
       "summary": "Core evolution step for GR fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/bssn-evolve.ts"
+        }
+      ]
     },
     {
       "id": "gr-constraint-network",
@@ -120,7 +138,13 @@
         }
       ],
       "summary": "Compute constraint residuals and diagnostics.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-constraint-network.ts"
+        }
+      ]
     },
     {
       "id": "gr-constraint-gate",
@@ -141,7 +165,13 @@
         }
       ],
       "summary": "Gate evaluation converts diagnostics into pass/fail.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/constraint-evaluator.ts"
+        }
+      ]
     },
     {
       "id": "gr-agent-loop",
@@ -164,7 +194,13 @@
         }
       ],
       "summary": "Orchestration loop for GR evaluation and proposals.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-agent-loop.ts"
+        }
+      ]
     },
     {
       "id": "gr-evolution-orchestration",
@@ -189,7 +225,25 @@
         }
       ],
       "summary": "Orchestrate GR evolution runs and bricks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/evolution.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr/evolution/solver.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr/evolution/brick.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr-evolve-brick.ts"
+        }
+      ]
     },
     {
       "id": "gr-initial-data",
@@ -210,7 +264,17 @@
         }
       ],
       "summary": "Initialize GR fields for evolution.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/evolution/initial-data.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr-initial-brick.ts"
+        }
+      ]
     },
     {
       "id": "gr-evolution-solver",
@@ -231,7 +295,13 @@
         }
       ],
       "summary": "Solver loop for GR evolution.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/evolution/solver.ts"
+        }
+      ]
     },
     {
       "id": "gr-evolution-brick",
@@ -252,7 +322,17 @@
         }
       ],
       "summary": "Brick wrapper for GR evolution outputs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/evolution/brick.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr-evolve-brick.ts"
+        }
+      ]
     },
     {
       "id": "bssn-state",
@@ -273,7 +353,13 @@
         }
       ],
       "summary": "State containers for BSSN fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/bssn-state.ts"
+        }
+      ]
     },
     {
       "id": "rk4-integrator",
@@ -294,7 +380,13 @@
         }
       ],
       "summary": "Runge-Kutta integrator for BSSN fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/rk4.ts"
+        }
+      ]
     },
     {
       "id": "stencils",
@@ -315,7 +407,13 @@
         }
       ],
       "summary": "Stencil operators for derivatives and boundaries.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/stencils.ts"
+        }
+      ]
     },
     {
       "id": "gr-diagnostics",
@@ -336,7 +434,13 @@
         }
       ],
       "summary": "Diagnostics for shift stiffness and stability.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/gr-diagnostics.ts"
+        }
+      ]
     },
     {
       "id": "gr-stress-energy",
@@ -357,7 +461,17 @@
         }
       ],
       "summary": "Stress-energy grids for GR evolution.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/stress-energy.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr/evolution/stress-energy.ts"
+        }
+      ]
     },
     {
       "id": "stress-energy-integrals",
@@ -378,7 +492,13 @@
         }
       ],
       "summary": "Integrals over stress-energy fields.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/gr/stress-energy-integrals.ts"
+        }
+      ]
     },
     {
       "id": "gr-constraint-policy",
@@ -399,7 +519,13 @@
         }
       ],
       "summary": "Constraint policy thresholds and modes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-constraint-policy.ts"
+        }
+      ]
     },
     {
       "id": "gr-evaluation",
@@ -420,7 +546,13 @@
         }
       ],
       "summary": "Evaluation orchestration for GR runs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-evaluation.ts"
+        }
+      ]
     },
     {
       "id": "gr-worker-stack",
@@ -467,7 +599,13 @@
         }
       ],
       "summary": "Worker runtime for GR evaluations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-worker.ts"
+        }
+      ]
     },
     {
       "id": "gr-worker-client",
@@ -488,7 +626,13 @@
         }
       ],
       "summary": "Client interface for GR worker calls.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-worker-client.ts"
+        }
+      ]
     },
     {
       "id": "gr-worker-types",
@@ -509,7 +653,13 @@
         }
       ],
       "summary": "Shared types for GR worker payloads.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-worker-types.ts"
+        }
+      ]
     },
     {
       "id": "gr-os-payload",
@@ -530,7 +680,13 @@
         }
       ],
       "summary": "Payload schema for GR OS telemetry.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-os-payload.ts"
+        }
+      ]
     },
     {
       "id": "gr-assistant-adapter",
@@ -553,7 +709,13 @@
         }
       ],
       "summary": "Adapter for GR assistant workflows.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-assistant-adapter.ts"
+        }
+      ]
     },
     {
       "id": "gr-agent-loop-schema",
@@ -574,7 +736,13 @@
         }
       ],
       "summary": "Schema for GR agent loop runs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-agent-loop-schema.ts"
+        }
+      ]
     },
     {
       "id": "gr-assistant-tools",
@@ -595,7 +763,13 @@
         }
       ],
       "summary": "Standalone GR helper service for metric checks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "tools/gr_assistant/README.md"
+        }
+      ]
     }
   ],
   "schema": {

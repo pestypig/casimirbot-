@@ -67,7 +67,13 @@
         }
       ],
       "summary": "Equilibrium between pressure and gravity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/star-hydrostatic.md"
+        }
+      ]
     },
     {
       "id": "stellar-evolution-stack",
@@ -111,7 +117,13 @@
         }
       ],
       "summary": "Transition phase with major structural change.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/red-giant-phase.md"
+        }
+      ]
     },
     {
       "id": "stellar-ledger-stack",
@@ -156,7 +168,13 @@
         }
       ],
       "summary": "Ledger framework for stellar-scale commitments.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/stellar-ledger.md"
+        }
+      ]
     },
     {
       "id": "sun-ledger",
@@ -177,7 +195,13 @@
         }
       ],
       "summary": "Specific ledger for solar restoration obligations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/sun-ledger.md"
+        }
+      ]
     },
     {
       "id": "stellar-observation-stack",
@@ -223,7 +247,13 @@
         }
       ],
       "summary": "Time-binned telemetry for solar monitoring.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/sun-5-minute-bins.md"
+        }
+      ]
     },
     {
       "id": "curvature-unit-solar-notes",
@@ -244,7 +274,13 @@
         }
       ],
       "summary": "Unit mapping for solar curvature metrics.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/curvature-unit-solar-notes.md"
+        }
+      ]
     },
     {
       "id": "solar-pipeline",
@@ -265,7 +301,13 @@
         }
       ],
       "summary": "Pipeline for solar telemetry and restoration actions.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/solar-pipeline.md"
+        }
+      ]
     },
     {
       "id": "solar-restoration-plan",
@@ -290,7 +332,13 @@
         }
       ],
       "summary": "Restoration vow translated into actionable steps.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/solar-restoration.md"
+        }
+      ]
     }
   ],
   "schema": {

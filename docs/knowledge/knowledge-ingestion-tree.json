@@ -47,7 +47,17 @@
         }
       ],
       "summary": "Corpus ingestion and attachment handling.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/knowledge/corpus.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/knowledge.ts"
+        }
+      ]
     },
     {
       "id": "knowledge-validation",
@@ -67,7 +77,13 @@
         }
       ],
       "summary": "Validation rules for knowledge bundles.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/knowledge/validation.ts"
+        }
+      ]
     },
     {
       "id": "knowledge-merge",
@@ -87,7 +103,13 @@
         }
       ],
       "summary": "Merge logic for knowledge bundles.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/knowledge/merge.ts"
+        }
+      ]
     },
     {
       "id": "knowledge-citations",
@@ -107,7 +129,13 @@
         }
       ],
       "summary": "Citation formatting and enforcement.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/knowledge/citations.ts"
+        }
+      ]
     },
     {
       "id": "knowledge-vectorizer",
@@ -127,7 +155,17 @@
         }
       ],
       "summary": "Vectorization routes and services.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/vectorizer.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/vectorizer.ts"
+        }
+      ]
     },
     {
       "id": "knowledge-search",
@@ -148,7 +186,17 @@
         }
       ],
       "summary": "Search routing and repository indexing.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/search.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/search/repo-index.ts"
+        }
+      ]
     },
     {
       "id": "knowledge-client-tools",
@@ -168,7 +216,17 @@
         }
       ],
       "summary": "Client knowledge extraction and curation tools.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/knowledge/atom-extraction.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/knowledge/atom-curation.ts"
+        }
+      ]
     },
     {
       "id": "knowledge-ui-panels",
@@ -188,7 +246,21 @@
         }
       ],
       "summary": "Panels that surface knowledge bundles.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CoreKnowledgePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/DocViewerPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/AgiKnowledgePanel.ts"
+        }
+      ]
     },
     {
       "id": "knowledge-storage",
@@ -208,7 +280,17 @@
         }
       ],
       "summary": "Database storage for knowledge assets.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/db/knowledge.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/db/migrations/010_knowledge_corpus.ts"
+        }
+      ]
     }
   ],
   "schema": {

@@ -48,7 +48,13 @@
         }
       ],
       "summary": "Stress-energy brick build and stats.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/stress-energy-brick.ts"
+        }
+      ]
     },
     {
       "id": "brick-curvature",
@@ -69,7 +75,13 @@
         }
       ],
       "summary": "Curvature brick build and serialization.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/curvature-brick.ts"
+        }
+      ]
     },
     {
       "id": "brick-gr-evolve",
@@ -90,7 +102,13 @@
         }
       ],
       "summary": "GR evolution brick and constraint diagnostics.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr-evolve-brick.ts"
+        }
+      ]
     },
     {
       "id": "brick-gr-initial",
@@ -111,7 +129,13 @@
         }
       ],
       "summary": "Initial conditions brick for GR runs.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr-initial-brick.ts"
+        }
+      ]
     },
     {
       "id": "brick-brick-serialization",
@@ -132,7 +156,17 @@
         }
       ],
       "summary": "Binary and JSON brick serialization formats.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/curvature-brick.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/stress-energy-brick.ts"
+        }
+      ]
     },
     {
       "id": "brick-client-lattice",
@@ -153,7 +187,25 @@
         }
       ],
       "summary": "Client lattice frame, SDF, and surface adapters.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/lattice-frame.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/lattice-sdf.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/lattice-surface.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/lattice-export.ts"
+        }
+      ]
     },
     {
       "id": "brick-client-hooks",
@@ -174,7 +226,25 @@
         }
       ],
       "summary": "Hooks that fetch and hydrate brick payloads.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/hooks/useGrBrick.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useGrEvolveBrick.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useStressEnergyBrick.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useLapseBrick.ts"
+        }
+      ]
     },
     {
       "id": "brick-ui-panels",
@@ -195,7 +265,29 @@
         }
       ],
       "summary": "Panels rendering bricks and lattice views.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureTensorPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureSlicePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/QiLatticePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SliceViewer.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/TimeDilationLatticePanel.ts"
+        }
+      ]
     },
     {
       "id": "brick-constraints-tests",
@@ -216,7 +308,21 @@
         }
       ],
       "summary": "Constraint gates and brick tests.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "test",
+          "path": "tests/stress-energy-brick.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-constraint-gate.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-constraint-network.spec.ts"
+        }
+      ]
     }
   ],
   "schema": {

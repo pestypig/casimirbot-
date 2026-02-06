@@ -45,7 +45,13 @@
         }
       ],
       "summary": "Telemetry endpoints for console snapshots.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts"
+        }
+      ]
     },
     {
       "id": "telemetry-console-storage",
@@ -66,7 +72,29 @@
         }
       ],
       "summary": "Telemetry persistence and snapshot formats.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/console-telemetry/store.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/console-telemetry/persist.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/console-telemetry/summarize.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/_generated/console-telemetry.js"
+        },
+        {
+          "type": "code",
+          "path": "shared/desktop.ts"
+        }
+      ]
     },
     {
       "id": "telemetry-console-client",
@@ -91,7 +119,21 @@
         }
       ],
       "summary": "Panel telemetry capture and push from the desktop UI.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/agi/consoleTelemetry.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/desktop/panelRegistry.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/desktop/panelTelemetryBus.ts"
+        }
+      ]
     },
     {
       "id": "telemetry-badges-panels",
@@ -116,7 +158,33 @@
         }
       ],
       "summary": "Telemetry summarizers and badge pipelines.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/telemetry/badges.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/telemetry/panels.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/telemetry.badges.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/telemetry.panels.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/badge-telemetry.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/star-telemetry.ts"
+        }
+      ]
     },
     {
       "id": "telemetry-observability",
@@ -137,7 +205,17 @@
         }
       ],
       "summary": "Telemetry adapters and observability stores.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/observability/constraint-pack-telemetry.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/observability/tool-event-adapters.ts"
+        }
+      ]
     },
     {
       "id": "telemetry-casimir",
@@ -162,7 +240,17 @@
         }
       ],
       "summary": "Casimir telemetry ingestion and persistence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/casimir/telemetry.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/casimir/__tests__/casimir-telemetry.spec.ts"
+        }
+      ]
     },
     {
       "id": "telemetry-tests",
@@ -183,7 +271,17 @@
         }
       ],
       "summary": "Telemetry regressions and console summary tests.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "test",
+          "path": "tests/console-summary.spec.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/casimir/__tests__/casimir-telemetry.spec.ts"
+        }
+      ]
     }
   ],
   "schema": {

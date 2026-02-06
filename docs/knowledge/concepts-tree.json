@@ -64,7 +64,13 @@
         }
       ],
       "summary": "Notes on Epistemology.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/epistemology.md"
+        }
+      ]
     },
     {
       "id": "scientific-method",
@@ -84,7 +90,13 @@
         }
       ],
       "summary": "Notes on Scientific Method.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/scientific-method.md"
+        }
+      ]
     },
     {
       "id": "falsifiability",
@@ -104,7 +116,13 @@
         }
       ],
       "summary": "Notes on Falsifiability.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/falsifiability.md"
+        }
+      ]
     },
     {
       "id": "reasoning-stack",
@@ -148,7 +166,13 @@
         }
       ],
       "summary": "Notes on Platonic Reasoning.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/platonic-reasoning.md"
+        }
+      ]
     },
     {
       "id": "halobank",
@@ -168,7 +192,13 @@
         }
       ],
       "summary": "Notes on Halobank.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/halobank.md"
+        }
+      ]
     },
     {
       "id": "model-landscape-stack",
@@ -210,7 +240,13 @@
         }
       ],
       "summary": "Attractor mapping for model behavior.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/morphospace-attractors.md"
+        }
+      ]
     },
     {
       "id": "degree-of-certainty-framework",
@@ -231,7 +267,13 @@
         }
       ],
       "summary": "Framework for evaluating confidence and uncertainty.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/certainty-framework-tree.js"
+        }
+      ]
     }
   ],
   "schema": {

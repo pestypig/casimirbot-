@@ -47,7 +47,29 @@
         }
       ],
       "summary": "Energy pipeline outputs wired to UI panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-energy-pipeline.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/EnergyFluxPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/energy-pipeline.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/live-energy-pipeline.ts"
+        }
+      ]
     },
     {
       "id": "binding-curvature-bricks",
@@ -68,7 +90,41 @@
         }
       ],
       "summary": "Curvature brick dataflow to GR panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/curvature-brick.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr-evolve-brick.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/physics.curvature.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/curvature-brick.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useGrBrick.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useGrEvolveBrick.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureTensorPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureSlicePanel.ts"
+        }
+      ]
     },
     {
       "id": "binding-warp-pipeline",
@@ -89,7 +145,33 @@
         }
       ],
       "summary": "Warp viability and render pipeline mapped to UI.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/warp-viability.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/warp-pipeline-adapter.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/AlcubierrePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/WarpBubbleGLPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/WarpProofPanel.ts"
+        }
+      ]
     },
     {
       "id": "binding-collapse-benchmark",
@@ -110,7 +192,25 @@
         }
       ],
       "summary": "Collapse benchmark outputs to HUD panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/benchmarks.collapse.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/collapse-benchmark.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CollapseBenchmarkHUD.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CollapseBenchmarkHUDPanel.ts"
+        }
+      ]
     },
     {
       "id": "binding-simulation-api",
@@ -131,7 +231,25 @@
         }
       ],
       "summary": "Simulation endpoints mapped to UI surfaces.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/scuffem.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/simulation-api.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/simulation.ts"
+        }
+      ]
     },
     {
       "id": "binding-hardware-telemetry",
@@ -152,7 +270,33 @@
         }
       ],
       "summary": "Hardware ingest endpoints wired to UI controls.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/helix-core.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useHardwareFeeds.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/HardwareConnectModal.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/SpectrumTunerPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/VacuumGapSweepHUD.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/LightSpeedStrobeScale.ts"
+        }
+      ]
     },
     {
       "id": "binding-knowledge-docs",
@@ -173,7 +317,29 @@
         }
       ],
       "summary": "Knowledge ingestion surfaced in doc panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/knowledge.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/knowledge/corpus.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/DocViewerPanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/CoreKnowledgePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/AgiKnowledgePanel.ts"
+        }
+      ]
     },
     {
       "id": "binding-proof-verification",
@@ -194,7 +360,29 @@
         }
       ],
       "summary": "Verification outputs mapped to proof panels.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/MathMaturityTreePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/UniversalAuditTreePanel.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/verification-tab.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.constraint-packs.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.eval.ts"
+        }
+      ]
     }
   ],
   "schema": {

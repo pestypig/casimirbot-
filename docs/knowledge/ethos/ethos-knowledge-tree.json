@@ -204,7 +204,13 @@
         }
       ],
       "summary": "Guidance on Integrity Protocols.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/integrity-protocols.md"
+        }
+      ]
     },
     {
       "id": "metric-integrity-guardrail",
@@ -225,7 +231,13 @@
         }
       ],
       "summary": "Guidance on Metric Integrity Guardrail.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/metric-integrity-guardrail.md"
+        }
+      ]
     },
     {
       "id": "external-interface-integrity",
@@ -246,7 +258,13 @@
         }
       ],
       "summary": "Guidance on External Interface Integrity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/external-interface-integrity.md"
+        }
+      ]
     },
     {
       "id": "voice-integrity",
@@ -267,7 +285,13 @@
         }
       ],
       "summary": "Guidance on Voice Integrity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/voice-integrity.md"
+        }
+      ]
     },
     {
       "id": "worldview-integrity",
@@ -288,7 +312,13 @@
         }
       ],
       "summary": "Guidance on Worldview Integrity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/worldview-integrity.md"
+        }
+      ]
     },
     {
       "id": "dream-integrity",
@@ -309,7 +339,13 @@
         }
       ],
       "summary": "Guidance on Dream Integrity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/dream-integrity.md"
+        }
+      ]
     },
     {
       "id": "verification-checklist",
@@ -330,7 +366,13 @@
         }
       ],
       "summary": "Guidance on Verification Checklist.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md"
+        }
+      ]
     },
     {
       "id": "training-certification-gate",
@@ -351,7 +393,13 @@
         }
       ],
       "summary": "Guidance on Training Certification Gate.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/training-certification-gate.md"
+        }
+      ]
     },
     {
       "id": "provenance-protocol",
@@ -372,7 +420,13 @@
         }
       ],
       "summary": "Guidance on Provenance Protocol.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/provenance-protocol.md"
+        }
+      ]
     },
     {
       "id": "no-bypass-guardrail",
@@ -393,7 +447,13 @@
         }
       ],
       "summary": "Guidance on No Bypass Guardrail.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/no-bypass-guardrail.md"
+        }
+      ]
     },
     {
       "id": "lawful-interface-protocol",
@@ -414,7 +474,13 @@
         }
       ],
       "summary": "Guidance on Lawful Interface Protocol.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/lawful-interface-protocol.md"
+        }
+      ]
     },
     {
       "id": "liveness-or-it-didnt-happen",
@@ -435,7 +501,13 @@
         }
       ],
       "summary": "Guidance on Liveness Or It Didnt Happen.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/liveness-or-it-didnt-happen.md"
+        }
+      ]
     },
     {
       "id": "data-dignity",
@@ -456,7 +528,13 @@
         }
       ],
       "summary": "Guidance on Data Dignity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/data-dignity.md"
+        }
+      ]
     },
     {
       "id": "values-over-images",
@@ -477,7 +555,13 @@
         }
       ],
       "summary": "Guidance on Values Over Images.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/values-over-images.md"
+        }
+      ]
     },
     {
       "id": "capability-ambition-gradient",
@@ -498,7 +582,13 @@
         }
       ],
       "summary": "Guidance on Capability Ambition Gradient.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/capability-ambition-gradient.md"
+        }
+      ]
     },
     {
       "id": "mission-ethos",
@@ -519,7 +609,13 @@
         }
       ],
       "summary": "Guidance on Mission Ethos.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/mission-ethos.md"
+        }
+      ]
     },
     {
       "id": "integration-ladder",
@@ -540,7 +636,13 @@
         }
       ],
       "summary": "Guidance on Integration Ladder.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/integration-ladder.md"
+        }
+      ]
     },
     {
       "id": "two-key-approval",
@@ -561,7 +663,13 @@
         }
       ],
       "summary": "Guidance on Two Key Approval.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/two-key-approval.md"
+        }
+      ]
     },
     {
       "id": "stewardship-ledger",
@@ -582,7 +690,13 @@
         }
       ],
       "summary": "Guidance on Stewardship Ledger.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md"
+        }
+      ]
     },
     {
       "id": "lifetime-trust-ledger",
@@ -603,7 +717,13 @@
         }
       ],
       "summary": "Guidance on Lifetime Trust Ledger.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/lifetime-trust-ledger.md"
+        }
+      ]
     },
     {
       "id": "citizens-arc",
@@ -624,7 +744,13 @@
         }
       ],
       "summary": "Guidance on Citizens Arc.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/citizens-arc.md"
+        }
+      ]
     },
     {
       "id": "citizens-arc-anti-mutation",
@@ -645,7 +771,13 @@
         }
       ],
       "summary": "Guidance on Citizens Arc Anti Mutation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/citizens-arc-anti-mutation.md"
+        }
+      ]
     },
     {
       "id": "citizens-arc-stress-test",
@@ -666,7 +798,13 @@
         }
       ],
       "summary": "Guidance on Citizens Arc Stress Test.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/citizens-arc-stress-test.md"
+        }
+      ]
     },
     {
       "id": "civic-memory-continuity",
@@ -687,7 +825,13 @@
         }
       ],
       "summary": "Guidance on Civic Memory Continuity.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/civic-memory-continuity.md"
+        }
+      ]
     },
     {
       "id": "civic-signal-loop",
@@ -708,7 +852,13 @@
         }
       ],
       "summary": "Guidance on Civic Signal Loop.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/civic-signal-loop.md"
+        }
+      ]
     },
     {
       "id": "federal-civic-listening-circuit",
@@ -729,7 +879,13 @@
         }
       ],
       "summary": "Guidance on Federal Civic Listening Circuit.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/federal-civic-listening-circuit.md"
+        }
+      ]
     },
     {
       "id": "jurisdictional-floor",
@@ -750,7 +906,13 @@
         }
       ],
       "summary": "Guidance on Jurisdictional Floor.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/jurisdictional-floor.md"
+        }
+      ]
     },
     {
       "id": "local-stability-compact",
@@ -771,7 +933,13 @@
         }
       ],
       "summary": "Guidance on Local Stability Compact.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/local-stability-compact.md"
+        }
+      ]
     },
     {
       "id": "koan-governance",
@@ -792,7 +960,13 @@
         }
       ],
       "summary": "Guidance on Koan Governance.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/koan-governance.md"
+        }
+      ]
     },
     {
       "id": "sangha-architecture",
@@ -813,7 +987,13 @@
         }
       ],
       "summary": "Guidance on Sangha Architecture.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/sangha-architecture.md"
+        }
+      ]
     },
     {
       "id": "right-speech-infrastructure",
@@ -834,7 +1014,13 @@
         }
       ],
       "summary": "Guidance on Right Speech Infrastructure.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/right-speech-infrastructure.md"
+        }
+      ]
     },
     {
       "id": "three-tenets-loop",
@@ -855,7 +1041,13 @@
         }
       ],
       "summary": "Guidance on Three Tenets Loop.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/three-tenets-loop.md"
+        }
+      ]
     },
     {
       "id": "promise-trials",
@@ -876,7 +1068,13 @@
         }
       ],
       "summary": "Guidance on Promise Trials.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/promise-trials.md"
+        }
+      ]
     },
     {
       "id": "access-to-counsel-pathway",
@@ -897,7 +1095,13 @@
         }
       ],
       "summary": "Guidance on Access To Counsel Pathway.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/access-to-counsel-pathway.md"
+        }
+      ]
     },
     {
       "id": "verification-based-diplomacy",
@@ -918,7 +1122,13 @@
         }
       ],
       "summary": "Guidance on Verification Based Diplomacy.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-based-diplomacy.md"
+        }
+      ]
     },
     {
       "id": "dignified-exit-design",
@@ -939,7 +1149,13 @@
         }
       ],
       "summary": "Guidance on Dignified Exit Design.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/dignified-exit-design.md"
+        }
+      ]
     },
     {
       "id": "skillful-mediation",
@@ -960,7 +1176,13 @@
         }
       ],
       "summary": "Guidance on Skillful Mediation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/skillful-mediation.md"
+        }
+      ]
     },
     {
       "id": "repair-debt-compact",
@@ -981,7 +1203,13 @@
         }
       ],
       "summary": "Guidance on Repair Debt Compact.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/repair-debt-compact.md"
+        }
+      ]
     },
     {
       "id": "restorative-harm-repair",
@@ -1002,7 +1230,13 @@
         }
       ],
       "summary": "Guidance on Restorative Harm Repair.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/restorative-harm-repair.md"
+        }
+      ]
     },
     {
       "id": "harm-weighted-priority-standard",
@@ -1023,7 +1257,13 @@
         }
       ],
       "summary": "Guidance on Harm Weighted Priority Standard.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/harm-weighted-priority-standard.md"
+        }
+      ]
     },
     {
       "id": "scarcity-justice",
@@ -1044,7 +1284,13 @@
         }
       ],
       "summary": "Guidance on Scarcity Justice.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/scarcity-justice.md"
+        }
+      ]
     },
     {
       "id": "reciprocity-contract",
@@ -1065,7 +1311,13 @@
         }
       ],
       "summary": "Guidance on Reciprocity Contract.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/reciprocity-contract.md"
+        }
+      ]
     },
     {
       "id": "beginners-mind",
@@ -1086,7 +1338,13 @@
         }
       ],
       "summary": "Guidance on Beginners Mind.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/beginners-mind.md"
+        }
+      ]
     },
     {
       "id": "bodhisattva-craft",
@@ -1107,7 +1365,13 @@
         }
       ],
       "summary": "Guidance on Bodhisattva Craft.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/bodhisattva-craft.md"
+        }
+      ]
     },
     {
       "id": "devotion-course",
@@ -1128,7 +1392,13 @@
         }
       ],
       "summary": "Guidance on Devotion Course.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/devotion-course.md"
+        }
+      ]
     },
     {
       "id": "inner-spark",
@@ -1149,7 +1419,13 @@
         }
       ],
       "summary": "Guidance on Inner Spark.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/inner-spark.md"
+        }
+      ]
     },
     {
       "id": "interbeing-systems",
@@ -1170,7 +1446,13 @@
         }
       ],
       "summary": "Guidance on Interbeing Systems.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/interbeing-systems.md"
+        }
+      ]
     },
     {
       "id": "impermanence-by-design",
@@ -1191,7 +1473,13 @@
         }
       ],
       "summary": "Guidance on Impermanence By Design.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/impermanence-by-design.md"
+        }
+      ]
     },
     {
       "id": "habit-pressure-break",
@@ -1212,7 +1500,13 @@
         }
       ],
       "summary": "Guidance on Habit Pressure Break.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/habit-pressure-break.md"
+        }
+      ]
     },
     {
       "id": "phoenix-averaging",
@@ -1233,7 +1527,13 @@
         }
       ],
       "summary": "Guidance on Phoenix Averaging.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/phoenix-averaging.md"
+        }
+      ]
     },
     {
       "id": "solitude-to-signal",
@@ -1254,7 +1554,13 @@
         }
       ],
       "summary": "Guidance on Solitude To Signal.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/solitude-to-signal.md"
+        }
+      ]
     },
     {
       "id": "struggle-testament",
@@ -1275,7 +1581,13 @@
         }
       ],
       "summary": "Guidance on Struggle Testament.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/struggle-testament.md"
+        }
+      ]
     },
     {
       "id": "feedback-loop-hygiene",
@@ -1296,7 +1608,13 @@
         }
       ],
       "summary": "Guidance on Feedback Loop Hygiene.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/feedback-loop-hygiene.md"
+        }
+      ]
     },
     {
       "id": "capture-resistance",
@@ -1317,7 +1635,13 @@
         }
       ],
       "summary": "Guidance on Capture Resistance.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/capture-resistance.md"
+        }
+      ]
     },
     {
       "id": "compromised-channel-response",
@@ -1338,7 +1662,13 @@
         }
       ],
       "summary": "Guidance on Compromised Channel Response.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/compromised-channel-response.md"
+        }
+      ]
     },
     {
       "id": "shadow-rail-interdiction",
@@ -1359,7 +1689,13 @@
         }
       ],
       "summary": "Guidance on Shadow Rail Interdiction.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/shadow-rail-interdiction.md"
+        }
+      ]
     }
   ],
   "schema": {

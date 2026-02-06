@@ -45,7 +45,13 @@
         }
       ],
       "summary": "Core ladder pack overview.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/README.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-readme",
@@ -65,7 +71,13 @@
         }
       ],
       "summary": "Overview of the ladder pack.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/README.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-deck",
@@ -86,7 +98,13 @@
         }
       ],
       "summary": "Deck outline for ladder pack.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/deck/deck-outline.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-memo",
@@ -107,7 +125,13 @@
         }
       ],
       "summary": "Policy memo for ladder pack.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/memo/policy-memo.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-artifacts",
@@ -156,7 +180,13 @@
         }
       ],
       "summary": "Artifact template for Coi Disclosure.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/templates/artifacts/coi-disclosure.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-interview-log",
@@ -177,7 +207,13 @@
         }
       ],
       "summary": "Artifact template for Interview Log.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/templates/artifacts/interview-log.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-pilot-log",
@@ -198,7 +234,13 @@
         }
       ],
       "summary": "Artifact template for Pilot Log.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/templates/artifacts/pilot-log.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-privacy-minimization",
@@ -219,7 +261,13 @@
         }
       ],
       "summary": "Artifact template for Privacy Minimization.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/templates/artifacts/privacy-minimization.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-safety-precheck",
@@ -240,7 +288,13 @@
         }
       ],
       "summary": "Artifact template for Safety Precheck.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/templates/artifacts/safety-precheck.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-unit-econ",
@@ -261,7 +315,13 @@
         }
       ],
       "summary": "Artifact template for Unit Econ.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/templates/artifacts/unit-econ.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-receipts",
@@ -306,7 +366,13 @@
         }
       ],
       "summary": "Receipt template for Curiosity Receipt.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/templates/receipts/curiosity-receipt.md"
+        }
+      ]
     },
     {
       "id": "zen-ladder-rung-decision-receipt",
@@ -327,7 +393,13 @@
         }
       ],
       "summary": "Receipt template for Rung Decision Receipt.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/templates/receipts/rung-decision-receipt.md"
+        }
+      ]
     }
   ],
   "schema": {

@@ -45,7 +45,17 @@
         }
       ],
       "summary": "Tenant isolation, auth policy, and request gating.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/auth/tenant.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/auth/policy.ts"
+        }
+      ]
     },
     {
       "id": "security-hull-guard",
@@ -66,7 +76,17 @@
         }
       ],
       "summary": "Outbound access control and hull enforcement.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/security/hull-guard.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/hull-basis.ts"
+        }
+      ]
     },
     {
       "id": "security-hull-routes",
@@ -87,7 +107,21 @@
         }
       ],
       "summary": "Hull status, capsules, and preview endpoints.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/hull.status.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/hull.capsules.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/hull-preview.ts"
+        }
+      ]
     },
     {
       "id": "security-hull-client",
@@ -112,7 +146,29 @@
         }
       ],
       "summary": "Hull UI guardrails and metrics capture.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/hull-guardrails.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/hull-hud.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/hull-metrics.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/resolve-hull-dims.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/hull-assets.ts"
+        }
+      ]
     },
     {
       "id": "security-guard-docs",
@@ -133,7 +189,33 @@
         }
       ],
       "summary": "Guardrail documentation and operator notes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/guarded-casimir-tile-code-mapped.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/qi-guard-consolidation.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/needle-hull-materials.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/needle-hull-mainframe.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/metric-integrity-guardrail.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/no-bypass-guardrail.md"
+        }
+      ]
     },
     {
       "id": "security-concurrency",
@@ -154,7 +236,13 @@
         }
       ],
       "summary": "Concurrency limits and overload protection.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/middleware/concurrency-guard.ts"
+        }
+      ]
     },
     {
       "id": "security-guard-tests",
@@ -175,7 +263,33 @@
         }
       ],
       "summary": "Hull guardrail and QI enforcement tests.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "test",
+          "path": "tests/hull-guard.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/hull-capsules.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/hull-tools.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/hull-status.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/qi-guardrail.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/pipeline-ts-qi-guard.spec.ts"
+        }
+      ]
     }
   ],
   "schema": {

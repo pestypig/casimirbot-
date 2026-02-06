@@ -41,7 +41,17 @@
         }
       ],
       "summary": "Documentation for Helix Ask flows.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-flow.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-ladder.md"
+        }
+      ]
     },
     {
       "id": "helix-ask-core",
@@ -62,7 +72,45 @@
         }
       ],
       "summary": "Core routing, formatting, and intent services.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/arbiter.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/intent-directory.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/query.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/topic.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/paths.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/format.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/doc-sections.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/job-store.ts"
+        }
+      ]
     },
     {
       "id": "helix-ask-evidence",
@@ -82,7 +130,25 @@
         }
       ],
       "summary": "Evidence gating and reasoning checks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/platonic-gates.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/math.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/repo-search.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/session-memory.ts"
+        }
+      ]
     },
     {
       "id": "helix-ask-graph",
@@ -102,7 +168,17 @@
         }
       ],
       "summary": "Anchor-and-walk graph resolver.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/graph-resolver.ts"
+        },
+        {
+          "type": "code",
+          "path": "configs/graph-resolvers.js"
+        }
+      ]
     }
   ],
   "schema": {

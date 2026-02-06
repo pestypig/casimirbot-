@@ -23,7 +23,13 @@
       ],
       "links": [],
       "summary": "Constraint and analysis loops used for diagnostics and verification prototypes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/analysis-loops.md"
+        }
+      ]
     },
     {
       "id": "analysis-loops-overview",
@@ -44,7 +50,13 @@
         }
       ],
       "summary": "Prototype loops for constraint exploration and diagnostics.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/analysis-loops.md"
+        }
+      ]
     },
     {
       "id": "noise-field-loop",
@@ -65,7 +77,13 @@
         }
       ],
       "summary": "Prototype loop for noise field constraints.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/analysis/noise-field-loop.ts"
+        }
+      ]
     },
     {
       "id": "diffusion-loop",
@@ -86,7 +104,13 @@
         }
       ],
       "summary": "Prototype loop for diffusion field constraints.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/analysis/diffusion-loop.ts"
+        }
+      ]
     },
     {
       "id": "belief-graph-loop",
@@ -107,7 +131,13 @@
         }
       ],
       "summary": "Prototype loop for belief graph consistency checks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/analysis/belief-graph-loop.ts"
+        }
+      ]
     },
     {
       "id": "constraint-loop",
@@ -128,7 +158,13 @@
         }
       ],
       "summary": "Generic constraint loop driver for prototypes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/analysis/constraint-loop.ts"
+        }
+      ]
     },
     {
       "id": "analysis-loop-routes",
@@ -149,7 +185,13 @@
         }
       ],
       "summary": "HTTP routes for analysis loop execution.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/analysis-loops.ts"
+        }
+      ]
     }
   ],
   "schema": {

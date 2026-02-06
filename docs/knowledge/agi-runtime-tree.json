@@ -54,7 +54,13 @@
         }
       ],
       "summary": "Plan/execute entrypoints and Helix Ask runtime.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts"
+        }
+      ]
     },
     {
       "id": "agi-planner-core",
@@ -74,7 +80,29 @@
         }
       ],
       "summary": "Plan synthesis, grounding, and agent routing.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/planner/chat-b.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/planner/grounding.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/planner/agent-map.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/planner/why-belongs.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/planner/supplements.ts"
+        }
+      ]
     },
     {
       "id": "agi-refinery",
@@ -95,7 +123,29 @@
         }
       ],
       "summary": "Refinery gates, variants, and trajectory capture.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-gates.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-trajectory.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-variants.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/refinery-policy.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.refinery.ts"
+        }
+      ]
     },
     {
       "id": "agi-trace-memory",
@@ -120,7 +170,25 @@
         }
       ],
       "summary": "Trace capture, memory, and audit trails.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.trace.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.memory.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.memory.trace.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/observability/training-trace-store.ts"
+        }
+      ]
     },
     {
       "id": "agi-evaluation",
@@ -140,7 +208,17 @@
         }
       ],
       "summary": "Eval smoke runs and regression harnesses.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/agi/eval-smoke.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.eval.ts"
+        }
+      ]
     },
     {
       "id": "agi-adapter",
@@ -160,7 +238,21 @@
         }
       ],
       "summary": "Adapter endpoint and contract mapping.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.adapter.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/ADAPTER-CONTRACT.md"
+        },
+        {
+          "type": "code",
+          "path": "cli/casimir-verify.ts"
+        }
+      ]
     },
     {
       "id": "agi-chat-sessions",
@@ -180,7 +272,17 @@
         }
       ],
       "summary": "Chat session storage and rendering.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.chat.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/agi/chat-render.ts"
+        }
+      ]
     },
     {
       "id": "agi-contributions",
@@ -200,7 +302,13 @@
         }
       ],
       "summary": "Contribution intake and tracking.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.contributions.ts"
+        }
+      ]
     },
     {
       "id": "agi-constraint-packs",
@@ -220,7 +328,13 @@
         }
       ],
       "summary": "Constraint pack routing and validation.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.constraint-packs.ts"
+        }
+      ]
     },
     {
       "id": "agi-resilience",
@@ -240,7 +354,13 @@
         }
       ],
       "summary": "Circuit breaker and failure controls.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/resilience/circuit-breaker.ts"
+        }
+      ]
     },
     {
       "id": "agi-learning-loop",
@@ -260,7 +380,13 @@
         }
       ],
       "summary": "Reflection and learning hooks.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/learning/reflect.ts"
+        }
+      ]
     },
     {
       "id": "agi-knowledge-compositor",
@@ -284,7 +410,21 @@
         }
       ],
       "summary": "Knowledge bundles and prompt composition.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/planner/knowledge-compositor.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/services/knowledge/merge.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/config/knowledge.ts"
+        }
+      ]
     }
   ],
   "schema": {

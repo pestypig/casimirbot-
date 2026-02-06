@@ -77,7 +77,13 @@
         }
       ],
       "summary": "Define the metric as the core object for distances and intervals.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/spacetime-metric-basics.md"
+        }
+      ]
     },
     {
       "id": "connection-curvature",
@@ -98,7 +104,13 @@
         }
       ],
       "summary": "Curvature expresses how geometry responds to matter and energy.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/connection-curvature.md"
+        }
+      ]
     },
     {
       "id": "boundary-conditions-modes",
@@ -119,7 +131,13 @@
         }
       ],
       "summary": "Boundary choices shape stability and the physical interpretation of solutions.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/boundary-conditions-modes.md"
+        }
+      ]
     },
     {
       "id": "field-equations-stack",
@@ -170,7 +188,13 @@
         }
       ],
       "summary": "Curvature equals stress-energy with constant factors.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/einstein-field-equations.md"
+        }
+      ]
     },
     {
       "id": "adm-3plus1",
@@ -191,7 +215,13 @@
         }
       ],
       "summary": "Split spacetime into spatial slices and time evolution.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/adm-3plus1.md"
+        }
+      ]
     },
     {
       "id": "york-time-constraints",
@@ -212,7 +242,13 @@
         }
       ],
       "summary": "York time gauges constrain slicing and stability.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/york-time-constraints.md"
+        }
+      ]
     },
     {
       "id": "stress-energy-stack",
@@ -261,7 +297,13 @@
         }
       ],
       "summary": "Tensor form of energy, momentum, and pressure.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+        }
+      ]
     },
     {
       "id": "energy-mass-equivalence",
@@ -282,7 +324,13 @@
         }
       ],
       "summary": "Energy and mass relate through scaling constants.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/energy-mass-equivalence.md"
+        }
+      ]
     },
     {
       "id": "energy-conditions-stack",
@@ -332,7 +380,13 @@
         }
       ],
       "summary": "Classical conditions restrict stress-energy.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/energy-conditions.md"
+        }
+      ]
     },
     {
       "id": "negative-energy-interpretation",
@@ -353,7 +407,13 @@
         }
       ],
       "summary": "Interpretation and limits for negative energy densities.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/negative-energy-interpretation.md"
+        }
+      ]
     },
     {
       "id": "ford-roman-quantum-inequality",
@@ -374,7 +434,13 @@
         }
       ],
       "summary": "Quantum inequalities bound magnitude and duration of negative energy.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+        }
+      ]
     },
     {
       "id": "casimir-phenomena",
@@ -404,7 +470,13 @@
         }
       ],
       "summary": "Casimir effects provide a concrete negative-energy mechanism.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/casimir-force-energy.md"
+        }
+      ]
     },
     {
       "id": "casimir-force-energy",
@@ -425,7 +497,13 @@
         }
       ],
       "summary": "Vacuum boundary conditions generate measurable forces.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/casimir-force-energy.md"
+        }
+      ]
     },
     {
       "id": "casimir-geometry-effects",
@@ -446,7 +524,13 @@
         }
       ],
       "summary": "Geometry choices change mode structure and energy density.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/casimir-geometry-effects.md"
+        }
+      ]
     },
     {
       "id": "dynamic-casimir-effect",
@@ -467,7 +551,13 @@
         }
       ],
       "summary": "Time-varying boundaries create real photons.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dynamic-casimir-effect.md"
+        }
+      ]
     },
     {
       "id": "vacuum-fluctuations",
@@ -488,7 +578,13 @@
         }
       ],
       "summary": "Vacuum fluctuations underpin zero-point energy effects.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/vacuum-fluctuations.md"
+        }
+      ]
     },
     {
       "id": "units-and-scaling",
@@ -540,7 +636,13 @@
         }
       ],
       "summary": "Geometric and SI units must be mapped explicitly.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/units-systems.md"
+        }
+      ]
     },
     {
       "id": "dimensional-analysis",
@@ -561,7 +663,13 @@
         }
       ],
       "summary": "Dimensional checks prevent hidden inconsistencies.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dimensional-analysis.md"
+        }
+      ]
     },
     {
       "id": "scaling-laws",
@@ -582,7 +690,13 @@
         }
       ],
       "summary": "Scaling relations explain how results change with size.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/scaling-laws.md"
+        }
+      ]
     },
     {
       "id": "fundamental-constants",
@@ -603,7 +717,13 @@
         }
       ],
       "summary": "Constants anchor conversions and scaling.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/fundamental-constants.md"
+        }
+      ]
     },
     {
       "id": "numerics-and-stability",
@@ -652,7 +772,13 @@
         }
       ],
       "summary": "Mesh resolution shapes accuracy and stability.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/discretization-mesh.md"
+        }
+      ]
     },
     {
       "id": "numerical-precision",
@@ -673,7 +799,13 @@
         }
       ],
       "summary": "Precision limits determine residual reliability.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/numerical-precision.md"
+        }
+      ]
     },
     {
       "id": "stability-timestep",
@@ -694,7 +826,13 @@
         }
       ],
       "summary": "Timestep choices control numerical stability.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stability-timestep.md"
+        }
+      ]
     },
     {
       "id": "visualization-scaling",
@@ -715,7 +853,13 @@
         }
       ],
       "summary": "Scaling choices impact interpretation of plots.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/visualization-scaling.md"
+        }
+      ]
     },
     {
       "id": "time-bounds-stack",
@@ -759,7 +903,13 @@
         }
       ],
       "summary": "Bounds on sampling windows prevent false averages.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+        }
+      ]
     },
     {
       "id": "viability-and-claims",
@@ -809,7 +959,13 @@
         }
       ],
       "summary": "Define viability in terms of constraints and evidence.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/viability-definition.md"
+        }
+      ]
     },
     {
       "id": "no-feasibility-claims",
@@ -830,7 +986,13 @@
         }
       ],
       "summary": "Guard against unsupported feasibility claims.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/no-feasibility-claims.md"
+        }
+      ]
     },
     {
       "id": "certificate-integrity",
@@ -851,7 +1013,13 @@
         }
       ],
       "summary": "Integrity checks back any certified claim.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/certificate-integrity.md"
+        }
+      ]
     },
     {
       "id": "gr-units-conversion",
@@ -872,7 +1040,13 @@
         }
       ],
       "summary": "Convert between SI and geometric GR units.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/gr-units.ts"
+        }
+      ]
     },
     {
       "id": "curvature-diagnostics",
@@ -893,7 +1067,13 @@
         }
       ],
       "summary": "Schema for curvature diagnostics output.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/curvature-diagnostics.ts"
+        }
+      ]
     },
     {
       "id": "qi-diagnostics-schema",
@@ -914,7 +1094,13 @@
         }
       ],
       "summary": "Schema for QI diagnostic payloads.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/qi-diagnostics.ts"
+        }
+      ]
     },
     {
       "id": "quantum-gr-bridge",
@@ -935,7 +1121,13 @@
         }
       ],
       "summary": "Bridge notes between quantum effects and GR constraints.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/quantum-gr-bridge.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-mechanics",
@@ -964,7 +1156,13 @@
         }
       ],
       "summary": "Classical vs statistical uncertainty and physics constraints.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/uncertainty-mechanics-tree.js"
+        }
+      ]
     },
     {
       "id": "brick-lattice-dataflow",
@@ -993,7 +1191,13 @@
         }
       ],
       "summary": "Brick payloads and lattice dataflow in physics pipelines.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/brick-lattice-dataflow-tree.js"
+        }
+      ]
     },
     {
       "id": "simulation-systems",
@@ -1022,7 +1226,13 @@
         }
       ],
       "summary": "Simulation systems and pipelines.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/simulation-systems-tree.js"
+        }
+      ]
     }
   ],
   "schema": {
