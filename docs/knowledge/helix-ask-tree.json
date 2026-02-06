@@ -46,6 +46,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/helix-ask-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/helix-ask-routing.spec.ts"
         }
       ]
     },
@@ -76,6 +84,14 @@
         {
           "type": "doc",
           "path": "docs/helix-ask-ladder.md"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/helix-ask-routing.spec.ts"
         }
       ],
       "inputs": [],
@@ -155,6 +171,14 @@
         {
           "type": "code",
           "path": "server/services/helix-ask/job-store.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-flow.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/helix-ask-routing.spec.ts"
         }
       ],
       "inputs": [],
@@ -213,6 +237,14 @@
         {
           "type": "code",
           "path": "server/services/helix-ask/session-memory.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-flow.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/helix-ask-routing.spec.ts"
         }
       ],
       "inputs": [],
@@ -263,6 +295,14 @@
         {
           "type": "code",
           "path": "configs/graph-resolvers.js"
+        },
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-flow.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/helix-ask-routing.spec.ts"
         }
       ],
       "inputs": [],

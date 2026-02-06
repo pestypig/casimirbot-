@@ -47,6 +47,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ]
     },
@@ -101,6 +109,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ]
     },
@@ -128,6 +144,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/warp-bubble.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -175,6 +199,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/alcubierre-metric.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -222,6 +254,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/natario-zero-expansion.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -269,6 +309,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/shift-vector-expansion-scalar.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -316,6 +364,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/bubble-wall-thickness.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -363,6 +419,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/vdb-compression-factor.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -434,6 +498,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ]
     },
@@ -461,6 +533,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/casimir-lattice.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -508,6 +588,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/ford-roman-proxy.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -555,6 +643,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/power-mass-ladders.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -625,6 +721,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ]
     },
@@ -652,6 +756,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/sector-strobes-duty-cycle.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -699,6 +811,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/active-fraction.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -775,6 +895,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ]
     },
@@ -802,6 +930,14 @@
         {
           "type": "code",
           "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/warp-bubble.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -849,6 +985,14 @@
         {
           "type": "code",
           "path": "modules/warp/natario-warp.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/warp-bubble.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -896,6 +1040,14 @@
         {
           "type": "doc",
           "path": "docs/theta-semantics.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -943,6 +1095,14 @@
         {
           "type": "doc",
           "path": "docs/warp-pulsed-power.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -990,6 +1150,14 @@
         {
           "type": "doc",
           "path": "docs/warpfield-mesh-patch-plan.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -1037,6 +1205,14 @@
         {
           "type": "doc",
           "path": "docs/warpfield-visualization-roadmap.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -1084,6 +1260,14 @@
         {
           "type": "doc",
           "path": "docs/warp-console-architecture.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
@@ -1131,6 +1315,14 @@
         {
           "type": "doc",
           "path": "docs/warp-llm-contracts.md"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts"
         }
       ],
       "inputs": [],
