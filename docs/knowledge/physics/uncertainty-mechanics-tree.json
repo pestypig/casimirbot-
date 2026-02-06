@@ -1326,7 +1326,8 @@
       "children": [
         "uncertainty-energy-conditions",
         "uncertainty-quantum-inequality",
-        "uncertainty-sampling-window"
+        "uncertainty-sampling-window",
+        "bridge-uncertainty-reality-bounds-verification-checklist"
       ],
       "links": [
         {
@@ -1600,6 +1601,80 @@
       ],
       "slug": "bridge-uncertainty-classical-stack-uncertainty-statistical-stack",
       "summary": "Bridge between Classical Uncertainty Stack and Statistical Uncertainty Stack."
+    },
+    {
+      "id": "bridge-uncertainty-reality-bounds-verification-checklist",
+      "slug": "bridge-uncertainty-reality-bounds-verification-checklist",
+      "title": "Reality Constraint Bounds <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and uncertainty-reality-bounds.",
+      "bodyMD": "Bridge between verification-checklist and uncertainty-reality-bounds (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "uncertainty"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-reality-bounds"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "uncertainty-reality-bounds"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "uncertainty-reality-bounds",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "uncertainty-reality-bounds"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/energy-conditions.md",
+          "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
+          "content_hash": "sha256:cfa8949441bef4cec276f2dc2274b7affd811c7feb2d2d8c27341fd96d3e0625"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and uncertainty-reality-bounds."
     }
   ],
   "schema": {

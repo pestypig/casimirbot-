@@ -80,8 +80,17 @@ Resonance stack for code-lattice computations. Minimal artifact: code-lattice co
 - type: bridge
 - summary: Cross-reference between Code Lattice Core and Resonance Runtime within this tree. Minimal artifact: left/right evidence anchors.
 
+### Node: Resonance Tests <-> Verification Checklist
+- id: bridge-resonance-tests-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and resonance-tests (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Code Lattice Core <-> Resonance Runtime
 - relation: Cross-reference between Code Lattice Core and Resonance Runtime.
 - summary: Cross-reference between Code Lattice Core and Resonance Runtime within this tree. Minimal artifact: left/right evidence anchors.
+
+### Bridge: verification-checklist <-> Resonance Tests
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and resonance-tests (verification-anchor).

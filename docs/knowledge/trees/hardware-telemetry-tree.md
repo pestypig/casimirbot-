@@ -55,8 +55,17 @@ This tree maps hardware telemetry ingest, scheduling, and the UI controls used t
 - type: bridge
 - summary: Cross-reference between Hardware Ingest and Hardware Bus within this tree. Minimal artifact: left/right evidence anchors.
 
+### Node: Hardware Provenance <-> Stewardship Ledger
+- id: bridge-hardware-provenance-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and hardware-provenance (stewardship-guardrail).
+
 ## Bridges
 
 ### Bridge: Hardware Ingest <-> Hardware Bus
 - relation: Cross-reference between Hardware Ingest and Hardware Bus.
 - summary: Cross-reference between Hardware Ingest and Hardware Bus within this tree. Minimal artifact: left/right evidence anchors.
+
+### Bridge: stewardship-ledger <-> Hardware Provenance
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and hardware-provenance (stewardship-guardrail).

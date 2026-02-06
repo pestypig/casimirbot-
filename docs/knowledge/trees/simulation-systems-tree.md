@@ -90,8 +90,17 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 - type: bridge
 - summary: Cross-reference between Simulation Contracts and Simulation API within this tree. Minimal artifact: left/right evidence anchors.
 
+### Node: Simulation Core Modules <-> Mission Ethos
+- id: bridge-simulation-core-modules-mission-ethos
+- type: bridge
+- summary: Bridge between mission-ethos and simulation-core-modules (mission-guardrail).
+
 ## Bridges
 
 ### Bridge: Simulation Contracts <-> Simulation API
 - relation: Cross-reference between Simulation Contracts and Simulation API.
 - summary: Cross-reference between Simulation Contracts and Simulation API within this tree. Minimal artifact: left/right evidence anchors.
+
+### Bridge: mission-ethos <-> Simulation Core Modules
+- relation: mission-guardrail
+- summary: Bridge between mission-ethos and simulation-core-modules (mission-guardrail).

@@ -160,8 +160,17 @@ This tree maps how uncertainty is defined, propagated, and bounded across classi
 - type: bridge
 - summary: Cross-reference between Classical Uncertainty Stack and Statistical Uncertainty Stack within this tree. Minimal artifact: left/right evidence anchors.
 
+### Node: Reality Constraint Bounds <-> Verification Checklist
+- id: bridge-uncertainty-reality-bounds-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and uncertainty-reality-bounds (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Classical Uncertainty Stack <-> Statistical Uncertainty Stack
 - relation: Cross-reference between Classical Uncertainty Stack and Statistical Uncertainty Stack.
 - summary: Cross-reference between Classical Uncertainty Stack and Statistical Uncertainty Stack within this tree. Minimal artifact: left/right evidence anchors.
+
+### Bridge: verification-checklist <-> Reality Constraint Bounds
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and uncertainty-reality-bounds (verification-anchor).
