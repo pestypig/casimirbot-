@@ -640,7 +640,9 @@
         "simulation",
         "ui"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-ui-surfaces-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -1308,6 +1310,81 @@
         ]
       },
       "summary": "Bridge between stewardship-ledger and simulation-contracts."
+    },
+    {
+      "id": "bridge-simulation-ui-surfaces-verification-checklist",
+      "slug": "bridge-simulation-ui-surfaces-verification-checklist",
+      "title": "Simulation UI Surfaces <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and simulation-ui-surfaces.",
+      "bodyMD": "Bridge between verification-checklist and simulation-ui-surfaces (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "ui"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-ui-surfaces"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-ui-surfaces"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "simulation-ui-surfaces",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "simulation-ui-surfaces"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "10870ac503b9c1b083d5e80ca944190423ecf94d",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/simulation.tsx",
+          "repo_rev": "10870ac503b9c1b083d5e80ca944190423ecf94d",
+          "content_hash": "sha256:d37ef3ef2c78f892832e098759729d2604910e31879479187d1178b53f1aef13"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and simulation-ui-surfaces."
     }
   ],
   "schema": {

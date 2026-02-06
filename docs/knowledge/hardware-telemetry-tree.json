@@ -233,7 +233,9 @@
         "hardware",
         "ui"
       ],
-      "children": [],
+      "children": [
+        "bridge-hardware-panels-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -362,7 +364,8 @@
         "provenance"
       ],
       "children": [
-        "bridge-hardware-provenance-stewardship-ledger"
+        "bridge-hardware-provenance-stewardship-ledger",
+        "bridge-hardware-provenance-verification-checklist"
       ],
       "links": [
         {
@@ -850,6 +853,156 @@
         ]
       },
       "summary": "Bridge between verification-checklist and hardware-hooks."
+    },
+    {
+      "id": "bridge-hardware-panels-verification-checklist",
+      "slug": "bridge-hardware-panels-verification-checklist",
+      "title": "Hardware Panels <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and hardware-panels.",
+      "bodyMD": "Bridge between verification-checklist and hardware-panels (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "hardware",
+        "panels"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-panels"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-panels"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "hardware-panels",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "hardware-panels"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "10870ac503b9c1b083d5e80ca944190423ecf94d",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/HardwareConnectModal.tsx",
+          "repo_rev": "10870ac503b9c1b083d5e80ca944190423ecf94d",
+          "content_hash": "sha256:4705e0e8590728e0837668a6d7ef55f2de1c4160dc0bb2a54b9fdcddca9d520a"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and hardware-panels."
+    },
+    {
+      "id": "bridge-hardware-provenance-verification-checklist",
+      "slug": "bridge-hardware-provenance-verification-checklist",
+      "title": "Hardware Provenance <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and hardware-provenance.",
+      "bodyMD": "Bridge between verification-checklist and hardware-provenance (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "hardware",
+        "provenance"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-provenance"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-provenance"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "hardware-provenance",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "hardware-provenance"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "10870ac503b9c1b083d5e80ca944190423ecf94d",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "10870ac503b9c1b083d5e80ca944190423ecf94d",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and hardware-provenance."
     }
   ],
   "schema": {

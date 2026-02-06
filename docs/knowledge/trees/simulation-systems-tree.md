@@ -120,6 +120,11 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 - type: bridge
 - summary: Bridge between stewardship-ledger and simulation-contracts (stewardship-guardrail).
 
+### Node: Simulation UI Surfaces <-> Verification Checklist
+- id: bridge-simulation-ui-surfaces-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and simulation-ui-surfaces (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Simulation Contracts <-> Simulation API
@@ -149,3 +154,7 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 ### Bridge: stewardship-ledger <-> Simulation Contracts
 - relation: stewardship-guardrail
 - summary: Bridge between stewardship-ledger and simulation-contracts (stewardship-guardrail).
+
+### Bridge: verification-checklist <-> Simulation UI Surfaces
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and simulation-ui-surfaces (verification-anchor).

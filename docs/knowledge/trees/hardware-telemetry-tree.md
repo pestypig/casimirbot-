@@ -80,6 +80,16 @@ This tree maps hardware telemetry ingest, scheduling, and the UI controls used t
 - type: bridge
 - summary: Bridge between verification-checklist and hardware-hooks (verification-anchor).
 
+### Node: Hardware Panels <-> Verification Checklist
+- id: bridge-hardware-panels-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-panels (verification-anchor).
+
+### Node: Hardware Provenance <-> Verification Checklist
+- id: bridge-hardware-provenance-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-provenance (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Hardware Ingest <-> Hardware Bus
@@ -105,3 +115,11 @@ This tree maps hardware telemetry ingest, scheduling, and the UI controls used t
 ### Bridge: verification-checklist <-> Hardware Hooks
 - relation: verification-anchor
 - summary: Bridge between verification-checklist and hardware-hooks (verification-anchor).
+
+### Bridge: verification-checklist <-> Hardware Panels
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-panels (verification-anchor).
+
+### Bridge: verification-checklist <-> Hardware Provenance
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-provenance (verification-anchor).
