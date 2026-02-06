@@ -22,7 +22,9 @@
         "external-hardware-stack",
         "external-architecture-stack"
       ],
-      "links": []
+      "links": [],
+      "summary": "Third-party dependencies and vendor integrations.",
+      "nodeType": "concept"
     },
     {
       "id": "external-llm-stack",
@@ -41,7 +43,9 @@
           "rel": "parent",
           "to": "external-integrations-tree"
         }
-      ]
+      ],
+      "summary": "LLM inference backends and adapters.",
+      "nodeType": "concept"
     },
     {
       "id": "external-audio-stack",
@@ -60,7 +64,9 @@
           "rel": "parent",
           "to": "external-integrations-tree"
         }
-      ]
+      ],
+      "summary": "Audio and speech processing dependencies.",
+      "nodeType": "concept"
     },
     {
       "id": "external-physics-stack",
@@ -79,7 +85,9 @@
           "rel": "parent",
           "to": "external-integrations-tree"
         }
-      ]
+      ],
+      "summary": "External physics and visualization references.",
+      "nodeType": "concept"
     },
     {
       "id": "external-solar-stack",
@@ -98,7 +106,9 @@
           "rel": "parent",
           "to": "external-integrations-tree"
         }
-      ]
+      ],
+      "summary": "Solar data tooling dependencies.",
+      "nodeType": "concept"
     },
     {
       "id": "external-webgpu-stack",
@@ -117,7 +127,9 @@
           "rel": "parent",
           "to": "external-integrations-tree"
         }
-      ]
+      ],
+      "summary": "WebGPU volume rendering references.",
+      "nodeType": "concept"
     },
     {
       "id": "external-hardware-stack",
@@ -136,7 +148,9 @@
           "rel": "parent",
           "to": "external-integrations-tree"
         }
-      ]
+      ],
+      "summary": "Hardware utility dependencies.",
+      "nodeType": "concept"
     },
     {
       "id": "external-architecture-stack",
@@ -155,7 +169,13 @@
           "rel": "parent",
           "to": "external-integrations-tree"
         }
-      ]
+      ],
+      "summary": "External architectural references and notes.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

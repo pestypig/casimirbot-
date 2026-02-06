@@ -21,7 +21,9 @@
         "ops-scripts-tools",
         "ops-release-packaging"
       ],
-      "links": []
+      "links": [],
+      "summary": "CI, verification gates, observability, and deployment scaffolding.",
+      "nodeType": "concept"
     },
     {
       "id": "ops-ci-workflows",
@@ -39,7 +41,9 @@
           "rel": "parent",
           "to": "ops-deployment-tree"
         }
-      ]
+      ],
+      "summary": "GitHub Actions workflows for verification and release.",
+      "nodeType": "concept"
     },
     {
       "id": "ops-verification-tools",
@@ -57,7 +61,9 @@
           "rel": "parent",
           "to": "ops-deployment-tree"
         }
-      ]
+      ],
+      "summary": "Casimir verification CLI and adapter contracts.",
+      "nodeType": "concept"
     },
     {
       "id": "ops-observability",
@@ -75,7 +81,9 @@
           "rel": "parent",
           "to": "ops-deployment-tree"
         }
-      ]
+      ],
+      "summary": "Observability config and compose stacks.",
+      "nodeType": "concept"
     },
     {
       "id": "ops-env-config",
@@ -93,7 +101,9 @@
           "rel": "parent",
           "to": "ops-deployment-tree"
         }
-      ]
+      ],
+      "summary": "Environment and configuration files.",
+      "nodeType": "concept"
     },
     {
       "id": "ops-scripts-tools",
@@ -111,7 +121,9 @@
           "rel": "parent",
           "to": "ops-deployment-tree"
         }
-      ]
+      ],
+      "summary": "Scripts, tools, and CLI helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "ops-release-packaging",
@@ -129,7 +141,13 @@
           "rel": "parent",
           "to": "ops-deployment-tree"
         }
-      ]
+      ],
+      "summary": "Packaging and release assets.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

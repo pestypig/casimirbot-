@@ -21,7 +21,9 @@
         "queue-profile-summarizer",
         "queue-orchestrator"
       ],
-      "links": []
+      "links": [],
+      "summary": "Async job queues, schedulers, and orchestration services.",
+      "nodeType": "concept"
     },
     {
       "id": "queue-core",
@@ -39,7 +41,9 @@
           "rel": "parent",
           "to": "queue-orchestration-tree"
         }
-      ]
+      ],
+      "summary": "Queue registry and dispatch.",
+      "nodeType": "concept"
     },
     {
       "id": "queue-routes",
@@ -57,7 +61,9 @@
           "rel": "parent",
           "to": "queue-orchestration-tree"
         }
-      ]
+      ],
+      "summary": "HTTP routes for job dispatch and status.",
+      "nodeType": "concept"
     },
     {
       "id": "queue-job-services",
@@ -75,7 +81,9 @@
           "rel": "parent",
           "to": "queue-orchestration-tree"
         }
-      ]
+      ],
+      "summary": "Job execution and budget policies.",
+      "nodeType": "concept"
     },
     {
       "id": "queue-essence-ingest",
@@ -93,7 +101,9 @@
           "rel": "parent",
           "to": "queue-orchestration-tree"
         }
-      ]
+      ],
+      "summary": "Essence ingest job pipeline.",
+      "nodeType": "concept"
     },
     {
       "id": "queue-profile-summarizer",
@@ -111,7 +121,9 @@
           "rel": "parent",
           "to": "queue-orchestration-tree"
         }
-      ]
+      ],
+      "summary": "Profile summarizer job and schedules.",
+      "nodeType": "concept"
     },
     {
       "id": "queue-orchestrator",
@@ -129,7 +141,13 @@
           "rel": "parent",
           "to": "queue-orchestration-tree"
         }
-      ]
+      ],
+      "summary": "Orchestration routes and services.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

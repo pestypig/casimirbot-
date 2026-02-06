@@ -20,7 +20,9 @@
         "sdk-docs",
         "sdk-examples"
       ],
-      "links": []
+      "links": [],
+      "summary": "SDK clients, runtime helpers, and integration examples.",
+      "nodeType": "concept"
     },
     {
       "id": "sdk-core",
@@ -39,7 +41,9 @@
           "rel": "parent",
           "to": "sdk-integration-tree"
         }
-      ]
+      ],
+      "summary": "SDK client entrypoints and shared types.",
+      "nodeType": "concept"
     },
     {
       "id": "sdk-runtime",
@@ -58,7 +62,9 @@
           "rel": "parent",
           "to": "sdk-integration-tree"
         }
-      ]
+      ],
+      "summary": "Runtime helpers and transport wiring.",
+      "nodeType": "concept"
     },
     {
       "id": "sdk-config",
@@ -77,7 +83,9 @@
           "rel": "parent",
           "to": "sdk-integration-tree"
         }
-      ]
+      ],
+      "summary": "SDK package configuration and build settings.",
+      "nodeType": "concept"
     },
     {
       "id": "sdk-docs",
@@ -96,7 +104,9 @@
           "rel": "parent",
           "to": "sdk-integration-tree"
         }
-      ]
+      ],
+      "summary": "SDK README and usage notes.",
+      "nodeType": "concept"
     },
     {
       "id": "sdk-examples",
@@ -119,7 +129,13 @@
           "rel": "see-also",
           "to": "packages-tree"
         }
-      ]
+      ],
+      "summary": "SDK usage examples and adapter payloads.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

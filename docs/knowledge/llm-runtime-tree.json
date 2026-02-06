@@ -22,7 +22,9 @@
         "llm-runtime-tokenizer",
         "llm-runtime-contracts"
       ],
-      "links": []
+      "links": [],
+      "summary": "Local and remote LLM runtime, tool backends, and tokenizer safeguards.",
+      "nodeType": "concept"
     },
     {
       "id": "llm-runtime-core",
@@ -41,7 +43,9 @@
           "rel": "parent",
           "to": "llm-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Small LLM routing and service glue.",
+      "nodeType": "concept"
     },
     {
       "id": "llm-runtime-backends",
@@ -64,7 +68,9 @@
           "rel": "see-also",
           "to": "skills-tooling-tree"
         }
-      ]
+      ],
+      "summary": "HTTP and local LLM backends exposed as tools.",
+      "nodeType": "concept"
     },
     {
       "id": "llm-runtime-artifacts",
@@ -83,7 +89,9 @@
           "rel": "parent",
           "to": "llm-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Runtime artifact hydration and integrity checks.",
+      "nodeType": "concept"
     },
     {
       "id": "llm-runtime-worker",
@@ -102,7 +110,9 @@
           "rel": "parent",
           "to": "llm-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Browser-side local inference and model loading.",
+      "nodeType": "concept"
     },
     {
       "id": "llm-runtime-rag",
@@ -125,7 +135,9 @@
           "rel": "see-also",
           "to": "knowledge-ingestion"
         }
-      ]
+      ],
+      "summary": "Local retrieval utilities for LLM generation.",
+      "nodeType": "concept"
     },
     {
       "id": "llm-runtime-tokenizer",
@@ -144,7 +156,9 @@
           "rel": "parent",
           "to": "llm-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Tokenizer registry, canaries, and verification tools.",
+      "nodeType": "concept"
     },
     {
       "id": "llm-runtime-contracts",
@@ -167,7 +181,13 @@
           "rel": "see-also",
           "to": "telemetry-console-tree"
         }
-      ]
+      ],
+      "summary": "LLM behavior contracts and local setup notes.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

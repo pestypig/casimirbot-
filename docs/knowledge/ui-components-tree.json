@@ -35,7 +35,9 @@
         "ui-visualization-utils",
         "ui-backend-binding"
       ],
-      "links": []
+      "links": [],
+      "summary": "Client-side surfaces, panels, renderers, and UI primitives.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-app-shell",
@@ -54,7 +56,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Global UI shell and routing entry points.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-surfaces",
@@ -82,7 +86,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Primary page routes and top-level surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-helix-core",
@@ -101,7 +107,9 @@
           "rel": "parent",
           "to": "ui-page-surfaces"
         }
-      ]
+      ],
+      "summary": "Primary Helix core surface and panel hub.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-desktop",
@@ -119,7 +127,9 @@
           "rel": "parent",
           "to": "ui-page-surfaces"
         }
-      ]
+      ],
+      "summary": "Desktop layout and panel stacking.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-simulation",
@@ -137,7 +147,9 @@
           "rel": "parent",
           "to": "ui-page-surfaces"
         }
-      ]
+      ],
+      "summary": "Simulation UI surface and controls.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-star",
@@ -155,7 +167,9 @@
           "rel": "parent",
           "to": "ui-page-surfaces"
         }
-      ]
+      ],
+      "summary": "Star monitoring and hydrostatic pages.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-ideology",
@@ -173,7 +187,9 @@
           "rel": "parent",
           "to": "ui-page-surfaces"
         }
-      ]
+      ],
+      "summary": "Ideology render and supporting pages.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-agi",
@@ -191,7 +207,9 @@
           "rel": "parent",
           "to": "ui-page-surfaces"
         }
-      ]
+      ],
+      "summary": "AGI administration and refinery pages.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-docs",
@@ -209,7 +227,9 @@
           "rel": "parent",
           "to": "ui-page-surfaces"
         }
-      ]
+      ],
+      "summary": "Docs and ingest pages.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-page-start",
@@ -227,7 +247,9 @@
           "rel": "parent",
           "to": "ui-page-surfaces"
         }
-      ]
+      ],
+      "summary": "Start and home pages.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-registry",
@@ -249,7 +271,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Panel mounting and registration.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-registry-helix",
@@ -268,7 +292,9 @@
           "rel": "parent",
           "to": "ui-panel-registry"
         }
-      ]
+      ],
+      "summary": "Helix panel registration and docking.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-registry-desktop",
@@ -287,7 +313,9 @@
           "rel": "parent",
           "to": "ui-panel-registry"
         }
-      ]
+      ],
+      "summary": "Desktop panel layouts.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-physics-core",
@@ -313,7 +341,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Core physics panels for monitoring and controls.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-drive-guards",
@@ -332,7 +362,9 @@
           "rel": "parent",
           "to": "ui-panel-physics-core"
         }
-      ]
+      ],
+      "summary": "Drive guardrails and capability displays.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-parameter-sweep",
@@ -351,7 +383,9 @@
           "rel": "parent",
           "to": "ui-panel-physics-core"
         }
-      ]
+      ],
+      "summary": "Parameter sweep controls and visualization.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-energy-flux",
@@ -370,7 +404,9 @@
           "rel": "parent",
           "to": "ui-panel-physics-core"
         }
-      ]
+      ],
+      "summary": "Energy flux and pipeline indicators.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-observables",
@@ -388,7 +424,9 @@
           "rel": "parent",
           "to": "ui-panel-physics-core"
         }
-      ]
+      ],
+      "summary": "Observables and field sampling views.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-qi-controls",
@@ -407,7 +445,9 @@
           "rel": "parent",
           "to": "ui-panel-physics-core"
         }
-      ]
+      ],
+      "summary": "QI guardrails and tuning widgets.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-metrics-dashboard",
@@ -425,7 +465,9 @@
           "rel": "parent",
           "to": "ui-panel-physics-core"
         }
-      ]
+      ],
+      "summary": "Metrics dashboards and KPI widgets.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-warp-drive",
@@ -450,7 +492,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Warp bubble, shift vector, and proof panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-alcubierre",
@@ -469,7 +513,9 @@
           "rel": "parent",
           "to": "ui-panel-warp-drive"
         }
-      ]
+      ],
+      "summary": "Primary Alcubierre surface panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-warp-bubble",
@@ -488,7 +534,9 @@
           "rel": "parent",
           "to": "ui-panel-warp-drive"
         }
-      ]
+      ],
+      "summary": "Warp bubble visualization and diagnostics.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-warp-proof",
@@ -507,7 +555,9 @@
           "rel": "parent",
           "to": "ui-panel-warp-drive"
         }
-      ]
+      ],
+      "summary": "Warp proof and experiment ladder panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-warp-ledger",
@@ -526,7 +576,9 @@
           "rel": "parent",
           "to": "ui-panel-warp-drive"
         }
-      ]
+      ],
+      "summary": "Warp ledger and accounting UI.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-shift-vector",
@@ -545,7 +597,9 @@
           "rel": "parent",
           "to": "ui-panel-warp-drive"
         }
-      ]
+      ],
+      "summary": "Shift vector diagnostic UI.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-casimir-energy",
@@ -571,7 +625,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Casimir geometry, cavity, and energy pipeline surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-casimir-grid",
@@ -590,7 +646,9 @@
           "rel": "parent",
           "to": "ui-panel-casimir-energy"
         }
-      ]
+      ],
+      "summary": "Casimir tile grid and lattice views.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-cavity-mechanism",
@@ -609,7 +667,9 @@
           "rel": "parent",
           "to": "ui-panel-casimir-energy"
         }
-      ]
+      ],
+      "summary": "Cavity geometry and cross-section panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-energy-pipeline",
@@ -628,7 +688,9 @@
           "rel": "parent",
           "to": "ui-panel-casimir-energy"
         }
-      ]
+      ],
+      "summary": "Energy pipeline and live pipeline views.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-casimir-amplifier",
@@ -647,7 +709,9 @@
           "rel": "parent",
           "to": "ui-panel-casimir-energy"
         }
-      ]
+      ],
+      "summary": "Amplification and metric pockets.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-pipeline-proof",
@@ -666,7 +730,9 @@
           "rel": "parent",
           "to": "ui-panel-casimir-energy"
         }
-      ]
+      ],
+      "summary": "Proof overlays and provenance panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-vacuum",
@@ -685,7 +751,9 @@
           "rel": "parent",
           "to": "ui-panel-casimir-energy"
         }
-      ]
+      ],
+      "summary": "Vacuum gap heatmaps and contracts.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-curvature-gr",
@@ -709,7 +777,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Curvature, GR agent loops, and time dilation surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-curvature-ledger",
@@ -728,7 +798,9 @@
           "rel": "parent",
           "to": "ui-panel-curvature-gr"
         }
-      ]
+      ],
+      "summary": "Curvature ledger and tensor views.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-curvature-slices",
@@ -747,7 +819,9 @@
           "rel": "parent",
           "to": "ui-panel-curvature-gr"
         }
-      ]
+      ],
+      "summary": "Curvature slices and sampling views.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-gr-agent-loop",
@@ -766,7 +840,9 @@
           "rel": "parent",
           "to": "ui-panel-curvature-gr"
         }
-      ]
+      ],
+      "summary": "GR agent loop audit and learning panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-time-dilation",
@@ -785,7 +861,9 @@
           "rel": "parent",
           "to": "ui-panel-curvature-gr"
         }
-      ]
+      ],
+      "summary": "Time dilation lattice and strobe visuals.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-proof-verification",
@@ -808,7 +886,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Verification panels and audit trees.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-math-maturity",
@@ -827,7 +907,9 @@
           "rel": "parent",
           "to": "ui-panel-proof-verification"
         }
-      ]
+      ],
+      "summary": "Math maturity tree displays.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-universal-audit",
@@ -846,7 +928,9 @@
           "rel": "parent",
           "to": "ui-panel-proof-verification"
         }
-      ]
+      ],
+      "summary": "Audit trees and knowledge panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-verification-tab",
@@ -865,7 +949,9 @@
           "rel": "parent",
           "to": "ui-panel-proof-verification"
         }
-      ]
+      ],
+      "summary": "Verification tab and proof charts.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-knowledge-ideology",
@@ -888,7 +974,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Panels for ideology and knowledge navigation.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-ideology",
@@ -906,7 +994,9 @@
           "rel": "parent",
           "to": "ui-panel-knowledge-ideology"
         }
-      ]
+      ],
+      "summary": "Ideology and ethos surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-knowledge-docs",
@@ -925,7 +1015,9 @@
           "rel": "parent",
           "to": "ui-panel-knowledge-ideology"
         }
-      ]
+      ],
+      "summary": "Document viewer and definition chips.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-halobank",
@@ -943,7 +1035,9 @@
           "rel": "parent",
           "to": "ui-panel-knowledge-ideology"
         }
-      ]
+      ],
+      "summary": "Halobank and spore timeline panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-stellar-solar",
@@ -967,7 +1061,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Solar and stellar monitoring panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-solar-globe",
@@ -985,7 +1081,9 @@
           "rel": "parent",
           "to": "ui-panel-stellar-solar"
         }
-      ]
+      ],
+      "summary": "Solar globe and navigation panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-stellar-lsr",
@@ -1003,7 +1101,9 @@
           "rel": "parent",
           "to": "ui-panel-stellar-solar"
         }
-      ]
+      ],
+      "summary": "Local standard of rest displays.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-deep-mixing",
@@ -1022,7 +1122,9 @@
           "rel": "parent",
           "to": "ui-panel-stellar-solar"
         }
-      ]
+      ],
+      "summary": "Deep mixing solar visuals.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-tokamak",
@@ -1041,7 +1143,9 @@
           "rel": "parent",
           "to": "ui-panel-stellar-solar"
         }
-      ]
+      ],
+      "summary": "Tokamak simulation UI.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-lattice-time-dilation",
@@ -1064,7 +1168,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Hull, lattice, and needle panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-hull3d",
@@ -1083,7 +1189,9 @@
           "rel": "parent",
           "to": "ui-panel-lattice-time-dilation"
         }
-      ]
+      ],
+      "summary": "Hull 3D renderer and metrics panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-lattice",
@@ -1101,7 +1209,9 @@
           "rel": "parent",
           "to": "ui-panel-lattice-time-dilation"
         }
-      ]
+      ],
+      "summary": "Lattice and slice viewing panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-needle",
@@ -1119,7 +1229,9 @@
           "rel": "parent",
           "to": "ui-panel-lattice-time-dilation"
         }
-      ]
+      ],
+      "summary": "Needle bubble, worksheet, and roadmap panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-noise-essence",
@@ -1143,7 +1255,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Noise generation, Luma, and essence panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-noise-gen",
@@ -1161,7 +1275,9 @@
           "rel": "parent",
           "to": "ui-panel-noise-essence"
         }
-      ]
+      ],
+      "summary": "Noise generation project panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-noise-gens",
@@ -1179,7 +1295,9 @@
           "rel": "parent",
           "to": "ui-panel-noise-essence"
         }
-      ]
+      ],
+      "summary": "Noise gen libraries and players.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-luma",
@@ -1197,7 +1315,9 @@
           "rel": "parent",
           "to": "ui-panel-noise-essence"
         }
-      ]
+      ],
+      "summary": "Luma overlays and mood visuals.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-panel-essence",
@@ -1215,7 +1335,9 @@
           "rel": "parent",
           "to": "ui-panel-noise-essence"
         }
-      ]
+      ],
+      "summary": "Essence dresscode and profile panels.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-renderers-3d",
@@ -1238,7 +1360,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "3D and WebGL rendering surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-renderer-hull3d",
@@ -1257,7 +1381,9 @@
           "rel": "parent",
           "to": "ui-renderers-3d"
         }
-      ]
+      ],
+      "summary": "Hull 3D renderer and overlays.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-renderer-warp-bubble",
@@ -1276,7 +1402,9 @@
           "rel": "parent",
           "to": "ui-renderers-3d"
         }
-      ]
+      ],
+      "summary": "Warp bubble GL renderer.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-renderer-galaxy",
@@ -1295,7 +1423,9 @@
           "rel": "parent",
           "to": "ui-renderers-3d"
         }
-      ]
+      ],
+      "summary": "Galaxy map and deep zoom views.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-hud-overlays",
@@ -1318,7 +1448,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "HUD overlays and live indicators.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-hud-collapse",
@@ -1337,7 +1469,9 @@
           "rel": "parent",
           "to": "ui-hud-overlays"
         }
-      ]
+      ],
+      "summary": "Collapse benchmark HUD surface.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-hud-sector",
@@ -1356,7 +1490,9 @@
           "rel": "parent",
           "to": "ui-hud-overlays"
         }
-      ]
+      ],
+      "summary": "Sector grid and role HUDs.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-hud-nav",
@@ -1375,7 +1511,9 @@
           "rel": "parent",
           "to": "ui-hud-overlays"
         }
-      ]
+      ],
+      "summary": "Navigation pose HUD elements.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-hooks-state",
@@ -1398,7 +1536,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Hooks, stores, and client adapters.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-hooks-physics",
@@ -1417,7 +1557,9 @@
           "rel": "parent",
           "to": "ui-hooks-state"
         }
-      ]
+      ],
+      "summary": "Physics data hooks.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-stores",
@@ -1436,7 +1578,9 @@
           "rel": "parent",
           "to": "ui-hooks-state"
         }
-      ]
+      ],
+      "summary": "State stores for panels and routing.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-lib-adapters",
@@ -1455,7 +1599,9 @@
           "rel": "parent",
           "to": "ui-hooks-state"
         }
-      ]
+      ],
+      "summary": "Client library adapters and physics bridges.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-primitives",
@@ -1475,7 +1621,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Shared UI primitives and components.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-primitives-shadcn",
@@ -1494,7 +1642,9 @@
           "rel": "parent",
           "to": "ui-primitives"
         }
-      ]
+      ],
+      "summary": "Reusable UI building blocks.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-mobile-start",
@@ -1512,7 +1662,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Mobile start surface and components.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-legacy-warp-web",
@@ -1531,7 +1683,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Static warp web surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-visualization-utils",
@@ -1553,7 +1707,9 @@
           "rel": "parent",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Charts and visual helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-vis-charts",
@@ -1571,7 +1727,9 @@
           "rel": "parent",
           "to": "ui-visualization-utils"
         }
-      ]
+      ],
+      "summary": "Chart and plot helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-vis-mesh",
@@ -1589,7 +1747,9 @@
           "rel": "parent",
           "to": "ui-visualization-utils"
         }
-      ]
+      ],
+      "summary": "Mesh and surface visualization helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-vis-phase-diagram",
@@ -1607,7 +1767,9 @@
           "rel": "parent",
           "to": "ui-visualization-utils"
         }
-      ]
+      ],
+      "summary": "Phase diagram visualization.",
+      "nodeType": "concept"
     },
     {
       "id": "ui-backend-binding",
@@ -1634,7 +1796,13 @@
           "rel": "see-also",
           "to": "ui-panel-proof-verification"
         }
-      ]
+      ],
+      "summary": "Backend-to-UI dataflow map for physics surfaces.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

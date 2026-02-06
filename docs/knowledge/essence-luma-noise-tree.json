@@ -24,7 +24,9 @@
         "noisegen-ui",
         "essence-ui"
       ],
-      "links": []
+      "links": [],
+      "summary": "Essence ingestion, luma generation, and noise pipelines.",
+      "nodeType": "concept"
     },
     {
       "id": "essence-schema",
@@ -42,7 +44,9 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Core essence schemas and persona fields.",
+      "nodeType": "concept"
     },
     {
       "id": "essence-store",
@@ -60,7 +64,9 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Essence storage and memory stores.",
+      "nodeType": "concept"
     },
     {
       "id": "essence-ingest-jobs",
@@ -78,7 +84,9 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Async ingest and job scheduling.",
+      "nodeType": "concept"
     },
     {
       "id": "essence-mix",
@@ -96,7 +104,9 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Mixing and collapse fusion.",
+      "nodeType": "concept"
     },
     {
       "id": "luma-services",
@@ -114,7 +124,9 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Luma generation services and routes.",
+      "nodeType": "concept"
     },
     {
       "id": "luma-client",
@@ -132,7 +144,9 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Client Luma panels and helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "noisegen-services",
@@ -150,7 +164,9 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Noise generation services and routes.",
+      "nodeType": "concept"
     },
     {
       "id": "noisegen-ui",
@@ -168,7 +184,9 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Noise generation UI surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "essence-ui",
@@ -186,7 +204,13 @@
           "rel": "parent",
           "to": "essence-luma-noise-tree"
         }
-      ]
+      ],
+      "summary": "Essence panels and render surfaces.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

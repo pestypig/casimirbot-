@@ -22,7 +22,9 @@
         "telemetry-casimir",
         "telemetry-tests"
       ],
-      "links": []
+      "links": [],
+      "summary": "Console telemetry capture, storage, and observability hooks.",
+      "nodeType": "concept"
     },
     {
       "id": "telemetry-console-routing",
@@ -41,7 +43,9 @@
           "rel": "parent",
           "to": "telemetry-console-tree"
         }
-      ]
+      ],
+      "summary": "Telemetry endpoints for console snapshots.",
+      "nodeType": "concept"
     },
     {
       "id": "telemetry-console-storage",
@@ -60,7 +64,9 @@
           "rel": "parent",
           "to": "telemetry-console-tree"
         }
-      ]
+      ],
+      "summary": "Telemetry persistence and snapshot formats.",
+      "nodeType": "concept"
     },
     {
       "id": "telemetry-console-client",
@@ -83,7 +89,9 @@
           "rel": "see-also",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Panel telemetry capture and push from the desktop UI.",
+      "nodeType": "concept"
     },
     {
       "id": "telemetry-badges-panels",
@@ -106,7 +114,9 @@
           "rel": "see-also",
           "to": "skills-tooling-tree"
         }
-      ]
+      ],
+      "summary": "Telemetry summarizers and badge pipelines.",
+      "nodeType": "concept"
     },
     {
       "id": "telemetry-observability",
@@ -125,7 +135,9 @@
           "rel": "parent",
           "to": "telemetry-console-tree"
         }
-      ]
+      ],
+      "summary": "Telemetry adapters and observability stores.",
+      "nodeType": "concept"
     },
     {
       "id": "telemetry-casimir",
@@ -148,7 +160,9 @@
           "rel": "see-also",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Casimir telemetry ingestion and persistence.",
+      "nodeType": "concept"
     },
     {
       "id": "telemetry-tests",
@@ -167,7 +181,13 @@
           "rel": "parent",
           "to": "telemetry-console-tree"
         }
-      ]
+      ],
+      "summary": "Telemetry regressions and console summary tests.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

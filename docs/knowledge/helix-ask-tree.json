@@ -19,7 +19,9 @@
         "helix-ask-evidence",
         "helix-ask-graph"
       ],
-      "links": []
+      "links": [],
+      "summary": "Helix Ask routing, scaffolds, and evidence gates.",
+      "nodeType": "concept"
     },
     {
       "id": "helix-ask-docs",
@@ -37,7 +39,9 @@
           "rel": "parent",
           "to": "helix-ask-tree"
         }
-      ]
+      ],
+      "summary": "Documentation for Helix Ask flows.",
+      "nodeType": "concept"
     },
     {
       "id": "helix-ask-core",
@@ -56,7 +60,9 @@
           "rel": "parent",
           "to": "helix-ask-tree"
         }
-      ]
+      ],
+      "summary": "Core routing, formatting, and intent services.",
+      "nodeType": "concept"
     },
     {
       "id": "helix-ask-evidence",
@@ -74,7 +80,9 @@
           "rel": "parent",
           "to": "helix-ask-tree"
         }
-      ]
+      ],
+      "summary": "Evidence gating and reasoning checks.",
+      "nodeType": "concept"
     },
     {
       "id": "helix-ask-graph",
@@ -92,7 +100,13 @@
           "rel": "parent",
           "to": "helix-ask-tree"
         }
-      ]
+      ],
+      "summary": "Anchor-and-walk graph resolver.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

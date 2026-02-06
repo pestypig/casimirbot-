@@ -20,7 +20,9 @@
         "zen-ladder-artifacts",
         "zen-ladder-receipts"
       ],
-      "links": []
+      "links": [],
+      "summary": "Deck, memo, and template artifacts for ladder pack.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-core",
@@ -41,7 +43,9 @@
           "rel": "parent",
           "to": "zen-ladder-pack-tree"
         }
-      ]
+      ],
+      "summary": "Core ladder pack overview.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-readme",
@@ -59,7 +63,9 @@
           "rel": "parent",
           "to": "zen-ladder-core"
         }
-      ]
+      ],
+      "summary": "Overview of the ladder pack.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-deck",
@@ -78,7 +84,9 @@
           "rel": "parent",
           "to": "zen-ladder-pack-tree"
         }
-      ]
+      ],
+      "summary": "Deck outline for ladder pack.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-memo",
@@ -97,7 +105,9 @@
           "rel": "parent",
           "to": "zen-ladder-pack-tree"
         }
-      ]
+      ],
+      "summary": "Policy memo for ladder pack.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-artifacts",
@@ -123,7 +133,9 @@
           "rel": "parent",
           "to": "zen-ladder-pack-tree"
         }
-      ]
+      ],
+      "summary": "Artifact templates for ladder pack.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-coi-disclosure",
@@ -142,7 +154,9 @@
           "rel": "parent",
           "to": "zen-ladder-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Coi Disclosure.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-interview-log",
@@ -161,7 +175,9 @@
           "rel": "parent",
           "to": "zen-ladder-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Interview Log.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-pilot-log",
@@ -180,7 +196,9 @@
           "rel": "parent",
           "to": "zen-ladder-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Pilot Log.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-privacy-minimization",
@@ -199,7 +217,9 @@
           "rel": "parent",
           "to": "zen-ladder-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Privacy Minimization.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-safety-precheck",
@@ -218,7 +238,9 @@
           "rel": "parent",
           "to": "zen-ladder-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Safety Precheck.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-unit-econ",
@@ -237,7 +259,9 @@
           "rel": "parent",
           "to": "zen-ladder-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Unit Econ.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-receipts",
@@ -259,7 +283,9 @@
           "rel": "parent",
           "to": "zen-ladder-pack-tree"
         }
-      ]
+      ],
+      "summary": "Receipt templates for ladder pack.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-curiosity-receipt",
@@ -278,7 +304,9 @@
           "rel": "parent",
           "to": "zen-ladder-receipts"
         }
-      ]
+      ],
+      "summary": "Receipt template for Curiosity Receipt.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-ladder-rung-decision-receipt",
@@ -297,7 +325,13 @@
           "rel": "parent",
           "to": "zen-ladder-receipts"
         }
-      ]
+      ],
+      "summary": "Receipt template for Rung Decision Receipt.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

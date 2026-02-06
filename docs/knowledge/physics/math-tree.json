@@ -21,7 +21,9 @@
         "math-verification-gates",
         "math-evidence-registry"
       ],
-      "links": []
+      "links": [],
+      "summary": "A navigable map of math maturity stages and the GR/warp verification walk.",
+      "nodeType": "concept"
     },
     {
       "id": "math-maturity-stages",
@@ -46,7 +48,9 @@
           "rel": "see-also",
           "to": "math-evidence-registry"
         }
-      ]
+      ],
+      "summary": "Stages define which claims are allowed and which checks are required.",
+      "nodeType": "concept"
     },
     {
       "id": "stage-exploratory",
@@ -66,7 +70,9 @@
           "rel": "parent",
           "to": "math-maturity-stages"
         }
-      ]
+      ],
+      "summary": "Intuition-building and visualization without hard pass/fail claims.",
+      "nodeType": "concept"
     },
     {
       "id": "stage-reduced-order",
@@ -86,7 +92,9 @@
           "rel": "parent",
           "to": "math-maturity-stages"
         }
-      ]
+      ],
+      "summary": "Coarse estimates and proxy constraints with regression snapshots.",
+      "nodeType": "concept"
     },
     {
       "id": "stage-diagnostic",
@@ -106,7 +114,9 @@
           "rel": "parent",
           "to": "math-maturity-stages"
         }
-      ]
+      ],
+      "summary": "Constraint residuals and stability checks enable diagnostic claims.",
+      "nodeType": "concept"
     },
     {
       "id": "stage-certified",
@@ -134,7 +144,9 @@
           "rel": "see-also",
           "to": "pipeline-certificate"
         }
-      ]
+      ],
+      "summary": "Pass/fail under named constraints with certificate integrity checks.",
+      "nodeType": "concept"
     },
     {
       "id": "math-pipeline-walk",
@@ -161,7 +173,9 @@
           "rel": "see-also",
           "to": "math-verification-gates"
         }
-      ]
+      ],
+      "summary": "Narrative walk from energy pipeline to viability certificate.",
+      "nodeType": "concept"
     },
     {
       "id": "pipeline-energy",
@@ -191,7 +205,9 @@
           "rel": "see-also",
           "to": "pipeline-stress-energy"
         }
-      ]
+      ],
+      "summary": "Compute dynamic Casimir and warp proxy inputs.",
+      "nodeType": "concept"
     },
     {
       "id": "pipeline-stress-energy",
@@ -220,7 +236,9 @@
           "rel": "see-also",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "Map pipeline outputs into stress-energy fields.",
+      "nodeType": "concept"
     },
     {
       "id": "pipeline-gr-evolution",
@@ -253,7 +271,9 @@
           "rel": "see-also",
           "to": "pipeline-constraint-gate"
         }
-      ]
+      ],
+      "summary": "Evolve BSSN fields and compute diagnostics.",
+      "nodeType": "concept"
     },
     {
       "id": "pipeline-constraint-gate",
@@ -280,7 +300,9 @@
           "rel": "see-also",
           "to": "pipeline-viability"
         }
-      ]
+      ],
+      "summary": "Evaluate constraints against threshold policies.",
+      "nodeType": "concept"
     },
     {
       "id": "pipeline-viability",
@@ -307,7 +329,9 @@
           "rel": "see-also",
           "to": "pipeline-certificate"
         }
-      ]
+      ],
+      "summary": "Combine pipeline outputs with guardrails to evaluate viability.",
+      "nodeType": "concept"
     },
     {
       "id": "pipeline-certificate",
@@ -333,7 +357,9 @@
           "rel": "see-also",
           "to": "math-verification-gates"
         }
-      ]
+      ],
+      "summary": "Issue certificate with integrity checks and policy gates.",
+      "nodeType": "concept"
     },
     {
       "id": "math-verification-gates",
@@ -362,7 +388,9 @@
           "rel": "see-also",
           "to": "stage-certified"
         }
-      ]
+      ],
+      "summary": "Hard constraints, required tests, and certificate integrity.",
+      "nodeType": "concept"
     },
     {
       "id": "math-evidence-registry",
@@ -386,7 +414,9 @@
           "rel": "see-also",
           "to": "math-maturity-stages"
         }
-      ]
+      ],
+      "summary": "Stage policy, evidence profiles, and dependency graph.",
+      "nodeType": "concept"
     },
     {
       "id": "energy-pipeline-core",
@@ -406,7 +436,9 @@
           "rel": "parent",
           "to": "pipeline-energy"
         }
-      ]
+      ],
+      "summary": "Central pipeline calculations and state assembly.",
+      "nodeType": "concept"
     },
     {
       "id": "dynamic-casimir-stack",
@@ -430,7 +462,9 @@
           "rel": "parent",
           "to": "pipeline-energy"
         }
-      ]
+      ],
+      "summary": "Dynamic Casimir calculations and geometry coupling.",
+      "nodeType": "concept"
     },
     {
       "id": "dynamic-casimir-engine",
@@ -449,7 +483,9 @@
           "rel": "parent",
           "to": "dynamic-casimir-stack"
         }
-      ]
+      ],
+      "summary": "Compute dynamic Casimir energy and sweep curves.",
+      "nodeType": "concept"
     },
     {
       "id": "natario-metric-engine",
@@ -468,7 +504,9 @@
           "rel": "parent",
           "to": "dynamic-casimir-stack"
         }
-      ]
+      ],
+      "summary": "Compute Natario metric helpers for dynamic Casimir.",
+      "nodeType": "concept"
     },
     {
       "id": "static-casimir-engine",
@@ -487,7 +525,9 @@
           "rel": "parent",
           "to": "dynamic-casimir-stack"
         }
-      ]
+      ],
+      "summary": "Compute static Casimir energy baseline.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-inference-engine",
@@ -506,7 +546,9 @@
           "rel": "parent",
           "to": "dynamic-casimir-stack"
         }
-      ]
+      ],
+      "summary": "Infer energy from force series and datasets.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-guardrails-stack",
@@ -533,7 +575,9 @@
           "rel": "parent",
           "to": "pipeline-energy"
         }
-      ]
+      ],
+      "summary": "Quantum-inequality monitoring and control loops.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-bounds-engine",
@@ -552,7 +596,9 @@
           "rel": "parent",
           "to": "qi-guardrails-stack"
         }
-      ]
+      ],
+      "summary": "Compute Ford-Roman quantum inequality bounds.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-monitor-engine",
@@ -571,7 +617,9 @@
           "rel": "parent",
           "to": "qi-guardrails-stack"
         }
-      ]
+      ],
+      "summary": "Kernel-based QI monitor for running averages.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-saturation-window",
@@ -590,7 +638,9 @@
           "rel": "parent",
           "to": "qi-guardrails-stack"
         }
-      ]
+      ],
+      "summary": "Sampling window and saturation estimates.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-stream",
@@ -609,7 +659,9 @@
           "rel": "parent",
           "to": "qi-guardrails-stack"
         }
-      ]
+      ],
+      "summary": "Live QI telemetry aggregation and snapshots.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-autoscale",
@@ -628,7 +680,9 @@
           "rel": "parent",
           "to": "qi-guardrails-stack"
         }
-      ]
+      ],
+      "summary": "Autoscale QI controls to hold guardrail margins.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-autothrottle",
@@ -647,7 +701,9 @@
           "rel": "parent",
           "to": "qi-guardrails-stack"
         }
-      ]
+      ],
+      "summary": "Throttle controls to prevent guardrail breaches.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-diagnostics",
@@ -666,7 +722,9 @@
           "rel": "parent",
           "to": "qi-guardrails-stack"
         }
-      ]
+      ],
+      "summary": "Schema for QI diagnostic payloads.",
+      "nodeType": "concept"
     },
     {
       "id": "phase-control-stack",
@@ -690,7 +748,9 @@
           "rel": "parent",
           "to": "pipeline-energy"
         }
-      ]
+      ],
+      "summary": "Phase scheduling, calibration, and pump control.",
+      "nodeType": "concept"
     },
     {
       "id": "phase-scheduler",
@@ -709,7 +769,9 @@
           "rel": "parent",
           "to": "phase-control-stack"
         }
-      ]
+      ],
+      "summary": "Compute sector phase offsets and pulse alignment.",
+      "nodeType": "concept"
     },
     {
       "id": "phase-calibration",
@@ -728,7 +790,9 @@
           "rel": "parent",
           "to": "phase-control-stack"
         }
-      ]
+      ],
+      "summary": "Record calibration snapshots for phase tuning.",
+      "nodeType": "concept"
     },
     {
       "id": "pump-controls",
@@ -747,7 +811,9 @@
           "rel": "parent",
           "to": "phase-control-stack"
         }
-      ]
+      ],
+      "summary": "Drive pump command generation for pulses.",
+      "nodeType": "concept"
     },
     {
       "id": "ts-autoscale",
@@ -766,7 +832,9 @@
           "rel": "parent",
           "to": "phase-control-stack"
         }
-      ]
+      ],
+      "summary": "Autoscale TS ratio to stabilize cadence.",
+      "nodeType": "concept"
     },
     {
       "id": "energy-field-inputs",
@@ -792,7 +860,9 @@
           "rel": "parent",
           "to": "pipeline-energy"
         }
-      ]
+      ],
+      "summary": "Schema and adapters for pipeline energy fields.",
+      "nodeType": "concept"
     },
     {
       "id": "raster-energy-field",
@@ -811,7 +881,9 @@
           "rel": "parent",
           "to": "energy-field-inputs"
         }
-      ]
+      ],
+      "summary": "Canonical raster energy-field contract.",
+      "nodeType": "concept"
     },
     {
       "id": "tokamak-energy-field",
@@ -830,7 +902,9 @@
           "rel": "parent",
           "to": "energy-field-inputs"
         }
-      ]
+      ],
+      "summary": "Tokamak channel manifests and energy fields.",
+      "nodeType": "concept"
     },
     {
       "id": "solar-energy-calibration",
@@ -849,7 +923,9 @@
           "rel": "parent",
           "to": "energy-field-inputs"
         }
-      ]
+      ],
+      "summary": "Calibration for solar intensity to energy density.",
+      "nodeType": "concept"
     },
     {
       "id": "tokamak-synthetic-diagnostics",
@@ -868,7 +944,9 @@
           "rel": "parent",
           "to": "energy-field-inputs"
         }
-      ]
+      ],
+      "summary": "Synthetic diagnostic schema for tokamak inputs.",
+      "nodeType": "concept"
     },
     {
       "id": "solar-energy-adapter",
@@ -887,7 +965,9 @@
           "rel": "parent",
           "to": "energy-field-inputs"
         }
-      ]
+      ],
+      "summary": "Adapter for solar telemetry to energy fields.",
+      "nodeType": "concept"
     },
     {
       "id": "tokamak-energy-adapter",
@@ -906,7 +986,9 @@
           "rel": "parent",
           "to": "energy-field-inputs"
         }
-      ]
+      ],
+      "summary": "Adapter for tokamak telemetry to energy fields.",
+      "nodeType": "concept"
     },
     {
       "id": "stress-energy-equations",
@@ -925,7 +1007,9 @@
           "rel": "parent",
           "to": "pipeline-stress-energy"
         }
-      ]
+      ],
+      "summary": "Compute stress-energy tensors from pipeline fields.",
+      "nodeType": "concept"
     },
     {
       "id": "stress-energy-brick",
@@ -944,7 +1028,9 @@
           "rel": "parent",
           "to": "pipeline-stress-energy"
         }
-      ]
+      ],
+      "summary": "Brick that packages stress-energy for GR.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-stress-energy-fields",
@@ -963,7 +1049,9 @@
           "rel": "parent",
           "to": "pipeline-stress-energy"
         }
-      ]
+      ],
+      "summary": "GR stress-energy field representation.",
+      "nodeType": "concept"
     },
     {
       "id": "stress-energy-integrals",
@@ -982,7 +1070,9 @@
           "rel": "parent",
           "to": "pipeline-stress-energy"
         }
-      ]
+      ],
+      "summary": "Compute integrals over stress-energy fields.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-initial-data",
@@ -1001,7 +1091,9 @@
           "rel": "parent",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "Initialize GR fields for evolution.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-evolution-solver",
@@ -1020,7 +1112,9 @@
           "rel": "parent",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "Orchestrate GR evolution steps.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-evolution-brick",
@@ -1039,7 +1133,9 @@
           "rel": "parent",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "Brick wrapper for GR evolution runs.",
+      "nodeType": "concept"
     },
     {
       "id": "bssn-state",
@@ -1058,7 +1154,9 @@
           "rel": "parent",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "State containers for BSSN fields.",
+      "nodeType": "concept"
     },
     {
       "id": "bssn-evolution-core",
@@ -1077,7 +1175,9 @@
           "rel": "parent",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "Core BSSN evolution step.",
+      "nodeType": "concept"
     },
     {
       "id": "rk4-integrator",
@@ -1096,7 +1196,9 @@
           "rel": "parent",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "Runge-Kutta integrator for BSSN fields.",
+      "nodeType": "concept"
     },
     {
       "id": "stencils",
@@ -1115,7 +1217,9 @@
           "rel": "parent",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "Stencil operators for derivatives and boundaries.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-diagnostics",
@@ -1134,7 +1238,9 @@
           "rel": "parent",
           "to": "pipeline-gr-evolution"
         }
-      ]
+      ],
+      "summary": "Diagnostics for shift stiffness and stability.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-constraint-policy",
@@ -1153,7 +1259,9 @@
           "rel": "parent",
           "to": "pipeline-constraint-gate"
         }
-      ]
+      ],
+      "summary": "Constraint policy thresholds and modes.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-constraint-network",
@@ -1172,7 +1280,9 @@
           "rel": "parent",
           "to": "pipeline-constraint-gate"
         }
-      ]
+      ],
+      "summary": "Compute constraint residuals for GR.",
+      "nodeType": "concept"
     },
     {
       "id": "warp-viability-sim",
@@ -1191,7 +1301,9 @@
           "rel": "parent",
           "to": "pipeline-viability"
         }
-      ]
+      ],
+      "summary": "Simplified viability calculation for pipeline sanity checks.",
+      "nodeType": "concept"
     },
     {
       "id": "certificate-verify",
@@ -1210,7 +1322,9 @@
           "rel": "parent",
           "to": "pipeline-certificate"
         }
-      ]
+      ],
+      "summary": "Verify certificate hashes and integrity.",
+      "nodeType": "concept"
     },
     {
       "id": "constraint-packs",
@@ -1229,7 +1343,9 @@
           "rel": "parent",
           "to": "math-verification-gates"
         }
-      ]
+      ],
+      "summary": "Constraint pack definitions and ladder tiers.",
+      "nodeType": "concept"
     },
     {
       "id": "constraint-pack-policy",
@@ -1248,7 +1364,9 @@
           "rel": "parent",
           "to": "math-verification-gates"
         }
-      ]
+      ],
+      "summary": "Policy profiles for constraint packs.",
+      "nodeType": "concept"
     },
     {
       "id": "constraint-pack-evaluator",
@@ -1267,7 +1385,9 @@
           "rel": "parent",
           "to": "math-verification-gates"
         }
-      ]
+      ],
+      "summary": "Evaluate telemetry against pack constraints.",
+      "nodeType": "concept"
     },
     {
       "id": "constraint-pack-telemetry",
@@ -1286,7 +1406,9 @@
           "rel": "parent",
           "to": "math-verification-gates"
         }
-      ]
+      ],
+      "summary": "Telemetry ingestion for constraint evaluation.",
+      "nodeType": "concept"
     },
     {
       "id": "phase-diagram-validation",
@@ -1305,7 +1427,13 @@
           "rel": "parent",
           "to": "pipeline-viability"
         }
-      ]
+      ],
+      "summary": "Validate viability outputs against phase diagram expectations.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

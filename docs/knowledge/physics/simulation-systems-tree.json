@@ -28,7 +28,9 @@
         "simulation-streaming",
         "simulation-artifacts"
       ],
-      "links": []
+      "links": [],
+      "summary": "Simulation-only pipeline from contracts to UI surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-contracts",
@@ -47,7 +49,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Schema contracts for simulation parameters and results.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-api",
@@ -65,7 +69,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "REST and client API helpers for simulations.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-storage",
@@ -83,7 +89,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Simulation persistence and migrations.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-core-modules",
@@ -101,7 +109,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Core simulation modules and registry.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-geometry-mesh",
@@ -120,7 +130,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Geometry and mesh generation for simulations.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-scuffem-service",
@@ -138,7 +150,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "SCUFF-EM adapter and file generation.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-dynamic-casimir",
@@ -157,7 +171,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Dynamic Casimir simulation module.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-warp-module",
@@ -175,7 +191,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Warp module simulation parameter bridge.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-tsn",
@@ -193,7 +211,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Time-sensitive networking simulation.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-parametric-sweeps",
@@ -211,7 +231,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Parametric sweep simulation helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-ui-surfaces",
@@ -229,7 +251,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Client surfaces that run and visualize simulations.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-streaming",
@@ -247,7 +271,9 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "WebSocket and SSE simulation telemetry.",
+      "nodeType": "concept"
     },
     {
       "id": "simulation-artifacts",
@@ -265,7 +291,13 @@
           "rel": "parent",
           "to": "simulation-systems-tree"
         }
-      ]
+      ],
+      "summary": "Generated files and simulation outputs.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

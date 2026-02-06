@@ -22,7 +22,9 @@
         "security-concurrency",
         "security-guard-tests"
       ],
-      "links": []
+      "links": [],
+      "summary": "Tenant safeguards, hull guardrails, and enforcement tests.",
+      "nodeType": "concept"
     },
     {
       "id": "security-tenant-auth",
@@ -41,7 +43,9 @@
           "rel": "parent",
           "to": "security-hull-guard-tree"
         }
-      ]
+      ],
+      "summary": "Tenant isolation, auth policy, and request gating.",
+      "nodeType": "concept"
     },
     {
       "id": "security-hull-guard",
@@ -60,7 +64,9 @@
           "rel": "parent",
           "to": "security-hull-guard-tree"
         }
-      ]
+      ],
+      "summary": "Outbound access control and hull enforcement.",
+      "nodeType": "concept"
     },
     {
       "id": "security-hull-routes",
@@ -79,7 +85,9 @@
           "rel": "parent",
           "to": "security-hull-guard-tree"
         }
-      ]
+      ],
+      "summary": "Hull status, capsules, and preview endpoints.",
+      "nodeType": "concept"
     },
     {
       "id": "security-hull-client",
@@ -102,7 +110,9 @@
           "rel": "see-also",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Hull UI guardrails and metrics capture.",
+      "nodeType": "concept"
     },
     {
       "id": "security-guard-docs",
@@ -121,7 +131,9 @@
           "rel": "parent",
           "to": "security-hull-guard-tree"
         }
-      ]
+      ],
+      "summary": "Guardrail documentation and operator notes.",
+      "nodeType": "concept"
     },
     {
       "id": "security-concurrency",
@@ -140,7 +152,9 @@
           "rel": "parent",
           "to": "security-hull-guard-tree"
         }
-      ]
+      ],
+      "summary": "Concurrency limits and overload protection.",
+      "nodeType": "concept"
     },
     {
       "id": "security-guard-tests",
@@ -159,7 +173,13 @@
           "rel": "parent",
           "to": "security-hull-guard-tree"
         }
-      ]
+      ],
+      "summary": "Hull guardrail and QI enforcement tests.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

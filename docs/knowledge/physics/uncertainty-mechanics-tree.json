@@ -23,7 +23,9 @@
         "uncertainty-collapse-constraints",
         "uncertainty-reality-bounds"
       ],
-      "links": []
+      "links": [],
+      "summary": "Classical, statistical, and quantum-stochastic uncertainty mapped to physics constraints.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-classical-stack",
@@ -47,7 +49,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-tree"
         }
-      ]
+      ],
+      "summary": "Model error, boundary conditions, and numerical precision limits.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-boundary-conditions",
@@ -66,7 +70,9 @@
           "rel": "parent",
           "to": "uncertainty-classical-stack"
         }
-      ]
+      ],
+      "summary": "Boundary choices define admissible modes and error bands.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-discretization",
@@ -85,7 +91,9 @@
           "rel": "parent",
           "to": "uncertainty-classical-stack"
         }
-      ]
+      ],
+      "summary": "Mesh resolution and discretization error control uncertainty.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-numerical-precision",
@@ -104,7 +112,9 @@
           "rel": "parent",
           "to": "uncertainty-classical-stack"
         }
-      ]
+      ],
+      "summary": "Floating point precision limits error floors.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-timestep-stability",
@@ -123,7 +133,9 @@
           "rel": "parent",
           "to": "uncertainty-classical-stack"
         }
-      ]
+      ],
+      "summary": "Stability bounds constrain timestep error growth.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-statistical-stack",
@@ -146,7 +158,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-tree"
         }
-      ]
+      ],
+      "summary": "Sampling noise, distributions, and stochastic variance.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-sampling-bounds",
@@ -165,7 +179,9 @@
           "rel": "parent",
           "to": "uncertainty-statistical-stack"
         }
-      ]
+      ],
+      "summary": "Sampling windows bound valid averages.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-monte-carlo-bands",
@@ -184,7 +200,9 @@
           "rel": "parent",
           "to": "uncertainty-statistical-stack"
         }
-      ]
+      ],
+      "summary": "Monte Carlo spreads define statistical error bands.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-propagated-bands",
@@ -203,7 +221,9 @@
           "rel": "parent",
           "to": "uncertainty-statistical-stack"
         }
-      ]
+      ],
+      "summary": "Uncertainty propagation across geometry and energy bands.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-data-contracts",
@@ -225,7 +245,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-tree"
         }
-      ]
+      ],
+      "summary": "Shared schemas for values, sigmas, and bands.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-1sigma-container",
@@ -244,7 +266,9 @@
           "rel": "parent",
           "to": "uncertainty-data-contracts"
         }
-      ]
+      ],
+      "summary": "Explicit 1-sigma value containers.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-band-fields",
@@ -263,7 +287,9 @@
           "rel": "parent",
           "to": "uncertainty-data-contracts"
         }
-      ]
+      ],
+      "summary": "Min/max bands for propagated ranges.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-quantum-stochastic",
@@ -285,7 +311,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-tree"
         }
-      ]
+      ],
+      "summary": "Noise-kernel constraints for semiclassical sourcing.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-quantum-gr-bridge",
@@ -304,7 +332,9 @@
           "rel": "parent",
           "to": "uncertainty-quantum-stochastic"
         }
-      ]
+      ],
+      "summary": "Semiclassical interface with uncertainty propagation.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-coherence-window",
@@ -323,7 +353,9 @@
           "rel": "parent",
           "to": "uncertainty-quantum-stochastic"
         }
-      ]
+      ],
+      "summary": "Tau and r_c set the causal sampling window.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-approximation-ladders",
@@ -347,7 +379,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-tree"
         }
-      ]
+      ],
+      "summary": "Approximation ladders bridge classical and statistical models.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-axisymmetric-approximations",
@@ -366,7 +400,9 @@
           "rel": "parent",
           "to": "uncertainty-approximation-ladders"
         }
-      ]
+      ],
+      "summary": "Closed-form approximations and Monte Carlo deltas.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-pfa-geometry",
@@ -385,7 +421,9 @@
           "rel": "parent",
           "to": "uncertainty-approximation-ladders"
         }
-      ]
+      ],
+      "summary": "PFA and geometry approximations for Casimir models.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-casimir-bands",
@@ -404,7 +442,9 @@
           "rel": "parent",
           "to": "uncertainty-approximation-ladders"
         }
-      ]
+      ],
+      "summary": "Material models define banded ranges.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-dynamic-transients",
@@ -423,7 +463,9 @@
           "rel": "parent",
           "to": "uncertainty-approximation-ladders"
         }
-      ]
+      ],
+      "summary": "Transient energy approximations for time-varying boundaries.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-collapse-constraints",
@@ -445,7 +487,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-tree"
         }
-      ]
+      ],
+      "summary": "Causal collapse benchmarks and policy gating.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-collapse-benchmark",
@@ -464,7 +508,9 @@
           "rel": "parent",
           "to": "uncertainty-collapse-constraints"
         }
-      ]
+      ],
+      "summary": "Benchmark contract for causal collapse estimates.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-coherence-policy",
@@ -483,7 +529,9 @@
           "rel": "parent",
           "to": "uncertainty-collapse-constraints"
         }
-      ]
+      ],
+      "summary": "Policy gating tied to collapse confidence.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-reality-bounds",
@@ -506,7 +554,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-tree"
         }
-      ]
+      ],
+      "summary": "Energy conditions and quantum inequality limits.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-energy-conditions",
@@ -525,7 +575,9 @@
           "rel": "parent",
           "to": "uncertainty-reality-bounds"
         }
-      ]
+      ],
+      "summary": "Classical energy conditions bound admissible stress-energy.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-quantum-inequality",
@@ -544,7 +596,9 @@
           "rel": "parent",
           "to": "uncertainty-reality-bounds"
         }
-      ]
+      ],
+      "summary": "QI bounds constrain magnitude and duration of negative energy.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-sampling-window",
@@ -563,7 +617,13 @@
           "rel": "parent",
           "to": "uncertainty-reality-bounds"
         }
-      ]
+      ],
+      "summary": "Sampling windows must respect system coherence times.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

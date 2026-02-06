@@ -18,7 +18,9 @@
         "reasoning-stack",
         "model-landscape-stack"
       ],
-      "links": []
+      "links": [],
+      "summary": "Epistemology, method, and reasoning frameworks.",
+      "nodeType": "concept"
     },
     {
       "id": "epistemic-stack",
@@ -40,7 +42,9 @@
           "rel": "parent",
           "to": "concepts-tree"
         }
-      ]
+      ],
+      "summary": "Core epistemology and scientific method anchors.",
+      "nodeType": "concept"
     },
     {
       "id": "epistemology",
@@ -58,7 +62,9 @@
           "rel": "parent",
           "to": "epistemic-stack"
         }
-      ]
+      ],
+      "summary": "Notes on Epistemology.",
+      "nodeType": "concept"
     },
     {
       "id": "scientific-method",
@@ -76,7 +82,9 @@
           "rel": "parent",
           "to": "epistemic-stack"
         }
-      ]
+      ],
+      "summary": "Notes on Scientific Method.",
+      "nodeType": "concept"
     },
     {
       "id": "falsifiability",
@@ -94,7 +102,9 @@
           "rel": "parent",
           "to": "epistemic-stack"
         }
-      ]
+      ],
+      "summary": "Notes on Falsifiability.",
+      "nodeType": "concept"
     },
     {
       "id": "reasoning-stack",
@@ -116,7 +126,9 @@
           "rel": "parent",
           "to": "concepts-tree"
         }
-      ]
+      ],
+      "summary": "Frameworks for reasoning and model behavior.",
+      "nodeType": "concept"
     },
     {
       "id": "platonic-reasoning",
@@ -134,7 +146,9 @@
           "rel": "parent",
           "to": "reasoning-stack"
         }
-      ]
+      ],
+      "summary": "Notes on Platonic Reasoning.",
+      "nodeType": "concept"
     },
     {
       "id": "halobank",
@@ -152,7 +166,9 @@
           "rel": "parent",
           "to": "reasoning-stack"
         }
-      ]
+      ],
+      "summary": "Notes on Halobank.",
+      "nodeType": "concept"
     },
     {
       "id": "model-landscape-stack",
@@ -172,7 +188,9 @@
           "rel": "parent",
           "to": "concepts-tree"
         }
-      ]
+      ],
+      "summary": "Landscape and attractor narratives.",
+      "nodeType": "concept"
     },
     {
       "id": "morphospace-attractors",
@@ -190,7 +208,9 @@
           "rel": "parent",
           "to": "model-landscape-stack"
         }
-      ]
+      ],
+      "summary": "Attractor mapping for model behavior.",
+      "nodeType": "concept"
     },
     {
       "id": "degree-of-certainty-framework",
@@ -209,7 +229,13 @@
           "rel": "parent",
           "to": "reasoning-stack"
         }
-      ]
+      ],
+      "summary": "Framework for evaluating confidence and uncertainty.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

@@ -18,7 +18,9 @@
         "zen-society-templates",
         "zen-society-artifacts"
       ],
-      "links": []
+      "links": [],
+      "summary": "Governance spine and artifact templates for zen society.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-society-core",
@@ -41,7 +43,9 @@
           "rel": "parent",
           "to": "zen-society-tree"
         }
-      ]
+      ],
+      "summary": "Core governance spine and gates.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-society-readme",
@@ -59,7 +63,9 @@
           "rel": "parent",
           "to": "zen-society-core"
         }
-      ]
+      ],
+      "summary": "Overview of zen society docs.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-society-gates",
@@ -78,7 +84,9 @@
           "rel": "parent",
           "to": "zen-society-core"
         }
-      ]
+      ],
+      "summary": "Gate definitions for zen society governance.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-society-spine",
@@ -97,7 +105,9 @@
           "rel": "parent",
           "to": "zen-society-core"
         }
-      ]
+      ],
+      "summary": "Public safety governance spine.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-society-templates",
@@ -125,7 +135,9 @@
           "rel": "parent",
           "to": "zen-society-tree"
         }
-      ]
+      ],
+      "summary": "Template pillars and logs.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-decision-log",
@@ -143,7 +155,9 @@
           "rel": "parent",
           "to": "zen-society-templates"
         }
-      ]
+      ],
+      "summary": "Template for Decision Log.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-pillar-01-dignity",
@@ -161,7 +175,9 @@
           "rel": "parent",
           "to": "zen-society-templates"
         }
-      ]
+      ],
+      "summary": "Template for Pillar 01 Dignity.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-pillar-02-services",
@@ -179,7 +195,9 @@
           "rel": "parent",
           "to": "zen-society-templates"
         }
-      ]
+      ],
+      "summary": "Template for Pillar 02 Services.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-pillar-03-contracts",
@@ -197,7 +215,9 @@
           "rel": "parent",
           "to": "zen-society-templates"
         }
-      ]
+      ],
+      "summary": "Template for Pillar 03 Contracts.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-pillar-04-finance",
@@ -215,7 +235,9 @@
           "rel": "parent",
           "to": "zen-society-templates"
         }
-      ]
+      ],
+      "summary": "Template for Pillar 04 Finance.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-pillar-05-consent",
@@ -233,7 +255,9 @@
           "rel": "parent",
           "to": "zen-society-templates"
         }
-      ]
+      ],
+      "summary": "Template for Pillar 05 Consent.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-pillar-06-verification",
@@ -251,7 +275,9 @@
           "rel": "parent",
           "to": "zen-society-templates"
         }
-      ]
+      ],
+      "summary": "Template for Pillar 06 Verification.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-signatory-registry",
@@ -269,7 +295,9 @@
           "rel": "parent",
           "to": "zen-society-templates"
         }
-      ]
+      ],
+      "summary": "Template for Signatory Registry.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-society-artifacts",
@@ -302,7 +330,9 @@
           "rel": "parent",
           "to": "zen-society-tree"
         }
-      ]
+      ],
+      "summary": "Artifact templates for governance workflows.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-access-to-counsel-pathway",
@@ -320,7 +350,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Access To Counsel Pathway.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-charter",
@@ -338,7 +370,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Charter.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-civic-signal-survey",
@@ -356,7 +390,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Civic Signal Survey.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-dashboard",
@@ -374,7 +410,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Dashboard.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-federal-civic-listening-circuit",
@@ -392,7 +430,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Federal Civic Listening Circuit.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-harm-weighted-priority-standard",
@@ -410,7 +450,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Harm Weighted Priority Standard.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-integration-ladder",
@@ -428,7 +470,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Integration Ladder.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-lawful-interface-protocol",
@@ -446,7 +490,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Lawful Interface Protocol.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-ledger",
@@ -464,7 +510,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Ledger.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-local-stability-compact",
@@ -482,7 +530,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Local Stability Compact.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-metric-integrity-guardrail",
@@ -500,7 +550,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Metric Integrity Guardrail.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-protocol",
@@ -518,7 +570,9 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Protocol.",
+      "nodeType": "concept"
     },
     {
       "id": "zen-artifact-training-certification-gate",
@@ -536,7 +590,13 @@
           "rel": "parent",
           "to": "zen-society-artifacts"
         }
-      ]
+      ],
+      "summary": "Artifact template for Training Certification Gate.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

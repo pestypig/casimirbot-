@@ -22,7 +22,9 @@
         "specialists-runtime",
         "debate-harness"
       ],
-      "links": []
+      "links": [],
+      "summary": "Debate orchestration, specialist runners, and verification loops.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-core",
@@ -41,7 +43,9 @@
           "rel": "parent",
           "to": "debate-specialists-tree"
         }
-      ]
+      ],
+      "summary": "Debate loop orchestration, prompts, and warp helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-contracts",
@@ -60,7 +64,9 @@
           "rel": "parent",
           "to": "debate-specialists-tree"
         }
-      ]
+      ],
+      "summary": "Schemas and shared grounding payloads.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-telemetry",
@@ -83,7 +89,9 @@
           "rel": "see-also",
           "to": "telemetry-console-tree"
         }
-      ]
+      ],
+      "summary": "Telemetry capture and storage for debates.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-routes",
@@ -102,7 +110,9 @@
           "rel": "parent",
           "to": "debate-specialists-tree"
         }
-      ]
+      ],
+      "summary": "HTTP routes for debate and specialist execution.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-skills",
@@ -125,7 +135,9 @@
           "rel": "see-also",
           "to": "skills-tooling-tree"
         }
-      ]
+      ],
+      "summary": "Debate tool implementations and checklist tooling.",
+      "nodeType": "concept"
     },
     {
       "id": "specialists-runtime",
@@ -144,7 +156,9 @@
           "rel": "parent",
           "to": "debate-specialists-tree"
         }
-      ]
+      ],
+      "summary": "Specialist registry, solvers, and verifiers.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-harness",
@@ -163,7 +177,13 @@
           "rel": "parent",
           "to": "debate-specialists-tree"
         }
-      ]
+      ],
+      "summary": "Debate harness scripts and regression tests.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

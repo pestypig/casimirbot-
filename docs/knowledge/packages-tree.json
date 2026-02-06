@@ -19,7 +19,9 @@
         "packages-templates",
         "packages-docs"
       ],
-      "links": []
+      "links": [],
+      "summary": "Monorepo packages, templates, and scaffolds.",
+      "nodeType": "concept"
     },
     {
       "id": "packages-create-verifier",
@@ -38,7 +40,9 @@
           "rel": "parent",
           "to": "packages-tree"
         }
-      ]
+      ],
+      "summary": "Scaffold package for verifier adapters.",
+      "nodeType": "concept"
     },
     {
       "id": "packages-app-native",
@@ -57,7 +61,9 @@
           "rel": "parent",
           "to": "packages-tree"
         }
-      ]
+      ],
+      "summary": "Native bundle configuration package.",
+      "nodeType": "concept"
     },
     {
       "id": "packages-templates",
@@ -76,7 +82,9 @@
           "rel": "parent",
           "to": "packages-tree"
         }
-      ]
+      ],
+      "summary": "Template payloads and workflow hooks.",
+      "nodeType": "concept"
     },
     {
       "id": "packages-docs",
@@ -99,7 +107,13 @@
           "rel": "see-also",
           "to": "sdk-integration-tree"
         }
-      ]
+      ],
+      "summary": "Package documentation and examples.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

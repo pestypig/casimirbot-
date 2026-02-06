@@ -25,7 +25,9 @@
         "brick-ui-panels",
         "brick-constraints-tests"
       ],
-      "links": []
+      "links": [],
+      "summary": "Stress-energy, curvature, and lattice bricks from backend to UI.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-stress-energy",
@@ -44,7 +46,9 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "Stress-energy brick build and stats.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-curvature",
@@ -63,7 +67,9 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "Curvature brick build and serialization.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-gr-evolve",
@@ -82,7 +88,9 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "GR evolution brick and constraint diagnostics.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-gr-initial",
@@ -101,7 +109,9 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "Initial conditions brick for GR runs.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-brick-serialization",
@@ -120,7 +130,9 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "Binary and JSON brick serialization formats.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-client-lattice",
@@ -139,7 +151,9 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "Client lattice frame, SDF, and surface adapters.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-client-hooks",
@@ -158,7 +172,9 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "Hooks that fetch and hydrate brick payloads.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-ui-panels",
@@ -177,7 +193,9 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "Panels rendering bricks and lattice views.",
+      "nodeType": "concept"
     },
     {
       "id": "brick-constraints-tests",
@@ -196,7 +214,13 @@
           "rel": "parent",
           "to": "brick-lattice-dataflow-tree"
         }
-      ]
+      ],
+      "summary": "Constraint gates and brick tests.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

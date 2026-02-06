@@ -21,7 +21,9 @@
         "hardware-scheduler",
         "hardware-provenance"
       ],
-      "links": []
+      "links": [],
+      "summary": "Hardware ingest, scheduling, and UI control surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "hardware-ingest",
@@ -39,7 +41,9 @@
           "rel": "parent",
           "to": "hardware-telemetry-tree"
         }
-      ]
+      ],
+      "summary": "Hardware ingest endpoints and normalization.",
+      "nodeType": "concept"
     },
     {
       "id": "hardware-bus",
@@ -57,7 +61,9 @@
           "rel": "parent",
           "to": "hardware-telemetry-tree"
         }
-      ]
+      ],
+      "summary": "Hardware sector bus and broadcast channels.",
+      "nodeType": "concept"
     },
     {
       "id": "hardware-hooks",
@@ -76,7 +82,9 @@
           "rel": "parent",
           "to": "hardware-telemetry-tree"
         }
-      ]
+      ],
+      "summary": "Client hooks for hardware feeds.",
+      "nodeType": "concept"
     },
     {
       "id": "hardware-panels",
@@ -94,7 +102,9 @@
           "rel": "parent",
           "to": "hardware-telemetry-tree"
         }
-      ]
+      ],
+      "summary": "UI surfaces for hardware control and monitoring.",
+      "nodeType": "concept"
     },
     {
       "id": "hardware-scheduler",
@@ -112,7 +122,9 @@
           "rel": "parent",
           "to": "hardware-telemetry-tree"
         }
-      ]
+      ],
+      "summary": "Scheduling and pump control helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "hardware-provenance",
@@ -130,7 +142,13 @@
           "rel": "parent",
           "to": "hardware-telemetry-tree"
         }
-      ]
+      ],
+      "summary": "Hardware truth signals feeding physics pipelines.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

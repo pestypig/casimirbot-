@@ -27,7 +27,9 @@
         "agi-learning-loop",
         "agi-knowledge-compositor"
       ],
-      "links": []
+      "links": [],
+      "summary": "Planning, execution, refinement, and trace capture for AGI runs.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-plan-execute",
@@ -50,7 +52,9 @@
           "rel": "see-also",
           "to": "helix-ask-tree"
         }
-      ]
+      ],
+      "summary": "Plan/execute entrypoints and Helix Ask runtime.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-planner-core",
@@ -68,7 +72,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Plan synthesis, grounding, and agent routing.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-refinery",
@@ -87,7 +93,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Refinery gates, variants, and trajectory capture.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-trace-memory",
@@ -110,7 +118,9 @@
           "rel": "see-also",
           "to": "trace-system"
         }
-      ]
+      ],
+      "summary": "Trace capture, memory, and audit trails.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-evaluation",
@@ -128,7 +138,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Eval smoke runs and regression harnesses.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-adapter",
@@ -146,7 +158,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Adapter endpoint and contract mapping.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-chat-sessions",
@@ -164,7 +178,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Chat session storage and rendering.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-contributions",
@@ -182,7 +198,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Contribution intake and tracking.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-constraint-packs",
@@ -200,7 +218,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Constraint pack routing and validation.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-resilience",
@@ -218,7 +238,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Circuit breaker and failure controls.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-learning-loop",
@@ -236,7 +258,9 @@
           "rel": "parent",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Reflection and learning hooks.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-knowledge-compositor",
@@ -258,7 +282,13 @@
           "rel": "see-also",
           "to": "knowledge-ingestion"
         }
-      ]
+      ],
+      "summary": "Knowledge bundles and prompt composition.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

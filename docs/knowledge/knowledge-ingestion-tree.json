@@ -24,7 +24,9 @@
         "knowledge-ui-panels",
         "knowledge-storage"
       ],
-      "links": []
+      "links": [],
+      "summary": "Knowledge ingestion, vectorization, and retrieval pipeline.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-corpus",
@@ -43,7 +45,9 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Corpus ingestion and attachment handling.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-validation",
@@ -61,7 +65,9 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Validation rules for knowledge bundles.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-merge",
@@ -79,7 +85,9 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Merge logic for knowledge bundles.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-citations",
@@ -97,7 +105,9 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Citation formatting and enforcement.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-vectorizer",
@@ -115,7 +125,9 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Vectorization routes and services.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-search",
@@ -134,7 +146,9 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Search routing and repository indexing.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-client-tools",
@@ -152,7 +166,9 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Client knowledge extraction and curation tools.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-ui-panels",
@@ -170,7 +186,9 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Panels that surface knowledge bundles.",
+      "nodeType": "concept"
     },
     {
       "id": "knowledge-storage",
@@ -188,7 +206,13 @@
           "rel": "parent",
           "to": "knowledge-ingestion-tree"
         }
-      ]
+      ],
+      "summary": "Database storage for knowledge assets.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

@@ -25,7 +25,9 @@
         "essence-telemetry-stack",
         "agi-client-stack"
       ],
-      "links": []
+      "links": [],
+      "summary": "Trace capture, essence profiles, and AGI refinement pipelines.",
+      "nodeType": "concept"
     },
     {
       "id": "trace-api-stack",
@@ -43,7 +45,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Trace API routes and contracts.",
+      "nodeType": "concept"
     },
     {
       "id": "trace-training-stack",
@@ -61,7 +65,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Training trace export and storage.",
+      "nodeType": "concept"
     },
     {
       "id": "trace-storage-stack",
@@ -80,7 +86,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Database models and migrations for traces.",
+      "nodeType": "concept"
     },
     {
       "id": "essence-schema-stack",
@@ -98,7 +106,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Shared essence schemas and prompts.",
+      "nodeType": "concept"
     },
     {
       "id": "essence-profile-stack",
@@ -116,7 +126,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Profile policy, summarization, and panel integration.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-refinery-stack",
@@ -134,7 +146,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Refinery workflows, policies, and exports.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-routing-stack",
@@ -152,7 +166,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Core AGI routes and control flows.",
+      "nodeType": "concept"
     },
     {
       "id": "collapse-benchmark-stack",
@@ -170,7 +186,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Collapse benchmarking and trace links.",
+      "nodeType": "concept"
     },
     {
       "id": "essence-telemetry-stack",
@@ -188,7 +206,9 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Solar and tokamak ingestion pipelines.",
+      "nodeType": "concept"
     },
     {
       "id": "agi-client-stack",
@@ -206,7 +226,13 @@
           "rel": "parent",
           "to": "trace-system-tree"
         }
-      ]
+      ],
+      "summary": "Client integration for AGI APIs.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

@@ -21,7 +21,9 @@
         "star-panels",
         "hull-materials"
       ],
-      "links": []
+      "links": [],
+      "summary": "Star runtime, solar guardrails, and materials context.",
+      "nodeType": "concept"
     },
     {
       "id": "star-runtime-routes",
@@ -40,7 +42,9 @@
           "rel": "parent",
           "to": "star-materials-environment-tree"
         }
-      ]
+      ],
+      "summary": "Star and watcher API routes.",
+      "nodeType": "concept"
     },
     {
       "id": "star-models-telemetry",
@@ -63,7 +67,9 @@
           "rel": "see-also",
           "to": "telemetry-console-tree"
         }
-      ]
+      ],
+      "summary": "Star model and telemetry schemas.",
+      "nodeType": "concept"
     },
     {
       "id": "solar-adapters-guardrails",
@@ -82,7 +88,9 @@
           "rel": "parent",
           "to": "star-materials-environment-tree"
         }
-      ]
+      ],
+      "summary": "Solar energy adapters and guardrail definitions.",
+      "nodeType": "concept"
     },
     {
       "id": "environment-model",
@@ -101,7 +109,9 @@
           "rel": "parent",
           "to": "star-materials-environment-tree"
         }
-      ]
+      ],
+      "summary": "Environment schema and persistence.",
+      "nodeType": "concept"
     },
     {
       "id": "star-panels",
@@ -124,7 +134,9 @@
           "rel": "see-also",
           "to": "ui-components-tree"
         }
-      ]
+      ],
+      "summary": "Star UI panels and docs.",
+      "nodeType": "concept"
     },
     {
       "id": "hull-materials",
@@ -147,7 +159,13 @@
           "rel": "see-also",
           "to": "security-hull-guard-tree"
         }
-      ]
+      ],
+      "summary": "Needle hull materials, GLB handling, and geometry helpers.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

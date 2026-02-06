@@ -8,7 +8,12 @@
       "title": "Pipeline and Ledger Tree",
       "excerpt": "A walk from pipeline outputs to ledger verification.",
       "bodyMD": "This tree ties pipeline calculations to ledger reporting and verification.\n\nMinimal artifact: pipeline + ledger docs (docs/knowledge/*.md).",
-      "tags": ["pipeline", "ledger", "verification", "physics"],
+      "tags": [
+        "pipeline",
+        "ledger",
+        "verification",
+        "physics"
+      ],
       "children": [
         "pipeline-overview",
         "curvature-ledger",
@@ -21,7 +26,9 @@
         "stellar-ledger",
         "sun-ledger"
       ],
-      "links": []
+      "links": [],
+      "summary": "A walk from pipeline outputs to ledger verification.",
+      "nodeType": "concept"
     },
     {
       "id": "pipeline-overview",
@@ -29,9 +36,20 @@
       "title": "Pipeline Overview",
       "excerpt": "Energy pipeline converts inputs into warp and GR proxies.",
       "bodyMD": "Pipeline definitions and assumptions live in docs/knowledge/pipeline.md.\n\nMinimal artifact: pipeline assumptions list.",
-      "tags": ["pipeline", "energy", "proxies"],
+      "tags": [
+        "pipeline",
+        "energy",
+        "proxies"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Energy pipeline converts inputs into warp and GR proxies.",
+      "nodeType": "concept"
     },
     {
       "id": "curvature-ledger",
@@ -39,9 +57,20 @@
       "title": "Curvature Ledger",
       "excerpt": "Track curvature proxies and constraints.",
       "bodyMD": "Curvature ledger ties proxy values to verification (docs/knowledge/curvature-ledger.md).\n\nMinimal artifact: curvature ledger entries.",
-      "tags": ["curvature", "ledger", "constraints"],
+      "tags": [
+        "curvature",
+        "ledger",
+        "constraints"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Track curvature proxies and constraints.",
+      "nodeType": "concept"
     },
     {
       "id": "warp-ledger",
@@ -49,9 +78,20 @@
       "title": "Warp Ledger",
       "excerpt": "Ledger of warp-related proxy values and checks.",
       "bodyMD": "Warp ledger connects pipeline outputs to constraints (docs/knowledge/warp-ledger.md).\n\nMinimal artifact: warp ledger entry list.",
-      "tags": ["warp", "ledger", "proxies"],
+      "tags": [
+        "warp",
+        "ledger",
+        "proxies"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Ledger of warp-related proxy values and checks.",
+      "nodeType": "concept"
     },
     {
       "id": "stewardship-ledger",
@@ -59,9 +99,20 @@
       "title": "Stewardship Ledger",
       "excerpt": "Ledger of ethical and physics constraints.",
       "bodyMD": "Stewardship ledger binds capability to verification (docs/knowledge/stewardship-ledger.md).\n\nMinimal artifact: ledger constraints list.",
-      "tags": ["stewardship", "ledger", "verification"],
+      "tags": [
+        "stewardship",
+        "ledger",
+        "verification"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Ledger of ethical and physics constraints.",
+      "nodeType": "concept"
     },
     {
       "id": "kappa-proxy",
@@ -69,9 +120,20 @@
       "title": "Kappa Proxy",
       "excerpt": "Proxy comparison for drive vs body curvature.",
       "bodyMD": "Kappa proxy compares drive and body curvature (docs/knowledge/kappa-proxy.md).\n\nMinimal artifact: kappa proxy definition.",
-      "tags": ["kappa", "proxy", "curvature"],
+      "tags": [
+        "kappa",
+        "proxy",
+        "curvature"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Proxy comparison for drive vs body curvature.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-bounds",
@@ -79,9 +141,20 @@
       "title": "Quantum Inequality Bounds",
       "excerpt": "Proxy bounds on negative energy exposure.",
       "bodyMD": "QI bounds constrain negative energy (docs/knowledge/qi-bounds.md).\n\nMinimal artifact: QI bound summary.",
-      "tags": ["quantum", "inequality", "bounds"],
+      "tags": [
+        "quantum",
+        "inequality",
+        "bounds"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Proxy bounds on negative energy exposure.",
+      "nodeType": "concept"
     },
     {
       "id": "potato-threshold",
@@ -89,9 +162,20 @@
       "title": "Potato Threshold",
       "excerpt": "Threshold for warp proxy sanity checks.",
       "bodyMD": "Potato threshold is a sanity limit for proxies (docs/knowledge/potato-threshold.md).\n\nMinimal artifact: threshold definition.",
-      "tags": ["threshold", "sanity", "proxies"],
+      "tags": [
+        "threshold",
+        "sanity",
+        "proxies"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Threshold for warp proxy sanity checks.",
+      "nodeType": "concept"
     },
     {
       "id": "verification-core",
@@ -99,9 +183,20 @@
       "title": "Verification Core",
       "excerpt": "Define how verification and evidence connect to claims.",
       "bodyMD": "Verification definitions govern evidence handling (docs/knowledge/verification.md).\n\nMinimal artifact: verification criteria list.",
-      "tags": ["verification", "evidence", "claims"],
+      "tags": [
+        "verification",
+        "evidence",
+        "claims"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Define how verification and evidence connect to claims.",
+      "nodeType": "concept"
     },
     {
       "id": "stellar-ledger",
@@ -109,9 +204,20 @@
       "title": "Stellar Ledger",
       "excerpt": "Ledger for stellar-scale commitments.",
       "bodyMD": "Stellar ledger ties star restoration to reporting (docs/knowledge/stellar-ledger.md).\n\nMinimal artifact: stellar ledger entries.",
-      "tags": ["stellar", "ledger", "restoration"],
+      "tags": [
+        "stellar",
+        "ledger",
+        "restoration"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Ledger for stellar-scale commitments.",
+      "nodeType": "concept"
     },
     {
       "id": "sun-ledger",
@@ -119,9 +225,24 @@
       "title": "Sun Ledger",
       "excerpt": "Solar restoration ledger entries.",
       "bodyMD": "Sun ledger defines restoration accounting (docs/knowledge/sun-ledger.md).\n\nMinimal artifact: sun ledger schema.",
-      "tags": ["sun", "ledger", "restoration"],
+      "tags": [
+        "sun",
+        "ledger",
+        "restoration"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "pipeline-ledger-tree" }]
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        }
+      ],
+      "summary": "Solar restoration ledger entries.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

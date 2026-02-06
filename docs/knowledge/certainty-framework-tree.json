@@ -24,7 +24,9 @@
         "schema-confidence-stack",
         "uncertainty-mechanics-stack"
       ],
-      "links": []
+      "links": [],
+      "summary": "Evaluation framework for confidence, evidence gates, and uncertainty tracking.",
+      "nodeType": "concept"
     },
     {
       "id": "certainty-motivation",
@@ -43,7 +45,9 @@
           "rel": "parent",
           "to": "certainty-framework-tree"
         }
-      ]
+      ],
+      "summary": "Why graded certainty and verification gates matter.",
+      "nodeType": "concept"
     },
     {
       "id": "platonic-reasoning-bridge",
@@ -62,7 +66,9 @@
           "rel": "parent",
           "to": "certainty-framework-tree"
         }
-      ]
+      ],
+      "summary": "Concept registry and platonic gates as certainty scaffolds.",
+      "nodeType": "concept"
     },
     {
       "id": "helix-ask-certainty-stack",
@@ -89,7 +95,9 @@
           "rel": "parent",
           "to": "certainty-framework-tree"
         }
-      ]
+      ],
+      "summary": "Gates and registers that grade answer certainty.",
+      "nodeType": "concept"
     },
     {
       "id": "retrieval-confidence",
@@ -108,7 +116,9 @@
           "rel": "parent",
           "to": "helix-ask-certainty-stack"
         }
-      ]
+      ],
+      "summary": "Repository retrieval confidence signals.",
+      "nodeType": "concept"
     },
     {
       "id": "claim-ledger",
@@ -127,7 +137,9 @@
           "rel": "parent",
           "to": "helix-ask-certainty-stack"
         }
-      ]
+      ],
+      "summary": "Ledger of claims and support status.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-register",
@@ -146,7 +158,9 @@
           "rel": "parent",
           "to": "helix-ask-certainty-stack"
         }
-      ]
+      ],
+      "summary": "Register of uncertainties per claim.",
+      "nodeType": "concept"
     },
     {
       "id": "coverage-gate",
@@ -165,7 +179,9 @@
           "rel": "parent",
           "to": "helix-ask-certainty-stack"
         }
-      ]
+      ],
+      "summary": "Ensure required slots are covered by evidence.",
+      "nodeType": "concept"
     },
     {
       "id": "belief-gate",
@@ -184,7 +200,9 @@
           "rel": "parent",
           "to": "helix-ask-certainty-stack"
         }
-      ]
+      ],
+      "summary": "Belief graph checks for support and contradictions.",
+      "nodeType": "concept"
     },
     {
       "id": "rattling-gate",
@@ -203,7 +221,9 @@
           "rel": "parent",
           "to": "helix-ask-certainty-stack"
         }
-      ]
+      ],
+      "summary": "Stability check via perturbation tests.",
+      "nodeType": "concept"
     },
     {
       "id": "variant-selection",
@@ -222,7 +242,9 @@
           "rel": "parent",
           "to": "helix-ask-certainty-stack"
         }
-      ]
+      ],
+      "summary": "Choose variants based on alignment and evidence.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-confidence-stack",
@@ -246,7 +268,9 @@
           "rel": "parent",
           "to": "certainty-framework-tree"
         }
-      ]
+      ],
+      "summary": "Confidence scoring in debate workflows.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-schema",
@@ -265,7 +289,9 @@
           "rel": "parent",
           "to": "debate-confidence-stack"
         }
-      ]
+      ],
+      "summary": "Confidence fields in debate schema.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-run-skill",
@@ -284,7 +310,9 @@
           "rel": "parent",
           "to": "debate-confidence-stack"
         }
-      ]
+      ],
+      "summary": "Debate.run returns confidence.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-checklist-skill",
@@ -303,7 +331,9 @@
           "rel": "parent",
           "to": "debate-confidence-stack"
         }
-      ]
+      ],
+      "summary": "Checklist generation with confidence.",
+      "nodeType": "concept"
     },
     {
       "id": "debate-planner-logging",
@@ -322,7 +352,9 @@
           "rel": "parent",
           "to": "debate-confidence-stack"
         }
-      ]
+      ],
+      "summary": "Planner logging of debate confidence.",
+      "nodeType": "concept"
     },
     {
       "id": "rationale-confidence-stack",
@@ -343,7 +375,9 @@
           "rel": "parent",
           "to": "certainty-framework-tree"
         }
-      ]
+      ],
+      "summary": "Evidence/inference tags with optional confidence.",
+      "nodeType": "concept"
     },
     {
       "id": "rationale-schema",
@@ -362,7 +396,9 @@
           "rel": "parent",
           "to": "rationale-confidence-stack"
         }
-      ]
+      ],
+      "summary": "Rationale tags and confidence fields.",
+      "nodeType": "concept"
     },
     {
       "id": "coherence-confidence-stack",
@@ -384,7 +420,9 @@
           "rel": "parent",
           "to": "certainty-framework-tree"
         }
-      ]
+      ],
+      "summary": "Coherence and collapse confidence scores.",
+      "nodeType": "concept"
     },
     {
       "id": "coherence-governor",
@@ -403,7 +441,9 @@
           "rel": "parent",
           "to": "coherence-confidence-stack"
         }
-      ]
+      ],
+      "summary": "Collapse confidence and action policy.",
+      "nodeType": "concept"
     },
     {
       "id": "noisegen-confidence",
@@ -422,7 +462,9 @@
           "rel": "parent",
           "to": "coherence-confidence-stack"
         }
-      ]
+      ],
+      "summary": "Planner confidence for noisegen proposals.",
+      "nodeType": "concept"
     },
     {
       "id": "schema-confidence-stack",
@@ -443,7 +485,9 @@
           "rel": "parent",
           "to": "certainty-framework-tree"
         }
-      ]
+      ],
+      "summary": "Shared confidence/weight fields used across telemetry.",
+      "nodeType": "concept"
     },
     {
       "id": "shared-schema-confidence",
@@ -461,7 +505,9 @@
           "rel": "parent",
           "to": "schema-confidence-stack"
         }
-      ]
+      ],
+      "summary": "Confidence/weight fields in shared schema.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-mechanics-stack",
@@ -488,7 +534,9 @@
           "rel": "parent",
           "to": "certainty-framework-tree"
         }
-      ]
+      ],
+      "summary": "Classical, statistical, and quantum-stochastic sources of uncertainty.",
+      "nodeType": "concept"
     },
     {
       "id": "classical-uncertainty",
@@ -507,7 +555,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-stack"
         }
-      ]
+      ],
+      "summary": "Model error, discretization, and boundary-condition uncertainty.",
+      "nodeType": "concept"
     },
     {
       "id": "statistical-uncertainty",
@@ -526,7 +576,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-stack"
         }
-      ]
+      ],
+      "summary": "Sampling noise, distributions, and stochastic variance.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-data-contracts",
@@ -545,7 +597,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-stack"
         }
-      ]
+      ],
+      "summary": "Shared schemas for values, sigmas, and bands.",
+      "nodeType": "concept"
     },
     {
       "id": "quantum-stochastic-bridge",
@@ -564,7 +618,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-stack"
         }
-      ]
+      ],
+      "summary": "Noise-kernel and coherence-window constraints for semiclassical sourcing.",
+      "nodeType": "concept"
     },
     {
       "id": "transient-energy-approximations",
@@ -583,7 +639,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-stack"
         }
-      ]
+      ],
+      "summary": "Approximation ladders and energy bands bridging classical and statistical models.",
+      "nodeType": "concept"
     },
     {
       "id": "collapse-framework-constraints",
@@ -602,7 +660,9 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-stack"
         }
-      ]
+      ],
+      "summary": "Causal collapse benchmarks and policy gating.",
+      "nodeType": "concept"
     },
     {
       "id": "uncertainty-reality-constraints",
@@ -621,7 +681,13 @@
           "rel": "parent",
           "to": "uncertainty-mechanics-stack"
         }
-      ]
+      ],
+      "summary": "Energy conditions, quantum inequality limits, and sampling bounds.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

@@ -29,7 +29,9 @@
         "qi-ops-runbook",
         "casimir-calculation-stack"
       ],
-      "links": []
+      "links": [],
+      "summary": "A walk from tile mechanics to guardrails and roadmap proofs.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-tiles-overview",
@@ -55,7 +57,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Casimir tile definitions and scope.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-tile-mechanism",
@@ -81,7 +85,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Mechanism and physical justification.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-tile-roadmap",
@@ -100,7 +106,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Roadmap for proof and development milestones.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-tile-schematic-roadmap",
@@ -119,7 +127,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Schematic steps and verification hooks.",
+      "nodeType": "concept"
     },
     {
       "id": "guarded-casimir-tile-code-mapped",
@@ -150,7 +160,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Code-mapped guardrails and implementation trace.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-guard-consolidation",
@@ -169,7 +181,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Quantum inequality guardrail consolidation.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-homogenization-addendum",
@@ -188,7 +202,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Homogenization notes for quantum inequality handling.",
+      "nodeType": "concept"
     },
     {
       "id": "qi-ops-runbook",
@@ -207,7 +223,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Operational runbook for QI guardrails.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-calculation-stack",
@@ -233,7 +251,9 @@
           "rel": "parent",
           "to": "casimir-tiles-tree"
         }
-      ]
+      ],
+      "summary": "Calculation modules underpinning Casimir tiles.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-static-engine",
@@ -259,7 +279,9 @@
           "rel": "parent",
           "to": "casimir-calculation-stack"
         }
-      ]
+      ],
+      "summary": "Compute static Casimir energy baseline.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-pressure-parallel-plate-ideal",
@@ -308,15 +330,15 @@
       ],
       "validity": {
         "gap_m": {
-          "min": 1e-9,
-          "max": 1e-6
+          "min": 1e-09,
+          "max": 1e-06
         },
         "notes": "Outside range, correction models required."
       },
       "deterministic": true,
       "tolerance": {
-        "rel": 1e-9,
-        "abs": 1e-6
+        "rel": 1e-09,
+        "abs": 1e-06
       },
       "dependencies": [
         "casimir-static-engine",
@@ -374,7 +396,9 @@
           "rel": "parent",
           "to": "casimir-calculation-stack"
         }
-      ]
+      ],
+      "summary": "Dynamic Casimir sweeps for tile calculations.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-inference-engine",
@@ -400,7 +424,9 @@
           "rel": "parent",
           "to": "casimir-calculation-stack"
         }
-      ]
+      ],
+      "summary": "Infer energy from force series and datasets.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-natario-metric",
@@ -426,7 +452,9 @@
           "rel": "parent",
           "to": "casimir-calculation-stack"
         }
-      ]
+      ],
+      "summary": "Natario metric helpers for Casimir geometry.",
+      "nodeType": "concept"
     },
     {
       "id": "casimir-stress-energy-equations",
@@ -452,7 +480,9 @@
           "rel": "parent",
           "to": "casimir-calculation-stack"
         }
-      ]
+      ],
+      "summary": "Stress-energy equations for Casimir fields.",
+      "nodeType": "concept"
     }
   ]
 }

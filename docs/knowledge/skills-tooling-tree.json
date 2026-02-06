@@ -22,7 +22,9 @@
         "skills-telemetry",
         "skills-cli-tools"
       ],
-      "links": []
+      "links": [],
+      "summary": "Tool registry, skill implementations, and CLI utilities.",
+      "nodeType": "concept"
     },
     {
       "id": "skills-registry",
@@ -41,7 +43,9 @@
           "rel": "parent",
           "to": "skills-tooling-tree"
         }
-      ]
+      ],
+      "summary": "Tool specs, safety profiles, and registry helpers.",
+      "nodeType": "concept"
     },
     {
       "id": "skills-routing",
@@ -64,7 +68,9 @@
           "rel": "see-also",
           "to": "agi-runtime-tree"
         }
-      ]
+      ],
+      "summary": "Tool registration and runtime dispatch.",
+      "nodeType": "concept"
     },
     {
       "id": "skills-physics",
@@ -87,7 +93,9 @@
           "rel": "see-also",
           "to": "physics-foundations"
         }
-      ]
+      ],
+      "summary": "Warp, GR grounding, and curvature tools.",
+      "nodeType": "concept"
     },
     {
       "id": "skills-docs-repo",
@@ -106,7 +114,9 @@
           "rel": "parent",
           "to": "skills-tooling-tree"
         }
-      ]
+      ],
+      "summary": "Docs extraction, citation checks, and repo tools.",
+      "nodeType": "concept"
     },
     {
       "id": "skills-media",
@@ -125,7 +135,9 @@
           "rel": "parent",
           "to": "skills-tooling-tree"
         }
-      ]
+      ],
+      "summary": "Luma, noise, vision, speech, and fashion tools.",
+      "nodeType": "concept"
     },
     {
       "id": "skills-telemetry",
@@ -148,7 +160,9 @@
           "rel": "see-also",
           "to": "telemetry-console-tree"
         }
-      ]
+      ],
+      "summary": "Telemetry snapshots and crosschecks.",
+      "nodeType": "concept"
     },
     {
       "id": "skills-cli-tools",
@@ -167,7 +181,13 @@
           "rel": "parent",
           "to": "skills-tooling-tree"
         }
-      ]
+      ],
+      "summary": "CLI utilities and tooling scripts.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

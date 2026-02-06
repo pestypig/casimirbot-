@@ -27,7 +27,9 @@
         "gr-agent-loop",
         "gr-assistant-adapter"
       ],
-      "links": []
+      "links": [],
+      "summary": "A walk from GR evolution to constraint gates and robustness notes.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-solver-progress",
@@ -46,7 +48,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Status and milestones for solver development.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-solver-robustness",
@@ -65,7 +69,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Robustness checks and failure modes.",
+      "nodeType": "concept"
     },
     {
       "id": "bssn-evolution",
@@ -91,7 +97,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Core evolution step for GR fields.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-constraint-network",
@@ -110,7 +118,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Compute constraint residuals and diagnostics.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-constraint-gate",
@@ -129,7 +139,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Gate evaluation converts diagnostics into pass/fail.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-agent-loop",
@@ -150,7 +162,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Orchestration loop for GR evaluation and proposals.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-evolution-orchestration",
@@ -173,7 +187,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Orchestrate GR evolution runs and bricks.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-initial-data",
@@ -192,7 +208,9 @@
           "rel": "parent",
           "to": "gr-evolution-orchestration"
         }
-      ]
+      ],
+      "summary": "Initialize GR fields for evolution.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-evolution-solver",
@@ -211,7 +229,9 @@
           "rel": "parent",
           "to": "gr-evolution-orchestration"
         }
-      ]
+      ],
+      "summary": "Solver loop for GR evolution.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-evolution-brick",
@@ -230,7 +250,9 @@
           "rel": "parent",
           "to": "gr-evolution-orchestration"
         }
-      ]
+      ],
+      "summary": "Brick wrapper for GR evolution outputs.",
+      "nodeType": "concept"
     },
     {
       "id": "bssn-state",
@@ -249,7 +271,9 @@
           "rel": "parent",
           "to": "bssn-evolution"
         }
-      ]
+      ],
+      "summary": "State containers for BSSN fields.",
+      "nodeType": "concept"
     },
     {
       "id": "rk4-integrator",
@@ -268,7 +292,9 @@
           "rel": "parent",
           "to": "bssn-evolution"
         }
-      ]
+      ],
+      "summary": "Runge-Kutta integrator for BSSN fields.",
+      "nodeType": "concept"
     },
     {
       "id": "stencils",
@@ -287,7 +313,9 @@
           "rel": "parent",
           "to": "bssn-evolution"
         }
-      ]
+      ],
+      "summary": "Stencil operators for derivatives and boundaries.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-diagnostics",
@@ -306,7 +334,9 @@
           "rel": "parent",
           "to": "bssn-evolution"
         }
-      ]
+      ],
+      "summary": "Diagnostics for shift stiffness and stability.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-stress-energy",
@@ -325,7 +355,9 @@
           "rel": "parent",
           "to": "bssn-evolution"
         }
-      ]
+      ],
+      "summary": "Stress-energy grids for GR evolution.",
+      "nodeType": "concept"
     },
     {
       "id": "stress-energy-integrals",
@@ -344,7 +376,9 @@
           "rel": "parent",
           "to": "bssn-evolution"
         }
-      ]
+      ],
+      "summary": "Integrals over stress-energy fields.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-constraint-policy",
@@ -363,7 +397,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Constraint policy thresholds and modes.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-evaluation",
@@ -382,7 +418,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Evaluation orchestration for GR runs.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-worker-stack",
@@ -406,7 +444,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Worker processes for GR evaluation.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-worker",
@@ -425,7 +465,9 @@
           "rel": "parent",
           "to": "gr-worker-stack"
         }
-      ]
+      ],
+      "summary": "Worker runtime for GR evaluations.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-worker-client",
@@ -444,7 +486,9 @@
           "rel": "parent",
           "to": "gr-worker-stack"
         }
-      ]
+      ],
+      "summary": "Client interface for GR worker calls.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-worker-types",
@@ -463,7 +507,9 @@
           "rel": "parent",
           "to": "gr-worker-stack"
         }
-      ]
+      ],
+      "summary": "Shared types for GR worker payloads.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-os-payload",
@@ -482,7 +528,9 @@
           "rel": "parent",
           "to": "gr-worker-stack"
         }
-      ]
+      ],
+      "summary": "Payload schema for GR OS telemetry.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-assistant-adapter",
@@ -503,7 +551,9 @@
           "rel": "parent",
           "to": "gr-solver-tree"
         }
-      ]
+      ],
+      "summary": "Adapter for GR assistant workflows.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-agent-loop-schema",
@@ -522,7 +572,9 @@
           "rel": "parent",
           "to": "gr-agent-loop"
         }
-      ]
+      ],
+      "summary": "Schema for GR agent loop runs.",
+      "nodeType": "concept"
     },
     {
       "id": "gr-assistant-tools",
@@ -541,7 +593,13 @@
           "rel": "parent",
           "to": "gr-assistant-adapter"
         }
-      ]
+      ],
+      "summary": "Standalone GR helper service for metric checks.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

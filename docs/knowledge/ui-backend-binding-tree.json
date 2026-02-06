@@ -24,7 +24,9 @@
         "binding-knowledge-docs",
         "binding-proof-verification"
       ],
-      "links": []
+      "links": [],
+      "summary": "Backend-to-UI dataflow for physics surfaces and verification panels.",
+      "nodeType": "concept"
     },
     {
       "id": "binding-energy-pipeline",
@@ -43,7 +45,9 @@
           "rel": "parent",
           "to": "ui-backend-binding-tree"
         }
-      ]
+      ],
+      "summary": "Energy pipeline outputs wired to UI panels.",
+      "nodeType": "concept"
     },
     {
       "id": "binding-curvature-bricks",
@@ -62,7 +66,9 @@
           "rel": "parent",
           "to": "ui-backend-binding-tree"
         }
-      ]
+      ],
+      "summary": "Curvature brick dataflow to GR panels.",
+      "nodeType": "concept"
     },
     {
       "id": "binding-warp-pipeline",
@@ -81,7 +87,9 @@
           "rel": "parent",
           "to": "ui-backend-binding-tree"
         }
-      ]
+      ],
+      "summary": "Warp viability and render pipeline mapped to UI.",
+      "nodeType": "concept"
     },
     {
       "id": "binding-collapse-benchmark",
@@ -100,7 +108,9 @@
           "rel": "parent",
           "to": "ui-backend-binding-tree"
         }
-      ]
+      ],
+      "summary": "Collapse benchmark outputs to HUD panels.",
+      "nodeType": "concept"
     },
     {
       "id": "binding-simulation-api",
@@ -119,7 +129,9 @@
           "rel": "parent",
           "to": "ui-backend-binding-tree"
         }
-      ]
+      ],
+      "summary": "Simulation endpoints mapped to UI surfaces.",
+      "nodeType": "concept"
     },
     {
       "id": "binding-hardware-telemetry",
@@ -138,7 +150,9 @@
           "rel": "parent",
           "to": "ui-backend-binding-tree"
         }
-      ]
+      ],
+      "summary": "Hardware ingest endpoints wired to UI controls.",
+      "nodeType": "concept"
     },
     {
       "id": "binding-knowledge-docs",
@@ -157,7 +171,9 @@
           "rel": "parent",
           "to": "ui-backend-binding-tree"
         }
-      ]
+      ],
+      "summary": "Knowledge ingestion surfaced in doc panels.",
+      "nodeType": "concept"
     },
     {
       "id": "binding-proof-verification",
@@ -176,7 +192,13 @@
           "rel": "parent",
           "to": "ui-backend-binding-tree"
         }
-      ]
+      ],
+      "summary": "Verification outputs mapped to proof panels.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }
