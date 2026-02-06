@@ -2770,10 +2770,19 @@ const HELIX_ASK_ANSWER_MAX_TOKENS = clampNumber(
     process.env.HELIX_ASK_ANSWER_MAX_TOKENS ??
       process.env.VITE_HELIX_ASK_MAX_TOKENS ??
       process.env.LLM_LOCAL_MAX_TOKENS,
-    2048,
+    3072,
   ),
   256,
   8192,
+);
+const HELIX_ASK_ANSWER_EXTENSION_MAX_ITEMS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_ANSWER_EXTENSION_MAX_ITEMS ??
+      process.env.VITE_HELIX_ASK_ANSWER_EXTENSION_MAX_ITEMS,
+    3,
+  ),
+  1,
+  8,
 );
 const HELIX_ASK_SHORT_ANSWER_RETRY_MAX = clampNumber(
   readNumber(
@@ -8773,6 +8782,217 @@ const buildToolResultsFallbackAnswer = (args: {
   return lines.join("\n");
 };
 
+const stripEvidenceBulletPrefix = (value: string): string =>
+  value.replace(/^\s*-\s*/, "").trim();
+
+const buildSingleLlmShortAnswerFallback = (args: {
+  question: string;
+  definitionFocus: boolean;
+  docBlocks: Array<{ path: string; block: string }>;
+  codeAlignment?: HelixAskCodeAlignment | null;
+  treeWalk?: string;
+  missingSlots?: string[];
+  slotPlan?: HelixAskSlotPlan | null;
+  anchorFiles?: string[];
+  searchedTerms?: string[];
+  searchedFiles?: string[];
+  planClarify?: string;
+  headingSeedSlots?: HelixAskSlotPlanEntry[];
+  requiresRepoEvidence?: boolean;
+}): string => {
+  const docLimit = Math.min(args.docBlocks.length, args.definitionFocus ? 5 : 4);
+  const codeLimit = Math.min(args.codeAlignment?.spans?.length ?? 0, 4);
+  const docBullets = args.docBlocks
+    .slice(0, docLimit)
+    .map((block, index) =>
+      buildDocEvidenceBullet(block, args.definitionFocus && index === 0 ? "Definition" : "Evidence"),
+    );
+  const codeBullets =
+    args.codeAlignment?.spans?.slice(0, codeLimit).map((span) => buildCodeEvidenceBullet(span)) ?? [];
+  const normalizedEvidence = [...docBullets, ...codeBullets].map(stripEvidenceBulletPrefix);
+  const lines: string[] = ["Confirmed:"];
+  if (docBullets.length === 0 && codeBullets.length === 0) {
+    lines.push(
+      `- ${
+        args.requiresRepoEvidence
+          ? "No repo-evidenced claims were confirmed yet."
+          : "No confirmed evidence was found yet."
+      }`,
+    );
+  } else {
+    for (const bullet of docBullets) lines.push(bullet);
+    for (const bullet of codeBullets) lines.push(bullet);
+  }
+  lines.push("");
+  lines.push("Reasoned connections (bounded):");
+  if (normalizedEvidence.length >= 2) {
+    lines.push(
+      `- ${clipAskText(normalizedEvidence[0], 220)} ${clipAskText(normalizedEvidence[1], 220)} Hypothesis: a direct connection needs evidence mentioning both.`,
+    );
+  } else {
+    lines.push("- Need at least two grounded points before drawing a connection.");
+  }
+  if (args.treeWalk?.trim()) {
+    lines.push("");
+    lines.push("Tree walk (bound):");
+    lines.push(args.treeWalk.trim());
+  }
+  const nextEvidence = buildNextEvidenceHints({
+    question: args.question,
+    missingSlots: args.missingSlots,
+    slotPlan: args.slotPlan,
+    anchorFiles: args.anchorFiles,
+    searchedTerms: args.searchedTerms,
+    searchedFiles: args.searchedFiles,
+    includeSearchSummary: true,
+    planClarify: args.planClarify,
+    headingSeedSlots: args.headingSeedSlots,
+    limit: 6,
+  });
+  lines.push("");
+  lines.push("Next evidence:");
+  if (nextEvidence.length > 0) {
+    nextEvidence.forEach((item) => lines.push(`- ${item}`));
+  } else {
+    lines.push("- Provide the file path or doc section that defines the missing terms.");
+  }
+  return lines.join("\n").trim();
+};
+
+type HelixAskAnswerExtensionResult = {
+  available: boolean;
+  text?: string;
+  citations: string[];
+  itemCount: number;
+  docItems: number;
+  codeItems: number;
+};
+
+type HelixAskAnswerExtensionItem = {
+  kind: "doc" | "code";
+  path: string;
+  summary: string;
+};
+
+const normalizePathKey = (value: string): string =>
+  (normalizeEvidenceRef(value) ?? value).toLowerCase();
+
+const summarizeForExtension = (value: string): string => {
+  const cleaned = stripEvidenceBulletPrefix(value)
+    .replace(/\s+/g, " ")
+    .trim();
+  return clipAskText(cleaned, 220);
+};
+
+const scoreNovelty = (answerLower: string, summary: string): number => {
+  if (!summary.trim()) return 1;
+  const tokens = dedupeTokens(tokenizeAskQuery(summary)).filter((token) => token.length >= 4);
+  if (tokens.length === 0) return 1;
+  let overlap = 0;
+  for (const token of tokens) {
+    if (answerLower.includes(token)) overlap += 1;
+  }
+  return 1 - overlap / tokens.length;
+};
+
+const buildAnswerCoverageExtension = (args: {
+  answerText: string;
+  docBlocks: Array<{ path: string; block: string }>;
+  codeAlignment?: HelixAskCodeAlignment | null;
+}): HelixAskAnswerExtensionResult => {
+  const answer = args.answerText?.trim() ?? "";
+  if (!answer) {
+    return {
+      available: false,
+      citations: [],
+      itemCount: 0,
+      docItems: 0,
+      codeItems: 0,
+    };
+  }
+  const answerLower = answer.toLowerCase();
+  const citedPathKeys = new Set(
+    extractFilePathsFromText(answer)
+      .map((entry) => normalizePathKey(entry))
+      .filter(Boolean),
+  );
+  const candidates: HelixAskAnswerExtensionItem[] = [];
+  const pushCandidate = (item: HelixAskAnswerExtensionItem) => {
+    if (!item.path || !item.summary) return;
+    candidates.push(item);
+  };
+  for (let index = 0; index < args.docBlocks.length; index += 1) {
+    const block = args.docBlocks[index];
+    const bullet = buildDocEvidenceBullet(
+      block,
+      index === 0 ? "Definition" : "Evidence",
+    );
+    const summary = summarizeForExtension(bullet);
+    if (!summary) continue;
+    pushCandidate({ kind: "doc", path: block.path, summary });
+  }
+  for (const span of args.codeAlignment?.spans ?? []) {
+    const summary = summarizeForExtension(buildCodeEvidenceBullet(span));
+    if (!summary) continue;
+    pushCandidate({ kind: "code", path: span.filePath, summary });
+  }
+  if (candidates.length === 0) {
+    return {
+      available: false,
+      citations: [],
+      itemCount: 0,
+      docItems: 0,
+      codeItems: 0,
+    };
+  }
+  const ranked = candidates
+    .map((item) => {
+      const pathKey = normalizePathKey(item.path);
+      const pathNovel = pathKey ? !citedPathKeys.has(pathKey) : true;
+      const novelty = scoreNovelty(answerLower, item.summary);
+      const score = (pathNovel ? 1 : 0) + novelty;
+      return { ...item, pathKey, pathNovel, novelty, score };
+    })
+    .sort((a, b) => b.score - a.score || Number(b.pathNovel) - Number(a.pathNovel));
+  const selected: HelixAskAnswerExtensionItem[] = [];
+  const seenPathKeys = new Set<string>();
+  for (const item of ranked) {
+    if (selected.length >= HELIX_ASK_ANSWER_EXTENSION_MAX_ITEMS) break;
+    if (item.pathKey && seenPathKeys.has(item.pathKey)) continue;
+    if (item.pathKey) {
+      seenPathKeys.add(item.pathKey);
+    }
+    if (item.pathNovel || item.novelty >= 0.35 || selected.length === 0) {
+      selected.push({
+        kind: item.kind,
+        path: item.path,
+        summary: item.summary,
+      });
+    }
+  }
+  if (selected.length === 0) {
+    return {
+      available: false,
+      citations: [],
+      itemCount: 0,
+      docItems: 0,
+      codeItems: 0,
+    };
+  }
+  const citations = Array.from(new Set(selected.map((item) => item.path)));
+  const sentence = selected
+    .map((item) => `${ensureSentence(item.summary)} (see ${item.path})`)
+    .join(" ");
+  return {
+    available: true,
+    text: `Additional repo context: ${sentence}`.trim(),
+    citations,
+    itemCount: selected.length,
+    docItems: selected.filter((item) => item.kind === "doc").length,
+    codeItems: selected.filter((item) => item.kind === "code").length,
+  };
+};
+
 type HelixAskTreeWalkMetrics = {
   treeCount: number;
   nodeCount: number;
@@ -13445,6 +13665,12 @@ const executeHelixAsk = async ({
       answer_retry_max_tokens?: number;
       answer_short_sentences?: number;
       answer_short_tokens?: number;
+      answer_short_fallback_applied?: boolean;
+      answer_short_fallback_reason?: string;
+      answer_extension_available?: boolean;
+      answer_extension_items?: number;
+      answer_extension_doc_items?: number;
+      answer_extension_code_items?: number;
       arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
       arbiter_reason?: string;
       arbiter_strictness?: "low" | "med" | "high";
@@ -19651,6 +19877,7 @@ const executeHelixAsk = async ({
     }
 
     let cleanedText: string | undefined;
+    let answerExtension: HelixAskAnswerExtensionResult | null = null;
     if (typeof result.text === "string" && result.text.trim()) {
       let cleaned = formatHelixAskAnswer(stripPromptEchoFromAnswer(result.text, baseQuestion));
         cleaned = stripInlineJsonArtifacts(cleaned);
@@ -19689,6 +19916,40 @@ const executeHelixAsk = async ({
         if (debugPayload) {
           debugPayload.tool_results_fallback_applied = true;
           debugPayload.tool_results_fallback_reason = "llm_denied_evidence";
+        }
+      }
+      const shortMetaAfterClean = isShortAnswer(cleaned, verbosity);
+      const singleLlmShortFallbackEligible =
+        HELIX_ASK_SINGLE_LLM && hasToolEvidence && shortMetaAfterClean.short;
+      if (singleLlmShortFallbackEligible) {
+        const missingSlotsForShortFallback =
+          docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : coverageSlotSummary?.missingSlots ?? [];
+        const shortFallbackText = buildSingleLlmShortAnswerFallback({
+          question: baseQuestion,
+          definitionFocus,
+          docBlocks,
+          codeAlignment,
+          treeWalk: HELIX_ASK_TREE_WALK_INJECT ? treeWalkBlock : undefined,
+          missingSlots: missingSlotsForShortFallback,
+          slotPlan,
+          anchorFiles: contextFiles,
+          searchedTerms: retrievalQueries,
+          searchedFiles: retrievalFilesSnapshot,
+          planClarify: clarifyOverride ?? planDirectives?.clarifyQuestion,
+          headingSeedSlots:
+            slotPlanHeadingSeedSlots.length > 0 ? slotPlanHeadingSeedSlots : headingSeedSlots,
+          requiresRepoEvidence,
+        });
+        const fallbackMeta = isShortAnswer(shortFallbackText, verbosity);
+        if (!fallbackMeta.short || shortFallbackText.length > cleaned.length + 80) {
+          cleaned = shortFallbackText;
+          answerPath.push("shortAnswerFallback");
+          if (debugPayload) {
+            debugPayload.answer_short_fallback_applied = true;
+            debugPayload.answer_short_fallback_reason = "single_llm_short_answer";
+          }
         }
       }
       const baselineCleaned = cleaned;
@@ -20546,6 +20807,17 @@ const executeHelixAsk = async ({
       }
       cleanedText = cleaned;
       result.text = cleaned;
+      answerExtension = buildAnswerCoverageExtension({
+        answerText: cleaned,
+        docBlocks,
+        codeAlignment,
+      });
+      if (debugPayload) {
+        debugPayload.answer_extension_available = answerExtension.available;
+        debugPayload.answer_extension_items = answerExtension.itemCount;
+        debugPayload.answer_extension_doc_items = answerExtension.docItems;
+        debugPayload.answer_extension_code_items = answerExtension.codeItems;
+      }
     }
     if (cleanedText) {
       result.envelope = buildHelixAskEnvelope({
@@ -20557,6 +20829,8 @@ const executeHelixAsk = async ({
         evidenceText,
         traceId: askTraceId,
         treeWalk: treeWalkBlock || undefined,
+        extensionText: answerExtension?.text,
+        extensionCitations: answerExtension?.citations,
       });
     }
     logDebug("streamEmitter.finalize start", {

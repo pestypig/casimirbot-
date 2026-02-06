@@ -980,6 +980,9 @@ export function HelixAskPill({
   const [askError, setAskError] = useState<string | null>(null);
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
+  const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
+    {},
+  );
   const [askLiveEvents, setAskLiveEvents] = useState<AskLiveEventEntry[]>([]);
   const askLiveEventsRef = useRef<AskLiveEventEntry[]>([]);
   const [askLiveSessionId, setAskLiveSessionId] = useState<string | null>(null);
@@ -1253,11 +1256,44 @@ export function HelixAskPill({
       const detailSections = sections.filter((section) => section.layer !== "proof");
       const proofSections = sections.filter((section) => section.layer === "proof");
       const expandDetails = reply.envelope.mode === "extended";
+      const extension = reply.envelope.extension;
+      const extensionBody = extension?.body?.trim() ?? "";
+      const extensionCitations = extension?.citations ?? [];
+      const extensionAvailable = Boolean(extension?.available && extensionBody);
+      const extensionOpen = Boolean(askExtensionOpenByReply[reply.id]);
       return (
         <div className="space-y-3">
           <p className="whitespace-pre-wrap leading-relaxed">
             {renderHelixAskContent(envelopeAnswer || fallbackAnswer)}
           </p>
+          {extensionAvailable ? (
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+              <button
+                type="button"
+                className="text-[10px] uppercase tracking-[0.22em] text-slate-400 hover:text-slate-200"
+                onClick={() =>
+                  setAskExtensionOpenByReply((prev) => ({
+                    ...prev,
+                    [reply.id]: !prev[reply.id],
+                  }))
+                }
+              >
+                {extensionOpen ? "Hide Additional Repo Context" : "Expand With Retrieved Evidence"}
+              </button>
+              {extensionOpen ? (
+                <div className="mt-2 space-y-1">
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    {renderHelixAskContent(extensionBody)}
+                  </p>
+                  {extensionCitations.length > 0 ? (
+                    <p className="text-[11px] text-slate-400">
+                      Sources: {renderHelixAskContent(extensionCitations.join(", "))}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {detailSections.length > 0 ? (
             <details
               open={expandDetails}
@@ -1283,7 +1319,7 @@ export function HelixAskPill({
         </div>
       );
     },
-    [renderEnvelopeSections, renderHelixAskContent],
+    [askExtensionOpenByReply, renderEnvelopeSections, renderHelixAskContent],
   );
 
   const buildCopyText = useCallback((reply: HelixAskReply): string => {
@@ -1293,6 +1329,10 @@ export function HelixAskPill({
     const detailSections = sections.filter((section) => section.layer !== "proof");
     const proofSections = sections.filter((section) => section.layer === "proof");
     const chunks: string[] = [reply.envelope.answer];
+    const extensionBody = reply.envelope.extension?.body?.trim();
+    if (extensionBody) {
+      chunks.push(`Additional Repo Context\n${extensionBody}`);
+    }
     if (detailSections.length > 0) {
       const detailText = formatEnvelopeSectionsForCopy(detailSections, "Details");
       if (detailText) {
