@@ -171,31 +171,112 @@
         }
       ],
       "summary": "Core evolution step for GR fields.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "modules/gr/bssn-evolve.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-constraints.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "state",
+          "unit": "1",
+          "type": "BssnState",
+          "source": "modules/gr/bssn-state"
+        },
+        {
+          "name": "dt_geom",
+          "unit": "s",
+          "type": "float",
+          "source": "evolveBssn.dt"
+        },
+        {
+          "name": "steps",
+          "unit": "steps",
+          "type": "int",
+          "source": "evolveBssn.steps"
+        },
+        {
+          "name": "gauge",
+          "unit": "1",
+          "type": "GaugeParams",
+          "source": "BssnEvolveParams.gauge"
+        },
+        {
+          "name": "stencils",
+          "unit": "1",
+          "type": "StencilParams",
+          "source": "BssnEvolveParams.stencils"
+        },
+        {
+          "name": "boundary",
+          "unit": "1",
+          "type": "BoundaryParams",
+          "source": "BssnEvolveParams.boundary"
+        },
+        {
+          "name": "fixups",
+          "unit": "1",
+          "type": "FixupParams",
+          "source": "BssnEvolveParams.fixups"
+        },
+        {
+          "name": "matter",
+          "unit": "J/m^3",
+          "type": "StressEnergyFieldSet|null",
+          "source": "BssnEvolveParams.matter"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "state",
+          "unit": "1",
+          "type": "BssnState"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "ConstraintFields"
+        },
+        {
+          "name": "fixups",
+          "unit": "1",
+          "type": "FixupStats"
+        }
+      ],
+      "assumptions": [
+        "BSSN formulation with finite-difference stencils",
+        "RK4 time integration for field updates",
+        "Gauge parameters remain within stability bounds"
+      ],
+      "validity": {
+        "dt_geom": {
+          "min": 0
+        },
+        "steps": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "bssn-state",
+        "rk4-integrator",
+        "stencils",
+        "gr-stress-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -218,31 +299,132 @@
         }
       ],
       "summary": "Compute constraint residuals and diagnostics.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-constraint-network.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-constraint-network.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "GrConstraintNetwork4dParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "GrConstraintNetwork4dParams.bounds"
+        },
+        {
+          "name": "time_s",
+          "unit": "s",
+          "type": "float",
+          "source": "GrConstraintNetwork4dParams.time_s"
+        },
+        {
+          "name": "dt_s",
+          "unit": "s",
+          "type": "float",
+          "source": "GrConstraintNetwork4dParams.dt_s"
+        },
+        {
+          "name": "steps",
+          "unit": "steps",
+          "type": "int",
+          "source": "GrConstraintNetwork4dParams.steps"
+        },
+        {
+          "name": "thresholds",
+          "unit": "1",
+          "type": "GrConstraintThresholds",
+          "source": "GrConstraintNetwork4dParams.thresholds"
+        },
+        {
+          "name": "policy",
+          "unit": "1",
+          "type": "GrConstraintPolicy",
+          "source": "GrConstraintNetwork4dParams.policy"
+        },
+        {
+          "name": "stencils",
+          "unit": "1",
+          "type": "StencilParams",
+          "source": "GrConstraintNetwork4dParams.stencils"
+        },
+        {
+          "name": "gauge",
+          "unit": "1",
+          "type": "GaugeParams",
+          "source": "GrConstraintNetwork4dParams.gauge"
+        },
+        {
+          "name": "matter",
+          "unit": "J/m^3",
+          "type": "StressEnergyFieldSet|null",
+          "source": "GrConstraintNetwork4dParams.matter"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "gateStatus",
+          "unit": "1",
+          "type": "GrConstraintGateStatus"
+        },
+        {
+          "name": "summaryMax",
+          "unit": "1",
+          "type": "GrConstraintMetrics"
+        },
+        {
+          "name": "summaryFinal",
+          "unit": "1",
+          "type": "GrConstraintMetrics"
+        },
+        {
+          "name": "trend",
+          "unit": "1",
+          "type": "GrConstraintTrend"
+        }
+      ],
+      "assumptions": [
+        "Initial data solve provides certified starting state",
+        "Constraint metrics computed each evolution step",
+        "Gate policy applied to peak residuals"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        },
+        "steps": {
+          "min": 0
+        },
+        "dt_s": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-initial-data",
+        "bssn-evolution",
+        "gr-constraint-gate",
+        "gr-constraint-policy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -265,31 +447,97 @@
         }
       ],
       "summary": "Gate evaluation converts diagnostics into pass/fail.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/constraint-evaluator.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/viability-definition.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-constraint-gate.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "H_rms",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintMetrics.H_rms"
+        },
+        {
+          "name": "M_rms",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintMetrics.M_rms"
+        },
+        {
+          "name": "H_maxAbs",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintMetrics.H_maxAbs"
+        },
+        {
+          "name": "M_maxAbs",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintMetrics.M_maxAbs"
+        },
+        {
+          "name": "thresholds",
+          "unit": "1",
+          "type": "GrConstraintThresholds",
+          "source": "DEFAULT_GR_CONSTRAINT_THRESHOLDS"
+        },
+        {
+          "name": "policy",
+          "unit": "1",
+          "type": "GrConstraintPolicy",
+          "source": "DEFAULT_GR_CONSTRAINT_POLICY"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "gateStatus",
+          "unit": "1",
+          "type": "GrConstraintGateStatus"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "GrConstraintEntry[]"
+        },
+        {
+          "name": "notes",
+          "unit": "1",
+          "type": "string[]"
+        }
+      ],
+      "assumptions": [
+        "Hard-only mode evaluates HARD constraints only",
+        "Unknown metrics fail when unknownAsFail is true"
+      ],
+      "validity": {
+        "metrics": {
+          "finite": true
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-constraint-policy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -424,7 +672,7 @@
         }
       ],
       "summary": "Initialize GR fields for evolution.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
@@ -433,26 +681,93 @@
         {
           "type": "code",
           "path": "server/gr-initial-brick.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/york-time-constraints.md"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "grid",
+          "unit": "m",
+          "type": "GridSpec",
+          "source": "InitialDataSolveParams.grid"
+        },
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "InitialDataSolveParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "InitialDataSolveParams.bounds"
+        },
+        {
+          "name": "iterations",
+          "unit": "steps",
+          "type": "int",
+          "source": "InitialDataSolveParams.iterations"
+        },
+        {
+          "name": "tolerance",
+          "unit": "1",
+          "type": "float",
+          "source": "InitialDataSolveParams.tolerance"
+        },
+        {
+          "name": "matter",
+          "unit": "J/m^3",
+          "type": "StressEnergyFieldSet|null",
+          "source": "InitialDataSolveParams.matter"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "state",
+          "unit": "1",
+          "type": "BssnState"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "ConstraintFields"
+        },
+        {
+          "name": "solverStatus",
+          "unit": "1",
+          "type": "InitialDataStatus"
+        }
+      ],
+      "assumptions": [
+        "Lichnerowicz-York solve for initial conformal factor",
+        "Vacuum inputs certify immediately"
+      ],
+      "validity": {
+        "dims": {
+          "min": 3
+        },
+        "iterations": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "bssn-state",
+        "stencils",
+        "gr-stress-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -475,31 +790,120 @@
         }
       ],
       "summary": "Solver loop for GR evolution.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/evolution/solver.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stability-timestep.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-advection-stability.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "grid",
+          "unit": "m",
+          "type": "GridSpec",
+          "source": "GrEvolutionRunParams.grid"
+        },
+        {
+          "name": "dt",
+          "unit": "s",
+          "type": "float",
+          "source": "GrEvolutionRunParams.dt"
+        },
+        {
+          "name": "steps",
+          "unit": "steps",
+          "type": "int",
+          "source": "GrEvolutionRunParams.steps"
+        },
+        {
+          "name": "gauge",
+          "unit": "1",
+          "type": "GaugeParams",
+          "source": "GrEvolutionRunParams.gauge"
+        },
+        {
+          "name": "stencils",
+          "unit": "1",
+          "type": "StencilParams",
+          "source": "GrEvolutionRunParams.stencils"
+        },
+        {
+          "name": "boundary",
+          "unit": "1",
+          "type": "BoundaryParams",
+          "source": "GrEvolutionRunParams.boundary"
+        },
+        {
+          "name": "fixups",
+          "unit": "1",
+          "type": "FixupParams",
+          "source": "GrEvolutionRunParams.fixups"
+        },
+        {
+          "name": "matter",
+          "unit": "J/m^3",
+          "type": "StressEnergyFieldSet|null",
+          "source": "GrEvolutionRunParams.matter"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "state",
+          "unit": "1",
+          "type": "BssnState"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "ConstraintFields"
+        },
+        {
+          "name": "fixups",
+          "unit": "1",
+          "type": "FixupStats"
+        },
+        {
+          "name": "time_s",
+          "unit": "s",
+          "type": "float"
+        }
+      ],
+      "assumptions": [
+        "BSSN evolution with RK4 time integration",
+        "Stabilizers apply when shock mode is enabled"
+      ],
+      "validity": {
+        "dt": {
+          "min": 0
+        },
+        "steps": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "bssn-evolution",
+        "gr-initial-data",
+        "stencils",
+        "rk4-integrator"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -522,7 +926,7 @@
         }
       ],
       "summary": "Brick wrapper for GR evolution outputs.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
@@ -531,26 +935,92 @@
         {
           "type": "code",
           "path": "server/gr-evolve-brick.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-advection-stability.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "GrEvolveBrickParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "GrEvolveBrickParams.bounds"
+        },
+        {
+          "name": "dt_s",
+          "unit": "s",
+          "type": "float",
+          "source": "GrEvolveBrickParams.dt_s"
+        },
+        {
+          "name": "steps",
+          "unit": "steps",
+          "type": "int",
+          "source": "GrEvolveBrickParams.steps"
+        },
+        {
+          "name": "gauge",
+          "unit": "1",
+          "type": "GaugeParams",
+          "source": "GrEvolveBrickParams.gauge"
+        },
+        {
+          "name": "stencils",
+          "unit": "1",
+          "type": "StencilParams",
+          "source": "GrEvolveBrickParams.stencils"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "stats",
+          "unit": "1",
+          "type": "GrEvolveBrickStats"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "ConstraintFields"
+        },
+        {
+          "name": "channels",
+          "unit": "1",
+          "type": "GrEvolveBrickChannel[]"
+        }
+      ],
+      "assumptions": [
+        "Brick packaging wraps evolution state and diagnostics",
+        "Constraints derived from evolved state"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        },
+        "dt_s": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-evolution-solver",
+        "gr-constraint-gate"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -620,31 +1090,66 @@
         }
       ],
       "summary": "Runge-Kutta integrator for BSSN fields.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "modules/gr/rk4.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "state",
+          "unit": "1",
+          "type": "BssnState",
+          "source": "modules/gr/bssn-state"
+        },
+        {
+          "name": "dt",
+          "unit": "s",
+          "type": "float",
+          "source": "rk4Step.dt"
+        },
+        {
+          "name": "rhs",
+          "unit": "1",
+          "type": "RhsFn",
+          "source": "rk4Step.rhs"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "state",
+          "unit": "1",
+          "type": "BssnState"
+        },
+        {
+          "name": "scratch",
+          "unit": "1",
+          "type": "Rk4Scratch"
+        }
+      ],
+      "assumptions": [
+        "RHS function is deterministic for a given state",
+        "dt chosen within stability bounds"
+      ],
+      "validity": {
+        "dt": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "bssn-state"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -667,31 +1172,69 @@
         }
       ],
       "summary": "Stencil operators for derivatives and boundaries.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "modules/gr/stencils.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-advection-stability.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "field",
+          "unit": "1",
+          "type": "Float32Array",
+          "source": "stencils.field"
+        },
+        {
+          "name": "grid",
+          "unit": "m",
+          "type": "GridSpec",
+          "source": "stencils.grid"
+        },
+        {
+          "name": "order",
+          "unit": "1",
+          "type": "StencilOrder",
+          "source": "StencilParams.order"
+        },
+        {
+          "name": "boundary",
+          "unit": "1",
+          "type": "BoundaryMode",
+          "source": "StencilParams.boundary"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "derivatives",
+          "unit": "1",
+          "type": "float"
+        }
+      ],
+      "assumptions": [
+        "Finite-difference stencils on a regular grid",
+        "Boundary handling is clamp or periodic"
+      ],
+      "validity": {
+        "order": {
+          "min": 2
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
+      "environment": {
+        "runtime": "node"
+      },
       "dependencies": [],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -714,31 +1257,60 @@
         }
       ],
       "summary": "Diagnostics for shift stiffness and stability.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "modules/gr/gr-diagnostics.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-advection-stability.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "state",
+          "unit": "1",
+          "type": "BssnState",
+          "source": "modules/gr/bssn-state"
+        },
+        {
+          "name": "stencils",
+          "unit": "1",
+          "type": "StencilParams",
+          "source": "computeShiftStiffnessMetrics.stencils"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "shiftStiffness",
+          "unit": "1",
+          "type": "ShiftStiffnessMetrics"
+        }
+      ],
+      "assumptions": [
+        "Diagnostics derive from current BSSN state",
+        "Finite-difference derivatives are stable for chosen dt"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "bssn-state",
+        "stencils"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -1008,31 +1580,67 @@
         }
       ],
       "summary": "Constraint policy thresholds and modes.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-constraint-policy.ts"
+        },
+        {
+          "type": "doc",
+          "path": "WARP_AGENTS.md"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "thresholdOverrides",
+          "unit": "1",
+          "type": "Partial<GrConstraintThresholds>",
+          "source": "resolveGrConstraintPolicyBundle.overrides.thresholds"
+        },
+        {
+          "name": "policyOverrides",
+          "unit": "1",
+          "type": "Partial<GrConstraintPolicy>",
+          "source": "resolveGrConstraintPolicyBundle.overrides.policy"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "gateThresholds",
+          "unit": "1",
+          "type": "GrConstraintThresholds"
+        },
+        {
+          "name": "gatePolicy",
+          "unit": "1",
+          "type": "GrConstraintPolicy"
+        },
+        {
+          "name": "certificatePolicy",
+          "unit": "1",
+          "type": "GrCertificatePolicy"
+        }
+      ],
+      "assumptions": [
+        "WARP_AGENTS.md provides default thresholds and policy",
+        "Overrides apply after defaults"
+      ],
+      "validity": {
+        "thresholds": {
+          "finite": true
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
+      "environment": {
+        "runtime": "node"
+      },
       "dependencies": [],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -1055,31 +1663,87 @@
         }
       ],
       "summary": "Evaluation orchestration for GR runs.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-evaluation.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/viability-definition.md"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "diagnostics",
+          "unit": "1",
+          "type": "GrPipelineDiagnostics|null",
+          "source": "GrEvaluationInput.diagnostics"
+        },
+        {
+          "name": "warpConfig",
+          "unit": "1",
+          "type": "WarpConfig",
+          "source": "GrEvaluationInput.warpConfig"
+        },
+        {
+          "name": "thresholds",
+          "unit": "1",
+          "type": "Partial<GrConstraintThresholds>",
+          "source": "GrEvaluationInput.thresholds"
+        },
+        {
+          "name": "policy",
+          "unit": "1",
+          "type": "Partial<GrConstraintPolicy>",
+          "source": "GrEvaluationInput.policy"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pass",
+          "unit": "1",
+          "type": "boolean"
+        },
+        {
+          "name": "gateStatus",
+          "unit": "1",
+          "type": "GrConstraintGateStatus"
+        },
+        {
+          "name": "certificateStatus",
+          "unit": "1",
+          "type": "string"
+        },
+        {
+          "name": "integrityOk",
+          "unit": "1",
+          "type": "boolean"
+        }
+      ],
+      "assumptions": [
+        "Certificate policy enforces admissible status",
+        "Diagnostics contain constraint metrics"
+      ],
+      "validity": {
+        "diagnostics": {
+          "nullable": true
+        }
+      },
+      "deterministic": false,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-constraint-policy",
+        "gr-constraint-gate"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },

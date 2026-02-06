@@ -68,31 +68,119 @@
         }
       ],
       "summary": "Stress-energy brick build and stats.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/stress-energy-brick.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/stress-energy-brick.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "StressEnergyBrickParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "StressEnergyBrickParams.bounds"
+        },
+        {
+          "name": "phase01",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:phase01"
+        },
+        {
+          "name": "sigmaSector",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:sigmaSector"
+        },
+        {
+          "name": "dutyFR",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:dutyFR"
+        },
+        {
+          "name": "q",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:q"
+        },
+        {
+          "name": "gammaGeo",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:gammaGeo"
+        },
+        {
+          "name": "gammaVdB",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:gammaVdB"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "t00",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sx",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sy",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "totalEnergy_J",
+          "unit": "J",
+          "type": "float"
+        }
+      ],
+      "assumptions": [
+        "Brick grid is axis-aligned within bounds",
+        "Stress-energy mapping uses pipeline snapshot"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        },
+        "dutyFR": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "brick-curvature"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -115,31 +203,102 @@
         }
       ],
       "summary": "Curvature brick build and serialization.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/curvature-brick.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "CurvBrickParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "CurvBrickParams.bounds"
+        },
+        {
+          "name": "dutyFR",
+          "unit": "1",
+          "type": "float",
+          "source": "CurvBrickParams.dutyFR"
+        },
+        {
+          "name": "tauLC_s",
+          "unit": "s",
+          "type": "float",
+          "source": "CurvBrickParams.tauLC_s"
+        },
+        {
+          "name": "Tm_s",
+          "unit": "s",
+          "type": "float",
+          "source": "CurvBrickParams.Tm_s"
+        },
+        {
+          "name": "gammaGeo",
+          "unit": "1",
+          "type": "float",
+          "source": "CurvBrickParams.gammaGeo"
+        },
+        {
+          "name": "gammaVdB",
+          "unit": "1",
+          "type": "float",
+          "source": "CurvBrickParams.gammaVdB"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "data",
+          "unit": "1",
+          "type": "Float32Array"
+        },
+        {
+          "name": "qiMargin",
+          "unit": "1",
+          "type": "Float32Array"
+        },
+        {
+          "name": "min",
+          "unit": "1",
+          "type": "float"
+        },
+        {
+          "name": "max",
+          "unit": "1",
+          "type": "float"
+        }
+      ],
+      "assumptions": [
+        "Curvature brick derived from pipeline snapshot",
+        "Natario wall scale and QI clamp applied"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        },
+        "dutyFR": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
+      "environment": {
+        "runtime": "node"
+      },
       "dependencies": [],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -162,31 +321,92 @@
         }
       ],
       "summary": "GR evolution brick and constraint diagnostics.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr-evolve-brick.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-advection-stability.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "GrEvolveBrickParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "GrEvolveBrickParams.bounds"
+        },
+        {
+          "name": "dt_s",
+          "unit": "s",
+          "type": "float",
+          "source": "GrEvolveBrickParams.dt_s"
+        },
+        {
+          "name": "steps",
+          "unit": "steps",
+          "type": "int",
+          "source": "GrEvolveBrickParams.steps"
+        },
+        {
+          "name": "gauge",
+          "unit": "1",
+          "type": "GaugeParams",
+          "source": "GrEvolveBrickParams.gauge"
+        },
+        {
+          "name": "stencils",
+          "unit": "1",
+          "type": "StencilParams",
+          "source": "GrEvolveBrickParams.stencils"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "stats",
+          "unit": "1",
+          "type": "GrEvolveBrickStats"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "ConstraintFields"
+        }
+      ],
+      "assumptions": [
+        "Brick packaging wraps evolution diagnostics",
+        "Constraints derived from evolved state"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        },
+        "dt_s": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "brick-gr-initial",
+        "brick-stress-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -209,31 +429,90 @@
         }
       ],
       "summary": "Initial conditions brick for GR runs.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr-initial-brick.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/york-time-constraints.md"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "InitialDataSolveParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "InitialDataSolveParams.bounds"
+        },
+        {
+          "name": "iterations",
+          "unit": "steps",
+          "type": "int",
+          "source": "InitialDataSolveParams.iterations"
+        },
+        {
+          "name": "tolerance",
+          "unit": "1",
+          "type": "float",
+          "source": "InitialDataSolveParams.tolerance"
+        },
+        {
+          "name": "matter",
+          "unit": "J/m^3",
+          "type": "StressEnergyFieldSet|null",
+          "source": "InitialDataSolveParams.matter"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "state",
+          "unit": "1",
+          "type": "BssnState"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "ConstraintFields"
+        },
+        {
+          "name": "solverStatus",
+          "unit": "1",
+          "type": "InitialDataStatus"
+        }
+      ],
+      "assumptions": [
+        "Lichnerowicz-York solve for initial conditions",
+        "Vacuum inputs certify immediately"
+      ],
+      "validity": {
+        "dims": {
+          "min": 3
+        },
+        "iterations": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "brick-stress-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },

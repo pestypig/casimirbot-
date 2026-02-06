@@ -534,31 +534,98 @@
         }
       ],
       "summary": "Evaluate constraints against threshold policies.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/constraint-evaluator.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/viability-definition.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-constraint-gate.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "H_rms",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintMetrics.H_rms"
+        },
+        {
+          "name": "M_rms",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintMetrics.M_rms"
+        },
+        {
+          "name": "H_maxAbs",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintMetrics.H_maxAbs"
+        },
+        {
+          "name": "M_maxAbs",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintMetrics.M_maxAbs"
+        },
+        {
+          "name": "thresholds",
+          "unit": "1",
+          "type": "GrConstraintThresholds",
+          "source": "DEFAULT_GR_CONSTRAINT_THRESHOLDS"
+        },
+        {
+          "name": "policy",
+          "unit": "1",
+          "type": "GrConstraintPolicy",
+          "source": "DEFAULT_GR_CONSTRAINT_POLICY"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "gateStatus",
+          "unit": "1",
+          "type": "GrConstraintGateStatus"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "GrConstraintEntry[]"
+        },
+        {
+          "name": "notes",
+          "unit": "1",
+          "type": "string[]"
+        }
+      ],
+      "assumptions": [
+        "Hard-only mode evaluates HARD constraints only",
+        "Unknown metrics fail when unknownAsFail is true"
+      ],
+      "validity": {
+        "metrics": {
+          "finite": true
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-constraint-policy",
+        "gr-constraint-network"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -2987,31 +3054,67 @@
         }
       ],
       "summary": "Constraint policy thresholds and modes.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-constraint-policy.ts"
+        },
+        {
+          "type": "doc",
+          "path": "WARP_AGENTS.md"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "thresholdOverrides",
+          "unit": "1",
+          "type": "Partial<GrConstraintThresholds>",
+          "source": "resolveGrConstraintPolicyBundle.overrides.thresholds"
+        },
+        {
+          "name": "policyOverrides",
+          "unit": "1",
+          "type": "Partial<GrConstraintPolicy>",
+          "source": "resolveGrConstraintPolicyBundle.overrides.policy"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "gateThresholds",
+          "unit": "1",
+          "type": "GrConstraintThresholds"
+        },
+        {
+          "name": "gatePolicy",
+          "unit": "1",
+          "type": "GrConstraintPolicy"
+        },
+        {
+          "name": "certificatePolicy",
+          "unit": "1",
+          "type": "GrCertificatePolicy"
+        }
+      ],
+      "assumptions": [
+        "WARP_AGENTS.md provides default thresholds and policy",
+        "Overrides apply after defaults"
+      ],
+      "validity": {
+        "thresholds": {
+          "finite": true
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
+      "environment": {
+        "runtime": "node"
+      },
       "dependencies": [],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -3034,31 +3137,132 @@
         }
       ],
       "summary": "Compute constraint residuals for GR.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-constraint-network.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-constraint-network.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "GrConstraintNetwork4dParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "GrConstraintNetwork4dParams.bounds"
+        },
+        {
+          "name": "time_s",
+          "unit": "s",
+          "type": "float",
+          "source": "GrConstraintNetwork4dParams.time_s"
+        },
+        {
+          "name": "dt_s",
+          "unit": "s",
+          "type": "float",
+          "source": "GrConstraintNetwork4dParams.dt_s"
+        },
+        {
+          "name": "steps",
+          "unit": "steps",
+          "type": "int",
+          "source": "GrConstraintNetwork4dParams.steps"
+        },
+        {
+          "name": "thresholds",
+          "unit": "1",
+          "type": "GrConstraintThresholds",
+          "source": "GrConstraintNetwork4dParams.thresholds"
+        },
+        {
+          "name": "policy",
+          "unit": "1",
+          "type": "GrConstraintPolicy",
+          "source": "GrConstraintNetwork4dParams.policy"
+        },
+        {
+          "name": "stencils",
+          "unit": "1",
+          "type": "StencilParams",
+          "source": "GrConstraintNetwork4dParams.stencils"
+        },
+        {
+          "name": "gauge",
+          "unit": "1",
+          "type": "GaugeParams",
+          "source": "GrConstraintNetwork4dParams.gauge"
+        },
+        {
+          "name": "matter",
+          "unit": "J/m^3",
+          "type": "StressEnergyFieldSet|null",
+          "source": "GrConstraintNetwork4dParams.matter"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "gateStatus",
+          "unit": "1",
+          "type": "GrConstraintGateStatus"
+        },
+        {
+          "name": "summaryMax",
+          "unit": "1",
+          "type": "GrConstraintMetrics"
+        },
+        {
+          "name": "summaryFinal",
+          "unit": "1",
+          "type": "GrConstraintMetrics"
+        },
+        {
+          "name": "trend",
+          "unit": "1",
+          "type": "GrConstraintTrend"
+        }
+      ],
+      "assumptions": [
+        "Initial data solve provides certified starting state",
+        "Constraint metrics computed each evolution step",
+        "Gate policy applied to peak residuals"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        },
+        "steps": {
+          "min": 0
+        },
+        "dt_s": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-initial-data",
+        "bssn-evolution",
+        "gr-constraint-gate",
+        "gr-constraint-policy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
