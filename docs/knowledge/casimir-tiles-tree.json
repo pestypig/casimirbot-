@@ -1,5 +1,9 @@
 {
   "version": 1,
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  },
   "rootId": "casimir-tiles-tree",
   "nodes": [
     {
@@ -218,6 +222,7 @@
       ],
       "children": [
         "casimir-static-engine",
+        "casimir-pressure-parallel-plate-ideal",
         "casimir-dynamic-engine",
         "casimir-inference-engine",
         "casimir-natario-metric",
@@ -253,6 +258,95 @@
         {
           "rel": "parent",
           "to": "casimir-calculation-stack"
+        }
+      ]
+    },
+    {
+      "id": "casimir-pressure-parallel-plate-ideal",
+      "slug": "casimir-pressure-parallel-plate-ideal",
+      "title": "Casimir Pressure (Ideal Parallel Plates)",
+      "excerpt": "Compute vacuum pressure using the T=0 ideal parallel-plate model.",
+      "summary": "Derives Casimir pressure for ideal parallel plates and maps it to pipeline telemetry.",
+      "nodeType": "derived",
+      "tags": [
+        "casimir",
+        "pressure",
+        "physics"
+      ],
+      "inputs": [
+        {
+          "name": "gap_m",
+          "unit": "m",
+          "type": "float",
+          "source": "node:tile-gap.output.gap_m"
+        },
+        {
+          "name": "hbar",
+          "unit": "J*s",
+          "type": "float",
+          "source": "constants:physics.hbar"
+        },
+        {
+          "name": "c",
+          "unit": "m/s",
+          "type": "float",
+          "source": "constants:physics.c"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "casimirPressure_Pa",
+          "unit": "Pa",
+          "type": "float",
+          "path": "mechanical.casimirPressure_Pa"
+        }
+      ],
+      "assumptions": [
+        "parallel plates",
+        "perfect conductors",
+        "zero temperature approximation"
+      ],
+      "validity": {
+        "gap_m": {
+          "min": 1e-9,
+          "max": 1e-6
+        },
+        "notes": "Outside range, correction models required."
+      },
+      "deterministic": true,
+      "tolerance": {
+        "rel": 1e-9,
+        "abs": 1e-6
+      },
+      "dependencies": [
+        "casimir-static-engine",
+        "casimir-tile-mechanism"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "symbol": "casimirPressure_Pa"
+        },
+        {
+          "type": "telemetry",
+          "field": "mechanical.casimirPressure_Pa"
+        },
+        {
+          "type": "doc",
+          "path": "docs/guarded-casimir-tile-code-mapped.md",
+          "heading": "2.1 Ideal parallel-plate Casimir energy and pressure"
+        }
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-calculation-stack"
+        },
+        {
+          "rel": "depends-on",
+          "to": "casimir-static-engine"
         }
       ]
     },

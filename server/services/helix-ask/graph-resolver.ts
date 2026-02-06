@@ -118,6 +118,7 @@ const DEFAULT_EDGE_PRIORITY: Record<string, number> = {
   child: 3,
   parent: 2,
   "see-also": 1,
+  "depends-on": 2,
 };
 
 const DEFAULT_MAX_ANCHORS = 3;

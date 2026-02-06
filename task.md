@@ -20,6 +20,21 @@ Make Helix Ask behave like a tool-using agent while keeping single-LLM final gen
 - Soft hints guide retrieval only (headings, tree nodes, plan directives).
 - One LLM call only, after evidence converges.
 
+## DAG Node Schema (Reproducibility)
+Helix Ask trees should move toward a DAG node schema that is replayable.
+Minimum required for each node:
+- id, title, summary
+- tags
+- evidence (doc/code/test/telemetry)
+Recommended for reproducibility:
+- inputs (name, type, unit, source)
+- outputs (name, type, unit, telemetry path)
+- assumptions and validity regime
+- deterministic + tolerance
+- environment (runtime + lockfile)
+
+Template: `docs/knowledge/dag-node-schema.md`
+
 ## Non-Goals
 - Re-introducing multi-LLM planning or multi-LLM evidence distillation.
 - Allowing tree JSON alone to stand in for definitions when a doc span exists.
