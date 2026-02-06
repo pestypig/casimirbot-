@@ -78,7 +78,9 @@
         "schema",
         "contracts"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-contracts-stewardship-ledger"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -128,7 +130,9 @@
         "simulation",
         "api"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-api-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -184,7 +188,9 @@
         "simulation",
         "storage"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-storage-stewardship-ledger"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -634,7 +640,9 @@
         "simulation",
         "ui"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-ui-surfaces-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -686,7 +694,9 @@
         "simulation",
         "streaming"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-streaming-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -736,7 +746,9 @@
         "simulation",
         "artifacts"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-artifacts-stewardship-ledger"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -923,6 +935,456 @@
         ]
       },
       "summary": "Bridge between mission-ethos and simulation-core-modules."
+    },
+    {
+      "id": "bridge-simulation-streaming-verification-checklist",
+      "slug": "bridge-simulation-streaming-verification-checklist",
+      "title": "Simulation Streaming <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and simulation-streaming.",
+      "bodyMD": "Bridge between verification-checklist and simulation-streaming (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "streaming"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-streaming"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-streaming"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "simulation-streaming",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "simulation-streaming"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "a1222a7790ed929867ac06b29d3d35b364b6406e",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/routes.ts",
+          "repo_rev": "a1222a7790ed929867ac06b29d3d35b364b6406e",
+          "content_hash": "sha256:0dcc6da8765d93d821cdfdec3a55581ee6b8923855881341fc1184c87b41f41a"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and simulation-streaming."
+    },
+    {
+      "id": "bridge-simulation-artifacts-stewardship-ledger",
+      "slug": "bridge-simulation-artifacts-stewardship-ledger",
+      "title": "Simulation Artifacts <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and simulation-artifacts.",
+      "bodyMD": "Bridge between stewardship-ledger and simulation-artifacts (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "artifacts"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-artifacts"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-artifacts"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "simulation-artifacts",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "simulation-artifacts"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "252c16c9fff0d9a6d6085dfbb417f84ac72b5a06",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/simulation-systems-tree.json",
+          "repo_rev": "252c16c9fff0d9a6d6085dfbb417f84ac72b5a06",
+          "content_hash": "sha256:547e8154312394f205f1821852015b1288770b81cd471583388729ab54bd7937"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between stewardship-ledger and simulation-artifacts."
+    },
+    {
+      "id": "bridge-simulation-storage-stewardship-ledger",
+      "slug": "bridge-simulation-storage-stewardship-ledger",
+      "title": "Simulation Storage <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and simulation-storage.",
+      "bodyMD": "Bridge between stewardship-ledger and simulation-storage (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "storage"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-storage"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-storage"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "simulation-storage",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "simulation-storage"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "code",
+          "path": "server/db/simulations.ts",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:7d8ef5fd06bed8ef620bc4fcafaeb34e4320e010e398b8e34376efa509336a92"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between stewardship-ledger and simulation-storage."
+    },
+    {
+      "id": "bridge-simulation-api-verification-checklist",
+      "slug": "bridge-simulation-api-verification-checklist",
+      "title": "Simulation API <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and simulation-api.",
+      "bodyMD": "Bridge between verification-checklist and simulation-api (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "api"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-api"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-api"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "simulation-api",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "simulation-api"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "eaee28820426505e7496c12e8e6f6f3488101438",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/routes.ts",
+          "repo_rev": "eaee28820426505e7496c12e8e6f6f3488101438",
+          "content_hash": "sha256:0dcc6da8765d93d821cdfdec3a55581ee6b8923855881341fc1184c87b41f41a"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and simulation-api."
+    },
+    {
+      "id": "bridge-simulation-contracts-stewardship-ledger",
+      "slug": "bridge-simulation-contracts-stewardship-ledger",
+      "title": "Simulation Contracts <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and simulation-contracts.",
+      "bodyMD": "Bridge between stewardship-ledger and simulation-contracts (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "contracts"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-contracts"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-contracts"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "simulation-contracts",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "simulation-contracts"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "eaee28820426505e7496c12e8e6f6f3488101438",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "code",
+          "path": "shared/schema.ts",
+          "repo_rev": "eaee28820426505e7496c12e8e6f6f3488101438",
+          "content_hash": "sha256:031ed9cce6805b96b67408dc0602956993f2b7707d44e7ef8187902e09843752"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between stewardship-ledger and simulation-contracts."
+    },
+    {
+      "id": "bridge-simulation-ui-surfaces-verification-checklist",
+      "slug": "bridge-simulation-ui-surfaces-verification-checklist",
+      "title": "Simulation UI Surfaces <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and simulation-ui-surfaces.",
+      "bodyMD": "Bridge between verification-checklist and simulation-ui-surfaces (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "ui"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-ui-surfaces"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-ui-surfaces"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "simulation-ui-surfaces",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "simulation-ui-surfaces"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "10870ac503b9c1b083d5e80ca944190423ecf94d",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/simulation.tsx",
+          "repo_rev": "10870ac503b9c1b083d5e80ca944190423ecf94d",
+          "content_hash": "sha256:d37ef3ef2c78f892832e098759729d2604910e31879479187d1178b53f1aef13"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and simulation-ui-surfaces."
     }
   ],
   "schema": {

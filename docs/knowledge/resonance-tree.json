@@ -165,7 +165,8 @@
       ],
       "children": [
         "resonance-constants",
-        "resonance-engine"
+        "resonance-engine",
+        "bridge-resonance-runtime-stewardship-ledger"
       ],
       "links": [
         {
@@ -272,7 +273,9 @@
         "resonance",
         "engine"
       ],
-      "children": [],
+      "children": [
+        "bridge-resonance-engine-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -326,7 +329,8 @@
         "resonance-loader",
         "resonance-builders",
         "resonance-watcher",
-        "resonance-routes"
+        "resonance-routes",
+        "bridge-resonance-io-verification-checklist"
       ],
       "links": [
         {
@@ -789,6 +793,230 @@
         ]
       },
       "summary": "Bridge between verification-checklist and resonance-tests."
+    },
+    {
+      "id": "bridge-resonance-runtime-stewardship-ledger",
+      "slug": "bridge-resonance-runtime-stewardship-ledger",
+      "title": "Resonance Runtime <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and resonance-runtime.",
+      "bodyMD": "Bridge between stewardship-ledger and resonance-runtime (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "resonance"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-runtime"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "resonance-runtime"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "resonance-runtime",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "resonance-runtime"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "a1222a7790ed929867ac06b29d3d35b364b6406e",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/resonance.ts",
+          "repo_rev": "a1222a7790ed929867ac06b29d3d35b364b6406e",
+          "content_hash": "sha256:52b2dd83154833f540976b86255d9aca0d4aa1842fd566e6658af602e5e74513"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between stewardship-ledger and resonance-runtime."
+    },
+    {
+      "id": "bridge-resonance-io-verification-checklist",
+      "slug": "bridge-resonance-io-verification-checklist",
+      "title": "Resonance IO <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and resonance-io.",
+      "bodyMD": "Bridge between verification-checklist and resonance-io (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "resonance",
+        "io"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-io"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "resonance-io"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "resonance-io",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "resonance-io"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "252c16c9fff0d9a6d6085dfbb417f84ac72b5a06",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/code-lattice.ts",
+          "repo_rev": "252c16c9fff0d9a6d6085dfbb417f84ac72b5a06",
+          "content_hash": "sha256:4d5c4ef5bf46d878fa7b8f34ef004408c2c45fda19a31c297517e35d62efaf79"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and resonance-io."
+    },
+    {
+      "id": "bridge-resonance-engine-verification-checklist",
+      "slug": "bridge-resonance-engine-verification-checklist",
+      "title": "Resonance Engine <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and resonance-engine.",
+      "bodyMD": "Bridge between verification-checklist and resonance-engine (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "resonance",
+        "engine"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-engine"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "resonance-engine"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "resonance-engine",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "resonance-engine"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/resonance.ts",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:52b2dd83154833f540976b86255d9aca0d4aa1842fd566e6658af602e5e74513"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and resonance-engine."
     }
   ],
   "schema": {

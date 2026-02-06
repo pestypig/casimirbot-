@@ -95,6 +95,36 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 - type: bridge
 - summary: Bridge between mission-ethos and simulation-core-modules (mission-guardrail).
 
+### Node: Simulation Streaming <-> Verification Checklist
+- id: bridge-simulation-streaming-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and simulation-streaming (verification-anchor).
+
+### Node: Simulation Artifacts <-> Stewardship Ledger
+- id: bridge-simulation-artifacts-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and simulation-artifacts (stewardship-guardrail).
+
+### Node: Simulation Storage <-> Stewardship Ledger
+- id: bridge-simulation-storage-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and simulation-storage (stewardship-guardrail).
+
+### Node: Simulation API <-> Verification Checklist
+- id: bridge-simulation-api-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and simulation-api (verification-anchor).
+
+### Node: Simulation Contracts <-> Stewardship Ledger
+- id: bridge-simulation-contracts-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and simulation-contracts (stewardship-guardrail).
+
+### Node: Simulation UI Surfaces <-> Verification Checklist
+- id: bridge-simulation-ui-surfaces-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and simulation-ui-surfaces (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Simulation Contracts <-> Simulation API
@@ -104,3 +134,27 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 ### Bridge: mission-ethos <-> Simulation Core Modules
 - relation: mission-guardrail
 - summary: Bridge between mission-ethos and simulation-core-modules (mission-guardrail).
+
+### Bridge: verification-checklist <-> Simulation Streaming
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and simulation-streaming (verification-anchor).
+
+### Bridge: stewardship-ledger <-> Simulation Artifacts
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and simulation-artifacts (stewardship-guardrail).
+
+### Bridge: stewardship-ledger <-> Simulation Storage
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and simulation-storage (stewardship-guardrail).
+
+### Bridge: verification-checklist <-> Simulation API
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and simulation-api (verification-anchor).
+
+### Bridge: stewardship-ledger <-> Simulation Contracts
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and simulation-contracts (stewardship-guardrail).
+
+### Bridge: verification-checklist <-> Simulation UI Surfaces
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and simulation-ui-surfaces (verification-anchor).

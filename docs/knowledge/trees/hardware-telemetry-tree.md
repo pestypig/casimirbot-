@@ -60,6 +60,36 @@ This tree maps hardware telemetry ingest, scheduling, and the UI controls used t
 - type: bridge
 - summary: Bridge between stewardship-ledger and hardware-provenance (stewardship-guardrail).
 
+### Node: Hardware Scheduler <-> Verification Checklist
+- id: bridge-hardware-scheduler-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-scheduler (verification-anchor).
+
+### Node: Hardware Ingest <-> Verification Checklist
+- id: bridge-hardware-ingest-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-ingest (verification-anchor).
+
+### Node: Hardware Bus <-> Verification Checklist
+- id: bridge-hardware-bus-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-bus (verification-anchor).
+
+### Node: Hardware Hooks <-> Verification Checklist
+- id: bridge-hardware-hooks-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-hooks (verification-anchor).
+
+### Node: Hardware Panels <-> Verification Checklist
+- id: bridge-hardware-panels-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-panels (verification-anchor).
+
+### Node: Hardware Provenance <-> Verification Checklist
+- id: bridge-hardware-provenance-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-provenance (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Hardware Ingest <-> Hardware Bus
@@ -69,3 +99,27 @@ This tree maps hardware telemetry ingest, scheduling, and the UI controls used t
 ### Bridge: stewardship-ledger <-> Hardware Provenance
 - relation: stewardship-guardrail
 - summary: Bridge between stewardship-ledger and hardware-provenance (stewardship-guardrail).
+
+### Bridge: verification-checklist <-> Hardware Scheduler
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-scheduler (verification-anchor).
+
+### Bridge: verification-checklist <-> Hardware Ingest
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-ingest (verification-anchor).
+
+### Bridge: verification-checklist <-> Hardware Bus
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-bus (verification-anchor).
+
+### Bridge: verification-checklist <-> Hardware Hooks
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-hooks (verification-anchor).
+
+### Bridge: verification-checklist <-> Hardware Panels
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-panels (verification-anchor).
+
+### Bridge: verification-checklist <-> Hardware Provenance
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-provenance (verification-anchor).
