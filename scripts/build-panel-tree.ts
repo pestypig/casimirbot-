@@ -50,6 +50,7 @@ const run = () => {
   const repoRev = report.repoRev || execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
   const registryHash = sha256("client/src/pages/helix-core.panels.ts");
   const panelNodes: any[] = [];
+  const bridgeNodes: any[] = [];
 
   for (const panel of report.panels) {
     const nodeId = `panel-${panel.id}`;
@@ -61,12 +62,16 @@ const run = () => {
     ];
 
     const matchedNodes = new Set<string>();
+    const matchEvidence = new Map<string, { term: string; file?: string }>();
     (panel.termHits ?? []).forEach((hit) => {
       hit.treeMatches?.forEach((match) => {
         if (match.treeId === "panel-registry-tree") return;
         if (match.nodeId === nodeId) return;
         const key = `${match.treeId}:${match.nodeId}`;
         matchedNodes.add(key);
+        if (!matchEvidence.has(key)) {
+          matchEvidence.set(key, { term: hit.term, file: hit.files?.[0] });
+        }
       });
     });
     const matchedList = Array.from(matchedNodes).slice(0, 6);
@@ -95,6 +100,83 @@ const run = () => {
       content_hash: registryHash ? `sha256:${registryHash}` : undefined
     });
 
+    const panelChildren: string[] = [];
+    for (const key of matchedList) {
+      const [, nodeIdMatch] = key.split(":");
+      if (!nodeIdMatch) continue;
+      const bridgeId = `bridge-${nodeId}-${nodeIdMatch}`;
+      panelChildren.push(bridgeId);
+      const evidenceHit = matchEvidence.get(key);
+      const evidenceEntries: any[] = [];
+      if (evidenceHit?.file) {
+        const hitPath = safePath(evidenceHit.file);
+        if (hitPath && fs.existsSync(hitPath)) {
+          const hash = sha256(hitPath);
+          const type =
+            hitPath.startsWith("docs/")
+              ? "doc"
+              : hitPath.startsWith("client/") ||
+                hitPath.startsWith("server/") ||
+                hitPath.startsWith("modules/") ||
+                hitPath.startsWith("shared/")
+              ? "code"
+              : "doc";
+          evidenceEntries.push({
+            type,
+            path: hitPath,
+            repo_rev: repoRev,
+            content_hash: hash ? `sha256:${hash}` : undefined
+          });
+        }
+      }
+      evidenceEntries.push({
+        type: "doc",
+        path: "client/src/pages/helix-core.panels.ts",
+        repo_rev: repoRev,
+        content_hash: registryHash ? `sha256:${registryHash}` : undefined
+      });
+      bridgeNodes.push({
+        id: bridgeId,
+        slug: bridgeId,
+        title: `${title} <-> ${nodeIdMatch}`,
+        excerpt: `Bridge between panel ${panel.id} and ${nodeIdMatch}.`,
+        bodyMD: `Panel ${panel.id} links to ${nodeIdMatch} via term "${evidenceHit?.term ?? "match"}".`,
+        tags: ["bridge", "panel", panel.id],
+        nodeType: "bridge",
+        links: [
+          { rel: "parent", to: nodeId },
+          { rel: "see-also", to: nodeIdMatch },
+          { rel: "see-also", to: nodeId }
+        ],
+        bridge: {
+          left: nodeId,
+          right: nodeIdMatch,
+          relation: "Panel cross-concept join"
+        },
+        inputs: [],
+        outputs: [],
+        assumptions: [],
+        validity: {},
+        deterministic: null,
+        tolerance: null,
+        environment: null,
+        dependencies: [nodeId, nodeIdMatch],
+        evidence: evidenceEntries.filter((entry) => entry.content_hash || entry.type !== "code"),
+        predictability: {
+          status: "partial",
+          missing: [
+            "inputs",
+            "outputs",
+            "assumptions",
+            "validity",
+            "deterministic",
+            "tolerance",
+            "environment"
+          ]
+        }
+      });
+    }
+
     const endpoints = (panel.endpoints ?? []).filter(Boolean);
     const bodyLines = [
       `Panel ${panel.id} loaded from helix-core panels registry.`,
@@ -110,7 +192,7 @@ const run = () => {
       excerpt: `Panel surface for ${title}.`,
       bodyMD: bodyLines.join("\n"),
       tags,
-      children: [],
+      children: panelChildren,
       links,
       summary: `Panel surface for ${title}.`,
       nodeType: "concept",
@@ -183,7 +265,7 @@ const run = () => {
   const payload = {
     version: 1,
     rootId: "panel-registry-tree",
-    nodes: [rootNode, ...panelNodes],
+    nodes: [rootNode, ...panelNodes, ...bridgeNodes],
     schema: {
       name: "helix-ask-dag-node",
       version: 1
