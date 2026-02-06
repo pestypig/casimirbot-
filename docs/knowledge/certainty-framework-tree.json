@@ -38,7 +38,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/helix-ask-ladder.md"
+          "path": "docs/helix-ask-ladder.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:431641d9b8967db9e0ed67c30f549bb321956cd1f6168cfd322257563e27d2be"
         }
       ],
       "predictability": {
@@ -77,7 +79,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/BUSINESS_MODEL.md"
+          "path": "docs/BUSINESS_MODEL.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         }
       ],
       "inputs": [],
@@ -87,7 +91,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "certainty-framework-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -124,11 +130,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/platonic-reasoning.md"
+          "path": "docs/knowledge/platonic-reasoning.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:1daf73dacf82b1c1a14c617f34e60c105d13b609c4188f4a51de3f58fb887e78"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         }
       ],
       "inputs": [],
@@ -138,7 +148,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "certainty-framework-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -183,11 +195,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/helix-ask-ladder.md"
+          "path": "docs/helix-ask-ladder.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:431641d9b8967db9e0ed67c30f549bb321956cd1f6168cfd322257563e27d2be"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         }
       ],
       "inputs": [],
@@ -197,7 +213,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "certainty-framework-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -234,7 +252,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/helix-ask-ladder.md"
+          "path": "docs/helix-ask-ladder.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:431641d9b8967db9e0ed67c30f549bb321956cd1f6168cfd322257563e27d2be"
         }
       ],
       "inputs": [],
@@ -244,7 +264,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "helix-ask-certainty-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -281,7 +303,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         }
       ],
       "inputs": [],
@@ -291,7 +315,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "helix-ask-certainty-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -328,7 +354,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         }
       ],
       "inputs": [],
@@ -338,7 +366,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "helix-ask-certainty-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -375,7 +405,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         }
       ],
       "inputs": [],
@@ -385,7 +417,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "helix-ask-certainty-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -422,7 +456,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         }
       ],
       "inputs": [],
@@ -432,7 +468,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "helix-ask-certainty-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -469,7 +507,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         }
       ],
       "inputs": [],
@@ -479,7 +519,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "helix-ask-certainty-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -516,7 +558,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         }
       ],
       "inputs": [],
@@ -526,7 +570,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "helix-ask-certainty-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -572,11 +618,15 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "certainty-framework-tree"
+      ],
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/debate.run.ts"
+          "path": "server/skills/debate.run.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:6ebb870e1e0b3608dee5043b70383f599f72858ee4d44b388a493522d1b8432d"
         }
       ],
       "predictability": {
@@ -615,7 +665,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/essence-debate.ts"
+          "path": "shared/essence-debate.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:8bfc2219e6bbaac740b86e31dbd36a28526de92e8d78522ae5a2398293c857c1"
         }
       ],
       "inputs": [],
@@ -625,7 +677,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-confidence-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -662,7 +716,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/debate.run.ts"
+          "path": "server/skills/debate.run.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:6ebb870e1e0b3608dee5043b70383f599f72858ee4d44b388a493522d1b8432d"
         }
       ],
       "inputs": [],
@@ -672,7 +728,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-confidence-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -709,7 +767,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/debate.checklist.generate.ts"
+          "path": "server/skills/debate.checklist.generate.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:58566586778f21b77974381efa3e7be743a75c8af1e80d0b1dbcd66752080814"
         }
       ],
       "inputs": [],
@@ -719,7 +779,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-confidence-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -756,7 +818,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/planner/chat-b.ts"
+          "path": "server/services/planner/chat-b.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:40408e6369f2742902580df89a9f928b3651294cdfbdf8ef682c10a7bb96bbaa"
         }
       ],
       "inputs": [],
@@ -766,7 +830,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-confidence-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -805,7 +871,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/rationale.ts"
+          "path": "shared/rationale.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5061fcff18663cfb4721ca8fbbb2db86a06ea2c3198cbb3e4d0ab7dce67cb9e5"
         }
       ],
       "inputs": [],
@@ -815,7 +883,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "certainty-framework-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -852,7 +922,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/rationale.ts"
+          "path": "shared/rationale.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5061fcff18663cfb4721ca8fbbb2db86a06ea2c3198cbb3e4d0ab7dce67cb9e5"
         }
       ],
       "inputs": [],
@@ -862,7 +934,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "rationale-confidence-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -902,7 +976,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/policies/coherence-governor.ts"
+          "path": "modules/policies/coherence-governor.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:20e4cb957463ffe5b13f4686be95a53590c160ddd4293d5aeb7d196c2e29360e"
         }
       ],
       "inputs": [],
@@ -912,7 +988,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "certainty-framework-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -949,7 +1027,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/policies/coherence-governor.ts"
+          "path": "modules/policies/coherence-governor.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:20e4cb957463ffe5b13f4686be95a53590c160ddd4293d5aeb7d196c2e29360e"
         }
       ],
       "inputs": [],
@@ -959,7 +1039,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "coherence-confidence-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -996,7 +1078,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/noisegen-planner-model.ts"
+          "path": "server/services/noisegen-planner-model.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         }
       ],
       "inputs": [],
@@ -1006,7 +1090,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "coherence-confidence-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1045,7 +1131,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/schema.ts"
+          "path": "shared/schema.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:031ed9cce6805b96b67408dc0602956993f2b7707d44e7ef8187902e09843752"
         }
       ],
       "inputs": [],
@@ -1055,7 +1143,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "certainty-framework-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1091,7 +1181,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/schema.ts"
+          "path": "shared/schema.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:031ed9cce6805b96b67408dc0602956993f2b7707d44e7ef8187902e09843752"
         }
       ],
       "inputs": [],
@@ -1101,7 +1193,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "schema-confidence-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1150,11 +1244,15 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "certainty-framework-tree"
+      ],
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/uncertainty-mechanics-tree.json"
+          "path": "docs/knowledge/physics/uncertainty-mechanics-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:6830d4ef9ce4884cf8901a05c2afd0c3af85dce5e0b10fba4b1320dc3ac66ad2"
         }
       ],
       "predictability": {
@@ -1193,15 +1291,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/boundary-conditions-modes.md"
+          "path": "docs/knowledge/physics/boundary-conditions-modes.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:875aee66bffeb84f9a406d2faaf486811dbfa962aeefdf9e9f414a76092a8bd3"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/discretization-mesh.md"
+          "path": "docs/knowledge/physics/discretization-mesh.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:7e497860b0d131d22e24f69394f3865824aab5d7146c2c55da36fefb08354ff9"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/numerical-precision.md"
+          "path": "docs/knowledge/physics/numerical-precision.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:06789e573c5ec3537be0db51cb5a97b22cd5d1bc7b651407cd8635c65d06bd32"
         }
       ],
       "inputs": [],
@@ -1211,7 +1315,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1248,11 +1354,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/energy-pipeline.ts"
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+          "path": "docs/knowledge/physics/sampling-time-bounds.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:63bfb24d0701cac0d54c8d77d9497e49861142b1b604eb75ac4a55ab1e03f55e"
         }
       ],
       "inputs": [],
@@ -1262,7 +1372,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1299,15 +1411,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/physics.ts"
+          "path": "shared/physics.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:465613b9d8afd5f7d222009d023bda4d2a2f22ee7ca81e5610104ace387137a3"
         },
         {
           "type": "code",
-          "path": "shared/schema.ts"
+          "path": "shared/schema.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:031ed9cce6805b96b67408dc0602956993f2b7707d44e7ef8187902e09843752"
         },
         {
           "type": "code",
-          "path": "server/energy-pipeline.ts"
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         }
       ],
       "inputs": [],
@@ -1317,7 +1435,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1354,15 +1474,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/quantum-gr-bridge.md"
+          "path": "docs/quantum-gr-bridge.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:1f5812f179ecbd59a21567b9236155d4705f47bc686613e304d0fa541225ae1c"
         },
         {
           "type": "doc",
-          "path": "docs/DP_COLLAPSE_DERIVATION.md"
+          "path": "docs/DP_COLLAPSE_DERIVATION.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:875f58336e3fcd4dd0f8a6a50b4cbd080644c2c363f79ea50525dfd7c1e636e6"
         },
         {
           "type": "code",
-          "path": "shared/dp-collapse.ts"
+          "path": "shared/dp-collapse.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:bedeec6e6ba6f90e374ae38571ab906015aea830a2b28555902e7f3f21a99b7a"
         }
       ],
       "inputs": [],
@@ -1372,7 +1498,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1409,15 +1537,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/energy-pipeline.ts"
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         },
         {
           "type": "code",
-          "path": "modules/sim_core/static-casimir.ts"
+          "path": "modules/sim_core/static-casimir.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:e67c3f5375b9a51bd95ea8b6d6877633a467c8f1d3141d9136e6f595e8911e3e"
         },
         {
           "type": "doc",
-          "path": "docs/casimir-tile-mechanism.md"
+          "path": "docs/casimir-tile-mechanism.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:100ded5f8596d639ff80e36473c85cba62d96d2b1af158948a9165e5a0e1d100"
         }
       ],
       "inputs": [],
@@ -1427,7 +1561,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1464,15 +1600,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/collapse-benchmark-backend-roadmap.md"
+          "path": "docs/collapse-benchmark-backend-roadmap.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:9fd9fc79f8a2c9d0c9525502b66cb61a841358860dca72e92121530e9ae6b77b"
         },
         {
           "type": "code",
-          "path": "shared/collapse-benchmark.ts"
+          "path": "shared/collapse-benchmark.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3f0560fee01d8206a6aa50e5d8981b4879dfdb133056ca6372b21b6253c39d84"
         },
         {
           "type": "code",
-          "path": "modules/policies/coherence-governor.ts"
+          "path": "modules/policies/coherence-governor.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:20e4cb957463ffe5b13f4686be95a53590c160ddd4293d5aeb7d196c2e29360e"
         }
       ],
       "inputs": [],
@@ -1482,7 +1624,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1519,15 +1663,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/energy-conditions.md"
+          "path": "docs/knowledge/physics/energy-conditions.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cfa8949441bef4cec276f2dc2274b7affd811c7feb2d2d8c27341fd96d3e0625"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:7ca013891c69a6f8bb7b051555aab6e11101d638bc8eefd672c27769a5ae43dd"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+          "path": "docs/knowledge/physics/sampling-time-bounds.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:63bfb24d0701cac0d54c8d77d9497e49861142b1b604eb75ac4a55ab1e03f55e"
         }
       ],
       "inputs": [],
@@ -1537,7 +1687,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

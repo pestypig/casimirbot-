@@ -45,15 +45,33 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/helix-ask-tree.json"
+          "path": "docs/knowledge/helix-ask-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f358ec4efcd881186f15480c9d96536cfcff1a5f4bbe1ab2dc18526ff5edfbcd"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.plan.ts"
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150"
         },
         {
           "type": "test",
-          "path": "tests/helix-ask-routing.spec.ts"
+          "path": "tests/helix-ask-routing.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:23b61d00ea9f73ae7f8fcb8f42e79f7a6ae3f58ee615ea00f7b5367aa4d43337"
+        },
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-flow.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:34a623b3d8868d83b81e9d898c060b3a362d3bcdaaa811261383b5ec203b58e4"
+        },
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-ladder.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:431641d9b8967db9e0ed67c30f549bb321956cd1f6168cfd322257563e27d2be"
         }
       ]
     },
@@ -79,19 +97,27 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/helix-ask-flow.md"
+          "path": "docs/helix-ask-flow.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:34a623b3d8868d83b81e9d898c060b3a362d3bcdaaa811261383b5ec203b58e4"
         },
         {
           "type": "doc",
-          "path": "docs/helix-ask-ladder.md"
+          "path": "docs/helix-ask-ladder.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:431641d9b8967db9e0ed67c30f549bb321956cd1f6168cfd322257563e27d2be"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.plan.ts"
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150"
         },
         {
           "type": "test",
-          "path": "tests/helix-ask-routing.spec.ts"
+          "path": "tests/helix-ask-routing.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:23b61d00ea9f73ae7f8fcb8f42e79f7a6ae3f58ee615ea00f7b5367aa4d43337"
         }
       ],
       "inputs": [],
@@ -138,47 +164,69 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.plan.ts"
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/arbiter.ts"
+          "path": "server/services/helix-ask/arbiter.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:9ead1d2c8cecd104a04362c3c97817754681d23f4e7ac5ece870fe0f31742596"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/intent-directory.ts"
+          "path": "server/services/helix-ask/intent-directory.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:54a010d3f826c044ca7bfec2441bc9b23b74be453972f74af2b2477caabf6c7e"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/query.ts"
+          "path": "server/services/helix-ask/query.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:c60edcbaa6d9470a460147507d662af779cf22f6c68261fbaeae84db22f56871"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/topic.ts"
+          "path": "server/services/helix-ask/topic.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:8d6c21f1891d45ef98db43e6546c28a873cc65caa183f5adc628a8e94c38590e"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/paths.ts"
+          "path": "server/services/helix-ask/paths.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:6874429a880cae644d459ef8e7319dd1e49501ec00b756389af8eba49d240cb5"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/format.ts"
+          "path": "server/services/helix-ask/format.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:59c4984e2596baca484fd7cd020f3c59470927e8a9dca2a4196d9c4f50798205"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/doc-sections.ts"
+          "path": "server/services/helix-ask/doc-sections.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:93d0b2bbfe40b16b2d9985a5ecf25e143049316c810ff6c59e674ca4bb280e4d"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/job-store.ts"
+          "path": "server/services/helix-ask/job-store.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:21566cc0a65eb5936b0262e8f5f1cfd2705754b3a7d495dda3fc909c7d1de90d"
         },
         {
           "type": "doc",
-          "path": "docs/helix-ask-flow.md"
+          "path": "docs/helix-ask-flow.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:34a623b3d8868d83b81e9d898c060b3a362d3bcdaaa811261383b5ec203b58e4"
         },
         {
           "type": "test",
-          "path": "tests/helix-ask-routing.spec.ts"
+          "path": "tests/helix-ask-routing.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:23b61d00ea9f73ae7f8fcb8f42e79f7a6ae3f58ee615ea00f7b5367aa4d43337"
         }
       ],
       "inputs": [],
@@ -224,27 +272,39 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/helix-ask/platonic-gates.ts"
+          "path": "server/services/helix-ask/platonic-gates.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:99208e9d37b998d0557e002aa2e0af397645a69ed8ed32529284a43793e9ee9d"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/math.ts"
+          "path": "server/services/helix-ask/math.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:56ae5c42de2a1f78fd8718244d0d714efd19606334d8f69df3b3bbbcf2ef0980"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/repo-search.ts"
+          "path": "server/services/helix-ask/repo-search.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:750052b4226740c264eb9d11eb82744d0aa092136b3a331119ae97985fe58d9e"
         },
         {
           "type": "code",
-          "path": "server/services/helix-ask/session-memory.ts"
+          "path": "server/services/helix-ask/session-memory.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:e7cfab0e99cabfa6592f10567414229622b05f1d1a82801035eb85a26cd15e6f"
         },
         {
           "type": "doc",
-          "path": "docs/helix-ask-flow.md"
+          "path": "docs/helix-ask-flow.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:34a623b3d8868d83b81e9d898c060b3a362d3bcdaaa811261383b5ec203b58e4"
         },
         {
           "type": "test",
-          "path": "tests/helix-ask-routing.spec.ts"
+          "path": "tests/helix-ask-routing.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:23b61d00ea9f73ae7f8fcb8f42e79f7a6ae3f58ee615ea00f7b5367aa4d43337"
         }
       ],
       "inputs": [],
@@ -290,7 +350,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/helix-ask/graph-resolver.ts"
+          "path": "server/services/helix-ask/graph-resolver.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:494e5bbe0f1bb8e3b24505ecdd135722eeeeff5a078cf5e2b4f9f6fbaa712dd4"
         },
         {
           "type": "code",
@@ -298,11 +360,15 @@
         },
         {
           "type": "doc",
-          "path": "docs/helix-ask-flow.md"
+          "path": "docs/helix-ask-flow.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:34a623b3d8868d83b81e9d898c060b3a362d3bcdaaa811261383b5ec203b58e4"
         },
         {
           "type": "test",
-          "path": "tests/helix-ask-routing.spec.ts"
+          "path": "tests/helix-ask-routing.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:23b61d00ea9f73ae7f8fcb8f42e79f7a6ae3f58ee615ea00f7b5367aa4d43337"
         }
       ],
       "inputs": [],
