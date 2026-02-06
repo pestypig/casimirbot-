@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-02-05T23:51:03.702Z",
+  "repo": {
+    "deps": {
+      "coherence": true
+    },
+    "build": {
+      "status": "pass",
+      "ok": true,
+      "exitCode": 0,
+      "durationMs": 44468
+    },
+    "schema": {
+      "contracts": "pass",
+      "ok": true
+    },
+    "tests": {
+      "total": 559,
+      "failed": 0,
+      "passed": 559,
+      "status": "pass",
+      "ok": true
+    }
+  }
+}

@@ -1,156 +1,270 @@
-# Helix Ask Retrieval Stage Upgrade (All Domains)
+# Helix Ask Agentic Retrieval Loop (Build Plan)
 
-## Background
-Helix Ask is classification-first (topic tags, concept match, graph resolver). It lacks a deterministic, repo-grounded retrieval stage comparable to explicit repo search (for example, `rg`). This causes misses on unit- and formula-specific questions and weakens falsifiability across domains.
+Owner: Dan + Codex
+Last updated: 2026-02-05
 
-## Problem Statement
-We need a universal retrieval framework that runs for any prompt and grounds answers in repo content first, with platonic reasoning enforcing evidence quality. Generic LLM knowledge can be used only when repo evidence is absent or explicitly limited.
+## Goal
+Make Helix Ask behave like a tool-using agent while keeping single-LLM final generation. Retrieval should act like a deterministic tool loop, and evidence must be treated as ground truth.
 
-## Core Principle
-Always retrieve, then decide how to answer. Retrieval must be a first-class, always-on stage instead of a fallback after classification.
-
-## Goals
-- Retrieval runs for all domains, not just physics or warp.
-- Answers are falsifiable against repo evidence whenever possible.
-- Platonic gates enforce evidence quality and explicit uncertainty.
-- LLM generic answers are allowed only as a labeled fallback.
-- Retrieval trace is visible and auditable.
-- Retrieval remains fast and low-noise.
+## Core Principles
+- Evidence is tool output, not suggestion.
+- Retrieval runs before any coverage gate that can fail a slot.
+- Hard requirements come only from hard evidence (concept matches or user directives).
+- Soft hints guide retrieval only (headings, tree nodes, plan directives).
+- One LLM call only, after evidence converges.
 
 ## Non-Goals
-- Rewriting the entire Helix Ask architecture.
-- Forcing every question to match doc naming conventions.
-- Breaking existing workflows or UI formatting.
+- Re-introducing multi-LLM planning or multi-LLM evidence distillation.
+- Allowing tree JSON alone to stand in for definitions when a doc span exists.
 
-## Current Flow (As Implemented)
-- Input + obligations: normalize prompt, detect repo-citation requirements.
-- Intent + topic routing: assign domain/tier, apply topic tags, derive repo expectation.
-- Plan pass (micro-pass): emit query hints, scopes, slots, and clarify questions for repo-expected prompts.
-- Query + scope building: merge base queries with plan hints, build allowlists/must-include.
-- Retrieval: multi-channel search (lexical/symbol/fuzzy/path), fuse via RRF, diversify via MMR.
-- Docs-first phase (when enabled): restrict to docs/ethos + docs/knowledge for ideology/ledger/star repo-required cases.
-- Evidence gates + slot coverage: validate coverage, must-include, and eligibility.
-- Arbiter decision: repo_grounded | hybrid | general | clarify.
-- Synthesis + repair: build answer, run citation repair, then platonic gates.
+---
 
-## Evidence From Current Output (Example)
-- Slots generated search queries but did not retrieve any repo context.
-- Debug fields show `anchor_files: []`, `context_files: []`, `context_files_count: 0`.
-- Evidence gates report `evidence_ok: false`, `coverage_applied: false`.
-- Result is `clarify` across slots due to missing retrieval, not missing intent.
+## Phase 1 - Deterministic Agentic Retrieval Loop
 
-## Research Summary (Adjacent)
-- Multi-channel retrieval should run first, then fuse rankings (lexical, tree JSON, doc-section index, path/symbol; optional dense when available). [1]
-- Apply diversity reranking (MMR) so evidence does not collapse into one domain or tree. [1]
-- Use LLM planning only for query expansion and retrieval hints, not for factual claims (HyDE-style). [2]
-- Resolve ambiguity via competing evidence clusters rather than short-token heuristics. [2]
-- Formalize answer vs abstain using a selective prediction contract (grounded, bounded inference, hypothesis, clarify). [3]
-- Use hierarchical retrieval (file -> section -> span) to land proof spans, not just file paths. [4]
+### 1. Add a retrieval controller (deterministic loop)
+Iterate through retrieval actions with fixed stop conditions.
 
-## Design Principles (Helix Ask Mapping)
-- Always-on preflight retrieval: run a cheap universal retrieval stage for every prompt, then decide intent/answer mode.
-- Multi-channel fusion: lexical + tree/graph + doc-section + path/symbol lists fused via RRF.
-- Diversity constraint: enforce coverage across domain surfaces (docs/knowledge vs modules vs client vs server).
-- LLM planning for queries only: plan pass emits slots, aliases, headings, and retrieval hints, never facts.
-- Evidence-driven ambiguity: if two evidence clusters compete, ask a targeted clarify; otherwise proceed.
-- Selective answering contract: grounded facts require proof pointers; bounded inference only connects grounded facts; hypotheses are labeled; clarify is targeted.
+Loop policy (minimum):
+1. Seed pass: docs-first + tree JSON + doc sections
+2. If slot coverage weak: expand queries using headings, file names, symbol tokens
+3. If still weak: widen to code search + symbol index + one-hop usage
+4. Stop when coverage ok or budget hit
+5. Only then build the final prompt
 
-## Build Plan (Phased)
+### 2. Explicit stop conditions
+Define and enforce concrete thresholds:
+- min_doc_span_count
+- min_slot_coverage_ratio
+- max_iters
+- max_files
+- max_span_bytes
+- max_runtime_ms
 
-### Phase 1 - Universal Direct Retrieval Stage
-Goal: retrieval is deterministic and always-on; classification consumes retrieval, not the other way around.
+Add stop reason:
+- dominance_split (when ambiguity resolution is required)
 
-Work items:
-- Build a universal preflight retrieval stage (cheap and always-on).
-- Emit a retrieval plan object in the envelope: trees used, channels used, files/sections used, and slot coverage.
-- Add preflight signals to upgrade intent to hybrid/repo when evidence appears.
-- Preserve existing docs-first behavior for ideology/ledger/star when repo evidence is required.
+### 3. Multi-channel fusion baseline
+- Use RRF-style fusion for lexical/symbol/fuzzy/path hits
+- Keep scores and ordering deterministic
 
-Acceptance:
-- For any prompt, envelope includes preflight retrieval metadata.
-- Mixed-domain prompts yield at least one evidence card per slot or a targeted clarify.
+### 4. Controller debug output
+Add and expose:
+- controller_steps[] (step, action, reason, evidenceOk, slotCoverageOk, docCoverageOk, confidence, missingSlots)
+- retrieval_iterations (count)
+- retrieval_stop_reason (coverage_ok | budget | empty | dominance_split)
 
-### Phase 2 - Slot Canonicalization and Ambiguity Resolver
-Goal: stop brittle missing-token gates from blocking obviously related evidence.
+Acceptance checks:
+- Repo-required questions never answer before at least one retrieval step.
+- Clarify responses include what was searched and what would satisfy proof.
 
-Work items:
-- Canonicalize slots from doc headings, tree nodes, file names, and plan hints.
-- Cluster evidence by tree root and topic tag; if top two clusters are close, ask clarify.
+---
 
-Acceptance:
-- Short prompts only clarify when evidence clusters compete, not just due to short tokens.
+## Phase 2 - Itemized Prompt Assembly (Codex-style inputs)
 
-### Phase 3 - Scientific Response Contract and Metrics
-Goal: keep answers falsifiable and measurable.
+### 1. Internal items list
+Represent each step as typed items in stable order:
+- intent
+- selected_trees
+- doc_section_hits
+- repo_search_hits
+- proof_spans
+- slot_coverage_report
+- tree_walk
 
-Work items:
-- Enforce claim ledger: facts require evidence_refs; inferences must cite supporting facts.
-- Track grounded rate vs hypothesis/clarify rates (coverage vs risk proxy).
+### 2. Deterministic ordering
+Always order items by type and then by file path + header order. This makes prompts stable and diffable.
 
-Acceptance:
-- claim_ledger marks a claim supported only if evidence_refs is non-empty.
-- telemetry reports grounded_rate, hypothesis_rate, clarify_rate, and clarify_resolved rate.
+### 3. Item hashing
+Add per-item hashes to support diffing across runs and commits.
 
-### Phase 4 - Reasoning Contract (Hard vs Soft Signals)
-Goal: prevent noisy planner hints from forcing fail-closed coverage while keeping falsifiability strict.
+---
 
-Contract:
-- **Hard required slots** only from concept matches or explicit `coverageSlots` in the request.
-- **Soft signals** (plan directives, headings, graph hints, query hints) can steer retrieval but never gate coverage.
-- Coverage gates operate on hard required slots only; soft signals affect ranking, not pass/fail.
+## Phase 3 - Deterministic Evidence Compaction
 
-Implementation:
-- Filter required coverage slots by source (`concept`, explicit request).
-- Keep plan/directive slots advisory unless the user explicitly requests them.
-- Expose hard-required slots in debug to audit gating.
-- Add slot tier observability (A/B/C) in debug payload.
+### 1. Compaction rules (pre-LLM)
+- Deduplicate by (file, header, span hash)
+- Prefer: definitions, API/entrypoints, contracts/policy, tests
+- Keep top 1-2 spans per file
+- Add a short per-file rationale line if spans are dropped
 
-Acceptance:
-- No fail-closed due to plan-pass or planner directives alone.
-- Coverage failures only when concept slots are missing evidence.
+### 2. Compaction budget
+Define budgets and force compaction when exceeded:
+- max_items
+- max_spans
+- max_bytes
 
-## Implementation Notes
-- Run a cheap preflight retrieval universally (trees + section index + shallow lexical).
-- Widen to full repo search only when coverage or evidence gates fail.
-- Keep retrieval trace visible in debug output for audits.
+### 3. Debug output
+- compaction_applied (bool)
+- compaction_dropped (count)
+- compaction_kept (count)
+- compaction_policy (summary string)
+- compaction_budget (numbers)
 
-## Files Likely Impacted
-- server/routes/agi.plan.ts
-- server/services/helix-ask/topic.ts
-- server/services/helix-ask/concepts.ts
-- server/services/helix-ask/graph-resolver.ts
-- server/services/helix-ask/doc-sections.ts
-- server/services/helix-ask/repo-search.ts
-- server/services/helix-ask/query.ts
-- server/services/helix-ask/platonic-gates.ts
-- server/services/helix-ask/envelope.ts
-- configs/graph-resolvers.json
-- docs/helix-ask-flow.md
+---
+
+## Phase 4 - Evidence-based Disambiguation
+
+### 1. Multi-sense retrieval
+For ambiguous prompts:
+- Build candidate senses from tree nodes, headings, and concept registry
+- Run retrieval per sense (small budget each)
+- Compute dominance (evidence mass + slot coverage + proof density)
+
+### 2. Decision
+- If one dominates: answer that sense
+- If split: ask a 2-option clarify and show evidence for each
+
+### 3. Dominance scoring
+Define a deterministic score, for example:
+score = evidence_mass * slot_coverage_ratio * proof_density
+Clarify if top_two_score_gap < dominance_threshold.
+
+### 4. Debug output
+- ambiguity_candidates
+- ambiguity_scores
+- ambiguity_selected
+- ambiguity_reason
+
+---
+
+## Phase 5 - Code Alignment Pass
+
+### 1. Doc-to-code bridging
+After doc spans are selected:
+- Extract symbols from spans (function, type, module names)
+- Resolve to definitions and 1-hop usage
+- Pull 1-2 code spans per symbol
+- Include related tests if present
+
+### 2. Debug output
+- code_alignment_applied
+- symbols_extracted
+- symbols_resolved
+- code_spans_added
+
+---
+
+## Phase 6 - Tree Walk Depth Controls + UI Section
+
+### 1. Tree walk depth control
+Support levels:
+- root_to_anchor (default)
+- full_path
+- anchors_only
+
+### 2. Tree walk binding
+Tree nodes are narrative only when bound to a doc span. Otherwise keep as navigation hints.
+
+### 3. Envelope section
+Add a Tree Walk section in the answer envelope (rendered separately in UI).
+
+---
+
+## Phase 7 - Single-LLM Tool-Result Contract
+
+### 1. Tool results block in prompt
+Always place before the final answer instruction:
+TOOL_RESULTS
+- retrieval_summary
+- doc_spans
+- code_spans
+- tree_walk
+END_TOOL_RESULTS
+
+### 2. Strict instruction
+- If TOOL_RESULTS non-empty, answer must cite them.
+- Never claim no evidence when tool results exist.
+- If missing, say so and list searches.
+
+### 3. Deterministic fallback
+If LLM still claims no evidence while TOOL_RESULTS exist, replace answer with:
+- definition bullets (if definition focus)
+- evidence bullets (top N)
+- tree walk (if present)
+- sources list
+
+---
+
+## Phase 8 - Proof-Pointer Density Gate
+
+### 1. Grounded claims threshold
+Define a minimum grounded claim ratio before the answer can be labeled Grounded.
+If below threshold, downgrade to Bounded inference or Clarify.
+
+### 2. Debug output
+- grounded_claim_ratio
+- grounded_claim_threshold
+- tier_selected
+
+---
+
+## Recommended Build Order
+0) Phase 7 - Tool-results contract + deterministic fallback
+1) Phase 1 - Retrieval controller loop + stop reasons
+2) Phase 2 - Itemized prompt assembly + hashing
+3) Phase 3 - Compaction budgets + policy
+4) Phase 4 - Evidence-based disambiguation
+5) Phase 5 - Code alignment pass
+6) Phase 6 - Tree walk depth controls + UI section
+7) Phase 8 - Proof-pointer density gate
+
+---
 
 ## Acceptance Criteria
-- For any domain, at least one repo-backed context block is selected or an explicit "no evidence found" is returned.
-- Retrieval trace (trees, files, sections, search terms) is surfaced in the response envelope.
-- Platonic gates refuse unsupported claims or label them as fallback.
-- LLM generic answers are allowed only when repo evidence is missing and are explicitly labeled.
-- No regressions in existing Helix Ask UI.
+1. If doc spans exist, answer never says "no repo evidence".
+2. If doc spans exist, answer cites at least 1 matching file.
+3. Tree walk is shown in envelope when present.
+4. Ambiguous questions either resolve by evidence dominance or ask a 2-option clarify with evidence shown.
+5. Code alignment adds at least one code span when doc spans reference symbols.
+6. Single-LLM remains the only model call.
+7. Item hashes are stable across identical runs.
+8. Grounded claim ratio is enforced before "Grounded" tier.
+9. Coverage improves monotonically per iteration or the controller stops with a reason.
 
-## Tests and Validation
-- Add regression cases for unit/fact questions across multiple domains.
-- Validate retrieval trace emission and evidence coverage behavior.
-- Run Casimir verification gate after any code changes.
+---
 
-## Rollout Plan
-- Stage 1: Retrieval stage behind a flag.
-- Stage 2: Enable for all prompts in shadow mode (logging only).
-- Stage 3: Enforce as default.
+## Tests
+
+### Dry-run checks
+- What does solar restoration mean in this repo?
+- Define TS_ratio in this repo.
+- Is the Casimir tile pressure in GPa?
+- What is a cavity?
+- Explain the Helix Ask reasoning pipeline.
+
+Expected:
+- controller_steps present
+- evidence_ok and slot_coverage_ok track intent
+- ambiguity resolver only triggers on true multi-sense cases
+
+### Full-run checks
+- Same questions, expect citations in answer and tree walk in envelope
+
+### Code alignment test
+- Ask a question that references a known symbol from docs and verify doc span -> symbol -> code span.
+
+---
+
+## Clarify Response Contract
+When clarification is required, include:
+- searched queries
+- top candidate files or headers
+- which term failed dominance
+- what evidence would satisfy the slot
+
+---
+
+## Verification (Required)
+Run Casimir verification for every patch:
+```
+npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl
+```
+Report PASS + certificate hash + integrity OK in final response.
+
+---
 
 ## Open Questions
-- How large should the default repo search scope be per domain?
-- What is the fallback threshold for LLM generic answers?
-- Should any domains opt out of repo search for privacy or performance reasons?
-
-## References
-[1] https://trec.nist.gov/pubs/trec8/papers/okapi.pdf
-[2] https://arxiv.org/abs/2212.10496
-[3] https://www.ecva.net/papers/eccv_2022/papers_ECCV/papers/136960146.pdf
-[4] https://www.mdpi.com/2076-3417/16/2/903
+- Should the tree walk be visible to end users by default or only in debug?
+- How many code spans per symbol is optimal for the context budget?
+- Should clarification include top evidence snippets for each sense?
+- Should prompt caching be applied at the item level or at the final prompt level?
