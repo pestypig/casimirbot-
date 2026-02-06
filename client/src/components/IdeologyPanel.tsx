@@ -11,6 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import CitizensArcView from "@/components/ideology/CitizensArcView";
 import { cn } from "@/lib/utils";
 import { exportNodeToImage } from "@/lib/ideology/pill-export";
+import { usePanelTelemetryPublisher } from "@/lib/desktop/panelTelemetryBus";
+import { buildIdeologyPanelTelemetry } from "@shared/ideology-telemetry";
 import { Download } from "lucide-react";
 
 type IdeologyPanelProps = {
@@ -82,6 +84,24 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
   const artifactItems = artifactsData?.items ?? [];
   const artifactTotal = artifactsData?.total ?? 0;
   const artifactSearchItems = artifactSearchData?.items ?? [];
+
+  usePanelTelemetryPublisher(
+    "mission-ethos",
+    () => {
+      const nodeId = selected?.id ?? data?.rootId ?? CITIZENS_ARC_ID;
+      const panel = buildIdeologyPanelTelemetry({
+        nodeId,
+        panelId: "mission-ethos",
+        instanceId: "mission-ethos",
+        title: "Ideology & Zen",
+        surface: "ui",
+        strings: { surface: "ui" },
+      });
+      const { panelId, instanceId, title, ...details } = panel;
+      return details;
+    },
+    [selected?.id, data?.rootId],
+  );
 
   useEffect(() => {
     if (!selectedId && data?.rootId) {

@@ -61,7 +61,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -93,6 +105,18 @@
         {
           "type": "code",
           "path": "client/src/main.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -168,7 +192,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -199,7 +235,9 @@
         },
         {
           "type": "code",
-          "path": "client/src/pages/helix-core.panels.ts"
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
         },
         {
           "type": "code",
@@ -208,6 +246,18 @@
         {
           "type": "code",
           "path": "client/src/pages/helix-noise-gens.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -254,6 +304,18 @@
         {
           "type": "code",
           "path": "client/src/pages/desktop.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -300,6 +362,18 @@
         {
           "type": "code",
           "path": "client/src/pages/simulation.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -350,6 +424,18 @@
         {
           "type": "code",
           "path": "client/src/pages/star-hydrostatic-panel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -400,6 +486,18 @@
         {
           "type": "code",
           "path": "client/src/pages/why.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -454,6 +552,18 @@
         {
           "type": "code",
           "path": "client/src/pages/rag-admin.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -504,6 +614,18 @@
         {
           "type": "code",
           "path": "client/src/pages/ingest.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -558,6 +680,18 @@
         {
           "type": "code",
           "path": "client/src/pages/station.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -607,11 +741,25 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/pages/helix-core.panels.ts"
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
         },
         {
           "type": "code",
           "path": "client/src/pages/desktop.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -658,7 +806,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/pages/helix-core.panels.ts"
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -706,6 +868,18 @@
         {
           "type": "code",
           "path": "client/src/pages/desktop.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -779,7 +953,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -811,6 +997,18 @@
         {
           "type": "code",
           "path": "client/src/components/SpeedCapabilityPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -866,6 +1064,18 @@
         {
           "type": "code",
           "path": "client/src/components/dynamic-controls.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -921,6 +1131,18 @@
         {
           "type": "code",
           "path": "client/src/components/live-energy-pipeline.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -971,6 +1193,18 @@
         {
           "type": "code",
           "path": "client/src/components/PhysicsFieldSampler.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1034,6 +1268,18 @@
         {
           "type": "code",
           "path": "client/src/components/QiLatticePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1088,6 +1334,18 @@
         {
           "type": "code",
           "path": "client/src/components/FuelGauge.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1160,7 +1418,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -1192,6 +1462,18 @@
         {
           "type": "code",
           "path": "client/src/components/WarpEngineContainer.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1247,6 +1529,18 @@
         {
           "type": "code",
           "path": "client/src/components/WarpRenderInspector.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1298,6 +1592,18 @@
         {
           "type": "code",
           "path": "client/src/components/WarpExperimentLadderPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1345,6 +1651,18 @@
         {
           "type": "code",
           "path": "client/src/components/WarpLedgerPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1392,6 +1710,18 @@
         {
           "type": "code",
           "path": "client/src/components/ShiftVectorPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1465,7 +1795,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -1493,6 +1835,18 @@
         {
           "type": "code",
           "path": "client/src/components/CasimirTileGridPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1552,6 +1906,18 @@
         {
           "type": "code",
           "path": "client/src/components/CavitySideView.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1603,6 +1969,18 @@
         {
           "type": "code",
           "path": "client/src/components/live-energy-pipeline.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1658,6 +2036,18 @@
         {
           "type": "code",
           "path": "client/src/components/MetricAmplificationPocket.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1713,6 +2103,18 @@
         {
           "type": "code",
           "path": "client/src/components/CardProofOverlay.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1768,6 +2170,18 @@
         {
           "type": "code",
           "path": "client/src/components/VacuumContractBadge.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1839,7 +2253,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -1875,6 +2301,18 @@
         {
           "type": "code",
           "path": "client/src/components/CurvaturePhysicsPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1926,6 +2364,18 @@
         {
           "type": "code",
           "path": "client/src/components/SliceViewer.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -1981,6 +2431,18 @@
         {
           "type": "code",
           "path": "client/src/components/GrAgentLoopLearningPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2032,6 +2494,18 @@
         {
           "type": "code",
           "path": "client/src/components/LightSpeedStrobeScale.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2087,6 +2561,18 @@
         {
           "type": "code",
           "path": "client/src/components/UniversalAuditTreePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2134,6 +2620,18 @@
         {
           "type": "code",
           "path": "client/src/components/MathMaturityTreePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2189,6 +2687,18 @@
         {
           "type": "code",
           "path": "client/src/components/AgiKnowledgePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2244,6 +2754,18 @@
         {
           "type": "code",
           "path": "client/src/components/FrontProofsLedger.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2303,6 +2825,18 @@
         {
           "type": "code",
           "path": "client/src/components/DocViewerPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2353,6 +2887,18 @@
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2404,6 +2950,18 @@
         {
           "type": "code",
           "path": "client/src/components/DefinitionChip.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2454,6 +3012,18 @@
         {
           "type": "code",
           "path": "client/src/components/SporeTimeline.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2518,6 +3088,18 @@
         {
           "type": "code",
           "path": "client/src/components/StellarLsrPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2576,6 +3158,18 @@
         {
           "type": "code",
           "path": "client/src/components/SolarMap.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2622,6 +3216,18 @@
         {
           "type": "code",
           "path": "client/src/components/StellarLsrPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2669,6 +3275,18 @@
         {
           "type": "code",
           "path": "client/src/components/DeepMixingSolarView.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2716,6 +3334,18 @@
         {
           "type": "code",
           "path": "client/src/components/TokamakSimulationPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2766,11 +3396,25 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/components/Hull3DRenderer.ts"
+          "path": "client/src/components/Hull3DRenderer.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:64417383f95c5cc049181e432cfade012bde925a0477057fbf821e45a19290f1"
         },
         {
           "type": "code",
           "path": "client/src/components/HullMetricsVisPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2817,7 +3461,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/components/Hull3DRenderer.ts"
+          "path": "client/src/components/Hull3DRenderer.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:64417383f95c5cc049181e432cfade012bde925a0477057fbf821e45a19290f1"
         },
         {
           "type": "code",
@@ -2826,6 +3472,18 @@
         {
           "type": "code",
           "path": "client/src/components/HelixHullCardsPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2880,6 +3538,18 @@
         {
           "type": "code",
           "path": "client/src/components/VolumeModeToggle.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2938,6 +3608,18 @@
         {
           "type": "code",
           "path": "client/src/components/PhoenixNeedlePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -2994,6 +3676,18 @@
         {
           "type": "code",
           "path": "client/src/components/essence/DresscodePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3044,6 +3738,18 @@
         {
           "type": "code",
           "path": "client/src/components/noise-gen/StemDaw.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3098,6 +3804,18 @@
         {
           "type": "code",
           "path": "client/src/components/noise-gens/NoiseFieldPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3156,6 +3874,18 @@
         {
           "type": "code",
           "path": "client/src/components/BackgroundLuma.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3202,6 +3932,18 @@
         {
           "type": "code",
           "path": "client/src/components/essence/DresscodePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3272,7 +4014,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -3299,7 +4053,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/components/Hull3DRenderer.ts"
+          "path": "client/src/components/Hull3DRenderer.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:64417383f95c5cc049181e432cfade012bde925a0477057fbf821e45a19290f1"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3351,6 +4119,18 @@
         {
           "type": "code",
           "path": "client/src/components/WebGLDiagnostics.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3402,6 +4182,18 @@
         {
           "type": "code",
           "path": "client/src/components/GalaxyDeepZoom.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3461,6 +4253,18 @@
         {
           "type": "code",
           "path": "client/src/components/NavPoseHUD.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3512,6 +4316,18 @@
         {
           "type": "code",
           "path": "client/src/components/CollapseBenchmarkHUDPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3567,6 +4383,18 @@
         {
           "type": "code",
           "path": "client/src/components/SectorLegend.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3614,6 +4442,18 @@
         {
           "type": "code",
           "path": "client/src/components/NavPoseHUD.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3684,7 +4524,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -3711,15 +4563,33 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/hooks/use-energy-pipeline.ts"
+          "path": "client/src/hooks/use-energy-pipeline.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:52ea9c015d9d59e71e63f8938a69e2a3ac92d1156236ffd45a66f91be05ca999"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useGrBrick.ts"
+          "path": "client/src/hooks/useGrBrick.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:91ccb5f63caf4a083950b85b6b4d8a1ab575d01abd892276ae0438f2f89810fe"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useStressEnergyBrick.ts"
+          "path": "client/src/hooks/useStressEnergyBrick.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:d625cd2b70710a3543440c0e70297f8e6a34126017a46c889ac1c96f96eef16b"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3766,15 +4636,33 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/store/useDesktopStore.ts"
+          "path": "client/src/store/useDesktopStore.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:6d773477a9275d3a4519979a884c77235c03daf5b3f43f69f125a4aac84819f8"
         },
         {
           "type": "code",
-          "path": "client/src/store/useFlightDirectorStore.ts"
+          "path": "client/src/store/useFlightDirectorStore.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:4c4681beda0f91cb497a8f176b9088374ce668421ae981cb8976a351ff14dd77"
         },
         {
           "type": "code",
-          "path": "client/src/store/useAgiChatStore.ts"
+          "path": "client/src/store/useAgiChatStore.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:0d5aae03997dd9d5e80db010454523a0fdf44e8cd8f275dbef4b4fe38b893135"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3821,15 +4709,33 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/lib/simulation-api.ts"
+          "path": "client/src/lib/simulation-api.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:9476100cb5d89f7350c694272b88e55a1a995dd932c2d7ec877c27dc2df82475"
         },
         {
           "type": "code",
-          "path": "client/src/lib/warp-pipeline-adapter.ts"
+          "path": "client/src/lib/warp-pipeline-adapter.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:eb18a6848260106c274ce9e2c2831a3c0b2913b10b499407f1bea169f1a3965f"
         },
         {
           "type": "code",
-          "path": "client/src/lib/curvature-brick.ts"
+          "path": "client/src/lib/curvature-brick.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cc7458b35aae3b5144415a6b2890536000a1593f42150b6afadc9d14f8cb7b9d"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -3897,7 +4803,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -3944,7 +4862,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -3971,6 +4901,18 @@
         {
           "type": "code",
           "path": "client/src/pages/mobile-start.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -4037,7 +4979,19 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-components-tree.json"
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
     },
@@ -4080,6 +5034,18 @@
         {
           "type": "code",
           "path": "client/src/components/dynamic-visualization.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -4130,6 +5096,18 @@
         {
           "type": "code",
           "path": "client/src/components/visual-proof-charts.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -4180,6 +5158,18 @@
         {
           "type": "code",
           "path": "client/src/components/ShellOutlineVisualizer.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -4230,6 +5220,18 @@
         {
           "type": "code",
           "path": "client/src/components/phase-diagram-validator.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],
@@ -4285,6 +5287,16 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-backend-binding-tree.js"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
       "inputs": [],

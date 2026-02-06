@@ -8,6 +8,8 @@ import {
   searchIdeologyArtifacts
 } from "../services/ideology/artifacts";
 import { renderIdeologyPill } from "../services/ideology/render";
+import { getConsoleTelemetry, saveConsoleTelemetry } from "../services/console-telemetry/store";
+import { buildIdeologyPanelTelemetry } from "@shared/ideology-telemetry";
 
 export const ethosRouter = Router();
 
@@ -76,6 +78,39 @@ const beliefGraphRequestSchema = z
   .strict();
 
 const IDEOLOGY_FILE_PATH = path.resolve("docs/ethos/ideology.json");
+const IDEOLOGY_DESKTOP_ID = "helix.desktop.main";
+const IDEOLOGY_PANEL_ID = "mission-ethos";
+
+const recordIdeologyTelemetry = (
+  nodeId: string,
+  surface: "api" | "ui" | "batch" = "api",
+  strings?: Record<string, string>,
+) => {
+  try {
+    const panel = buildIdeologyPanelTelemetry({
+      nodeId,
+      panelId: IDEOLOGY_PANEL_ID,
+      instanceId: IDEOLOGY_PANEL_ID,
+      title: "Ideology & Zen",
+      surface,
+      strings,
+    });
+    const base = getConsoleTelemetry(IDEOLOGY_DESKTOP_ID);
+    const panels = base?.panels?.filter(
+      (existing) =>
+        existing.panelId !== panel.panelId || existing.instanceId !== panel.instanceId,
+    ) ?? [];
+    saveConsoleTelemetry({
+      desktopId: IDEOLOGY_DESKTOP_ID,
+      capturedAt: new Date().toISOString(),
+      panels: [...panels, panel],
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[ideology] telemetry update failed", error);
+    }
+  }
+};
 
 const loadIdeologyDoc = async (): Promise<IdeologyDoc> => {
   const payload = await fs.readFile(IDEOLOGY_FILE_PATH, "utf8");
@@ -197,9 +232,9 @@ const buildBeliefGraph = (
 
 ethosRouter.get("/ideology", async (_req, res) => {
   try {
-    const payload = await fs.readFile(IDEOLOGY_FILE_PATH, "utf8");
-    res.setHeader("Content-Type", "application/json");
-    res.send(payload);
+    const doc = await loadIdeologyDoc();
+    recordIdeologyTelemetry(doc.rootId, "api");
+    res.json(doc);
   } catch (err) {
     res.status(404).json({
       message: "ideology.json not found",
@@ -355,6 +390,9 @@ const handleBeliefGraphRequest = async (req: any, res: any) => {
 
   try {
     const ideology = await loadIdeologyDoc();
+    recordIdeologyTelemetry(ideology.rootId, "api", {
+      surface: "api:belief-graph",
+    });
     const includeGraph = parsed.data.includeGraph !== false;
     const includeAttempts = parsed.data.includeAttempts === true;
     const includeSeeAlso = parsed.data.includeSeeAlso === true;

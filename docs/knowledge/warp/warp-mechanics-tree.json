@@ -46,7 +46,39 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+          "path": "docs/knowledge/warp/warp-mechanics-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:282590bae0ac1d73ffd2d7df81b6eb762eef3e6d30a1a8be4a18a342e5e9db51"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/warp-bubble.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:a56632dd273044e79420c1926bb6b9cbbe2eb06cff494558774308aafafd3a8e"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/natario-zero-expansion.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f2de4e86376d8b54ca665cd9b62a0c857020bd3780d46f41d443e8d131ea30ec"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/alcubierre-metric.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:98af38a1b7923906d1831f09be59e83327eff443f0b5d2f7984f3b5d8ebd82ee"
         }
       ]
     },
@@ -84,7 +116,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -100,7 +134,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+          "path": "docs/knowledge/warp/warp-mechanics-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:282590bae0ac1d73ffd2d7df81b6eb762eef3e6d30a1a8be4a18a342e5e9db51"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ]
     },
@@ -127,7 +175,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/warp-bubble.md"
+          "path": "docs/knowledge/warp/warp-bubble.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:a56632dd273044e79420c1926bb6b9cbbe2eb06cff494558774308aafafd3a8e"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -137,7 +199,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -174,7 +238,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/alcubierre-metric.md"
+          "path": "docs/knowledge/warp/alcubierre-metric.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:98af38a1b7923906d1831f09be59e83327eff443f0b5d2f7984f3b5d8ebd82ee"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -184,7 +262,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -221,7 +301,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/natario-zero-expansion.md"
+          "path": "docs/knowledge/warp/natario-zero-expansion.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f2de4e86376d8b54ca665cd9b62a0c857020bd3780d46f41d443e8d131ea30ec"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -231,7 +325,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -268,7 +364,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/shift-vector-expansion-scalar.md"
+          "path": "docs/knowledge/warp/shift-vector-expansion-scalar.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f4ec7a18b86b2d0127194b7cca47306508b0f8450a01f25f17337af51e41eb90"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -278,7 +388,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -315,7 +427,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/bubble-wall-thickness.md"
+          "path": "docs/knowledge/warp/bubble-wall-thickness.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:9abb8191756425874ad88f7da7ee20e320c8da30354d5ffbc5c3025592b0ba9f"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -325,7 +451,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -362,7 +490,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/vdb-compression-factor.md"
+          "path": "docs/knowledge/warp/vdb-compression-factor.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:9b657d2e134d36fb800802b390f87bae841d2f308d9d7aced8682ec04384cc47"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -372,7 +514,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -417,7 +561,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -433,7 +579,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+          "path": "docs/knowledge/warp/warp-mechanics-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:282590bae0ac1d73ffd2d7df81b6eb762eef3e6d30a1a8be4a18a342e5e9db51"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ]
     },
@@ -460,7 +620,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/casimir-lattice.md"
+          "path": "docs/knowledge/warp/casimir-lattice.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:b5d06b7f9fa775ba24a14f91a3a5ea5c6f6d2dbe66e5d44a34ab1a3eadca6857"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -470,7 +644,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-proxy-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -507,7 +683,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/ford-roman-proxy.md"
+          "path": "docs/knowledge/warp/ford-roman-proxy.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:9aba667dd8e3531410b2ffe3b3c258b8e45f6f292a6e95a5dd21be787483e4b5"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -517,7 +707,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-proxy-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -554,7 +746,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/power-mass-ladders.md"
+          "path": "docs/knowledge/warp/power-mass-ladders.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:7a8b777851718097fff9e856854d5886b837ea6877bb4133ff0ed7ab1ec982f1"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -564,7 +770,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-proxy-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -608,7 +816,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -624,7 +834,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+          "path": "docs/knowledge/warp/warp-mechanics-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:282590bae0ac1d73ffd2d7df81b6eb762eef3e6d30a1a8be4a18a342e5e9db51"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ]
     },
@@ -651,7 +875,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/sector-strobes-duty-cycle.md"
+          "path": "docs/knowledge/warp/sector-strobes-duty-cycle.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:38281afebcbec2d99338adc8e822e2ce164b464a6674b1e055f6e741c8ebecd2"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -661,7 +899,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-control-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -698,7 +938,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/active-fraction.md"
+          "path": "docs/knowledge/warp/active-fraction.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:91c215ccd6aa31403837fb7371e6e34f39bbdf7cd808b9003a532fc30326e292"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -708,7 +962,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-control-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -758,7 +1014,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -774,7 +1032,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp/warp-mechanics-tree.json"
+          "path": "docs/knowledge/warp/warp-mechanics-tree.json",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:282590bae0ac1d73ffd2d7df81b6eb762eef3e6d30a1a8be4a18a342e5e9db51"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ]
     },
@@ -801,7 +1073,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/warp/warp-module.ts"
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/warp-bubble.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:a56632dd273044e79420c1926bb6b9cbbe2eb06cff494558774308aafafd3a8e"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -811,7 +1097,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-implementation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -848,7 +1136,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/warp/natario-warp.ts"
+          "path": "modules/warp/natario-warp.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:cdcfe2eb1831f0c332a5144617dc482dbd3d713ee2591ded6d97bfda48d0d7f5"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/warp-bubble.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:a56632dd273044e79420c1926bb6b9cbbe2eb06cff494558774308aafafd3a8e"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -858,7 +1160,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-implementation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -895,7 +1199,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/theta-semantics.md"
+          "path": "docs/theta-semantics.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:20904d04c24a857ee13732b59b9522f3aee7c657eacc732ee4fba9801c57a2ff"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -905,7 +1223,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-implementation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -942,7 +1262,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/warp-pulsed-power.md"
+          "path": "docs/warp-pulsed-power.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:7562ce1f1a33ae4b00fae4111d295f36acbda9b1f5009d6d39d4c4fd5de6fa42"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -952,7 +1286,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-implementation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -989,7 +1325,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/warpfield-mesh-patch-plan.md"
+          "path": "docs/warpfield-mesh-patch-plan.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:6984ee4aab2c73f73cbea8b2ed085c0be68cf8052952dfa01e5fb93cdc93feb8"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -999,7 +1349,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-implementation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1036,7 +1388,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/warpfield-visualization-roadmap.md"
+          "path": "docs/warpfield-visualization-roadmap.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:3591e2da74cc4213843bc1e5dc010d2e644fb0c391ea6e452dc6a654f6fcf6e1"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -1046,7 +1412,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-implementation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1083,7 +1451,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/warp-console-architecture.md"
+          "path": "docs/warp-console-architecture.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:47b77a13241ba6fcf417d3590697c7211199f8c9f02f6db33557163a25fb1a15"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -1093,7 +1475,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-implementation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1130,7 +1514,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/warp-llm-contracts.md"
+          "path": "docs/warp-llm-contracts.md",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:a47847b6346a6a6c024af85ddf7d52757fdaf6a324f99576659211ac3fb1c5d0"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
       "inputs": [],
@@ -1140,7 +1538,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "warp-implementation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
