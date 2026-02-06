@@ -711,7 +711,9 @@
         "deep-mixing-physics",
         "deep-mixing-autopilot",
         "deep-mixing-telemetry",
-        "deep-mixing-ui"
+        "deep-mixing-ui",
+        "bridge-deep-mixing-plan-mission-ethos",
+        "bridge-deep-mixing-plan-stewardship-ledger"
       ],
       "links": [
         {
@@ -1271,6 +1273,166 @@
       ],
       "slug": "bridge-solar-restoration-plan-deep-mixing-plan",
       "summary": "Bridge between Solar Restoration Plan and Deep Mixing Plan."
+    },
+    {
+      "id": "bridge-deep-mixing-plan-mission-ethos",
+      "slug": "bridge-deep-mixing-plan-mission-ethos",
+      "title": "Deep Mixing Plan <-> Mission Ethos",
+      "excerpt": "Bridge between mission-ethos and deep-mixing-plan.",
+      "bodyMD": "Bridge between mission-ethos and deep-mixing-plan (mission-constraint).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "deep-mixing"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "deep-mixing-plan"
+        },
+        {
+          "rel": "see-also",
+          "to": "mission-ethos"
+        },
+        {
+          "rel": "see-also",
+          "to": "deep-mixing-plan"
+        }
+      ],
+      "bridge": {
+        "left": "mission-ethos",
+        "right": "deep-mixing-plan",
+        "relation": "mission-constraint"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "mission-ethos",
+        "deep-mixing-plan"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/deep-mixing.md",
+          "repo_rev": "eabfc41bc331355b9f0da67dbef050c8d3f98c6f",
+          "content_hash": "sha256:4eceec7e28a4cb1c8993a3e479c229df37b05612c858533ceabd4463f8e283cb"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/mission-ethos.md",
+          "repo_rev": "eabfc41bc331355b9f0da67dbef050c8d3f98c6f",
+          "content_hash": "sha256:9fe08823eba41a68bb24b3ebe5386725326d1cef354528c816f1edebfd870615"
+        },
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "repo_rev": "eabfc41bc331355b9f0da67dbef050c8d3f98c6f",
+          "content_hash": "sha256:b07c01cd9f946ab27944444a1e0ff965c9a29b89e6dce444a235f87215713b36"
+        },
+        {
+          "type": "doc",
+          "path": "docs/ethos/why.md",
+          "repo_rev": "eabfc41bc331355b9f0da67dbef050c8d3f98c6f",
+          "content_hash": "sha256:d17c7c7f5804f27879b281fccae65e2ac25e170660b1a5397c80b1d6b532b72d"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "bridge-deep-mixing-plan-stewardship-ledger",
+      "slug": "bridge-deep-mixing-plan-stewardship-ledger",
+      "title": "Deep Mixing Plan <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and deep-mixing-plan.",
+      "bodyMD": "Bridge between stewardship-ledger and deep-mixing-plan (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "deep-mixing"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "deep-mixing-plan"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "deep-mixing-plan"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "deep-mixing-plan",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "deep-mixing-plan"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/deep-mixing.md",
+          "repo_rev": "eabfc41bc331355b9f0da67dbef050c8d3f98c6f",
+          "content_hash": "sha256:4eceec7e28a4cb1c8993a3e479c229df37b05612c858533ceabd4463f8e283cb"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "eabfc41bc331355b9f0da67dbef050c8d3f98c6f",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "repo_rev": "eabfc41bc331355b9f0da67dbef050c8d3f98c6f",
+          "content_hash": "sha256:b07c01cd9f946ab27944444a1e0ff965c9a29b89e6dce444a235f87215713b36"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     }
   ],
   "schema": {

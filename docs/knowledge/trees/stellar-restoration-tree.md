@@ -115,6 +115,16 @@ This tree connects star physics, ledgers, and restoration obligations. Minimal a
 - type: bridge
 - summary: Cross-reference between Solar Restoration Plan and Deep Mixing Plan within this tree. Minimal artifact: left/right evidence anchors.
 
+### Node: Deep Mixing Plan <-> Mission Ethos
+- id: bridge-deep-mixing-plan-mission-ethos
+- type: bridge
+- summary: Bridge between mission-ethos and deep-mixing-plan (mission-constraint).
+
+### Node: Deep Mixing Plan <-> Stewardship Ledger
+- id: bridge-deep-mixing-plan-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and deep-mixing-plan (stewardship-guardrail).
+
 ## Bridges
 
 ### Bridge: Solar Restoration Plan <-> Stellar Ledger Stack
@@ -124,3 +134,11 @@ This tree connects star physics, ledgers, and restoration obligations. Minimal a
 ### Bridge: Solar Restoration Plan <-> Deep Mixing Plan
 - relation: Cross-reference between Solar Restoration Plan and Deep Mixing Plan.
 - summary: Cross-reference between Solar Restoration Plan and Deep Mixing Plan within this tree. Minimal artifact: left/right evidence anchors.
+
+### Bridge: mission-ethos <-> Deep Mixing Plan
+- relation: mission-constraint
+- summary: Bridge between mission-ethos and deep-mixing-plan (mission-constraint).
+
+### Bridge: stewardship-ledger <-> Deep Mixing Plan
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and deep-mixing-plan (stewardship-guardrail).
