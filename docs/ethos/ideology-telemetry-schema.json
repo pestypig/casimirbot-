@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "event": "ideology.node.viewed",
+      "description": "Node viewed or referenced in UI or API response.",
+      "fields": ["nodeId", "surface", "sessionId", "timestamp"]
+    },
+    {
+      "event": "ideology.node.cited",
+      "description": "Node cited in an answer or report.",
+      "fields": ["nodeId", "surface", "traceId", "timestamp"]
+    }
+  ],
+  "metrics": {
+    "noise_laplacian_rms": "Spatial coherence of noise field (lower is better).",
+    "amplitude_violation_rate": "Rate of saturation/overrun violations.",
+    "determinism_rate": "Repeatability across (seed,constraints,budget).",
+    "contradiction_count": "Number of contradictions in coherence graph.",
+    "axiom_satisfaction": "Axiom satisfaction score (0..1).",
+    "evidence_consistency": "Evidence consistency score (0..1)."
+  },
+  "flags": {
+    "artifacts_complete": "All run artifacts captured (plan, diff, reports).",
+    "gate_trace_present": "Constraint/gate trace is present for audit."
+  },
+  "strings": {
+    "surface": "Surface that emitted the telemetry (ui, api, batch).",
+    "note": "Optional operator note."
+  }
+}

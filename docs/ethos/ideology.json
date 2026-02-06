@@ -117,6 +117,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -202,6 +206,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -284,6 +292,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -419,6 +431,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -513,6 +529,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -607,6 +627,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -683,6 +707,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -769,6 +797,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -851,6 +883,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -937,6 +973,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1023,6 +1063,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1115,6 +1159,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1199,6 +1247,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1289,6 +1341,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1379,6 +1435,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1469,6 +1529,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1555,6 +1619,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1641,6 +1709,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1727,6 +1799,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1837,6 +1913,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -1927,6 +2007,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2017,6 +2101,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2107,6 +2195,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2228,6 +2320,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2324,6 +2420,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2420,6 +2520,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2521,6 +2625,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2611,6 +2719,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2705,6 +2817,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2800,6 +2916,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2890,6 +3010,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -2995,6 +3119,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3090,6 +3218,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3211,6 +3343,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3295,6 +3431,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3380,6 +3520,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3471,6 +3615,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3567,6 +3715,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3668,6 +3820,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3756,6 +3912,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3834,6 +3994,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -3925,6 +4089,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4023,6 +4191,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4111,6 +4283,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4209,6 +4385,10 @@
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4299,6 +4479,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4381,6 +4565,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4463,6 +4651,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4569,6 +4761,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4658,6 +4854,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4747,6 +4947,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4836,6 +5040,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -4928,6 +5136,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -5017,6 +5229,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -5105,6 +5321,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
@@ -5193,6 +5413,10 @@
         {
           "type": "code",
           "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {
