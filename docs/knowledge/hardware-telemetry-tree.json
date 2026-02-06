@@ -353,7 +353,9 @@
         "hardware",
         "provenance"
       ],
-      "children": [],
+      "children": [
+        "bridge-hardware-provenance-stewardship-ledger"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -465,6 +467,81 @@
       ],
       "slug": "bridge-hardware-ingest-hardware-bus",
       "summary": "Bridge between Hardware Ingest and Hardware Bus."
+    },
+    {
+      "id": "bridge-hardware-provenance-stewardship-ledger",
+      "slug": "bridge-hardware-provenance-stewardship-ledger",
+      "title": "Hardware Provenance <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and hardware-provenance.",
+      "bodyMD": "Bridge between stewardship-ledger and hardware-provenance (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "hardware",
+        "telemetry"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-provenance"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-provenance"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "hardware-provenance",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "hardware-provenance"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between stewardship-ledger and hardware-provenance."
     }
   ],
   "schema": {

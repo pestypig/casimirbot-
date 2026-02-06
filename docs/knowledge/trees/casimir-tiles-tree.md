@@ -105,8 +105,26 @@ Casimir tiles define a concrete negative-energy mechanism and its verification p
 - type: bridge
 - summary: Cross-reference between TS_ratio Guardrail and Casimir Tile Mechanism within this tree. Minimal artifact: left/right evidence anchors.
 
+### Node: Casimir Tiles Overview <-> Stewardship Ledger
+- id: bridge-casimir-tiles-overview-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and casimir-tiles-overview (stewardship-guardrail).
+
+### Node: Casimir Calculation Stack <-> Verification Checklist
+- id: bridge-casimir-calculation-stack-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and casimir-calculation-stack (verification-anchor).
+
 ## Bridges
 
 ### Bridge: TS_ratio Guardrail <-> Casimir Tile Mechanism
 - relation: Cross-reference between TS_ratio Guardrail and Casimir Tile Mechanism.
 - summary: Cross-reference between TS_ratio Guardrail and Casimir Tile Mechanism within this tree. Minimal artifact: left/right evidence anchors.
+
+### Bridge: stewardship-ledger <-> Casimir Tiles Overview
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and casimir-tiles-overview (stewardship-guardrail).
+
+### Bridge: verification-checklist <-> Casimir Calculation Stack
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and casimir-calculation-stack (verification-anchor).

@@ -595,7 +595,9 @@
         "resonance",
         "tests"
       ],
-      "children": [],
+      "children": [
+        "bridge-resonance-tests-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -713,6 +715,80 @@
       ],
       "slug": "bridge-code-lattice-core-resonance-runtime",
       "summary": "Bridge between Code Lattice Core and Resonance Runtime."
+    },
+    {
+      "id": "bridge-resonance-tests-verification-checklist",
+      "slug": "bridge-resonance-tests-verification-checklist",
+      "title": "Resonance Tests <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and resonance-tests.",
+      "bodyMD": "Bridge between verification-checklist and resonance-tests (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "resonance"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-tests"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "resonance-tests"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "resonance-tests",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "resonance-tests"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "test",
+          "path": "server/services/code-lattice/__tests__/resonance.casimir.spec.ts",
+          "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
+          "content_hash": "sha256:db8f238939886e377c394c263994bf664b27c44f9c4245c2ae265258468a45dd"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and resonance-tests."
     }
   ],
   "schema": {

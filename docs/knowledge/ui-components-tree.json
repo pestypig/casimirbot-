@@ -3233,6 +3233,10 @@
         {
           "rel": "parent",
           "to": "ui-panel-stellar-solar"
+        },
+        {
+          "rel": "see-also",
+          "to": "deep-mixing-plan"
         }
       ],
       "summary": "Solar globe and navigation panels.",
@@ -3373,7 +3377,7 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/components/DeepMixingSolarView.ts"
+          "path": "client/src/components/DeepMixingSolarView.tsx"
         },
         {
           "type": "doc",

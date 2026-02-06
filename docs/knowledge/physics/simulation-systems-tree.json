@@ -240,7 +240,9 @@
         "simulation",
         "modules"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-core-modules-mission-ethos"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -847,6 +849,80 @@
       ],
       "slug": "bridge-simulation-contracts-simulation-api",
       "summary": "Bridge between Simulation Contracts and Simulation API."
+    },
+    {
+      "id": "bridge-simulation-core-modules-mission-ethos",
+      "slug": "bridge-simulation-core-modules-mission-ethos",
+      "title": "Simulation Core Modules <-> Mission Ethos",
+      "excerpt": "Bridge between mission-ethos and simulation-core-modules.",
+      "bodyMD": "Bridge between mission-ethos and simulation-core-modules (mission-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-core-modules"
+        },
+        {
+          "rel": "see-also",
+          "to": "mission-ethos"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-core-modules"
+        }
+      ],
+      "bridge": {
+        "left": "mission-ethos",
+        "right": "simulation-core-modules",
+        "relation": "mission-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "mission-ethos",
+        "simulation-core-modules"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/mission-ethos.md",
+          "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
+          "content_hash": "sha256:9fe08823eba41a68bb24b3ebe5386725326d1cef354528c816f1edebfd870615"
+        },
+        {
+          "type": "doc",
+          "path": "modules/sim_core/README.md",
+          "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
+          "content_hash": "sha256:d8dfd543b8ef9af8d6a20bab2a631e45035807072819bde89727c98c96e2301e"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between mission-ethos and simulation-core-modules."
     }
   ],
   "schema": {

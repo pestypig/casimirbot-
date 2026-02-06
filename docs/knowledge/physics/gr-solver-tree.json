@@ -319,7 +319,9 @@
         "residuals",
         "gr"
       ],
-      "children": [],
+      "children": [
+        "bridge-gr-constraint-network-stewardship-ledger"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -471,7 +473,9 @@
         "constraints",
         "verification"
       ],
-      "children": [],
+      "children": [
+        "bridge-gr-constraint-gate-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -2691,6 +2695,150 @@
       ],
       "slug": "bridge-gr-solver-progress-gr-solver-robustness",
       "summary": "Bridge between GR Solver Progress and GR Solver Robustness."
+    },
+    {
+      "id": "bridge-gr-constraint-gate-verification-checklist",
+      "slug": "bridge-gr-constraint-gate-verification-checklist",
+      "title": "GR Constraint Gate <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and gr-constraint-gate.",
+      "bodyMD": "Bridge between verification-checklist and gr-constraint-gate (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-constraint-gate"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-constraint-gate"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "gr-constraint-gate",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "gr-constraint-gate"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "doc",
+          "path": "docs/gr-solver-robustness.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:e9e3f763b8d45fc81442c97d0911239c994929ef35b90ffa99c0895a7710b3f4"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "bridge-gr-constraint-network-stewardship-ledger",
+      "slug": "bridge-gr-constraint-network-stewardship-ledger",
+      "title": "GR Constraint Network <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and gr-constraint-network.",
+      "bodyMD": "Bridge between stewardship-ledger and gr-constraint-network (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-constraint-network"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-constraint-network"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "gr-constraint-network",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "gr-constraint-network"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "doc",
+          "path": "docs/gr-solver-progress.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:2cdb431e8047772cff50ef1aa17c1d3821c85f5907639399343c3eaeb5724d49"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     }
   ],
   "schema": {

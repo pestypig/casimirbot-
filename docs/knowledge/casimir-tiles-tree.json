@@ -82,7 +82,9 @@
           "content_hash": "sha256:825bcbb7a9462ca2d651850cc22f7abac3d21d3932440a50cae0a45e3da1d7e0"
         }
       ],
-      "children": [],
+      "children": [
+        "bridge-casimir-tiles-overview-stewardship-ledger"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -498,7 +500,8 @@
         "casimir-dynamic-engine",
         "casimir-inference-engine",
         "casimir-natario-metric",
-        "casimir-stress-energy-equations"
+        "casimir-stress-energy-equations",
+        "bridge-casimir-calculation-stack-verification-checklist"
       ],
       "links": [
         {
@@ -1074,6 +1077,156 @@
       ],
       "slug": "bridge-ts-ratio-guardrail-casimir-tile-mechanism",
       "summary": "Bridge between TS_ratio Guardrail and Casimir Tile Mechanism."
+    },
+    {
+      "id": "bridge-casimir-tiles-overview-stewardship-ledger",
+      "slug": "bridge-casimir-tiles-overview-stewardship-ledger",
+      "title": "Casimir Tiles Overview <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and casimir-tiles-overview.",
+      "bodyMD": "Bridge between stewardship-ledger and casimir-tiles-overview (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-overview"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-overview"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "casimir-tiles-overview",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "casimir-tiles-overview"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "doc",
+          "path": "docs/guarded-casimir-tile-code-mapped.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:c89daf1192841702019265493aa762724e7110caef2c5bfdbd7e9a8624d16013"
+        },
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:b07c01cd9f946ab27944444a1e0ff965c9a29b89e6dce444a235f87215713b36"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "bridge-casimir-calculation-stack-verification-checklist",
+      "slug": "bridge-casimir-calculation-stack-verification-checklist",
+      "title": "Casimir Calculation Stack <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and casimir-calculation-stack.",
+      "bodyMD": "Bridge between verification-checklist and casimir-calculation-stack (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-calculation-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-calculation-stack"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "casimir-calculation-stack",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "casimir-calculation-stack"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "doc",
+          "path": "docs/guarded-casimir-tile-code-mapped.md",
+          "repo_rev": "a65c3a8a4c5fa0a0b8a6ed73f3465ad6a5b6b5f2",
+          "content_hash": "sha256:c89daf1192841702019265493aa762724e7110caef2c5bfdbd7e9a8624d16013"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     }
   ]
 }
