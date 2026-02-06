@@ -144,6 +144,41 @@ A node is “full access” only if all checks are satisfied:
 
 ---
 
+
+---
+
+## Codex Gap-Closure Prompt (Panel ? DAG)
+Use this prompt for Codex to keep working until panel-driven DAG gaps are closed.
+
+**Prompt**
+```
+You are Codex. Keep iterating until panel-driven DAG gaps are closed.
+
+Loop:
+1) Run `npx tsx scripts/panel-cross-concepts.ts`.
+2) Read `reports/panel-cross-concepts.json` and `reports/panel-dag-gaps.md`.
+3) For each panel with `treeIds.length == 0` or `missingTerms.length > 0`:
+   - Identify the panel’s component file and its highest-weight terms.
+   - Create or update the appropriate DAG node(s) in the relevant tree(s).
+   - Bind evidence (doc, code, test, telemetry where applicable) with `repo_rev` + `content_hash`.
+   - Add bridge nodes for cross-concept joins.
+4) Regenerate tree docs: `npx tsx scripts/helix-ask-tree-docs.ts`.
+5) Re-run the panel miner to verify the panel now maps to a tree.
+
+Stop conditions:
+- `panels_without_tree_matches == 0` (from `panel-cross-concepts.json`)
+- `missingTerms.length == 0` for all panels **or** missing terms are explicitly documented as out-of-scope in the tree notes.
+
+After each loop:
+- Update the DAG Full-Access Checklist status for nodes you touched.
+- Keep commits small and descriptive.
+```
+
+**Acceptance**
+- Every panel maps to at least one tree.
+- Cross-concept bridges exist where panels combine concepts from multiple trees.
+- Evidence bindings (doc/code/test/telemetry) meet the DAG Full-Access Checklist.
+
 ## Test Matrix (Dry Runs)
 Use dry runs to confirm controller + gates without LLM:
 - “What does solar restoration mean in this repo?”
@@ -170,4 +205,5 @@ Use dry runs to confirm controller + gates without LLM:
 - Tool-result contract guardrail.
 - DAG full-access checklist applied to priority trees.
 - Continual learning loop tied to tree/DAG metadata + A/B adapters.
+
 
