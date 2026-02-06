@@ -13294,16 +13294,22 @@ const executeHelixAsk = async ({
   const HELIX_ASK_EVENT_VERSION = "v1";
   const HELIX_ASK_EVENT_MAX_CHARS = clampNumber(
     readNumber(
-      process.env.HELIX_ASK_EVENT_MAX_CHARS ?? process.env.VITE_HELIX_ASK_EVENT_MAX_CHARS,
-      1400,
+      process.env.HELIX_ASK_EVENT_MAX_CHARS ??
+        process.env.VITE_HELIX_ASK_EVENT_MAX_CHARS ??
+        process.env.HELIX_ASK_PREVIEW_CHARS ??
+        process.env.VITE_HELIX_ASK_PREVIEW_CHARS,
+      3000,
     ),
     240,
     8000,
   );
   const HELIX_ASK_ANSWER_PREVIEW_CHARS = clampNumber(
     readNumber(
-      process.env.HELIX_ASK_ANSWER_PREVIEW_CHARS ?? process.env.VITE_HELIX_ASK_ANSWER_PREVIEW_CHARS,
-      1400,
+      process.env.HELIX_ASK_PREVIEW_CHARS ??
+        process.env.VITE_HELIX_ASK_PREVIEW_CHARS ??
+        process.env.HELIX_ASK_ANSWER_PREVIEW_CHARS ??
+        process.env.VITE_HELIX_ASK_ANSWER_PREVIEW_CHARS,
+      3000,
     ),
     240,
     8000,
