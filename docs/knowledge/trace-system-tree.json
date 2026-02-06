@@ -27,7 +27,33 @@
       ],
       "links": [],
       "summary": "Trace capture, essence profiles, and AGI refinement pipelines.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/trace-system-tree.json"
+        }
+      ]
     },
     {
       "id": "trace-api-stack",
@@ -61,7 +87,27 @@
           "type": "code",
           "path": "server/routes/agi.memory.trace.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "trace-training-stack",
@@ -99,7 +145,27 @@
           "type": "code",
           "path": "server/__tests__/training-trace.test.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "trace-storage-stack",
@@ -170,7 +236,27 @@
           "type": "code",
           "path": "server/db/migrations/020_trace_debate_id.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "essence-schema-stack",
@@ -224,7 +310,27 @@
           "type": "code",
           "path": "shared/inferenceProfile.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "essence-profile-stack",
@@ -290,7 +396,27 @@
           "type": "code",
           "path": "server/services/panels/profile-panel-from-profile.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "agi-refinery-stack",
@@ -372,7 +498,27 @@
           "type": "code",
           "path": "server/services/agi/refinery-variants.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "agi-routing-stack",
@@ -434,7 +580,27 @@
           "type": "code",
           "path": "server/routes/agi.refinery.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "collapse-benchmark-stack",
@@ -480,7 +646,27 @@
           "type": "code",
           "path": "server/services/contributions/trace-links.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "essence-telemetry-stack",
@@ -602,7 +788,27 @@
           "type": "code",
           "path": "server/services/essence/preferences.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "agi-client-stack",
@@ -684,7 +890,27 @@
           "type": "code",
           "path": "client/src/hooks/useEssenceThemes.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     }
   ],
   "schema": {

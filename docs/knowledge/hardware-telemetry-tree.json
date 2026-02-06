@@ -23,7 +23,33 @@
       ],
       "links": [],
       "summary": "Hardware ingest, scheduling, and UI control surfaces.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/hardware-telemetry-tree.json"
+        }
+      ]
     },
     {
       "id": "hardware-ingest",
@@ -49,7 +75,27 @@
           "type": "code",
           "path": "server/helix-core.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "hardware-bus",
@@ -79,7 +125,27 @@
           "type": "code",
           "path": "server/helix-core.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "hardware-hooks",
@@ -110,7 +176,27 @@
           "type": "code",
           "path": "client/src/hooks/useSectorStateBusRelay.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "hardware-panels",
@@ -152,7 +238,27 @@
           "type": "code",
           "path": "client/src/components/LightSpeedStrobeScale.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "hardware-scheduler",
@@ -186,7 +292,27 @@
           "type": "code",
           "path": "server/instruments/pump-multitone.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "hardware-provenance",
@@ -212,7 +338,27 @@
           "type": "code",
           "path": "server/energy-pipeline.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     }
   ],
   "schema": {

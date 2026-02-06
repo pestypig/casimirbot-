@@ -24,7 +24,33 @@
       ],
       "links": [],
       "summary": "Third-party dependencies and vendor integrations.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json"
+        }
+      ]
     },
     {
       "id": "external-llm-stack",
@@ -45,7 +71,33 @@
         }
       ],
       "summary": "LLM inference backends and adapters.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json"
+        }
+      ]
     },
     {
       "id": "external-audio-stack",
@@ -66,7 +118,33 @@
         }
       ],
       "summary": "Audio and speech processing dependencies.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json"
+        }
+      ]
     },
     {
       "id": "external-physics-stack",
@@ -87,7 +165,33 @@
         }
       ],
       "summary": "External physics and visualization references.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json"
+        }
+      ]
     },
     {
       "id": "external-solar-stack",
@@ -108,7 +212,33 @@
         }
       ],
       "summary": "Solar data tooling dependencies.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json"
+        }
+      ]
     },
     {
       "id": "external-webgpu-stack",
@@ -129,7 +259,33 @@
         }
       ],
       "summary": "WebGPU volume rendering references.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json"
+        }
+      ]
     },
     {
       "id": "external-hardware-stack",
@@ -150,7 +306,33 @@
         }
       ],
       "summary": "Hardware utility dependencies.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json"
+        }
+      ]
     },
     {
       "id": "external-architecture-stack",
@@ -171,7 +353,33 @@
         }
       ],
       "summary": "External architectural references and notes.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json"
+        }
+      ]
     }
   ],
   "schema": {

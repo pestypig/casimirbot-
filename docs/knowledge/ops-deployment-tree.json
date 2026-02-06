@@ -23,7 +23,33 @@
       ],
       "links": [],
       "summary": "CI, verification gates, observability, and deployment scaffolding.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ops-deployment-tree.json"
+        }
+      ]
     },
     {
       "id": "ops-ci-workflows",
@@ -43,7 +69,33 @@
         }
       ],
       "summary": "GitHub Actions workflows for verification and release.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ops-deployment-tree.json"
+        }
+      ]
     },
     {
       "id": "ops-verification-tools",
@@ -77,7 +129,27 @@
           "type": "doc",
           "path": "docs/ADAPTER-CONTRACT.md"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "ops-observability",
@@ -103,7 +175,27 @@
           "type": "code",
           "path": "server/routes/observability.client-error.ts"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "ops-env-config",
@@ -123,7 +215,33 @@
         }
       ],
       "summary": "Environment and configuration files.",
-      "nodeType": "concept"
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ops-deployment-tree.json"
+        }
+      ]
     },
     {
       "id": "ops-scripts-tools",
@@ -149,7 +267,27 @@
           "type": "doc",
           "path": "cli/README.md"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     },
     {
       "id": "ops-release-packaging",
@@ -175,7 +313,27 @@
           "type": "code",
           "path": "cli/package.js"
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     }
   ],
   "schema": {
