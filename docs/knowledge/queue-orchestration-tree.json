@@ -19,7 +19,8 @@
         "queue-job-services",
         "queue-essence-ingest",
         "queue-profile-summarizer",
-        "queue-orchestrator"
+        "queue-orchestrator",
+        "bridge-queue-core-queue-routes"
       ],
       "links": [],
       "summary": "Async job queues, schedulers, and orchestration services.",
@@ -388,6 +389,79 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-queue-core-queue-routes",
+      "title": "Queue Core <-> Queue Routes Bridge",
+      "excerpt": "Bridge between Queue Core and Queue Routes.",
+      "bodyMD": "Cross-reference between Queue Core and Queue Routes within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "queue",
+        "core",
+        "routes"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "queue-orchestration-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "queue-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "queue-routes"
+        }
+      ],
+      "bridge": {
+        "left": "queue-core",
+        "right": "queue-routes",
+        "relation": "Cross-reference between Queue Core and Queue Routes."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "queue-core",
+        "queue-routes"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/queue/index.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bdb919aeb2e0914f7dae27eae8c9996f73e89cea45c79f9615a6a4615cce0bce",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/jobs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:95da7f81910021fc6ea712ab1f3c2d0e425e4711747f4a50a25b7ec638132dc1",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-queue-core-queue-routes",
+      "summary": "Bridge between Queue Core and Queue Routes."
     }
   ],
   "schema": {

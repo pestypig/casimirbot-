@@ -25,7 +25,8 @@
         "gr-evaluation",
         "gr-worker-stack",
         "gr-agent-loop",
-        "gr-assistant-adapter"
+        "gr-assistant-adapter",
+        "bridge-gr-solver-progress-gr-solver-robustness"
       ],
       "links": [],
       "summary": "A walk from GR evolution to constraint gates and robustness notes.",
@@ -443,7 +444,7 @@
       },
       "deterministic": true,
       "tolerance": {
-        "abs": 1e-06
+        "abs": 0.000001
       },
       "environment": {
         "runtime": "node"
@@ -1221,7 +1222,7 @@
       "deterministic": true,
       "tolerance": {
         "cfl_max": 0.5,
-        "abs": 1e-06
+        "abs": 0.000001
       },
       "environment": {
         "runtime": "node"
@@ -2616,6 +2617,80 @@
         "status": "complete",
         "missing": []
       }
+    },
+    {
+      "id": "bridge-gr-solver-progress-gr-solver-robustness",
+      "title": "GR Solver Progress <-> GR Solver Robustness Bridge",
+      "excerpt": "Bridge between GR Solver Progress and GR Solver Robustness.",
+      "bodyMD": "Cross-reference between GR Solver Progress and GR Solver Robustness within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "gr",
+        "solver",
+        "progress",
+        "robustness"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "gr-solver-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-solver-progress"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-solver-robustness"
+        }
+      ],
+      "bridge": {
+        "left": "gr-solver-progress",
+        "right": "gr-solver-robustness",
+        "relation": "Cross-reference between GR Solver Progress and GR Solver Robustness."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "gr-solver-progress",
+        "gr-solver-robustness"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/gr-solver-progress.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2cdb431e8047772cff50ef1aa17c1d3821c85f5907639399343c3eaeb5724d49",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/gr-solver-robustness.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e9e3f763b8d45fc81442c97d0911239c994929ef35b90ffa99c0895a7710b3f4",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-gr-solver-progress-gr-solver-robustness",
+      "summary": "Bridge between GR Solver Progress and GR Solver Robustness."
     }
   ],
   "schema": {

@@ -21,7 +21,8 @@
         "uncertainty-quantum-stochastic",
         "uncertainty-approximation-ladders",
         "uncertainty-collapse-constraints",
-        "uncertainty-reality-bounds"
+        "uncertainty-reality-bounds",
+        "bridge-uncertainty-classical-stack-uncertainty-statistical-stack"
       ],
       "links": [],
       "summary": "Classical, statistical, and quantum-stochastic uncertainty mapped to physics constraints.",
@@ -1524,6 +1525,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-uncertainty-classical-stack-uncertainty-statistical-stack",
+      "title": "Classical Uncertainty Stack <-> Statistical Uncertainty Stack Bridge",
+      "excerpt": "Bridge between Classical Uncertainty Stack and Statistical Uncertainty Stack.",
+      "bodyMD": "Cross-reference between Classical Uncertainty Stack and Statistical Uncertainty Stack within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "uncertainty",
+        "classical",
+        "numerics",
+        "statistical",
+        "sampling"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-mechanics-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "uncertainty-classical-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "uncertainty-statistical-stack"
+        }
+      ],
+      "bridge": {
+        "left": "uncertainty-classical-stack",
+        "right": "uncertainty-statistical-stack",
+        "relation": "Cross-reference between Classical Uncertainty Stack and Statistical Uncertainty Stack."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "uncertainty-classical-stack",
+        "uncertainty-statistical-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/numerical-precision.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:06789e573c5ec3537be0db51cb5a97b22cd5d1bc7b651407cd8635c65d06bd32",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sampling-time-bounds.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:63bfb24d0701cac0d54c8d77d9497e49861142b1b604eb75ac4a55ab1e03f55e",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-uncertainty-classical-stack-uncertainty-statistical-stack",
+      "summary": "Bridge between Classical Uncertainty Stack and Statistical Uncertainty Stack."
     }
   ],
   "schema": {

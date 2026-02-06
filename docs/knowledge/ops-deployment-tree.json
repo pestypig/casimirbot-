@@ -19,7 +19,8 @@
         "ops-observability",
         "ops-env-config",
         "ops-scripts-tools",
-        "ops-release-packaging"
+        "ops-release-packaging",
+        "bridge-ops-ci-workflows-ops-verification-tools"
       ],
       "links": [],
       "summary": "CI, verification gates, observability, and deployment scaffolding.",
@@ -362,6 +363,79 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-ops-ci-workflows-ops-verification-tools",
+      "title": "CI Workflows <-> Verification Tools Bridge",
+      "excerpt": "Bridge between CI Workflows and Verification Tools.",
+      "bodyMD": "Cross-reference between CI Workflows and Verification Tools within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "ops",
+        "ci",
+        "verification"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ops-deployment-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ops-ci-workflows"
+        },
+        {
+          "rel": "see-also",
+          "to": "ops-verification-tools"
+        }
+      ],
+      "bridge": {
+        "left": "ops-ci-workflows",
+        "right": "ops-verification-tools",
+        "relation": "Cross-reference between CI Workflows and Verification Tools."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "ops-ci-workflows",
+        "ops-verification-tools"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ops-deployment-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:931d45bf82b99d84fcb032ba89e14f0888cfa034287fd1cb053e44cedc338218",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "cli/casimir-verify.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6cd7089a337749588054caa18bb460d406560a4951abdd22295ef17fc0154a60",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-ops-ci-workflows-ops-verification-tools",
+      "summary": "Bridge between CI Workflows and Verification Tools."
     }
   ],
   "schema": {

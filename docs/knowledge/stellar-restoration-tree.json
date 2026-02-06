@@ -19,7 +19,8 @@
         "stellar-evolution-stack",
         "stellar-ledger-stack",
         "stellar-observation-stack",
-        "solar-restoration-plan"
+        "solar-restoration-plan",
+        "bridge-solar-restoration-plan-stellar-ledger-stack"
       ],
       "links": [],
       "summary": "A walk from stellar structure to ledgers, monitoring, and restoration plans.",
@@ -691,6 +692,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-solar-restoration-plan-stellar-ledger-stack",
+      "title": "Solar Restoration Plan <-> Stellar Ledger Stack Bridge",
+      "excerpt": "Bridge between Solar Restoration Plan and Stellar Ledger Stack.",
+      "bodyMD": "Cross-reference between Solar Restoration Plan and Stellar Ledger Stack within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "restoration",
+        "solar",
+        "plan",
+        "ledger",
+        "accounting"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "stellar-restoration-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "solar-restoration-plan"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-ledger-stack"
+        }
+      ],
+      "bridge": {
+        "left": "solar-restoration-plan",
+        "right": "stellar-ledger-stack",
+        "relation": "Cross-reference between Solar Restoration Plan and Stellar Ledger Stack."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "solar-restoration-plan",
+        "stellar-ledger-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/solar-restoration.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:acd9d5f26eff13797063abf2bdfddf3f246639aaae330bd51d4deccf7aa7bf0b",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/stellar-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:97085a2390e8f5172f36e81feb07118279d79d211519a3b4c8e63421ef4fe56d",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-solar-restoration-plan-stellar-ledger-stack",
+      "summary": "Bridge between Solar Restoration Plan and Stellar Ledger Stack."
     }
   ],
   "schema": {

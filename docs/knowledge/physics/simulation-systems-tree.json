@@ -26,7 +26,8 @@
         "simulation-parametric-sweeps",
         "simulation-ui-surfaces",
         "simulation-streaming",
-        "simulation-artifacts"
+        "simulation-artifacts",
+        "bridge-simulation-contracts-simulation-api"
       ],
       "links": [],
       "summary": "Simulation-only pipeline from contracts to UI surfaces.",
@@ -772,6 +773,80 @@
           "content_hash": "sha256:d0664357b50c0ee288952e50cf7eeeb0ea2cef64258cc63fc8420668e2a9f6d0"
         }
       ]
+    },
+    {
+      "id": "bridge-simulation-contracts-simulation-api",
+      "title": "Simulation Contracts <-> Simulation API Bridge",
+      "excerpt": "Bridge between Simulation Contracts and Simulation API.",
+      "bodyMD": "Cross-reference between Simulation Contracts and Simulation API within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "simulation",
+        "schema",
+        "contracts",
+        "api"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-systems-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-contracts"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-api"
+        }
+      ],
+      "bridge": {
+        "left": "simulation-contracts",
+        "right": "simulation-api",
+        "relation": "Cross-reference between Simulation Contracts and Simulation API."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "simulation-contracts",
+        "simulation-api"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/schema.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:031ed9cce6805b96b67408dc0602956993f2b7707d44e7ef8187902e09843752",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/routes.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0dcc6da8765d93d821cdfdec3a55581ee6b8923855881341fc1184c87b41f41a",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-simulation-contracts-simulation-api",
+      "summary": "Bridge between Simulation Contracts and Simulation API."
     }
   ],
   "schema": {

@@ -20,7 +20,8 @@
         "telemetry-badges-panels",
         "telemetry-observability",
         "telemetry-casimir",
-        "telemetry-tests"
+        "telemetry-tests",
+        "bridge-telemetry-console-routing-telemetry-console-storage"
       ],
       "links": [],
       "summary": "Console telemetry capture, storage, and observability hooks.",
@@ -504,6 +505,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-telemetry-console-routing-telemetry-console-storage",
+      "title": "Console Telemetry Routes <-> Console Telemetry Storage Bridge",
+      "excerpt": "Bridge between Console Telemetry Routes and Console Telemetry Storage.",
+      "bodyMD": "Cross-reference between Console Telemetry Routes and Console Telemetry Storage within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "telemetry",
+        "routes",
+        "api",
+        "storage",
+        "schemas"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "telemetry-console-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "telemetry-console-routing"
+        },
+        {
+          "rel": "see-also",
+          "to": "telemetry-console-storage"
+        }
+      ],
+      "bridge": {
+        "left": "telemetry-console-routing",
+        "right": "telemetry-console-storage",
+        "relation": "Cross-reference between Console Telemetry Routes and Console Telemetry Storage."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "telemetry-console-routing",
+        "telemetry-console-storage"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/services/console-telemetry/store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1b5f21b2c71e99f7eb6fd0e81d093b8efeab69033cef627314f69470b69d2acb",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-telemetry-console-routing-telemetry-console-storage",
+      "summary": "Bridge between Console Telemetry Routes and Console Telemetry Storage."
     }
   ],
   "schema": {

@@ -18,7 +18,8 @@
         "zen-ladder-deck",
         "zen-ladder-memo",
         "zen-ladder-artifacts",
-        "zen-ladder-receipts"
+        "zen-ladder-receipts",
+        "bridge-zen-ladder-core-zen-ladder-deck"
       ],
       "links": [],
       "summary": "Deck, memo, and template artifacts for ladder pack.",
@@ -776,6 +777,80 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-zen-ladder-core-zen-ladder-deck",
+      "title": "Zen Ladder Core <-> Zen Ladder Deck Bridge",
+      "excerpt": "Bridge between Zen Ladder Core and Zen Ladder Deck.",
+      "bodyMD": "Cross-reference between Zen Ladder Core and Zen Ladder Deck within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "zen",
+        "ladder",
+        "core",
+        "deck"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-ladder-pack-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "zen-ladder-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "zen-ladder-deck"
+        }
+      ],
+      "bridge": {
+        "left": "zen-ladder-core",
+        "right": "zen-ladder-deck",
+        "relation": "Cross-reference between Zen Ladder Core and Zen Ladder Deck."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "zen-ladder-core",
+        "zen-ladder-deck"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:82dc22a90d64f81990b2cf9300d0991ba29858934803e4cc9840172a4359d672",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/zen-ladder-pack/deck/deck-outline.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:65ab40db79cab25d6cc419a10f2d340ec2fb07d58495922c3a493bc6502b6f0f",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-zen-ladder-core-zen-ladder-deck",
+      "summary": "Bridge between Zen Ladder Core and Zen Ladder Deck."
     }
   ],
   "schema": {

@@ -16,7 +16,8 @@
       "children": [
         "zen-society-core",
         "zen-society-templates",
-        "zen-society-artifacts"
+        "zen-society-artifacts",
+        "bridge-zen-society-core-zen-society-templates"
       ],
       "links": [],
       "summary": "Governance spine and artifact templates for zen society.",
@@ -1443,6 +1444,80 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-zen-society-core-zen-society-templates",
+      "title": "Zen Society Core <-> Zen Society Templates Bridge",
+      "excerpt": "Bridge between Zen Society Core and Zen Society Templates.",
+      "bodyMD": "Cross-reference between Zen Society Core and Zen Society Templates within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "zen",
+        "society",
+        "core",
+        "templates"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "zen-society-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "zen-society-templates"
+        }
+      ],
+      "bridge": {
+        "left": "zen-society-core",
+        "right": "zen-society-templates",
+        "relation": "Cross-reference between Zen Society Core and Zen Society Templates."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "zen-society-core",
+        "zen-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:70d1ce0b246dc205b751c5b4f2fe241c9a6e6eca10bb6952401d17c168ce7604",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/zen-society-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ea40222cc8d9c4cf716007022b8f331c478fe1591b101b08aae69fddb91c640",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-zen-society-core-zen-society-templates",
+      "summary": "Bridge between Zen Society Core and Zen Society Templates."
     }
   ],
   "schema": {

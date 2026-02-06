@@ -16,7 +16,8 @@
       "children": [
         "epistemic-stack",
         "reasoning-stack",
-        "model-landscape-stack"
+        "model-landscape-stack",
+        "bridge-epistemic-stack-reasoning-stack"
       ],
       "links": [],
       "summary": "Epistemology, method, and reasoning frameworks.",
@@ -558,6 +559,80 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-epistemic-stack-reasoning-stack",
+      "title": "Epistemic Foundations <-> Reasoning Structures Bridge",
+      "excerpt": "Bridge between Epistemic Foundations and Reasoning Structures.",
+      "bodyMD": "Cross-reference between Epistemic Foundations and Reasoning Structures within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "epistemology",
+        "method",
+        "reasoning",
+        "concepts"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "concepts-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "epistemic-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "reasoning-stack"
+        }
+      ],
+      "bridge": {
+        "left": "epistemic-stack",
+        "right": "reasoning-stack",
+        "relation": "Cross-reference between Epistemic Foundations and Reasoning Structures."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "epistemic-stack",
+        "reasoning-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/concepts-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f32137bee9de2290a6670d830fc6578e2cd80940f182a85e921f48c081995c67",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/concepts-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f32137bee9de2290a6670d830fc6578e2cd80940f182a85e921f48c081995c67",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-epistemic-stack-reasoning-stack",
+      "summary": "Bridge between Epistemic Foundations and Reasoning Structures."
     }
   ],
   "schema": {

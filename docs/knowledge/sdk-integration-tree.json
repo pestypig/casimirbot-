@@ -18,7 +18,8 @@
         "sdk-runtime",
         "sdk-config",
         "sdk-docs",
-        "sdk-examples"
+        "sdk-examples",
+        "bridge-sdk-core-sdk-runtime"
       ],
       "links": [],
       "summary": "SDK clients, runtime helpers, and integration examples.",
@@ -342,6 +343,77 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-sdk-core-sdk-runtime",
+      "title": "SDK Core Surface <-> SDK Runtime Bridge",
+      "excerpt": "Bridge between SDK Core Surface and SDK Runtime.",
+      "bodyMD": "Cross-reference between SDK Core Surface and SDK Runtime within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "sdk",
+        "client",
+        "types",
+        "runtime",
+        "transport"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sdk-integration-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sdk-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "sdk-runtime"
+        }
+      ],
+      "bridge": {
+        "left": "sdk-core",
+        "right": "sdk-runtime",
+        "relation": "Cross-reference between SDK Core Surface and SDK Runtime."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "sdk-core",
+        "sdk-runtime"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "sdk/index.ts",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "sdk/runtime.ts",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-sdk-core-sdk-runtime",
+      "summary": "Bridge between SDK Core Surface and SDK Runtime."
     }
   ],
   "schema": {

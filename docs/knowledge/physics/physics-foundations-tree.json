@@ -27,7 +27,8 @@
         "quantum-gr-bridge",
         "uncertainty-mechanics",
         "brick-lattice-dataflow",
-        "simulation-systems"
+        "simulation-systems",
+        "bridge-field-equations-stack-stress-energy-stack"
       ],
       "links": [],
       "summary": "A walkable map from spacetime geometry to constraints, proofs, and verification.",
@@ -2383,6 +2384,83 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-field-equations-stack-stress-energy-stack",
+      "title": "Field Equations Stack <-> Stress-Energy Stack Bridge",
+      "excerpt": "Bridge between Field Equations Stack and Stress-Energy Stack.",
+      "bodyMD": "Cross-reference between Field Equations Stack and Stress-Energy Stack within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "einstein",
+        "adm",
+        "equations",
+        "gr",
+        "stress-energy",
+        "matter",
+        "source"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "field-equations-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "stress-energy-stack"
+        }
+      ],
+      "bridge": {
+        "left": "field-equations-stack",
+        "right": "stress-energy-stack",
+        "relation": "Cross-reference between Field Equations Stack and Stress-Energy Stack."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "field-equations-stack",
+        "stress-energy-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/einstein-field-equations.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b3fa4a3bdb5b8600a6821dc6cde1599d8993c379c7d48a0c8d2bc8d7b63cd525",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:19cff33aa85b85791c4069def797748b931dd812da9dc3dabb1bf263f084de7a",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-field-equations-stack-stress-energy-stack",
+      "summary": "Bridge between Field Equations Stack and Stress-Energy Stack."
     }
   ],
   "schema": {

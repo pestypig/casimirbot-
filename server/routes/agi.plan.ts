@@ -7479,15 +7479,16 @@ const isDefinitionDocPath = (filePath: string): boolean => {
 const isDefinitionQuestion = (question: string): boolean =>
   HELIX_ASK_DEFINITION_FOCUS.test(question);
 
-const collectDefinitionRegistryPaths = (
-  question: string,
-  conceptMatch: HelixAskConceptMatch | null,
-  definitionFocus: boolean,
-): string[] => {
-  if (!definitionFocus) return [];
-  const paths = new Set<string>();
-  const addPath = (value?: string) => {
-    if (!value) return;
+  const collectDefinitionRegistryPaths = (
+    question: string,
+    conceptMatch: HelixAskConceptMatch | null,
+    definitionFocus: boolean,
+    graphPack?: HelixAskGraphPack | null,
+  ): string[] => {
+    if (!definitionFocus) return [];
+    const paths = new Set<string>();
+    const addPath = (value?: string) => {
+      if (!value) return;
     const normalized = value.replace(/\\/g, "/").trim();
     if (!normalized) return;
     if (!isDefinitionDocPath(normalized)) return;
@@ -7496,15 +7497,19 @@ const collectDefinitionRegistryPaths = (
   if (conceptMatch) {
     addPath(conceptMatch.card.sourcePath);
     (conceptMatch.card.mustIncludeFiles ?? []).forEach((filePath) => addPath(filePath));
-  } else {
-    const candidates = listConceptCandidates(question, HELIX_ASK_DEFINITION_REGISTRY_TOPK);
-    candidates.forEach((candidate) => {
-      addPath(candidate.card.sourcePath);
-      (candidate.card.mustIncludeFiles ?? []).forEach((filePath) => addPath(filePath));
-    });
-  }
-  return Array.from(paths);
-};
+    } else {
+      const candidates = listConceptCandidates(question, HELIX_ASK_DEFINITION_REGISTRY_TOPK);
+      candidates.forEach((candidate) => {
+        addPath(candidate.card.sourcePath);
+        (candidate.card.mustIncludeFiles ?? []).forEach((filePath) => addPath(filePath));
+      });
+    }
+      const treeDocPaths = findDefinitionTreeDocPaths(question);
+      treeDocPaths.forEach((treePath) => addPath(treePath));
+      const packTreeDocs = findDefinitionTreeDocPathsForPack(graphPack);
+      packTreeDocs.forEach((treePath) => addPath(treePath));
+      return Array.from(paths);
+    };
 
 const buildDefinitionMatchTerms = (
   question: string,
@@ -7565,6 +7570,25 @@ const buildDefinitionRegistryBlocks = (
     blocks.push({ path: normalized, block });
   }
   return blocks;
+};
+
+const mergeDefinitionRegistryBlocks = (
+  baseBlocks: Array<{ path: string; block: string }>,
+  registryBlocks: Array<{ path: string; block: string }>,
+): Array<{ path: string; block: string }> => {
+  if (!registryBlocks.length) return baseBlocks;
+  const existing = new Set(
+    baseBlocks.map((block) => block.path.replace(/\\/g, "/").toLowerCase()),
+  );
+  const mergedBlocks = [...baseBlocks];
+  registryBlocks.forEach((block) => {
+    const key = block.path.replace(/\\/g, "/").toLowerCase();
+    if (!existing.has(key)) {
+      mergedBlocks.push(block);
+      existing.add(key);
+    }
+  });
+  return mergedBlocks;
 };
 
 const normalizeGraphEvidenceKey = (entry: HelixAskGraphEvidence): string => {
@@ -8757,8 +8781,214 @@ type HelixAskTreeWalkMetrics = {
 
 type HelixAskTreeWalkMode = "full" | "root_to_anchor" | "root_only" | "anchor_only";
 
-const normalizeTreeWalkKey = (value: string): string =>
-  value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+  const normalizeTreeWalkKey = (value: string): string =>
+    value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+
+  const TREE_TOKEN_STOPWORDS = new Set([
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "does",
+    "for",
+    "from",
+    "how",
+    "in",
+    "into",
+    "is",
+    "it",
+    "mean",
+    "of",
+    "on",
+    "or",
+    "repo",
+    "the",
+    "this",
+    "to",
+    "what",
+    "with",
+    "within",
+  ]);
+
+  const TREE_SHORT_TOKENS = new Set(["ts", "qi", "gr", "ai", "ml", "ui", "ux"]);
+
+  const tokenizeTreeText = (value: string): string[] =>
+    value
+      .toLowerCase()
+      .split(/[^a-z0-9]+/g)
+      .map((token) => token.trim())
+      .filter((token) => {
+        if (!token) return false;
+        if (TREE_TOKEN_STOPWORDS.has(token)) return false;
+        if (token.length >= 3) return true;
+        if (token.length === 2) return TREE_SHORT_TOKENS.has(token);
+        return false;
+      });
+
+const TREE_DOCS_DIR = "docs/knowledge/trees";
+  type DefinitionTreeDocEntry = { key: string; path: string; tokens: string[] };
+  let definitionTreeDocCache: DefinitionTreeDocEntry[] | null = null;
+
+const sanitizeTreeDocSlug = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .trim();
+
+const collectTreeFiles = (dir: string): string[] => {
+  if (!fs.existsSync(dir)) return [];
+  const entries: string[] = [];
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    let children: string[] = [];
+    try {
+      children = fs.readdirSync(current);
+    } catch {
+      continue;
+    }
+    for (const child of children) {
+      const full = path.join(current, child);
+      let stat: fs.Stats | null = null;
+      try {
+        stat = fs.statSync(full);
+      } catch {
+        stat = null;
+      }
+      if (!stat) continue;
+      if (stat.isDirectory()) {
+        stack.push(full);
+        continue;
+      }
+      if (child.endsWith("-tree.json")) {
+        entries.push(full);
+      }
+    }
+  }
+  return entries;
+};
+
+  const loadDefinitionTreeDocIndex = (): DefinitionTreeDocEntry[] => {
+    if (definitionTreeDocCache) return definitionTreeDocCache;
+    const index: DefinitionTreeDocEntry[] = [];
+    const treeFiles = collectTreeFiles(path.resolve(process.cwd(), "docs/knowledge"));
+  for (const treeFile of treeFiles) {
+    let raw = "";
+    try {
+      raw = fs.readFileSync(treeFile, "utf8");
+    } catch {
+      continue;
+    }
+    let parsed: { rootId?: string; nodes?: Array<{ id?: string; title?: string }> } | null = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+    if (!parsed) continue;
+    const rootId = typeof parsed.rootId === "string" ? parsed.rootId : path.basename(treeFile, ".json");
+    const slug = sanitizeTreeDocSlug(rootId || "");
+    if (!slug) continue;
+    const docPath = path.join(TREE_DOCS_DIR, `${slug}.md`).replace(/\\/g, "/");
+    const fullDocPath = path.resolve(process.cwd(), docPath);
+    if (!fs.existsSync(fullDocPath)) continue;
+      const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+      for (const node of nodes) {
+        const title = node?.title ?? node?.label ?? node?.id ?? "";
+        const id = node?.id ?? "";
+        const tags = Array.isArray(node?.tags) ? node.tags : [];
+        const aliases = Array.isArray(node?.aliases) ? node.aliases : [];
+        if (!title && !id && tags.length === 0 && aliases.length === 0) continue;
+        const key = normalizeTreeWalkKey(title || id);
+        const tokenSet = new Set<string>();
+        [title, id, ...tags, ...aliases]
+          .filter(Boolean)
+          .forEach((value) => {
+            tokenizeTreeText(String(value)).forEach((token) => tokenSet.add(token));
+          });
+        const tokens = Array.from(tokenSet);
+        if (!key && tokens.length === 0) continue;
+        index.push({ key, path: docPath, tokens });
+      }
+    }
+    definitionTreeDocCache = index;
+    return index;
+  };
+
+  const findDefinitionTreeDocPaths = (question: string, limit = 3): string[] => {
+    const normalizedQuestion = normalizeTreeWalkKey(question);
+    const questionTokens = new Set(tokenizeTreeText(question));
+    if (!normalizedQuestion && questionTokens.size === 0) return [];
+    const entries = loadDefinitionTreeDocIndex();
+    const scores = new Map<string, number>();
+    for (const entry of entries) {
+      let score = 0;
+      if (entry.key && normalizedQuestion && normalizedQuestion.includes(entry.key)) {
+        score += 3;
+      }
+      if (entry.tokens.length && questionTokens.size) {
+        let overlap = 0;
+        for (const token of entry.tokens) {
+          if (questionTokens.has(token)) overlap += 1;
+        }
+        if (overlap > 0) score += overlap;
+      }
+      if (score <= 0) continue;
+      const current = scores.get(entry.path) ?? 0;
+      if (score > current) scores.set(entry.path, score);
+    }
+    return Array.from(scores.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, Math.max(1, limit))
+      .map(([path]) => path);
+  };
+
+  const findDefinitionTreeDocPathsForPack = (
+    graphPack?: HelixAskGraphPack | null,
+    limit = 3,
+  ): string[] => {
+    if (!graphPack?.frameworks?.length) return [];
+    const paths: string[] = [];
+    const seen = new Set<string>();
+    const resolveDocPath = (candidate: string): string | null => {
+      const slug = sanitizeTreeDocSlug(candidate);
+      if (!slug) return null;
+      const docPath = path.join(TREE_DOCS_DIR, `${slug}.md`).replace(/\\/g, "/");
+      const fullDocPath = path.resolve(process.cwd(), docPath);
+      return fs.existsSync(fullDocPath) ? docPath : null;
+    };
+    const pushCandidate = (candidate: string) => {
+      if (!candidate) return;
+      const docPath = resolveDocPath(candidate);
+      if (!docPath || seen.has(docPath)) return;
+      seen.add(docPath);
+      paths.push(docPath);
+    };
+    for (const framework of graphPack.frameworks) {
+      const treeId = framework.treeId || framework.rootId || "";
+      const fallbackId = framework.sourcePath
+        ? path.basename(framework.sourcePath, ".json")
+        : "";
+      const candidates = [treeId, fallbackId].filter(Boolean);
+      for (const candidate of candidates) {
+        pushCandidate(candidate);
+        if (!candidate.endsWith("-tree")) {
+          pushCandidate(`${candidate}-tree`);
+        } else {
+          pushCandidate(candidate.replace(/-tree$/, ""));
+        }
+        if (paths.length >= limit) break;
+      }
+      if (paths.length >= limit) break;
+    }
+    return paths;
+  };
 
 const resolveHelixAskTreeWalkMode = (
   raw: string,
@@ -14493,39 +14723,45 @@ const executeHelixAsk = async ({
           ? getHelixAskSessionMemory(parsed.data.sessionId)
           : null;
     }
-    if (sessionMemoryForTags?.recentTopics?.length) {
-      topicTags = Array.from(
-        new Set([...topicTags, ...sessionMemoryForTags.recentTopics]),
-      ) as HelixAskTopicTag[];
-    }
-    logEvent(
-      "Topic tags",
-      topicTags.length ? "ok" : "none",
-      topicTags.length ? topicTags.join(", ") : "none",
-    );
-    const repoNativeTags = new Set([
-      "helix_ask",
-      "warp",
-      "ideology",
-      "ledger",
-      "star",
+      if (sessionMemoryForTags?.recentTopics?.length) {
+        topicTags = Array.from(
+          new Set([...topicTags, ...sessionMemoryForTags.recentTopics]),
+        ) as HelixAskTopicTag[];
+      }
+      logEvent(
+        "Topic tags",
+        topicTags.length ? "ok" : "none",
+        topicTags.length ? topicTags.join(", ") : "none",
+      );
+      let conceptMatch: HelixAskConceptMatch | null = null;
+      const repoNativeTags = new Set([
+        "helix_ask",
+        "warp",
+        "ideology",
+        "ledger",
+        "star",
       "constraints",
     ]);
-    const repoExpectationSignals: string[] = [];
-    let repoExpectationScore = 0;
+      const repoExpectationSignals: string[] = [];
+      let repoExpectationScore = 0;
     if (explicitRepoExpectation) {
       repoExpectationScore = 3;
       repoExpectationSignals.push("explicit_repo");
     }
-    if (hasFilePathHints) {
-      repoExpectationScore = Math.max(repoExpectationScore, 3);
-      repoExpectationSignals.push("file_path");
-    }
-    const tagSignals = topicTags.filter((tag) => repoNativeTags.has(tag));
-    if (tagSignals.length) {
-      repoExpectationScore = Math.max(repoExpectationScore, 2);
-      repoExpectationSignals.push(...tagSignals.map((tag) => `tag:${tag}`));
-    }
+      if (hasFilePathHints) {
+        repoExpectationScore = Math.max(repoExpectationScore, 3);
+        repoExpectationSignals.push("file_path");
+      }
+      const conceptRepoMatch = Boolean(conceptMatch?.card?.sourcePath);
+      if (conceptRepoMatch) {
+        repoExpectationScore = Math.max(repoExpectationScore, 2);
+        repoExpectationSignals.push("concept_match");
+      }
+      const tagSignals = topicTags.filter((tag) => repoNativeTags.has(tag));
+      if (tagSignals.length) {
+        repoExpectationScore = Math.max(repoExpectationScore, 2);
+        repoExpectationSignals.push(...tagSignals.map((tag) => `tag:${tag}`));
+      }
     if (HELIX_ASK_REPO_HINT.test(baseQuestion)) {
       repoExpectationScore = Math.max(repoExpectationScore, 1);
       repoExpectationSignals.push("repo_hint");
@@ -14536,11 +14772,12 @@ const executeHelixAsk = async ({
         : repoExpectationScore >= 2
           ? "medium"
           : "low";
-    let requiresRepoEvidence = explicitRepoExpectation;
-    let hasRepoHints =
-      explicitRepoExpectation ||
-      HELIX_ASK_REPO_HINT.test(baseQuestion) ||
-      repoExpectationLevel !== "low";
+      let requiresRepoEvidence = explicitRepoExpectation || conceptRepoMatch;
+      let hasRepoHints =
+        explicitRepoExpectation ||
+        HELIX_ASK_REPO_HINT.test(baseQuestion) ||
+        conceptRepoMatch ||
+        repoExpectationLevel !== "low";
     if (debugPayload) {
       debugPayload.explicit_repo_expectation = explicitRepoExpectation;
       debugPayload.repo_expectation_score = repoExpectationScore;
@@ -14950,16 +15187,17 @@ const executeHelixAsk = async ({
     if (!contextText && prompt) {
       contextText = extractContextFromPrompt(prompt);
     }
-    let contextFiles = extractFilePathsFromText(contextText);
-    let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
-    let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
-    let docSlotTargets: string[] = [];
-    let docBlocks: Array<{ path: string; block: string }> = [];
-    let graphEvidenceItems: HelixAskGraphEvidence[] = [];
-    let minDocEvidenceCards = 0;
-    const providedContextFiles = Array.isArray((parsed.data as any).contextFiles)
-      ? (parsed.data as any).contextFiles
-      : [];
+      let contextFiles = extractFilePathsFromText(contextText);
+      let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+      let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+      let docSlotTargets: string[] = [];
+      let docBlocks: Array<{ path: string; block: string }> = [];
+      let definitionRegistryBlocks: Array<{ path: string; block: string }> = [];
+      let graphEvidenceItems: HelixAskGraphEvidence[] = [];
+      let minDocEvidenceCards = 0;
+      const providedContextFiles = Array.isArray((parsed.data as any).contextFiles)
+        ? (parsed.data as any).contextFiles
+        : [];
     if (providedContextFiles.length > 0) {
       const normalized = providedContextFiles
         .map((entry: string) => (entry ? entry.replace(/\\/g, "/") : ""))
@@ -15075,8 +15313,7 @@ const executeHelixAsk = async ({
         debugPayload.prompt_used_sections = promptUsedSections.slice();
       }
     }
-    let conceptMatch: HelixAskConceptMatch | null = null;
-    let graphPack: HelixAskGraphPack | null = null;
+      let graphPack: HelixAskGraphPack | null = null;
     let treeWalkBlock = "";
     let treeWalkMetrics: HelixAskTreeWalkMetrics | null = null;
     let treeWalkMode: HelixAskTreeWalkMode = resolveHelixAskTreeWalkMode(
@@ -16416,7 +16653,7 @@ const executeHelixAsk = async ({
         coverageSlotSummary = null;
         docSlotSummary = null;
         docSlotTargets = [];
-        docBlocks = [];
+          docBlocks = mergeDefinitionRegistryBlocks([], definitionRegistryBlocks);
         minDocEvidenceCards = 0;
 
         if (!contextText) {
@@ -16562,7 +16799,10 @@ const executeHelixAsk = async ({
             }
           }
           const selectedDocs = selectDocBlocks(contextText, definitionFocus);
-          docBlocks = selectedDocs.docBlocks;
+          docBlocks = mergeDefinitionRegistryBlocks(
+            selectedDocs.docBlocks,
+            definitionRegistryBlocks,
+          );
           applyCompactionDebug(debugPayload, selectedDocs.compaction);
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
@@ -16766,7 +17006,10 @@ const executeHelixAsk = async ({
             }
             const refreshedDocs = selectDocBlocks(contextText, definitionFocus);
             const refreshedDocBlocks = refreshedDocs.docBlocks;
-            docBlocks = refreshedDocBlocks;
+            docBlocks = mergeDefinitionRegistryBlocks(
+              refreshedDocBlocks,
+              definitionRegistryBlocks,
+            );
             applyCompactionDebug(debugPayload, refreshedDocs.compaction);
             if (debugPayload) {
               debugPayload.proof_span_rate = Math.max(
@@ -17011,7 +17254,10 @@ const executeHelixAsk = async ({
         }
         if (!docSlotSummary) {
           const selectedDocs = selectDocBlocks(contextText, definitionFocus);
-          docBlocks = selectedDocs.docBlocks;
+          docBlocks = mergeDefinitionRegistryBlocks(
+            selectedDocs.docBlocks,
+            definitionRegistryBlocks,
+          );
           applyCompactionDebug(debugPayload, selectedDocs.compaction);
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
@@ -17171,7 +17417,10 @@ const executeHelixAsk = async ({
         }
         if (docSlotSummary) {
           const selectedDocs = selectDocBlocks(contextText, definitionFocus);
-          docBlocks = selectedDocs.docBlocks;
+          docBlocks = mergeDefinitionRegistryBlocks(
+            selectedDocs.docBlocks,
+            definitionRegistryBlocks,
+          );
           applyCompactionDebug(debugPayload, selectedDocs.compaction);
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
@@ -17512,7 +17761,10 @@ const executeHelixAsk = async ({
           const attemptDocSelection = selectDocBlocks(contextText, definitionFocus);
           const attemptDocBlocks = attemptDocSelection.docBlocks;
           const attemptDocText = attemptDocBlocks.map((block) => block.block).join("\n\n");
-          docBlocks = attemptDocBlocks;
+          docBlocks = mergeDefinitionRegistryBlocks(
+            attemptDocBlocks,
+            definitionRegistryBlocks,
+          );
           applyCompactionDebug(debugPayload, attemptDocSelection.compaction);
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
@@ -18136,41 +18388,32 @@ const executeHelixAsk = async ({
           promptContextFiles.forEach((entry) => merged.add(entry));
           contextFiles = Array.from(merged);
         }
-      }
+    }
 
-      const definitionRegistryPaths = collectDefinitionRegistryPaths(
-        baseQuestion,
-        conceptMatch,
-        definitionFocus,
-      );
-      if (definitionRegistryPaths.length > 0) {
-        const registryBlocks = buildDefinitionRegistryBlocks(
-          definitionRegistryPaths,
+        const definitionRegistryPaths = collectDefinitionRegistryPaths(
           baseQuestion,
           conceptMatch,
-          docBlocks,
+          definitionFocus,
+          graphPack,
         );
-        if (registryBlocks.length > 0) {
-          const existing = new Set(
-            docBlocks.map((block) => block.path.replace(/\\/g, "/").toLowerCase()),
-          );
-          const mergedBlocks = [...docBlocks];
-          registryBlocks.forEach((block) => {
-            const key = block.path.replace(/\\/g, "/").toLowerCase();
-            if (!existing.has(key)) {
-              mergedBlocks.push(block);
-              existing.add(key);
-            }
-          });
-          docBlocks = mergedBlocks;
-        }
         if (definitionRegistryPaths.length > 0) {
-          contextFiles = Array.from(new Set([...contextFiles, ...definitionRegistryPaths]));
-        }
-        if (debugPayload) {
-          debugPayload.definition_registry_paths = definitionRegistryPaths.slice(0, 6);
-          debugPayload.definition_registry_blocks = registryBlocks.length;
-        }
+          const registryBlocks = buildDefinitionRegistryBlocks(
+            definitionRegistryPaths,
+            baseQuestion,
+            conceptMatch,
+            docBlocks,
+          );
+          definitionRegistryBlocks = registryBlocks;
+          if (registryBlocks.length > 0) {
+            docBlocks = mergeDefinitionRegistryBlocks(docBlocks, registryBlocks);
+          }
+          if (definitionRegistryPaths.length > 0) {
+            contextFiles = Array.from(new Set([...contextFiles, ...definitionRegistryPaths]));
+          }
+          if (debugPayload) {
+            debugPayload.definition_registry_paths = definitionRegistryPaths.slice(0, 6);
+            debugPayload.definition_registry_blocks = registryBlocks.length;
+          }
       }
 
       const graphEvidence = collectGraphEvidenceItems(graphPack);
@@ -18209,7 +18452,10 @@ const executeHelixAsk = async ({
               existing.add(key);
             }
           });
-          docBlocks = mergedBlocks;
+          docBlocks = mergeDefinitionRegistryBlocks(
+            mergedBlocks,
+            definitionRegistryBlocks,
+          );
         }
         if (graphDoc.paths.length > 0) {
           contextFiles = Array.from(new Set([...contextFiles, ...graphDoc.paths]));
@@ -18224,10 +18470,7 @@ const executeHelixAsk = async ({
       }
 
       if (graphPack) {
-        const bindingBlocks =
-          definitionFocus && docBlocks.length > 0
-            ? resolveDefinitionDocBlocks(docBlocks, conceptMatch, definitionFocus)
-            : docBlocks;
+          const bindingBlocks = docBlocks;
         const boundNodes = HELIX_ASK_TREE_WALK_BINDING
           ? buildTreeWalkBindingSet(graphPack, bindingBlocks)
           : undefined;
