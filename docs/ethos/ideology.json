@@ -97,6 +97,26 @@
           "type": "doc",
           "path": "docs/ethos/why.md",
           "title": "Mission Ethos Seeds"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -162,6 +182,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "interbeing-systems"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -224,6 +264,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "sangha-architecture"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -433,6 +493,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "citizens-arc-anti-mutation"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -507,6 +587,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "citizens-arc-stress-test"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -649,6 +749,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "restorative-harm-repair"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -711,6 +831,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "impermanence-by-design"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -777,6 +917,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "koan-governance"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1109,6 +1269,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "capture-resistance"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1179,6 +1359,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "scarcity-justice"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1249,6 +1449,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "data-dignity"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1315,6 +1535,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "civic-memory-continuity"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1381,6 +1621,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "skillful-mediation"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1447,6 +1707,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "external-interface-integrity"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1537,6 +1817,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "verification-based-diplomacy"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1607,6 +1907,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "shadow-rail-interdiction"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1677,6 +1997,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "dignified-exit-design"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1747,6 +2087,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "repair-debt-compact"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1848,6 +2208,26 @@
           "type": "doc",
           "path": "docs/ethos/why.md",
           "title": "Mission Ethos Seeds"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -1924,6 +2304,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "bodhisattva-craft"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -2000,6 +2400,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "stewardship-ledger"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -2081,6 +2501,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "beginners-mind"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -2245,6 +2685,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "dream-integrity"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -2320,6 +2780,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "struggle-testament"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -2390,6 +2870,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "devotion-course"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -2475,6 +2975,26 @@
           "type": "doc",
           "path": "docs/ethos/why.md",
           "title": "Mission Ethos Seeds"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -2550,6 +3070,26 @@
           "type": "doc",
           "path": "docs/product-narrative.md",
           "title": "Product Narrative"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -2911,6 +3451,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "voice-integrity"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -3088,6 +3648,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "habit-pressure-break"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -3156,6 +3736,26 @@
           "type": "doc",
           "path": "docs/casimir-tile-mechanism.md",
           "title": "Casimir Tile Mechanism"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -3305,6 +3905,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "reciprocity-contract"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -3659,6 +4279,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "lifetime-trust-ledger"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -3721,6 +4361,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "jurisdictional-floor"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -3783,6 +4443,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "two-key-approval"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -3869,6 +4549,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "lawful-interface-protocol"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -3938,6 +4638,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "federal-civic-listening-circuit"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -4007,6 +4727,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "metric-integrity-guardrail"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -4076,6 +4816,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "harm-weighted-priority-standard"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -4148,6 +4908,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "integration-ladder"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -4217,6 +4997,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "local-stability-compact"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -4285,6 +5085,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "access-to-counsel-pathway"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
@@ -4353,6 +5173,26 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "training-certification-gate"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
         }
       ],
       "predictability": {
