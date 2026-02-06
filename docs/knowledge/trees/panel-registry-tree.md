@@ -550,15 +550,15 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel tsn-sim links to hardware-telemetry-tree via term "telemetry".
 
-### Node: TSN Determinism <-> ui-page-desktop
-- id: bridge-panel-tsn-sim-ui-page-desktop
+### Node: TSN Determinism <-> skills-telemetry
+- id: bridge-panel-tsn-sim-skills-telemetry
 - type: bridge
-- summary: Panel tsn-sim links to ui-page-desktop via term "desktop".
+- summary: Panel tsn-sim links to skills-telemetry via term "telemetry".
 
-### Node: TSN Determinism <-> ui-panel-registry-desktop
-- id: bridge-panel-tsn-sim-ui-panel-registry-desktop
+### Node: TSN Determinism <-> star-models-telemetry
+- id: bridge-panel-tsn-sim-star-models-telemetry
 - type: bridge
-- summary: Panel tsn-sim links to ui-panel-registry-desktop via term "desktop".
+- summary: Panel tsn-sim links to star-models-telemetry via term "telemetry".
 
 ### Node: Warp Pulsed Power <-> warp-pulsed-power
 - id: bridge-panel-pulsed-power-doc-warp-pulsed-power
@@ -585,10 +585,10 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel pulsed-power-doc links to solar-pipeline via term "pipeline".
 
-### Node: Warp Pulsed Power <-> external-hardware-stack
-- id: bridge-panel-pulsed-power-doc-external-hardware-stack
+### Node: Warp Pulsed Power <-> binding-energy-pipeline
+- id: bridge-panel-pulsed-power-doc-binding-energy-pipeline
 - type: bridge
-- summary: Panel pulsed-power-doc links to external-hardware-stack via term "hardware".
+- summary: Panel pulsed-power-doc links to binding-energy-pipeline via term "pipeline".
 
 ### Node: Bus Voltage Program <-> guarded-casimir-tile-code-mapped
 - id: bridge-panel-bus-voltage-guarded-casimir-tile-code-mapped
@@ -760,6 +760,16 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel cavity-mechanism links to solar-pipeline via term "pipeline".
 
+### Node: Cavity Mechanism <-> binding-energy-pipeline
+- id: bridge-panel-cavity-mechanism-binding-energy-pipeline
+- type: bridge
+- summary: Panel cavity-mechanism links to binding-energy-pipeline via term "pipeline".
+
+### Node: Cavity Mechanism <-> binding-warp-pipeline
+- id: bridge-panel-cavity-mechanism-binding-warp-pipeline
+- type: bridge
+- summary: Panel cavity-mechanism links to binding-warp-pipeline via term "pipeline".
+
 ### Node: Solar Navigation <-> ui-hud-nav
 - id: bridge-panel-nav-system-ui-hud-nav
 - type: bridge
@@ -824,6 +834,16 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - id: bridge-panel-model-silhouette-bridge-ts-ratio-guardrail-casimir-tile-mechanism
 - type: bridge
 - summary: Panel model-silhouette links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "scale".
+
+### Node: Silhouette Stretch <-> qi-autoscale
+- id: bridge-panel-model-silhouette-qi-autoscale
+- type: bridge
+- summary: Panel model-silhouette links to qi-autoscale via term "scale".
+
+### Node: Silhouette Stretch <-> ts-autoscale
+- id: bridge-panel-model-silhouette-ts-autoscale
+- type: bridge
+- summary: Panel model-silhouette links to ts-autoscale via term "scale".
 
 ### Node: Silhouette Stretch <-> ui-panel-casimir-grid
 - id: bridge-panel-model-silhouette-ui-panel-casimir-grid
@@ -1050,6 +1070,21 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel fuel-gauge links to hardware-telemetry-tree via term "telemetry".
 
+### Node: Fuel Gauge <-> skills-telemetry
+- id: bridge-panel-fuel-gauge-skills-telemetry
+- type: bridge
+- summary: Panel fuel-gauge links to skills-telemetry via term "telemetry".
+
+### Node: Fuel Gauge <-> star-models-telemetry
+- id: bridge-panel-fuel-gauge-star-models-telemetry
+- type: bridge
+- summary: Panel fuel-gauge links to star-models-telemetry via term "telemetry".
+
+### Node: Fuel Gauge <-> bridge-star-runtime-routes-star-models-telemetry
+- id: bridge-panel-fuel-gauge-bridge-star-runtime-routes-star-models-telemetry
+- type: bridge
+- summary: Panel fuel-gauge links to bridge-star-runtime-routes-star-models-telemetry via term "telemetry".
+
 ### Node: Vacuum Contract <-> agi-adapter
 - id: bridge-panel-vacuum-contract-agi-adapter
 - type: bridge
@@ -1074,6 +1109,11 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - id: bridge-panel-vacuum-contract-llm-runtime-contracts
 - type: bridge
 - summary: Panel vacuum-contract links to llm-runtime-contracts via term "contract".
+
+### Node: Vacuum Contract <-> zen-pillar-03-contracts
+- id: bridge-panel-vacuum-contract-zen-pillar-03-contracts
+- type: bridge
+- summary: Panel vacuum-contract links to zen-pillar-03-contracts via term "contract".
 
 ### Node: Metric Amplification Pocket <-> warp-control-stack
 - id: bridge-panel-metric-pocket-warp-control-stack
@@ -1150,6 +1190,16 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel hull-status links to hardware-telemetry-tree via term "telemetry".
 
+### Node: Runtime Ops <-> skills-telemetry
+- id: bridge-panel-hull-status-skills-telemetry
+- type: bridge
+- summary: Panel hull-status links to skills-telemetry via term "telemetry".
+
+### Node: Runtime Ops <-> star-models-telemetry
+- id: bridge-panel-hull-status-star-models-telemetry
+- type: bridge
+- summary: Panel hull-status links to star-models-telemetry via term "telemetry".
+
 ### Node: Star Coherence Governor <-> coherence-governor
 - id: bridge-panel-star-coherence-coherence-governor
 - type: bridge
@@ -1174,6 +1224,11 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - id: bridge-panel-star-coherence-hardware-telemetry-tree
 - type: bridge
 - summary: Panel star-coherence links to hardware-telemetry-tree via term "telemetry".
+
+### Node: Star Coherence Governor <-> skills-telemetry
+- id: bridge-panel-star-coherence-skills-telemetry
+- type: bridge
+- summary: Panel star-coherence links to skills-telemetry via term "telemetry".
 
 ### Node: Pipeline Proof <-> agi-planner-core
 - id: bridge-panel-pipeline-proof-agi-planner-core
@@ -1375,15 +1430,15 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel stellar-lsr links to stellar-evolution-stack via term "stellar".
 
-### Node: Stellar LSR Viewer <-> ui-panel-stellar-lsr
-- id: bridge-panel-stellar-lsr-ui-panel-stellar-lsr
+### Node: Stellar LSR Viewer <-> stellar-ledger-stack
+- id: bridge-panel-stellar-lsr-stellar-ledger-stack
 - type: bridge
-- summary: Panel stellar-lsr links to ui-panel-stellar-lsr via term "lsr".
+- summary: Panel stellar-lsr links to stellar-ledger-stack via term "stellar".
 
-### Node: Stellar LSR Viewer <-> ui-hud-nav
-- id: bridge-panel-stellar-lsr-ui-hud-nav
+### Node: Stellar LSR Viewer <-> stellar-ledger
+- id: bridge-panel-stellar-lsr-stellar-ledger
 - type: bridge
-- summary: Panel stellar-lsr links to ui-hud-nav via term "nav".
+- summary: Panel stellar-lsr links to stellar-ledger via term "stellar".
 
 ## Bridges
 
@@ -1515,13 +1570,13 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel tsn-sim links to hardware-telemetry-tree via term "telemetry".
 
-### Bridge: TSN Determinism <-> ui-page-desktop
+### Bridge: TSN Determinism <-> skills-telemetry
 - relation: Panel cross-concept join
-- summary: Panel tsn-sim links to ui-page-desktop via term "desktop".
+- summary: Panel tsn-sim links to skills-telemetry via term "telemetry".
 
-### Bridge: TSN Determinism <-> ui-panel-registry-desktop
+### Bridge: TSN Determinism <-> star-models-telemetry
 - relation: Panel cross-concept join
-- summary: Panel tsn-sim links to ui-panel-registry-desktop via term "desktop".
+- summary: Panel tsn-sim links to star-models-telemetry via term "telemetry".
 
 ### Bridge: Warp Pulsed Power <-> warp-pulsed-power
 - relation: Panel cross-concept join
@@ -1543,9 +1598,9 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel pulsed-power-doc links to solar-pipeline via term "pipeline".
 
-### Bridge: Warp Pulsed Power <-> external-hardware-stack
+### Bridge: Warp Pulsed Power <-> binding-energy-pipeline
 - relation: Panel cross-concept join
-- summary: Panel pulsed-power-doc links to external-hardware-stack via term "hardware".
+- summary: Panel pulsed-power-doc links to binding-energy-pipeline via term "pipeline".
 
 ### Bridge: Bus Voltage Program <-> guarded-casimir-tile-code-mapped
 - relation: Panel cross-concept join
@@ -1683,6 +1738,14 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel cavity-mechanism links to solar-pipeline via term "pipeline".
 
+### Bridge: Cavity Mechanism <-> binding-energy-pipeline
+- relation: Panel cross-concept join
+- summary: Panel cavity-mechanism links to binding-energy-pipeline via term "pipeline".
+
+### Bridge: Cavity Mechanism <-> binding-warp-pipeline
+- relation: Panel cross-concept join
+- summary: Panel cavity-mechanism links to binding-warp-pipeline via term "pipeline".
+
 ### Bridge: Solar Navigation <-> ui-hud-nav
 - relation: Panel cross-concept join
 - summary: Panel nav-system links to ui-hud-nav via term "navigation hud".
@@ -1734,6 +1797,14 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 ### Bridge: Silhouette Stretch <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
 - relation: Panel cross-concept join
 - summary: Panel model-silhouette links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "scale".
+
+### Bridge: Silhouette Stretch <-> qi-autoscale
+- relation: Panel cross-concept join
+- summary: Panel model-silhouette links to qi-autoscale via term "scale".
+
+### Bridge: Silhouette Stretch <-> ts-autoscale
+- relation: Panel cross-concept join
+- summary: Panel model-silhouette links to ts-autoscale via term "scale".
 
 ### Bridge: Silhouette Stretch <-> ui-panel-casimir-grid
 - relation: Panel cross-concept join
@@ -1915,6 +1986,18 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel fuel-gauge links to hardware-telemetry-tree via term "telemetry".
 
+### Bridge: Fuel Gauge <-> skills-telemetry
+- relation: Panel cross-concept join
+- summary: Panel fuel-gauge links to skills-telemetry via term "telemetry".
+
+### Bridge: Fuel Gauge <-> star-models-telemetry
+- relation: Panel cross-concept join
+- summary: Panel fuel-gauge links to star-models-telemetry via term "telemetry".
+
+### Bridge: Fuel Gauge <-> bridge-star-runtime-routes-star-models-telemetry
+- relation: Panel cross-concept join
+- summary: Panel fuel-gauge links to bridge-star-runtime-routes-star-models-telemetry via term "telemetry".
+
 ### Bridge: Vacuum Contract <-> agi-adapter
 - relation: Panel cross-concept join
 - summary: Panel vacuum-contract links to agi-adapter via term "contract".
@@ -1934,6 +2017,10 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 ### Bridge: Vacuum Contract <-> llm-runtime-contracts
 - relation: Panel cross-concept join
 - summary: Panel vacuum-contract links to llm-runtime-contracts via term "contract".
+
+### Bridge: Vacuum Contract <-> zen-pillar-03-contracts
+- relation: Panel cross-concept join
+- summary: Panel vacuum-contract links to zen-pillar-03-contracts via term "contract".
 
 ### Bridge: Metric Amplification Pocket <-> warp-control-stack
 - relation: Panel cross-concept join
@@ -1995,6 +2082,14 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel hull-status links to hardware-telemetry-tree via term "telemetry".
 
+### Bridge: Runtime Ops <-> skills-telemetry
+- relation: Panel cross-concept join
+- summary: Panel hull-status links to skills-telemetry via term "telemetry".
+
+### Bridge: Runtime Ops <-> star-models-telemetry
+- relation: Panel cross-concept join
+- summary: Panel hull-status links to star-models-telemetry via term "telemetry".
+
 ### Bridge: Star Coherence Governor <-> coherence-governor
 - relation: Panel cross-concept join
 - summary: Panel star-coherence links to coherence-governor via term "coherence governor".
@@ -2014,6 +2109,10 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 ### Bridge: Star Coherence Governor <-> hardware-telemetry-tree
 - relation: Panel cross-concept join
 - summary: Panel star-coherence links to hardware-telemetry-tree via term "telemetry".
+
+### Bridge: Star Coherence Governor <-> skills-telemetry
+- relation: Panel cross-concept join
+- summary: Panel star-coherence links to skills-telemetry via term "telemetry".
 
 ### Bridge: Pipeline Proof <-> agi-planner-core
 - relation: Panel cross-concept join
@@ -2175,10 +2274,10 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel stellar-lsr links to stellar-evolution-stack via term "stellar".
 
-### Bridge: Stellar LSR Viewer <-> ui-panel-stellar-lsr
+### Bridge: Stellar LSR Viewer <-> stellar-ledger-stack
 - relation: Panel cross-concept join
-- summary: Panel stellar-lsr links to ui-panel-stellar-lsr via term "lsr".
+- summary: Panel stellar-lsr links to stellar-ledger-stack via term "stellar".
 
-### Bridge: Stellar LSR Viewer <-> ui-hud-nav
+### Bridge: Stellar LSR Viewer <-> stellar-ledger
 - relation: Panel cross-concept join
-- summary: Panel stellar-lsr links to ui-hud-nav via term "nav".
+- summary: Panel stellar-lsr links to stellar-ledger via term "stellar".

@@ -42,6 +42,26 @@ const safePath = (filePath: string | null | undefined): string | null => {
   return filePath.replace(/\\/g, "/");
 };
 
+const classifyEvidence = (filePath: string): "doc" | "test" | "telemetry" | "code" => {
+  if (filePath.startsWith("docs/")) return "doc";
+  if (/__tests__|\.spec\.|\.test\./i.test(filePath)) return "test";
+  if (/telemetry|metrics|kpi/i.test(filePath)) return "telemetry";
+  return "code";
+};
+
+const uniqueLimit = (items: string[], limit: number) => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of items) {
+    const key = item.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+    if (out.length >= limit) break;
+  }
+  return out;
+};
+
 const run = () => {
   if (!fs.existsSync(REPORT_PATH)) {
     throw new Error(`Missing ${REPORT_PATH}. Run scripts/panel-cross-concepts.ts first.`);
@@ -92,6 +112,28 @@ const run = () => {
         repo_rev: repoRev,
         content_hash: hash ? `sha256:${hash}` : undefined
       });
+    }
+    const termFiles = (panel.termHits ?? []).flatMap((hit) => hit.files ?? []);
+    const limitedTermFiles = uniqueLimit(termFiles, 12).map((file) => safePath(file)).filter(Boolean) as string[];
+    const categorized = new Map<string, string[]>();
+    for (const file of limitedTermFiles) {
+      const kind = classifyEvidence(file);
+      const list = categorized.get(kind) ?? [];
+      list.push(file);
+      categorized.set(kind, list);
+    }
+    for (const [kind, files] of categorized.entries()) {
+      const picks = uniqueLimit(files, kind === "doc" ? 2 : kind === "test" ? 1 : 2);
+      for (const file of picks) {
+        if (!fs.existsSync(file)) continue;
+        const hash = sha256(file);
+        evidence.push({
+          type: kind,
+          path: file,
+          repo_rev: repoRev,
+          content_hash: hash ? `sha256:${hash}` : undefined
+        });
+      }
     }
     evidence.push({
       type: "doc",
