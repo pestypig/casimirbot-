@@ -13300,6 +13300,14 @@ const executeHelixAsk = async ({
     240,
     8000,
   );
+  const HELIX_ASK_ANSWER_PREVIEW_CHARS = clampNumber(
+    readNumber(
+      process.env.HELIX_ASK_ANSWER_PREVIEW_CHARS ?? process.env.VITE_HELIX_ASK_ANSWER_PREVIEW_CHARS,
+      1400,
+    ),
+    240,
+    8000,
+  );
   const HELIX_ASK_EVENT_FILE_LIMIT = 14;
   const clipEventText = (value?: string): string | undefined => {
     if (!value) return undefined;
@@ -14972,7 +14980,10 @@ const executeHelixAsk = async ({
           mode: block.mode,
           clarify: block.clarify,
           citation_count: block.citations.length,
-          answer_preview: clipAskText(block.answer.replace(/\s+/g, " ").trim(), 240),
+          answer_preview: clipAskText(
+            block.answer.replace(/\s+/g, " ").trim(),
+            HELIX_ASK_ANSWER_PREVIEW_CHARS,
+          ),
           trace_id: block.traceId,
         })),
       };
@@ -19925,7 +19936,7 @@ const executeHelixAsk = async ({
           stripInlineJsonArtifacts(stripPromptEchoFromAnswer(result.text, baseQuestion))
             .replace(/\s+/g, " ")
             .trim(),
-          240,
+          HELIX_ASK_ANSWER_PREVIEW_CHARS,
         );
       if (rawPreview) {
         logEvent("Answer raw preview", "llm", rawPreview, answerStart);
@@ -20664,7 +20675,10 @@ const executeHelixAsk = async ({
         intentProfile.evidencePolicy.requireCitations ? "required" : "optional",
         `present=${hasCitations ? "yes" : "no"} | files=${citedPaths.length}`,
       );
-      const cleanedPreview = clipAskText(cleaned.replace(/\s+/g, " ").trim(), 240);
+      const cleanedPreview = clipAskText(
+        cleaned.replace(/\s+/g, " ").trim(),
+        HELIX_ASK_ANSWER_PREVIEW_CHARS,
+      );
       if (cleanedPreview) {
         logEvent("Answer cleaned preview", "final", cleanedPreview, answerStart);
       }
