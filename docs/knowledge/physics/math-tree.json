@@ -43,7 +43,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/math-maturity-stages.md"
+        }
+      ]
     },
     {
       "id": "math-maturity-stages",
@@ -138,7 +144,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/math-maturity-stages.md"
+        }
+      ]
     },
     {
       "id": "stage-reduced-order",
@@ -180,7 +192,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/math-maturity-stages.md"
+        }
+      ]
     },
     {
       "id": "stage-diagnostic",
@@ -222,7 +240,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/math-maturity-stages.md"
+        }
+      ]
     },
     {
       "id": "stage-certified",
@@ -272,7 +296,17 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/math-maturity-stages.md"
+        },
+        {
+          "type": "doc",
+          "path": "WARP_AGENTS.md"
+        }
+      ]
     },
     {
       "id": "math-pipeline-walk",
@@ -321,7 +355,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/gr-solver-tree.json"
+        }
+      ]
     },
     {
       "id": "pipeline-energy",
@@ -791,7 +831,17 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "WARP_AGENTS.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/certificate-integrity.md"
+        }
+      ]
     },
     {
       "id": "math-evidence-registry",
@@ -837,7 +887,29 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "math.config.json"
+        },
+        {
+          "type": "doc",
+          "path": "math.evidence.json"
+        },
+        {
+          "type": "doc",
+          "path": "math.waivers.json"
+        },
+        {
+          "type": "doc",
+          "path": "MATH_GRAPH.json"
+        },
+        {
+          "type": "doc",
+          "path": "MATH_STATUS.md"
+        }
+      ]
     },
     {
       "id": "energy-pipeline-core",
@@ -931,7 +1003,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dynamic-casimir-effect.md"
+        }
+      ]
     },
     {
       "id": "dynamic-casimir-engine",
@@ -1168,7 +1246,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+        }
+      ]
     },
     {
       "id": "qi-bounds-engine",
@@ -1551,7 +1635,17 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy/phase-scheduler.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/utils/phase-calibration.ts"
+        }
+      ]
     },
     {
       "id": "phase-scheduler",
@@ -1795,7 +1889,17 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/raster-energy-field.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/tokamak-energy-field.ts"
+        }
+      ]
     },
     {
       "id": "raster-energy-field",
@@ -3250,7 +3354,7 @@
       },
       "deterministic": true,
       "tolerance": {
-        "abs": 0.000001
+        "abs": 1e-06
       },
       "environment": {
         "runtime": "node"

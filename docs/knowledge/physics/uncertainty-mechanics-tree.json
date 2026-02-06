@@ -45,7 +45,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/uncertainty-mechanics-tree.json"
+        }
+      ]
     },
     {
       "id": "uncertainty-classical-stack",
@@ -91,7 +97,17 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/numerical-precision.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/boundary-conditions-modes.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-boundary-conditions",
@@ -324,7 +340,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-sampling-bounds",
@@ -819,7 +841,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/casimir-force-energy.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-axisymmetric-approximations",
@@ -1212,7 +1240,17 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/energy-conditions.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+        }
+      ]
     },
     {
       "id": "uncertainty-energy-conditions",

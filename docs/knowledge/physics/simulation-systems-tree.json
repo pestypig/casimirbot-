@@ -50,7 +50,17 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/simulation-systems-tree.json"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/discretization-mesh.md"
+        }
+      ]
     },
     {
       "id": "simulation-contracts",
@@ -685,7 +695,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/simulation-systems-tree.json"
+        }
+      ]
     }
   ],
   "schema": {
