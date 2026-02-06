@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-02-06T18:04:44.847Z",
-  "repoRev": "dc9f106360710ec660c40b166d197a9f30aeacff",
+  "generatedAt": "2026-02-06T18:09:15.963Z",
+  "repoRev": "9a58f068d73010b65c4cd407dbd7085a97bc3b05",
   "panelCount": 74,
   "termLimit": 12,
   "fileLimit": 8,
@@ -378,12 +378,12 @@
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/physics/math-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/warp-pulsed-power.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/BridgeDerivationCards.tsx",
-            "client/src/components/CavityMechanismPanel.tsx"
+            "client/src/components/BridgeDerivationCards.tsx"
           ],
           "treeMatches": [
             {
@@ -470,13 +470,13 @@
           "term": "dutyEffectiveFR",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/gr-solver-progress.md",
             "docs/proof-pack.md",
             "docs/qi-guard-consolidation.md",
             "docs/qi-ops-runbook.md",
             "docs/time-dilation-lattice-panel.md",
-            "docs/TRAINING-TRACE-API.md",
-            "docs/warp-pulsed-power.md"
+            "docs/TRAINING-TRACE-API.md"
           ],
           "treeMatches": [
             {
@@ -853,13 +853,13 @@
           "term": "deltaAOverA",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/AmplificationPanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/HelixCasimirAmplifier.tsx",
             "client/src/components/MetricAmplificationPocket.tsx",
-            "client/src/components/PipelineProofPanel.tsx",
-            "client/src/components/TimeDilationLatticePanel.tsx"
+            "client/src/components/PipelineProofPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -1782,13 +1782,13 @@
           "term": "dutyEffectiveFR",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/gr-solver-progress.md",
             "docs/proof-pack.md",
             "docs/qi-guard-consolidation.md",
             "docs/qi-ops-runbook.md",
             "docs/time-dilation-lattice-panel.md",
-            "docs/TRAINING-TRACE-API.md",
-            "docs/warp-pulsed-power.md"
+            "docs/TRAINING-TRACE-API.md"
           ],
           "treeMatches": [
             {
@@ -2678,13 +2678,53 @@
               ]
             },
             {
-              "treeId": "ethos-knowledge-tree",
-              "nodeId": "phoenix-averaging",
-              "title": "Phoenix Averaging",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tiles-tree",
+              "title": "Phoenix Averaging Concept <-> casimir-tiles-tree",
               "tags": [
-                "ethos",
-                "ethos",
-                "practice"
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tiles-overview",
+              "title": "Phoenix Averaging Concept <-> casimir-tiles-overview",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tile-mechanism",
+              "title": "Phoenix Averaging Concept <-> casimir-tile-mechanism",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tile-roadmap",
+              "title": "Phoenix Averaging Concept <-> casimir-tile-roadmap",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tile-schematic-roadmap",
+              "title": "Phoenix Averaging Concept <-> casimir-tile-schematic-roadmap",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
               ]
             }
           ]
@@ -3403,7 +3443,6 @@
       "missingTerms": [],
       "treeIds": [
         "panel-concepts-tree",
-        "ethos-knowledge-tree",
         "casimir-tiles-tree"
       ]
     },
@@ -3786,13 +3825,13 @@
           "term": "useEnergyPipeline",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/casimir-tile-mechanism.md",
             "docs/helix-desktop-panels.md",
             "docs/needle-hull-mainframe.md",
             "docs/time-dilation-lattice-panel.md",
             "client/src/components/AlcubierrePanel.tsx",
-            "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/BubbleFieldPanel.tsx"
+            "client/src/components/AmplificationPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -4648,6 +4687,26 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pulsed-power-doc-warp-pulsed-power",
+              "title": "Warp Pulsed Power Concept <-> warp-pulsed-power",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "pulsed-power-doc"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pulsed-power-doc-guarded-casimir-tile-code-mapped",
+              "title": "Warp Pulsed Power Concept <-> guarded-casimir-tile-code-mapped",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "pulsed-power-doc"
+              ]
+            },
+            {
               "treeId": "warp-mechanics-tree",
               "nodeId": "warp-pulsed-power",
               "title": "Warp Pulsed Power",
@@ -4803,6 +4862,16 @@
                 "Math",
                 "sqrt"
               ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-needle-ipeak-worksheet-warp-pulsed-power",
+              "title": "Needle I_peak Worksheet Concept <-> warp-pulsed-power",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "needle-ipeak-worksheet"
+              ]
             }
           ]
         },
@@ -4908,6 +4977,16 @@
                 "I_rms",
                 "Math",
                 "sqrt"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-needle-ipeak-worksheet-warp-pulsed-power",
+              "title": "Needle I_peak Worksheet Concept <-> warp-pulsed-power",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "needle-ipeak-worksheet"
               ]
             }
           ]
@@ -5165,10 +5244,10 @@
             "docs/knowledge/stellar-restoration-tree.json",
             "docs/knowledge/physics/uncertainty-mechanics-tree.json",
             "docs/knowledge/physics/visualization-scaling.md",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/knowledge/trees/uncertainty-mechanics-tree.md",
             "docs/curvature-unit-solar-notes.md",
-            "docs/fashion-generative-panel.md",
-            "docs/helix-ask-ladder.md"
+            "docs/fashion-generative-panel.md"
           ],
           "treeMatches": [
             {
@@ -5255,13 +5334,13 @@
           "term": "undefined",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ESSENCE-CONSOLE_PATCH-PLAN.md",
             "client/src/App.tsx",
             "client/src/main.tsx",
             "client/src/components/AgiKnowledgePanel.tsx",
             "client/src/components/AlcubierrePanel.tsx",
-            "client/src/components/AppErrorBoundary.tsx",
-            "client/src/components/BackgroundLuma.tsx"
+            "client/src/components/AppErrorBoundary.tsx"
           ],
           "treeMatches": [
             {
@@ -6067,10 +6146,10 @@
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/ts-ratio.md",
             "docs/knowledge/trees/casimir-tiles-tree.md",
+            "docs/knowledge/trees/panel-concepts-tree.md",
             "docs/knowledge/trees/panel-registry-tree.md",
             "docs/casimir-tile-mechanism.md",
-            "docs/gr-solver-progress.md",
-            "docs/guarded-casimir-tile-code-mapped.md"
+            "docs/gr-solver-progress.md"
           ],
           "treeMatches": [
             {
@@ -6313,23 +6392,23 @@
               ]
             },
             {
-              "treeId": "math-maturity-tree",
-              "nodeId": "qi-bounds-engine",
-              "title": "QI Bounds",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-needle-world-roadmap-ford-roman-quantum-inequality",
+              "title": "Needle World Roadmap Concept <-> ford-roman-quantum-inequality",
               "tags": [
-                "qi",
-                "bounds",
-                "ford-roman"
+                "bridge",
+                "panel-concept",
+                "needle-world-roadmap"
               ]
             },
             {
-              "treeId": "physics-foundations-tree",
-              "nodeId": "ford-roman-quantum-inequality",
-              "title": "Ford-Roman Quantum Inequality",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-ford-roman-quantum-inequality",
+              "title": "Warp Experiment Ladder Concept <-> ford-roman-quantum-inequality",
               "tags": [
-                "quantum-inequality",
-                "ford-roman",
-                "constraints"
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
               ]
             }
           ]
@@ -6486,23 +6565,23 @@
               ]
             },
             {
-              "treeId": "math-maturity-tree",
-              "nodeId": "qi-bounds-engine",
-              "title": "QI Bounds",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-needle-world-roadmap-ford-roman-quantum-inequality",
+              "title": "Needle World Roadmap Concept <-> ford-roman-quantum-inequality",
               "tags": [
-                "qi",
-                "bounds",
-                "ford-roman"
+                "bridge",
+                "panel-concept",
+                "needle-world-roadmap"
               ]
             },
             {
-              "treeId": "physics-foundations-tree",
-              "nodeId": "ford-roman-quantum-inequality",
-              "title": "Ford-Roman Quantum Inequality",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-ford-roman-quantum-inequality",
+              "title": "Warp Experiment Ladder Concept <-> ford-roman-quantum-inequality",
               "tags": [
-                "quantum-inequality",
-                "ford-roman",
-                "constraints"
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
               ]
             }
           ]
@@ -6511,9 +6590,7 @@
       "missingTerms": [],
       "treeIds": [
         "panel-concepts-tree",
-        "casimir-tiles-tree",
-        "math-maturity-tree",
-        "physics-foundations-tree"
+        "casimir-tiles-tree"
       ]
     },
     {
@@ -7362,13 +7439,13 @@
           "term": "formatPercent",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/CurvatureLedgerPanel.tsx",
             "client/src/components/dynamic-dashboard.tsx",
             "client/src/components/ElectronOrbitalPanel.tsx",
             "client/src/components/NearZeroWidget.tsx",
-            "client/src/components/OperationalModePanel.tsx",
-            "client/src/components/ReversibilityBadge.tsx"
+            "client/src/components/OperationalModePanel.tsx"
           ],
           "treeMatches": [
             {
@@ -9136,6 +9213,7 @@
           "term": "override warnings",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/pages/helix-core.panels.ts"
           ],
           "treeMatches": [
@@ -9957,6 +10035,36 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-gr-agent-loop-audit-gr-agent-loop",
+              "title": "GR Agent Loop Audit Concept <-> gr-agent-loop",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "gr-agent-loop-audit"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-gr-agent-loop-audit-gr-agent-loop-schema",
+              "title": "GR Agent Loop Audit Concept <-> gr-agent-loop-schema",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "gr-agent-loop-audit"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-gr-agent-loop-audit-gr-constraint-network",
+              "title": "GR Agent Loop Audit Concept <-> gr-constraint-network",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "gr-agent-loop-audit"
+              ]
+            },
+            {
               "treeId": "ui-components-tree",
               "nodeId": "ui-panel-gr-agent-loop",
               "title": "GR Agent Loop Panels",
@@ -9964,26 +10072,6 @@
                 "ui",
                 "gr",
                 "agent"
-              ]
-            },
-            {
-              "treeId": "gr-solver-tree",
-              "nodeId": "gr-agent-loop",
-              "title": "GR Agent Loop",
-              "tags": [
-                "agent-loop",
-                "orchestration",
-                "gr"
-              ]
-            },
-            {
-              "treeId": "gr-solver-tree",
-              "nodeId": "gr-agent-loop-schema",
-              "title": "GR Agent Loop Schema",
-              "tags": [
-                "gr",
-                "agent-loop",
-                "schema"
               ]
             }
           ]
@@ -10235,6 +10323,7 @@
           "term": "residualSeries",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/GrAgentLoopAuditPanel.tsx",
             "client/src/components/GrAgentLoopLearningPanel.tsx"
           ],
@@ -10956,6 +11045,36 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-gr-agent-loop-audit-gr-agent-loop",
+              "title": "GR Agent Loop Audit Concept <-> gr-agent-loop",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "gr-agent-loop-audit"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-gr-agent-loop-audit-gr-agent-loop-schema",
+              "title": "GR Agent Loop Audit Concept <-> gr-agent-loop-schema",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "gr-agent-loop-audit"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-gr-agent-loop-audit-gr-constraint-network",
+              "title": "GR Agent Loop Audit Concept <-> gr-constraint-network",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "gr-agent-loop-audit"
+              ]
+            },
+            {
               "treeId": "ui-components-tree",
               "nodeId": "ui-panel-gr-agent-loop",
               "title": "GR Agent Loop Panels",
@@ -10963,26 +11082,6 @@
                 "ui",
                 "gr",
                 "agent"
-              ]
-            },
-            {
-              "treeId": "gr-solver-tree",
-              "nodeId": "gr-agent-loop",
-              "title": "GR Agent Loop",
-              "tags": [
-                "agent-loop",
-                "orchestration",
-                "gr"
-              ]
-            },
-            {
-              "treeId": "gr-solver-tree",
-              "nodeId": "gr-agent-loop-schema",
-              "title": "GR Agent Loop Schema",
-              "tags": [
-                "gr",
-                "agent-loop",
-                "schema"
               ]
             }
           ]
@@ -11191,6 +11290,26 @@
                 "KpiTileProps",
                 "KpiTile",
                 "label"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-gr-agent-loop-kpis-gr-agent-loop",
+              "title": "GR Loop KPIs Concept <-> gr-agent-loop",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "gr-agent-loop-kpis"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-gr-agent-loop-kpis-gr-agent-loop-schema",
+              "title": "GR Loop KPIs Concept <-> gr-agent-loop-schema",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "gr-agent-loop-kpis"
               ]
             }
           ]
@@ -11507,8 +11626,7 @@
       "missingTerms": [],
       "treeIds": [
         "panel-concepts-tree",
-        "ui-components-tree",
-        "gr-solver-tree"
+        "ui-components-tree"
       ]
     },
     {
@@ -11674,6 +11792,7 @@
           "term": "accepted config history",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/GrAgentLoopAuditPanel.tsx",
             "client/src/components/GrAgentLoopLearningPanel.tsx",
             "client/src/pages/helix-core.panels.ts"
@@ -12041,6 +12160,7 @@
           "term": "residualSeries",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/GrAgentLoopAuditPanel.tsx",
             "client/src/components/GrAgentLoopLearningPanel.tsx"
           ],
@@ -13121,11 +13241,11 @@
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/physics/gr-solver-tree.json",
             "docs/knowledge/physics/math-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ethos/ideology-telemetry-schema.json",
             "docs/AGI-ROADMAP.md",
             "docs/alcubierre-alignment.md",
-            "docs/ESSENCE-CONSOLE_GAP-REPORT.md",
-            "docs/ESSENCE-CONSOLE_PATCH-PLAN.md"
+            "docs/ESSENCE-CONSOLE_GAP-REPORT.md"
           ],
           "treeMatches": [
             {
@@ -14485,11 +14605,11 @@
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/physics/gr-solver-tree.json",
             "docs/knowledge/physics/math-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ethos/ideology-telemetry-schema.json",
             "docs/AGI-ROADMAP.md",
             "docs/alcubierre-alignment.md",
-            "docs/ESSENCE-CONSOLE_GAP-REPORT.md",
-            "docs/ESSENCE-CONSOLE_PATCH-PLAN.md"
+            "docs/ESSENCE-CONSOLE_GAP-REPORT.md"
           ],
           "treeMatches": [
             {
@@ -15310,6 +15430,16 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-tsn-sim-simulation-tsn",
+              "title": "TSN Determinism Concept <-> simulation-tsn",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "tsn-sim"
+              ]
+            },
+            {
               "treeId": "simulation-systems-tree",
               "nodeId": "simulation-tsn",
               "title": "TSN Simulation",
@@ -15363,6 +15493,7 @@
           "term": "usePanelTelemetryPublisher",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/HelixTsnPanel.tsx",
             "client/src/components/IdeologyPanel.tsx",
             "client/src/components/NearZeroWidget.tsx",
@@ -16466,6 +16597,26 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pulsed-power-doc-warp-pulsed-power",
+              "title": "Warp Pulsed Power Concept <-> warp-pulsed-power",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "pulsed-power-doc"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pulsed-power-doc-guarded-casimir-tile-code-mapped",
+              "title": "Warp Pulsed Power Concept <-> guarded-casimir-tile-code-mapped",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "pulsed-power-doc"
+              ]
+            },
+            {
               "treeId": "warp-mechanics-tree",
               "nodeId": "warp-pulsed-power",
               "title": "Warp Pulsed Power",
@@ -17084,6 +17235,7 @@
           "term": "usePanelTelemetryPublisher",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/HelixTsnPanel.tsx",
             "client/src/components/IdeologyPanel.tsx",
             "client/src/components/NearZeroWidget.tsx",
@@ -17942,6 +18094,36 @@
                 "without",
                 "ampChain",
                 "gain"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-bus-voltage-guarded-casimir-tile-code-mapped",
+              "title": "Bus Voltage Program Concept <-> guarded-casimir-tile-code-mapped",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "bus-voltage"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-bus-voltage-ts-ratio-guardrail",
+              "title": "Bus Voltage Program Concept <-> ts-ratio-guardrail",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "bus-voltage"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-bus-voltage-bridge-ts-ratio-guardrail-casimir-tile-mechanism",
+              "title": "Bus Voltage Program Concept <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "bus-voltage"
               ]
             }
           ]
@@ -19403,6 +19585,7 @@
           "term": "@/lib/whispers/usePanelHashFocus",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/HalobankPanel.tsx",
             "client/src/components/live-energy-pipeline.tsx",
             "client/src/components/ParametricSweepPanel.tsx",
@@ -19782,6 +19965,56 @@
                 "dwell",
                 "tile"
               ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-ford-roman-quantum-inequality",
+              "title": "Warp Experiment Ladder Concept <-> ford-roman-quantum-inequality",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-ford-roman-proxy",
+              "title": "Warp Experiment Ladder Concept <-> ford-roman-proxy",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-casimir-tiles-tree",
+              "title": "Warp Experiment Ladder Concept <-> casimir-tiles-tree",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-casimir-tiles-overview",
+              "title": "Warp Experiment Ladder Concept <-> casimir-tiles-overview",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-casimir-tile-mechanism",
+              "title": "Warp Experiment Ladder Concept <-> casimir-tile-mechanism",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
+              ]
             }
           ]
         },
@@ -19928,33 +20161,43 @@
               ]
             },
             {
-              "treeId": "math-maturity-tree",
-              "nodeId": "qi-bounds-engine",
-              "title": "QI Bounds",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-needle-world-roadmap-ford-roman-quantum-inequality",
+              "title": "Needle World Roadmap Concept <-> ford-roman-quantum-inequality",
               "tags": [
-                "qi",
-                "bounds",
-                "ford-roman"
+                "bridge",
+                "panel-concept",
+                "needle-world-roadmap"
               ]
             },
             {
-              "treeId": "physics-foundations-tree",
-              "nodeId": "ford-roman-quantum-inequality",
-              "title": "Ford-Roman Quantum Inequality",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-ford-roman-quantum-inequality",
+              "title": "Warp Experiment Ladder Concept <-> ford-roman-quantum-inequality",
               "tags": [
-                "quantum-inequality",
-                "ford-roman",
-                "constraints"
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
               ]
             },
             {
-              "treeId": "warp-mechanics-tree",
-              "nodeId": "ford-roman-proxy",
-              "title": "Ford-Roman Proxy",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-ford-roman-proxy",
+              "title": "Warp Experiment Ladder Concept <-> ford-roman-proxy",
               "tags": [
-                "ford-roman",
-                "proxy",
-                "constraints"
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-qi-widget-ford-roman-quantum-inequality",
+              "title": "Qi Widget Concept <-> ford-roman-quantum-inequality",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "qi-widget"
               ]
             }
           ]
@@ -20127,13 +20370,43 @@
               ]
             },
             {
-              "treeId": "ethos-knowledge-tree",
-              "nodeId": "phoenix-averaging",
-              "title": "Phoenix Averaging",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tiles-tree",
+              "title": "Phoenix Averaging Concept <-> casimir-tiles-tree",
               "tags": [
-                "ethos",
-                "ethos",
-                "practice"
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tiles-overview",
+              "title": "Phoenix Averaging Concept <-> casimir-tiles-overview",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tile-mechanism",
+              "title": "Phoenix Averaging Concept <-> casimir-tile-mechanism",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-phoenix-casimir-tile-roadmap",
+              "title": "Phoenix Averaging Concept <-> casimir-tile-roadmap",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-phoenix"
               ]
             }
           ]
@@ -20279,23 +20552,23 @@
               ]
             },
             {
-              "treeId": "math-maturity-tree",
-              "nodeId": "natario-metric-engine",
-              "title": "Natario Metric Engine",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-metrics-vis-casimir-natario-metric",
+              "title": "Hull Metrics Vis Concept <-> casimir-natario-metric",
               "tags": [
-                "natario",
-                "metric",
-                "geometry"
+                "bridge",
+                "panel-concept",
+                "hull-metrics-vis"
               ]
             },
             {
-              "treeId": "warp-mechanics-tree",
-              "nodeId": "natario-zero-expansion",
-              "title": "Natario Zero-Expansion",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-metrics-vis-natario-zero-expansion",
+              "title": "Hull Metrics Vis Concept <-> natario-zero-expansion",
               "tags": [
-                "natario",
-                "expansion",
-                "warp"
+                "bridge",
+                "panel-concept",
+                "hull-metrics-vis"
               ]
             }
           ]
@@ -20558,13 +20831,13 @@
           "term": "sectorPeriod_ms",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/qi-guard-consolidation.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CasimirTileGridPanel.tsx",
             "client/src/components/DriveGuardsPanel.tsx",
-            "client/src/components/energy-pipeline.tsx",
-            "client/src/components/LightSpeedStrobeScale.tsx"
+            "client/src/components/energy-pipeline.tsx"
           ],
           "treeMatches": [
             {
@@ -20726,11 +20999,7 @@
       "missingTerms": [],
       "treeIds": [
         "panel-concepts-tree",
-        "math-maturity-tree",
-        "physics-foundations-tree",
-        "warp-mechanics-tree",
-        "casimir-tiles-tree",
-        "ethos-knowledge-tree"
+        "casimir-tiles-tree"
       ]
     },
     {
@@ -23171,13 +23440,13 @@
           "term": "CardDescription",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/CurvatureLedgerPanel.tsx",
             "client/src/components/CurvaturePhysicsPanel.tsx",
             "client/src/components/CurvatureSlicePanel.tsx",
             "client/src/components/DriveGuardsPanel.tsx",
-            "client/src/components/dynamic-controls.tsx",
-            "client/src/components/ElectronOrbitalPanel.tsx"
+            "client/src/components/dynamic-controls.tsx"
           ],
           "treeMatches": [
             {
@@ -24325,13 +24594,13 @@
           "term": "global_coherence",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/sun-5-minute-bins.md",
             "client/src/pages/star-watcher-panel.tsx",
             "client/src/components/agi/CollapseWatcherPanel.tsx",
             "client/src/components/agi/DebateView.tsx",
             "client/src/components/agi/essence.tsx",
-            "client/src/components/agi/StarCoherencePanel.tsx",
-            "server/_generated/debate-telemetry.json"
+            "client/src/components/agi/StarCoherencePanel.tsx"
           ],
           "treeMatches": [
             {
@@ -24505,13 +24774,13 @@
           "term": "CardDescription",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/CurvatureLedgerPanel.tsx",
             "client/src/components/CurvaturePhysicsPanel.tsx",
             "client/src/components/CurvatureSlicePanel.tsx",
             "client/src/components/DriveGuardsPanel.tsx",
-            "client/src/components/dynamic-controls.tsx",
-            "client/src/components/ElectronOrbitalPanel.tsx"
+            "client/src/components/dynamic-controls.tsx"
           ],
           "treeMatches": [
             {
@@ -25320,13 +25589,13 @@
           "term": "formatNumber",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/dynamic-values-table.tsx",
             "client/src/components/ElectronOrbitalPanel.tsx",
             "client/src/components/NeedleIpeakWorksheetPanel.tsx",
             "client/src/components/QiLatticePanel.tsx",
-            "client/src/components/TokamakSimulationPanel.tsx",
-            "client/src/components/VacuumContractBadge.tsx"
+            "client/src/components/TokamakSimulationPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -26756,13 +27025,13 @@
           "term": "dutyEffectiveFR",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/gr-solver-progress.md",
             "docs/proof-pack.md",
             "docs/qi-guard-consolidation.md",
             "docs/qi-ops-runbook.md",
             "docs/time-dilation-lattice-panel.md",
-            "docs/TRAINING-TRACE-API.md",
-            "docs/warp-pulsed-power.md"
+            "docs/TRAINING-TRACE-API.md"
           ],
           "treeMatches": [
             {
@@ -27042,13 +27311,13 @@
           "term": "formatPercent",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/CurvatureLedgerPanel.tsx",
             "client/src/components/dynamic-dashboard.tsx",
             "client/src/components/ElectronOrbitalPanel.tsx",
             "client/src/components/NearZeroWidget.tsx",
-            "client/src/components/OperationalModePanel.tsx",
-            "client/src/components/ReversibilityBadge.tsx"
+            "client/src/components/OperationalModePanel.tsx"
           ],
           "treeMatches": [
             {
@@ -27196,13 +27465,13 @@
           "term": "deltaAOverA",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/AmplificationPanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/HelixCasimirAmplifier.tsx",
             "client/src/components/MetricAmplificationPocket.tsx",
-            "client/src/components/PipelineProofPanel.tsx",
-            "client/src/components/TimeDilationLatticePanel.tsx"
+            "client/src/components/PipelineProofPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -27328,13 +27597,13 @@
           "term": "dutyCycle",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ADAPTER-CONTRACT.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/helix-autoscale-runbook.md",
             "docs/time-dilation-lattice-panel.md",
             "docs/warp-console-architecture.md",
-            "docs/warp-llm-contracts.md",
-            "client/src/components/AlcubierrePanel.tsx"
+            "docs/warp-llm-contracts.md"
           ],
           "treeMatches": [
             {
@@ -27560,13 +27829,13 @@
           "term": "undefined",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ESSENCE-CONSOLE_PATCH-PLAN.md",
             "client/src/App.tsx",
             "client/src/main.tsx",
             "client/src/components/AgiKnowledgePanel.tsx",
             "client/src/components/AlcubierrePanel.tsx",
-            "client/src/components/AppErrorBoundary.tsx",
-            "client/src/components/BackgroundLuma.tsx"
+            "client/src/components/AppErrorBoundary.tsx"
           ],
           "treeMatches": [
             {
@@ -28605,6 +28874,7 @@
           "term": "coherence lattice",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/pages/helix-core.panels.ts",
             "client/src/components/agi/StarCoherencePanel.tsx"
           ],
@@ -28766,13 +29036,13 @@
           "term": "Hz",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/curvature-unit-solar-notes.md",
             "docs/ENVIRONMENT.md",
             "docs/gr-solver-progress.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/hce.md",
-            "docs/replit-runtime.md",
-            "docs/sun-5-minute-bins.md"
+            "docs/replit-runtime.md"
           ],
           "treeMatches": [
             {
@@ -29658,6 +29928,7 @@
           "term": "usePanelTelemetryPublisher",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/HelixTsnPanel.tsx",
             "client/src/components/IdeologyPanel.tsx",
             "client/src/components/NearZeroWidget.tsx",
@@ -31287,13 +31558,13 @@
           "term": "react",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/AGI-ROADMAP.md",
             "docs/casimir-tile-mechanism.md",
             "docs/client-index.md",
             "docs/curvature-unit-solar-notes.md",
             "docs/helix-desktop-panels.md",
-            "docs/helix-panel-template.md",
-            "docs/mobile-helix-start-roadmap.md"
+            "docs/helix-panel-template.md"
           ],
           "treeMatches": [
             {
@@ -31771,13 +32042,13 @@
           "term": "react",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/AGI-ROADMAP.md",
             "docs/casimir-tile-mechanism.md",
             "docs/client-index.md",
             "docs/curvature-unit-solar-notes.md",
             "docs/helix-desktop-panels.md",
-            "docs/helix-panel-template.md",
-            "docs/mobile-helix-start-roadmap.md"
+            "docs/helix-panel-template.md"
           ],
           "treeMatches": [
             {
@@ -32251,6 +32522,16 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-solar-globe-qi-guard-consolidation",
+              "title": "Solar Globe Concept <-> qi-guard-consolidation",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "solar-globe"
+              ]
+            },
+            {
               "treeId": "ui-components-tree",
               "nodeId": "ui-panel-solar-globe",
               "title": "Solar Globe Panels",
@@ -32420,10 +32701,10 @@
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/ui-backend-binding-tree.json",
             "docs/knowledge/ethos/mission-ethos.md",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/knowledge/trees/ui-backend-binding-tree.md",
             "docs/ethos/ideology.json",
-            "docs/ADAPTER-CONTRACT.md",
-            "docs/agi-index-exclusions-rc0.md"
+            "docs/ADAPTER-CONTRACT.md"
           ],
           "treeMatches": [
             {
@@ -33406,6 +33687,7 @@
           "term": "ratePerShipKgS",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/deepmix/DeepMixGlobePanel.tsx",
             "client/src/components/deepmix/DeepMixSweetSpot.tsx"
           ],
@@ -33811,13 +34093,13 @@
           "term": "toExponential",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CardProofOverlay.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
-            "client/src/components/CavitySideView.tsx",
-            "client/src/components/CollapseBenchmarkHUD.tsx"
+            "client/src/components/CavitySideView.tsx"
           ],
           "treeMatches": [
             {
@@ -34419,6 +34701,7 @@
           "term": "ratePerShipKgS",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/deepmix/DeepMixGlobePanel.tsx",
             "client/src/components/deepmix/DeepMixSweetSpot.tsx"
           ],
@@ -34776,13 +35059,13 @@
           "term": "toExponential",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CardProofOverlay.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
-            "client/src/components/CavitySideView.tsx",
-            "client/src/components/CollapseBenchmarkHUD.tsx"
+            "client/src/components/CavitySideView.tsx"
           ],
           "treeMatches": [
             {
@@ -36931,13 +37214,13 @@
           "term": "resolveHullDimsEffective",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/time-dilation-lattice-panel.md",
             "docs/warpfield-mesh-patch-plan.md",
             "docs/warpfield-visualization-roadmap.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/HullMetricsVisPanel.tsx",
-            "client/src/lib/resolve-hull-dims.test.ts",
-            "client/src/lib/resolve-hull-dims.ts"
+            "client/src/lib/resolve-hull-dims.test.ts"
           ],
           "treeMatches": [
             {
@@ -37461,13 +37744,13 @@
           "term": "dutyEffectiveFR",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/gr-solver-progress.md",
             "docs/proof-pack.md",
             "docs/qi-guard-consolidation.md",
             "docs/qi-ops-runbook.md",
             "docs/time-dilation-lattice-panel.md",
-            "docs/TRAINING-TRACE-API.md",
-            "docs/warp-pulsed-power.md"
+            "docs/TRAINING-TRACE-API.md"
           ],
           "treeMatches": [
             {
@@ -39899,6 +40182,36 @@
                 "className",
                 "text"
               ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-metrics-vis-alcubierre-metric",
+              "title": "Hull Metrics Vis Concept <-> alcubierre-metric",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "hull-metrics-vis"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-metrics-vis-casimir-natario-metric",
+              "title": "Hull Metrics Vis Concept <-> casimir-natario-metric",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "hull-metrics-vis"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-metrics-vis-natario-zero-expansion",
+              "title": "Hull Metrics Vis Concept <-> natario-zero-expansion",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "hull-metrics-vis"
+              ]
             }
           ]
         },
@@ -40048,6 +40361,36 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-alcubierre-viewer-alcubierre-metric",
+              "title": "Alcubierre Viewer Concept <-> alcubierre-metric",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "alcubierre-viewer"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-alcubierre-viewer-warp-bubble",
+              "title": "Alcubierre Viewer Concept <-> warp-bubble",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "alcubierre-viewer"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-metrics-vis-alcubierre-metric",
+              "title": "Hull Metrics Vis Concept <-> alcubierre-metric",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "hull-metrics-vis"
+              ]
+            },
+            {
               "treeId": "ui-components-tree",
               "nodeId": "ui-panel-alcubierre",
               "title": "Alcubierre Panels",
@@ -40055,16 +40398,6 @@
                 "ui",
                 "warp",
                 "alcubierre"
-              ]
-            },
-            {
-              "treeId": "warp-mechanics-tree",
-              "nodeId": "alcubierre-metric",
-              "title": "Alcubierre Metric",
-              "tags": [
-                "alcubierre",
-                "metric",
-                "warp"
               ]
             }
           ]
@@ -40303,23 +40636,23 @@
               ]
             },
             {
-              "treeId": "math-maturity-tree",
-              "nodeId": "natario-metric-engine",
-              "title": "Natario Metric Engine",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-metrics-vis-casimir-natario-metric",
+              "title": "Hull Metrics Vis Concept <-> casimir-natario-metric",
               "tags": [
-                "natario",
-                "metric",
-                "geometry"
+                "bridge",
+                "panel-concept",
+                "hull-metrics-vis"
               ]
             },
             {
-              "treeId": "warp-mechanics-tree",
-              "nodeId": "natario-zero-expansion",
-              "title": "Natario Zero-Expansion",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-metrics-vis-natario-zero-expansion",
+              "title": "Hull Metrics Vis Concept <-> natario-zero-expansion",
               "tags": [
-                "natario",
-                "expansion",
-                "warp"
+                "bridge",
+                "panel-concept",
+                "hull-metrics-vis"
               ]
             }
           ]
@@ -40328,13 +40661,13 @@
           "term": "resolveHullDimsEffective",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/time-dilation-lattice-panel.md",
             "docs/warpfield-mesh-patch-plan.md",
             "docs/warpfield-visualization-roadmap.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/HullMetricsVisPanel.tsx",
-            "client/src/lib/resolve-hull-dims.test.ts",
-            "client/src/lib/resolve-hull-dims.ts"
+            "client/src/lib/resolve-hull-dims.test.ts"
           ],
           "treeMatches": [
             {
@@ -40715,12 +41048,12 @@
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/physics/math-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/warp-pulsed-power.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/BridgeDerivationCards.tsx",
-            "client/src/components/CavityMechanismPanel.tsx"
+            "client/src/components/BridgeDerivationCards.tsx"
           ],
           "treeMatches": [
             {
@@ -40862,9 +41195,7 @@
       "treeIds": [
         "panel-concepts-tree",
         "ui-components-tree",
-        "warp-mechanics-tree",
-        "casimir-tiles-tree",
-        "math-maturity-tree"
+        "casimir-tiles-tree"
       ]
     },
     {
@@ -41048,6 +41379,36 @@
                 "based",
                 "mode",
                 "and"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-shift-vector-shift-vector-expansion-scalar",
+              "title": "Shift Vector Panel Concept <-> shift-vector-expansion-scalar",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "shift-vector"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-shift-vector-casimir-natario-metric",
+              "title": "Shift Vector Panel Concept <-> casimir-natario-metric",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "shift-vector"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-shift-vector-hull-materials",
+              "title": "Shift Vector Panel Concept <-> hull-materials",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "shift-vector"
               ]
             },
             {
@@ -41480,13 +41841,13 @@
           "term": "useMetrics",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CurvatureSlicePanel.tsx",
             "client/src/components/DriveGuardsPanel.tsx",
             "client/src/components/LightSpeedStrobeScale.tsx",
             "client/src/components/ShiftVectorPanel.tsx",
-            "client/src/components/WarpEngineContainer.tsx",
-            "client/src/components/WarpRenderInspector.tsx"
+            "client/src/components/WarpEngineContainer.tsx"
           ],
           "treeMatches": [
             {
@@ -42484,13 +42845,13 @@
           "term": "dutyEffectiveFR",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/gr-solver-progress.md",
             "docs/proof-pack.md",
             "docs/qi-guard-consolidation.md",
             "docs/qi-ops-runbook.md",
             "docs/time-dilation-lattice-panel.md",
-            "docs/TRAINING-TRACE-API.md",
-            "docs/warp-pulsed-power.md"
+            "docs/TRAINING-TRACE-API.md"
           ],
           "treeMatches": [
             {
@@ -42818,13 +43179,13 @@
           "term": "toExponential",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CardProofOverlay.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
-            "client/src/components/CavitySideView.tsx",
-            "client/src/components/CollapseBenchmarkHUD.tsx"
+            "client/src/components/CavitySideView.tsx"
           ],
           "treeMatches": [
             {
@@ -44394,12 +44755,12 @@
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/physics/gr-solver-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/qi-homogenization-addendum.md",
             "client/src/components/CardProofOverlay.tsx",
             "client/src/components/CollapseBenchmarkHUD.tsx",
-            "client/src/components/HelixCasimirAmplifier.tsx",
-            "client/src/components/HelixHullCardsPanel.tsx"
+            "client/src/components/HelixCasimirAmplifier.tsx"
           ],
           "treeMatches": [
             {
@@ -45494,6 +45855,16 @@
                 "span",
                 "Duty"
               ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-operational-mode-qi-guard-consolidation",
+              "title": "Operational Mode Switch Concept <-> qi-guard-consolidation",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "operational-mode"
+              ]
             }
           ]
         },
@@ -45601,13 +45972,13 @@
           "term": "dutyEffectiveFR",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/gr-solver-progress.md",
             "docs/proof-pack.md",
             "docs/qi-guard-consolidation.md",
             "docs/qi-ops-runbook.md",
             "docs/time-dilation-lattice-panel.md",
-            "docs/TRAINING-TRACE-API.md",
-            "docs/warp-pulsed-power.md"
+            "docs/TRAINING-TRACE-API.md"
           ],
           "treeMatches": [
             {
@@ -45833,13 +46204,13 @@
           "term": "formatPercent",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/CurvatureLedgerPanel.tsx",
             "client/src/components/dynamic-dashboard.tsx",
             "client/src/components/ElectronOrbitalPanel.tsx",
             "client/src/components/NearZeroWidget.tsx",
-            "client/src/components/OperationalModePanel.tsx",
-            "client/src/components/ReversibilityBadge.tsx"
+            "client/src/components/OperationalModePanel.tsx"
           ],
           "treeMatches": [
             {
@@ -45987,13 +46358,13 @@
           "term": "dutyCycle",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ADAPTER-CONTRACT.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/helix-autoscale-runbook.md",
             "docs/time-dilation-lattice-panel.md",
             "docs/warp-console-architecture.md",
-            "docs/warp-llm-contracts.md",
-            "client/src/components/AlcubierrePanel.tsx"
+            "docs/warp-llm-contracts.md"
           ],
           "treeMatches": [
             {
@@ -46969,6 +47340,26 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-casimir-tile-grid-casimir-tiles-tree",
+              "title": "Casimir Tile Grid Concept <-> casimir-tiles-tree",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "casimir-tile-grid"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-casimir-tile-grid-casimir-tiles-overview",
+              "title": "Casimir Tile Grid Concept <-> casimir-tiles-overview",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "casimir-tile-grid"
+              ]
+            },
+            {
               "treeId": "ui-components-tree",
               "nodeId": "ui-panel-casimir-grid",
               "title": "Casimir Tile Grid",
@@ -47037,10 +47428,10 @@
             "docs/knowledge/casimir-tiles.md",
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/trees/casimir-tiles-tree.md",
+            "docs/knowledge/trees/panel-concepts-tree.md",
             "docs/knowledge/trees/panel-registry-tree.md",
             "docs/knowledge/warp/casimir-lattice.md",
-            "docs/casimir-tile-mechanism.md",
-            "docs/warp-console-architecture.md"
+            "docs/casimir-tile-mechanism.md"
           ],
           "treeMatches": [
             {
@@ -47404,13 +47795,13 @@
           "term": "sectorPeriod_ms",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/qi-guard-consolidation.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CasimirTileGridPanel.tsx",
             "client/src/components/DriveGuardsPanel.tsx",
-            "client/src/components/energy-pipeline.tsx",
-            "client/src/components/LightSpeedStrobeScale.tsx"
+            "client/src/components/energy-pipeline.tsx"
           ],
           "treeMatches": [
             {
@@ -48175,6 +48566,16 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-light-speed-strobe-sector-strobes-duty-cycle",
+              "title": "Light-Speed Strobe Scale Concept <-> sector-strobes-duty-cycle",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "light-speed-strobe"
+              ]
+            },
+            {
               "treeId": "warp-mechanics-tree",
               "nodeId": "sector-strobes-duty-cycle",
               "title": "Sector Strobes Duty Cycle",
@@ -48766,6 +49167,36 @@
                 "mt-1 grid grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-2",
                 "rounded-lg p-3 border ${\r\n                    isCurrent ?"
               ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-speed-capability-casimir-tiles-tree",
+              "title": "Speed Capability Concept <-> casimir-tiles-tree",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "speed-capability"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-speed-capability-casimir-tiles-overview",
+              "title": "Speed Capability Concept <-> casimir-tiles-overview",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "speed-capability"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-speed-capability-casimir-tile-mechanism",
+              "title": "Speed Capability Concept <-> casimir-tile-mechanism",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "speed-capability"
+              ]
             }
           ]
         },
@@ -48987,13 +49418,13 @@
           "term": "km/s",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/stellar-fact-check.md",
             "client/src/components/SpeedCapabilityPanel.tsx",
             "client/src/components/StellarLsrPanel.tsx",
             "server/_generated/local-rest_epoch-1763695068238_r-200pc_ebb4cdf040e9e5f5.json",
             "server/_generated/local-rest_epoch-1763696763658_r-200pc_82f893256ebbf332.json",
-            "server/_generated/local-rest_epoch-1763696773601_r-200pc_012fd60ec17881cc.json",
-            "server/modules/stellar/local-rest.ts"
+            "server/_generated/local-rest_epoch-1763696773601_r-200pc_012fd60ec17881cc.json"
           ],
           "treeMatches": [
             {
@@ -49067,8 +49498,8 @@
             "docs/knowledge/stellar-restoration-tree.json",
             "docs/knowledge/physics/gr-solver-tree.json",
             "docs/knowledge/physics/math-tree.json",
-            "docs/OPENAI-WIRING.md",
-            "docs/quantum-gr-bridge.md"
+            "docs/knowledge/trees/panel-registry-tree.md",
+            "docs/OPENAI-WIRING.md"
           ],
           "treeMatches": [
             {
@@ -50974,13 +51405,13 @@
           "term": "modulationFreq_GHz",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/energy-pipeline.tsx",
             "client/src/components/HelixCasimirAmplifier.tsx",
-            "client/src/components/LightSpeedStrobeScale.tsx",
-            "client/src/components/live-energy-pipeline.tsx"
+            "client/src/components/LightSpeedStrobeScale.tsx"
           ],
           "treeMatches": [
             {
@@ -51448,13 +51879,13 @@
           "term": "sectorPeriod_ms",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/qi-guard-consolidation.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CasimirTileGridPanel.tsx",
             "client/src/components/DriveGuardsPanel.tsx",
-            "client/src/components/energy-pipeline.tsx",
-            "client/src/components/LightSpeedStrobeScale.tsx"
+            "client/src/components/energy-pipeline.tsx"
           ],
           "treeMatches": [
             {
@@ -51667,13 +52098,13 @@
           "term": "className",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ESSENCE-CONSOLE_PATCH-PLAN.md",
             "client/src/App.tsx",
             "client/src/components/AgiKnowledgePanel.tsx",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/AppErrorBoundary.tsx",
-            "client/src/components/BackgroundLuma.tsx"
+            "client/src/components/AppErrorBoundary.tsx"
           ],
           "treeMatches": [
             {
@@ -52614,6 +53045,16 @@
                 "const",
                 "dutyBoost"
               ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-trip-player-qi-guard-consolidation",
+              "title": "Trip Player Concept <-> qi-guard-consolidation",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "trip-player"
+              ]
             }
           ]
         },
@@ -52725,6 +53166,7 @@
           "term": "computeEffectiveLyPerHour",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/FuelGauge.tsx",
             "client/src/components/RouteSteps.tsx",
             "client/src/components/TripPlayer.tsx",
@@ -53510,6 +53952,7 @@
           "term": "computeEffectiveLyPerHour",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/FuelGauge.tsx",
             "client/src/components/RouteSteps.tsx",
             "client/src/components/TripPlayer.tsx",
@@ -54408,13 +54851,13 @@
           "term": "modulationFreq_GHz",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/energy-pipeline.tsx",
             "client/src/components/HelixCasimirAmplifier.tsx",
-            "client/src/components/LightSpeedStrobeScale.tsx",
-            "client/src/components/live-energy-pipeline.tsx"
+            "client/src/components/LightSpeedStrobeScale.tsx"
           ],
           "treeMatches": [
             {
@@ -54555,13 +54998,13 @@
           "term": "formatNumber",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/dynamic-values-table.tsx",
             "client/src/components/ElectronOrbitalPanel.tsx",
             "client/src/components/NeedleIpeakWorksheetPanel.tsx",
             "client/src/components/QiLatticePanel.tsx",
-            "client/src/components/TokamakSimulationPanel.tsx",
-            "client/src/components/VacuumContractBadge.tsx"
+            "client/src/components/TokamakSimulationPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -54751,13 +55194,13 @@
           "term": "dutyCycle",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ADAPTER-CONTRACT.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/helix-autoscale-runbook.md",
             "docs/time-dilation-lattice-panel.md",
             "docs/warp-console-architecture.md",
-            "docs/warp-llm-contracts.md",
-            "client/src/components/AlcubierrePanel.tsx"
+            "docs/warp-llm-contracts.md"
           ],
           "treeMatches": [
             {
@@ -55231,6 +55674,16 @@
                 "return",
                 "viewAvg"
               ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-metric-pocket-warp-control-stack",
+              "title": "Metric Amplification Pocket Concept <-> warp-control-stack",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "metric-pocket"
+              ]
             }
           ]
         },
@@ -55441,13 +55894,13 @@
           "term": "deltaAOverA",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/AmplificationPanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
             "client/src/components/HelixCasimirAmplifier.tsx",
             "client/src/components/MetricAmplificationPocket.tsx",
-            "client/src/components/PipelineProofPanel.tsx",
-            "client/src/components/TimeDilationLatticePanel.tsx"
+            "client/src/components/PipelineProofPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -55576,10 +56029,10 @@
             "docs/knowledge/stellar-restoration-tree.json",
             "docs/knowledge/physics/uncertainty-mechanics-tree.json",
             "docs/knowledge/physics/visualization-scaling.md",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/knowledge/trees/uncertainty-mechanics-tree.md",
             "docs/curvature-unit-solar-notes.md",
-            "docs/fashion-generative-panel.md",
-            "docs/helix-ask-ladder.md"
+            "docs/fashion-generative-panel.md"
           ],
           "treeMatches": [
             {
@@ -55666,13 +56119,13 @@
           "term": "effective",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/knowledge/trees/warp-mechanics-tree.md",
             "docs/knowledge/warp/warp-mechanics-tree.json",
             "docs/casimir-tile-mechanism.md",
             "docs/gr-solver-progress.md",
             "docs/guarded-casimir-tile-code-mapped.md",
-            "docs/needle-hull-materials.md",
-            "docs/proof-pack.md"
+            "docs/needle-hull-materials.md"
           ],
           "treeMatches": [
             {
@@ -55916,12 +56369,12 @@
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/physics/math-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/warp-console-architecture.md",
             "docs/warp-pulsed-power.md",
             "client/src/components/AlcubierrePanel.tsx",
-            "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/BridgeDerivationCards.tsx"
+            "client/src/components/AmplificationPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -56928,6 +57381,7 @@
           "term": "@/lib/whispers/usePanelHashFocus",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/HalobankPanel.tsx",
             "client/src/components/live-energy-pipeline.tsx",
             "client/src/components/ParametricSweepPanel.tsx",
@@ -57361,33 +57815,43 @@
               ]
             },
             {
-              "treeId": "math-maturity-tree",
-              "nodeId": "qi-bounds-engine",
-              "title": "QI Bounds",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-needle-world-roadmap-ford-roman-quantum-inequality",
+              "title": "Needle World Roadmap Concept <-> ford-roman-quantum-inequality",
               "tags": [
-                "qi",
-                "bounds",
-                "ford-roman"
+                "bridge",
+                "panel-concept",
+                "needle-world-roadmap"
               ]
             },
             {
-              "treeId": "physics-foundations-tree",
-              "nodeId": "ford-roman-quantum-inequality",
-              "title": "Ford-Roman Quantum Inequality",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-ford-roman-quantum-inequality",
+              "title": "Warp Experiment Ladder Concept <-> ford-roman-quantum-inequality",
               "tags": [
-                "quantum-inequality",
-                "ford-roman",
-                "constraints"
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
               ]
             },
             {
-              "treeId": "warp-mechanics-tree",
-              "nodeId": "ford-roman-proxy",
-              "title": "Ford-Roman Proxy",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-experiment-ladder-ford-roman-proxy",
+              "title": "Warp Experiment Ladder Concept <-> ford-roman-proxy",
               "tags": [
-                "ford-roman",
-                "proxy",
-                "constraints"
+                "bridge",
+                "panel-concept",
+                "experiment-ladder"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-qi-widget-ford-roman-quantum-inequality",
+              "title": "Qi Widget Concept <-> ford-roman-quantum-inequality",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "qi-widget"
               ]
             }
           ]
@@ -57437,6 +57901,36 @@
                 "lattice",
                 "tiles",
                 "report"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-qi-widget-ford-roman-quantum-inequality",
+              "title": "Qi Widget Concept <-> ford-roman-quantum-inequality",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "qi-widget"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-qi-widget-uncertainty-quantum-inequality",
+              "title": "Qi Widget Concept <-> uncertainty-quantum-inequality",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "qi-widget"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-qi-widget-ford-roman-proxy",
+              "title": "Qi Widget Concept <-> ford-roman-proxy",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "qi-widget"
               ]
             }
           ]
@@ -57785,13 +58279,13 @@
           "term": "className",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ESSENCE-CONSOLE_PATCH-PLAN.md",
             "client/src/App.tsx",
             "client/src/components/AgiKnowledgePanel.tsx",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/AppErrorBoundary.tsx",
-            "client/src/components/BackgroundLuma.tsx"
+            "client/src/components/AppErrorBoundary.tsx"
           ],
           "treeMatches": [
             {
@@ -58114,7 +58608,6 @@
         "physics-foundations-tree",
         "uncertainty-mechanics-tree",
         "math-maturity-tree",
-        "warp-mechanics-tree",
         "certainty-framework-tree",
         "debate-specialists-tree",
         "hardware-telemetry-tree"
@@ -59907,13 +60400,13 @@
           "term": "sectorPeriod_ms",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/qi-guard-consolidation.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CasimirTileGridPanel.tsx",
             "client/src/components/DriveGuardsPanel.tsx",
-            "client/src/components/energy-pipeline.tsx",
-            "client/src/components/LightSpeedStrobeScale.tsx"
+            "client/src/components/energy-pipeline.tsx"
           ],
           "treeMatches": [
             {
@@ -60168,13 +60661,13 @@
           "term": "sectorPeriod",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/helix-autoscale-runbook.md",
             "docs/qi-guard-consolidation.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CasimirTileGridPanel.tsx",
-            "client/src/components/DriveGuardsPanel.tsx",
-            "client/src/components/energy-pipeline.tsx"
+            "client/src/components/DriveGuardsPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -60810,13 +61303,13 @@
           "term": "center",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ethos/ideology.json",
             "docs/casimir-tile-schematic-roadmap.md",
             "docs/ESSENCE-CONSOLE_PATCH-PLAN.md",
             "docs/fashion-generative-panel.md",
             "docs/gr-solver-robustness.md",
-            "docs/product-narrative.md",
-            "docs/solar-pipeline.md"
+            "docs/product-narrative.md"
           ],
           "treeMatches": [
             {
@@ -60888,13 +61381,13 @@
           "term": "react",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/AGI-ROADMAP.md",
             "docs/casimir-tile-mechanism.md",
             "docs/client-index.md",
             "docs/curvature-unit-solar-notes.md",
             "docs/helix-desktop-panels.md",
-            "docs/helix-panel-template.md",
-            "docs/mobile-helix-start-roadmap.md"
+            "docs/helix-panel-template.md"
           ],
           "treeMatches": [
             {
@@ -61339,6 +61832,16 @@
                 "data",
                 "length"
               ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-hull-status-bridge-solar-restoration-plan-deep-mixing-plan",
+              "title": "Runtime Ops Concept <-> bridge-solar-restoration-plan-deep-mixing-plan",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "hull-status"
+              ]
             }
           ]
         },
@@ -61581,13 +62084,13 @@
           "term": "className",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ESSENCE-CONSOLE_PATCH-PLAN.md",
             "client/src/App.tsx",
             "client/src/components/AgiKnowledgePanel.tsx",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/AppErrorBoundary.tsx",
-            "client/src/components/BackgroundLuma.tsx"
+            "client/src/components/AppErrorBoundary.tsx"
           ],
           "treeMatches": [
             {
@@ -62386,6 +62889,7 @@
           "term": "useDebateTelemetry",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/client-index.md",
             "client/src/hooks/useDebateTelemetry.ts",
             "client/src/components/agi/CollapseWatcherPanel.tsx",
@@ -62701,13 +63205,13 @@
           "term": "global_coherence",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/sun-5-minute-bins.md",
             "client/src/pages/star-watcher-panel.tsx",
             "client/src/components/agi/CollapseWatcherPanel.tsx",
             "client/src/components/agi/DebateView.tsx",
             "client/src/components/agi/essence.tsx",
-            "client/src/components/agi/StarCoherencePanel.tsx",
-            "server/_generated/debate-telemetry.json"
+            "client/src/components/agi/StarCoherencePanel.tsx"
           ],
           "treeMatches": [
             {
@@ -64525,6 +65029,16 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-star-coherence-uncertainty-coherence-policy",
+              "title": "Star Coherence Governor Concept <-> uncertainty-coherence-policy",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "star-coherence"
+              ]
+            },
+            {
               "treeId": "uncertainty-mechanics-tree",
               "nodeId": "uncertainty-coherence-policy",
               "title": "Coherence Governor",
@@ -64636,6 +65150,16 @@
                 "number",
                 "new",
                 "Date"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-star-coherence-uncertainty-coherence-policy",
+              "title": "Star Coherence Governor Concept <-> uncertainty-coherence-policy",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "star-coherence"
               ]
             }
           ]
@@ -65051,6 +65575,7 @@
           "term": "useCoherenceTelemetry",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/hooks/useDebateTelemetry.ts",
             "client/src/components/agi/CollapseWatcherPanel.tsx",
             "client/src/components/agi/StarCoherencePanel.tsx"
@@ -65993,6 +66518,26 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pipeline-proof-resonance-tree",
+              "title": "Pipeline Proof Concept <-> resonance-tree",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "pipeline-proof"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pipeline-proof-resonance-runtime",
+              "title": "Pipeline Proof Concept <-> resonance-runtime",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "pipeline-proof"
+              ]
+            },
+            {
               "treeId": "resonance-tree",
               "nodeId": "resonance-tree",
               "title": "Resonance and Code-Lattice Tree",
@@ -66008,24 +66553,6 @@
               "tags": [
                 "resonance",
                 "schema"
-              ]
-            },
-            {
-              "treeId": "resonance-tree",
-              "nodeId": "code-lattice-schema",
-              "title": "Code Lattice Schema",
-              "tags": [
-                "resonance",
-                "schema"
-              ]
-            },
-            {
-              "treeId": "resonance-tree",
-              "nodeId": "resonance-runtime",
-              "title": "Resonance Runtime",
-              "tags": [
-                "resonance",
-                "runtime"
               ]
             }
           ]
@@ -66340,43 +66867,43 @@
               ]
             },
             {
-              "treeId": "ui-backend-binding-tree",
-              "nodeId": "binding-proof-verification",
-              "title": "Proof and Verification Binding",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pipeline-proof-resonance-tree",
+              "title": "Pipeline Proof Concept <-> resonance-tree",
               "tags": [
-                "ui",
-                "verification",
-                "proof"
+                "bridge",
+                "panel-concept",
+                "pipeline-proof"
               ]
             },
             {
-              "treeId": "ui-components-tree",
-              "nodeId": "ui-panel-warp-proof",
-              "title": "Warp Proof Panels",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pipeline-proof-code-lattice-core",
+              "title": "Pipeline Proof Concept <-> code-lattice-core",
               "tags": [
-                "ui",
-                "warp",
-                "proof"
+                "bridge",
+                "panel-concept",
+                "pipeline-proof"
               ]
             },
             {
-              "treeId": "ui-components-tree",
-              "nodeId": "ui-panel-pipeline-proof",
-              "title": "Pipeline Proof Panels",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pipeline-proof-code-lattice-schema",
+              "title": "Pipeline Proof Concept <-> code-lattice-schema",
               "tags": [
-                "ui",
-                "proof",
-                "pipeline"
+                "bridge",
+                "panel-concept",
+                "pipeline-proof"
               ]
             },
             {
-              "treeId": "ui-components-tree",
-              "nodeId": "ui-panel-proof-verification",
-              "title": "Proof and Verification Panels",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-pipeline-proof-resonance-runtime",
+              "title": "Pipeline Proof Concept <-> resonance-runtime",
               "tags": [
-                "ui",
-                "verification",
-                "proof"
+                "bridge",
+                "panel-concept",
+                "pipeline-proof"
               ]
             }
           ]
@@ -66868,12 +67395,12 @@
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
             "docs/knowledge/physics/gr-solver-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/guarded-casimir-tile-code-mapped.md",
             "docs/qi-homogenization-addendum.md",
             "client/src/components/CardProofOverlay.tsx",
             "client/src/components/CollapseBenchmarkHUD.tsx",
-            "client/src/components/HelixCasimirAmplifier.tsx",
-            "client/src/components/HelixHullCardsPanel.tsx"
+            "client/src/components/HelixCasimirAmplifier.tsx"
           ],
           "treeMatches": [
             {
@@ -66960,13 +67487,13 @@
           "term": "useEnergyPipeline",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/casimir-tile-mechanism.md",
             "docs/helix-desktop-panels.md",
             "docs/needle-hull-mainframe.md",
             "docs/time-dilation-lattice-panel.md",
             "client/src/components/AlcubierrePanel.tsx",
-            "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/BubbleFieldPanel.tsx"
+            "client/src/components/AmplificationPanel.tsx"
           ],
           "treeMatches": [
             {
@@ -67055,9 +67582,7 @@
         "agi-runtime-tree",
         "panel-concepts-tree",
         "resonance-tree",
-        "casimir-tiles-tree",
-        "ui-backend-binding-tree",
-        "ui-components-tree"
+        "casimir-tiles-tree"
       ]
     },
     {
@@ -67441,6 +67966,7 @@
           "term": "useCoherenceTelemetry",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/hooks/useDebateTelemetry.ts",
             "client/src/components/agi/CollapseWatcherPanel.tsx",
             "client/src/components/agi/StarCoherencePanel.tsx"
@@ -67621,6 +68147,7 @@
           "term": "useDebateTelemetry",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/client-index.md",
             "client/src/hooks/useDebateTelemetry.ts",
             "client/src/components/agi/CollapseWatcherPanel.tsx",
@@ -67937,13 +68464,13 @@
           "term": "global_coherence",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/sun-5-minute-bins.md",
             "client/src/pages/star-watcher-panel.tsx",
             "client/src/components/agi/CollapseWatcherPanel.tsx",
             "client/src/components/agi/DebateView.tsx",
             "client/src/components/agi/essence.tsx",
-            "client/src/components/agi/StarCoherencePanel.tsx",
-            "server/_generated/debate-telemetry.json"
+            "client/src/components/agi/StarCoherencePanel.tsx"
           ],
           "treeMatches": [
             {
@@ -68195,6 +68722,16 @@
                 ">\n          {isFetching ?",
                 "./CollapseBenchmarkHUD",
                 "text-sm text-slate-300"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-collapse-benchmark-hud-uncertainty-collapse-benchmark",
+              "title": "Collapse Benchmark HUD Concept <-> uncertainty-collapse-benchmark",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "collapse-benchmark-hud"
               ]
             },
             {
@@ -69542,6 +70079,7 @@
           "term": "render plan",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/pages/helix-core.panels.ts",
             "client/src/components/noise-gens/AtomLibraryPanel.tsx"
           ],
@@ -69637,6 +70175,26 @@
                 "fallbackMood",
                 "mood",
                 "description"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-noise-gens-units-systems",
+              "title": "Noise Gens Concept <-> units-systems",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-noise-gens"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-noise-gens-simulation-systems",
+              "title": "Noise Gens Concept <-> simulation-systems",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-noise-gens"
               ]
             },
             {
@@ -69858,6 +70416,26 @@
               ]
             },
             {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-noise-gens-units-systems",
+              "title": "Noise Gens Concept <-> units-systems",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-noise-gens"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-helix-noise-gens-simulation-systems",
+              "title": "Noise Gens Concept <-> simulation-systems",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "helix-noise-gens"
+              ]
+            },
+            {
               "treeId": "ethos-knowledge-tree",
               "nodeId": "civic-governance-stack",
               "title": "Civic and Governance Systems",
@@ -69885,26 +70463,6 @@
                 "ethos",
                 "integrity",
                 "governance"
-              ]
-            },
-            {
-              "treeId": "physics-foundations-tree",
-              "nodeId": "units-systems",
-              "title": "Units Systems",
-              "tags": [
-                "units",
-                "systems",
-                "conversion"
-              ]
-            },
-            {
-              "treeId": "physics-foundations-tree",
-              "nodeId": "simulation-systems",
-              "title": "Simulation Systems",
-              "tags": [
-                "simulation",
-                "physics",
-                "pipeline"
               ]
             }
           ]
@@ -70265,8 +70823,7 @@
         "panel-concepts-tree",
         "ui-components-tree",
         "certainty-framework-tree",
-        "ethos-knowledge-tree",
-        "physics-foundations-tree"
+        "ethos-knowledge-tree"
       ]
     },
     {
@@ -70647,8 +71204,8 @@
             "docs/knowledge/physics/certificate-integrity.md",
             "docs/knowledge/physics/simulation-systems-tree.json",
             "docs/knowledge/trees/debate-specialists-tree.md",
-            "docs/knowledge/trees/telemetry-console-tree.md",
-            "docs/ethos/ideology.json"
+            "docs/knowledge/trees/panel-registry-tree.md",
+            "docs/knowledge/trees/telemetry-console-tree.md"
           ],
           "treeMatches": [
             {
@@ -71346,6 +71903,26 @@
                 "border-slate-800/70 bg-slate-950/60 hover:border-slate-700",
                 "Describe the correction, test case, or protocol update.",
                 "}\n                                        {entry.tier ?"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-agi-contribution-workbench-casimir-tiles-tree",
+              "title": "Contribution Workbench Concept <-> casimir-tiles-tree",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "agi-contribution-workbench"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-agi-contribution-workbench-casimir-tile-schematic-roadmap",
+              "title": "Contribution Workbench Concept <-> casimir-tile-schematic-roadmap",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "agi-contribution-workbench"
               ]
             }
           ]
@@ -72328,13 +72905,13 @@
           "term": "useCallback",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/AgiKnowledgePanel.tsx",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/CasimirTileGridPanel.tsx",
             "client/src/components/CavitySideView.tsx",
             "client/src/components/DirectionPad.tsx",
-            "client/src/components/energy-pipeline.tsx",
-            "client/src/components/EnergyFluxPanel.tsx"
+            "client/src/components/energy-pipeline.tsx"
           ],
           "treeMatches": [
             {
@@ -72409,13 +72986,13 @@
           "term": "className",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ESSENCE-CONSOLE_PATCH-PLAN.md",
             "client/src/App.tsx",
             "client/src/components/AgiKnowledgePanel.tsx",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
-            "client/src/components/AppErrorBoundary.tsx",
-            "client/src/components/BackgroundLuma.tsx"
+            "client/src/components/AppErrorBoundary.tsx"
           ],
           "treeMatches": [
             {
@@ -74070,12 +74647,12 @@
           "files": [
             "docs/knowledge/dag-node-schema.md",
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "docs/ethos/ideology-telemetry-schema.json",
             "docs/AGI-ROADMAP.md",
             "docs/needle-hull-mainframe.md",
             "docs/qi-homogenization-addendum.md",
-            "docs/TRACE-API.md",
-            "client/src/components/AgiKnowledgePanel.tsx"
+            "docs/TRACE-API.md"
           ],
           "treeMatches": [
             {
@@ -74603,44 +75180,43 @@
               ]
             },
             {
-              "treeId": "pipeline-ledger-tree",
-              "nodeId": "stellar-ledger",
-              "title": "Stellar Ledger",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-star-hydrostatic-stellar-ledger-stack",
+              "title": "Hydrostatic Equilibrium (HR) Concept <-> stellar-ledger-stack",
               "tags": [
-                "stellar",
-                "ledger",
-                "restoration"
+                "bridge",
+                "panel-concept",
+                "star-hydrostatic"
               ]
             },
             {
-              "treeId": "stellar-restoration-tree",
-              "nodeId": "stellar-restoration-tree",
-              "title": "Stellar Restoration Tree",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-star-hydrostatic-stellar-ledger",
+              "title": "Hydrostatic Equilibrium (HR) Concept <-> stellar-ledger",
               "tags": [
-                "star",
-                "stellar",
-                "restoration",
-                "ledger"
+                "bridge",
+                "panel-concept",
+                "star-hydrostatic"
               ]
             },
             {
-              "treeId": "stellar-restoration-tree",
-              "nodeId": "stellar-structure-stack",
-              "title": "Stellar Structure",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-star-hydrostatic-bridge-solar-restoration-plan-stellar-ledger-stack",
+              "title": "Hydrostatic Equilibrium (HR) Concept <-> bridge-solar-restoration-plan-stellar-ledger-stack",
               "tags": [
-                "structure",
-                "hydrostatic",
-                "star"
+                "bridge",
+                "panel-concept",
+                "star-hydrostatic"
               ]
             },
             {
-              "treeId": "stellar-restoration-tree",
-              "nodeId": "stellar-evolution-stack",
-              "title": "Stellar Evolution",
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-stellar-lsr-stellar-restoration-tree",
+              "title": "Stellar LSR Viewer Concept <-> stellar-restoration-tree",
               "tags": [
-                "evolution",
-                "phases",
-                "star"
+                "bridge",
+                "panel-concept",
+                "stellar-lsr"
               ]
             }
           ]
@@ -74749,6 +75325,36 @@
                 "toFixed",
                 "max",
                 "Density"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-stellar-lsr-stellar-restoration-tree",
+              "title": "Stellar LSR Viewer Concept <-> stellar-restoration-tree",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "stellar-lsr"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-stellar-lsr-stellar-structure-stack",
+              "title": "Stellar LSR Viewer Concept <-> stellar-structure-stack",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "stellar-lsr"
+              ]
+            },
+            {
+              "treeId": "panel-concepts-tree",
+              "nodeId": "bridge-panel-concept-stellar-lsr-stellar-evolution-stack",
+              "title": "Stellar LSR Viewer Concept <-> stellar-evolution-stack",
+              "tags": [
+                "bridge",
+                "panel-concept",
+                "stellar-lsr"
               ]
             },
             {
@@ -75190,13 +75796,13 @@
           "term": "toExponential",
           "files": [
             "docs/knowledge/panel-concepts-tree.json",
+            "docs/knowledge/trees/panel-registry-tree.md",
             "client/src/components/AlcubierrePanel.tsx",
             "client/src/components/AmplificationPanel.tsx",
             "client/src/components/BridgeDerivationCards.tsx",
             "client/src/components/CardProofOverlay.tsx",
             "client/src/components/CavityMechanismPanel.tsx",
-            "client/src/components/CavitySideView.tsx",
-            "client/src/components/CollapseBenchmarkHUD.tsx"
+            "client/src/components/CavitySideView.tsx"
           ],
           "treeMatches": [
             {
@@ -75382,8 +75988,6 @@
       "missingTerms": [],
       "treeIds": [
         "panel-concepts-tree",
-        "pipeline-ledger-tree",
-        "stellar-restoration-tree",
         "ui-components-tree"
       ]
     },

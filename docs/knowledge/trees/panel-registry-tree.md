@@ -390,6 +390,71 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: concept
 - summary: Panel essence-proposals loaded from helix-core panels registry. Component: client/src/components/agi/EssenceProposalsPanel.tsx Endpoints: GET /api/proposals, POST /api/proposals/:id/action, GET /api/essence/events Keywords: essence proposal…
 
+### Node: Viz Diagnostics HUD <-> panel-concept-viz-diagnostics
+- id: bridge-panel-viz-diagnostics-panel-concept-viz-diagnostics
+- type: bridge
+- summary: Panel viz-diagnostics links to panel-concept-viz-diagnostics via term "diagnostics overlay".
+
+### Node: Viz Diagnostics HUD <-> panel-concept-hull-metrics-vis
+- id: bridge-panel-viz-diagnostics-panel-concept-hull-metrics-vis
+- type: bridge
+- summary: Panel viz-diagnostics links to panel-concept-hull-metrics-vis via term "qSpoilingFactor".
+
+### Node: Viz Diagnostics HUD <-> panel-concept-energy-flux
+- id: bridge-panel-viz-diagnostics-panel-concept-energy-flux
+- type: bridge
+- summary: Panel viz-diagnostics links to panel-concept-energy-flux via term "dutyEffectiveFR".
+
+### Node: Viz Diagnostics HUD <-> panel-concept-cavity-mechanism
+- id: bridge-panel-viz-diagnostics-panel-concept-cavity-mechanism
+- type: bridge
+- summary: Panel viz-diagnostics links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
+
+### Node: Viz Diagnostics HUD <-> panel-concept-shell-outline
+- id: bridge-panel-viz-diagnostics-panel-concept-shell-outline
+- type: bridge
+- summary: Panel viz-diagnostics links to panel-concept-shell-outline via term "dutyEffectiveFR".
+
+### Node: Viz Diagnostics HUD <-> panel-concept-curvature-slice
+- id: bridge-panel-viz-diagnostics-panel-concept-curvature-slice
+- type: bridge
+- summary: Panel viz-diagnostics links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Node: Energy Flux Stability <-> panel-concept-energy-flux
+- id: bridge-panel-energy-flux-panel-concept-energy-flux
+- type: bridge
+- summary: Panel energy-flux links to panel-concept-energy-flux via term "R = (phi_A)/(I3 + |T|)".
+
+### Node: Energy Flux Stability <-> panel-concept-viz-diagnostics
+- id: bridge-panel-energy-flux-panel-concept-viz-diagnostics
+- type: bridge
+- summary: Panel energy-flux links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
+
+### Node: Energy Flux Stability <-> panel-concept-cavity-mechanism
+- id: bridge-panel-energy-flux-panel-concept-cavity-mechanism
+- type: bridge
+- summary: Panel energy-flux links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
+
+### Node: Energy Flux Stability <-> panel-concept-shell-outline
+- id: bridge-panel-energy-flux-panel-concept-shell-outline
+- type: bridge
+- summary: Panel energy-flux links to panel-concept-shell-outline via term "dutyEffectiveFR".
+
+### Node: Energy Flux Stability <-> panel-concept-curvature-slice
+- id: bridge-panel-energy-flux-panel-concept-curvature-slice
+- type: bridge
+- summary: Panel energy-flux links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Node: Energy Flux Stability <-> panel-concept-operational-mode
+- id: bridge-panel-energy-flux-panel-concept-operational-mode
+- type: bridge
+- summary: Panel energy-flux links to panel-concept-operational-mode via term "dutyEffectiveFR".
+
+### Node: Phoenix Averaging <-> panel-concept-helix-phoenix
+- id: bridge-panel-helix-phoenix-panel-concept-helix-phoenix
+- type: bridge
+- summary: Panel helix-phoenix links to panel-concept-helix-phoenix via term "phoenix averaging".
+
 ### Node: Phoenix Averaging <-> phoenix-averaging
 - id: bridge-panel-helix-phoenix-phoenix-averaging
 - type: bridge
@@ -415,40 +480,120 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel helix-phoenix links to casimir-tile-roadmap via term "casimir tile".
 
-### Node: Phoenix Averaging <-> casimir-tile-schematic-roadmap
-- id: bridge-panel-helix-phoenix-casimir-tile-schematic-roadmap
+### Node: Microscopy Mode <-> panel-concept-microscopy
+- id: bridge-panel-microscopy-panel-concept-microscopy
 - type: bridge
-- summary: Panel helix-phoenix links to casimir-tile-schematic-roadmap via term "casimir tile".
+- summary: Panel microscopy links to panel-concept-microscopy via term "microscopy mode".
+
+### Node: Microscopy Mode <-> panel-concept-pipeline-proof
+- id: bridge-panel-microscopy-panel-concept-pipeline-proof
+- type: bridge
+- summary: Panel microscopy links to panel-concept-pipeline-proof via term "useEnergyPipeline".
+
+### Node: Needle I_peak Worksheet <-> panel-concept-needle-ipeak-worksheet
+- id: bridge-panel-needle-ipeak-worksheet-panel-concept-needle-ipeak-worksheet
+- type: bridge
+- summary: Panel needle-ipeak-worksheet links to panel-concept-needle-ipeak-worksheet via term "pulsed power".
+
+### Node: Needle I_peak Worksheet <-> panel-concept-pulsed-power-doc
+- id: bridge-panel-needle-ipeak-worksheet-panel-concept-pulsed-power-doc
+- type: bridge
+- summary: Panel needle-ipeak-worksheet links to panel-concept-pulsed-power-doc via term "pulsed power".
 
 ### Node: Needle I_peak Worksheet <-> warp-pulsed-power
 - id: bridge-panel-needle-ipeak-worksheet-warp-pulsed-power
 - type: bridge
 - summary: Panel needle-ipeak-worksheet links to warp-pulsed-power via term "pulsed power".
 
+### Node: Needle I_peak Worksheet <-> panel-concept-helix-phoenix
+- id: bridge-panel-needle-ipeak-worksheet-panel-concept-helix-phoenix
+- type: bridge
+- summary: Panel needle-ipeak-worksheet links to panel-concept-helix-phoenix via term "needle hull".
+
+### Node: Needle I_peak Worksheet <-> panel-concept-metric-pocket
+- id: bridge-panel-needle-ipeak-worksheet-panel-concept-metric-pocket
+- type: bridge
+- summary: Panel needle-ipeak-worksheet links to panel-concept-metric-pocket via term "normalized".
+
+### Node: Needle I_peak Worksheet <-> panel-concept-gr-agent-loop-audit
+- id: bridge-panel-needle-ipeak-worksheet-panel-concept-gr-agent-loop-audit
+- type: bridge
+- summary: Panel needle-ipeak-worksheet links to panel-concept-gr-agent-loop-audit via term "undefined".
+
+### Node: Needle World Roadmap <-> panel-concept-needle-world-roadmap
+- id: bridge-panel-needle-world-roadmap-panel-concept-needle-world-roadmap
+- type: bridge
+- summary: Panel needle-world-roadmap links to panel-concept-needle-world-roadmap via term "needle roadmap".
+
+### Node: Needle World Roadmap <-> panel-concept-resonance-scheduler
+- id: bridge-panel-needle-world-roadmap-panel-concept-resonance-scheduler
+- type: bridge
+- summary: Panel needle-world-roadmap links to panel-concept-resonance-scheduler via term "timeline".
+
+### Node: Needle World Roadmap <-> panel-concept-trip-player
+- id: bridge-panel-needle-world-roadmap-panel-concept-trip-player
+- type: bridge
+- summary: Panel needle-world-roadmap links to panel-concept-trip-player via term "timeline".
+
+### Node: Needle World Roadmap <-> panel-concept-halobank
+- id: bridge-panel-needle-world-roadmap-panel-concept-halobank
+- type: bridge
+- summary: Panel needle-world-roadmap links to panel-concept-halobank via term "timeline".
+
+### Node: Needle World Roadmap <-> panel-concept-agi-task-history
+- id: bridge-panel-needle-world-roadmap-panel-concept-agi-task-history
+- type: bridge
+- summary: Panel needle-world-roadmap links to panel-concept-agi-task-history via term "timeline".
+
 ### Node: Needle World Roadmap <-> ts-ratio-guardrail
 - id: bridge-panel-needle-world-roadmap-ts-ratio-guardrail
 - type: bridge
 - summary: Panel needle-world-roadmap links to ts-ratio-guardrail via term "TS_ratio".
 
-### Node: Needle World Roadmap <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
-- id: bridge-panel-needle-world-roadmap-bridge-ts-ratio-guardrail-casimir-tile-mechanism
+### Node: Electron Orbital Simulator <-> panel-concept-electron-orbital
+- id: bridge-panel-electron-orbital-panel-concept-electron-orbital
 - type: bridge
-- summary: Panel needle-world-roadmap links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "TS_ratio".
+- summary: Panel electron-orbital links to panel-concept-electron-orbital via term "toroidal packets".
 
-### Node: Needle World Roadmap <-> qi-bounds-engine
-- id: bridge-panel-needle-world-roadmap-qi-bounds-engine
+### Node: Electron Orbital Simulator <-> panel-concept-cavity-mechanism
+- id: bridge-panel-electron-orbital-panel-concept-cavity-mechanism
 - type: bridge
-- summary: Panel needle-world-roadmap links to qi-bounds-engine via term "Roman".
+- summary: Panel electron-orbital links to panel-concept-cavity-mechanism via term "formatPercent".
 
-### Node: Needle World Roadmap <-> ford-roman-quantum-inequality
-- id: bridge-panel-needle-world-roadmap-ford-roman-quantum-inequality
+### Node: Electron Orbital Simulator <-> panel-concept-near-zero
+- id: bridge-panel-electron-orbital-panel-concept-near-zero
 - type: bridge
-- summary: Panel needle-world-roadmap links to ford-roman-quantum-inequality via term "Roman".
+- summary: Panel electron-orbital links to panel-concept-near-zero via term "formatPercent".
 
-### Node: Needle World Roadmap <-> ford-roman-proxy
-- id: bridge-panel-needle-world-roadmap-ford-roman-proxy
+### Node: Electron Orbital Simulator <-> panel-concept-operational-mode
+- id: bridge-panel-electron-orbital-panel-concept-operational-mode
 - type: bridge
-- summary: Panel needle-world-roadmap links to ford-roman-proxy via term "Roman".
+- summary: Panel electron-orbital links to panel-concept-operational-mode via term "formatPercent".
+
+### Node: Drive Guards <-> panel-concept-drive-guards
+- id: bridge-panel-drive-guards-panel-concept-drive-guards
+- type: bridge
+- summary: Panel drive-guards links to panel-concept-drive-guards via term "sector strobing".
+
+### Node: Mass Provenance <-> panel-concept-mass-provenance
+- id: bridge-panel-mass-provenance-panel-concept-mass-provenance
+- type: bridge
+- summary: Panel mass-provenance links to panel-concept-mass-provenance via term "override warnings".
+
+### Node: GR Agent Loop Audit <-> panel-concept-gr-agent-loop-audit
+- id: bridge-panel-gr-agent-loop-audit-panel-concept-gr-agent-loop-audit
+- type: bridge
+- summary: Panel gr-agent-loop-audit links to panel-concept-gr-agent-loop-audit via term "warp constraints".
+
+### Node: GR Agent Loop Audit <-> panel-concept-gr-agent-loop-learning
+- id: bridge-panel-gr-agent-loop-audit-panel-concept-gr-agent-loop-learning
+- type: bridge
+- summary: Panel gr-agent-loop-audit links to panel-concept-gr-agent-loop-learning via term "accepted config".
+
+### Node: GR Agent Loop Audit <-> panel-concept-gr-agent-loop-kpis
+- id: bridge-panel-gr-agent-loop-audit-panel-concept-gr-agent-loop-kpis
+- type: bridge
+- summary: Panel gr-agent-loop-audit links to panel-concept-gr-agent-loop-kpis via term "gr agent loop".
 
 ### Node: GR Agent Loop Audit <-> ui-panel-gr-agent-loop
 - id: bridge-panel-gr-agent-loop-audit-ui-panel-gr-agent-loop
@@ -465,20 +610,15 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel gr-agent-loop-audit links to gr-agent-loop-schema via term "gr agent loop".
 
-### Node: GR Agent Loop Audit <-> gr-constraint-network
-- id: bridge-panel-gr-agent-loop-audit-gr-constraint-network
+### Node: GR Loop KPIs <-> panel-concept-gr-agent-loop-kpis
+- id: bridge-panel-gr-agent-loop-kpis-panel-concept-gr-agent-loop-kpis
 - type: bridge
-- summary: Panel gr-agent-loop-audit links to gr-constraint-network via term "residuals".
+- summary: Panel gr-agent-loop-kpis links to panel-concept-gr-agent-loop-kpis via term "constraint violations".
 
-### Node: GR Agent Loop Audit <-> stage-diagnostic
-- id: bridge-panel-gr-agent-loop-audit-stage-diagnostic
+### Node: GR Loop KPIs <-> panel-concept-gr-agent-loop-audit
+- id: bridge-panel-gr-agent-loop-kpis-panel-concept-gr-agent-loop-audit
 - type: bridge
-- summary: Panel gr-agent-loop-audit links to stage-diagnostic via term "residuals".
-
-### Node: GR Agent Loop Audit <-> gr-constraint-network
-- id: bridge-panel-gr-agent-loop-audit-gr-constraint-network
-- type: bridge
-- summary: Panel gr-agent-loop-audit links to gr-constraint-network via term "residuals".
+- summary: Panel gr-agent-loop-kpis links to panel-concept-gr-agent-loop-audit via term "gr agent loop".
 
 ### Node: GR Loop KPIs <-> ui-panel-gr-agent-loop
 - id: bridge-panel-gr-agent-loop-kpis-ui-panel-gr-agent-loop
@@ -495,10 +635,25 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel gr-agent-loop-kpis links to gr-agent-loop-schema via term "gr agent loop".
 
+### Node: GR Loop Learning <-> panel-concept-gr-agent-loop-learning
+- id: bridge-panel-gr-agent-loop-learning-panel-concept-gr-agent-loop-learning
+- type: bridge
+- summary: Panel gr-agent-loop-learning links to panel-concept-gr-agent-loop-learning via term "accepted config history".
+
 ### Node: GR Loop Learning <-> agi-learning-loop
 - id: bridge-panel-gr-agent-loop-learning-agi-learning-loop
 - type: bridge
 - summary: Panel gr-agent-loop-learning links to agi-learning-loop via term "learning loop".
+
+### Node: GR Loop Learning <-> panel-concept-gr-agent-loop-audit
+- id: bridge-panel-gr-agent-loop-learning-panel-concept-gr-agent-loop-audit
+- type: bridge
+- summary: Panel gr-agent-loop-learning links to panel-concept-gr-agent-loop-audit via term "residualSeries".
+
+### Node: Math Maturity Tree <-> panel-concept-math-maturity-tree
+- id: bridge-panel-math-maturity-tree-panel-concept-math-maturity-tree
+- type: bridge
+- summary: Panel math-maturity-tree links to panel-concept-math-maturity-tree via term "math maturity".
 
 ### Node: Math Maturity Tree <-> ui-panel-math-maturity
 - id: bridge-panel-math-maturity-tree-ui-panel-math-maturity
@@ -520,75 +675,110 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel math-maturity-tree links to bridge-math-maturity-stages-math-evidence-registry via term "math maturity".
 
-### Node: Math Maturity Tree <-> math-pipeline-walk
-- id: bridge-panel-math-maturity-tree-math-pipeline-walk
+### Node: Math Maturity Tree <-> panel-concept-universal-audit-tree
+- id: bridge-panel-math-maturity-tree-panel-concept-universal-audit-tree
 - type: bridge
-- summary: Panel math-maturity-tree links to math-pipeline-walk via term "math".
+- summary: Panel math-maturity-tree links to panel-concept-universal-audit-tree via term "repo audit".
 
-### Node: Math Maturity Tree <-> math-verification-gates
-- id: bridge-panel-math-maturity-tree-math-verification-gates
+### Node: Universal Audit Tree <-> panel-concept-universal-audit-tree
+- id: bridge-panel-universal-audit-tree-panel-concept-universal-audit-tree
 - type: bridge
-- summary: Panel math-maturity-tree links to math-verification-gates via term "math".
+- summary: Panel universal-audit-tree links to panel-concept-universal-audit-tree via term "verification map".
+
+### Node: Universal Audit Tree <-> panel-concept-math-maturity-tree
+- id: bridge-panel-universal-audit-tree-panel-concept-math-maturity-tree
+- type: bridge
+- summary: Panel universal-audit-tree links to panel-concept-math-maturity-tree via term "repo audit".
+
+### Node: Universal Audit Tree <-> panel-concept-gr-agent-loop-kpis
+- id: bridge-panel-universal-audit-tree-panel-concept-gr-agent-loop-kpis
+- type: bridge
+- summary: Panel universal-audit-tree links to panel-concept-gr-agent-loop-kpis via term "string".
+
+### Node: Universal Audit Tree <-> panel-concept-model-silhouette
+- id: bridge-panel-universal-audit-tree-panel-concept-model-silhouette
+- type: bridge
+- summary: Panel universal-audit-tree links to panel-concept-model-silhouette via term "string".
+
+### Node: Universal Audit Tree <-> panel-concept-trip-player
+- id: bridge-panel-universal-audit-tree-panel-concept-trip-player
+- type: bridge
+- summary: Panel universal-audit-tree links to panel-concept-trip-player via term "string".
+
+### Node: Universal Audit Tree <-> panel-concept-fuel-gauge
+- id: bridge-panel-universal-audit-tree-panel-concept-fuel-gauge
+- type: bridge
+- summary: Panel universal-audit-tree links to panel-concept-fuel-gauge via term "string".
+
+### Node: TSN Determinism <-> panel-concept-tsn-sim
+- id: bridge-panel-tsn-sim-panel-concept-tsn-sim
+- type: bridge
+- summary: Panel tsn-sim links to panel-concept-tsn-sim via term "deterministic".
+
+### Node: TSN Determinism <-> panel-concept-time-dilation-lattice
+- id: bridge-panel-tsn-sim-panel-concept-time-dilation-lattice
+- type: bridge
+- summary: Panel tsn-sim links to panel-concept-time-dilation-lattice via term "clock".
+
+### Node: TSN Determinism <-> panel-concept-agi-task-history
+- id: bridge-panel-tsn-sim-panel-concept-agi-task-history
+- type: bridge
+- summary: Panel tsn-sim links to panel-concept-agi-task-history via term "clock".
+
+### Node: TSN Determinism <-> panel-concept-light-speed-strobe
+- id: bridge-panel-tsn-sim-panel-concept-light-speed-strobe
+- type: bridge
+- summary: Panel tsn-sim links to panel-concept-light-speed-strobe via term "tsn".
 
 ### Node: TSN Determinism <-> simulation-tsn
 - id: bridge-panel-tsn-sim-simulation-tsn
 - type: bridge
 - summary: Panel tsn-sim links to simulation-tsn via term "tsn".
 
-### Node: TSN Determinism <-> schema-confidence-stack
-- id: bridge-panel-tsn-sim-schema-confidence-stack
+### Node: TSN Determinism <-> panel-concept-pulsed-power-doc
+- id: bridge-panel-tsn-sim-panel-concept-pulsed-power-doc
 - type: bridge
-- summary: Panel tsn-sim links to schema-confidence-stack via term "telemetry".
+- summary: Panel tsn-sim links to panel-concept-pulsed-power-doc via term "usePanelTelemetryPublisher".
 
-### Node: TSN Determinism <-> debate-telemetry
-- id: bridge-panel-tsn-sim-debate-telemetry
+### Node: Warp Pulsed Power <-> panel-concept-needle-ipeak-worksheet
+- id: bridge-panel-pulsed-power-doc-panel-concept-needle-ipeak-worksheet
 - type: bridge
-- summary: Panel tsn-sim links to debate-telemetry via term "telemetry".
+- summary: Panel pulsed-power-doc links to panel-concept-needle-ipeak-worksheet via term "pulsed power".
 
-### Node: TSN Determinism <-> hardware-telemetry-tree
-- id: bridge-panel-tsn-sim-hardware-telemetry-tree
+### Node: Warp Pulsed Power <-> panel-concept-pulsed-power-doc
+- id: bridge-panel-pulsed-power-doc-panel-concept-pulsed-power-doc
 - type: bridge
-- summary: Panel tsn-sim links to hardware-telemetry-tree via term "telemetry".
-
-### Node: TSN Determinism <-> skills-telemetry
-- id: bridge-panel-tsn-sim-skills-telemetry
-- type: bridge
-- summary: Panel tsn-sim links to skills-telemetry via term "telemetry".
-
-### Node: TSN Determinism <-> star-models-telemetry
-- id: bridge-panel-tsn-sim-star-models-telemetry
-- type: bridge
-- summary: Panel tsn-sim links to star-models-telemetry via term "telemetry".
+- summary: Panel pulsed-power-doc links to panel-concept-pulsed-power-doc via term "pulsed power".
 
 ### Node: Warp Pulsed Power <-> warp-pulsed-power
 - id: bridge-panel-pulsed-power-doc-warp-pulsed-power
 - type: bridge
 - summary: Panel pulsed-power-doc links to warp-pulsed-power via term "pulsed power".
 
-### Node: Warp Pulsed Power <-> pipeline-ledger-tree
-- id: bridge-panel-pulsed-power-doc-pipeline-ledger-tree
+### Node: Warp Pulsed Power <-> panel-concept-viz-diagnostics
+- id: bridge-panel-pulsed-power-doc-panel-concept-viz-diagnostics
 - type: bridge
-- summary: Panel pulsed-power-doc links to pipeline-ledger-tree via term "pipeline".
+- summary: Panel pulsed-power-doc links to panel-concept-viz-diagnostics via term "pipeline".
 
-### Node: Warp Pulsed Power <-> pipeline-overview
-- id: bridge-panel-pulsed-power-doc-pipeline-overview
+### Node: Warp Pulsed Power <-> panel-concept-energy-flux
+- id: bridge-panel-pulsed-power-doc-panel-concept-energy-flux
 - type: bridge
-- summary: Panel pulsed-power-doc links to pipeline-overview via term "pipeline".
+- summary: Panel pulsed-power-doc links to panel-concept-energy-flux via term "pipeline".
 
-### Node: Warp Pulsed Power <-> bridge-pipeline-overview-curvature-ledger
-- id: bridge-panel-pulsed-power-doc-bridge-pipeline-overview-curvature-ledger
+### Node: Warp Pulsed Power <-> panel-concept-microscopy
+- id: bridge-panel-pulsed-power-doc-panel-concept-microscopy
 - type: bridge
-- summary: Panel pulsed-power-doc links to bridge-pipeline-overview-curvature-ledger via term "pipeline".
+- summary: Panel pulsed-power-doc links to panel-concept-microscopy via term "pipeline".
 
-### Node: Warp Pulsed Power <-> solar-pipeline
-- id: bridge-panel-pulsed-power-doc-solar-pipeline
+### Node: Bus Voltage Program <-> panel-concept-bus-voltage
+- id: bridge-panel-bus-voltage-panel-concept-bus-voltage
 - type: bridge
-- summary: Panel pulsed-power-doc links to solar-pipeline via term "pipeline".
+- summary: Panel bus-voltage links to panel-concept-bus-voltage via term "power policy".
 
-### Node: Warp Pulsed Power <-> binding-energy-pipeline
-- id: bridge-panel-pulsed-power-doc-binding-energy-pipeline
+### Node: Bus Voltage Program <-> panel-concept-qi-auto-tuner
+- id: bridge-panel-bus-voltage-panel-concept-qi-auto-tuner
 - type: bridge
-- summary: Panel pulsed-power-doc links to binding-energy-pipeline via term "pipeline".
+- summary: Panel bus-voltage links to panel-concept-qi-auto-tuner via term "setpoint".
 
 ### Node: Bus Voltage Program <-> guarded-casimir-tile-code-mapped
 - id: bridge-panel-bus-voltage-guarded-casimir-tile-code-mapped
@@ -610,15 +800,10 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel bus-voltage links to llm-runtime-tokenizer via term "Guardrail".
 
-### Node: Bus Voltage Program <-> security-hull-guard-tree
-- id: bridge-panel-bus-voltage-security-hull-guard-tree
+### Node: KM-Scale Warp Ledger <-> panel-concept-warp-ledger
+- id: bridge-panel-warp-ledger-panel-concept-warp-ledger
 - type: bridge
-- summary: Panel bus-voltage links to security-hull-guard-tree via term "Guardrail".
-
-### Node: Bus Voltage Program <-> security-hull-guard
-- id: bridge-panel-bus-voltage-security-hull-guard
-- type: bridge
-- summary: Panel bus-voltage links to security-hull-guard via term "Guardrail".
+- summary: Panel warp-ledger links to panel-concept-warp-ledger via term "km-scale ledger".
 
 ### Node: KM-Scale Warp Ledger <-> warp-ledger
 - id: bridge-panel-warp-ledger-warp-ledger
@@ -629,6 +814,21 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - id: bridge-panel-warp-ledger-ui-panel-warp-ledger
 - type: bridge
 - summary: Panel warp-ledger links to ui-panel-warp-ledger via term "warp ledger".
+
+### Node: KM-Scale Warp Ledger <-> panel-concept-halobank
+- id: bridge-panel-warp-ledger-panel-concept-halobank
+- type: bridge
+- summary: Panel warp-ledger links to panel-concept-halobank via term "@/lib/whispers/usePanelHashFocus".
+
+### Node: Warp Experiment Ladder <-> panel-concept-experiment-ladder
+- id: bridge-panel-experiment-ladder-panel-concept-experiment-ladder
+- type: bridge
+- summary: Panel experiment-ladder links to panel-concept-experiment-ladder via term "experiment ladder".
+
+### Node: Warp Experiment Ladder <-> panel-concept-qi-widget
+- id: bridge-panel-experiment-ladder-panel-concept-qi-widget
+- type: bridge
+- summary: Panel experiment-ladder links to panel-concept-qi-widget via term "ford-roman".
 
 ### Node: Warp Experiment Ladder <-> qi-bounds-engine
 - id: bridge-panel-experiment-ladder-qi-bounds-engine
@@ -650,15 +850,10 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel experiment-ladder links to casimir-tiles-tree via term "casimir".
 
-### Node: Warp Experiment Ladder <-> casimir-tiles-overview
-- id: bridge-panel-experiment-ladder-casimir-tiles-overview
+### Node: Spectrum Tuner <-> panel-concept-spectrum-tuner
+- id: bridge-panel-spectrum-tuner-panel-concept-spectrum-tuner
 - type: bridge
-- summary: Panel experiment-ladder links to casimir-tiles-overview via term "casimir".
-
-### Node: Warp Experiment Ladder <-> casimir-tile-mechanism
-- id: bridge-panel-experiment-ladder-casimir-tile-mechanism
-- type: bridge
-- summary: Panel experiment-ladder links to casimir-tile-mechanism via term "casimir".
+- summary: Panel spectrum-tuner links to panel-concept-spectrum-tuner via term "harmonics sweep".
 
 ### Node: Spectrum Tuner <-> external-integrations-tree
 - id: bridge-panel-spectrum-tuner-external-integrations-tree
@@ -685,15 +880,30 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel spectrum-tuner links to hardware-provenance via term "Provenance".
 
-### Node: Spectrum Tuner <-> provenance-protocol
-- id: bridge-panel-spectrum-tuner-provenance-protocol
+### Node: Vacuum Gap Heatmap <-> panel-concept-vacuum-gap-heatmap
+- id: bridge-panel-vacuum-gap-heatmap-panel-concept-vacuum-gap-heatmap
 - type: bridge
-- summary: Panel spectrum-tuner links to provenance-protocol via term "Provenance".
+- summary: Panel vacuum-gap-heatmap links to panel-concept-vacuum-gap-heatmap via term "Casimir gap".
+
+### Node: Vacuum Gap Heatmap <-> panel-concept-vacuum-gap-sweep
+- id: bridge-panel-vacuum-gap-heatmap-panel-concept-vacuum-gap-sweep
+- type: bridge
+- summary: Panel vacuum-gap-heatmap links to panel-concept-vacuum-gap-sweep via term "vacuum gap".
 
 ### Node: Vacuum Gap Heatmap <-> ui-panel-vacuum
 - id: bridge-panel-vacuum-gap-heatmap-ui-panel-vacuum
 - type: bridge
 - summary: Panel vacuum-gap-heatmap links to ui-panel-vacuum via term "vacuum gap".
+
+### Node: Vacuum Gap Heatmap <-> panel-concept-helix-casimir-amplifier
+- id: bridge-panel-vacuum-gap-heatmap-panel-concept-helix-casimir-amplifier
+- type: bridge
+- summary: Panel vacuum-gap-heatmap links to panel-concept-helix-casimir-amplifier via term "heatmap".
+
+### Node: Hydrostatic Equilibrium (HR) <-> panel-concept-star-hydrostatic
+- id: bridge-panel-star-hydrostatic-panel-concept-star-hydrostatic
+- type: bridge
+- summary: Panel star-hydrostatic links to panel-concept-star-hydrostatic via term "potato threshold".
 
 ### Node: Hydrostatic Equilibrium (HR) <-> potato-threshold
 - id: bridge-panel-star-hydrostatic-potato-threshold
@@ -720,6 +930,31 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel star-hydrostatic links to bridge-solar-restoration-plan-stellar-ledger-stack via term "stellar ledger".
 
+### Node: Star Watcher <-> panel-concept-star-watcher
+- id: bridge-panel-star-watcher-panel-concept-star-watcher
+- type: bridge
+- summary: Panel star-watcher links to panel-concept-star-watcher via term "Coherence overlay".
+
+### Node: Star Watcher <-> panel-concept-agi-debate-view
+- id: bridge-panel-star-watcher-panel-concept-agi-debate-view
+- type: bridge
+- summary: Panel star-watcher links to panel-concept-agi-debate-view via term "global_coherence".
+
+### Node: Star Watcher <-> panel-concept-collapse-monitor
+- id: bridge-panel-star-watcher-panel-concept-collapse-monitor
+- type: bridge
+- summary: Panel star-watcher links to panel-concept-collapse-monitor via term "global_coherence".
+
+### Node: Star Watcher <-> panel-concept-star-hydrostatic
+- id: bridge-panel-star-watcher-panel-concept-star-hydrostatic
+- type: bridge
+- summary: Panel star-watcher links to panel-concept-star-hydrostatic via term "CardDescription".
+
+### Node: Tokamak Simulation <-> panel-concept-tokamak-sim
+- id: bridge-panel-tokamak-sim-panel-concept-tokamak-sim
+- type: bridge
+- summary: Panel tokamak-sim links to panel-concept-tokamak-sim via term "coherence diagnostics".
+
 ### Node: Tokamak Simulation <-> ui-panel-tokamak
 - id: bridge-panel-tokamak-sim-ui-panel-tokamak
 - type: bridge
@@ -740,70 +975,250 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel tokamak-sim links to tokamak-energy-adapter via term "tokamak".
 
-### Node: Cavity Mechanism <-> pipeline-ledger-tree
-- id: bridge-panel-cavity-mechanism-pipeline-ledger-tree
+### Node: Tokamak Simulation <-> panel-concept-vacuum-contract
+- id: bridge-panel-tokamak-sim-panel-concept-vacuum-contract
 - type: bridge
-- summary: Panel cavity-mechanism links to pipeline-ledger-tree via term "pipeline".
+- summary: Panel tokamak-sim links to panel-concept-vacuum-contract via term "formatNumber".
 
-### Node: Cavity Mechanism <-> pipeline-overview
-- id: bridge-panel-cavity-mechanism-pipeline-overview
+### Node: Vacuum Gap Sweep HUD <-> panel-concept-vacuum-gap-sweep
+- id: bridge-panel-vacuum-gap-sweep-panel-concept-vacuum-gap-sweep
 - type: bridge
-- summary: Panel cavity-mechanism links to pipeline-overview via term "pipeline".
+- summary: Panel vacuum-gap-sweep links to panel-concept-vacuum-gap-sweep via term "gap sweep".
 
-### Node: Cavity Mechanism <-> bridge-pipeline-overview-curvature-ledger
-- id: bridge-panel-cavity-mechanism-bridge-pipeline-overview-curvature-ledger
+### Node: Cavity Mechanism <-> panel-concept-cavity-mechanism
+- id: bridge-panel-cavity-mechanism-panel-concept-cavity-mechanism
 - type: bridge
-- summary: Panel cavity-mechanism links to bridge-pipeline-overview-curvature-ledger via term "pipeline".
+- summary: Panel cavity-mechanism links to panel-concept-cavity-mechanism via term "actuator layout".
 
-### Node: Cavity Mechanism <-> solar-pipeline
-- id: bridge-panel-cavity-mechanism-solar-pipeline
+### Node: Cavity Mechanism <-> panel-concept-viz-diagnostics
+- id: bridge-panel-cavity-mechanism-panel-concept-viz-diagnostics
 - type: bridge
-- summary: Panel cavity-mechanism links to solar-pipeline via term "pipeline".
+- summary: Panel cavity-mechanism links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
 
-### Node: Cavity Mechanism <-> binding-energy-pipeline
-- id: bridge-panel-cavity-mechanism-binding-energy-pipeline
+### Node: Cavity Mechanism <-> panel-concept-energy-flux
+- id: bridge-panel-cavity-mechanism-panel-concept-energy-flux
 - type: bridge
-- summary: Panel cavity-mechanism links to binding-energy-pipeline via term "pipeline".
+- summary: Panel cavity-mechanism links to panel-concept-energy-flux via term "dutyEffectiveFR".
 
-### Node: Cavity Mechanism <-> binding-warp-pipeline
-- id: bridge-panel-cavity-mechanism-binding-warp-pipeline
+### Node: Cavity Mechanism <-> panel-concept-shell-outline
+- id: bridge-panel-cavity-mechanism-panel-concept-shell-outline
 - type: bridge
-- summary: Panel cavity-mechanism links to binding-warp-pipeline via term "pipeline".
+- summary: Panel cavity-mechanism links to panel-concept-shell-outline via term "dutyEffectiveFR".
+
+### Node: Cavity Mechanism <-> panel-concept-curvature-slice
+- id: bridge-panel-cavity-mechanism-panel-concept-curvature-slice
+- type: bridge
+- summary: Panel cavity-mechanism links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Node: Cavity Mechanism <-> panel-concept-operational-mode
+- id: bridge-panel-cavity-mechanism-panel-concept-operational-mode
+- type: bridge
+- summary: Panel cavity-mechanism links to panel-concept-operational-mode via term "dutyEffectiveFR".
+
+### Node: Fractional Coherence Rail <-> panel-concept-fractional-coherence-rail
+- id: bridge-panel-fractional-coherence-rail-panel-concept-fractional-coherence-rail
+- type: bridge
+- summary: Panel fractional-coherence-rail links to panel-concept-fractional-coherence-rail via term "fractional coherence".
+
+### Node: Fractional Coherence Rail <-> panel-concept-fractional-coherence-grid
+- id: bridge-panel-fractional-coherence-rail-panel-concept-fractional-coherence-grid
+- type: bridge
+- summary: Panel fractional-coherence-rail links to panel-concept-fractional-coherence-grid via term "fractional coherence".
+
+### Node: Fractional Coherence Grid <-> panel-concept-fractional-coherence-grid
+- id: bridge-panel-fractional-coherence-grid-panel-concept-fractional-coherence-grid
+- type: bridge
+- summary: Panel fractional-coherence-grid links to panel-concept-fractional-coherence-grid via term "coherence lattice".
+
+### Node: Fractional Coherence Grid <-> panel-concept-needle-ipeak-worksheet
+- id: bridge-panel-fractional-coherence-grid-panel-concept-needle-ipeak-worksheet
+- type: bridge
+- summary: Panel fractional-coherence-grid links to panel-concept-needle-ipeak-worksheet via term "Hz".
+
+### Node: Fractional Coherence Grid <-> panel-concept-vacuum-gap-heatmap
+- id: bridge-panel-fractional-coherence-grid-panel-concept-vacuum-gap-heatmap
+- type: bridge
+- summary: Panel fractional-coherence-grid links to panel-concept-vacuum-gap-heatmap via term "Hz".
+
+### Node: Fractional Coherence Grid <-> panel-concept-tokamak-sim
+- id: bridge-panel-fractional-coherence-grid-panel-concept-tokamak-sim
+- type: bridge
+- summary: Panel fractional-coherence-grid links to panel-concept-tokamak-sim via term "Hz".
+
+### Node: Fractional Coherence Grid <-> panel-concept-alcubierre-viewer
+- id: bridge-panel-fractional-coherence-grid-panel-concept-alcubierre-viewer
+- type: bridge
+- summary: Panel fractional-coherence-grid links to panel-concept-alcubierre-viewer via term "Hz".
+
+### Node: Fractional Coherence Grid <-> panel-concept-shell-outline
+- id: bridge-panel-fractional-coherence-grid-panel-concept-shell-outline
+- type: bridge
+- summary: Panel fractional-coherence-grid links to panel-concept-shell-outline via term "Hz".
+
+### Node: Near-Zero Widget <-> panel-concept-near-zero
+- id: bridge-panel-near-zero-panel-concept-near-zero
+- type: bridge
+- summary: Panel near-zero links to panel-concept-near-zero via term "near zero widget".
+
+### Node: Near-Zero Widget <-> panel-concept-tsn-sim
+- id: bridge-panel-near-zero-panel-concept-tsn-sim
+- type: bridge
+- summary: Panel near-zero links to panel-concept-tsn-sim via term "usePanelTelemetryPublisher".
+
+### Node: Near-Zero Widget <-> panel-concept-pulsed-power-doc
+- id: bridge-panel-near-zero-panel-concept-pulsed-power-doc
+- type: bridge
+- summary: Panel near-zero links to panel-concept-pulsed-power-doc via term "usePanelTelemetryPublisher".
+
+### Node: Direction Pad <-> panel-concept-direction-pad
+- id: bridge-panel-direction-pad-panel-concept-direction-pad
+- type: bridge
+- summary: Panel direction-pad links to panel-concept-direction-pad via term "flight director".
+
+### Node: Solar Navigation <-> panel-concept-nav-system
+- id: bridge-panel-nav-system-panel-concept-nav-system
+- type: bridge
+- summary: Panel nav-system links to panel-concept-nav-system via term "navigation hud".
 
 ### Node: Solar Navigation <-> ui-hud-nav
 - id: bridge-panel-nav-system-ui-hud-nav
 - type: bridge
 - summary: Panel nav-system links to ui-hud-nav via term "navigation hud".
 
+### Node: Solar Navigation <-> panel-concept-viz-diagnostics
+- id: bridge-panel-nav-system-panel-concept-viz-diagnostics
+- type: bridge
+- summary: Panel nav-system links to panel-concept-viz-diagnostics via term "react".
+
+### Node: Solar Navigation <-> panel-concept-deepmix-solar
+- id: bridge-panel-nav-system-panel-concept-deepmix-solar
+- type: bridge
+- summary: Panel nav-system links to panel-concept-deepmix-solar via term "react".
+
+### Node: Solar Navigation <-> panel-concept-casimir-tile-grid
+- id: bridge-panel-nav-system-panel-concept-casimir-tile-grid
+- type: bridge
+- summary: Panel nav-system links to panel-concept-casimir-tile-grid via term "react".
+
+### Node: Solar Navigation <-> panel-concept-sweep-replay
+- id: bridge-panel-nav-system-panel-concept-sweep-replay
+- type: bridge
+- summary: Panel nav-system links to panel-concept-sweep-replay via term "react".
+
+### Node: DeepMix Solar View <-> panel-concept-deepmix-solar
+- id: bridge-panel-deepmix-solar-panel-concept-deepmix-solar
+- type: bridge
+- summary: Panel deepmix-solar links to panel-concept-deepmix-solar via term "solar telemetry".
+
+### Node: DeepMix Solar View <-> panel-concept-viz-diagnostics
+- id: bridge-panel-deepmix-solar-panel-concept-viz-diagnostics
+- type: bridge
+- summary: Panel deepmix-solar links to panel-concept-viz-diagnostics via term "react".
+
+### Node: DeepMix Solar View <-> panel-concept-nav-system
+- id: bridge-panel-deepmix-solar-panel-concept-nav-system
+- type: bridge
+- summary: Panel deepmix-solar links to panel-concept-nav-system via term "react".
+
+### Node: DeepMix Solar View <-> panel-concept-casimir-tile-grid
+- id: bridge-panel-deepmix-solar-panel-concept-casimir-tile-grid
+- type: bridge
+- summary: Panel deepmix-solar links to panel-concept-casimir-tile-grid via term "react".
+
+### Node: DeepMix Solar View <-> panel-concept-sweep-replay
+- id: bridge-panel-deepmix-solar-panel-concept-sweep-replay
+- type: bridge
+- summary: Panel deepmix-solar links to panel-concept-sweep-replay via term "react".
+
+### Node: DeepMix Solar View <-> panel-concept-remove-bg-edges
+- id: bridge-panel-deepmix-solar-panel-concept-remove-bg-edges
+- type: bridge
+- summary: Panel deepmix-solar links to panel-concept-remove-bg-edges via term "react".
+
+### Node: Solar Globe <-> panel-concept-solar-globe
+- id: bridge-panel-solar-globe-panel-concept-solar-globe
+- type: bridge
+- summary: Panel solar-globe links to panel-concept-solar-globe via term "synoptic globe".
+
 ### Node: Solar Globe <-> ui-panel-solar-globe
 - id: bridge-panel-solar-globe-ui-panel-solar-globe
 - type: bridge
 - summary: Panel solar-globe links to ui-panel-solar-globe via term "solar globe".
 
-### Node: Solar Globe <-> agi-constraint-packs
-- id: bridge-panel-solar-globe-agi-constraint-packs
+### Node: Solar Globe <-> panel-concept-needle-ipeak-worksheet
+- id: bridge-panel-solar-globe-panel-concept-needle-ipeak-worksheet
 - type: bridge
-- summary: Panel solar-globe links to agi-constraint-packs via term "const".
+- summary: Panel solar-globe links to panel-concept-needle-ipeak-worksheet via term "return".
 
-### Node: Solar Globe <-> noise-field-loop
-- id: bridge-panel-solar-globe-noise-field-loop
+### Node: Solar Globe <-> panel-concept-electron-orbital
+- id: bridge-panel-solar-globe-panel-concept-electron-orbital
 - type: bridge
-- summary: Panel solar-globe links to noise-field-loop via term "const".
+- summary: Panel solar-globe links to panel-concept-electron-orbital via term "return".
 
-### Node: Solar Globe <-> diffusion-loop
-- id: bridge-panel-solar-globe-diffusion-loop
+### Node: Solar Globe <-> panel-concept-drive-guards
+- id: bridge-panel-solar-globe-panel-concept-drive-guards
 - type: bridge
-- summary: Panel solar-globe links to diffusion-loop via term "const".
+- summary: Panel solar-globe links to panel-concept-drive-guards via term "return".
 
-### Node: Solar Globe <-> constraint-loop
-- id: bridge-panel-solar-globe-constraint-loop
+### Node: Solar Globe <-> panel-concept-mass-provenance
+- id: bridge-panel-solar-globe-panel-concept-mass-provenance
 - type: bridge
-- summary: Panel solar-globe links to constraint-loop via term "const".
+- summary: Panel solar-globe links to panel-concept-mass-provenance via term "return".
 
-### Node: Solar Globe <-> bridge-analysis-loops-overview-noise-field-loop
-- id: bridge-panel-solar-globe-bridge-analysis-loops-overview-noise-field-loop
+### Node: DeepMix Sweet Spot <-> panel-concept-deepmix-sweetspot
+- id: bridge-panel-deepmix-sweetspot-panel-concept-deepmix-sweetspot
 - type: bridge
-- summary: Panel solar-globe links to bridge-analysis-loops-overview-noise-field-loop via term "const".
+- summary: Panel deepmix-sweetspot links to panel-concept-deepmix-sweetspot via term "mix optimization".
+
+### Node: DeepMix Sweet Spot <-> panel-concept-deepmix-globe
+- id: bridge-panel-deepmix-sweetspot-panel-concept-deepmix-globe
+- type: bridge
+- summary: Panel deepmix-sweetspot links to panel-concept-deepmix-globe via term "ratePerShipKgS".
+
+### Node: DeepMix Sweet Spot <-> panel-concept-mass-provenance
+- id: bridge-panel-deepmix-sweetspot-panel-concept-mass-provenance
+- type: bridge
+- summary: Panel deepmix-sweetspot links to panel-concept-mass-provenance via term "toExponential".
+
+### Node: DeepMix Sweet Spot <-> panel-concept-curvature-slice
+- id: bridge-panel-deepmix-sweetspot-panel-concept-curvature-slice
+- type: bridge
+- summary: Panel deepmix-sweetspot links to panel-concept-curvature-slice via term "toExponential".
+
+### Node: DeepMix Sweet Spot <-> panel-concept-stellar-lsr
+- id: bridge-panel-deepmix-sweetspot-panel-concept-stellar-lsr
+- type: bridge
+- summary: Panel deepmix-sweetspot links to panel-concept-stellar-lsr via term "toExponential".
+
+### Node: DeepMix Globe <-> panel-concept-deepmix-globe
+- id: bridge-panel-deepmix-globe-panel-concept-deepmix-globe
+- type: bridge
+- summary: Panel deepmix-globe links to panel-concept-deepmix-globe via term "deep mixing globe".
+
+### Node: DeepMix Globe <-> panel-concept-deepmix-sweetspot
+- id: bridge-panel-deepmix-globe-panel-concept-deepmix-sweetspot
+- type: bridge
+- summary: Panel deepmix-globe links to panel-concept-deepmix-sweetspot via term "ratePerShipKgS".
+
+### Node: DeepMix Globe <-> panel-concept-mass-provenance
+- id: bridge-panel-deepmix-globe-panel-concept-mass-provenance
+- type: bridge
+- summary: Panel deepmix-globe links to panel-concept-mass-provenance via term "toExponential".
+
+### Node: DeepMix Globe <-> panel-concept-curvature-slice
+- id: bridge-panel-deepmix-globe-panel-concept-curvature-slice
+- type: bridge
+- summary: Panel deepmix-globe links to panel-concept-curvature-slice via term "toExponential".
+
+### Node: DeepMix Globe <-> panel-concept-stellar-lsr
+- id: bridge-panel-deepmix-globe-panel-concept-stellar-lsr
+- type: bridge
+- summary: Panel deepmix-globe links to panel-concept-stellar-lsr via term "toExponential".
+
+### Node: Alcubierre Viewer <-> panel-concept-alcubierre-viewer
+- id: bridge-panel-alcubierre-viewer-panel-concept-alcubierre-viewer
+- type: bridge
+- summary: Panel alcubierre-viewer links to panel-concept-alcubierre-viewer via term "Alcubierre metric".
 
 ### Node: Alcubierre Viewer <-> alcubierre-metric
 - id: bridge-panel-alcubierre-viewer-alcubierre-metric
@@ -825,6 +1240,51 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel alcubierre-viewer links to warp-bubble via term "warp bubble".
 
+### Node: Alcubierre Viewer <-> panel-concept-hull-metrics-vis
+- id: bridge-panel-alcubierre-viewer-panel-concept-hull-metrics-vis
+- type: bridge
+- summary: Panel alcubierre-viewer links to panel-concept-hull-metrics-vis via term "resolveHullDimsEffective".
+
+### Node: Shell Outline Visualizer <-> panel-concept-shell-outline
+- id: bridge-panel-shell-outline-panel-concept-shell-outline
+- type: bridge
+- summary: Panel shell-outline links to panel-concept-shell-outline via term "shell outline".
+
+### Node: Shell Outline Visualizer <-> panel-concept-viz-diagnostics
+- id: bridge-panel-shell-outline-panel-concept-viz-diagnostics
+- type: bridge
+- summary: Panel shell-outline links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
+
+### Node: Shell Outline Visualizer <-> panel-concept-energy-flux
+- id: bridge-panel-shell-outline-panel-concept-energy-flux
+- type: bridge
+- summary: Panel shell-outline links to panel-concept-energy-flux via term "dutyEffectiveFR".
+
+### Node: Shell Outline Visualizer <-> panel-concept-cavity-mechanism
+- id: bridge-panel-shell-outline-panel-concept-cavity-mechanism
+- type: bridge
+- summary: Panel shell-outline links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
+
+### Node: Shell Outline Visualizer <-> panel-concept-curvature-slice
+- id: bridge-panel-shell-outline-panel-concept-curvature-slice
+- type: bridge
+- summary: Panel shell-outline links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Node: Shell Outline Visualizer <-> panel-concept-operational-mode
+- id: bridge-panel-shell-outline-panel-concept-operational-mode
+- type: bridge
+- summary: Panel shell-outline links to panel-concept-operational-mode via term "dutyEffectiveFR".
+
+### Node: Silhouette Stretch <-> panel-concept-model-silhouette
+- id: bridge-panel-model-silhouette-panel-concept-model-silhouette
+- type: bridge
+- summary: Panel model-silhouette links to panel-concept-model-silhouette via term "ellipsoid".
+
+### Node: Silhouette Stretch <-> panel-concept-pipeline-proof
+- id: bridge-panel-model-silhouette-panel-concept-pipeline-proof
+- type: bridge
+- summary: Panel model-silhouette links to panel-concept-pipeline-proof via term "ellipsoid".
+
 ### Node: Silhouette Stretch <-> ts-ratio-guardrail
 - id: bridge-panel-model-silhouette-ts-ratio-guardrail
 - type: bridge
@@ -835,20 +1295,25 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel model-silhouette links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "scale".
 
-### Node: Silhouette Stretch <-> qi-autoscale
-- id: bridge-panel-model-silhouette-qi-autoscale
+### Node: Silhouette Stretch <-> panel-concept-microscopy
+- id: bridge-panel-model-silhouette-panel-concept-microscopy
 - type: bridge
-- summary: Panel model-silhouette links to qi-autoscale via term "scale".
+- summary: Panel model-silhouette links to panel-concept-microscopy via term "scale".
 
-### Node: Silhouette Stretch <-> ts-autoscale
-- id: bridge-panel-model-silhouette-ts-autoscale
+### Node: Silhouette Stretch <-> panel-concept-warp-ledger
+- id: bridge-panel-model-silhouette-panel-concept-warp-ledger
 - type: bridge
-- summary: Panel model-silhouette links to ts-autoscale via term "scale".
+- summary: Panel model-silhouette links to panel-concept-warp-ledger via term "scale".
 
-### Node: Silhouette Stretch <-> ui-panel-casimir-grid
-- id: bridge-panel-model-silhouette-ui-panel-casimir-grid
+### Node: Hull Metrics Vis <-> panel-concept-hull-metrics-vis
+- id: bridge-panel-hull-metrics-vis-panel-concept-hull-metrics-vis
 - type: bridge
-- summary: Panel model-silhouette links to ui-panel-casimir-grid via term "grid".
+- summary: Panel hull-metrics-vis links to panel-concept-hull-metrics-vis via term "hull metrics".
+
+### Node: Hull Metrics Vis <-> panel-concept-alcubierre-viewer
+- id: bridge-panel-hull-metrics-vis-panel-concept-alcubierre-viewer
+- type: bridge
+- summary: Panel hull-metrics-vis links to panel-concept-alcubierre-viewer via term "alcubierre".
 
 ### Node: Hull Metrics Vis <-> ui-panel-alcubierre
 - id: bridge-panel-hull-metrics-vis-ui-panel-alcubierre
@@ -865,20 +1330,15 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel hull-metrics-vis links to casimir-natario-metric via term "natario".
 
-### Node: Hull Metrics Vis <-> natario-metric-engine
-- id: bridge-panel-hull-metrics-vis-natario-metric-engine
+### Node: Hull Metrics Vis <-> panel-concept-experiment-ladder
+- id: bridge-panel-hull-metrics-vis-panel-concept-experiment-ladder
 - type: bridge
-- summary: Panel hull-metrics-vis links to natario-metric-engine via term "natario".
+- summary: Panel hull-metrics-vis links to panel-concept-experiment-ladder via term "natario".
 
-### Node: Hull Metrics Vis <-> natario-zero-expansion
-- id: bridge-panel-hull-metrics-vis-natario-zero-expansion
+### Node: Shift Vector Panel <-> panel-concept-shift-vector
+- id: bridge-panel-shift-vector-panel-concept-shift-vector
 - type: bridge
-- summary: Panel hull-metrics-vis links to natario-zero-expansion via term "natario".
-
-### Node: Hull Metrics Vis <-> casimir-natario-bridge
-- id: bridge-panel-hull-metrics-vis-casimir-natario-bridge
-- type: bridge
-- summary: Panel hull-metrics-vis links to casimir-natario-bridge via term "natario".
+- summary: Panel shift-vector links to panel-concept-shift-vector via term "shift vector".
 
 ### Node: Shift Vector Panel <-> ui-panel-shift-vector
 - id: bridge-panel-shift-vector-ui-panel-shift-vector
@@ -890,35 +1350,75 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel shift-vector links to shift-vector-expansion-scalar via term "shift vector".
 
-### Node: Shift Vector Panel <-> casimir-natario-metric
-- id: bridge-panel-shift-vector-casimir-natario-metric
+### Node: Shift Vector Panel <-> panel-concept-hull-metrics-vis
+- id: bridge-panel-shift-vector-panel-concept-hull-metrics-vis
 - type: bridge
-- summary: Panel shift-vector links to casimir-natario-metric via term "geometry".
+- summary: Panel shift-vector links to panel-concept-hull-metrics-vis via term "shiftVector".
 
-### Node: Shift Vector Panel <-> hull-materials
-- id: bridge-panel-shift-vector-hull-materials
+### Node: Shift Vector Panel <-> panel-concept-drive-guards
+- id: bridge-panel-shift-vector-panel-concept-drive-guards
 - type: bridge
-- summary: Panel shift-vector links to hull-materials via term "geometry".
+- summary: Panel shift-vector links to panel-concept-drive-guards via term "useMetrics".
 
-### Node: Shift Vector Panel <-> natario-metric-engine
-- id: bridge-panel-shift-vector-natario-metric-engine
+### Node: Shift Vector Panel <-> panel-concept-curvature-slice
+- id: bridge-panel-shift-vector-panel-concept-curvature-slice
 - type: bridge
-- summary: Panel shift-vector links to natario-metric-engine via term "geometry".
+- summary: Panel shift-vector links to panel-concept-curvature-slice via term "useMetrics".
 
-### Node: Shift Vector Panel <-> physics-foundations-tree
-- id: bridge-panel-shift-vector-physics-foundations-tree
+### Node: Equatorial Curvature Slice <-> panel-concept-curvature-slice
+- id: bridge-panel-curvature-slice-panel-concept-curvature-slice
 - type: bridge
-- summary: Panel shift-vector links to physics-foundations-tree via term "geometry".
+- summary: Panel curvature-slice links to panel-concept-curvature-slice via term "scalar curvature".
 
 ### Node: Equatorial Curvature Slice <-> ui-panel-curvature-slices
 - id: bridge-panel-curvature-slice-ui-panel-curvature-slices
 - type: bridge
 - summary: Panel curvature-slice links to ui-panel-curvature-slices via term "curvature slice".
 
+### Node: Equatorial Curvature Slice <-> panel-concept-viz-diagnostics
+- id: bridge-panel-curvature-slice-panel-concept-viz-diagnostics
+- type: bridge
+- summary: Panel curvature-slice links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
+
+### Node: Equatorial Curvature Slice <-> panel-concept-energy-flux
+- id: bridge-panel-curvature-slice-panel-concept-energy-flux
+- type: bridge
+- summary: Panel curvature-slice links to panel-concept-energy-flux via term "dutyEffectiveFR".
+
+### Node: Equatorial Curvature Slice <-> panel-concept-cavity-mechanism
+- id: bridge-panel-curvature-slice-panel-concept-cavity-mechanism
+- type: bridge
+- summary: Panel curvature-slice links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
+
+### Node: Equatorial Curvature Slice <-> panel-concept-shell-outline
+- id: bridge-panel-curvature-slice-panel-concept-shell-outline
+- type: bridge
+- summary: Panel curvature-slice links to panel-concept-shell-outline via term "dutyEffectiveFR".
+
+### Node: Time Dilation Lattice <-> panel-concept-time-dilation-lattice
+- id: bridge-panel-time-dilation-lattice-panel-concept-time-dilation-lattice
+- type: bridge
+- summary: Panel time-dilation-lattice links to panel-concept-time-dilation-lattice via term "spacetime lattice".
+
 ### Node: Time Dilation Lattice <-> ui-panel-time-dilation
 - id: bridge-panel-time-dilation-lattice-ui-panel-time-dilation
 - type: bridge
 - summary: Panel time-dilation-lattice links to ui-panel-time-dilation via term "time dilation".
+
+### Node: Time Dilation Lattice <-> panel-concept-remove-bg-edges
+- id: bridge-panel-time-dilation-lattice-panel-concept-remove-bg-edges
+- type: bridge
+- summary: Panel time-dilation-lattice links to panel-concept-remove-bg-edges via term "alpha".
+
+### Node: Time Dilation Lattice <-> panel-concept-pipeline-proof
+- id: bridge-panel-time-dilation-lattice-panel-concept-pipeline-proof
+- type: bridge
+- summary: Panel time-dilation-lattice links to panel-concept-pipeline-proof via term "EnergyPipelineState".
+
+### Node: Curvature Ledger <-> panel-concept-curvature-ledger
+- id: bridge-panel-curvature-ledger-panel-concept-curvature-ledger
+- type: bridge
+- summary: Panel curvature-ledger links to panel-concept-curvature-ledger via term "curvature ledger".
 
 ### Node: Curvature Ledger <-> curvature-ledger
 - id: bridge-panel-curvature-ledger-curvature-ledger
@@ -935,35 +1435,40 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel curvature-ledger links to ui-panel-curvature-ledger via term "curvature ledger".
 
-### Node: Operational Mode Switch <-> agi-constraint-packs
-- id: bridge-panel-operational-mode-agi-constraint-packs
+### Node: Operational Mode Switch <-> panel-concept-operational-mode
+- id: bridge-panel-operational-mode-panel-concept-operational-mode
 - type: bridge
-- summary: Panel operational-mode links to agi-constraint-packs via term "const".
+- summary: Panel operational-mode links to panel-concept-operational-mode via term "station vs desktop".
 
-### Node: Operational Mode Switch <-> noise-field-loop
-- id: bridge-panel-operational-mode-noise-field-loop
+### Node: Operational Mode Switch <-> panel-concept-viz-diagnostics
+- id: bridge-panel-operational-mode-panel-concept-viz-diagnostics
 - type: bridge
-- summary: Panel operational-mode links to noise-field-loop via term "const".
+- summary: Panel operational-mode links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
 
-### Node: Operational Mode Switch <-> diffusion-loop
-- id: bridge-panel-operational-mode-diffusion-loop
+### Node: Operational Mode Switch <-> panel-concept-energy-flux
+- id: bridge-panel-operational-mode-panel-concept-energy-flux
 - type: bridge
-- summary: Panel operational-mode links to diffusion-loop via term "const".
+- summary: Panel operational-mode links to panel-concept-energy-flux via term "dutyEffectiveFR".
 
-### Node: Operational Mode Switch <-> constraint-loop
-- id: bridge-panel-operational-mode-constraint-loop
+### Node: Operational Mode Switch <-> panel-concept-cavity-mechanism
+- id: bridge-panel-operational-mode-panel-concept-cavity-mechanism
 - type: bridge
-- summary: Panel operational-mode links to constraint-loop via term "const".
+- summary: Panel operational-mode links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
 
-### Node: Operational Mode Switch <-> bridge-analysis-loops-overview-noise-field-loop
-- id: bridge-panel-operational-mode-bridge-analysis-loops-overview-noise-field-loop
+### Node: Operational Mode Switch <-> panel-concept-shell-outline
+- id: bridge-panel-operational-mode-panel-concept-shell-outline
 - type: bridge
-- summary: Panel operational-mode links to bridge-analysis-loops-overview-noise-field-loop via term "const".
+- summary: Panel operational-mode links to panel-concept-shell-outline via term "dutyEffectiveFR".
 
-### Node: Operational Mode Switch <-> qi-guard-consolidation
-- id: bridge-panel-operational-mode-qi-guard-consolidation
+### Node: Operational Mode Switch <-> panel-concept-curvature-slice
+- id: bridge-panel-operational-mode-panel-concept-curvature-slice
 - type: bridge
-- summary: Panel operational-mode links to qi-guard-consolidation via term "const".
+- summary: Panel operational-mode links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Node: Casimir Tile Grid <-> panel-concept-casimir-tile-grid
+- id: bridge-panel-casimir-tile-grid-panel-concept-casimir-tile-grid
+- type: bridge
+- summary: Panel casimir-tile-grid links to panel-concept-casimir-tile-grid via term "Casimir tile grid".
 
 ### Node: Casimir Tile Grid <-> ui-panel-casimir-grid
 - id: bridge-panel-casimir-tile-grid-ui-panel-casimir-grid
@@ -980,50 +1485,110 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel casimir-tile-grid links to casimir-tiles-overview via term "Casimir tiles".
 
+### Node: Casimir Tile Grid <-> panel-concept-experiment-ladder
+- id: bridge-panel-casimir-tile-grid-panel-concept-experiment-ladder
+- type: bridge
+- summary: Panel casimir-tile-grid links to panel-concept-experiment-ladder via term "sectorPeriod_ms".
+
+### Node: Casimir Tile Grid <-> panel-concept-resonance-scheduler
+- id: bridge-panel-casimir-tile-grid-panel-concept-resonance-scheduler
+- type: bridge
+- summary: Panel casimir-tile-grid links to panel-concept-resonance-scheduler via term "sectorPeriod_ms".
+
+### Node: Light-Speed Strobe Scale <-> panel-concept-light-speed-strobe
+- id: bridge-panel-light-speed-strobe-panel-concept-light-speed-strobe
+- type: bridge
+- summary: Panel light-speed-strobe links to panel-concept-light-speed-strobe via term "light speed strobe".
+
 ### Node: Light-Speed Strobe Scale <-> sector-strobes-duty-cycle
 - id: bridge-panel-light-speed-strobe-sector-strobes-duty-cycle
 - type: bridge
 - summary: Panel light-speed-strobe links to sector-strobes-duty-cycle via term "strobes".
 
-### Node: Speed Capability <-> agi-refinery
-- id: bridge-panel-speed-capability-agi-refinery
+### Node: Speed Capability <-> panel-concept-speed-capability
+- id: bridge-panel-speed-capability-panel-concept-speed-capability
 - type: bridge
-- summary: Panel speed-capability links to agi-refinery via term "s".
+- summary: Panel speed-capability links to panel-concept-speed-capability via term "translation speed".
 
-### Node: Speed Capability <-> agi-trace-memory
-- id: bridge-panel-speed-capability-agi-trace-memory
+### Node: Speed Capability <-> panel-concept-shell-outline
+- id: bridge-panel-speed-capability-panel-concept-shell-outline
 - type: bridge
-- summary: Panel speed-capability links to agi-trace-memory via term "s".
+- summary: Panel speed-capability links to panel-concept-shell-outline via term "beta".
 
-### Node: Speed Capability <-> agi-evaluation
-- id: bridge-panel-speed-capability-agi-evaluation
+### Node: Speed Capability <-> panel-concept-shift-vector
+- id: bridge-panel-speed-capability-panel-concept-shift-vector
 - type: bridge
-- summary: Panel speed-capability links to agi-evaluation via term "s".
+- summary: Panel speed-capability links to panel-concept-shift-vector via term "beta".
 
-### Node: Speed Capability <-> agi-chat-sessions
-- id: bridge-panel-speed-capability-agi-chat-sessions
+### Node: Speed Capability <-> panel-concept-stellar-lsr
+- id: bridge-panel-speed-capability-panel-concept-stellar-lsr
 - type: bridge
-- summary: Panel speed-capability links to agi-chat-sessions via term "s".
+- summary: Panel speed-capability links to panel-concept-stellar-lsr via term "km/s".
 
-### Node: Speed Capability <-> agi-contributions
-- id: bridge-panel-speed-capability-agi-contributions
+### Node: Speed Capability <-> panel-concept-drive-guards
+- id: bridge-panel-speed-capability-panel-concept-drive-guards
 - type: bridge
-- summary: Panel speed-capability links to agi-contributions via term "s".
+- summary: Panel speed-capability links to panel-concept-drive-guards via term "m/s".
 
-### Node: Speed Capability <-> agi-constraint-packs
-- id: bridge-panel-speed-capability-agi-constraint-packs
+### Node: Speed Capability <-> panel-concept-near-zero
+- id: bridge-panel-speed-capability-panel-concept-near-zero
 - type: bridge
-- summary: Panel speed-capability links to agi-constraint-packs via term "s".
+- summary: Panel speed-capability links to panel-concept-near-zero via term "m/s".
+
+### Node: Helix Casimir Amplifier <-> panel-concept-helix-casimir-amplifier
+- id: bridge-panel-helix-casimir-amplifier-panel-concept-helix-casimir-amplifier
+- type: bridge
+- summary: Panel helix-casimir-amplifier links to panel-concept-helix-casimir-amplifier via term "Casimir amplifier".
 
 ### Node: Helix Casimir Amplifier <-> ui-panel-casimir-amplifier
 - id: bridge-panel-helix-casimir-amplifier-ui-panel-casimir-amplifier
 - type: bridge
 - summary: Panel helix-casimir-amplifier links to ui-panel-casimir-amplifier via term "Casimir amplifier".
 
+### Node: Helix Casimir Amplifier <-> panel-concept-vacuum-contract
+- id: bridge-panel-helix-casimir-amplifier-panel-concept-vacuum-contract
+- type: bridge
+- summary: Panel helix-casimir-amplifier links to panel-concept-vacuum-contract via term "modulationFreq_GHz".
+
+### Node: Resonance Scheduler <-> panel-concept-resonance-scheduler
+- id: bridge-panel-resonance-scheduler-panel-concept-resonance-scheduler
+- type: bridge
+- summary: Panel resonance-scheduler links to panel-concept-resonance-scheduler via term "resonance scheduler".
+
 ### Node: Resonance Scheduler <-> phase-scheduler
 - id: bridge-panel-resonance-scheduler-phase-scheduler
 - type: bridge
 - summary: Panel resonance-scheduler links to phase-scheduler via term "phase scheduler".
+
+### Node: Resonance Scheduler <-> panel-concept-qi-auto-tuner
+- id: bridge-panel-resonance-scheduler-panel-concept-qi-auto-tuner
+- type: bridge
+- summary: Panel resonance-scheduler links to panel-concept-qi-auto-tuner via term "auto duty".
+
+### Node: Resonance Scheduler <-> panel-concept-experiment-ladder
+- id: bridge-panel-resonance-scheduler-panel-concept-experiment-ladder
+- type: bridge
+- summary: Panel resonance-scheduler links to panel-concept-experiment-ladder via term "sectorPeriod_ms".
+
+### Node: Resonance Scheduler <-> panel-concept-casimir-tile-grid
+- id: bridge-panel-resonance-scheduler-panel-concept-casimir-tile-grid
+- type: bridge
+- summary: Panel resonance-scheduler links to panel-concept-casimir-tile-grid via term "sectorPeriod_ms".
+
+### Node: Resonance Scheduler <-> panel-concept-sector-roles
+- id: bridge-panel-resonance-scheduler-panel-concept-sector-roles
+- type: bridge
+- summary: Panel resonance-scheduler links to panel-concept-sector-roles via term "sectorPeriod_ms".
+
+### Node: Trip Player <-> panel-concept-trip-player
+- id: bridge-panel-trip-player-panel-concept-trip-player
+- type: bridge
+- summary: Panel trip-player links to panel-concept-trip-player via term "timeline playback".
+
+### Node: Trip Player <-> panel-concept-fuel-gauge
+- id: bridge-panel-trip-player-panel-concept-fuel-gauge
+- type: bridge
+- summary: Panel trip-player links to panel-concept-fuel-gauge via term "computeEffectiveLyPerHour".
 
 ### Node: Trip Player <-> agi-constraint-packs
 - id: bridge-panel-trip-player-agi-constraint-packs
@@ -1045,15 +1610,15 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel trip-player links to constraint-loop via term "constraints".
 
-### Node: Trip Player <-> bridge-analysis-loops-overview-noise-field-loop
-- id: bridge-panel-trip-player-bridge-analysis-loops-overview-noise-field-loop
+### Node: Fuel Gauge <-> panel-concept-fuel-gauge
+- id: bridge-panel-fuel-gauge-panel-concept-fuel-gauge
 - type: bridge
-- summary: Panel trip-player links to bridge-analysis-loops-overview-noise-field-loop via term "constraints".
+- summary: Panel fuel-gauge links to panel-concept-fuel-gauge via term "energy reserve".
 
-### Node: Trip Player <-> qi-guard-consolidation
-- id: bridge-panel-trip-player-qi-guard-consolidation
+### Node: Fuel Gauge <-> panel-concept-trip-player
+- id: bridge-panel-fuel-gauge-panel-concept-trip-player
 - type: bridge
-- summary: Panel trip-player links to qi-guard-consolidation via term "constraints".
+- summary: Panel fuel-gauge links to panel-concept-trip-player via term "computeEffectiveLyPerHour".
 
 ### Node: Fuel Gauge <-> schema-confidence-stack
 - id: bridge-panel-fuel-gauge-schema-confidence-stack
@@ -1070,60 +1635,75 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel fuel-gauge links to hardware-telemetry-tree via term "telemetry".
 
-### Node: Fuel Gauge <-> skills-telemetry
-- id: bridge-panel-fuel-gauge-skills-telemetry
+### Node: Fuel Gauge <-> panel-concept-energy-flux
+- id: bridge-panel-fuel-gauge-panel-concept-energy-flux
 - type: bridge
-- summary: Panel fuel-gauge links to skills-telemetry via term "telemetry".
+- summary: Panel fuel-gauge links to panel-concept-energy-flux via term "telemetry".
 
-### Node: Fuel Gauge <-> star-models-telemetry
-- id: bridge-panel-fuel-gauge-star-models-telemetry
+### Node: Vacuum Contract <-> panel-concept-vacuum-contract
+- id: bridge-panel-vacuum-contract-panel-concept-vacuum-contract
 - type: bridge
-- summary: Panel fuel-gauge links to star-models-telemetry via term "telemetry".
+- summary: Panel vacuum-contract links to panel-concept-vacuum-contract via term "negative energy covenant".
 
-### Node: Fuel Gauge <-> bridge-star-runtime-routes-star-models-telemetry
-- id: bridge-panel-fuel-gauge-bridge-star-runtime-routes-star-models-telemetry
+### Node: Vacuum Contract <-> panel-concept-helix-casimir-amplifier
+- id: bridge-panel-vacuum-contract-panel-concept-helix-casimir-amplifier
 - type: bridge
-- summary: Panel fuel-gauge links to bridge-star-runtime-routes-star-models-telemetry via term "telemetry".
+- summary: Panel vacuum-contract links to panel-concept-helix-casimir-amplifier via term "modulationFreq_GHz".
 
-### Node: Vacuum Contract <-> agi-adapter
-- id: bridge-panel-vacuum-contract-agi-adapter
+### Node: Vacuum Contract <-> panel-concept-tokamak-sim
+- id: bridge-panel-vacuum-contract-panel-concept-tokamak-sim
 - type: bridge
-- summary: Panel vacuum-contract links to agi-adapter via term "contract".
+- summary: Panel vacuum-contract links to panel-concept-tokamak-sim via term "formatNumber".
 
-### Node: Vacuum Contract <-> uncertainty-data-contracts
-- id: bridge-panel-vacuum-contract-uncertainty-data-contracts
+### Node: Vacuum Contract <-> panel-concept-viz-diagnostics
+- id: bridge-panel-vacuum-contract-panel-concept-viz-diagnostics
 - type: bridge
-- summary: Panel vacuum-contract links to uncertainty-data-contracts via term "contract".
+- summary: Panel vacuum-contract links to panel-concept-viz-diagnostics via term "dutyCycle".
 
-### Node: Vacuum Contract <-> debate-contracts
-- id: bridge-panel-vacuum-contract-debate-contracts
+### Node: Vacuum Contract <-> panel-concept-energy-flux
+- id: bridge-panel-vacuum-contract-panel-concept-energy-flux
 - type: bridge
-- summary: Panel vacuum-contract links to debate-contracts via term "contract".
+- summary: Panel vacuum-contract links to panel-concept-energy-flux via term "dutyCycle".
 
-### Node: Vacuum Contract <-> bridge-debate-core-debate-contracts
-- id: bridge-panel-vacuum-contract-bridge-debate-core-debate-contracts
+### Node: Vacuum Contract <-> panel-concept-cavity-mechanism
+- id: bridge-panel-vacuum-contract-panel-concept-cavity-mechanism
 - type: bridge
-- summary: Panel vacuum-contract links to bridge-debate-core-debate-contracts via term "contract".
+- summary: Panel vacuum-contract links to panel-concept-cavity-mechanism via term "dutyCycle".
 
-### Node: Vacuum Contract <-> llm-runtime-contracts
-- id: bridge-panel-vacuum-contract-llm-runtime-contracts
+### Node: Metric Amplification Pocket <-> panel-concept-metric-pocket
+- id: bridge-panel-metric-pocket-panel-concept-metric-pocket
 - type: bridge
-- summary: Panel vacuum-contract links to llm-runtime-contracts via term "contract".
+- summary: Panel metric-pocket links to panel-concept-metric-pocket via term "amplification pocket".
 
-### Node: Vacuum Contract <-> zen-pillar-03-contracts
-- id: bridge-panel-vacuum-contract-zen-pillar-03-contracts
+### Node: Metric Amplification Pocket <-> panel-concept-viz-diagnostics
+- id: bridge-panel-metric-pocket-panel-concept-viz-diagnostics
 - type: bridge
-- summary: Panel vacuum-contract links to zen-pillar-03-contracts via term "contract".
+- summary: Panel metric-pocket links to panel-concept-viz-diagnostics via term "deltaAOverA".
 
-### Node: Metric Amplification Pocket <-> warp-control-stack
-- id: bridge-panel-metric-pocket-warp-control-stack
+### Node: Metric Amplification Pocket <-> panel-concept-cavity-mechanism
+- id: bridge-panel-metric-pocket-panel-concept-cavity-mechanism
 - type: bridge
-- summary: Panel metric-pocket links to warp-control-stack via term "fraction".
+- summary: Panel metric-pocket links to panel-concept-cavity-mechanism via term "deltaAOverA".
 
-### Node: Metric Amplification Pocket <-> active-fraction
-- id: bridge-panel-metric-pocket-active-fraction
+### Node: Metric Amplification Pocket <-> panel-concept-needle-ipeak-worksheet
+- id: bridge-panel-metric-pocket-panel-concept-needle-ipeak-worksheet
 - type: bridge
-- summary: Panel metric-pocket links to active-fraction via term "fraction".
+- summary: Panel metric-pocket links to panel-concept-needle-ipeak-worksheet via term "normalized".
+
+### Node: Metric Amplification Pocket <-> panel-concept-energy-flux
+- id: bridge-panel-metric-pocket-panel-concept-energy-flux
+- type: bridge
+- summary: Panel metric-pocket links to panel-concept-energy-flux via term "effective".
+
+### Node: Metric Amplification Pocket <-> panel-concept-drive-guards
+- id: bridge-panel-metric-pocket-panel-concept-drive-guards
+- type: bridge
+- summary: Panel metric-pocket links to panel-concept-drive-guards via term "effective".
+
+### Node: HaloBank Timeline <-> panel-concept-halobank
+- id: bridge-panel-halobank-panel-concept-halobank
+- type: bridge
+- summary: Panel halobank links to panel-concept-halobank via term "bank history".
 
 ### Node: HaloBank Timeline <-> halobank
 - id: bridge-panel-halobank-halobank
@@ -1134,6 +1714,31 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - id: bridge-panel-halobank-ui-panel-halobank
 - type: bridge
 - summary: Panel halobank links to ui-panel-halobank via term "HaloBank".
+
+### Node: HaloBank Timeline <-> panel-concept-needle-world-roadmap
+- id: bridge-panel-halobank-panel-concept-needle-world-roadmap
+- type: bridge
+- summary: Panel halobank links to panel-concept-needle-world-roadmap via term "timeline".
+
+### Node: HaloBank Timeline <-> panel-concept-resonance-scheduler
+- id: bridge-panel-halobank-panel-concept-resonance-scheduler
+- type: bridge
+- summary: Panel halobank links to panel-concept-resonance-scheduler via term "timeline".
+
+### Node: HaloBank Timeline <-> panel-concept-trip-player
+- id: bridge-panel-halobank-panel-concept-trip-player
+- type: bridge
+- summary: Panel halobank links to panel-concept-trip-player via term "timeline".
+
+### Node: Qi Widget <-> panel-concept-qi-widget
+- id: bridge-panel-qi-widget-panel-concept-qi-widget
+- type: bridge
+- summary: Panel qi-widget links to panel-concept-qi-widget via term "quantum inequality".
+
+### Node: Qi Widget <-> panel-concept-qi-auto-tuner
+- id: bridge-panel-qi-widget-panel-concept-qi-auto-tuner
+- type: bridge
+- summary: Panel qi-widget links to panel-concept-qi-auto-tuner via term "quantum inequality".
 
 ### Node: Qi Widget <-> qi-bounds
 - id: bridge-panel-qi-widget-qi-bounds
@@ -1150,60 +1755,155 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel qi-widget links to uncertainty-quantum-inequality via term "quantum inequality".
 
-### Node: Qi Widget <-> qi-bounds-engine
-- id: bridge-panel-qi-widget-qi-bounds-engine
+### Node: Qi Widget <-> panel-concept-experiment-ladder
+- id: bridge-panel-qi-widget-panel-concept-experiment-ladder
 - type: bridge
-- summary: Panel qi-widget links to qi-bounds-engine via term "Ford-Roman".
+- summary: Panel qi-widget links to panel-concept-experiment-ladder via term "Ford-Roman".
 
-### Node: Qi Widget <-> ford-roman-proxy
-- id: bridge-panel-qi-widget-ford-roman-proxy
+### Node: QI Auto-Tuner <-> panel-concept-qi-auto-tuner
+- id: bridge-panel-qi-auto-tuner-panel-concept-qi-auto-tuner
 - type: bridge
-- summary: Panel qi-widget links to ford-roman-proxy via term "Ford-Roman".
+- summary: Panel qi-auto-tuner links to panel-concept-qi-auto-tuner via term "quantum inequality tuner".
 
-### Node: Qi Widget <-> schema-confidence-stack
-- id: bridge-panel-qi-widget-schema-confidence-stack
+### Node: QI Auto-Tuner <-> panel-concept-resonance-scheduler
+- id: bridge-panel-qi-auto-tuner-panel-concept-resonance-scheduler
 - type: bridge
-- summary: Panel qi-widget links to schema-confidence-stack via term "Telemetry".
+- summary: Panel qi-auto-tuner links to panel-concept-resonance-scheduler via term "auto duty".
+
+### Node: Sector Legend <-> panel-concept-sector-legend
+- id: bridge-panel-sector-legend-panel-concept-sector-legend
+- type: bridge
+- summary: Panel sector-legend links to panel-concept-sector-legend via term "sector palette".
+
+### Node: Sector Roles HUD <-> panel-concept-sector-roles
+- id: bridge-panel-sector-roles-panel-concept-sector-roles
+- type: bridge
+- summary: Panel sector-roles links to panel-concept-sector-roles via term "sector overlay".
+
+### Node: Sector Roles HUD <-> panel-concept-sector-legend
+- id: bridge-panel-sector-roles-panel-concept-sector-legend
+- type: bridge
+- summary: Panel sector-roles links to panel-concept-sector-legend via term "role legend".
 
 ### Node: Sector Roles HUD <-> ui-hud-sector
 - id: bridge-panel-sector-roles-ui-hud-sector
 - type: bridge
 - summary: Panel sector-roles links to ui-hud-sector via term "sector HUD".
 
+### Node: Sector Roles HUD <-> panel-concept-experiment-ladder
+- id: bridge-panel-sector-roles-panel-concept-experiment-ladder
+- type: bridge
+- summary: Panel sector-roles links to panel-concept-experiment-ladder via term "sectorPeriod_ms".
+
+### Node: Sector Roles HUD <-> panel-concept-casimir-tile-grid
+- id: bridge-panel-sector-roles-panel-concept-casimir-tile-grid
+- type: bridge
+- summary: Panel sector-roles links to panel-concept-casimir-tile-grid via term "sectorPeriod_ms".
+
+### Node: Sector Roles HUD <-> panel-concept-resonance-scheduler
+- id: bridge-panel-sector-roles-panel-concept-resonance-scheduler
+- type: bridge
+- summary: Panel sector-roles links to panel-concept-resonance-scheduler via term "sectorPeriod_ms".
+
+### Node: Sweep Replay Controls <-> panel-concept-sweep-replay
+- id: bridge-panel-sweep-replay-panel-concept-sweep-replay
+- type: bridge
+- summary: Panel sweep-replay links to panel-concept-sweep-replay via term "sweep telemetry".
+
+### Node: Sweep Replay Controls <-> panel-concept-mass-provenance
+- id: bridge-panel-sweep-replay-panel-concept-mass-provenance
+- type: bridge
+- summary: Panel sweep-replay links to panel-concept-mass-provenance via term "center".
+
+### Node: Sweep Replay Controls <-> panel-concept-agi-task-history
+- id: bridge-panel-sweep-replay-panel-concept-agi-task-history
+- type: bridge
+- summary: Panel sweep-replay links to panel-concept-agi-task-history via term "center".
+
+### Node: Sweep Replay Controls <-> panel-concept-viz-diagnostics
+- id: bridge-panel-sweep-replay-panel-concept-viz-diagnostics
+- type: bridge
+- summary: Panel sweep-replay links to panel-concept-viz-diagnostics via term "react".
+
+### Node: Sweep Replay Controls <-> panel-concept-nav-system
+- id: bridge-panel-sweep-replay-panel-concept-nav-system
+- type: bridge
+- summary: Panel sweep-replay links to panel-concept-nav-system via term "react".
+
+### Node: Sweep Replay Controls <-> panel-concept-deepmix-solar
+- id: bridge-panel-sweep-replay-panel-concept-deepmix-solar
+- type: bridge
+- summary: Panel sweep-replay links to panel-concept-deepmix-solar via term "react".
+
+### Node: Runtime Ops <-> panel-concept-hull-status
+- id: bridge-panel-hull-status-panel-concept-hull-status
+- type: bridge
+- summary: Panel hull-status links to panel-concept-hull-status via term "queue telemetry".
+
 ### Node: Runtime Ops <-> bridge-solar-restoration-plan-deep-mixing-plan
 - id: bridge-panel-hull-status-bridge-solar-restoration-plan-deep-mixing-plan
 - type: bridge
 - summary: Panel hull-status links to bridge-solar-restoration-plan-deep-mixing-plan via term "plan b".
 
-### Node: Runtime Ops <-> schema-confidence-stack
-- id: bridge-panel-hull-status-schema-confidence-stack
+### Node: Runtime Ops <-> panel-concept-viz-diagnostics
+- id: bridge-panel-hull-status-panel-concept-viz-diagnostics
 - type: bridge
-- summary: Panel hull-status links to schema-confidence-stack via term "telemetry".
+- summary: Panel hull-status links to panel-concept-viz-diagnostics via term "className".
 
-### Node: Runtime Ops <-> debate-telemetry
-- id: bridge-panel-hull-status-debate-telemetry
+### Node: Runtime Ops <-> panel-concept-mass-provenance
+- id: bridge-panel-hull-status-panel-concept-mass-provenance
 - type: bridge
-- summary: Panel hull-status links to debate-telemetry via term "telemetry".
+- summary: Panel hull-status links to panel-concept-mass-provenance via term "className".
 
-### Node: Runtime Ops <-> hardware-telemetry-tree
-- id: bridge-panel-hull-status-hardware-telemetry-tree
+### Node: Runtime Ops <-> panel-concept-universal-audit-tree
+- id: bridge-panel-hull-status-panel-concept-universal-audit-tree
 - type: bridge
-- summary: Panel hull-status links to hardware-telemetry-tree via term "telemetry".
+- summary: Panel hull-status links to panel-concept-universal-audit-tree via term "className".
 
-### Node: Runtime Ops <-> skills-telemetry
-- id: bridge-panel-hull-status-skills-telemetry
+### Node: Runtime Ops <-> panel-concept-warp-ledger
+- id: bridge-panel-hull-status-panel-concept-warp-ledger
 - type: bridge
-- summary: Panel hull-status links to skills-telemetry via term "telemetry".
+- summary: Panel hull-status links to panel-concept-warp-ledger via term "className".
 
-### Node: Runtime Ops <-> star-models-telemetry
-- id: bridge-panel-hull-status-star-models-telemetry
+### Node: Debate View <-> panel-concept-agi-debate-view
+- id: bridge-panel-agi-debate-view-panel-concept-agi-debate-view
 - type: bridge
-- summary: Panel hull-status links to star-models-telemetry via term "telemetry".
+- summary: Panel agi-debate-view links to panel-concept-agi-debate-view via term "multi agent debate".
+
+### Node: Debate View <-> panel-concept-agi-essence-console
+- id: bridge-panel-agi-debate-view-panel-concept-agi-essence-console
+- type: bridge
+- summary: Panel agi-debate-view links to panel-concept-agi-essence-console via term "useDebateTelemetry".
+
+### Node: Debate View <-> panel-concept-star-coherence
+- id: bridge-panel-agi-debate-view-panel-concept-star-coherence
+- type: bridge
+- summary: Panel agi-debate-view links to panel-concept-star-coherence via term "useDebateTelemetry".
+
+### Node: Debate View <-> panel-concept-collapse-monitor
+- id: bridge-panel-agi-debate-view-panel-concept-collapse-monitor
+- type: bridge
+- summary: Panel agi-debate-view links to panel-concept-collapse-monitor via term "useDebateTelemetry".
+
+### Node: Debate View <-> panel-concept-star-watcher
+- id: bridge-panel-agi-debate-view-panel-concept-star-watcher
+- type: bridge
+- summary: Panel agi-debate-view links to panel-concept-star-watcher via term "global_coherence".
+
+### Node: Essence Console <-> panel-concept-agi-essence-console
+- id: bridge-panel-agi-essence-console-panel-concept-agi-essence-console
+- type: bridge
+- summary: Panel agi-essence-console links to panel-concept-agi-essence-console via term "Essence console".
 
 ### Node: Star Coherence Governor <-> coherence-governor
 - id: bridge-panel-star-coherence-coherence-governor
 - type: bridge
 - summary: Panel star-coherence links to coherence-governor via term "coherence governor".
+
+### Node: Star Coherence Governor <-> panel-concept-star-coherence
+- id: bridge-panel-star-coherence-panel-concept-star-coherence
+- type: bridge
+- summary: Panel star-coherence links to panel-concept-star-coherence via term "coherence governor".
 
 ### Node: Star Coherence Governor <-> uncertainty-coherence-policy
 - id: bridge-panel-star-coherence-uncertainty-coherence-policy
@@ -1225,11 +1925,6 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel star-coherence links to hardware-telemetry-tree via term "telemetry".
 
-### Node: Star Coherence Governor <-> skills-telemetry
-- id: bridge-panel-star-coherence-skills-telemetry
-- type: bridge
-- summary: Panel star-coherence links to skills-telemetry via term "telemetry".
-
 ### Node: Pipeline Proof <-> agi-planner-core
 - id: bridge-panel-pipeline-proof-agi-planner-core
 - type: bridge
@@ -1239,6 +1934,16 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - id: bridge-panel-pipeline-proof-bridge-agi-plan-execute-agi-planner-core
 - type: bridge
 - summary: Panel pipeline-proof links to bridge-agi-plan-execute-agi-planner-core via term "grounding".
+
+### Node: Pipeline Proof <-> panel-concept-pipeline-proof
+- id: bridge-panel-pipeline-proof-panel-concept-pipeline-proof
+- type: bridge
+- summary: Panel pipeline-proof links to panel-concept-pipeline-proof via term "grounding".
+
+### Node: Pipeline Proof <-> panel-concept-resonance-scheduler
+- id: bridge-panel-pipeline-proof-panel-concept-resonance-scheduler
+- type: bridge
+- summary: Panel pipeline-proof links to panel-concept-resonance-scheduler via term "resonance".
 
 ### Node: Pipeline Proof <-> resonance-tree
 - id: bridge-panel-pipeline-proof-resonance-tree
@@ -1250,15 +1955,35 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel pipeline-proof links to code-lattice-core via term "resonance".
 
-### Node: Pipeline Proof <-> code-lattice-schema
-- id: bridge-panel-pipeline-proof-code-lattice-schema
+### Node: Collapse Watch <-> panel-concept-collapse-monitor
+- id: bridge-panel-collapse-monitor-panel-concept-collapse-monitor
 - type: bridge
-- summary: Panel pipeline-proof links to code-lattice-schema via term "resonance".
+- summary: Panel collapse-monitor links to panel-concept-collapse-monitor via term "collapse pressure".
 
-### Node: Pipeline Proof <-> resonance-runtime
-- id: bridge-panel-pipeline-proof-resonance-runtime
+### Node: Collapse Watch <-> panel-concept-star-coherence
+- id: bridge-panel-collapse-monitor-panel-concept-star-coherence
 - type: bridge
-- summary: Panel pipeline-proof links to resonance-runtime via term "resonance".
+- summary: Panel collapse-monitor links to panel-concept-star-coherence via term "useCoherenceTelemetry".
+
+### Node: Collapse Watch <-> panel-concept-agi-debate-view
+- id: bridge-panel-collapse-monitor-panel-concept-agi-debate-view
+- type: bridge
+- summary: Panel collapse-monitor links to panel-concept-agi-debate-view via term "useDebateTelemetry".
+
+### Node: Collapse Watch <-> panel-concept-agi-essence-console
+- id: bridge-panel-collapse-monitor-panel-concept-agi-essence-console
+- type: bridge
+- summary: Panel collapse-monitor links to panel-concept-agi-essence-console via term "useDebateTelemetry".
+
+### Node: Collapse Watch <-> panel-concept-star-watcher
+- id: bridge-panel-collapse-monitor-panel-concept-star-watcher
+- type: bridge
+- summary: Panel collapse-monitor links to panel-concept-star-watcher via term "global_coherence".
+
+### Node: Collapse Benchmark HUD <-> panel-concept-collapse-benchmark-hud
+- id: bridge-panel-collapse-benchmark-hud-panel-concept-collapse-benchmark-hud
+- type: bridge
+- summary: Panel collapse-benchmark-hud links to panel-concept-collapse-benchmark-hud via term "collapse benchmark".
 
 ### Node: Collapse Benchmark HUD <-> collapse-benchmark-stack
 - id: bridge-panel-collapse-benchmark-hud-collapse-benchmark-stack
@@ -1280,10 +2005,20 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel collapse-benchmark-hud links to uncertainty-collapse-benchmark via term "collapse benchmark".
 
-### Node: Collapse Benchmark HUD <-> kappa-proxy
-- id: bridge-panel-collapse-benchmark-hud-kappa-proxy
+### Node: Collapse Benchmark HUD <-> panel-concept-helix-phoenix
+- id: bridge-panel-collapse-benchmark-hud-panel-concept-helix-phoenix
 - type: bridge
-- summary: Panel collapse-benchmark-hud links to kappa-proxy via term "kappa".
+- summary: Panel collapse-benchmark-hud links to panel-concept-helix-phoenix via term "kappa".
+
+### Node: Task History <-> panel-concept-agi-task-history
+- id: bridge-panel-agi-task-history-panel-concept-agi-task-history
+- type: bridge
+- summary: Panel agi-task-history links to panel-concept-agi-task-history via term "trace timeline".
+
+### Node: Noise Gens <-> panel-concept-helix-noise-gens
+- id: bridge-panel-helix-noise-gens-panel-concept-helix-noise-gens
+- type: bridge
+- summary: Panel helix-noise-gens links to panel-concept-helix-noise-gens via term "render plan".
 
 ### Node: Noise Gens <-> ui-panel-noise-gen
 - id: bridge-panel-helix-noise-gens-ui-panel-noise-gen
@@ -1300,55 +2035,55 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel helix-noise-gens links to coverage-gate via term "cover".
 
+### Node: Noise Gens <-> panel-concept-math-maturity-tree
+- id: bridge-panel-helix-noise-gens-panel-concept-math-maturity-tree
+- type: bridge
+- summary: Panel helix-noise-gens links to panel-concept-math-maturity-tree via term "cover".
+
 ### Node: Noise Gens <-> civic-governance-stack
 - id: bridge-panel-helix-noise-gens-civic-governance-stack
 - type: bridge
 - summary: Panel helix-noise-gens links to civic-governance-stack via term "stems".
-
-### Node: Noise Gens <-> interbeing-systems
-- id: bridge-panel-helix-noise-gens-interbeing-systems
-- type: bridge
-- summary: Panel helix-noise-gens links to interbeing-systems via term "stems".
-
-### Node: Noise Gens <-> bridge-integrity-protocols-stack-civic-governance-stack
-- id: bridge-panel-helix-noise-gens-bridge-integrity-protocols-stack-civic-governance-stack
-- type: bridge
-- summary: Panel helix-noise-gens links to bridge-integrity-protocols-stack-civic-governance-stack via term "stems".
 
 ### Node: Constraint Pack Policies <-> agi-constraint-packs
 - id: bridge-panel-constraint-pack-policy-agi-constraint-packs
 - type: bridge
 - summary: Panel constraint-pack-policy links to agi-constraint-packs via term "constraint packs".
 
+### Node: Constraint Pack Policies <-> panel-concept-constraint-pack-policy
+- id: bridge-panel-constraint-pack-policy-panel-concept-constraint-pack-policy
+- type: bridge
+- summary: Panel constraint-pack-policy links to panel-concept-constraint-pack-policy via term "constraint packs".
+
 ### Node: Constraint Pack Policies <-> constraint-packs
 - id: bridge-panel-constraint-pack-policy-constraint-packs
 - type: bridge
 - summary: Panel constraint-pack-policy links to constraint-packs via term "constraint packs".
 
-### Node: Constraint Pack Policies <-> deep-mixing-autopilot
-- id: bridge-panel-constraint-pack-policy-deep-mixing-autopilot
+### Node: Constraint Pack Policies <-> panel-concept-math-maturity-tree
+- id: bridge-panel-constraint-pack-policy-panel-concept-math-maturity-tree
 - type: bridge
-- summary: Panel constraint-pack-policy links to deep-mixing-autopilot via term "auto".
+- summary: Panel constraint-pack-policy links to panel-concept-math-maturity-tree via term "generated".
 
-### Node: Constraint Pack Policies <-> qi-autoscale
-- id: bridge-panel-constraint-pack-policy-qi-autoscale
+### Node: Constraint Pack Policies <-> panel-concept-universal-audit-tree
+- id: bridge-panel-constraint-pack-policy-panel-concept-universal-audit-tree
 - type: bridge
-- summary: Panel constraint-pack-policy links to qi-autoscale via term "auto".
+- summary: Panel constraint-pack-policy links to panel-concept-universal-audit-tree via term "generated".
 
-### Node: Constraint Pack Policies <-> qi-autothrottle
-- id: bridge-panel-constraint-pack-policy-qi-autothrottle
+### Node: Constraint Pack Policies <-> panel-concept-energy-flux
+- id: bridge-panel-constraint-pack-policy-panel-concept-energy-flux
 - type: bridge
-- summary: Panel constraint-pack-policy links to qi-autothrottle via term "auto".
-
-### Node: Constraint Pack Policies <-> ts-autoscale
-- id: bridge-panel-constraint-pack-policy-ts-autoscale
-- type: bridge
-- summary: Panel constraint-pack-policy links to ts-autoscale via term "auto".
+- summary: Panel constraint-pack-policy links to panel-concept-energy-flux via term "auto".
 
 ### Node: Contribution Workbench <-> agi-contributions
 - id: bridge-panel-agi-contribution-workbench-agi-contributions
 - type: bridge
 - summary: Panel agi-contribution-workbench links to agi-contributions via term "contribution".
+
+### Node: Contribution Workbench <-> panel-concept-agi-contribution-workbench
+- id: bridge-panel-agi-contribution-workbench-panel-concept-agi-contribution-workbench
+- type: bridge
+- summary: Panel agi-contribution-workbench links to panel-concept-agi-contribution-workbench via term "contribution".
 
 ### Node: Contribution Workbench <-> agi-constraint-packs
 - id: bridge-panel-agi-contribution-workbench-agi-constraint-packs
@@ -1370,45 +2105,75 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel agi-contribution-workbench links to certainty-motivation via term "verification".
 
-### Node: Contribution Workbench <-> bridge-certainty-motivation-platonic-reasoning-bridge
-- id: bridge-panel-agi-contribution-workbench-bridge-certainty-motivation-platonic-reasoning-bridge
+### Node: PNG Edge Cutter <-> panel-concept-remove-bg-edges
+- id: bridge-panel-remove-bg-edges-panel-concept-remove-bg-edges
 - type: bridge
-- summary: Panel agi-contribution-workbench links to bridge-certainty-motivation-platonic-reasoning-bridge via term "verification".
+- summary: Panel remove-bg-edges links to panel-concept-remove-bg-edges via term "background removal".
 
-### Node: PNG Edge Cutter <-> agi-constraint-packs
-- id: bridge-panel-remove-bg-edges-agi-constraint-packs
+### Node: PNG Edge Cutter <-> panel-concept-dresscode
+- id: bridge-panel-remove-bg-edges-panel-concept-dresscode
 - type: bridge
-- summary: Panel remove-bg-edges links to agi-constraint-packs via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-dresscode via term "mask".
 
-### Node: PNG Edge Cutter <-> noise-field-loop
-- id: bridge-panel-remove-bg-edges-noise-field-loop
+### Node: PNG Edge Cutter <-> panel-concept-helix-noise-gens
+- id: bridge-panel-remove-bg-edges-panel-concept-helix-noise-gens
 - type: bridge
-- summary: Panel remove-bg-edges links to noise-field-loop via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-helix-noise-gens via term "useCallback".
 
-### Node: PNG Edge Cutter <-> diffusion-loop
-- id: bridge-panel-remove-bg-edges-diffusion-loop
+### Node: PNG Edge Cutter <-> panel-concept-viz-diagnostics
+- id: bridge-panel-remove-bg-edges-panel-concept-viz-diagnostics
 - type: bridge
-- summary: Panel remove-bg-edges links to diffusion-loop via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-viz-diagnostics via term "className".
 
-### Node: PNG Edge Cutter <-> constraint-loop
-- id: bridge-panel-remove-bg-edges-constraint-loop
+### Node: PNG Edge Cutter <-> panel-concept-mass-provenance
+- id: bridge-panel-remove-bg-edges-panel-concept-mass-provenance
 - type: bridge
-- summary: Panel remove-bg-edges links to constraint-loop via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-mass-provenance via term "className".
 
-### Node: PNG Edge Cutter <-> bridge-analysis-loops-overview-noise-field-loop
-- id: bridge-panel-remove-bg-edges-bridge-analysis-loops-overview-noise-field-loop
+### Node: PNG Edge Cutter <-> panel-concept-universal-audit-tree
+- id: bridge-panel-remove-bg-edges-panel-concept-universal-audit-tree
 - type: bridge
-- summary: Panel remove-bg-edges links to bridge-analysis-loops-overview-noise-field-loop via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-universal-audit-tree via term "className".
 
-### Node: PNG Edge Cutter <-> qi-guard-consolidation
-- id: bridge-panel-remove-bg-edges-qi-guard-consolidation
+### Node: Dresscode Drafting <-> panel-concept-dresscode
+- id: bridge-panel-dresscode-panel-concept-dresscode
 - type: bridge
-- summary: Panel remove-bg-edges links to qi-guard-consolidation via term "const".
+- summary: Panel dresscode links to panel-concept-dresscode via term "dresscode".
 
-### Node: Dresscode Drafting <-> ui-panel-casimir-grid
-- id: bridge-panel-dresscode-ui-panel-casimir-grid
+### Node: Dresscode Drafting <-> panel-concept-constraint-pack-policy
+- id: bridge-panel-dresscode-panel-concept-constraint-pack-policy
 - type: bridge
-- summary: Panel dresscode links to ui-panel-casimir-grid via term "grid".
+- summary: Panel dresscode links to panel-concept-constraint-pack-policy via term "draft".
+
+### Node: Dresscode Drafting <-> panel-concept-fractional-coherence-grid
+- id: bridge-panel-dresscode-panel-concept-fractional-coherence-grid
+- type: bridge
+- summary: Panel dresscode links to panel-concept-fractional-coherence-grid via term "grid".
+
+### Node: Dresscode Drafting <-> panel-concept-alcubierre-viewer
+- id: bridge-panel-dresscode-panel-concept-alcubierre-viewer
+- type: bridge
+- summary: Panel dresscode links to panel-concept-alcubierre-viewer via term "grid".
+
+### Node: Dresscode Drafting <-> panel-concept-model-silhouette
+- id: bridge-panel-dresscode-panel-concept-model-silhouette
+- type: bridge
+- summary: Panel dresscode links to panel-concept-model-silhouette via term "grid".
+
+### Node: Dresscode Drafting <-> panel-concept-time-dilation-lattice
+- id: bridge-panel-dresscode-panel-concept-time-dilation-lattice
+- type: bridge
+- summary: Panel dresscode links to panel-concept-time-dilation-lattice via term "grid".
+
+### Node: Stellar LSR Viewer <-> panel-concept-stellar-lsr
+- id: bridge-panel-stellar-lsr-panel-concept-stellar-lsr
+- type: bridge
+- summary: Panel stellar-lsr links to panel-concept-stellar-lsr via term "local standard of rest".
+
+### Node: Stellar LSR Viewer <-> panel-concept-star-hydrostatic
+- id: bridge-panel-stellar-lsr-panel-concept-star-hydrostatic
+- type: bridge
+- summary: Panel stellar-lsr links to panel-concept-star-hydrostatic via term "stellar".
 
 ### Node: Stellar LSR Viewer <-> stellar-ledger
 - id: bridge-panel-stellar-lsr-stellar-ledger
@@ -1430,17 +2195,64 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel stellar-lsr links to stellar-evolution-stack via term "stellar".
 
-### Node: Stellar LSR Viewer <-> stellar-ledger-stack
-- id: bridge-panel-stellar-lsr-stellar-ledger-stack
+### Node: Essence Proposals <-> panel-concept-essence-proposals
+- id: bridge-panel-essence-proposals-panel-concept-essence-proposals
 - type: bridge
-- summary: Panel stellar-lsr links to stellar-ledger-stack via term "stellar".
-
-### Node: Stellar LSR Viewer <-> stellar-ledger
-- id: bridge-panel-stellar-lsr-stellar-ledger
-- type: bridge
-- summary: Panel stellar-lsr links to stellar-ledger via term "stellar".
+- summary: Panel essence-proposals links to panel-concept-essence-proposals via term "essence proposals".
 
 ## Bridges
+
+### Bridge: Viz Diagnostics HUD <-> panel-concept-viz-diagnostics
+- relation: Panel cross-concept join
+- summary: Panel viz-diagnostics links to panel-concept-viz-diagnostics via term "diagnostics overlay".
+
+### Bridge: Viz Diagnostics HUD <-> panel-concept-hull-metrics-vis
+- relation: Panel cross-concept join
+- summary: Panel viz-diagnostics links to panel-concept-hull-metrics-vis via term "qSpoilingFactor".
+
+### Bridge: Viz Diagnostics HUD <-> panel-concept-energy-flux
+- relation: Panel cross-concept join
+- summary: Panel viz-diagnostics links to panel-concept-energy-flux via term "dutyEffectiveFR".
+
+### Bridge: Viz Diagnostics HUD <-> panel-concept-cavity-mechanism
+- relation: Panel cross-concept join
+- summary: Panel viz-diagnostics links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
+
+### Bridge: Viz Diagnostics HUD <-> panel-concept-shell-outline
+- relation: Panel cross-concept join
+- summary: Panel viz-diagnostics links to panel-concept-shell-outline via term "dutyEffectiveFR".
+
+### Bridge: Viz Diagnostics HUD <-> panel-concept-curvature-slice
+- relation: Panel cross-concept join
+- summary: Panel viz-diagnostics links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Bridge: Energy Flux Stability <-> panel-concept-energy-flux
+- relation: Panel cross-concept join
+- summary: Panel energy-flux links to panel-concept-energy-flux via term "R = (phi_A)/(I3 + |T|)".
+
+### Bridge: Energy Flux Stability <-> panel-concept-viz-diagnostics
+- relation: Panel cross-concept join
+- summary: Panel energy-flux links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
+
+### Bridge: Energy Flux Stability <-> panel-concept-cavity-mechanism
+- relation: Panel cross-concept join
+- summary: Panel energy-flux links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
+
+### Bridge: Energy Flux Stability <-> panel-concept-shell-outline
+- relation: Panel cross-concept join
+- summary: Panel energy-flux links to panel-concept-shell-outline via term "dutyEffectiveFR".
+
+### Bridge: Energy Flux Stability <-> panel-concept-curvature-slice
+- relation: Panel cross-concept join
+- summary: Panel energy-flux links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Bridge: Energy Flux Stability <-> panel-concept-operational-mode
+- relation: Panel cross-concept join
+- summary: Panel energy-flux links to panel-concept-operational-mode via term "dutyEffectiveFR".
+
+### Bridge: Phoenix Averaging <-> panel-concept-helix-phoenix
+- relation: Panel cross-concept join
+- summary: Panel helix-phoenix links to panel-concept-helix-phoenix via term "phoenix averaging".
 
 ### Bridge: Phoenix Averaging <-> phoenix-averaging
 - relation: Panel cross-concept join
@@ -1462,33 +2274,97 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel helix-phoenix links to casimir-tile-roadmap via term "casimir tile".
 
-### Bridge: Phoenix Averaging <-> casimir-tile-schematic-roadmap
+### Bridge: Microscopy Mode <-> panel-concept-microscopy
 - relation: Panel cross-concept join
-- summary: Panel helix-phoenix links to casimir-tile-schematic-roadmap via term "casimir tile".
+- summary: Panel microscopy links to panel-concept-microscopy via term "microscopy mode".
+
+### Bridge: Microscopy Mode <-> panel-concept-pipeline-proof
+- relation: Panel cross-concept join
+- summary: Panel microscopy links to panel-concept-pipeline-proof via term "useEnergyPipeline".
+
+### Bridge: Needle I_peak Worksheet <-> panel-concept-needle-ipeak-worksheet
+- relation: Panel cross-concept join
+- summary: Panel needle-ipeak-worksheet links to panel-concept-needle-ipeak-worksheet via term "pulsed power".
+
+### Bridge: Needle I_peak Worksheet <-> panel-concept-pulsed-power-doc
+- relation: Panel cross-concept join
+- summary: Panel needle-ipeak-worksheet links to panel-concept-pulsed-power-doc via term "pulsed power".
 
 ### Bridge: Needle I_peak Worksheet <-> warp-pulsed-power
 - relation: Panel cross-concept join
 - summary: Panel needle-ipeak-worksheet links to warp-pulsed-power via term "pulsed power".
 
+### Bridge: Needle I_peak Worksheet <-> panel-concept-helix-phoenix
+- relation: Panel cross-concept join
+- summary: Panel needle-ipeak-worksheet links to panel-concept-helix-phoenix via term "needle hull".
+
+### Bridge: Needle I_peak Worksheet <-> panel-concept-metric-pocket
+- relation: Panel cross-concept join
+- summary: Panel needle-ipeak-worksheet links to panel-concept-metric-pocket via term "normalized".
+
+### Bridge: Needle I_peak Worksheet <-> panel-concept-gr-agent-loop-audit
+- relation: Panel cross-concept join
+- summary: Panel needle-ipeak-worksheet links to panel-concept-gr-agent-loop-audit via term "undefined".
+
+### Bridge: Needle World Roadmap <-> panel-concept-needle-world-roadmap
+- relation: Panel cross-concept join
+- summary: Panel needle-world-roadmap links to panel-concept-needle-world-roadmap via term "needle roadmap".
+
+### Bridge: Needle World Roadmap <-> panel-concept-resonance-scheduler
+- relation: Panel cross-concept join
+- summary: Panel needle-world-roadmap links to panel-concept-resonance-scheduler via term "timeline".
+
+### Bridge: Needle World Roadmap <-> panel-concept-trip-player
+- relation: Panel cross-concept join
+- summary: Panel needle-world-roadmap links to panel-concept-trip-player via term "timeline".
+
+### Bridge: Needle World Roadmap <-> panel-concept-halobank
+- relation: Panel cross-concept join
+- summary: Panel needle-world-roadmap links to panel-concept-halobank via term "timeline".
+
+### Bridge: Needle World Roadmap <-> panel-concept-agi-task-history
+- relation: Panel cross-concept join
+- summary: Panel needle-world-roadmap links to panel-concept-agi-task-history via term "timeline".
+
 ### Bridge: Needle World Roadmap <-> ts-ratio-guardrail
 - relation: Panel cross-concept join
 - summary: Panel needle-world-roadmap links to ts-ratio-guardrail via term "TS_ratio".
 
-### Bridge: Needle World Roadmap <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
+### Bridge: Electron Orbital Simulator <-> panel-concept-electron-orbital
 - relation: Panel cross-concept join
-- summary: Panel needle-world-roadmap links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "TS_ratio".
+- summary: Panel electron-orbital links to panel-concept-electron-orbital via term "toroidal packets".
 
-### Bridge: Needle World Roadmap <-> qi-bounds-engine
+### Bridge: Electron Orbital Simulator <-> panel-concept-cavity-mechanism
 - relation: Panel cross-concept join
-- summary: Panel needle-world-roadmap links to qi-bounds-engine via term "Roman".
+- summary: Panel electron-orbital links to panel-concept-cavity-mechanism via term "formatPercent".
 
-### Bridge: Needle World Roadmap <-> ford-roman-quantum-inequality
+### Bridge: Electron Orbital Simulator <-> panel-concept-near-zero
 - relation: Panel cross-concept join
-- summary: Panel needle-world-roadmap links to ford-roman-quantum-inequality via term "Roman".
+- summary: Panel electron-orbital links to panel-concept-near-zero via term "formatPercent".
 
-### Bridge: Needle World Roadmap <-> ford-roman-proxy
+### Bridge: Electron Orbital Simulator <-> panel-concept-operational-mode
 - relation: Panel cross-concept join
-- summary: Panel needle-world-roadmap links to ford-roman-proxy via term "Roman".
+- summary: Panel electron-orbital links to panel-concept-operational-mode via term "formatPercent".
+
+### Bridge: Drive Guards <-> panel-concept-drive-guards
+- relation: Panel cross-concept join
+- summary: Panel drive-guards links to panel-concept-drive-guards via term "sector strobing".
+
+### Bridge: Mass Provenance <-> panel-concept-mass-provenance
+- relation: Panel cross-concept join
+- summary: Panel mass-provenance links to panel-concept-mass-provenance via term "override warnings".
+
+### Bridge: GR Agent Loop Audit <-> panel-concept-gr-agent-loop-audit
+- relation: Panel cross-concept join
+- summary: Panel gr-agent-loop-audit links to panel-concept-gr-agent-loop-audit via term "warp constraints".
+
+### Bridge: GR Agent Loop Audit <-> panel-concept-gr-agent-loop-learning
+- relation: Panel cross-concept join
+- summary: Panel gr-agent-loop-audit links to panel-concept-gr-agent-loop-learning via term "accepted config".
+
+### Bridge: GR Agent Loop Audit <-> panel-concept-gr-agent-loop-kpis
+- relation: Panel cross-concept join
+- summary: Panel gr-agent-loop-audit links to panel-concept-gr-agent-loop-kpis via term "gr agent loop".
 
 ### Bridge: GR Agent Loop Audit <-> ui-panel-gr-agent-loop
 - relation: Panel cross-concept join
@@ -1502,17 +2378,13 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel gr-agent-loop-audit links to gr-agent-loop-schema via term "gr agent loop".
 
-### Bridge: GR Agent Loop Audit <-> gr-constraint-network
+### Bridge: GR Loop KPIs <-> panel-concept-gr-agent-loop-kpis
 - relation: Panel cross-concept join
-- summary: Panel gr-agent-loop-audit links to gr-constraint-network via term "residuals".
+- summary: Panel gr-agent-loop-kpis links to panel-concept-gr-agent-loop-kpis via term "constraint violations".
 
-### Bridge: GR Agent Loop Audit <-> stage-diagnostic
+### Bridge: GR Loop KPIs <-> panel-concept-gr-agent-loop-audit
 - relation: Panel cross-concept join
-- summary: Panel gr-agent-loop-audit links to stage-diagnostic via term "residuals".
-
-### Bridge: GR Agent Loop Audit <-> gr-constraint-network
-- relation: Panel cross-concept join
-- summary: Panel gr-agent-loop-audit links to gr-constraint-network via term "residuals".
+- summary: Panel gr-agent-loop-kpis links to panel-concept-gr-agent-loop-audit via term "gr agent loop".
 
 ### Bridge: GR Loop KPIs <-> ui-panel-gr-agent-loop
 - relation: Panel cross-concept join
@@ -1526,9 +2398,21 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel gr-agent-loop-kpis links to gr-agent-loop-schema via term "gr agent loop".
 
+### Bridge: GR Loop Learning <-> panel-concept-gr-agent-loop-learning
+- relation: Panel cross-concept join
+- summary: Panel gr-agent-loop-learning links to panel-concept-gr-agent-loop-learning via term "accepted config history".
+
 ### Bridge: GR Loop Learning <-> agi-learning-loop
 - relation: Panel cross-concept join
 - summary: Panel gr-agent-loop-learning links to agi-learning-loop via term "learning loop".
+
+### Bridge: GR Loop Learning <-> panel-concept-gr-agent-loop-audit
+- relation: Panel cross-concept join
+- summary: Panel gr-agent-loop-learning links to panel-concept-gr-agent-loop-audit via term "residualSeries".
+
+### Bridge: Math Maturity Tree <-> panel-concept-math-maturity-tree
+- relation: Panel cross-concept join
+- summary: Panel math-maturity-tree links to panel-concept-math-maturity-tree via term "math maturity".
 
 ### Bridge: Math Maturity Tree <-> ui-panel-math-maturity
 - relation: Panel cross-concept join
@@ -1546,61 +2430,89 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel math-maturity-tree links to bridge-math-maturity-stages-math-evidence-registry via term "math maturity".
 
-### Bridge: Math Maturity Tree <-> math-pipeline-walk
+### Bridge: Math Maturity Tree <-> panel-concept-universal-audit-tree
 - relation: Panel cross-concept join
-- summary: Panel math-maturity-tree links to math-pipeline-walk via term "math".
+- summary: Panel math-maturity-tree links to panel-concept-universal-audit-tree via term "repo audit".
 
-### Bridge: Math Maturity Tree <-> math-verification-gates
+### Bridge: Universal Audit Tree <-> panel-concept-universal-audit-tree
 - relation: Panel cross-concept join
-- summary: Panel math-maturity-tree links to math-verification-gates via term "math".
+- summary: Panel universal-audit-tree links to panel-concept-universal-audit-tree via term "verification map".
+
+### Bridge: Universal Audit Tree <-> panel-concept-math-maturity-tree
+- relation: Panel cross-concept join
+- summary: Panel universal-audit-tree links to panel-concept-math-maturity-tree via term "repo audit".
+
+### Bridge: Universal Audit Tree <-> panel-concept-gr-agent-loop-kpis
+- relation: Panel cross-concept join
+- summary: Panel universal-audit-tree links to panel-concept-gr-agent-loop-kpis via term "string".
+
+### Bridge: Universal Audit Tree <-> panel-concept-model-silhouette
+- relation: Panel cross-concept join
+- summary: Panel universal-audit-tree links to panel-concept-model-silhouette via term "string".
+
+### Bridge: Universal Audit Tree <-> panel-concept-trip-player
+- relation: Panel cross-concept join
+- summary: Panel universal-audit-tree links to panel-concept-trip-player via term "string".
+
+### Bridge: Universal Audit Tree <-> panel-concept-fuel-gauge
+- relation: Panel cross-concept join
+- summary: Panel universal-audit-tree links to panel-concept-fuel-gauge via term "string".
+
+### Bridge: TSN Determinism <-> panel-concept-tsn-sim
+- relation: Panel cross-concept join
+- summary: Panel tsn-sim links to panel-concept-tsn-sim via term "deterministic".
+
+### Bridge: TSN Determinism <-> panel-concept-time-dilation-lattice
+- relation: Panel cross-concept join
+- summary: Panel tsn-sim links to panel-concept-time-dilation-lattice via term "clock".
+
+### Bridge: TSN Determinism <-> panel-concept-agi-task-history
+- relation: Panel cross-concept join
+- summary: Panel tsn-sim links to panel-concept-agi-task-history via term "clock".
+
+### Bridge: TSN Determinism <-> panel-concept-light-speed-strobe
+- relation: Panel cross-concept join
+- summary: Panel tsn-sim links to panel-concept-light-speed-strobe via term "tsn".
 
 ### Bridge: TSN Determinism <-> simulation-tsn
 - relation: Panel cross-concept join
 - summary: Panel tsn-sim links to simulation-tsn via term "tsn".
 
-### Bridge: TSN Determinism <-> schema-confidence-stack
+### Bridge: TSN Determinism <-> panel-concept-pulsed-power-doc
 - relation: Panel cross-concept join
-- summary: Panel tsn-sim links to schema-confidence-stack via term "telemetry".
+- summary: Panel tsn-sim links to panel-concept-pulsed-power-doc via term "usePanelTelemetryPublisher".
 
-### Bridge: TSN Determinism <-> debate-telemetry
+### Bridge: Warp Pulsed Power <-> panel-concept-needle-ipeak-worksheet
 - relation: Panel cross-concept join
-- summary: Panel tsn-sim links to debate-telemetry via term "telemetry".
+- summary: Panel pulsed-power-doc links to panel-concept-needle-ipeak-worksheet via term "pulsed power".
 
-### Bridge: TSN Determinism <-> hardware-telemetry-tree
+### Bridge: Warp Pulsed Power <-> panel-concept-pulsed-power-doc
 - relation: Panel cross-concept join
-- summary: Panel tsn-sim links to hardware-telemetry-tree via term "telemetry".
-
-### Bridge: TSN Determinism <-> skills-telemetry
-- relation: Panel cross-concept join
-- summary: Panel tsn-sim links to skills-telemetry via term "telemetry".
-
-### Bridge: TSN Determinism <-> star-models-telemetry
-- relation: Panel cross-concept join
-- summary: Panel tsn-sim links to star-models-telemetry via term "telemetry".
+- summary: Panel pulsed-power-doc links to panel-concept-pulsed-power-doc via term "pulsed power".
 
 ### Bridge: Warp Pulsed Power <-> warp-pulsed-power
 - relation: Panel cross-concept join
 - summary: Panel pulsed-power-doc links to warp-pulsed-power via term "pulsed power".
 
-### Bridge: Warp Pulsed Power <-> pipeline-ledger-tree
+### Bridge: Warp Pulsed Power <-> panel-concept-viz-diagnostics
 - relation: Panel cross-concept join
-- summary: Panel pulsed-power-doc links to pipeline-ledger-tree via term "pipeline".
+- summary: Panel pulsed-power-doc links to panel-concept-viz-diagnostics via term "pipeline".
 
-### Bridge: Warp Pulsed Power <-> pipeline-overview
+### Bridge: Warp Pulsed Power <-> panel-concept-energy-flux
 - relation: Panel cross-concept join
-- summary: Panel pulsed-power-doc links to pipeline-overview via term "pipeline".
+- summary: Panel pulsed-power-doc links to panel-concept-energy-flux via term "pipeline".
 
-### Bridge: Warp Pulsed Power <-> bridge-pipeline-overview-curvature-ledger
+### Bridge: Warp Pulsed Power <-> panel-concept-microscopy
 - relation: Panel cross-concept join
-- summary: Panel pulsed-power-doc links to bridge-pipeline-overview-curvature-ledger via term "pipeline".
+- summary: Panel pulsed-power-doc links to panel-concept-microscopy via term "pipeline".
 
-### Bridge: Warp Pulsed Power <-> solar-pipeline
+### Bridge: Bus Voltage Program <-> panel-concept-bus-voltage
 - relation: Panel cross-concept join
-- summary: Panel pulsed-power-doc links to solar-pipeline via term "pipeline".
+- summary: Panel bus-voltage links to panel-concept-bus-voltage via term "power policy".
 
-### Bridge: Warp Pulsed Power <-> binding-energy-pipeline
+### Bridge: Bus Voltage Program <-> panel-concept-qi-auto-tuner
 - relation: Panel cross-concept join
-- summary: Panel pulsed-power-doc links to binding-energy-pipeline via term "pipeline".
+- summary: Panel bus-voltage links to panel-concept-qi-auto-tuner via term "setpoint".
 
 ### Bridge: Bus Voltage Program <-> guarded-casimir-tile-code-mapped
 - relation: Panel cross-concept join
@@ -1618,13 +2530,9 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel bus-voltage links to llm-runtime-tokenizer via term "Guardrail".
 
-### Bridge: Bus Voltage Program <-> security-hull-guard-tree
+### Bridge: KM-Scale Warp Ledger <-> panel-concept-warp-ledger
 - relation: Panel cross-concept join
-- summary: Panel bus-voltage links to security-hull-guard-tree via term "Guardrail".
-
-### Bridge: Bus Voltage Program <-> security-hull-guard
-- relation: Panel cross-concept join
-- summary: Panel bus-voltage links to security-hull-guard via term "Guardrail".
+- summary: Panel warp-ledger links to panel-concept-warp-ledger via term "km-scale ledger".
 
 ### Bridge: KM-Scale Warp Ledger <-> warp-ledger
 - relation: Panel cross-concept join
@@ -1633,6 +2541,18 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 ### Bridge: KM-Scale Warp Ledger <-> ui-panel-warp-ledger
 - relation: Panel cross-concept join
 - summary: Panel warp-ledger links to ui-panel-warp-ledger via term "warp ledger".
+
+### Bridge: KM-Scale Warp Ledger <-> panel-concept-halobank
+- relation: Panel cross-concept join
+- summary: Panel warp-ledger links to panel-concept-halobank via term "@/lib/whispers/usePanelHashFocus".
+
+### Bridge: Warp Experiment Ladder <-> panel-concept-experiment-ladder
+- relation: Panel cross-concept join
+- summary: Panel experiment-ladder links to panel-concept-experiment-ladder via term "experiment ladder".
+
+### Bridge: Warp Experiment Ladder <-> panel-concept-qi-widget
+- relation: Panel cross-concept join
+- summary: Panel experiment-ladder links to panel-concept-qi-widget via term "ford-roman".
 
 ### Bridge: Warp Experiment Ladder <-> qi-bounds-engine
 - relation: Panel cross-concept join
@@ -1650,13 +2570,9 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel experiment-ladder links to casimir-tiles-tree via term "casimir".
 
-### Bridge: Warp Experiment Ladder <-> casimir-tiles-overview
+### Bridge: Spectrum Tuner <-> panel-concept-spectrum-tuner
 - relation: Panel cross-concept join
-- summary: Panel experiment-ladder links to casimir-tiles-overview via term "casimir".
-
-### Bridge: Warp Experiment Ladder <-> casimir-tile-mechanism
-- relation: Panel cross-concept join
-- summary: Panel experiment-ladder links to casimir-tile-mechanism via term "casimir".
+- summary: Panel spectrum-tuner links to panel-concept-spectrum-tuner via term "harmonics sweep".
 
 ### Bridge: Spectrum Tuner <-> external-integrations-tree
 - relation: Panel cross-concept join
@@ -1678,13 +2594,25 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel spectrum-tuner links to hardware-provenance via term "Provenance".
 
-### Bridge: Spectrum Tuner <-> provenance-protocol
+### Bridge: Vacuum Gap Heatmap <-> panel-concept-vacuum-gap-heatmap
 - relation: Panel cross-concept join
-- summary: Panel spectrum-tuner links to provenance-protocol via term "Provenance".
+- summary: Panel vacuum-gap-heatmap links to panel-concept-vacuum-gap-heatmap via term "Casimir gap".
+
+### Bridge: Vacuum Gap Heatmap <-> panel-concept-vacuum-gap-sweep
+- relation: Panel cross-concept join
+- summary: Panel vacuum-gap-heatmap links to panel-concept-vacuum-gap-sweep via term "vacuum gap".
 
 ### Bridge: Vacuum Gap Heatmap <-> ui-panel-vacuum
 - relation: Panel cross-concept join
 - summary: Panel vacuum-gap-heatmap links to ui-panel-vacuum via term "vacuum gap".
+
+### Bridge: Vacuum Gap Heatmap <-> panel-concept-helix-casimir-amplifier
+- relation: Panel cross-concept join
+- summary: Panel vacuum-gap-heatmap links to panel-concept-helix-casimir-amplifier via term "heatmap".
+
+### Bridge: Hydrostatic Equilibrium (HR) <-> panel-concept-star-hydrostatic
+- relation: Panel cross-concept join
+- summary: Panel star-hydrostatic links to panel-concept-star-hydrostatic via term "potato threshold".
 
 ### Bridge: Hydrostatic Equilibrium (HR) <-> potato-threshold
 - relation: Panel cross-concept join
@@ -1706,6 +2634,26 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel star-hydrostatic links to bridge-solar-restoration-plan-stellar-ledger-stack via term "stellar ledger".
 
+### Bridge: Star Watcher <-> panel-concept-star-watcher
+- relation: Panel cross-concept join
+- summary: Panel star-watcher links to panel-concept-star-watcher via term "Coherence overlay".
+
+### Bridge: Star Watcher <-> panel-concept-agi-debate-view
+- relation: Panel cross-concept join
+- summary: Panel star-watcher links to panel-concept-agi-debate-view via term "global_coherence".
+
+### Bridge: Star Watcher <-> panel-concept-collapse-monitor
+- relation: Panel cross-concept join
+- summary: Panel star-watcher links to panel-concept-collapse-monitor via term "global_coherence".
+
+### Bridge: Star Watcher <-> panel-concept-star-hydrostatic
+- relation: Panel cross-concept join
+- summary: Panel star-watcher links to panel-concept-star-hydrostatic via term "CardDescription".
+
+### Bridge: Tokamak Simulation <-> panel-concept-tokamak-sim
+- relation: Panel cross-concept join
+- summary: Panel tokamak-sim links to panel-concept-tokamak-sim via term "coherence diagnostics".
+
 ### Bridge: Tokamak Simulation <-> ui-panel-tokamak
 - relation: Panel cross-concept join
 - summary: Panel tokamak-sim links to ui-panel-tokamak via term "tokamak".
@@ -1722,57 +2670,201 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel tokamak-sim links to tokamak-energy-adapter via term "tokamak".
 
-### Bridge: Cavity Mechanism <-> pipeline-ledger-tree
+### Bridge: Tokamak Simulation <-> panel-concept-vacuum-contract
 - relation: Panel cross-concept join
-- summary: Panel cavity-mechanism links to pipeline-ledger-tree via term "pipeline".
+- summary: Panel tokamak-sim links to panel-concept-vacuum-contract via term "formatNumber".
 
-### Bridge: Cavity Mechanism <-> pipeline-overview
+### Bridge: Vacuum Gap Sweep HUD <-> panel-concept-vacuum-gap-sweep
 - relation: Panel cross-concept join
-- summary: Panel cavity-mechanism links to pipeline-overview via term "pipeline".
+- summary: Panel vacuum-gap-sweep links to panel-concept-vacuum-gap-sweep via term "gap sweep".
 
-### Bridge: Cavity Mechanism <-> bridge-pipeline-overview-curvature-ledger
+### Bridge: Cavity Mechanism <-> panel-concept-cavity-mechanism
 - relation: Panel cross-concept join
-- summary: Panel cavity-mechanism links to bridge-pipeline-overview-curvature-ledger via term "pipeline".
+- summary: Panel cavity-mechanism links to panel-concept-cavity-mechanism via term "actuator layout".
 
-### Bridge: Cavity Mechanism <-> solar-pipeline
+### Bridge: Cavity Mechanism <-> panel-concept-viz-diagnostics
 - relation: Panel cross-concept join
-- summary: Panel cavity-mechanism links to solar-pipeline via term "pipeline".
+- summary: Panel cavity-mechanism links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
 
-### Bridge: Cavity Mechanism <-> binding-energy-pipeline
+### Bridge: Cavity Mechanism <-> panel-concept-energy-flux
 - relation: Panel cross-concept join
-- summary: Panel cavity-mechanism links to binding-energy-pipeline via term "pipeline".
+- summary: Panel cavity-mechanism links to panel-concept-energy-flux via term "dutyEffectiveFR".
 
-### Bridge: Cavity Mechanism <-> binding-warp-pipeline
+### Bridge: Cavity Mechanism <-> panel-concept-shell-outline
 - relation: Panel cross-concept join
-- summary: Panel cavity-mechanism links to binding-warp-pipeline via term "pipeline".
+- summary: Panel cavity-mechanism links to panel-concept-shell-outline via term "dutyEffectiveFR".
+
+### Bridge: Cavity Mechanism <-> panel-concept-curvature-slice
+- relation: Panel cross-concept join
+- summary: Panel cavity-mechanism links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Bridge: Cavity Mechanism <-> panel-concept-operational-mode
+- relation: Panel cross-concept join
+- summary: Panel cavity-mechanism links to panel-concept-operational-mode via term "dutyEffectiveFR".
+
+### Bridge: Fractional Coherence Rail <-> panel-concept-fractional-coherence-rail
+- relation: Panel cross-concept join
+- summary: Panel fractional-coherence-rail links to panel-concept-fractional-coherence-rail via term "fractional coherence".
+
+### Bridge: Fractional Coherence Rail <-> panel-concept-fractional-coherence-grid
+- relation: Panel cross-concept join
+- summary: Panel fractional-coherence-rail links to panel-concept-fractional-coherence-grid via term "fractional coherence".
+
+### Bridge: Fractional Coherence Grid <-> panel-concept-fractional-coherence-grid
+- relation: Panel cross-concept join
+- summary: Panel fractional-coherence-grid links to panel-concept-fractional-coherence-grid via term "coherence lattice".
+
+### Bridge: Fractional Coherence Grid <-> panel-concept-needle-ipeak-worksheet
+- relation: Panel cross-concept join
+- summary: Panel fractional-coherence-grid links to panel-concept-needle-ipeak-worksheet via term "Hz".
+
+### Bridge: Fractional Coherence Grid <-> panel-concept-vacuum-gap-heatmap
+- relation: Panel cross-concept join
+- summary: Panel fractional-coherence-grid links to panel-concept-vacuum-gap-heatmap via term "Hz".
+
+### Bridge: Fractional Coherence Grid <-> panel-concept-tokamak-sim
+- relation: Panel cross-concept join
+- summary: Panel fractional-coherence-grid links to panel-concept-tokamak-sim via term "Hz".
+
+### Bridge: Fractional Coherence Grid <-> panel-concept-alcubierre-viewer
+- relation: Panel cross-concept join
+- summary: Panel fractional-coherence-grid links to panel-concept-alcubierre-viewer via term "Hz".
+
+### Bridge: Fractional Coherence Grid <-> panel-concept-shell-outline
+- relation: Panel cross-concept join
+- summary: Panel fractional-coherence-grid links to panel-concept-shell-outline via term "Hz".
+
+### Bridge: Near-Zero Widget <-> panel-concept-near-zero
+- relation: Panel cross-concept join
+- summary: Panel near-zero links to panel-concept-near-zero via term "near zero widget".
+
+### Bridge: Near-Zero Widget <-> panel-concept-tsn-sim
+- relation: Panel cross-concept join
+- summary: Panel near-zero links to panel-concept-tsn-sim via term "usePanelTelemetryPublisher".
+
+### Bridge: Near-Zero Widget <-> panel-concept-pulsed-power-doc
+- relation: Panel cross-concept join
+- summary: Panel near-zero links to panel-concept-pulsed-power-doc via term "usePanelTelemetryPublisher".
+
+### Bridge: Direction Pad <-> panel-concept-direction-pad
+- relation: Panel cross-concept join
+- summary: Panel direction-pad links to panel-concept-direction-pad via term "flight director".
+
+### Bridge: Solar Navigation <-> panel-concept-nav-system
+- relation: Panel cross-concept join
+- summary: Panel nav-system links to panel-concept-nav-system via term "navigation hud".
 
 ### Bridge: Solar Navigation <-> ui-hud-nav
 - relation: Panel cross-concept join
 - summary: Panel nav-system links to ui-hud-nav via term "navigation hud".
 
+### Bridge: Solar Navigation <-> panel-concept-viz-diagnostics
+- relation: Panel cross-concept join
+- summary: Panel nav-system links to panel-concept-viz-diagnostics via term "react".
+
+### Bridge: Solar Navigation <-> panel-concept-deepmix-solar
+- relation: Panel cross-concept join
+- summary: Panel nav-system links to panel-concept-deepmix-solar via term "react".
+
+### Bridge: Solar Navigation <-> panel-concept-casimir-tile-grid
+- relation: Panel cross-concept join
+- summary: Panel nav-system links to panel-concept-casimir-tile-grid via term "react".
+
+### Bridge: Solar Navigation <-> panel-concept-sweep-replay
+- relation: Panel cross-concept join
+- summary: Panel nav-system links to panel-concept-sweep-replay via term "react".
+
+### Bridge: DeepMix Solar View <-> panel-concept-deepmix-solar
+- relation: Panel cross-concept join
+- summary: Panel deepmix-solar links to panel-concept-deepmix-solar via term "solar telemetry".
+
+### Bridge: DeepMix Solar View <-> panel-concept-viz-diagnostics
+- relation: Panel cross-concept join
+- summary: Panel deepmix-solar links to panel-concept-viz-diagnostics via term "react".
+
+### Bridge: DeepMix Solar View <-> panel-concept-nav-system
+- relation: Panel cross-concept join
+- summary: Panel deepmix-solar links to panel-concept-nav-system via term "react".
+
+### Bridge: DeepMix Solar View <-> panel-concept-casimir-tile-grid
+- relation: Panel cross-concept join
+- summary: Panel deepmix-solar links to panel-concept-casimir-tile-grid via term "react".
+
+### Bridge: DeepMix Solar View <-> panel-concept-sweep-replay
+- relation: Panel cross-concept join
+- summary: Panel deepmix-solar links to panel-concept-sweep-replay via term "react".
+
+### Bridge: DeepMix Solar View <-> panel-concept-remove-bg-edges
+- relation: Panel cross-concept join
+- summary: Panel deepmix-solar links to panel-concept-remove-bg-edges via term "react".
+
+### Bridge: Solar Globe <-> panel-concept-solar-globe
+- relation: Panel cross-concept join
+- summary: Panel solar-globe links to panel-concept-solar-globe via term "synoptic globe".
+
 ### Bridge: Solar Globe <-> ui-panel-solar-globe
 - relation: Panel cross-concept join
 - summary: Panel solar-globe links to ui-panel-solar-globe via term "solar globe".
 
-### Bridge: Solar Globe <-> agi-constraint-packs
+### Bridge: Solar Globe <-> panel-concept-needle-ipeak-worksheet
 - relation: Panel cross-concept join
-- summary: Panel solar-globe links to agi-constraint-packs via term "const".
+- summary: Panel solar-globe links to panel-concept-needle-ipeak-worksheet via term "return".
 
-### Bridge: Solar Globe <-> noise-field-loop
+### Bridge: Solar Globe <-> panel-concept-electron-orbital
 - relation: Panel cross-concept join
-- summary: Panel solar-globe links to noise-field-loop via term "const".
+- summary: Panel solar-globe links to panel-concept-electron-orbital via term "return".
 
-### Bridge: Solar Globe <-> diffusion-loop
+### Bridge: Solar Globe <-> panel-concept-drive-guards
 - relation: Panel cross-concept join
-- summary: Panel solar-globe links to diffusion-loop via term "const".
+- summary: Panel solar-globe links to panel-concept-drive-guards via term "return".
 
-### Bridge: Solar Globe <-> constraint-loop
+### Bridge: Solar Globe <-> panel-concept-mass-provenance
 - relation: Panel cross-concept join
-- summary: Panel solar-globe links to constraint-loop via term "const".
+- summary: Panel solar-globe links to panel-concept-mass-provenance via term "return".
 
-### Bridge: Solar Globe <-> bridge-analysis-loops-overview-noise-field-loop
+### Bridge: DeepMix Sweet Spot <-> panel-concept-deepmix-sweetspot
 - relation: Panel cross-concept join
-- summary: Panel solar-globe links to bridge-analysis-loops-overview-noise-field-loop via term "const".
+- summary: Panel deepmix-sweetspot links to panel-concept-deepmix-sweetspot via term "mix optimization".
+
+### Bridge: DeepMix Sweet Spot <-> panel-concept-deepmix-globe
+- relation: Panel cross-concept join
+- summary: Panel deepmix-sweetspot links to panel-concept-deepmix-globe via term "ratePerShipKgS".
+
+### Bridge: DeepMix Sweet Spot <-> panel-concept-mass-provenance
+- relation: Panel cross-concept join
+- summary: Panel deepmix-sweetspot links to panel-concept-mass-provenance via term "toExponential".
+
+### Bridge: DeepMix Sweet Spot <-> panel-concept-curvature-slice
+- relation: Panel cross-concept join
+- summary: Panel deepmix-sweetspot links to panel-concept-curvature-slice via term "toExponential".
+
+### Bridge: DeepMix Sweet Spot <-> panel-concept-stellar-lsr
+- relation: Panel cross-concept join
+- summary: Panel deepmix-sweetspot links to panel-concept-stellar-lsr via term "toExponential".
+
+### Bridge: DeepMix Globe <-> panel-concept-deepmix-globe
+- relation: Panel cross-concept join
+- summary: Panel deepmix-globe links to panel-concept-deepmix-globe via term "deep mixing globe".
+
+### Bridge: DeepMix Globe <-> panel-concept-deepmix-sweetspot
+- relation: Panel cross-concept join
+- summary: Panel deepmix-globe links to panel-concept-deepmix-sweetspot via term "ratePerShipKgS".
+
+### Bridge: DeepMix Globe <-> panel-concept-mass-provenance
+- relation: Panel cross-concept join
+- summary: Panel deepmix-globe links to panel-concept-mass-provenance via term "toExponential".
+
+### Bridge: DeepMix Globe <-> panel-concept-curvature-slice
+- relation: Panel cross-concept join
+- summary: Panel deepmix-globe links to panel-concept-curvature-slice via term "toExponential".
+
+### Bridge: DeepMix Globe <-> panel-concept-stellar-lsr
+- relation: Panel cross-concept join
+- summary: Panel deepmix-globe links to panel-concept-stellar-lsr via term "toExponential".
+
+### Bridge: Alcubierre Viewer <-> panel-concept-alcubierre-viewer
+- relation: Panel cross-concept join
+- summary: Panel alcubierre-viewer links to panel-concept-alcubierre-viewer via term "Alcubierre metric".
 
 ### Bridge: Alcubierre Viewer <-> alcubierre-metric
 - relation: Panel cross-concept join
@@ -1790,6 +2882,42 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel alcubierre-viewer links to warp-bubble via term "warp bubble".
 
+### Bridge: Alcubierre Viewer <-> panel-concept-hull-metrics-vis
+- relation: Panel cross-concept join
+- summary: Panel alcubierre-viewer links to panel-concept-hull-metrics-vis via term "resolveHullDimsEffective".
+
+### Bridge: Shell Outline Visualizer <-> panel-concept-shell-outline
+- relation: Panel cross-concept join
+- summary: Panel shell-outline links to panel-concept-shell-outline via term "shell outline".
+
+### Bridge: Shell Outline Visualizer <-> panel-concept-viz-diagnostics
+- relation: Panel cross-concept join
+- summary: Panel shell-outline links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
+
+### Bridge: Shell Outline Visualizer <-> panel-concept-energy-flux
+- relation: Panel cross-concept join
+- summary: Panel shell-outline links to panel-concept-energy-flux via term "dutyEffectiveFR".
+
+### Bridge: Shell Outline Visualizer <-> panel-concept-cavity-mechanism
+- relation: Panel cross-concept join
+- summary: Panel shell-outline links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
+
+### Bridge: Shell Outline Visualizer <-> panel-concept-curvature-slice
+- relation: Panel cross-concept join
+- summary: Panel shell-outline links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Bridge: Shell Outline Visualizer <-> panel-concept-operational-mode
+- relation: Panel cross-concept join
+- summary: Panel shell-outline links to panel-concept-operational-mode via term "dutyEffectiveFR".
+
+### Bridge: Silhouette Stretch <-> panel-concept-model-silhouette
+- relation: Panel cross-concept join
+- summary: Panel model-silhouette links to panel-concept-model-silhouette via term "ellipsoid".
+
+### Bridge: Silhouette Stretch <-> panel-concept-pipeline-proof
+- relation: Panel cross-concept join
+- summary: Panel model-silhouette links to panel-concept-pipeline-proof via term "ellipsoid".
+
 ### Bridge: Silhouette Stretch <-> ts-ratio-guardrail
 - relation: Panel cross-concept join
 - summary: Panel model-silhouette links to ts-ratio-guardrail via term "scale".
@@ -1798,17 +2926,21 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel model-silhouette links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "scale".
 
-### Bridge: Silhouette Stretch <-> qi-autoscale
+### Bridge: Silhouette Stretch <-> panel-concept-microscopy
 - relation: Panel cross-concept join
-- summary: Panel model-silhouette links to qi-autoscale via term "scale".
+- summary: Panel model-silhouette links to panel-concept-microscopy via term "scale".
 
-### Bridge: Silhouette Stretch <-> ts-autoscale
+### Bridge: Silhouette Stretch <-> panel-concept-warp-ledger
 - relation: Panel cross-concept join
-- summary: Panel model-silhouette links to ts-autoscale via term "scale".
+- summary: Panel model-silhouette links to panel-concept-warp-ledger via term "scale".
 
-### Bridge: Silhouette Stretch <-> ui-panel-casimir-grid
+### Bridge: Hull Metrics Vis <-> panel-concept-hull-metrics-vis
 - relation: Panel cross-concept join
-- summary: Panel model-silhouette links to ui-panel-casimir-grid via term "grid".
+- summary: Panel hull-metrics-vis links to panel-concept-hull-metrics-vis via term "hull metrics".
+
+### Bridge: Hull Metrics Vis <-> panel-concept-alcubierre-viewer
+- relation: Panel cross-concept join
+- summary: Panel hull-metrics-vis links to panel-concept-alcubierre-viewer via term "alcubierre".
 
 ### Bridge: Hull Metrics Vis <-> ui-panel-alcubierre
 - relation: Panel cross-concept join
@@ -1822,17 +2954,13 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel hull-metrics-vis links to casimir-natario-metric via term "natario".
 
-### Bridge: Hull Metrics Vis <-> natario-metric-engine
+### Bridge: Hull Metrics Vis <-> panel-concept-experiment-ladder
 - relation: Panel cross-concept join
-- summary: Panel hull-metrics-vis links to natario-metric-engine via term "natario".
+- summary: Panel hull-metrics-vis links to panel-concept-experiment-ladder via term "natario".
 
-### Bridge: Hull Metrics Vis <-> natario-zero-expansion
+### Bridge: Shift Vector Panel <-> panel-concept-shift-vector
 - relation: Panel cross-concept join
-- summary: Panel hull-metrics-vis links to natario-zero-expansion via term "natario".
-
-### Bridge: Hull Metrics Vis <-> casimir-natario-bridge
-- relation: Panel cross-concept join
-- summary: Panel hull-metrics-vis links to casimir-natario-bridge via term "natario".
+- summary: Panel shift-vector links to panel-concept-shift-vector via term "shift vector".
 
 ### Bridge: Shift Vector Panel <-> ui-panel-shift-vector
 - relation: Panel cross-concept join
@@ -1842,29 +2970,61 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel shift-vector links to shift-vector-expansion-scalar via term "shift vector".
 
-### Bridge: Shift Vector Panel <-> casimir-natario-metric
+### Bridge: Shift Vector Panel <-> panel-concept-hull-metrics-vis
 - relation: Panel cross-concept join
-- summary: Panel shift-vector links to casimir-natario-metric via term "geometry".
+- summary: Panel shift-vector links to panel-concept-hull-metrics-vis via term "shiftVector".
 
-### Bridge: Shift Vector Panel <-> hull-materials
+### Bridge: Shift Vector Panel <-> panel-concept-drive-guards
 - relation: Panel cross-concept join
-- summary: Panel shift-vector links to hull-materials via term "geometry".
+- summary: Panel shift-vector links to panel-concept-drive-guards via term "useMetrics".
 
-### Bridge: Shift Vector Panel <-> natario-metric-engine
+### Bridge: Shift Vector Panel <-> panel-concept-curvature-slice
 - relation: Panel cross-concept join
-- summary: Panel shift-vector links to natario-metric-engine via term "geometry".
+- summary: Panel shift-vector links to panel-concept-curvature-slice via term "useMetrics".
 
-### Bridge: Shift Vector Panel <-> physics-foundations-tree
+### Bridge: Equatorial Curvature Slice <-> panel-concept-curvature-slice
 - relation: Panel cross-concept join
-- summary: Panel shift-vector links to physics-foundations-tree via term "geometry".
+- summary: Panel curvature-slice links to panel-concept-curvature-slice via term "scalar curvature".
 
 ### Bridge: Equatorial Curvature Slice <-> ui-panel-curvature-slices
 - relation: Panel cross-concept join
 - summary: Panel curvature-slice links to ui-panel-curvature-slices via term "curvature slice".
 
+### Bridge: Equatorial Curvature Slice <-> panel-concept-viz-diagnostics
+- relation: Panel cross-concept join
+- summary: Panel curvature-slice links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
+
+### Bridge: Equatorial Curvature Slice <-> panel-concept-energy-flux
+- relation: Panel cross-concept join
+- summary: Panel curvature-slice links to panel-concept-energy-flux via term "dutyEffectiveFR".
+
+### Bridge: Equatorial Curvature Slice <-> panel-concept-cavity-mechanism
+- relation: Panel cross-concept join
+- summary: Panel curvature-slice links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
+
+### Bridge: Equatorial Curvature Slice <-> panel-concept-shell-outline
+- relation: Panel cross-concept join
+- summary: Panel curvature-slice links to panel-concept-shell-outline via term "dutyEffectiveFR".
+
+### Bridge: Time Dilation Lattice <-> panel-concept-time-dilation-lattice
+- relation: Panel cross-concept join
+- summary: Panel time-dilation-lattice links to panel-concept-time-dilation-lattice via term "spacetime lattice".
+
 ### Bridge: Time Dilation Lattice <-> ui-panel-time-dilation
 - relation: Panel cross-concept join
 - summary: Panel time-dilation-lattice links to ui-panel-time-dilation via term "time dilation".
+
+### Bridge: Time Dilation Lattice <-> panel-concept-remove-bg-edges
+- relation: Panel cross-concept join
+- summary: Panel time-dilation-lattice links to panel-concept-remove-bg-edges via term "alpha".
+
+### Bridge: Time Dilation Lattice <-> panel-concept-pipeline-proof
+- relation: Panel cross-concept join
+- summary: Panel time-dilation-lattice links to panel-concept-pipeline-proof via term "EnergyPipelineState".
+
+### Bridge: Curvature Ledger <-> panel-concept-curvature-ledger
+- relation: Panel cross-concept join
+- summary: Panel curvature-ledger links to panel-concept-curvature-ledger via term "curvature ledger".
 
 ### Bridge: Curvature Ledger <-> curvature-ledger
 - relation: Panel cross-concept join
@@ -1878,29 +3038,33 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel curvature-ledger links to ui-panel-curvature-ledger via term "curvature ledger".
 
-### Bridge: Operational Mode Switch <-> agi-constraint-packs
+### Bridge: Operational Mode Switch <-> panel-concept-operational-mode
 - relation: Panel cross-concept join
-- summary: Panel operational-mode links to agi-constraint-packs via term "const".
+- summary: Panel operational-mode links to panel-concept-operational-mode via term "station vs desktop".
 
-### Bridge: Operational Mode Switch <-> noise-field-loop
+### Bridge: Operational Mode Switch <-> panel-concept-viz-diagnostics
 - relation: Panel cross-concept join
-- summary: Panel operational-mode links to noise-field-loop via term "const".
+- summary: Panel operational-mode links to panel-concept-viz-diagnostics via term "dutyEffectiveFR".
 
-### Bridge: Operational Mode Switch <-> diffusion-loop
+### Bridge: Operational Mode Switch <-> panel-concept-energy-flux
 - relation: Panel cross-concept join
-- summary: Panel operational-mode links to diffusion-loop via term "const".
+- summary: Panel operational-mode links to panel-concept-energy-flux via term "dutyEffectiveFR".
 
-### Bridge: Operational Mode Switch <-> constraint-loop
+### Bridge: Operational Mode Switch <-> panel-concept-cavity-mechanism
 - relation: Panel cross-concept join
-- summary: Panel operational-mode links to constraint-loop via term "const".
+- summary: Panel operational-mode links to panel-concept-cavity-mechanism via term "dutyEffectiveFR".
 
-### Bridge: Operational Mode Switch <-> bridge-analysis-loops-overview-noise-field-loop
+### Bridge: Operational Mode Switch <-> panel-concept-shell-outline
 - relation: Panel cross-concept join
-- summary: Panel operational-mode links to bridge-analysis-loops-overview-noise-field-loop via term "const".
+- summary: Panel operational-mode links to panel-concept-shell-outline via term "dutyEffectiveFR".
 
-### Bridge: Operational Mode Switch <-> qi-guard-consolidation
+### Bridge: Operational Mode Switch <-> panel-concept-curvature-slice
 - relation: Panel cross-concept join
-- summary: Panel operational-mode links to qi-guard-consolidation via term "const".
+- summary: Panel operational-mode links to panel-concept-curvature-slice via term "dutyEffectiveFR".
+
+### Bridge: Casimir Tile Grid <-> panel-concept-casimir-tile-grid
+- relation: Panel cross-concept join
+- summary: Panel casimir-tile-grid links to panel-concept-casimir-tile-grid via term "Casimir tile grid".
 
 ### Bridge: Casimir Tile Grid <-> ui-panel-casimir-grid
 - relation: Panel cross-concept join
@@ -1914,41 +3078,89 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel casimir-tile-grid links to casimir-tiles-overview via term "Casimir tiles".
 
+### Bridge: Casimir Tile Grid <-> panel-concept-experiment-ladder
+- relation: Panel cross-concept join
+- summary: Panel casimir-tile-grid links to panel-concept-experiment-ladder via term "sectorPeriod_ms".
+
+### Bridge: Casimir Tile Grid <-> panel-concept-resonance-scheduler
+- relation: Panel cross-concept join
+- summary: Panel casimir-tile-grid links to panel-concept-resonance-scheduler via term "sectorPeriod_ms".
+
+### Bridge: Light-Speed Strobe Scale <-> panel-concept-light-speed-strobe
+- relation: Panel cross-concept join
+- summary: Panel light-speed-strobe links to panel-concept-light-speed-strobe via term "light speed strobe".
+
 ### Bridge: Light-Speed Strobe Scale <-> sector-strobes-duty-cycle
 - relation: Panel cross-concept join
 - summary: Panel light-speed-strobe links to sector-strobes-duty-cycle via term "strobes".
 
-### Bridge: Speed Capability <-> agi-refinery
+### Bridge: Speed Capability <-> panel-concept-speed-capability
 - relation: Panel cross-concept join
-- summary: Panel speed-capability links to agi-refinery via term "s".
+- summary: Panel speed-capability links to panel-concept-speed-capability via term "translation speed".
 
-### Bridge: Speed Capability <-> agi-trace-memory
+### Bridge: Speed Capability <-> panel-concept-shell-outline
 - relation: Panel cross-concept join
-- summary: Panel speed-capability links to agi-trace-memory via term "s".
+- summary: Panel speed-capability links to panel-concept-shell-outline via term "beta".
 
-### Bridge: Speed Capability <-> agi-evaluation
+### Bridge: Speed Capability <-> panel-concept-shift-vector
 - relation: Panel cross-concept join
-- summary: Panel speed-capability links to agi-evaluation via term "s".
+- summary: Panel speed-capability links to panel-concept-shift-vector via term "beta".
 
-### Bridge: Speed Capability <-> agi-chat-sessions
+### Bridge: Speed Capability <-> panel-concept-stellar-lsr
 - relation: Panel cross-concept join
-- summary: Panel speed-capability links to agi-chat-sessions via term "s".
+- summary: Panel speed-capability links to panel-concept-stellar-lsr via term "km/s".
 
-### Bridge: Speed Capability <-> agi-contributions
+### Bridge: Speed Capability <-> panel-concept-drive-guards
 - relation: Panel cross-concept join
-- summary: Panel speed-capability links to agi-contributions via term "s".
+- summary: Panel speed-capability links to panel-concept-drive-guards via term "m/s".
 
-### Bridge: Speed Capability <-> agi-constraint-packs
+### Bridge: Speed Capability <-> panel-concept-near-zero
 - relation: Panel cross-concept join
-- summary: Panel speed-capability links to agi-constraint-packs via term "s".
+- summary: Panel speed-capability links to panel-concept-near-zero via term "m/s".
+
+### Bridge: Helix Casimir Amplifier <-> panel-concept-helix-casimir-amplifier
+- relation: Panel cross-concept join
+- summary: Panel helix-casimir-amplifier links to panel-concept-helix-casimir-amplifier via term "Casimir amplifier".
 
 ### Bridge: Helix Casimir Amplifier <-> ui-panel-casimir-amplifier
 - relation: Panel cross-concept join
 - summary: Panel helix-casimir-amplifier links to ui-panel-casimir-amplifier via term "Casimir amplifier".
 
+### Bridge: Helix Casimir Amplifier <-> panel-concept-vacuum-contract
+- relation: Panel cross-concept join
+- summary: Panel helix-casimir-amplifier links to panel-concept-vacuum-contract via term "modulationFreq_GHz".
+
+### Bridge: Resonance Scheduler <-> panel-concept-resonance-scheduler
+- relation: Panel cross-concept join
+- summary: Panel resonance-scheduler links to panel-concept-resonance-scheduler via term "resonance scheduler".
+
 ### Bridge: Resonance Scheduler <-> phase-scheduler
 - relation: Panel cross-concept join
 - summary: Panel resonance-scheduler links to phase-scheduler via term "phase scheduler".
+
+### Bridge: Resonance Scheduler <-> panel-concept-qi-auto-tuner
+- relation: Panel cross-concept join
+- summary: Panel resonance-scheduler links to panel-concept-qi-auto-tuner via term "auto duty".
+
+### Bridge: Resonance Scheduler <-> panel-concept-experiment-ladder
+- relation: Panel cross-concept join
+- summary: Panel resonance-scheduler links to panel-concept-experiment-ladder via term "sectorPeriod_ms".
+
+### Bridge: Resonance Scheduler <-> panel-concept-casimir-tile-grid
+- relation: Panel cross-concept join
+- summary: Panel resonance-scheduler links to panel-concept-casimir-tile-grid via term "sectorPeriod_ms".
+
+### Bridge: Resonance Scheduler <-> panel-concept-sector-roles
+- relation: Panel cross-concept join
+- summary: Panel resonance-scheduler links to panel-concept-sector-roles via term "sectorPeriod_ms".
+
+### Bridge: Trip Player <-> panel-concept-trip-player
+- relation: Panel cross-concept join
+- summary: Panel trip-player links to panel-concept-trip-player via term "timeline playback".
+
+### Bridge: Trip Player <-> panel-concept-fuel-gauge
+- relation: Panel cross-concept join
+- summary: Panel trip-player links to panel-concept-fuel-gauge via term "computeEffectiveLyPerHour".
 
 ### Bridge: Trip Player <-> agi-constraint-packs
 - relation: Panel cross-concept join
@@ -1966,13 +3178,13 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel trip-player links to constraint-loop via term "constraints".
 
-### Bridge: Trip Player <-> bridge-analysis-loops-overview-noise-field-loop
+### Bridge: Fuel Gauge <-> panel-concept-fuel-gauge
 - relation: Panel cross-concept join
-- summary: Panel trip-player links to bridge-analysis-loops-overview-noise-field-loop via term "constraints".
+- summary: Panel fuel-gauge links to panel-concept-fuel-gauge via term "energy reserve".
 
-### Bridge: Trip Player <-> qi-guard-consolidation
+### Bridge: Fuel Gauge <-> panel-concept-trip-player
 - relation: Panel cross-concept join
-- summary: Panel trip-player links to qi-guard-consolidation via term "constraints".
+- summary: Panel fuel-gauge links to panel-concept-trip-player via term "computeEffectiveLyPerHour".
 
 ### Bridge: Fuel Gauge <-> schema-confidence-stack
 - relation: Panel cross-concept join
@@ -1986,49 +3198,61 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel fuel-gauge links to hardware-telemetry-tree via term "telemetry".
 
-### Bridge: Fuel Gauge <-> skills-telemetry
+### Bridge: Fuel Gauge <-> panel-concept-energy-flux
 - relation: Panel cross-concept join
-- summary: Panel fuel-gauge links to skills-telemetry via term "telemetry".
+- summary: Panel fuel-gauge links to panel-concept-energy-flux via term "telemetry".
 
-### Bridge: Fuel Gauge <-> star-models-telemetry
+### Bridge: Vacuum Contract <-> panel-concept-vacuum-contract
 - relation: Panel cross-concept join
-- summary: Panel fuel-gauge links to star-models-telemetry via term "telemetry".
+- summary: Panel vacuum-contract links to panel-concept-vacuum-contract via term "negative energy covenant".
 
-### Bridge: Fuel Gauge <-> bridge-star-runtime-routes-star-models-telemetry
+### Bridge: Vacuum Contract <-> panel-concept-helix-casimir-amplifier
 - relation: Panel cross-concept join
-- summary: Panel fuel-gauge links to bridge-star-runtime-routes-star-models-telemetry via term "telemetry".
+- summary: Panel vacuum-contract links to panel-concept-helix-casimir-amplifier via term "modulationFreq_GHz".
 
-### Bridge: Vacuum Contract <-> agi-adapter
+### Bridge: Vacuum Contract <-> panel-concept-tokamak-sim
 - relation: Panel cross-concept join
-- summary: Panel vacuum-contract links to agi-adapter via term "contract".
+- summary: Panel vacuum-contract links to panel-concept-tokamak-sim via term "formatNumber".
 
-### Bridge: Vacuum Contract <-> uncertainty-data-contracts
+### Bridge: Vacuum Contract <-> panel-concept-viz-diagnostics
 - relation: Panel cross-concept join
-- summary: Panel vacuum-contract links to uncertainty-data-contracts via term "contract".
+- summary: Panel vacuum-contract links to panel-concept-viz-diagnostics via term "dutyCycle".
 
-### Bridge: Vacuum Contract <-> debate-contracts
+### Bridge: Vacuum Contract <-> panel-concept-energy-flux
 - relation: Panel cross-concept join
-- summary: Panel vacuum-contract links to debate-contracts via term "contract".
+- summary: Panel vacuum-contract links to panel-concept-energy-flux via term "dutyCycle".
 
-### Bridge: Vacuum Contract <-> bridge-debate-core-debate-contracts
+### Bridge: Vacuum Contract <-> panel-concept-cavity-mechanism
 - relation: Panel cross-concept join
-- summary: Panel vacuum-contract links to bridge-debate-core-debate-contracts via term "contract".
+- summary: Panel vacuum-contract links to panel-concept-cavity-mechanism via term "dutyCycle".
 
-### Bridge: Vacuum Contract <-> llm-runtime-contracts
+### Bridge: Metric Amplification Pocket <-> panel-concept-metric-pocket
 - relation: Panel cross-concept join
-- summary: Panel vacuum-contract links to llm-runtime-contracts via term "contract".
+- summary: Panel metric-pocket links to panel-concept-metric-pocket via term "amplification pocket".
 
-### Bridge: Vacuum Contract <-> zen-pillar-03-contracts
+### Bridge: Metric Amplification Pocket <-> panel-concept-viz-diagnostics
 - relation: Panel cross-concept join
-- summary: Panel vacuum-contract links to zen-pillar-03-contracts via term "contract".
+- summary: Panel metric-pocket links to panel-concept-viz-diagnostics via term "deltaAOverA".
 
-### Bridge: Metric Amplification Pocket <-> warp-control-stack
+### Bridge: Metric Amplification Pocket <-> panel-concept-cavity-mechanism
 - relation: Panel cross-concept join
-- summary: Panel metric-pocket links to warp-control-stack via term "fraction".
+- summary: Panel metric-pocket links to panel-concept-cavity-mechanism via term "deltaAOverA".
 
-### Bridge: Metric Amplification Pocket <-> active-fraction
+### Bridge: Metric Amplification Pocket <-> panel-concept-needle-ipeak-worksheet
 - relation: Panel cross-concept join
-- summary: Panel metric-pocket links to active-fraction via term "fraction".
+- summary: Panel metric-pocket links to panel-concept-needle-ipeak-worksheet via term "normalized".
+
+### Bridge: Metric Amplification Pocket <-> panel-concept-energy-flux
+- relation: Panel cross-concept join
+- summary: Panel metric-pocket links to panel-concept-energy-flux via term "effective".
+
+### Bridge: Metric Amplification Pocket <-> panel-concept-drive-guards
+- relation: Panel cross-concept join
+- summary: Panel metric-pocket links to panel-concept-drive-guards via term "effective".
+
+### Bridge: HaloBank Timeline <-> panel-concept-halobank
+- relation: Panel cross-concept join
+- summary: Panel halobank links to panel-concept-halobank via term "bank history".
 
 ### Bridge: HaloBank Timeline <-> halobank
 - relation: Panel cross-concept join
@@ -2037,6 +3261,26 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 ### Bridge: HaloBank Timeline <-> ui-panel-halobank
 - relation: Panel cross-concept join
 - summary: Panel halobank links to ui-panel-halobank via term "HaloBank".
+
+### Bridge: HaloBank Timeline <-> panel-concept-needle-world-roadmap
+- relation: Panel cross-concept join
+- summary: Panel halobank links to panel-concept-needle-world-roadmap via term "timeline".
+
+### Bridge: HaloBank Timeline <-> panel-concept-resonance-scheduler
+- relation: Panel cross-concept join
+- summary: Panel halobank links to panel-concept-resonance-scheduler via term "timeline".
+
+### Bridge: HaloBank Timeline <-> panel-concept-trip-player
+- relation: Panel cross-concept join
+- summary: Panel halobank links to panel-concept-trip-player via term "timeline".
+
+### Bridge: Qi Widget <-> panel-concept-qi-widget
+- relation: Panel cross-concept join
+- summary: Panel qi-widget links to panel-concept-qi-widget via term "quantum inequality".
+
+### Bridge: Qi Widget <-> panel-concept-qi-auto-tuner
+- relation: Panel cross-concept join
+- summary: Panel qi-widget links to panel-concept-qi-auto-tuner via term "quantum inequality".
 
 ### Bridge: Qi Widget <-> qi-bounds
 - relation: Panel cross-concept join
@@ -2050,49 +3294,125 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel qi-widget links to uncertainty-quantum-inequality via term "quantum inequality".
 
-### Bridge: Qi Widget <-> qi-bounds-engine
+### Bridge: Qi Widget <-> panel-concept-experiment-ladder
 - relation: Panel cross-concept join
-- summary: Panel qi-widget links to qi-bounds-engine via term "Ford-Roman".
+- summary: Panel qi-widget links to panel-concept-experiment-ladder via term "Ford-Roman".
 
-### Bridge: Qi Widget <-> ford-roman-proxy
+### Bridge: QI Auto-Tuner <-> panel-concept-qi-auto-tuner
 - relation: Panel cross-concept join
-- summary: Panel qi-widget links to ford-roman-proxy via term "Ford-Roman".
+- summary: Panel qi-auto-tuner links to panel-concept-qi-auto-tuner via term "quantum inequality tuner".
 
-### Bridge: Qi Widget <-> schema-confidence-stack
+### Bridge: QI Auto-Tuner <-> panel-concept-resonance-scheduler
 - relation: Panel cross-concept join
-- summary: Panel qi-widget links to schema-confidence-stack via term "Telemetry".
+- summary: Panel qi-auto-tuner links to panel-concept-resonance-scheduler via term "auto duty".
+
+### Bridge: Sector Legend <-> panel-concept-sector-legend
+- relation: Panel cross-concept join
+- summary: Panel sector-legend links to panel-concept-sector-legend via term "sector palette".
+
+### Bridge: Sector Roles HUD <-> panel-concept-sector-roles
+- relation: Panel cross-concept join
+- summary: Panel sector-roles links to panel-concept-sector-roles via term "sector overlay".
+
+### Bridge: Sector Roles HUD <-> panel-concept-sector-legend
+- relation: Panel cross-concept join
+- summary: Panel sector-roles links to panel-concept-sector-legend via term "role legend".
 
 ### Bridge: Sector Roles HUD <-> ui-hud-sector
 - relation: Panel cross-concept join
 - summary: Panel sector-roles links to ui-hud-sector via term "sector HUD".
 
+### Bridge: Sector Roles HUD <-> panel-concept-experiment-ladder
+- relation: Panel cross-concept join
+- summary: Panel sector-roles links to panel-concept-experiment-ladder via term "sectorPeriod_ms".
+
+### Bridge: Sector Roles HUD <-> panel-concept-casimir-tile-grid
+- relation: Panel cross-concept join
+- summary: Panel sector-roles links to panel-concept-casimir-tile-grid via term "sectorPeriod_ms".
+
+### Bridge: Sector Roles HUD <-> panel-concept-resonance-scheduler
+- relation: Panel cross-concept join
+- summary: Panel sector-roles links to panel-concept-resonance-scheduler via term "sectorPeriod_ms".
+
+### Bridge: Sweep Replay Controls <-> panel-concept-sweep-replay
+- relation: Panel cross-concept join
+- summary: Panel sweep-replay links to panel-concept-sweep-replay via term "sweep telemetry".
+
+### Bridge: Sweep Replay Controls <-> panel-concept-mass-provenance
+- relation: Panel cross-concept join
+- summary: Panel sweep-replay links to panel-concept-mass-provenance via term "center".
+
+### Bridge: Sweep Replay Controls <-> panel-concept-agi-task-history
+- relation: Panel cross-concept join
+- summary: Panel sweep-replay links to panel-concept-agi-task-history via term "center".
+
+### Bridge: Sweep Replay Controls <-> panel-concept-viz-diagnostics
+- relation: Panel cross-concept join
+- summary: Panel sweep-replay links to panel-concept-viz-diagnostics via term "react".
+
+### Bridge: Sweep Replay Controls <-> panel-concept-nav-system
+- relation: Panel cross-concept join
+- summary: Panel sweep-replay links to panel-concept-nav-system via term "react".
+
+### Bridge: Sweep Replay Controls <-> panel-concept-deepmix-solar
+- relation: Panel cross-concept join
+- summary: Panel sweep-replay links to panel-concept-deepmix-solar via term "react".
+
+### Bridge: Runtime Ops <-> panel-concept-hull-status
+- relation: Panel cross-concept join
+- summary: Panel hull-status links to panel-concept-hull-status via term "queue telemetry".
+
 ### Bridge: Runtime Ops <-> bridge-solar-restoration-plan-deep-mixing-plan
 - relation: Panel cross-concept join
 - summary: Panel hull-status links to bridge-solar-restoration-plan-deep-mixing-plan via term "plan b".
 
-### Bridge: Runtime Ops <-> schema-confidence-stack
+### Bridge: Runtime Ops <-> panel-concept-viz-diagnostics
 - relation: Panel cross-concept join
-- summary: Panel hull-status links to schema-confidence-stack via term "telemetry".
+- summary: Panel hull-status links to panel-concept-viz-diagnostics via term "className".
 
-### Bridge: Runtime Ops <-> debate-telemetry
+### Bridge: Runtime Ops <-> panel-concept-mass-provenance
 - relation: Panel cross-concept join
-- summary: Panel hull-status links to debate-telemetry via term "telemetry".
+- summary: Panel hull-status links to panel-concept-mass-provenance via term "className".
 
-### Bridge: Runtime Ops <-> hardware-telemetry-tree
+### Bridge: Runtime Ops <-> panel-concept-universal-audit-tree
 - relation: Panel cross-concept join
-- summary: Panel hull-status links to hardware-telemetry-tree via term "telemetry".
+- summary: Panel hull-status links to panel-concept-universal-audit-tree via term "className".
 
-### Bridge: Runtime Ops <-> skills-telemetry
+### Bridge: Runtime Ops <-> panel-concept-warp-ledger
 - relation: Panel cross-concept join
-- summary: Panel hull-status links to skills-telemetry via term "telemetry".
+- summary: Panel hull-status links to panel-concept-warp-ledger via term "className".
 
-### Bridge: Runtime Ops <-> star-models-telemetry
+### Bridge: Debate View <-> panel-concept-agi-debate-view
 - relation: Panel cross-concept join
-- summary: Panel hull-status links to star-models-telemetry via term "telemetry".
+- summary: Panel agi-debate-view links to panel-concept-agi-debate-view via term "multi agent debate".
+
+### Bridge: Debate View <-> panel-concept-agi-essence-console
+- relation: Panel cross-concept join
+- summary: Panel agi-debate-view links to panel-concept-agi-essence-console via term "useDebateTelemetry".
+
+### Bridge: Debate View <-> panel-concept-star-coherence
+- relation: Panel cross-concept join
+- summary: Panel agi-debate-view links to panel-concept-star-coherence via term "useDebateTelemetry".
+
+### Bridge: Debate View <-> panel-concept-collapse-monitor
+- relation: Panel cross-concept join
+- summary: Panel agi-debate-view links to panel-concept-collapse-monitor via term "useDebateTelemetry".
+
+### Bridge: Debate View <-> panel-concept-star-watcher
+- relation: Panel cross-concept join
+- summary: Panel agi-debate-view links to panel-concept-star-watcher via term "global_coherence".
+
+### Bridge: Essence Console <-> panel-concept-agi-essence-console
+- relation: Panel cross-concept join
+- summary: Panel agi-essence-console links to panel-concept-agi-essence-console via term "Essence console".
 
 ### Bridge: Star Coherence Governor <-> coherence-governor
 - relation: Panel cross-concept join
 - summary: Panel star-coherence links to coherence-governor via term "coherence governor".
+
+### Bridge: Star Coherence Governor <-> panel-concept-star-coherence
+- relation: Panel cross-concept join
+- summary: Panel star-coherence links to panel-concept-star-coherence via term "coherence governor".
 
 ### Bridge: Star Coherence Governor <-> uncertainty-coherence-policy
 - relation: Panel cross-concept join
@@ -2110,10 +3430,6 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel star-coherence links to hardware-telemetry-tree via term "telemetry".
 
-### Bridge: Star Coherence Governor <-> skills-telemetry
-- relation: Panel cross-concept join
-- summary: Panel star-coherence links to skills-telemetry via term "telemetry".
-
 ### Bridge: Pipeline Proof <-> agi-planner-core
 - relation: Panel cross-concept join
 - summary: Panel pipeline-proof links to agi-planner-core via term "grounding".
@@ -2121,6 +3437,14 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 ### Bridge: Pipeline Proof <-> bridge-agi-plan-execute-agi-planner-core
 - relation: Panel cross-concept join
 - summary: Panel pipeline-proof links to bridge-agi-plan-execute-agi-planner-core via term "grounding".
+
+### Bridge: Pipeline Proof <-> panel-concept-pipeline-proof
+- relation: Panel cross-concept join
+- summary: Panel pipeline-proof links to panel-concept-pipeline-proof via term "grounding".
+
+### Bridge: Pipeline Proof <-> panel-concept-resonance-scheduler
+- relation: Panel cross-concept join
+- summary: Panel pipeline-proof links to panel-concept-resonance-scheduler via term "resonance".
 
 ### Bridge: Pipeline Proof <-> resonance-tree
 - relation: Panel cross-concept join
@@ -2130,13 +3454,29 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel pipeline-proof links to code-lattice-core via term "resonance".
 
-### Bridge: Pipeline Proof <-> code-lattice-schema
+### Bridge: Collapse Watch <-> panel-concept-collapse-monitor
 - relation: Panel cross-concept join
-- summary: Panel pipeline-proof links to code-lattice-schema via term "resonance".
+- summary: Panel collapse-monitor links to panel-concept-collapse-monitor via term "collapse pressure".
 
-### Bridge: Pipeline Proof <-> resonance-runtime
+### Bridge: Collapse Watch <-> panel-concept-star-coherence
 - relation: Panel cross-concept join
-- summary: Panel pipeline-proof links to resonance-runtime via term "resonance".
+- summary: Panel collapse-monitor links to panel-concept-star-coherence via term "useCoherenceTelemetry".
+
+### Bridge: Collapse Watch <-> panel-concept-agi-debate-view
+- relation: Panel cross-concept join
+- summary: Panel collapse-monitor links to panel-concept-agi-debate-view via term "useDebateTelemetry".
+
+### Bridge: Collapse Watch <-> panel-concept-agi-essence-console
+- relation: Panel cross-concept join
+- summary: Panel collapse-monitor links to panel-concept-agi-essence-console via term "useDebateTelemetry".
+
+### Bridge: Collapse Watch <-> panel-concept-star-watcher
+- relation: Panel cross-concept join
+- summary: Panel collapse-monitor links to panel-concept-star-watcher via term "global_coherence".
+
+### Bridge: Collapse Benchmark HUD <-> panel-concept-collapse-benchmark-hud
+- relation: Panel cross-concept join
+- summary: Panel collapse-benchmark-hud links to panel-concept-collapse-benchmark-hud via term "collapse benchmark".
 
 ### Bridge: Collapse Benchmark HUD <-> collapse-benchmark-stack
 - relation: Panel cross-concept join
@@ -2154,9 +3494,17 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel collapse-benchmark-hud links to uncertainty-collapse-benchmark via term "collapse benchmark".
 
-### Bridge: Collapse Benchmark HUD <-> kappa-proxy
+### Bridge: Collapse Benchmark HUD <-> panel-concept-helix-phoenix
 - relation: Panel cross-concept join
-- summary: Panel collapse-benchmark-hud links to kappa-proxy via term "kappa".
+- summary: Panel collapse-benchmark-hud links to panel-concept-helix-phoenix via term "kappa".
+
+### Bridge: Task History <-> panel-concept-agi-task-history
+- relation: Panel cross-concept join
+- summary: Panel agi-task-history links to panel-concept-agi-task-history via term "trace timeline".
+
+### Bridge: Noise Gens <-> panel-concept-helix-noise-gens
+- relation: Panel cross-concept join
+- summary: Panel helix-noise-gens links to panel-concept-helix-noise-gens via term "render plan".
 
 ### Bridge: Noise Gens <-> ui-panel-noise-gen
 - relation: Panel cross-concept join
@@ -2170,45 +3518,45 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel helix-noise-gens links to coverage-gate via term "cover".
 
+### Bridge: Noise Gens <-> panel-concept-math-maturity-tree
+- relation: Panel cross-concept join
+- summary: Panel helix-noise-gens links to panel-concept-math-maturity-tree via term "cover".
+
 ### Bridge: Noise Gens <-> civic-governance-stack
 - relation: Panel cross-concept join
 - summary: Panel helix-noise-gens links to civic-governance-stack via term "stems".
-
-### Bridge: Noise Gens <-> interbeing-systems
-- relation: Panel cross-concept join
-- summary: Panel helix-noise-gens links to interbeing-systems via term "stems".
-
-### Bridge: Noise Gens <-> bridge-integrity-protocols-stack-civic-governance-stack
-- relation: Panel cross-concept join
-- summary: Panel helix-noise-gens links to bridge-integrity-protocols-stack-civic-governance-stack via term "stems".
 
 ### Bridge: Constraint Pack Policies <-> agi-constraint-packs
 - relation: Panel cross-concept join
 - summary: Panel constraint-pack-policy links to agi-constraint-packs via term "constraint packs".
 
+### Bridge: Constraint Pack Policies <-> panel-concept-constraint-pack-policy
+- relation: Panel cross-concept join
+- summary: Panel constraint-pack-policy links to panel-concept-constraint-pack-policy via term "constraint packs".
+
 ### Bridge: Constraint Pack Policies <-> constraint-packs
 - relation: Panel cross-concept join
 - summary: Panel constraint-pack-policy links to constraint-packs via term "constraint packs".
 
-### Bridge: Constraint Pack Policies <-> deep-mixing-autopilot
+### Bridge: Constraint Pack Policies <-> panel-concept-math-maturity-tree
 - relation: Panel cross-concept join
-- summary: Panel constraint-pack-policy links to deep-mixing-autopilot via term "auto".
+- summary: Panel constraint-pack-policy links to panel-concept-math-maturity-tree via term "generated".
 
-### Bridge: Constraint Pack Policies <-> qi-autoscale
+### Bridge: Constraint Pack Policies <-> panel-concept-universal-audit-tree
 - relation: Panel cross-concept join
-- summary: Panel constraint-pack-policy links to qi-autoscale via term "auto".
+- summary: Panel constraint-pack-policy links to panel-concept-universal-audit-tree via term "generated".
 
-### Bridge: Constraint Pack Policies <-> qi-autothrottle
+### Bridge: Constraint Pack Policies <-> panel-concept-energy-flux
 - relation: Panel cross-concept join
-- summary: Panel constraint-pack-policy links to qi-autothrottle via term "auto".
-
-### Bridge: Constraint Pack Policies <-> ts-autoscale
-- relation: Panel cross-concept join
-- summary: Panel constraint-pack-policy links to ts-autoscale via term "auto".
+- summary: Panel constraint-pack-policy links to panel-concept-energy-flux via term "auto".
 
 ### Bridge: Contribution Workbench <-> agi-contributions
 - relation: Panel cross-concept join
 - summary: Panel agi-contribution-workbench links to agi-contributions via term "contribution".
+
+### Bridge: Contribution Workbench <-> panel-concept-agi-contribution-workbench
+- relation: Panel cross-concept join
+- summary: Panel agi-contribution-workbench links to panel-concept-agi-contribution-workbench via term "contribution".
 
 ### Bridge: Contribution Workbench <-> agi-constraint-packs
 - relation: Panel cross-concept join
@@ -2226,37 +3574,61 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel agi-contribution-workbench links to certainty-motivation via term "verification".
 
-### Bridge: Contribution Workbench <-> bridge-certainty-motivation-platonic-reasoning-bridge
+### Bridge: PNG Edge Cutter <-> panel-concept-remove-bg-edges
 - relation: Panel cross-concept join
-- summary: Panel agi-contribution-workbench links to bridge-certainty-motivation-platonic-reasoning-bridge via term "verification".
+- summary: Panel remove-bg-edges links to panel-concept-remove-bg-edges via term "background removal".
 
-### Bridge: PNG Edge Cutter <-> agi-constraint-packs
+### Bridge: PNG Edge Cutter <-> panel-concept-dresscode
 - relation: Panel cross-concept join
-- summary: Panel remove-bg-edges links to agi-constraint-packs via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-dresscode via term "mask".
 
-### Bridge: PNG Edge Cutter <-> noise-field-loop
+### Bridge: PNG Edge Cutter <-> panel-concept-helix-noise-gens
 - relation: Panel cross-concept join
-- summary: Panel remove-bg-edges links to noise-field-loop via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-helix-noise-gens via term "useCallback".
 
-### Bridge: PNG Edge Cutter <-> diffusion-loop
+### Bridge: PNG Edge Cutter <-> panel-concept-viz-diagnostics
 - relation: Panel cross-concept join
-- summary: Panel remove-bg-edges links to diffusion-loop via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-viz-diagnostics via term "className".
 
-### Bridge: PNG Edge Cutter <-> constraint-loop
+### Bridge: PNG Edge Cutter <-> panel-concept-mass-provenance
 - relation: Panel cross-concept join
-- summary: Panel remove-bg-edges links to constraint-loop via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-mass-provenance via term "className".
 
-### Bridge: PNG Edge Cutter <-> bridge-analysis-loops-overview-noise-field-loop
+### Bridge: PNG Edge Cutter <-> panel-concept-universal-audit-tree
 - relation: Panel cross-concept join
-- summary: Panel remove-bg-edges links to bridge-analysis-loops-overview-noise-field-loop via term "const".
+- summary: Panel remove-bg-edges links to panel-concept-universal-audit-tree via term "className".
 
-### Bridge: PNG Edge Cutter <-> qi-guard-consolidation
+### Bridge: Dresscode Drafting <-> panel-concept-dresscode
 - relation: Panel cross-concept join
-- summary: Panel remove-bg-edges links to qi-guard-consolidation via term "const".
+- summary: Panel dresscode links to panel-concept-dresscode via term "dresscode".
 
-### Bridge: Dresscode Drafting <-> ui-panel-casimir-grid
+### Bridge: Dresscode Drafting <-> panel-concept-constraint-pack-policy
 - relation: Panel cross-concept join
-- summary: Panel dresscode links to ui-panel-casimir-grid via term "grid".
+- summary: Panel dresscode links to panel-concept-constraint-pack-policy via term "draft".
+
+### Bridge: Dresscode Drafting <-> panel-concept-fractional-coherence-grid
+- relation: Panel cross-concept join
+- summary: Panel dresscode links to panel-concept-fractional-coherence-grid via term "grid".
+
+### Bridge: Dresscode Drafting <-> panel-concept-alcubierre-viewer
+- relation: Panel cross-concept join
+- summary: Panel dresscode links to panel-concept-alcubierre-viewer via term "grid".
+
+### Bridge: Dresscode Drafting <-> panel-concept-model-silhouette
+- relation: Panel cross-concept join
+- summary: Panel dresscode links to panel-concept-model-silhouette via term "grid".
+
+### Bridge: Dresscode Drafting <-> panel-concept-time-dilation-lattice
+- relation: Panel cross-concept join
+- summary: Panel dresscode links to panel-concept-time-dilation-lattice via term "grid".
+
+### Bridge: Stellar LSR Viewer <-> panel-concept-stellar-lsr
+- relation: Panel cross-concept join
+- summary: Panel stellar-lsr links to panel-concept-stellar-lsr via term "local standard of rest".
+
+### Bridge: Stellar LSR Viewer <-> panel-concept-star-hydrostatic
+- relation: Panel cross-concept join
+- summary: Panel stellar-lsr links to panel-concept-star-hydrostatic via term "stellar".
 
 ### Bridge: Stellar LSR Viewer <-> stellar-ledger
 - relation: Panel cross-concept join
@@ -2274,10 +3646,6 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel stellar-lsr links to stellar-evolution-stack via term "stellar".
 
-### Bridge: Stellar LSR Viewer <-> stellar-ledger-stack
+### Bridge: Essence Proposals <-> panel-concept-essence-proposals
 - relation: Panel cross-concept join
-- summary: Panel stellar-lsr links to stellar-ledger-stack via term "stellar".
-
-### Bridge: Stellar LSR Viewer <-> stellar-ledger
-- relation: Panel cross-concept join
-- summary: Panel stellar-lsr links to stellar-ledger via term "stellar".
+- summary: Panel essence-proposals links to panel-concept-essence-proposals via term "essence proposals".

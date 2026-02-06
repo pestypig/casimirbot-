@@ -28,6 +28,18 @@ type PanelReport = {
 const REPORT_PATH = path.join("reports", "panel-cross-concepts.json");
 const OUTPUT_PATH = path.join("docs", "knowledge", "panel-registry-tree.json");
 const CONCEPT_OUTPUT_PATH = path.join("docs", "knowledge", "panel-concepts-tree.json");
+const PHYSICS_TREE_HINTS = [
+  /physics/i,
+  /warp/i,
+  /casimir/i,
+  /gr-/i,
+  /stellar/i,
+  /star-/i,
+  /resonance/i,
+  /simulation/i,
+  /math-tree/i,
+  /uncertainty/i
+];
 
 const sha256 = (filePath: string): string | null => {
   try {
@@ -73,6 +85,7 @@ const run = () => {
   const panelNodes: any[] = [];
   const bridgeNodes: any[] = [];
   const conceptNodes: any[] = [];
+  const conceptBridgeNodes: any[] = [];
 
   for (const panel of report.panels) {
     const nodeId = `panel-${panel.id}`;
@@ -263,6 +276,7 @@ const run = () => {
       }
     });
 
+    const conceptChildren: string[] = [];
     const conceptLinks: Array<{ rel: string; to: string }> = [
       { rel: "parent", to: "panel-concepts-tree" }
     ];
@@ -276,6 +290,89 @@ const run = () => {
     });
     for (const nodeIdMatch of Array.from(conceptSeeAlso).slice(0, 6)) {
       conceptLinks.push({ rel: "see-also", to: nodeIdMatch });
+    }
+
+    const conceptBridgeTargets = new Map<string, { term?: string; file?: string }>();
+    (panel.termHits ?? []).forEach((hit) => {
+      hit.treeMatches?.forEach((match) => {
+        if (!match.nodeId || !match.treeId) return;
+        if (!PHYSICS_TREE_HINTS.some((re) => re.test(match.treeId))) return;
+        const key = match.nodeId;
+        if (!conceptBridgeTargets.has(key)) {
+          conceptBridgeTargets.set(key, { term: hit.term, file: hit.files?.[0] });
+        }
+      });
+    });
+    for (const [nodeIdMatch, evidenceHit] of Array.from(conceptBridgeTargets.entries()).slice(0, 6)) {
+      const bridgeId = `bridge-panel-concept-${panel.id}-${nodeIdMatch}`;
+      conceptChildren.push(bridgeId);
+      const evidenceEntries: any[] = [];
+      if (evidenceHit?.file) {
+        const hitPath = safePath(evidenceHit.file);
+        if (hitPath && fs.existsSync(hitPath)) {
+          const hash = sha256(hitPath);
+          const type = hitPath.startsWith("docs/")
+            ? "doc"
+            : hitPath.startsWith("client/") ||
+              hitPath.startsWith("server/") ||
+              hitPath.startsWith("modules/") ||
+              hitPath.startsWith("shared/")
+            ? "code"
+            : "doc";
+          evidenceEntries.push({
+            type,
+            path: hitPath,
+            repo_rev: repoRev,
+            content_hash: hash ? `sha256:${hash}` : undefined
+          });
+        }
+      }
+      evidenceEntries.push({
+        type: "doc",
+        path: "client/src/pages/helix-core.panels.ts",
+        repo_rev: repoRev,
+        content_hash: registryHash ? `sha256:${registryHash}` : undefined
+      });
+      conceptBridgeNodes.push({
+        id: bridgeId,
+        slug: bridgeId,
+        title: `${title} Concept <-> ${nodeIdMatch}`,
+        excerpt: `Bridge between panel concept ${panel.id} and ${nodeIdMatch}.`,
+        bodyMD: `Panel concept ${panel.id} links to ${nodeIdMatch} via term "${evidenceHit?.term ?? "match"}".`,
+        tags: ["bridge", "panel-concept", panel.id],
+        nodeType: "bridge",
+        links: [
+          { rel: "parent", to: `panel-concept-${panel.id}` },
+          { rel: "see-also", to: nodeIdMatch },
+          { rel: "see-also", to: `panel-concept-${panel.id}` }
+        ],
+        bridge: {
+          left: `panel-concept-${panel.id}`,
+          right: nodeIdMatch,
+          relation: "Panel concept physics join"
+        },
+        inputs: [],
+        outputs: [],
+        assumptions: [],
+        validity: {},
+        deterministic: null,
+        tolerance: null,
+        environment: null,
+        dependencies: [`panel-concept-${panel.id}`, nodeIdMatch],
+        evidence: evidenceEntries.filter((entry) => entry.content_hash || entry.type !== "code"),
+        predictability: {
+          status: "partial",
+          missing: [
+            "inputs",
+            "outputs",
+            "assumptions",
+            "validity",
+            "deterministic",
+            "tolerance",
+            "environment"
+          ]
+        }
+      });
     }
 
     const conceptTags = Array.from(
@@ -296,6 +393,7 @@ const run = () => {
       excerpt: `Concept surface derived from panel ${panel.id}.`,
       bodyMD: bodyLines.join("\n"),
       tags: conceptTags,
+      children: conceptChildren,
       links: conceptLinks,
       summary: `Concept surface derived from panel ${panel.id}.`,
       nodeType: "concept",
@@ -419,7 +517,7 @@ const run = () => {
   const conceptPayload = {
     version: 1,
     rootId: "panel-concepts-tree",
-    nodes: [conceptRoot, ...conceptNodes],
+    nodes: [conceptRoot, ...conceptNodes, ...conceptBridgeNodes],
     schema: {
       name: "helix-ask-dag-node",
       version: 1

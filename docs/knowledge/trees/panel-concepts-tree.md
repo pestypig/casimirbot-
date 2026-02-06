@@ -389,3 +389,626 @@ This tree enumerates concepts inferred from UI panels (keywords, telemetry token
 - id: panel-concept-essence-proposals
 - type: concept
 - summary: Panel essence-proposals loaded from helix-core panels registry. Component: client/src/components/agi/EssenceProposalsPanel.tsx Endpoints: GET /api/proposals, POST /api/proposals/:id/action, GET /api/essence/events Keywords: essence proposal…
+
+### Node: Phoenix Averaging Concept <-> casimir-tiles-tree
+- id: bridge-panel-concept-helix-phoenix-casimir-tiles-tree
+- type: bridge
+- summary: Panel concept helix-phoenix links to casimir-tiles-tree via term "casimir tile".
+
+### Node: Phoenix Averaging Concept <-> casimir-tiles-overview
+- id: bridge-panel-concept-helix-phoenix-casimir-tiles-overview
+- type: bridge
+- summary: Panel concept helix-phoenix links to casimir-tiles-overview via term "casimir tile".
+
+### Node: Phoenix Averaging Concept <-> casimir-tile-mechanism
+- id: bridge-panel-concept-helix-phoenix-casimir-tile-mechanism
+- type: bridge
+- summary: Panel concept helix-phoenix links to casimir-tile-mechanism via term "casimir tile".
+
+### Node: Phoenix Averaging Concept <-> casimir-tile-roadmap
+- id: bridge-panel-concept-helix-phoenix-casimir-tile-roadmap
+- type: bridge
+- summary: Panel concept helix-phoenix links to casimir-tile-roadmap via term "casimir tile".
+
+### Node: Phoenix Averaging Concept <-> casimir-tile-schematic-roadmap
+- id: bridge-panel-concept-helix-phoenix-casimir-tile-schematic-roadmap
+- type: bridge
+- summary: Panel concept helix-phoenix links to casimir-tile-schematic-roadmap via term "casimir tile".
+
+### Node: Phoenix Averaging Concept <-> guarded-casimir-tile-code-mapped
+- id: bridge-panel-concept-helix-phoenix-guarded-casimir-tile-code-mapped
+- type: bridge
+- summary: Panel concept helix-phoenix links to guarded-casimir-tile-code-mapped via term "casimir tile".
+
+### Node: Needle I_peak Worksheet Concept <-> warp-pulsed-power
+- id: bridge-panel-concept-needle-ipeak-worksheet-warp-pulsed-power
+- type: bridge
+- summary: Panel concept needle-ipeak-worksheet links to warp-pulsed-power via term "pulsed power".
+
+### Node: Needle World Roadmap Concept <-> ts-ratio-guardrail
+- id: bridge-panel-concept-needle-world-roadmap-ts-ratio-guardrail
+- type: bridge
+- summary: Panel concept needle-world-roadmap links to ts-ratio-guardrail via term "TS_ratio".
+
+### Node: Needle World Roadmap Concept <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- id: bridge-panel-concept-needle-world-roadmap-bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- type: bridge
+- summary: Panel concept needle-world-roadmap links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "TS_ratio".
+
+### Node: Needle World Roadmap Concept <-> ford-roman-quantum-inequality
+- id: bridge-panel-concept-needle-world-roadmap-ford-roman-quantum-inequality
+- type: bridge
+- summary: Panel concept needle-world-roadmap links to ford-roman-quantum-inequality via term "Roman".
+
+### Node: GR Agent Loop Audit Concept <-> gr-agent-loop
+- id: bridge-panel-concept-gr-agent-loop-audit-gr-agent-loop
+- type: bridge
+- summary: Panel concept gr-agent-loop-audit links to gr-agent-loop via term "gr agent loop".
+
+### Node: GR Agent Loop Audit Concept <-> gr-agent-loop-schema
+- id: bridge-panel-concept-gr-agent-loop-audit-gr-agent-loop-schema
+- type: bridge
+- summary: Panel concept gr-agent-loop-audit links to gr-agent-loop-schema via term "gr agent loop".
+
+### Node: GR Agent Loop Audit Concept <-> gr-constraint-network
+- id: bridge-panel-concept-gr-agent-loop-audit-gr-constraint-network
+- type: bridge
+- summary: Panel concept gr-agent-loop-audit links to gr-constraint-network via term "residuals".
+
+### Node: GR Loop KPIs Concept <-> gr-agent-loop
+- id: bridge-panel-concept-gr-agent-loop-kpis-gr-agent-loop
+- type: bridge
+- summary: Panel concept gr-agent-loop-kpis links to gr-agent-loop via term "gr agent loop".
+
+### Node: GR Loop KPIs Concept <-> gr-agent-loop-schema
+- id: bridge-panel-concept-gr-agent-loop-kpis-gr-agent-loop-schema
+- type: bridge
+- summary: Panel concept gr-agent-loop-kpis links to gr-agent-loop-schema via term "gr agent loop".
+
+### Node: TSN Determinism Concept <-> simulation-tsn
+- id: bridge-panel-concept-tsn-sim-simulation-tsn
+- type: bridge
+- summary: Panel concept tsn-sim links to simulation-tsn via term "tsn".
+
+### Node: Warp Pulsed Power Concept <-> warp-pulsed-power
+- id: bridge-panel-concept-pulsed-power-doc-warp-pulsed-power
+- type: bridge
+- summary: Panel concept pulsed-power-doc links to warp-pulsed-power via term "pulsed power".
+
+### Node: Warp Pulsed Power Concept <-> guarded-casimir-tile-code-mapped
+- id: bridge-panel-concept-pulsed-power-doc-guarded-casimir-tile-code-mapped
+- type: bridge
+- summary: Panel concept pulsed-power-doc links to guarded-casimir-tile-code-mapped via term "guardrails".
+
+### Node: Bus Voltage Program Concept <-> guarded-casimir-tile-code-mapped
+- id: bridge-panel-concept-bus-voltage-guarded-casimir-tile-code-mapped
+- type: bridge
+- summary: Panel concept bus-voltage links to guarded-casimir-tile-code-mapped via term "Guardrail".
+
+### Node: Bus Voltage Program Concept <-> ts-ratio-guardrail
+- id: bridge-panel-concept-bus-voltage-ts-ratio-guardrail
+- type: bridge
+- summary: Panel concept bus-voltage links to ts-ratio-guardrail via term "Guardrail".
+
+### Node: Bus Voltage Program Concept <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- id: bridge-panel-concept-bus-voltage-bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- type: bridge
+- summary: Panel concept bus-voltage links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "Guardrail".
+
+### Node: Warp Experiment Ladder Concept <-> ford-roman-quantum-inequality
+- id: bridge-panel-concept-experiment-ladder-ford-roman-quantum-inequality
+- type: bridge
+- summary: Panel concept experiment-ladder links to ford-roman-quantum-inequality via term "ford-roman".
+
+### Node: Warp Experiment Ladder Concept <-> ford-roman-proxy
+- id: bridge-panel-concept-experiment-ladder-ford-roman-proxy
+- type: bridge
+- summary: Panel concept experiment-ladder links to ford-roman-proxy via term "ford-roman".
+
+### Node: Warp Experiment Ladder Concept <-> casimir-tiles-tree
+- id: bridge-panel-concept-experiment-ladder-casimir-tiles-tree
+- type: bridge
+- summary: Panel concept experiment-ladder links to casimir-tiles-tree via term "casimir".
+
+### Node: Warp Experiment Ladder Concept <-> casimir-tiles-overview
+- id: bridge-panel-concept-experiment-ladder-casimir-tiles-overview
+- type: bridge
+- summary: Panel concept experiment-ladder links to casimir-tiles-overview via term "casimir".
+
+### Node: Warp Experiment Ladder Concept <-> casimir-tile-mechanism
+- id: bridge-panel-concept-experiment-ladder-casimir-tile-mechanism
+- type: bridge
+- summary: Panel concept experiment-ladder links to casimir-tile-mechanism via term "casimir".
+
+### Node: Warp Experiment Ladder Concept <-> casimir-tile-roadmap
+- id: bridge-panel-concept-experiment-ladder-casimir-tile-roadmap
+- type: bridge
+- summary: Panel concept experiment-ladder links to casimir-tile-roadmap via term "casimir".
+
+### Node: Hydrostatic Equilibrium (HR) Concept <-> stellar-ledger-stack
+- id: bridge-panel-concept-star-hydrostatic-stellar-ledger-stack
+- type: bridge
+- summary: Panel concept star-hydrostatic links to stellar-ledger-stack via term "stellar ledger".
+
+### Node: Hydrostatic Equilibrium (HR) Concept <-> stellar-ledger
+- id: bridge-panel-concept-star-hydrostatic-stellar-ledger
+- type: bridge
+- summary: Panel concept star-hydrostatic links to stellar-ledger via term "stellar ledger".
+
+### Node: Hydrostatic Equilibrium (HR) Concept <-> bridge-solar-restoration-plan-stellar-ledger-stack
+- id: bridge-panel-concept-star-hydrostatic-bridge-solar-restoration-plan-stellar-ledger-stack
+- type: bridge
+- summary: Panel concept star-hydrostatic links to bridge-solar-restoration-plan-stellar-ledger-stack via term "stellar ledger".
+
+### Node: Solar Globe Concept <-> qi-guard-consolidation
+- id: bridge-panel-concept-solar-globe-qi-guard-consolidation
+- type: bridge
+- summary: Panel concept solar-globe links to qi-guard-consolidation via term "const".
+
+### Node: Alcubierre Viewer Concept <-> alcubierre-metric
+- id: bridge-panel-concept-alcubierre-viewer-alcubierre-metric
+- type: bridge
+- summary: Panel concept alcubierre-viewer links to alcubierre-metric via term "Alcubierre metric".
+
+### Node: Alcubierre Viewer Concept <-> warp-bubble
+- id: bridge-panel-concept-alcubierre-viewer-warp-bubble
+- type: bridge
+- summary: Panel concept alcubierre-viewer links to warp-bubble via term "warp bubble".
+
+### Node: Silhouette Stretch Concept <-> ts-ratio-guardrail
+- id: bridge-panel-concept-model-silhouette-ts-ratio-guardrail
+- type: bridge
+- summary: Panel concept model-silhouette links to ts-ratio-guardrail via term "scale".
+
+### Node: Silhouette Stretch Concept <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- id: bridge-panel-concept-model-silhouette-bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- type: bridge
+- summary: Panel concept model-silhouette links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "scale".
+
+### Node: Hull Metrics Vis Concept <-> alcubierre-metric
+- id: bridge-panel-concept-hull-metrics-vis-alcubierre-metric
+- type: bridge
+- summary: Panel concept hull-metrics-vis links to alcubierre-metric via term "alcubierre".
+
+### Node: Hull Metrics Vis Concept <-> casimir-natario-metric
+- id: bridge-panel-concept-hull-metrics-vis-casimir-natario-metric
+- type: bridge
+- summary: Panel concept hull-metrics-vis links to casimir-natario-metric via term "natario".
+
+### Node: Hull Metrics Vis Concept <-> natario-zero-expansion
+- id: bridge-panel-concept-hull-metrics-vis-natario-zero-expansion
+- type: bridge
+- summary: Panel concept hull-metrics-vis links to natario-zero-expansion via term "natario".
+
+### Node: Shift Vector Panel Concept <-> shift-vector-expansion-scalar
+- id: bridge-panel-concept-shift-vector-shift-vector-expansion-scalar
+- type: bridge
+- summary: Panel concept shift-vector links to shift-vector-expansion-scalar via term "shift vector".
+
+### Node: Shift Vector Panel Concept <-> casimir-natario-metric
+- id: bridge-panel-concept-shift-vector-casimir-natario-metric
+- type: bridge
+- summary: Panel concept shift-vector links to casimir-natario-metric via term "geometry".
+
+### Node: Shift Vector Panel Concept <-> hull-materials
+- id: bridge-panel-concept-shift-vector-hull-materials
+- type: bridge
+- summary: Panel concept shift-vector links to hull-materials via term "geometry".
+
+### Node: Operational Mode Switch Concept <-> qi-guard-consolidation
+- id: bridge-panel-concept-operational-mode-qi-guard-consolidation
+- type: bridge
+- summary: Panel concept operational-mode links to qi-guard-consolidation via term "const".
+
+### Node: Casimir Tile Grid Concept <-> casimir-tiles-tree
+- id: bridge-panel-concept-casimir-tile-grid-casimir-tiles-tree
+- type: bridge
+- summary: Panel concept casimir-tile-grid links to casimir-tiles-tree via term "Casimir tiles".
+
+### Node: Casimir Tile Grid Concept <-> casimir-tiles-overview
+- id: bridge-panel-concept-casimir-tile-grid-casimir-tiles-overview
+- type: bridge
+- summary: Panel concept casimir-tile-grid links to casimir-tiles-overview via term "Casimir tiles".
+
+### Node: Light-Speed Strobe Scale Concept <-> sector-strobes-duty-cycle
+- id: bridge-panel-concept-light-speed-strobe-sector-strobes-duty-cycle
+- type: bridge
+- summary: Panel concept light-speed-strobe links to sector-strobes-duty-cycle via term "strobes".
+
+### Node: Speed Capability Concept <-> casimir-tiles-tree
+- id: bridge-panel-concept-speed-capability-casimir-tiles-tree
+- type: bridge
+- summary: Panel concept speed-capability links to casimir-tiles-tree via term "m".
+
+### Node: Speed Capability Concept <-> casimir-tiles-overview
+- id: bridge-panel-concept-speed-capability-casimir-tiles-overview
+- type: bridge
+- summary: Panel concept speed-capability links to casimir-tiles-overview via term "m".
+
+### Node: Speed Capability Concept <-> casimir-tile-mechanism
+- id: bridge-panel-concept-speed-capability-casimir-tile-mechanism
+- type: bridge
+- summary: Panel concept speed-capability links to casimir-tile-mechanism via term "m".
+
+### Node: Trip Player Concept <-> qi-guard-consolidation
+- id: bridge-panel-concept-trip-player-qi-guard-consolidation
+- type: bridge
+- summary: Panel concept trip-player links to qi-guard-consolidation via term "constraints".
+
+### Node: Metric Amplification Pocket Concept <-> warp-control-stack
+- id: bridge-panel-concept-metric-pocket-warp-control-stack
+- type: bridge
+- summary: Panel concept metric-pocket links to warp-control-stack via term "fraction".
+
+### Node: Qi Widget Concept <-> ford-roman-quantum-inequality
+- id: bridge-panel-concept-qi-widget-ford-roman-quantum-inequality
+- type: bridge
+- summary: Panel concept qi-widget links to ford-roman-quantum-inequality via term "quantum inequality".
+
+### Node: Qi Widget Concept <-> uncertainty-quantum-inequality
+- id: bridge-panel-concept-qi-widget-uncertainty-quantum-inequality
+- type: bridge
+- summary: Panel concept qi-widget links to uncertainty-quantum-inequality via term "quantum inequality".
+
+### Node: Qi Widget Concept <-> ford-roman-proxy
+- id: bridge-panel-concept-qi-widget-ford-roman-proxy
+- type: bridge
+- summary: Panel concept qi-widget links to ford-roman-proxy via term "Ford-Roman".
+
+### Node: Runtime Ops Concept <-> bridge-solar-restoration-plan-deep-mixing-plan
+- id: bridge-panel-concept-hull-status-bridge-solar-restoration-plan-deep-mixing-plan
+- type: bridge
+- summary: Panel concept hull-status links to bridge-solar-restoration-plan-deep-mixing-plan via term "plan b".
+
+### Node: Star Coherence Governor Concept <-> uncertainty-coherence-policy
+- id: bridge-panel-concept-star-coherence-uncertainty-coherence-policy
+- type: bridge
+- summary: Panel concept star-coherence links to uncertainty-coherence-policy via term "coherence governor".
+
+### Node: Pipeline Proof Concept <-> resonance-tree
+- id: bridge-panel-concept-pipeline-proof-resonance-tree
+- type: bridge
+- summary: Panel concept pipeline-proof links to resonance-tree via term "resonance".
+
+### Node: Pipeline Proof Concept <-> code-lattice-core
+- id: bridge-panel-concept-pipeline-proof-code-lattice-core
+- type: bridge
+- summary: Panel concept pipeline-proof links to code-lattice-core via term "resonance".
+
+### Node: Pipeline Proof Concept <-> code-lattice-schema
+- id: bridge-panel-concept-pipeline-proof-code-lattice-schema
+- type: bridge
+- summary: Panel concept pipeline-proof links to code-lattice-schema via term "resonance".
+
+### Node: Pipeline Proof Concept <-> resonance-runtime
+- id: bridge-panel-concept-pipeline-proof-resonance-runtime
+- type: bridge
+- summary: Panel concept pipeline-proof links to resonance-runtime via term "resonance".
+
+### Node: Pipeline Proof Concept <-> casimir-tile-roadmap
+- id: bridge-panel-concept-pipeline-proof-casimir-tile-roadmap
+- type: bridge
+- summary: Panel concept pipeline-proof links to casimir-tile-roadmap via term "proof".
+
+### Node: Collapse Benchmark HUD Concept <-> uncertainty-collapse-benchmark
+- id: bridge-panel-concept-collapse-benchmark-hud-uncertainty-collapse-benchmark
+- type: bridge
+- summary: Panel concept collapse-benchmark-hud links to uncertainty-collapse-benchmark via term "collapse benchmark".
+
+### Node: Noise Gens Concept <-> units-systems
+- id: bridge-panel-concept-helix-noise-gens-units-systems
+- type: bridge
+- summary: Panel concept helix-noise-gens links to units-systems via term "stems".
+
+### Node: Noise Gens Concept <-> simulation-systems
+- id: bridge-panel-concept-helix-noise-gens-simulation-systems
+- type: bridge
+- summary: Panel concept helix-noise-gens links to simulation-systems via term "stems".
+
+### Node: Contribution Workbench Concept <-> casimir-tiles-tree
+- id: bridge-panel-concept-agi-contribution-workbench-casimir-tiles-tree
+- type: bridge
+- summary: Panel concept agi-contribution-workbench links to casimir-tiles-tree via term "verification".
+
+### Node: Contribution Workbench Concept <-> casimir-tile-schematic-roadmap
+- id: bridge-panel-concept-agi-contribution-workbench-casimir-tile-schematic-roadmap
+- type: bridge
+- summary: Panel concept agi-contribution-workbench links to casimir-tile-schematic-roadmap via term "verification".
+
+### Node: PNG Edge Cutter Concept <-> qi-guard-consolidation
+- id: bridge-panel-concept-remove-bg-edges-qi-guard-consolidation
+- type: bridge
+- summary: Panel concept remove-bg-edges links to qi-guard-consolidation via term "const".
+
+### Node: Stellar LSR Viewer Concept <-> stellar-restoration-tree
+- id: bridge-panel-concept-stellar-lsr-stellar-restoration-tree
+- type: bridge
+- summary: Panel concept stellar-lsr links to stellar-restoration-tree via term "stellar".
+
+### Node: Stellar LSR Viewer Concept <-> stellar-structure-stack
+- id: bridge-panel-concept-stellar-lsr-stellar-structure-stack
+- type: bridge
+- summary: Panel concept stellar-lsr links to stellar-structure-stack via term "stellar".
+
+### Node: Stellar LSR Viewer Concept <-> stellar-evolution-stack
+- id: bridge-panel-concept-stellar-lsr-stellar-evolution-stack
+- type: bridge
+- summary: Panel concept stellar-lsr links to stellar-evolution-stack via term "stellar".
+
+## Bridges
+
+### Bridge: Phoenix Averaging Concept <-> casimir-tiles-tree
+- relation: Panel concept physics join
+- summary: Panel concept helix-phoenix links to casimir-tiles-tree via term "casimir tile".
+
+### Bridge: Phoenix Averaging Concept <-> casimir-tiles-overview
+- relation: Panel concept physics join
+- summary: Panel concept helix-phoenix links to casimir-tiles-overview via term "casimir tile".
+
+### Bridge: Phoenix Averaging Concept <-> casimir-tile-mechanism
+- relation: Panel concept physics join
+- summary: Panel concept helix-phoenix links to casimir-tile-mechanism via term "casimir tile".
+
+### Bridge: Phoenix Averaging Concept <-> casimir-tile-roadmap
+- relation: Panel concept physics join
+- summary: Panel concept helix-phoenix links to casimir-tile-roadmap via term "casimir tile".
+
+### Bridge: Phoenix Averaging Concept <-> casimir-tile-schematic-roadmap
+- relation: Panel concept physics join
+- summary: Panel concept helix-phoenix links to casimir-tile-schematic-roadmap via term "casimir tile".
+
+### Bridge: Phoenix Averaging Concept <-> guarded-casimir-tile-code-mapped
+- relation: Panel concept physics join
+- summary: Panel concept helix-phoenix links to guarded-casimir-tile-code-mapped via term "casimir tile".
+
+### Bridge: Needle I_peak Worksheet Concept <-> warp-pulsed-power
+- relation: Panel concept physics join
+- summary: Panel concept needle-ipeak-worksheet links to warp-pulsed-power via term "pulsed power".
+
+### Bridge: Needle World Roadmap Concept <-> ts-ratio-guardrail
+- relation: Panel concept physics join
+- summary: Panel concept needle-world-roadmap links to ts-ratio-guardrail via term "TS_ratio".
+
+### Bridge: Needle World Roadmap Concept <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- relation: Panel concept physics join
+- summary: Panel concept needle-world-roadmap links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "TS_ratio".
+
+### Bridge: Needle World Roadmap Concept <-> ford-roman-quantum-inequality
+- relation: Panel concept physics join
+- summary: Panel concept needle-world-roadmap links to ford-roman-quantum-inequality via term "Roman".
+
+### Bridge: GR Agent Loop Audit Concept <-> gr-agent-loop
+- relation: Panel concept physics join
+- summary: Panel concept gr-agent-loop-audit links to gr-agent-loop via term "gr agent loop".
+
+### Bridge: GR Agent Loop Audit Concept <-> gr-agent-loop-schema
+- relation: Panel concept physics join
+- summary: Panel concept gr-agent-loop-audit links to gr-agent-loop-schema via term "gr agent loop".
+
+### Bridge: GR Agent Loop Audit Concept <-> gr-constraint-network
+- relation: Panel concept physics join
+- summary: Panel concept gr-agent-loop-audit links to gr-constraint-network via term "residuals".
+
+### Bridge: GR Loop KPIs Concept <-> gr-agent-loop
+- relation: Panel concept physics join
+- summary: Panel concept gr-agent-loop-kpis links to gr-agent-loop via term "gr agent loop".
+
+### Bridge: GR Loop KPIs Concept <-> gr-agent-loop-schema
+- relation: Panel concept physics join
+- summary: Panel concept gr-agent-loop-kpis links to gr-agent-loop-schema via term "gr agent loop".
+
+### Bridge: TSN Determinism Concept <-> simulation-tsn
+- relation: Panel concept physics join
+- summary: Panel concept tsn-sim links to simulation-tsn via term "tsn".
+
+### Bridge: Warp Pulsed Power Concept <-> warp-pulsed-power
+- relation: Panel concept physics join
+- summary: Panel concept pulsed-power-doc links to warp-pulsed-power via term "pulsed power".
+
+### Bridge: Warp Pulsed Power Concept <-> guarded-casimir-tile-code-mapped
+- relation: Panel concept physics join
+- summary: Panel concept pulsed-power-doc links to guarded-casimir-tile-code-mapped via term "guardrails".
+
+### Bridge: Bus Voltage Program Concept <-> guarded-casimir-tile-code-mapped
+- relation: Panel concept physics join
+- summary: Panel concept bus-voltage links to guarded-casimir-tile-code-mapped via term "Guardrail".
+
+### Bridge: Bus Voltage Program Concept <-> ts-ratio-guardrail
+- relation: Panel concept physics join
+- summary: Panel concept bus-voltage links to ts-ratio-guardrail via term "Guardrail".
+
+### Bridge: Bus Voltage Program Concept <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- relation: Panel concept physics join
+- summary: Panel concept bus-voltage links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "Guardrail".
+
+### Bridge: Warp Experiment Ladder Concept <-> ford-roman-quantum-inequality
+- relation: Panel concept physics join
+- summary: Panel concept experiment-ladder links to ford-roman-quantum-inequality via term "ford-roman".
+
+### Bridge: Warp Experiment Ladder Concept <-> ford-roman-proxy
+- relation: Panel concept physics join
+- summary: Panel concept experiment-ladder links to ford-roman-proxy via term "ford-roman".
+
+### Bridge: Warp Experiment Ladder Concept <-> casimir-tiles-tree
+- relation: Panel concept physics join
+- summary: Panel concept experiment-ladder links to casimir-tiles-tree via term "casimir".
+
+### Bridge: Warp Experiment Ladder Concept <-> casimir-tiles-overview
+- relation: Panel concept physics join
+- summary: Panel concept experiment-ladder links to casimir-tiles-overview via term "casimir".
+
+### Bridge: Warp Experiment Ladder Concept <-> casimir-tile-mechanism
+- relation: Panel concept physics join
+- summary: Panel concept experiment-ladder links to casimir-tile-mechanism via term "casimir".
+
+### Bridge: Warp Experiment Ladder Concept <-> casimir-tile-roadmap
+- relation: Panel concept physics join
+- summary: Panel concept experiment-ladder links to casimir-tile-roadmap via term "casimir".
+
+### Bridge: Hydrostatic Equilibrium (HR) Concept <-> stellar-ledger-stack
+- relation: Panel concept physics join
+- summary: Panel concept star-hydrostatic links to stellar-ledger-stack via term "stellar ledger".
+
+### Bridge: Hydrostatic Equilibrium (HR) Concept <-> stellar-ledger
+- relation: Panel concept physics join
+- summary: Panel concept star-hydrostatic links to stellar-ledger via term "stellar ledger".
+
+### Bridge: Hydrostatic Equilibrium (HR) Concept <-> bridge-solar-restoration-plan-stellar-ledger-stack
+- relation: Panel concept physics join
+- summary: Panel concept star-hydrostatic links to bridge-solar-restoration-plan-stellar-ledger-stack via term "stellar ledger".
+
+### Bridge: Solar Globe Concept <-> qi-guard-consolidation
+- relation: Panel concept physics join
+- summary: Panel concept solar-globe links to qi-guard-consolidation via term "const".
+
+### Bridge: Alcubierre Viewer Concept <-> alcubierre-metric
+- relation: Panel concept physics join
+- summary: Panel concept alcubierre-viewer links to alcubierre-metric via term "Alcubierre metric".
+
+### Bridge: Alcubierre Viewer Concept <-> warp-bubble
+- relation: Panel concept physics join
+- summary: Panel concept alcubierre-viewer links to warp-bubble via term "warp bubble".
+
+### Bridge: Silhouette Stretch Concept <-> ts-ratio-guardrail
+- relation: Panel concept physics join
+- summary: Panel concept model-silhouette links to ts-ratio-guardrail via term "scale".
+
+### Bridge: Silhouette Stretch Concept <-> bridge-ts-ratio-guardrail-casimir-tile-mechanism
+- relation: Panel concept physics join
+- summary: Panel concept model-silhouette links to bridge-ts-ratio-guardrail-casimir-tile-mechanism via term "scale".
+
+### Bridge: Hull Metrics Vis Concept <-> alcubierre-metric
+- relation: Panel concept physics join
+- summary: Panel concept hull-metrics-vis links to alcubierre-metric via term "alcubierre".
+
+### Bridge: Hull Metrics Vis Concept <-> casimir-natario-metric
+- relation: Panel concept physics join
+- summary: Panel concept hull-metrics-vis links to casimir-natario-metric via term "natario".
+
+### Bridge: Hull Metrics Vis Concept <-> natario-zero-expansion
+- relation: Panel concept physics join
+- summary: Panel concept hull-metrics-vis links to natario-zero-expansion via term "natario".
+
+### Bridge: Shift Vector Panel Concept <-> shift-vector-expansion-scalar
+- relation: Panel concept physics join
+- summary: Panel concept shift-vector links to shift-vector-expansion-scalar via term "shift vector".
+
+### Bridge: Shift Vector Panel Concept <-> casimir-natario-metric
+- relation: Panel concept physics join
+- summary: Panel concept shift-vector links to casimir-natario-metric via term "geometry".
+
+### Bridge: Shift Vector Panel Concept <-> hull-materials
+- relation: Panel concept physics join
+- summary: Panel concept shift-vector links to hull-materials via term "geometry".
+
+### Bridge: Operational Mode Switch Concept <-> qi-guard-consolidation
+- relation: Panel concept physics join
+- summary: Panel concept operational-mode links to qi-guard-consolidation via term "const".
+
+### Bridge: Casimir Tile Grid Concept <-> casimir-tiles-tree
+- relation: Panel concept physics join
+- summary: Panel concept casimir-tile-grid links to casimir-tiles-tree via term "Casimir tiles".
+
+### Bridge: Casimir Tile Grid Concept <-> casimir-tiles-overview
+- relation: Panel concept physics join
+- summary: Panel concept casimir-tile-grid links to casimir-tiles-overview via term "Casimir tiles".
+
+### Bridge: Light-Speed Strobe Scale Concept <-> sector-strobes-duty-cycle
+- relation: Panel concept physics join
+- summary: Panel concept light-speed-strobe links to sector-strobes-duty-cycle via term "strobes".
+
+### Bridge: Speed Capability Concept <-> casimir-tiles-tree
+- relation: Panel concept physics join
+- summary: Panel concept speed-capability links to casimir-tiles-tree via term "m".
+
+### Bridge: Speed Capability Concept <-> casimir-tiles-overview
+- relation: Panel concept physics join
+- summary: Panel concept speed-capability links to casimir-tiles-overview via term "m".
+
+### Bridge: Speed Capability Concept <-> casimir-tile-mechanism
+- relation: Panel concept physics join
+- summary: Panel concept speed-capability links to casimir-tile-mechanism via term "m".
+
+### Bridge: Trip Player Concept <-> qi-guard-consolidation
+- relation: Panel concept physics join
+- summary: Panel concept trip-player links to qi-guard-consolidation via term "constraints".
+
+### Bridge: Metric Amplification Pocket Concept <-> warp-control-stack
+- relation: Panel concept physics join
+- summary: Panel concept metric-pocket links to warp-control-stack via term "fraction".
+
+### Bridge: Qi Widget Concept <-> ford-roman-quantum-inequality
+- relation: Panel concept physics join
+- summary: Panel concept qi-widget links to ford-roman-quantum-inequality via term "quantum inequality".
+
+### Bridge: Qi Widget Concept <-> uncertainty-quantum-inequality
+- relation: Panel concept physics join
+- summary: Panel concept qi-widget links to uncertainty-quantum-inequality via term "quantum inequality".
+
+### Bridge: Qi Widget Concept <-> ford-roman-proxy
+- relation: Panel concept physics join
+- summary: Panel concept qi-widget links to ford-roman-proxy via term "Ford-Roman".
+
+### Bridge: Runtime Ops Concept <-> bridge-solar-restoration-plan-deep-mixing-plan
+- relation: Panel concept physics join
+- summary: Panel concept hull-status links to bridge-solar-restoration-plan-deep-mixing-plan via term "plan b".
+
+### Bridge: Star Coherence Governor Concept <-> uncertainty-coherence-policy
+- relation: Panel concept physics join
+- summary: Panel concept star-coherence links to uncertainty-coherence-policy via term "coherence governor".
+
+### Bridge: Pipeline Proof Concept <-> resonance-tree
+- relation: Panel concept physics join
+- summary: Panel concept pipeline-proof links to resonance-tree via term "resonance".
+
+### Bridge: Pipeline Proof Concept <-> code-lattice-core
+- relation: Panel concept physics join
+- summary: Panel concept pipeline-proof links to code-lattice-core via term "resonance".
+
+### Bridge: Pipeline Proof Concept <-> code-lattice-schema
+- relation: Panel concept physics join
+- summary: Panel concept pipeline-proof links to code-lattice-schema via term "resonance".
+
+### Bridge: Pipeline Proof Concept <-> resonance-runtime
+- relation: Panel concept physics join
+- summary: Panel concept pipeline-proof links to resonance-runtime via term "resonance".
+
+### Bridge: Pipeline Proof Concept <-> casimir-tile-roadmap
+- relation: Panel concept physics join
+- summary: Panel concept pipeline-proof links to casimir-tile-roadmap via term "proof".
+
+### Bridge: Collapse Benchmark HUD Concept <-> uncertainty-collapse-benchmark
+- relation: Panel concept physics join
+- summary: Panel concept collapse-benchmark-hud links to uncertainty-collapse-benchmark via term "collapse benchmark".
+
+### Bridge: Noise Gens Concept <-> units-systems
+- relation: Panel concept physics join
+- summary: Panel concept helix-noise-gens links to units-systems via term "stems".
+
+### Bridge: Noise Gens Concept <-> simulation-systems
+- relation: Panel concept physics join
+- summary: Panel concept helix-noise-gens links to simulation-systems via term "stems".
+
+### Bridge: Contribution Workbench Concept <-> casimir-tiles-tree
+- relation: Panel concept physics join
+- summary: Panel concept agi-contribution-workbench links to casimir-tiles-tree via term "verification".
+
+### Bridge: Contribution Workbench Concept <-> casimir-tile-schematic-roadmap
+- relation: Panel concept physics join
+- summary: Panel concept agi-contribution-workbench links to casimir-tile-schematic-roadmap via term "verification".
+
+### Bridge: PNG Edge Cutter Concept <-> qi-guard-consolidation
+- relation: Panel concept physics join
+- summary: Panel concept remove-bg-edges links to qi-guard-consolidation via term "const".
+
+### Bridge: Stellar LSR Viewer Concept <-> stellar-restoration-tree
+- relation: Panel concept physics join
+- summary: Panel concept stellar-lsr links to stellar-restoration-tree via term "stellar".
+
+### Bridge: Stellar LSR Viewer Concept <-> stellar-structure-stack
+- relation: Panel concept physics join
+- summary: Panel concept stellar-lsr links to stellar-structure-stack via term "stellar".
+
+### Bridge: Stellar LSR Viewer Concept <-> stellar-evolution-stack
+- relation: Panel concept physics join
+- summary: Panel concept stellar-lsr links to stellar-evolution-stack via term "stellar".

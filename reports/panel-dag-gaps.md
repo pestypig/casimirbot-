@@ -1,6 +1,6 @@
 # Panel Cross-Concept DAG Gaps
 
-Generated: 2026-02-06T18:04:44.847Z
+Generated: 2026-02-06T18:09:15.963Z
 Panels: 74
 
 ## Viz Diagnostics HUD
@@ -21,7 +21,7 @@ missing_terms: none
 id: helix-phoenix
 component: client\src\components\PhoenixNeedlePanel.tsx
 keywords: phoenix averaging, needle hull, light-crossing, kappa_drive, casimir tile, hann window
-tree_matches: panel-concepts-tree, ethos-knowledge-tree, casimir-tiles-tree
+tree_matches: panel-concepts-tree, casimir-tiles-tree
 missing_terms: none
 
 ## Microscopy Mode
@@ -42,7 +42,7 @@ missing_terms: none
 id: needle-world-roadmap
 component: client\src\components\NeedleWorldRoadmap.tsx
 keywords: needle roadmap, partner map, timeline, capex, opex, world map
-tree_matches: panel-concepts-tree, casimir-tiles-tree, math-maturity-tree, physics-foundations-tree
+tree_matches: panel-concepts-tree, casimir-tiles-tree
 missing_terms: none
 
 ## Electron Orbital Simulator
@@ -77,7 +77,7 @@ missing_terms: none
 id: gr-agent-loop-kpis
 component: client\src\components\GrAgentLoopKpiPanel.tsx
 keywords: gr agent loop, kpi, success rate, time to green, constraint violations, perf trend
-tree_matches: panel-concepts-tree, ui-components-tree, gr-solver-tree
+tree_matches: panel-concepts-tree, ui-components-tree
 missing_terms: none
 
 ## GR Loop Learning
@@ -133,7 +133,7 @@ missing_terms: none
 id: experiment-ladder
 component: client\src\components\WarpExperimentLadderPanel.tsx
 keywords: experiment ladder, casimir, phoenix, ford-roman, natario, sector gating
-tree_matches: panel-concepts-tree, math-maturity-tree, physics-foundations-tree, warp-mechanics-tree, casimir-tiles-tree, ethos-knowledge-tree
+tree_matches: panel-concepts-tree, casimir-tiles-tree
 missing_terms: none
 
 ## Spectrum Tuner
@@ -273,7 +273,7 @@ missing_terms: none
 id: hull-metrics-vis
 component: client\src\components\HullMetricsVisPanel.tsx
 keywords: hull metrics, natario, alcubierre, glb preview, wireframe
-tree_matches: panel-concepts-tree, ui-components-tree, warp-mechanics-tree, casimir-tiles-tree, math-maturity-tree
+tree_matches: panel-concepts-tree, ui-components-tree, casimir-tiles-tree
 missing_terms: none
 
 ## Shift Vector Panel
@@ -385,7 +385,7 @@ missing_terms: none
 id: qi-widget
 component: client\src\components\QiWidget.tsx
 keywords: QI widget, quantum inequality, Ford-Roman, QI bounds, rho_min
-tree_matches: panel-concepts-tree, pipeline-ledger-tree, physics-foundations-tree, uncertainty-mechanics-tree, math-maturity-tree, warp-mechanics-tree, certainty-framework-tree, debate-specialists-tree, hardware-telemetry-tree
+tree_matches: panel-concepts-tree, pipeline-ledger-tree, physics-foundations-tree, uncertainty-mechanics-tree, math-maturity-tree, certainty-framework-tree, debate-specialists-tree, hardware-telemetry-tree
 missing_terms: none
 
 ## QI Auto-Tuner
@@ -448,7 +448,7 @@ missing_terms: none
 id: pipeline-proof
 component: client\src\components\PipelineProofPanel.tsx
 keywords: warp, pipeline, grounding, proof, resonance
-tree_matches: agi-runtime-tree, panel-concepts-tree, resonance-tree, casimir-tiles-tree, ui-backend-binding-tree, ui-components-tree
+tree_matches: agi-runtime-tree, panel-concepts-tree, resonance-tree, casimir-tiles-tree
 missing_terms: none
 
 ## Collapse Watch
@@ -476,7 +476,7 @@ missing_terms: none
 id: helix-noise-gens
 component: client\src\pages\helix-noise-gens.tsx
 keywords: noise gen, noisegens, cover, render plan, stems, atoms, moods
-tree_matches: panel-concepts-tree, ui-components-tree, certainty-framework-tree, ethos-knowledge-tree, physics-foundations-tree
+tree_matches: panel-concepts-tree, ui-components-tree, certainty-framework-tree, ethos-knowledge-tree
 missing_terms: none
 
 ## Constraint Pack Policies
@@ -511,7 +511,7 @@ missing_terms: none
 id: stellar-lsr
 component: client\src\components\StellarLsrPanel.tsx
 keywords: stars, lsr, local standard of rest, catalog, nav, stellar
-tree_matches: panel-concepts-tree, pipeline-ledger-tree, stellar-restoration-tree, ui-components-tree
+tree_matches: panel-concepts-tree, ui-components-tree
 missing_terms: none
 
 ## Essence Proposals
