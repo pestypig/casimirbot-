@@ -2922,6 +2922,20 @@ const HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS = clampNumber(
   120,
   1200,
 );
+const HELIX_ASK_LONGPROMPT_QUESTION_OVERFLOW_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_LONGPROMPT_QUESTION_OVERFLOW_TOKENS ??
+      process.env.VITE_HELIX_ASK_LONGPROMPT_QUESTION_OVERFLOW_TOKENS,
+    220,
+  ),
+  80,
+  1200,
+);
+const HELIX_ASK_CROSS_CONCEPT_HINTS = clampNumber(
+  readNumber(process.env.HELIX_ASK_CROSS_CONCEPT_HINTS, 3),
+  1,
+  8,
+);
 const HELIX_ASK_REPORT_MODE = String(process.env.HELIX_ASK_REPORT_MODE ?? "1").trim() !== "0";
 const HELIX_ASK_REPORT_TRIGGER_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_REPORT_TRIGGER_TOKENS, 220),
@@ -3193,7 +3207,7 @@ const HELIX_ASK_VERIFICATION_ANCHOR_FILES = [
   "server/routes/training-trace.ts",
 ];
 const HELIX_ASK_COMPOSITE_HINT =
-  /\b(synthesize|fit together|bring together|tie together|map (?:it|them)? together|relate (?:these|those|them|it)|connect (?:these|those|them|it)|how do .* fit together|how do .* relate)\b/i;
+  /\b(synthesize|fit together|bring together|tie together|map (?:it|them)? together|relate (?:these|those|them|it)|connect (?:these|those|them|it)|connect .* to|how do .* fit together|how do .* relate|how does .* connect)\b/i;
 const HELIX_ASK_COMPOSITE_MIN_TOPICS = 2;
 const HELIX_ASK_COMPOSITE_ALLOWLIST =
   /(docs\/knowledge\/|docs\/ethos\/|server\/gr\/|server\/routes\/warp-viability\.ts|server\/skills\/physics\.warp\.viability\.ts|server\/helix-proof-pack\.ts|shared\/curvature-proxy\.ts|client\/src\/physics\/|client\/src\/pages\/star-hydrostatic-panel\.tsx|client\/src\/components\/WarpLedgerPanel\.tsx|client\/src\/components\/DriveGuardsPanel\.tsx|warp-web\/km-scale-warp-ledger\.html)/i;
@@ -5911,6 +5925,13 @@ const SLOT_IGNORE_TOKENS = new Set([
   "should",
   "could",
   "would",
+  "implement",
+  "implementation",
+  "loop",
+  "retrieval",
+  "controller",
+  "file",
+  "files",
 ]);
 
 const normalizeSlotId = (value: string): string => {
@@ -10748,7 +10769,8 @@ const filterClarifySlots = (slots: string[]): string[] =>
   slots
     .map((slot) => normalizeSlotName(slot))
     .filter(Boolean)
-    .filter((slot) => !STRUCTURAL_SLOTS.has(slot));
+    .filter((slot) => !STRUCTURAL_SLOTS.has(slot))
+    .filter((slot) => !SLOT_IGNORE_TOKENS.has(slot));
 
 const buildSlotClarifyOptions = (
   slotId: string,
@@ -15511,13 +15533,18 @@ const executeHelixAsk = async ({
       const estimatedTokens = estimateTokenCount(longPromptCandidate.text);
       const estimatedTotal =
         estimatedTokens + answerTokenBudgetEstimate.tokens + HELIX_ASK_LONGPROMPT_OVERHEAD_TOKENS;
+      const thresholdTrigger = estimatedTokens >= HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS;
+      const questionOverflowAllowed =
+        longPromptCandidate.source !== "question" ||
+        estimatedTokens >= HELIX_ASK_LONGPROMPT_QUESTION_OVERFLOW_TOKENS;
+      const overflowTrigger =
+        questionOverflowAllowed && estimatedTotal > HELIX_ASK_LOCAL_CONTEXT_TOKENS;
       if (
-        estimatedTokens >= HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS ||
-        estimatedTotal > HELIX_ASK_LOCAL_CONTEXT_TOKENS
+        thresholdTrigger ||
+        overflowTrigger
       ) {
         promptIngested = true;
-        promptIngestReason =
-          estimatedTokens >= HELIX_ASK_LONGPROMPT_TRIGGER_TOKENS ? "threshold" : "overflow";
+        promptIngestReason = thresholdTrigger ? "threshold" : "overflow";
         promptIngestSource = longPromptCandidate.source;
         const ingestStart = Date.now();
         logProgress("Prompt ingest", "chunking", ingestStart);
@@ -15628,7 +15655,7 @@ const executeHelixAsk = async ({
       intentDomain === "repo" ||
       intentProfile.id === "repo.ideology_reference" ||
       (intentDomain === "repo" && conceptualFocus);
-    if (!promptIngested && wantsConceptMatch) {
+    if (wantsConceptMatch && baseQuestion) {
       conceptMatch = findConceptMatch(baseQuestion);
       if (conceptMatch && debugPayload) {
         debugPayload.concept_id = conceptMatch.card.id;
@@ -16758,6 +16785,16 @@ const executeHelixAsk = async ({
           ? blockSearchSeed || coverageSlots.join(" ")
           : parsed.data.searchQuery?.trim() || baseQuestion;
         const baseQueries = buildHelixAskSearchQueries(searchSeed, topicTags);
+        const crossConceptHints = !blockScoped
+          ? slotPreviewCandidates
+              .slice(0, HELIX_ASK_CROSS_CONCEPT_HINTS)
+              .flatMap((candidate) => [
+                candidate.card.sourcePath ?? "",
+                ...(candidate.card.mustIncludeFiles ?? []).slice(0, 2),
+                ...(candidate.card.aliases ?? []).slice(0, 2),
+              ])
+              .filter(Boolean)
+          : [];
         if (!blockScoped && conceptMatch?.card.sourcePath) {
           baseQueries.push(conceptMatch.card.sourcePath);
         }
@@ -16770,6 +16807,7 @@ const executeHelixAsk = async ({
               ...slotAliases,
               ...slotEvidenceHints,
               ...memoryPinnedFiles,
+              ...crossConceptHints,
             ];
         const queries = mergeHelixAskQueries(
           baseQueries,
@@ -16834,7 +16872,9 @@ const executeHelixAsk = async ({
           const retrievalGain = planScope?.docsFirst ? "prioritize_docs" : "balanced_retrieval";
           recordAgentAction(retrievalAction, retrievalReason, retrievalGain);
         }
-        if (!requiredSlots.length) {
+        const enforceStructuralCoverage =
+          coverageSlotsFromRequest || intentStrategy === "constraint_report";
+        if (!requiredSlots.length && enforceStructuralCoverage) {
           if (planDirectives?.requiredSlots?.length) {
             const structural = planDirectives.requiredSlots
               .map((slot) => normalizeSlotName(slot))
