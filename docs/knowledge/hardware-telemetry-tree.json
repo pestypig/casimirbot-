@@ -175,7 +175,9 @@
         "hooks",
         "client"
       ],
-      "children": [],
+      "children": [
+        "bridge-hardware-hooks-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -773,6 +775,81 @@
         ]
       },
       "summary": "Bridge between verification-checklist and hardware-bus."
+    },
+    {
+      "id": "bridge-hardware-hooks-verification-checklist",
+      "slug": "bridge-hardware-hooks-verification-checklist",
+      "title": "Hardware Hooks <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and hardware-hooks.",
+      "bodyMD": "Bridge between verification-checklist and hardware-hooks (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "hardware",
+        "hooks"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-hooks"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-hooks"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "hardware-hooks",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "hardware-hooks"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "eaee28820426505e7496c12e8e6f6f3488101438",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useHardwareFeeds.ts",
+          "repo_rev": "eaee28820426505e7496c12e8e6f6f3488101438",
+          "content_hash": "sha256:f6be5c34a283b9ed015fd25a7eafb1d4361a9bf7966b9934da6c54704269119f"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and hardware-hooks."
     }
   ],
   "schema": {
