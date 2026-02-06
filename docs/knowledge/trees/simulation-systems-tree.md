@@ -95,6 +95,11 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 - type: bridge
 - summary: Bridge between mission-ethos and simulation-core-modules (mission-guardrail).
 
+### Node: Simulation Streaming <-> Verification Checklist
+- id: bridge-simulation-streaming-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and simulation-streaming (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Simulation Contracts <-> Simulation API
@@ -104,3 +109,7 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 ### Bridge: mission-ethos <-> Simulation Core Modules
 - relation: mission-guardrail
 - summary: Bridge between mission-ethos and simulation-core-modules (mission-guardrail).
+
+### Bridge: verification-checklist <-> Simulation Streaming
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and simulation-streaming (verification-anchor).

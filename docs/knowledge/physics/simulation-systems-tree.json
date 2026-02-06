@@ -686,7 +686,9 @@
         "simulation",
         "streaming"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-streaming-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -923,6 +925,81 @@
         ]
       },
       "summary": "Bridge between mission-ethos and simulation-core-modules."
+    },
+    {
+      "id": "bridge-simulation-streaming-verification-checklist",
+      "slug": "bridge-simulation-streaming-verification-checklist",
+      "title": "Simulation Streaming <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and simulation-streaming.",
+      "bodyMD": "Bridge between verification-checklist and simulation-streaming (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "streaming"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-streaming"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-streaming"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "simulation-streaming",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "simulation-streaming"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "a1222a7790ed929867ac06b29d3d35b364b6406e",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/routes.ts",
+          "repo_rev": "a1222a7790ed929867ac06b29d3d35b364b6406e",
+          "content_hash": "sha256:0dcc6da8765d93d821cdfdec3a55581ee6b8923855881341fc1184c87b41f41a"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and simulation-streaming."
     }
   ],
   "schema": {

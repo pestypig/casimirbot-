@@ -291,7 +291,9 @@
         "hardware",
         "scheduler"
       ],
-      "children": [],
+      "children": [
+        "bridge-hardware-scheduler-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -542,6 +544,81 @@
         ]
       },
       "summary": "Bridge between stewardship-ledger and hardware-provenance."
+    },
+    {
+      "id": "bridge-hardware-scheduler-verification-checklist",
+      "slug": "bridge-hardware-scheduler-verification-checklist",
+      "title": "Hardware Scheduler <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and hardware-scheduler.",
+      "bodyMD": "Bridge between verification-checklist and hardware-scheduler (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "hardware",
+        "scheduler"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-scheduler"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-scheduler"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "hardware-scheduler",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "hardware-scheduler"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "a1222a7790ed929867ac06b29d3d35b364b6406e",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/services/hardware/gpu-scheduler.ts",
+          "repo_rev": "a1222a7790ed929867ac06b29d3d35b364b6406e",
+          "content_hash": "sha256:723b815d500a2ad73ebe712c540bea86478406f05b315cfee354aa4996155d23"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and hardware-scheduler."
     }
   ],
   "schema": {

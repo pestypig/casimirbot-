@@ -60,6 +60,11 @@ This tree maps hardware telemetry ingest, scheduling, and the UI controls used t
 - type: bridge
 - summary: Bridge between stewardship-ledger and hardware-provenance (stewardship-guardrail).
 
+### Node: Hardware Scheduler <-> Verification Checklist
+- id: bridge-hardware-scheduler-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and hardware-scheduler (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Hardware Ingest <-> Hardware Bus
@@ -69,3 +74,7 @@ This tree maps hardware telemetry ingest, scheduling, and the UI controls used t
 ### Bridge: stewardship-ledger <-> Hardware Provenance
 - relation: stewardship-guardrail
 - summary: Bridge between stewardship-ledger and hardware-provenance (stewardship-guardrail).
+
+### Bridge: verification-checklist <-> Hardware Scheduler
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and hardware-scheduler (verification-anchor).
