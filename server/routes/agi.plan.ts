@@ -7563,13 +7563,49 @@ const normalizeGraphEvidenceKey = (entry: HelixAskGraphEvidence): string => {
   return parts.join("|");
 };
 
-const collectGraphEvidenceItems = (graphPack: HelixAskGraphPack | null): HelixAskGraphEvidence[] => {
-  if (!graphPack?.frameworks?.length) return [];
+const normalizeGraphNodeType = (value?: string): string => (value ?? "").trim().toLowerCase();
+
+const DERIVED_NODE_TYPES = new Set(["derived", "computed", "pipeline", "metric"]);
+
+const evaluateGraphNodeAcceptance = (node: {
+  nodeType?: string;
+  evidence?: HelixAskGraphEvidence[];
+  assumptions?: string[];
+  validity?: Record<string, unknown>;
+}): { ok: boolean; missing: string[] } => {
+  const nodeType = normalizeGraphNodeType(node.nodeType);
+  if (!DERIVED_NODE_TYPES.has(nodeType)) return { ok: true, missing: [] };
+  const evidenceTypes = new Set((node.evidence ?? []).map((entry) => entry.type));
+  const missing: string[] = [];
+  if (!evidenceTypes.has("doc")) missing.push("doc");
+  if (!evidenceTypes.has("code")) missing.push("code");
+  if (!evidenceTypes.has("telemetry") && !evidenceTypes.has("test")) {
+    missing.push("telemetry_or_test");
+  }
+  if (!node.assumptions || node.assumptions.length === 0) missing.push("assumptions");
+  if (!node.validity || Object.keys(node.validity).length === 0) missing.push("validity");
+  return { ok: missing.length === 0, missing };
+};
+
+const collectGraphEvidenceItems = (
+  graphPack: HelixAskGraphPack | null,
+): { items: HelixAskGraphEvidence[]; acceptance: { total: number; accepted: number; rejected: number; missing: string[] } } => {
+  const summary = { total: 0, accepted: 0, rejected: 0, missing: [] as string[] };
+  if (!graphPack?.frameworks?.length) return { items: [], acceptance: summary };
   const collected: HelixAskGraphEvidence[] = [];
   const seen = new Set<string>();
+  const missingSet = new Set<string>();
   for (const framework of graphPack.frameworks) {
     const nodes = [...(framework.path ?? []), ...(framework.anchors ?? [])];
     for (const node of nodes) {
+      summary.total += 1;
+      const acceptance = evaluateGraphNodeAcceptance(node);
+      if (!acceptance.ok) {
+        summary.rejected += 1;
+        acceptance.missing.forEach((entry) => missingSet.add(entry));
+        continue;
+      }
+      summary.accepted += 1;
       if (!node.evidence?.length) continue;
       for (const entry of node.evidence) {
         const key = normalizeGraphEvidenceKey(entry);
@@ -7579,7 +7615,8 @@ const collectGraphEvidenceItems = (graphPack: HelixAskGraphPack | null): HelixAs
       }
     }
   }
-  return collected;
+  summary.missing = Array.from(missingSet);
+  return { items: collected, acceptance: summary };
 };
 
 const buildGraphEvidenceMatchTerms = (
@@ -12946,6 +12983,10 @@ const executeHelixAsk = async ({
         graph_evidence_doc_blocks?: number;
         graph_evidence_code_spans?: number;
         graph_evidence_types?: string[];
+        graph_node_acceptance_rate?: number;
+        graph_node_acceptance_total?: number;
+        graph_node_acceptance_rejected?: number;
+        graph_node_acceptance_missing?: string[];
         claim_ref_rate?: number;
       report_mode?: boolean;
       report_mode_reason?: string;
@@ -18080,7 +18121,25 @@ const executeHelixAsk = async ({
         }
       }
 
-      graphEvidenceItems = collectGraphEvidenceItems(graphPack);
+      const graphEvidence = collectGraphEvidenceItems(graphPack);
+      graphEvidenceItems = graphEvidence.items;
+      if (debugPayload) {
+        const rate =
+          graphEvidence.acceptance.total > 0
+            ? graphEvidence.acceptance.accepted / graphEvidence.acceptance.total
+            : 0;
+        debugPayload.graph_node_acceptance_rate = Number(rate.toFixed(3));
+        debugPayload.graph_node_acceptance_total = graphEvidence.acceptance.total;
+        debugPayload.graph_node_acceptance_rejected = graphEvidence.acceptance.rejected;
+        debugPayload.graph_node_acceptance_missing = graphEvidence.acceptance.missing;
+        if (graphEvidence.acceptance.total > 0 && rate < 0.5) {
+          logEvent(
+            "Graph node acceptance",
+            "low",
+            `rate=${rate.toFixed(2)} | missing=${graphEvidence.acceptance.missing.join(",") || "none"}`,
+          );
+        }
+      }
       if (graphEvidenceItems.length > 0) {
         const graphDoc = buildGraphEvidenceDocBlocks({
           evidence: graphEvidenceItems,

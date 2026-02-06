@@ -20,7 +20,9 @@
         "practice-culture-stack",
         "security-resilience-stack"
       ],
-      "links": []
+      "links": [],
+      "summary": "Ethical governance, integrity protocols, and civic systems.",
+      "nodeType": "concept"
     },
     {
       "id": "integrity-protocols-stack",
@@ -54,7 +56,9 @@
           "rel": "parent",
           "to": "ethos-knowledge-tree"
         }
-      ]
+      ],
+      "summary": "Integrity and Protocols knowledge cluster.",
+      "nodeType": "concept"
     },
     {
       "id": "civic-governance-stack",
@@ -92,7 +96,9 @@
           "rel": "parent",
           "to": "ethos-knowledge-tree"
         }
-      ]
+      ],
+      "summary": "Civic and Governance Systems knowledge cluster.",
+      "nodeType": "concept"
     },
     {
       "id": "diplomacy-repair-stack",
@@ -119,7 +125,9 @@
           "rel": "parent",
           "to": "ethos-knowledge-tree"
         }
-      ]
+      ],
+      "summary": "Diplomacy and Repair knowledge cluster.",
+      "nodeType": "concept"
     },
     {
       "id": "practice-culture-stack",
@@ -149,7 +157,9 @@
           "rel": "parent",
           "to": "ethos-knowledge-tree"
         }
-      ]
+      ],
+      "summary": "Practice and Culture knowledge cluster.",
+      "nodeType": "concept"
     },
     {
       "id": "security-resilience-stack",
@@ -171,7 +181,9 @@
           "rel": "parent",
           "to": "ethos-knowledge-tree"
         }
-      ]
+      ],
+      "summary": "Security and Resilience knowledge cluster.",
+      "nodeType": "concept"
     },
     {
       "id": "integrity-protocols",
@@ -190,7 +202,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Integrity Protocols.",
+      "nodeType": "concept"
     },
     {
       "id": "metric-integrity-guardrail",
@@ -209,7 +223,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Metric Integrity Guardrail.",
+      "nodeType": "concept"
     },
     {
       "id": "external-interface-integrity",
@@ -228,7 +244,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on External Interface Integrity.",
+      "nodeType": "concept"
     },
     {
       "id": "voice-integrity",
@@ -247,7 +265,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Voice Integrity.",
+      "nodeType": "concept"
     },
     {
       "id": "worldview-integrity",
@@ -266,7 +286,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Worldview Integrity.",
+      "nodeType": "concept"
     },
     {
       "id": "dream-integrity",
@@ -285,7 +307,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Dream Integrity.",
+      "nodeType": "concept"
     },
     {
       "id": "verification-checklist",
@@ -304,7 +328,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Verification Checklist.",
+      "nodeType": "concept"
     },
     {
       "id": "training-certification-gate",
@@ -323,7 +349,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Training Certification Gate.",
+      "nodeType": "concept"
     },
     {
       "id": "provenance-protocol",
@@ -342,7 +370,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Provenance Protocol.",
+      "nodeType": "concept"
     },
     {
       "id": "no-bypass-guardrail",
@@ -361,7 +391,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on No Bypass Guardrail.",
+      "nodeType": "concept"
     },
     {
       "id": "lawful-interface-protocol",
@@ -380,7 +412,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Lawful Interface Protocol.",
+      "nodeType": "concept"
     },
     {
       "id": "liveness-or-it-didnt-happen",
@@ -399,7 +433,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Liveness Or It Didnt Happen.",
+      "nodeType": "concept"
     },
     {
       "id": "data-dignity",
@@ -418,7 +454,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Data Dignity.",
+      "nodeType": "concept"
     },
     {
       "id": "values-over-images",
@@ -437,7 +475,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Values Over Images.",
+      "nodeType": "concept"
     },
     {
       "id": "capability-ambition-gradient",
@@ -456,7 +496,9 @@
           "rel": "parent",
           "to": "integrity-protocols-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Capability Ambition Gradient.",
+      "nodeType": "concept"
     },
     {
       "id": "mission-ethos",
@@ -475,7 +517,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Mission Ethos.",
+      "nodeType": "concept"
     },
     {
       "id": "integration-ladder",
@@ -494,7 +538,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Integration Ladder.",
+      "nodeType": "concept"
     },
     {
       "id": "two-key-approval",
@@ -513,7 +559,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Two Key Approval.",
+      "nodeType": "concept"
     },
     {
       "id": "stewardship-ledger",
@@ -532,7 +580,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Stewardship Ledger.",
+      "nodeType": "concept"
     },
     {
       "id": "lifetime-trust-ledger",
@@ -551,7 +601,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Lifetime Trust Ledger.",
+      "nodeType": "concept"
     },
     {
       "id": "citizens-arc",
@@ -570,7 +622,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Citizens Arc.",
+      "nodeType": "concept"
     },
     {
       "id": "citizens-arc-anti-mutation",
@@ -589,7 +643,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Citizens Arc Anti Mutation.",
+      "nodeType": "concept"
     },
     {
       "id": "citizens-arc-stress-test",
@@ -608,7 +664,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Citizens Arc Stress Test.",
+      "nodeType": "concept"
     },
     {
       "id": "civic-memory-continuity",
@@ -627,7 +685,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Civic Memory Continuity.",
+      "nodeType": "concept"
     },
     {
       "id": "civic-signal-loop",
@@ -646,7 +706,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Civic Signal Loop.",
+      "nodeType": "concept"
     },
     {
       "id": "federal-civic-listening-circuit",
@@ -665,7 +727,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Federal Civic Listening Circuit.",
+      "nodeType": "concept"
     },
     {
       "id": "jurisdictional-floor",
@@ -684,7 +748,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Jurisdictional Floor.",
+      "nodeType": "concept"
     },
     {
       "id": "local-stability-compact",
@@ -703,7 +769,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Local Stability Compact.",
+      "nodeType": "concept"
     },
     {
       "id": "koan-governance",
@@ -722,7 +790,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Koan Governance.",
+      "nodeType": "concept"
     },
     {
       "id": "sangha-architecture",
@@ -741,7 +811,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Sangha Architecture.",
+      "nodeType": "concept"
     },
     {
       "id": "right-speech-infrastructure",
@@ -760,7 +832,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Right Speech Infrastructure.",
+      "nodeType": "concept"
     },
     {
       "id": "three-tenets-loop",
@@ -779,7 +853,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Three Tenets Loop.",
+      "nodeType": "concept"
     },
     {
       "id": "promise-trials",
@@ -798,7 +874,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Promise Trials.",
+      "nodeType": "concept"
     },
     {
       "id": "access-to-counsel-pathway",
@@ -817,7 +895,9 @@
           "rel": "parent",
           "to": "civic-governance-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Access To Counsel Pathway.",
+      "nodeType": "concept"
     },
     {
       "id": "verification-based-diplomacy",
@@ -836,7 +916,9 @@
           "rel": "parent",
           "to": "diplomacy-repair-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Verification Based Diplomacy.",
+      "nodeType": "concept"
     },
     {
       "id": "dignified-exit-design",
@@ -855,7 +937,9 @@
           "rel": "parent",
           "to": "diplomacy-repair-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Dignified Exit Design.",
+      "nodeType": "concept"
     },
     {
       "id": "skillful-mediation",
@@ -874,7 +958,9 @@
           "rel": "parent",
           "to": "diplomacy-repair-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Skillful Mediation.",
+      "nodeType": "concept"
     },
     {
       "id": "repair-debt-compact",
@@ -893,7 +979,9 @@
           "rel": "parent",
           "to": "diplomacy-repair-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Repair Debt Compact.",
+      "nodeType": "concept"
     },
     {
       "id": "restorative-harm-repair",
@@ -912,7 +1000,9 @@
           "rel": "parent",
           "to": "diplomacy-repair-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Restorative Harm Repair.",
+      "nodeType": "concept"
     },
     {
       "id": "harm-weighted-priority-standard",
@@ -931,7 +1021,9 @@
           "rel": "parent",
           "to": "diplomacy-repair-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Harm Weighted Priority Standard.",
+      "nodeType": "concept"
     },
     {
       "id": "scarcity-justice",
@@ -950,7 +1042,9 @@
           "rel": "parent",
           "to": "diplomacy-repair-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Scarcity Justice.",
+      "nodeType": "concept"
     },
     {
       "id": "reciprocity-contract",
@@ -969,7 +1063,9 @@
           "rel": "parent",
           "to": "diplomacy-repair-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Reciprocity Contract.",
+      "nodeType": "concept"
     },
     {
       "id": "beginners-mind",
@@ -988,7 +1084,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Beginners Mind.",
+      "nodeType": "concept"
     },
     {
       "id": "bodhisattva-craft",
@@ -1007,7 +1105,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Bodhisattva Craft.",
+      "nodeType": "concept"
     },
     {
       "id": "devotion-course",
@@ -1026,7 +1126,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Devotion Course.",
+      "nodeType": "concept"
     },
     {
       "id": "inner-spark",
@@ -1045,7 +1147,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Inner Spark.",
+      "nodeType": "concept"
     },
     {
       "id": "interbeing-systems",
@@ -1064,7 +1168,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Interbeing Systems.",
+      "nodeType": "concept"
     },
     {
       "id": "impermanence-by-design",
@@ -1083,7 +1189,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Impermanence By Design.",
+      "nodeType": "concept"
     },
     {
       "id": "habit-pressure-break",
@@ -1102,7 +1210,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Habit Pressure Break.",
+      "nodeType": "concept"
     },
     {
       "id": "phoenix-averaging",
@@ -1121,7 +1231,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Phoenix Averaging.",
+      "nodeType": "concept"
     },
     {
       "id": "solitude-to-signal",
@@ -1140,7 +1252,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Solitude To Signal.",
+      "nodeType": "concept"
     },
     {
       "id": "struggle-testament",
@@ -1159,7 +1273,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Struggle Testament.",
+      "nodeType": "concept"
     },
     {
       "id": "feedback-loop-hygiene",
@@ -1178,7 +1294,9 @@
           "rel": "parent",
           "to": "practice-culture-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Feedback Loop Hygiene.",
+      "nodeType": "concept"
     },
     {
       "id": "capture-resistance",
@@ -1197,7 +1315,9 @@
           "rel": "parent",
           "to": "security-resilience-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Capture Resistance.",
+      "nodeType": "concept"
     },
     {
       "id": "compromised-channel-response",
@@ -1216,7 +1336,9 @@
           "rel": "parent",
           "to": "security-resilience-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Compromised Channel Response.",
+      "nodeType": "concept"
     },
     {
       "id": "shadow-rail-interdiction",
@@ -1235,7 +1357,13 @@
           "rel": "parent",
           "to": "security-resilience-stack"
         }
-      ]
+      ],
+      "summary": "Guidance on Shadow Rail Interdiction.",
+      "nodeType": "concept"
     }
-  ]
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
 }

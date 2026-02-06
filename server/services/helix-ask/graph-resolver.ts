@@ -15,6 +15,16 @@ export type HelixAskGraphResolvedNode = {
   relation?: string;
   role?: string;
   evidence?: HelixAskGraphEvidence[];
+  summary?: string;
+  nodeType?: string;
+  inputs?: Array<Record<string, unknown>>;
+  outputs?: Array<Record<string, unknown>>;
+  assumptions?: string[];
+  validity?: Record<string, unknown>;
+  deterministic?: boolean;
+  tolerance?: Record<string, unknown>;
+  dependencies?: string[];
+  environment?: Record<string, unknown>;
 };
 
 export type HelixAskGraphEvidence = {
@@ -88,6 +98,16 @@ type GraphNode = {
   title?: string;
   excerpt?: string;
   bodyMD?: string;
+  summary?: string;
+  nodeType?: string;
+  inputs?: Array<Record<string, unknown>>;
+  outputs?: Array<Record<string, unknown>>;
+  assumptions?: string[];
+  validity?: Record<string, unknown>;
+  deterministic?: boolean;
+  tolerance?: Record<string, unknown>;
+  dependencies?: string[];
+  environment?: Record<string, unknown>;
   tags: string[];
   children: string[];
   links: GraphLink[];
@@ -237,6 +257,25 @@ const coerceNode = (raw: any): GraphNode | null => {
   const title = typeof raw.title === "string" ? raw.title.trim() : undefined;
   const excerpt = typeof raw.excerpt === "string" ? raw.excerpt.trim() : undefined;
   const bodyMD = typeof raw.bodyMD === "string" ? raw.bodyMD.trim() : undefined;
+  const summary = typeof raw.summary === "string" ? raw.summary.trim() : undefined;
+  const nodeType = typeof raw.nodeType === "string" ? raw.nodeType.trim() : undefined;
+  const inputs = Array.isArray(raw.inputs) ? raw.inputs.filter((entry: unknown) => !!entry) : undefined;
+  const outputs = Array.isArray(raw.outputs) ? raw.outputs.filter((entry: unknown) => !!entry) : undefined;
+  const assumptions = ensureArray<string>(raw.assumptions).filter((entry) => typeof entry === "string");
+  const validity =
+    raw.validity && typeof raw.validity === "object" && !Array.isArray(raw.validity)
+      ? (raw.validity as Record<string, unknown>)
+      : undefined;
+  const deterministic = typeof raw.deterministic === "boolean" ? raw.deterministic : undefined;
+  const tolerance =
+    raw.tolerance && typeof raw.tolerance === "object" && !Array.isArray(raw.tolerance)
+      ? (raw.tolerance as Record<string, unknown>)
+      : undefined;
+  const dependencies = ensureArray<string>(raw.dependencies).filter((entry) => typeof entry === "string");
+  const environment =
+    raw.environment && typeof raw.environment === "object" && !Array.isArray(raw.environment)
+      ? (raw.environment as Record<string, unknown>)
+      : undefined;
   const tags = ensureArray<string>(raw.tags).filter((entry) => typeof entry === "string");
   const children = ensureArray<string>(raw.children).filter((entry) => typeof entry === "string");
   const links = ensureArray<GraphLink>(raw.links).filter((link) => link && typeof link === "object");
@@ -247,6 +286,16 @@ const coerceNode = (raw: any): GraphNode | null => {
     title,
     excerpt,
     bodyMD,
+    summary,
+    nodeType,
+    inputs: inputs?.length ? (inputs as Array<Record<string, unknown>>) : undefined,
+    outputs: outputs?.length ? (outputs as Array<Record<string, unknown>>) : undefined,
+    assumptions: assumptions.length > 0 ? assumptions : undefined,
+    validity,
+    deterministic,
+    tolerance,
+    dependencies: dependencies.length > 0 ? dependencies : undefined,
+    environment,
     tags,
     children,
     links,
@@ -457,6 +506,16 @@ const resolveRoles = (
         relation: "role",
         role,
         evidence: best.evidence,
+        summary: best.summary,
+        nodeType: best.nodeType,
+        inputs: best.inputs,
+        outputs: best.outputs,
+        assumptions: best.assumptions,
+        validity: best.validity,
+        deterministic: best.deterministic,
+        tolerance: best.tolerance,
+        dependencies: best.dependencies,
+        environment: best.environment,
       });
     }
   }
@@ -567,6 +626,16 @@ const buildFrameworkCandidate = (
     depth: 0,
     relation: "anchor",
     evidence: entry.node.evidence,
+    summary: entry.node.summary,
+    nodeType: entry.node.nodeType,
+    inputs: entry.node.inputs,
+    outputs: entry.node.outputs,
+    assumptions: entry.node.assumptions,
+    validity: entry.node.validity,
+    deterministic: entry.node.deterministic,
+    tolerance: entry.node.tolerance,
+    dependencies: entry.node.dependencies,
+    environment: entry.node.environment,
   }));
   const maxDepth = treeConfig.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxNodes = treeConfig.maxNodes ?? DEFAULT_MAX_NODES;
@@ -611,6 +680,16 @@ const buildFrameworkCandidate = (
         depth: current.depth + 1,
         relation: neighbor.rel,
         evidence: node.evidence,
+        summary: node.summary,
+        nodeType: node.nodeType,
+        inputs: node.inputs,
+        outputs: node.outputs,
+        assumptions: node.assumptions,
+        validity: node.validity,
+        deterministic: node.deterministic,
+        tolerance: node.tolerance,
+        dependencies: node.dependencies,
+        environment: node.environment,
       });
       queue.push({ id: neighbor.id, depth: current.depth + 1 });
     }
