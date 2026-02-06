@@ -51,6 +51,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "server/db/knowledge.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ]
     },
@@ -82,6 +90,14 @@
         {
           "type": "code",
           "path": "server/routes/knowledge.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],
@@ -128,6 +144,14 @@
         {
           "type": "code",
           "path": "server/services/knowledge/validation.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],
@@ -174,6 +198,14 @@
         {
           "type": "code",
           "path": "server/services/knowledge/merge.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],
@@ -220,6 +252,14 @@
         {
           "type": "code",
           "path": "server/services/knowledge/citations.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],
@@ -270,6 +310,14 @@
         {
           "type": "code",
           "path": "server/routes/vectorizer.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],
@@ -321,6 +369,14 @@
         {
           "type": "code",
           "path": "server/services/search/repo-index.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],
@@ -371,6 +427,14 @@
         {
           "type": "code",
           "path": "client/src/lib/knowledge/atom-curation.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],
@@ -425,6 +489,14 @@
         {
           "type": "code",
           "path": "client/src/components/AgiKnowledgePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],
@@ -475,6 +547,14 @@
         {
           "type": "code",
           "path": "server/db/migrations/010_knowledge_corpus.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/knowledge-ingestion-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/essence-ingest.spec.ts"
         }
       ],
       "inputs": [],

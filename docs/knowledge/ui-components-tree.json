@@ -62,6 +62,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -93,6 +101,14 @@
         {
           "type": "code",
           "path": "client/src/main.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -169,6 +185,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -208,6 +232,14 @@
         {
           "type": "code",
           "path": "client/src/pages/helix-noise-gens.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -254,6 +286,14 @@
         {
           "type": "code",
           "path": "client/src/pages/desktop.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -300,6 +340,14 @@
         {
           "type": "code",
           "path": "client/src/pages/simulation.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -350,6 +398,14 @@
         {
           "type": "code",
           "path": "client/src/pages/star-hydrostatic-panel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -400,6 +456,14 @@
         {
           "type": "code",
           "path": "client/src/pages/why.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -454,6 +518,14 @@
         {
           "type": "code",
           "path": "client/src/pages/rag-admin.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -504,6 +576,14 @@
         {
           "type": "code",
           "path": "client/src/pages/ingest.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -558,6 +638,14 @@
         {
           "type": "code",
           "path": "client/src/pages/station.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -612,6 +700,14 @@
         {
           "type": "code",
           "path": "client/src/pages/desktop.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -659,6 +755,14 @@
         {
           "type": "code",
           "path": "client/src/pages/helix-core.panels.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -706,6 +810,14 @@
         {
           "type": "code",
           "path": "client/src/pages/desktop.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -780,6 +892,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -811,6 +931,14 @@
         {
           "type": "code",
           "path": "client/src/components/SpeedCapabilityPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -866,6 +994,14 @@
         {
           "type": "code",
           "path": "client/src/components/dynamic-controls.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -921,6 +1057,14 @@
         {
           "type": "code",
           "path": "client/src/components/live-energy-pipeline.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -971,6 +1115,14 @@
         {
           "type": "code",
           "path": "client/src/components/PhysicsFieldSampler.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1034,6 +1186,14 @@
         {
           "type": "code",
           "path": "client/src/components/QiLatticePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1088,6 +1248,14 @@
         {
           "type": "code",
           "path": "client/src/components/FuelGauge.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1161,6 +1329,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -1192,6 +1368,14 @@
         {
           "type": "code",
           "path": "client/src/components/WarpEngineContainer.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1247,6 +1431,14 @@
         {
           "type": "code",
           "path": "client/src/components/WarpRenderInspector.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1298,6 +1490,14 @@
         {
           "type": "code",
           "path": "client/src/components/WarpExperimentLadderPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1345,6 +1545,14 @@
         {
           "type": "code",
           "path": "client/src/components/WarpLedgerPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1392,6 +1600,14 @@
         {
           "type": "code",
           "path": "client/src/components/ShiftVectorPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1466,6 +1682,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -1493,6 +1717,14 @@
         {
           "type": "code",
           "path": "client/src/components/CasimirTileGridPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1552,6 +1784,14 @@
         {
           "type": "code",
           "path": "client/src/components/CavitySideView.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1603,6 +1843,14 @@
         {
           "type": "code",
           "path": "client/src/components/live-energy-pipeline.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1658,6 +1906,14 @@
         {
           "type": "code",
           "path": "client/src/components/MetricAmplificationPocket.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1713,6 +1969,14 @@
         {
           "type": "code",
           "path": "client/src/components/CardProofOverlay.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1768,6 +2032,14 @@
         {
           "type": "code",
           "path": "client/src/components/VacuumContractBadge.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1840,6 +2112,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -1875,6 +2155,14 @@
         {
           "type": "code",
           "path": "client/src/components/CurvaturePhysicsPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1926,6 +2214,14 @@
         {
           "type": "code",
           "path": "client/src/components/SliceViewer.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -1981,6 +2277,14 @@
         {
           "type": "code",
           "path": "client/src/components/GrAgentLoopLearningPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2032,6 +2336,14 @@
         {
           "type": "code",
           "path": "client/src/components/LightSpeedStrobeScale.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2087,6 +2399,14 @@
         {
           "type": "code",
           "path": "client/src/components/UniversalAuditTreePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2134,6 +2454,14 @@
         {
           "type": "code",
           "path": "client/src/components/MathMaturityTreePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2189,6 +2517,14 @@
         {
           "type": "code",
           "path": "client/src/components/AgiKnowledgePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2244,6 +2580,14 @@
         {
           "type": "code",
           "path": "client/src/components/FrontProofsLedger.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2303,6 +2647,14 @@
         {
           "type": "code",
           "path": "client/src/components/DocViewerPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2353,6 +2705,14 @@
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2404,6 +2764,14 @@
         {
           "type": "code",
           "path": "client/src/components/DefinitionChip.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2454,6 +2822,14 @@
         {
           "type": "code",
           "path": "client/src/components/SporeTimeline.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2518,6 +2894,14 @@
         {
           "type": "code",
           "path": "client/src/components/StellarLsrPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2576,6 +2960,14 @@
         {
           "type": "code",
           "path": "client/src/components/SolarMap.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2622,6 +3014,14 @@
         {
           "type": "code",
           "path": "client/src/components/StellarLsrPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2669,6 +3069,14 @@
         {
           "type": "code",
           "path": "client/src/components/DeepMixingSolarView.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2716,6 +3124,14 @@
         {
           "type": "code",
           "path": "client/src/components/TokamakSimulationPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2771,6 +3187,14 @@
         {
           "type": "code",
           "path": "client/src/components/HullMetricsVisPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2826,6 +3250,14 @@
         {
           "type": "code",
           "path": "client/src/components/HelixHullCardsPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2880,6 +3312,14 @@
         {
           "type": "code",
           "path": "client/src/components/VolumeModeToggle.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2938,6 +3378,14 @@
         {
           "type": "code",
           "path": "client/src/components/PhoenixNeedlePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -2994,6 +3442,14 @@
         {
           "type": "code",
           "path": "client/src/components/essence/DresscodePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3044,6 +3500,14 @@
         {
           "type": "code",
           "path": "client/src/components/noise-gen/StemDaw.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3098,6 +3562,14 @@
         {
           "type": "code",
           "path": "client/src/components/noise-gens/NoiseFieldPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3156,6 +3628,14 @@
         {
           "type": "code",
           "path": "client/src/components/BackgroundLuma.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3202,6 +3682,14 @@
         {
           "type": "code",
           "path": "client/src/components/essence/DresscodePanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3273,6 +3761,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -3300,6 +3796,14 @@
         {
           "type": "code",
           "path": "client/src/components/Hull3DRenderer.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3351,6 +3855,14 @@
         {
           "type": "code",
           "path": "client/src/components/WebGLDiagnostics.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3402,6 +3914,14 @@
         {
           "type": "code",
           "path": "client/src/components/GalaxyDeepZoom.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3461,6 +3981,14 @@
         {
           "type": "code",
           "path": "client/src/components/NavPoseHUD.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3512,6 +4040,14 @@
         {
           "type": "code",
           "path": "client/src/components/CollapseBenchmarkHUDPanel.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3567,6 +4103,14 @@
         {
           "type": "code",
           "path": "client/src/components/SectorLegend.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3614,6 +4158,14 @@
         {
           "type": "code",
           "path": "client/src/components/NavPoseHUD.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3685,6 +4237,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -3720,6 +4280,14 @@
         {
           "type": "code",
           "path": "client/src/hooks/useStressEnergyBrick.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3775,6 +4343,14 @@
         {
           "type": "code",
           "path": "client/src/store/useAgiChatStore.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3830,6 +4406,14 @@
         {
           "type": "code",
           "path": "client/src/lib/curvature-brick.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -3898,6 +4482,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -3945,6 +4537,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -3971,6 +4571,14 @@
         {
           "type": "code",
           "path": "client/src/pages/mobile-start.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -4038,6 +4646,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ]
     },
@@ -4080,6 +4696,14 @@
         {
           "type": "code",
           "path": "client/src/components/dynamic-visualization.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -4130,6 +4754,14 @@
         {
           "type": "code",
           "path": "client/src/components/visual-proof-charts.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -4180,6 +4812,14 @@
         {
           "type": "code",
           "path": "client/src/components/ShellOutlineVisualizer.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -4230,6 +4870,14 @@
         {
           "type": "code",
           "path": "client/src/components/phase-diagram-validator.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
@@ -4285,6 +4933,14 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-backend-binding-tree.js"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-lattice.integration.spec.ts"
         }
       ],
       "inputs": [],
