@@ -14511,14 +14511,14 @@ const executeHelixAsk = async ({
       repoExpectationScore = Math.max(repoExpectationScore, 1);
       repoExpectationSignals.push("repo_hint");
     }
-    const repoExpectationLevel =
+    let repoExpectationLevel =
       repoExpectationScore >= 3
         ? "high"
         : repoExpectationScore >= 2
           ? "medium"
           : "low";
     let requiresRepoEvidence = explicitRepoExpectation;
-    const hasRepoHints =
+    let hasRepoHints =
       explicitRepoExpectation ||
       HELIX_ASK_REPO_HINT.test(baseQuestion) ||
       repoExpectationLevel !== "low";
@@ -15121,6 +15121,33 @@ const executeHelixAsk = async ({
       }
       if (conceptMatch) {
         answerPath.push(`concept:${conceptMatch.card.id}`);
+        if (repoExpectationScore < 2) {
+          repoExpectationScore = 2;
+        }
+        if (!repoExpectationSignals.includes("concept_match")) {
+          repoExpectationSignals.push("concept_match");
+        }
+        repoExpectationLevel =
+          repoExpectationScore >= 3
+            ? "high"
+            : repoExpectationScore >= 2
+              ? "medium"
+              : "low";
+        hasRepoHints = true;
+        if (intentStrategy !== "constraint_report") {
+          requiresRepoEvidence = true;
+          if (!isRepoQuestion) {
+            isRepoQuestion = true;
+            if (debugPayload) {
+              debugPayload.is_repo_question = true;
+            }
+          }
+        }
+        if (debugPayload) {
+          debugPayload.repo_expectation_score = repoExpectationScore;
+          debugPayload.repo_expectation_level = repoExpectationLevel;
+          debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
+        }
       }
     }
     const normalizeConceptTags = (tags?: string[]): HelixAskTopicTag[] => {
