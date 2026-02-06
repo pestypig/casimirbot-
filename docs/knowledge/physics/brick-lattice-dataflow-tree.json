@@ -47,7 +47,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/brick-lattice-dataflow-tree.json"
+        }
+      ]
     },
     {
       "id": "brick-stress-energy",
@@ -397,7 +403,7 @@
       "deterministic": true,
       "tolerance": {
         "cfl_max": 0.5,
-        "abs": 0.000001
+        "abs": 1e-06
       },
       "environment": {
         "runtime": "node"

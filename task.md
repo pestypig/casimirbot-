@@ -40,10 +40,12 @@ To give Helix Ask full access to DAG nodes across the repo, complete all items b
 
 1) **Schema coverage per tree**
 - Add DAG fields to every node in core trees:
+  - `docs/knowledge/physics/*tree.json`
   - `docs/knowledge/casimir-tiles-tree.json`
   - `docs/knowledge/stellar-restoration-tree.json`
   - `docs/knowledge/warp/**` trees
-  - `docs/knowledge/ideology-tree.json`
+  - `docs/ethos/ideology.json`
+  - `docs/knowledge/certainty-framework-tree.json`
 
 2) **Dependencies + DAG edges**
 - Add `dependencies` arrays and/or `links: [{ rel: "depends-on", to: "node-id" }]` to all derived nodes.
@@ -70,6 +72,12 @@ Add evidence-level provenance:
 - Apply the schema to remaining trees beyond the core set above.
 - Prioritize trees with highest Helix Ask hit rate.
 
+7) **Ideology + certainty bridge**
+- For ideology nodes that reference signal/noise or uncertainty, attach evidence from:
+  - `docs/BUSINESS_MODEL.md` (Noise field generation section)
+  - `docs/knowledge/certainty-framework-tree.json` (noisegen-confidence)
+- Prefer real implementation anchors when they exist (e.g. `server/services/noisegen-planner-model.ts`).
+
 ## Node Acceptance Gate (Must for “Grounded”)
 To prevent lazy or purely narrative nodes, Helix Ask should only treat a node as
 grounded when it satisfies:
@@ -77,6 +85,10 @@ grounded when it satisfies:
 - 1 implementation code anchor (actual symbol used in pipeline)
 - 1 behavior proof (telemetry field or test)
 - explicit assumptions + validity regime present
+
+Note: when choosing evidence, prefer existing implementations and tests already in
+the repo. Do not invent stubs to satisfy the DAG; the hard constraints are already
+encoded elsewhere.
 
 ## Non-Goals
 - Re-introducing multi-LLM planning or multi-LLM evidence distillation.
