@@ -28,6 +28,9 @@ export type HelixAskConceptCandidate = HelixAskConceptMatch & {
 const CONCEPT_DIR = path.resolve(process.cwd(), "docs", "knowledge");
 let conceptCache: HelixAskConceptCard[] | null = null;
 let conceptLoadFailed = false;
+const CONCEPT_HOT_RELOAD =
+  process.env.HELIX_ASK_CONCEPTS_HOT_RELOAD === "1" || process.env.NODE_ENV !== "production";
+let conceptCacheStamp: { fileCount: number; maxMtimeMs: number } | null = null;
 
 const normalizeValue = (value: string): string => value.trim();
 
@@ -143,15 +146,53 @@ const collectConceptFiles = (root: string): string[] => {
   return files.sort();
 };
 
+const snapshotConceptFiles = (): { files: string[]; maxMtimeMs: number } => {
+  const files = collectConceptFiles(CONCEPT_DIR);
+  let maxMtimeMs = 0;
+  for (const filePath of files) {
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.mtimeMs > maxMtimeMs) {
+        maxMtimeMs = stat.mtimeMs;
+      }
+    } catch {
+      // Ignore transient stat failures during hot reload.
+    }
+  }
+  return { files, maxMtimeMs };
+};
+
+const isConceptCacheStale = (snapshot: { files: string[]; maxMtimeMs: number }): boolean => {
+  if (!conceptCacheStamp) return true;
+  if (conceptCacheStamp.fileCount !== snapshot.files.length) return true;
+  if (conceptCacheStamp.maxMtimeMs < snapshot.maxMtimeMs) return true;
+  return false;
+};
+
+const updateConceptCacheStamp = (snapshot: { files: string[]; maxMtimeMs: number }) => {
+  conceptCacheStamp = { fileCount: snapshot.files.length, maxMtimeMs: snapshot.maxMtimeMs };
+};
+
 const loadConceptCards = (): HelixAskConceptCard[] => {
   if (conceptLoadFailed) return [];
-  if (conceptCache) return conceptCache;
+  let snapshot: { files: string[]; maxMtimeMs: number } | null = null;
+  if (conceptCache) {
+    if (!CONCEPT_HOT_RELOAD) return conceptCache;
+    snapshot = snapshotConceptFiles();
+    if (!isConceptCacheStale(snapshot)) {
+      return conceptCache;
+    }
+  }
   try {
     if (!fs.existsSync(CONCEPT_DIR)) {
       conceptCache = [];
+      conceptCacheStamp = { fileCount: 0, maxMtimeMs: 0 };
       return conceptCache;
     }
-    const files = collectConceptFiles(CONCEPT_DIR);
+    if (!snapshot) {
+      snapshot = snapshotConceptFiles();
+    }
+    const files = snapshot.files;
     const cards: HelixAskConceptCard[] = [];
     for (const filePath of files) {
       const raw = fs.readFileSync(filePath, "utf8");
@@ -184,6 +225,7 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
       });
     }
     conceptCache = cards;
+    updateConceptCacheStamp(snapshot);
     return cards;
   } catch (error) {
     conceptLoadFailed = true;
@@ -194,6 +236,12 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
 };
 
 const normalizeTerm = (value: string): string => value.toLowerCase();
+const normalizeMatchString = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const buildTermRegex = (term: string): RegExp => {
   const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -203,10 +251,12 @@ const buildTermRegex = (term: string): RegExp => {
 export function findConceptMatch(question: string): HelixAskConceptMatch | null {
   const normalized = normalizeTerm(question);
   if (!normalized) return null;
+  const normalizedQuestion = normalizeMatchString(question);
   const cards = loadConceptCards();
   let best: HelixAskConceptMatch | null = null;
   let bestScore = 0;
   for (const card of cards) {
+    const aliasTerms = card.label ? [card.label, ...card.aliases] : card.aliases;
     const idRegex = buildTermRegex(card.id);
     if (idRegex.test(normalized)) {
       const score = card.id.length + 6;
@@ -215,10 +265,29 @@ export function findConceptMatch(question: string): HelixAskConceptMatch | null 
         best = { card, matchedTerm: card.id, matchedField: "id" };
       }
     }
-    for (const alias of card.aliases) {
+    const normalizedId = normalizeMatchString(card.id);
+    if (normalizedId.length >= 6 && normalizedQuestion.includes(normalizedId)) {
+      const score = normalizedId.length + 2;
+      if (score > bestScore) {
+        bestScore = score;
+        best = { card, matchedTerm: card.id, matchedField: "id" };
+      }
+    }
+    for (const alias of aliasTerms) {
       const aliasRegex = buildTermRegex(alias);
       if (!aliasRegex.test(normalized)) continue;
       const score = alias.length + 3;
+      if (score > bestScore) {
+        bestScore = score;
+        best = { card, matchedTerm: alias, matchedField: "alias" };
+      }
+    }
+    for (const alias of aliasTerms) {
+      const normalizedAlias = normalizeMatchString(alias);
+      if (normalizedAlias.length < 6) continue;
+      if (normalizedAlias.split(" ").length < 2) continue;
+      if (!normalizedQuestion.includes(normalizedAlias)) continue;
+      const score = normalizedAlias.length + 1;
       if (score > bestScore) {
         bestScore = score;
         best = { card, matchedTerm: alias, matchedField: "alias" };
@@ -234,10 +303,12 @@ export function listConceptCandidates(
 ): HelixAskConceptCandidate[] {
   const normalized = normalizeTerm(question);
   if (!normalized) return [];
+  const normalizedQuestion = normalizeMatchString(question);
   const cards = loadConceptCards();
   const candidates: HelixAskConceptCandidate[] = [];
   for (const card of cards) {
     let best: HelixAskConceptCandidate | null = null;
+    const aliasTerms = card.label ? [card.label, ...card.aliases] : card.aliases;
     const idRegex = buildTermRegex(card.id);
     if (idRegex.test(normalized)) {
       best = {
@@ -247,12 +318,32 @@ export function listConceptCandidates(
         score: card.id.length + 6,
       };
     }
-    for (const alias of card.aliases) {
+    const normalizedId = normalizeMatchString(card.id);
+    if (!best && normalizedId.length >= 6 && normalizedQuestion.includes(normalizedId)) {
+      best = {
+        card,
+        matchedTerm: card.id,
+        matchedField: "id",
+        score: normalizedId.length + 2,
+      };
+    }
+    for (const alias of aliasTerms) {
       const aliasRegex = buildTermRegex(alias);
       if (!aliasRegex.test(normalized)) continue;
       const score = alias.length + 3;
       if (!best || score > best.score) {
         best = { card, matchedTerm: alias, matchedField: "alias", score };
+      }
+    }
+    if (!best) {
+      for (const alias of aliasTerms) {
+        const normalizedAlias = normalizeMatchString(alias);
+        if (normalizedAlias.length < 6) continue;
+        if (normalizedAlias.split(" ").length < 2) continue;
+        if (!normalizedQuestion.includes(normalizedAlias)) continue;
+        const score = normalizedAlias.length + 1;
+        best = { card, matchedTerm: alias, matchedField: "alias", score };
+        break;
       }
     }
     if (best) {

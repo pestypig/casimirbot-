@@ -5632,6 +5632,7 @@ function buildPlanScope({
   requiresRepoEvidence,
   repoExpectationLevel,
   question,
+  conceptMatch,
   override,
 }: {
   directives?: HelixAskPlanDirectives | null;
@@ -5639,6 +5640,7 @@ function buildPlanScope({
   requiresRepoEvidence: boolean;
   repoExpectationLevel: "low" | "medium" | "high";
   question: string;
+  conceptMatch?: HelixAskConceptMatch | null;
   override?: HelixAskPlanScope | null;
 }): HelixAskPlanScope {
   const scope: HelixAskPlanScope = {};
@@ -5649,17 +5651,31 @@ function buildPlanScope({
   const mustIncludeGlobs = new Set<string>(sanitizedMustInclude);
   const avoidSurfaces = new Set<string>(directives?.avoidSurfaces ?? []);
   const definitionFocus = isDefinitionQuestion(question);
+  const conceptMustInclude = conceptMatch?.card.mustIncludeFiles ?? [];
+  const conceptDocsFirst = conceptMustInclude.some((filePath) => {
+    const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+    return normalized.startsWith("docs/");
+  });
+  const conceptEthos = conceptMustInclude.some((filePath) => {
+    const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+    return normalized.startsWith("docs/ethos/");
+  });
   const wantsDocsFirst =
     definitionFocus ||
     (HELIX_ASK_CONCEPTUAL_FOCUS.test(question) &&
       topicTags.some((tag) => tag === "warp" || tag === "concepts"));
   const docsFirst =
     repoExpectationLevel !== "low" &&
-    (wantsDocsFirst || topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star"));
+    (wantsDocsFirst ||
+      conceptDocsFirst ||
+      topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star"));
   if (docsFirst) {
     preferredSurfaces.add("docs");
     preferredSurfaces.add("knowledge");
-    if (topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star")) {
+    if (
+      conceptEthos ||
+      topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star")
+    ) {
       preferredSurfaces.add("ethos");
     }
   }
@@ -5690,7 +5706,10 @@ function buildPlanScope({
   }
   if (docsFirst) {
     const docsSurfaces = ["docs", "knowledge"];
-    if (topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star")) {
+    if (
+      conceptEthos ||
+      topicTags.some((tag) => tag === "ideology" || tag === "ledger" || tag === "star")
+    ) {
       docsSurfaces.push("ethos");
     }
     const docsRegexes = buildPlanSurfaceRegexes(docsSurfaces);
@@ -15110,6 +15129,7 @@ const executeHelixAsk = async ({
     const wantsConceptMatch =
       intentDomain === "general" ||
       intentDomain === "hybrid" ||
+      intentDomain === "repo" ||
       intentProfile.id === "repo.ideology_reference" ||
       (intentDomain === "repo" && conceptualFocus);
     if (!promptIngested && wantsConceptMatch) {
@@ -16278,6 +16298,7 @@ const executeHelixAsk = async ({
             requiresRepoEvidence,
             repoExpectationLevel,
             question: baseQuestion,
+            conceptMatch,
             override: reportContext?.planScopeOverride,
           });
           if (debugPayload) {
