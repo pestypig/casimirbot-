@@ -38,6 +38,10 @@ Template: `docs/knowledge/dag-node-schema.md`
 ## DAG Full-Access Checklist (Must Complete)
 To give Helix Ask full access to DAG nodes across the repo, complete all items below.
 
+Status:
+- DAG defaults + evidence placeholders applied to all tree JSONs (2026-02-05).
+- Remaining work: dependency edges, evidence completeness (code/test/telemetry), and version pinning.
+
 1) **Schema coverage per tree**
 - Add DAG fields to every node in core trees:
   - `docs/knowledge/physics/*tree.json`
