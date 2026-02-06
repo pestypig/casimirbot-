@@ -13893,6 +13893,10 @@ const executeHelixAsk = async ({
       answer_extension_doc_items?: number;
       answer_extension_code_items?: number;
       answer_extension_appended?: boolean;
+      answer_raw_text?: string;
+      answer_after_format?: string;
+      answer_after_fallback?: string;
+      answer_final_text?: string;
       arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
       arbiter_reason?: string;
       arbiter_strictness?: "low" | "med" | "high";
@@ -20128,13 +20132,17 @@ const executeHelixAsk = async ({
     let answerExtension: HelixAskAnswerExtensionResult | null = null;
     if (typeof result.text === "string" && result.text.trim()) {
       let cleaned = formatHelixAskAnswer(stripPromptEchoFromAnswer(result.text, baseQuestion));
-        cleaned = stripInlineJsonArtifacts(cleaned);
-        const rawPreview = clipAskText(
-          stripInlineJsonArtifacts(stripPromptEchoFromAnswer(result.text, baseQuestion))
-            .replace(/\s+/g, " ")
-            .trim(),
-          HELIX_ASK_ANSWER_PREVIEW_CHARS,
-        );
+      cleaned = stripInlineJsonArtifacts(cleaned);
+      const rawAnswerText = stripInlineJsonArtifacts(
+        stripPromptEchoFromAnswer(result.text, baseQuestion),
+      ).trim();
+      const rawPreview = clipAskText(
+        rawAnswerText.replace(/\s+/g, " ").trim(),
+        HELIX_ASK_ANSWER_PREVIEW_CHARS,
+      );
+      if (debugPayload) {
+        debugPayload.answer_raw_text = clipAskText(rawAnswerText, HELIX_ASK_ANSWER_PREVIEW_CHARS);
+      }
       if (rawPreview) {
         logEvent("Answer raw preview", "llm", rawPreview, answerStart);
       }
@@ -20144,12 +20152,18 @@ const executeHelixAsk = async ({
         cleaned = enforceHelixAskAnswerFormat(cleaned, formatSpec.format, baseQuestion);
       }
       cleaned = stripTruncationMarkers(cleaned);
-        if (!cleaned.trim()) {
-          const fallback = stripPromptEchoFromAnswer(result.text, baseQuestion);
-          cleaned = fallback.trim() ? fallback.trim() : result.text.trim();
-          cleaned = stripTruncationMarkers(cleaned);
-          cleaned = stripInlineJsonArtifacts(cleaned);
-        }
+      if (!cleaned.trim()) {
+        const fallback = stripPromptEchoFromAnswer(result.text, baseQuestion);
+        cleaned = fallback.trim() ? fallback.trim() : result.text.trim();
+        cleaned = stripTruncationMarkers(cleaned);
+        cleaned = stripInlineJsonArtifacts(cleaned);
+      }
+      if (debugPayload) {
+        debugPayload.answer_after_format = clipAskText(
+          cleaned,
+          HELIX_ASK_ANSWER_PREVIEW_CHARS,
+        );
+      }
       const toolResultsPresent = Boolean(toolResultsBlock?.trim());
       const hasToolEvidence =
         docBlocks.length > 0 || (codeAlignment?.spans?.length ?? 0) > 0;
@@ -20903,6 +20917,12 @@ const executeHelixAsk = async ({
           }
         }
       }
+      if (debugPayload) {
+        debugPayload.answer_after_fallback = clipAskText(
+          cleaned,
+          HELIX_ASK_ANSWER_PREVIEW_CHARS,
+        );
+      }
       const citedPaths = extractFilePathsFromText(cleaned);
       const hasCitations = citedPaths.length > 0 || hasSourcesLine(cleaned);
       logEvent(
@@ -21125,6 +21145,12 @@ const executeHelixAsk = async ({
           ? answerExtension.citations
           : extractFilePathsFromText(cleaned),
       );
+      if (debugPayload) {
+        debugPayload.answer_final_text = clipAskText(
+          cleaned,
+          HELIX_ASK_ANSWER_PREVIEW_CHARS,
+        );
+      }
       cleanedText = cleaned;
       result.text = cleaned;
       if (debugPayload) {
