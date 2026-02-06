@@ -1,6 +1,6 @@
 ﻿---
 id: casimir-tiles
-aliases: ["casimir tiles", "casimir tile", "casimir tile grid", "tile grid", "tile ledger"]
+aliases: ["casimir tiles", "casimir tile", "casimir tile grid", "tile grid", "tile ledger", "casimir tile pressure", "tile pressure", "casimir pressure"]
 scope: casimir tile grid visualization and telemetry
 intentHints: ["define", "casimir tiles", "tile grid", "tile ledger"]
 topicTags: ["warp", "physics"]
