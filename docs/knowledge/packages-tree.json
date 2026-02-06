@@ -17,7 +17,8 @@
         "packages-create-verifier",
         "packages-app-native",
         "packages-templates",
-        "packages-docs"
+        "packages-docs",
+        "bridge-packages-create-verifier-packages-app-native"
       ],
       "links": [],
       "summary": "Monorepo packages, templates, and scaffolds.",
@@ -260,6 +261,79 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-packages-create-verifier-packages-app-native",
+      "title": "Create Casimir Verifier <-> App Native Bundle Bridge",
+      "excerpt": "Bridge between Create Casimir Verifier and App Native Bundle.",
+      "bodyMD": "Cross-reference between Create Casimir Verifier and App Native Bundle within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "packages",
+        "scaffold",
+        "verifier",
+        "native",
+        "bundle"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "packages-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "packages-create-verifier"
+        },
+        {
+          "rel": "see-also",
+          "to": "packages-app-native"
+        }
+      ],
+      "bridge": {
+        "left": "packages-create-verifier",
+        "right": "packages-app-native",
+        "relation": "Cross-reference between Create Casimir Verifier and App Native Bundle."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "packages-create-verifier",
+        "packages-app-native"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "packages/create-casimir-verifier/package.js",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "packages/app-native/bundle.env",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:41b630f027e75b9eca90fb4dd20dab68ec2f79b9dd52c3c6eb3f901406aaebc1",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-packages-create-verifier-packages-app-native",
+      "summary": "Bridge between Create Casimir Verifier and App Native Bundle."
     }
   ],
   "schema": {

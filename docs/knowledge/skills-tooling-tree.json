@@ -20,7 +20,8 @@
         "skills-docs-repo",
         "skills-media",
         "skills-telemetry",
-        "skills-cli-tools"
+        "skills-cli-tools",
+        "bridge-skills-registry-skills-routing"
       ],
       "links": [],
       "summary": "Tool registry, skill implementations, and CLI utilities.",
@@ -602,6 +603,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-skills-registry-skills-routing",
+      "title": "Tool Registry <-> Tool Routing Bridge",
+      "excerpt": "Bridge between Tool Registry and Tool Routing.",
+      "bodyMD": "Cross-reference between Tool Registry and Tool Routing within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "skills",
+        "registry",
+        "safety",
+        "routing",
+        "runtime"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "skills-tooling-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "skills-registry"
+        },
+        {
+          "rel": "see-also",
+          "to": "skills-routing"
+        }
+      ],
+      "bridge": {
+        "left": "skills-registry",
+        "right": "skills-routing",
+        "relation": "Cross-reference between Tool Registry and Tool Routing."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "skills-registry",
+        "skills-routing"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/skills.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:39e019f5b16b2527bb84eae4a895798decd3088f37032a77c492981e6fe5780f",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-skills-registry-skills-routing",
+      "summary": "Bridge between Tool Registry and Tool Routing."
     }
   ],
   "schema": {

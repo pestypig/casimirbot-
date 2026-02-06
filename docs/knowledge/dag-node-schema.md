@@ -36,6 +36,18 @@ Helix Ask can surface missing inputs/assumptions directly:
 - `code`: implementation with `path` and `symbol`.
 - `test`: tests with `path` and `symbol` or test name.
 - `telemetry`: runtime output with `field`.
+- `scope` (optional): `"left" | "right" | "bridge"` when the node is a bridge.
+
+## Bridge nodes (cross-concept links)
+Use `nodeType: "bridge"` when a node exists to connect two concepts and supply
+evidence on both sides. Bridge nodes must include:
+- `bridge.left`: node id on the left side.
+- `bridge.right`: node id on the right side.
+- `bridge.relation`: short phrase describing the linkage.
+- `links` entries with `rel="see-also"` to both `bridge.left` and `bridge.right`.
+
+Bridge evidence should include at least one `evidence` entry with `scope: "left"`
+and one with `scope: "right"`.
 
 ## Template
 ```json
@@ -103,6 +115,34 @@ Helix Ask can surface missing inputs/assumptions directly:
     "runtime_version": ">=20",
     "lockfile": "package-lock.json"
   }
+}
+```
+
+## Bridge template
+```json
+{
+  "id": "casimir-natario-bridge",
+  "title": "Casimir Lattice <-> Natario Zero-Expansion Bridge",
+  "summary": "Connects Casimir lattice proxy inputs to Natario zero-expansion geometry.",
+  "tags": ["casimir", "natario", "warp", "bridge"],
+  "nodeType": "bridge",
+
+  "bridge": {
+    "left": "casimir-lattice",
+    "right": "natario-zero-expansion",
+    "relation": "Casimir lattice strobing relies on Natario zero-expansion geometry."
+  },
+
+  "links": [
+    { "rel": "parent", "to": "warp-implementation-stack" },
+    { "rel": "see-also", "to": "casimir-lattice" },
+    { "rel": "see-also", "to": "natario-zero-expansion" }
+  ],
+
+  "evidence": [
+    { "type": "doc", "path": "docs/knowledge/warp/casimir-lattice.md", "scope": "left" },
+    { "type": "doc", "path": "docs/knowledge/warp/natario-zero-expansion.md", "scope": "right" }
+  ]
 }
 ```
 

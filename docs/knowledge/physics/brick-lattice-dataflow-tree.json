@@ -23,7 +23,8 @@
         "brick-client-lattice",
         "brick-client-hooks",
         "brick-ui-panels",
-        "brick-constraints-tests"
+        "brick-constraints-tests",
+        "bridge-brick-stress-energy-brick-curvature"
       ],
       "links": [],
       "summary": "Stress-energy, curvature, and lattice bricks from backend to UI.",
@@ -417,7 +418,7 @@
       "deterministic": true,
       "tolerance": {
         "cfl_max": 0.5,
-        "abs": 1e-06
+        "abs": 0.000001
       },
       "environment": {
         "runtime": "node"
@@ -863,6 +864,80 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-brick-stress-energy-brick-curvature",
+      "title": "Stress-Energy Brick <-> Curvature Brick Bridge",
+      "excerpt": "Bridge between Stress-Energy Brick and Curvature Brick.",
+      "bodyMD": "Cross-reference between Stress-Energy Brick and Curvature Brick within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "brick",
+        "stress-energy",
+        "physics",
+        "curvature"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "brick-lattice-dataflow-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "brick-stress-energy"
+        },
+        {
+          "rel": "see-also",
+          "to": "brick-curvature"
+        }
+      ],
+      "bridge": {
+        "left": "brick-stress-energy",
+        "right": "brick-curvature",
+        "relation": "Cross-reference between Stress-Energy Brick and Curvature Brick."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "brick-stress-energy",
+        "brick-curvature"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/stress-energy-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1a79a1ddd1873ecf5031860ddae0cd106448d9f46490bd92ac1d18b0da161f2e",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/curvature-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e79416d2cfa49a366bbce49af964d9248502099d3af33126a5e1e0c5a7c9130a",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-brick-stress-energy-brick-curvature",
+      "summary": "Bridge between Stress-Energy Brick and Curvature Brick."
     }
   ],
   "schema": {

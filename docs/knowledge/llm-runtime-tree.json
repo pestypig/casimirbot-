@@ -20,7 +20,8 @@
         "llm-runtime-worker",
         "llm-runtime-rag",
         "llm-runtime-tokenizer",
-        "llm-runtime-contracts"
+        "llm-runtime-contracts",
+        "bridge-llm-runtime-core-llm-runtime-backends"
       ],
       "links": [],
       "summary": "Local and remote LLM runtime, tool backends, and tokenizer safeguards.",
@@ -484,6 +485,80 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-llm-runtime-core-llm-runtime-backends",
+      "title": "Runtime Routes and Services <-> Backend Adapters Bridge",
+      "excerpt": "Bridge between Runtime Routes and Services and Backend Adapters.",
+      "bodyMD": "Cross-reference between Runtime Routes and Services and Backend Adapters within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "llm",
+        "routes",
+        "backend",
+        "skills"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "llm-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "llm-runtime-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "llm-runtime-backends"
+        }
+      ],
+      "bridge": {
+        "left": "llm-runtime-core",
+        "right": "llm-runtime-backends",
+        "relation": "Cross-reference between Runtime Routes and Services and Backend Adapters."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "llm-runtime-core",
+        "llm-runtime-backends"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/small-llm.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3ee80c1419f92c2ff38d564d3bb516d00c61e0f7375954875ae60c890510cc62",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/llm.http.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e594539458a5717ea2302f737c63b21083dc5e866468e3eb1636dfddd015b1ce",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-llm-runtime-core-llm-runtime-backends",
+      "summary": "Bridge between Runtime Routes and Services and Backend Adapters."
     }
   ],
   "schema": {

@@ -18,7 +18,8 @@
         "civic-governance-stack",
         "diplomacy-repair-stack",
         "practice-culture-stack",
-        "security-resilience-stack"
+        "security-resilience-stack",
+        "bridge-integrity-protocols-stack-civic-governance-stack"
       ],
       "links": [],
       "summary": "Ethical governance, integrity protocols, and civic systems.",
@@ -3208,6 +3209,75 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-integrity-protocols-stack-civic-governance-stack",
+      "title": "Integrity and Protocols <-> Civic and Governance Systems Bridge",
+      "excerpt": "Bridge between Integrity and Protocols and Civic and Governance Systems.",
+      "bodyMD": "Cross-reference between Integrity and Protocols and Civic and Governance Systems within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "ethos",
+        "integrity",
+        "governance"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ethos-knowledge-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "integrity-protocols-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "civic-governance-stack"
+        }
+      ],
+      "bridge": {
+        "left": "integrity-protocols-stack",
+        "right": "civic-governance-stack",
+        "relation": "Cross-reference between Integrity and Protocols and Civic and Governance Systems."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "integrity-protocols-stack",
+        "civic-governance-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos.",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos.",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-integrity-protocols-stack-civic-governance-stack",
+      "summary": "Bridge between Integrity and Protocols and Civic and Governance Systems."
     }
   ],
   "schema": {

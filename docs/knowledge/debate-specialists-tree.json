@@ -20,7 +20,8 @@
         "debate-routes",
         "debate-skills",
         "specialists-runtime",
-        "debate-harness"
+        "debate-harness",
+        "bridge-debate-core-debate-contracts"
       ],
       "links": [],
       "summary": "Debate orchestration, specialist runners, and verification loops.",
@@ -480,6 +481,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-debate-core-debate-contracts",
+      "title": "Debate Orchestration <-> Debate Contracts Bridge",
+      "excerpt": "Bridge between Debate Orchestration and Debate Contracts.",
+      "bodyMD": "Cross-reference between Debate Orchestration and Debate Contracts within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "debate",
+        "orchestration",
+        "runtime",
+        "schemas",
+        "contracts"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "debate-specialists-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "debate-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "debate-contracts"
+        }
+      ],
+      "bridge": {
+        "left": "debate-core",
+        "right": "debate-contracts",
+        "relation": "Cross-reference between Debate Orchestration and Debate Contracts."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "debate-core",
+        "debate-contracts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/debate/orchestrator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f46bc4c08c01be4795a852d1a82e3338ef1d7cc3093ee50ef25d6859b1579ab7",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "shared/essence-debate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8bfc2219e6bbaac740b86e31dbd36a28526de92e8d78522ae5a2398293c857c1",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-debate-core-debate-contracts",
+      "summary": "Bridge between Debate Orchestration and Debate Contracts."
     }
   ],
   "schema": {

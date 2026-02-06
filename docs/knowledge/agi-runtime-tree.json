@@ -25,7 +25,8 @@
         "agi-constraint-packs",
         "agi-resilience",
         "agi-learning-loop",
-        "agi-knowledge-compositor"
+        "agi-knowledge-compositor",
+        "bridge-agi-plan-execute-agi-planner-core"
       ],
       "links": [],
       "summary": "Planning, execution, refinement, and trace capture for AGI runs.",
@@ -775,6 +776,80 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-agi-plan-execute-agi-planner-core",
+      "title": "Plan + Execute Router <-> Planner Core Bridge",
+      "excerpt": "Bridge between Plan + Execute Router and Planner Core.",
+      "bodyMD": "Cross-reference between Plan + Execute Router and Planner Core within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "agi",
+        "planner",
+        "router",
+        "grounding"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "agi-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-plan-execute"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-planner-core"
+        }
+      ],
+      "bridge": {
+        "left": "agi-plan-execute",
+        "right": "agi-planner-core",
+        "relation": "Cross-reference between Plan + Execute Router and Planner Core."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "agi-plan-execute",
+        "agi-planner-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/services/planner/chat-b.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:40408e6369f2742902580df89a9f928b3651294cdfbdf8ef682c10a7bb96bbaa",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-agi-plan-execute-agi-planner-core",
+      "summary": "Bridge between Plan + Execute Router and Planner Core."
     }
   ],
   "schema": {

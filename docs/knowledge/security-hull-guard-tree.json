@@ -20,7 +20,8 @@
         "security-hull-client",
         "security-guard-docs",
         "security-concurrency",
-        "security-guard-tests"
+        "security-guard-tests",
+        "bridge-security-tenant-auth-security-hull-guard"
       ],
       "links": [],
       "summary": "Tenant safeguards, hull guardrails, and enforcement tests.",
@@ -522,6 +523,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-security-tenant-auth-security-hull-guard",
+      "title": "Tenant and Auth Guards <-> Hull Guardrails Bridge",
+      "excerpt": "Bridge between Tenant and Auth Guards and Hull Guardrails.",
+      "bodyMD": "Cross-reference between Tenant and Auth Guards and Hull Guardrails within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "security",
+        "tenant",
+        "auth",
+        "hull",
+        "guardrails"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "security-hull-guard-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "security-tenant-auth"
+        },
+        {
+          "rel": "see-also",
+          "to": "security-hull-guard"
+        }
+      ],
+      "bridge": {
+        "left": "security-tenant-auth",
+        "right": "security-hull-guard",
+        "relation": "Cross-reference between Tenant and Auth Guards and Hull Guardrails."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "security-tenant-auth",
+        "security-hull-guard"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/auth/tenant.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e3002bb5215f7170382146304f5e415ae561d72292c1c0ab45c565d823d80c09",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/security/hull-guard.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3e33733155ad8006f5ca7cf379315d58e2089992e18abb8cb2d3c844da2cfcaa",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-security-tenant-auth-security-hull-guard",
+      "summary": "Bridge between Tenant and Auth Guards and Hull Guardrails."
     }
   ],
   "schema": {

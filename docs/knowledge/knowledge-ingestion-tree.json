@@ -22,7 +22,8 @@
         "knowledge-search",
         "knowledge-client-tools",
         "knowledge-ui-panels",
-        "knowledge-storage"
+        "knowledge-storage",
+        "bridge-knowledge-corpus-knowledge-validation"
       ],
       "links": [],
       "summary": "Knowledge ingestion, vectorization, and retrieval pipeline.",
@@ -663,6 +664,80 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-knowledge-corpus-knowledge-validation",
+      "title": "Knowledge Corpus <-> Knowledge Validation Bridge",
+      "excerpt": "Bridge between Knowledge Corpus and Knowledge Validation.",
+      "bodyMD": "Cross-reference between Knowledge Corpus and Knowledge Validation within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "knowledge",
+        "corpus",
+        "ingestion",
+        "validation"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "knowledge-ingestion-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "knowledge-corpus"
+        },
+        {
+          "rel": "see-also",
+          "to": "knowledge-validation"
+        }
+      ],
+      "bridge": {
+        "left": "knowledge-corpus",
+        "right": "knowledge-validation",
+        "relation": "Cross-reference between Knowledge Corpus and Knowledge Validation."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "knowledge-corpus",
+        "knowledge-validation"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/knowledge/corpus.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ef07d340d9a06662d44c8b74a8e589b074c1a7807d9fc3907b4a753c0fe74227",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/services/knowledge/validation.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2946cdff522a07403e5a6c52dd792fcab55b1e276c83e1902b2c89b3bd2f7628",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-knowledge-corpus-knowledge-validation",
+      "summary": "Bridge between Knowledge Corpus and Knowledge Validation."
     }
   ],
   "schema": {

@@ -17,7 +17,8 @@
         "helix-ask-docs",
         "helix-ask-core",
         "helix-ask-evidence",
-        "helix-ask-graph"
+        "helix-ask-graph",
+        "bridge-helix-ask-docs-helix-ask-core"
       ],
       "links": [],
       "summary": "Helix Ask routing, scaffolds, and evidence gates.",
@@ -399,6 +400,80 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-helix-ask-docs-helix-ask-core",
+      "title": "Helix Ask Docs <-> Helix Ask Core Bridge",
+      "excerpt": "Bridge between Helix Ask Docs and Helix Ask Core.",
+      "bodyMD": "Cross-reference between Helix Ask Docs and Helix Ask Core within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "helix_ask",
+        "docs",
+        "routing",
+        "format"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "helix-ask-docs"
+        },
+        {
+          "rel": "see-also",
+          "to": "helix-ask-core"
+        }
+      ],
+      "bridge": {
+        "left": "helix-ask-docs",
+        "right": "helix-ask-core",
+        "relation": "Cross-reference between Helix Ask Docs and Helix Ask Core."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "helix-ask-docs",
+        "helix-ask-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/helix-ask-flow.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:34a623b3d8868d83b81e9d898c060b3a362d3bcdaaa811261383b5ec203b58e4",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-helix-ask-docs-helix-ask-core",
+      "summary": "Bridge between Helix Ask Docs and Helix Ask Core."
     }
   ],
   "schema": {

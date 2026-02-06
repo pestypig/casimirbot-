@@ -20,7 +20,8 @@
         "dp-adapters",
         "dp-adapter-build",
         "dp-planner-schema",
-        "dp-planner-service"
+        "dp-planner-service",
+        "bridge-dp-collapse-derivation-dp-collapse-estimator"
       ],
       "links": [],
       "summary": "A walk from DP collapse theory to adapters, planners, and validation.",
@@ -359,6 +360,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-dp-collapse-derivation-dp-collapse-estimator",
+      "title": "DP Collapse Derivation <-> DP Collapse Estimator Bridge",
+      "excerpt": "Bridge between DP Collapse Derivation and DP Collapse Estimator.",
+      "bodyMD": "Cross-reference between DP Collapse Derivation and DP Collapse Estimator within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "derivation",
+        "dp-collapse",
+        "theory",
+        "estimator",
+        "deltae"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "dp-collapse-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "dp-collapse-derivation"
+        },
+        {
+          "rel": "see-also",
+          "to": "dp-collapse-estimator"
+        }
+      ],
+      "bridge": {
+        "left": "dp-collapse-derivation",
+        "right": "dp-collapse-estimator",
+        "relation": "Cross-reference between DP Collapse Derivation and DP Collapse Estimator."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "dp-collapse-derivation",
+        "dp-collapse-estimator"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/DP_COLLAPSE_DERIVATION.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:875f58336e3fcd4dd0f8a6a50b4cbd080644c2c363f79ea50525dfd7c1e636e6",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "shared/dp-collapse.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bedeec6e6ba6f90e374ae38571ab906015aea830a2b28555902e7f3f21a99b7a",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-dp-collapse-derivation-dp-collapse-estimator",
+      "summary": "Bridge between DP Collapse Derivation and DP Collapse Estimator."
     }
   ],
   "schema": {

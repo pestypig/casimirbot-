@@ -992,6 +992,7 @@
       "children": [
         "warp-module",
         "natario-warp-implementation",
+        "casimir-natario-bridge",
         "theta-semantics",
         "warp-pulsed-power",
         "warpfield-mesh-patch-plan",
@@ -1046,6 +1047,102 @@
           "type": "test",
           "path": "tests/warpfield-cross-validation.spec.ts",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
+        }
+      ]
+    },
+    {
+      "id": "casimir-natario-bridge",
+      "slug": "casimir-natario-bridge",
+      "title": "Casimir Lattice <-> Natario Zero-Expansion Bridge",
+      "excerpt": "Bridge between Casimir lattice proxy and Natario zero-expansion geometry.",
+      "bodyMD": "Connects the Casimir lattice proxy to Natario zero-expansion geometry and implementation hooks.\n\nMinimal artifact: cross-reference between Casimir lattice strobing and Natario geometry.",
+      "tags": [
+        "casimir",
+        "natario",
+        "warp",
+        "bridge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-implementation-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-lattice"
+        },
+        {
+          "rel": "see-also",
+          "to": "natario-zero-expansion"
+        }
+      ],
+      "summary": "Connects Casimir lattice proxy inputs to Natario zero-expansion geometry and runtime hooks.",
+      "nodeType": "bridge",
+      "bridge": {
+        "left": "casimir-lattice",
+        "right": "natario-zero-expansion",
+        "relation": "Casimir lattice strobing relies on Natario zero-expansion geometry."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "warp-implementation-stack",
+        "casimir-lattice",
+        "natario-zero-expansion"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/casimir-lattice.md",
+          "scope": "left",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:d7dac417da209e476656f66782040c6ebec13478b126c90210e2a3011da642ce"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/natario-zero-expansion.md",
+          "scope": "right",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:d87ca7ca7ea14a07703a0d9a3c261db5ecc94cc866848b5c379dd4439390aca4"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/natario-warp.ts",
+          "scope": "right",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:cdcfe2eb1831f0c332a5144617dc482dbd3d713ee2591ded6d97bfda48d0d7f5"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "scope": "left",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        },
+        {
+          "type": "test",
+          "path": "tests/warpfield-cross-validation.spec.ts",
+          "scope": "bridge",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
           "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ]

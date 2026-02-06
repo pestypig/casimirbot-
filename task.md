@@ -108,6 +108,27 @@ Make Helix Ask behave like an agent (iterative tool-style retrieval + evidence c
 **Acceptance**
 - No “no evidence” responses when `doc_spans.length > 0` or `code_spans.length > 0`.
 
+## Phase 8 - Continual Learning Loop (Tree + DAG Aligned)
+**Objective:** Keep Helix Ask aligned with the evolving repo using tree DAGs and concept docs without breaking baseline behavior.
+
+**Loop policy**
+- Emit graph-pack metadata in traces: treeIds, primaryTreeId, anchorIds, pathIds, conceptMatch, treeVersion, repo_rev, lattice_rev.
+- Store evidence pointers from DAG nodes (type, path, repo_rev, content_hash) so training samples remain auditable.
+- Only admit samples for training if the anchor node is full access per checklist or explicitly marked diagnostic.
+
+**Build cadence**
+- Rebuild the code lattice + tree indices on repo changes; keep the previous lattice as baseline.
+- Export training datasets on a schedule; pin a baseline export and tag variants with training settings.
+
+**A/B adapters**
+- Route baseline vs candidate with AGI_ANSWERER_ADAPTER / AGI_ROUTER_ADAPTER.
+- Evaluate with helix:ask:regression:light plus holdout gates; promote only if gates + regression improve.
+
+**Acceptance**
+- Each exported record links to a tree node and evidence hash.
+- Baseline artifacts are preserved; variants are additive.
+- A/B run yields separate gate metrics and a clear promote/rollback decision.
+
 ---
 
 ## DAG Full-Access Checklist (Must Complete)
@@ -148,4 +169,5 @@ Use dry runs to confirm controller + gates without LLM:
 - Tree-walk depth controls + UI traces.
 - Tool-result contract guardrail.
 - DAG full-access checklist applied to priority trees.
+- Continual learning loop tied to tree/DAG metadata + A/B adapters.
 

@@ -23,7 +23,8 @@
         "agi-routing-stack",
         "collapse-benchmark-stack",
         "essence-telemetry-stack",
-        "agi-client-stack"
+        "agi-client-stack",
+        "bridge-trace-api-stack-trace-training-stack"
       ],
       "links": [],
       "summary": "Trace capture, essence profiles, and AGI refinement pipelines.",
@@ -1151,6 +1152,79 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-trace-api-stack-trace-training-stack",
+      "title": "Trace API Stack <-> Training Trace Stack Bridge",
+      "excerpt": "Bridge between Trace API Stack and Training Trace Stack.",
+      "bodyMD": "Cross-reference between Trace API Stack and Training Trace Stack within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "trace",
+        "api",
+        "training"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trace-system-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "trace-api-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "trace-training-stack"
+        }
+      ],
+      "bridge": {
+        "left": "trace-api-stack",
+        "right": "trace-training-stack",
+        "relation": "Cross-reference between Trace API Stack and Training Trace Stack."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "trace-api-stack",
+        "trace-training-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/TRACE-API.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c1b290a7c21e223bf333bc1858e9835b8cba66d96a61094b233e1936af7aa939",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/TRAINING-TRACE-API.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:04fd53586d1a60ec57157204d6162cbf14ceea14c79a0517749ea624f377f515",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-trace-api-stack-trace-training-stack",
+      "summary": "Bridge between Trace API Stack and Training Trace Stack."
     }
   ],
   "schema": {

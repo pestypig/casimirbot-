@@ -27,7 +27,8 @@
         "qi-guard-consolidation",
         "qi-homogenization-addendum",
         "qi-ops-runbook",
-        "casimir-calculation-stack"
+        "casimir-calculation-stack",
+        "bridge-ts-ratio-guardrail-casimir-tile-mechanism"
       ],
       "links": [],
       "summary": "A walk from tile mechanics to guardrails and roadmap proofs.",
@@ -493,6 +494,7 @@
       "children": [
         "casimir-static-engine",
         "casimir-pressure-parallel-plate-ideal",
+        "ts-ratio-guardrail",
         "casimir-dynamic-engine",
         "casimir-inference-engine",
         "casimir-natario-metric",
@@ -542,6 +544,99 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "ts-ratio-guardrail",
+      "slug": "ts-ratio-guardrail",
+      "title": "TS_ratio Guardrail",
+      "excerpt": "Time-scale separation ratio used for pipeline guardrails.",
+      "bodyMD": "TS_ratio is the conservative time-scale separation ratio used by the pipeline (docs/knowledge/ts-ratio.md).\n\nMinimal artifact: TS_ratio definition + pipeline assignment.",
+      "tags": [
+        "ts_ratio",
+        "timescale",
+        "guardrail",
+        "casimir"
+      ],
+      "summary": "Time-scale separation ratio used by the pipeline and guardrails.",
+      "nodeType": "derived",
+      "inputs": [
+        {
+          "name": "TS_long",
+          "unit": "1",
+          "type": "float",
+          "source": "state.TS_long"
+        },
+        {
+          "name": "T_m",
+          "unit": "s",
+          "type": "float",
+          "source": "state.TS_modulation"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "TS_ratio",
+          "unit": "1",
+          "type": "float",
+          "path": "TS_ratio"
+        }
+      ],
+      "assumptions": [
+        "TS_ratio computed as T_long / T_m",
+        "TS_ratio_min guardrail enforces TS >> 1"
+      ],
+      "validity": {},
+      "deterministic": true,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "casimir-calculation-stack",
+        "casimir-tile-mechanism"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-calculation-stack"
+        },
+        {
+          "rel": "depends-on",
+          "to": "casimir-tile-mechanism"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "environment",
+          "tolerance"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ts-ratio.md",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:0425d336250dc3f962a97919437b1f38bbb42c799e5cf86472c263ccdd358f8e"
+        },
+        {
+          "type": "doc",
+          "path": "docs/casimir-tile-mechanism.md",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:100ded5f8596d639ff80e36473c85cba62d96d2b1af158948a9165e5a0e1d100"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "symbol": "TS_ratio",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
+        },
+        {
+          "type": "test",
+          "path": "tests/ts-autoscale.spec.ts",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:8932af0d013e0cedd02635c009fc94d9715e999160e9e6fc27c8596a0e9c38f6"
+        }
+      ]
     },
     {
       "id": "casimir-static-engine",
@@ -642,15 +737,15 @@
       ],
       "validity": {
         "gap_m": {
-          "min": 1e-09,
-          "max": 1e-06
+          "min": 1e-9,
+          "max": 0.000001
         },
         "notes": "Outside range, correction models required."
       },
       "deterministic": true,
       "tolerance": {
-        "rel": 1e-09,
-        "abs": 1e-06
+        "rel": 1e-9,
+        "abs": 0.000001
       },
       "dependencies": [
         "casimir-static-engine",
@@ -902,6 +997,83 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-ts-ratio-guardrail-casimir-tile-mechanism",
+      "title": "TS_ratio Guardrail <-> Casimir Tile Mechanism Bridge",
+      "excerpt": "Bridge between TS_ratio Guardrail and Casimir Tile Mechanism.",
+      "bodyMD": "Cross-reference between TS_ratio Guardrail and Casimir Tile Mechanism within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "ts_ratio",
+        "timescale",
+        "guardrail",
+        "casimir",
+        "mechanism",
+        "tiles"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "casimir-tiles-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tile-mechanism"
+        }
+      ],
+      "bridge": {
+        "left": "ts-ratio-guardrail",
+        "right": "casimir-tile-mechanism",
+        "relation": "Cross-reference between TS_ratio Guardrail and Casimir Tile Mechanism."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "ts-ratio-guardrail",
+        "casimir-tile-mechanism"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ts-ratio.md",
+          "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
+          "content_hash": "sha256:0425d336250dc3f962a97919437b1f38bbb42c799e5cf86472c263ccdd358f8e",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/casimir-tile-mechanism.md",
+          "heading": "1) Mechanism in one view",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:100ded5f8596d639ff80e36473c85cba62d96d2b1af158948a9165e5a0e1d100",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-ts-ratio-guardrail-casimir-tile-mechanism",
+      "summary": "Bridge between TS_ratio Guardrail and Casimir Tile Mechanism."
     }
   ]
 }

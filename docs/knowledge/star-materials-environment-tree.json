@@ -19,7 +19,8 @@
         "solar-adapters-guardrails",
         "environment-model",
         "star-panels",
-        "hull-materials"
+        "hull-materials",
+        "bridge-star-runtime-routes-star-models-telemetry"
       ],
       "links": [],
       "summary": "Star runtime, solar guardrails, and materials context.",
@@ -468,6 +469,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-star-runtime-routes-star-models-telemetry",
+      "title": "Star Runtime Routes <-> Star Models and Telemetry Bridge",
+      "excerpt": "Bridge between Star Runtime Routes and Star Models and Telemetry.",
+      "bodyMD": "Cross-reference between Star Runtime Routes and Star Models and Telemetry within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "star",
+        "routes",
+        "api",
+        "telemetry",
+        "models"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "star-materials-environment-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "star-runtime-routes"
+        },
+        {
+          "rel": "see-also",
+          "to": "star-models-telemetry"
+        }
+      ],
+      "bridge": {
+        "left": "star-runtime-routes",
+        "right": "star-models-telemetry",
+        "relation": "Cross-reference between Star Runtime Routes and Star Models and Telemetry."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "star-runtime-routes",
+        "star-models-telemetry"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/star.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d2fd65713453c2bcbe3e25c7f65e513e53d0f157e0baffe77baefb00c271e3e4",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "client/src/models/star.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f426b13a034079b58ab04e3a4515ab5256d6cbe0f1e0aff0c3533f9d55dad02f",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-star-runtime-routes-star-models-telemetry",
+      "summary": "Bridge between Star Runtime Routes and Star Models and Telemetry."
     }
   ],
   "schema": {

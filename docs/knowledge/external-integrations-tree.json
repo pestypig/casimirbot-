@@ -20,7 +20,8 @@
         "external-solar-stack",
         "external-webgpu-stack",
         "external-hardware-stack",
-        "external-architecture-stack"
+        "external-architecture-stack",
+        "bridge-external-llm-stack-external-audio-stack"
       ],
       "links": [],
       "summary": "Third-party dependencies and vendor integrations.",
@@ -410,6 +411,81 @@
           "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
+    },
+    {
+      "id": "bridge-external-llm-stack-external-audio-stack",
+      "title": "LLM Vendors <-> Audio and Speech Vendors Bridge",
+      "excerpt": "Bridge between LLM Vendors and Audio and Speech Vendors.",
+      "bodyMD": "Cross-reference between LLM Vendors and Audio and Speech Vendors within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "external",
+        "llm",
+        "vendors",
+        "audio",
+        "speech"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "external-integrations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "external-llm-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "external-audio-stack"
+        }
+      ],
+      "bridge": {
+        "left": "external-llm-stack",
+        "right": "external-audio-stack",
+        "relation": "Cross-reference between LLM Vendors and Audio and Speech Vendors."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "external-llm-stack",
+        "external-audio-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-external-llm-stack-external-audio-stack",
+      "summary": "Bridge between LLM Vendors and Audio and Speech Vendors."
     }
   ],
   "schema": {

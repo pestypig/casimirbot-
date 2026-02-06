@@ -33,7 +33,8 @@
         "ui-mobile-start",
         "ui-legacy-warp-web",
         "ui-visualization-utils",
-        "ui-backend-binding"
+        "ui-backend-binding",
+        "bridge-ui-backend-binding-ui-panel-physics-core"
       ],
       "links": [],
       "summary": "Client-side surfaces, panels, renderers, and UI primitives.",
@@ -5481,6 +5482,79 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-ui-backend-binding-ui-panel-physics-core",
+      "title": "UI Backend Bindings <-> Physics Core Panels Bridge",
+      "excerpt": "Bridge between UI Backend Bindings and Physics Core Panels.",
+      "bodyMD": "Cross-reference between UI Backend Bindings and Physics Core Panels within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "ui",
+        "backend",
+        "bindings",
+        "physics",
+        "panels"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-components-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-backend-binding"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-physics-core"
+        }
+      ],
+      "bridge": {
+        "left": "ui-backend-binding",
+        "right": "ui-panel-physics-core",
+        "relation": "Cross-reference between UI Backend Bindings and Physics Core Panels."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "ui-backend-binding",
+        "ui-panel-physics-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-backend-binding-tree.js",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ui-components-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-ui-backend-binding-ui-panel-physics-core",
+      "summary": "Bridge between UI Backend Bindings and Physics Core Panels."
     }
   ],
   "schema": {

@@ -19,7 +19,8 @@
         "hardware-hooks",
         "hardware-panels",
         "hardware-scheduler",
-        "hardware-provenance"
+        "hardware-provenance",
+        "bridge-hardware-ingest-hardware-bus"
       ],
       "links": [],
       "summary": "Hardware ingest, scheduling, and UI control surfaces.",
@@ -391,6 +392,79 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-hardware-ingest-hardware-bus",
+      "title": "Hardware Ingest <-> Hardware Bus Bridge",
+      "excerpt": "Bridge between Hardware Ingest and Hardware Bus.",
+      "bodyMD": "Cross-reference between Hardware Ingest and Hardware Bus within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "hardware",
+        "ingest",
+        "bus"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-telemetry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-ingest"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-bus"
+        }
+      ],
+      "bridge": {
+        "left": "hardware-ingest",
+        "right": "hardware-bus",
+        "relation": "Cross-reference between Hardware Ingest and Hardware Bus."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "hardware-ingest",
+        "hardware-bus"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/helix-core.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:df54877e753629e1410478685b192cbbe3794cd9946823a79fc4724231f1a97d",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/hardware-sector-bus.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2d61cdd97fdffd32b556b73de67986c8c623e11c303284bee126ceb98d0dde4c",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-hardware-ingest-hardware-bus",
+      "summary": "Bridge between Hardware Ingest and Hardware Bus."
     }
   ],
   "schema": {

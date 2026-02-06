@@ -19,7 +19,8 @@
         "math-maturity-stages",
         "math-pipeline-walk",
         "math-verification-gates",
-        "math-evidence-registry"
+        "math-evidence-registry",
+        "bridge-math-maturity-stages-math-evidence-registry"
       ],
       "links": [],
       "summary": "A navigable map of math maturity stages and the GR/warp verification walk.",
@@ -3620,7 +3621,7 @@
       },
       "deterministic": true,
       "tolerance": {
-        "abs": 1e-06
+        "abs": 0.000001
       },
       "environment": {
         "runtime": "node"
@@ -4016,6 +4017,83 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-math-maturity-stages-math-evidence-registry",
+      "title": "Math Maturity Stages <-> Math Evidence Registry Bridge",
+      "excerpt": "Bridge between Math Maturity Stages and Math Evidence Registry.",
+      "bodyMD": "Cross-reference between Math Maturity Stages and Math Evidence Registry within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "maturity",
+        "stages",
+        "claims",
+        "policy",
+        "evidence",
+        "registry",
+        "config"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "math-maturity-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-maturity-stages"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-evidence-registry"
+        }
+      ],
+      "bridge": {
+        "left": "math-maturity-stages",
+        "right": "math-evidence-registry",
+        "relation": "Cross-reference between Math Maturity Stages and Math Evidence Registry."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "math-maturity-stages",
+        "math-evidence-registry"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/math-stage.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7858bef29c7f0cf50f8e8a700359c35e58b6bf05dd15fa3db3df7f6d414e3639",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "math.config.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7da27fdc5bea5d3bea9b76976282a89382719bd6cfde2d0f6dd81974ce5abf06",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-math-maturity-stages-math-evidence-registry",
+      "summary": "Bridge between Math Maturity Stages and Math Evidence Registry."
     }
   ],
   "schema": {

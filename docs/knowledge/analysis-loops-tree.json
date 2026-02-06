@@ -19,7 +19,8 @@
         "diffusion-loop",
         "belief-graph-loop",
         "constraint-loop",
-        "analysis-loop-routes"
+        "analysis-loop-routes",
+        "bridge-analysis-loops-overview-noise-field-loop"
       ],
       "links": [],
       "summary": "Constraint and analysis loops used for diagnostics and verification prototypes.",
@@ -358,6 +359,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-analysis-loops-overview-noise-field-loop",
+      "title": "Analysis Loops Overview <-> Noise Field Loop Bridge",
+      "excerpt": "Bridge between Analysis Loops Overview and Noise Field Loop.",
+      "bodyMD": "Cross-reference between Analysis Loops Overview and Noise Field Loop within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "analysis",
+        "overview",
+        "loops",
+        "noise",
+        "constraints"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "analysis-loops-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "analysis-loops-overview"
+        },
+        {
+          "rel": "see-also",
+          "to": "noise-field-loop"
+        }
+      ],
+      "bridge": {
+        "left": "analysis-loops-overview",
+        "right": "noise-field-loop",
+        "relation": "Cross-reference between Analysis Loops Overview and Noise Field Loop."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "analysis-loops-overview",
+        "noise-field-loop"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/analysis-loops.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:54ba7f5189c2449ae2a123a22d8f401a32afc1b29608cbe76f6f8e275ea7bd7e",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "modules/analysis/noise-field-loop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d686909ed26ded718f43887e9dbd4e4cb88986ca4da246b59233757afeb9772b",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-analysis-loops-overview-noise-field-loop",
+      "summary": "Bridge between Analysis Loops Overview and Noise Field Loop."
     }
   ],
   "schema": {

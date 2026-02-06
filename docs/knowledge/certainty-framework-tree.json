@@ -22,7 +22,8 @@
         "rationale-confidence-stack",
         "coherence-confidence-stack",
         "schema-confidence-stack",
-        "uncertainty-mechanics-stack"
+        "uncertainty-mechanics-stack",
+        "bridge-certainty-motivation-platonic-reasoning-bridge"
       ],
       "links": [],
       "summary": "Evaluation framework for confidence, evidence gates, and uncertainty tracking.",
@@ -1702,6 +1703,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-certainty-motivation-platonic-reasoning-bridge",
+      "title": "Business Model Motivation <-> Platonic Reasoning Bridge Bridge",
+      "excerpt": "Bridge between Business Model Motivation and Platonic Reasoning Bridge.",
+      "bodyMD": "Cross-reference between Business Model Motivation and Platonic Reasoning Bridge within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "certainty",
+        "business-model",
+        "verification",
+        "platonic",
+        "gates"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "certainty-framework-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "certainty-motivation"
+        },
+        {
+          "rel": "see-also",
+          "to": "platonic-reasoning-bridge"
+        }
+      ],
+      "bridge": {
+        "left": "certainty-motivation",
+        "right": "platonic-reasoning-bridge",
+        "relation": "Cross-reference between Business Model Motivation and Platonic Reasoning Bridge."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "certainty-motivation",
+        "platonic-reasoning-bridge"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/BUSINESS_MODEL.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/platonic-reasoning.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1daf73dacf82b1c1a14c617f34e60c105d13b609c4188f4a51de3f58fb887e78",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-certainty-motivation-platonic-reasoning-bridge",
+      "summary": "Bridge between Business Model Motivation and Platonic Reasoning Bridge."
     }
   ],
   "schema": {

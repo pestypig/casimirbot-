@@ -22,7 +22,8 @@
         "binding-simulation-api",
         "binding-hardware-telemetry",
         "binding-knowledge-docs",
-        "binding-proof-verification"
+        "binding-proof-verification",
+        "bridge-binding-energy-pipeline-binding-curvature-bricks"
       ],
       "links": [],
       "summary": "Backend-to-UI dataflow for physics surfaces and verification panels.",
@@ -631,6 +632,81 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-binding-energy-pipeline-binding-curvature-bricks",
+      "title": "Energy Pipeline Binding <-> Curvature and GR Bricks Bridge",
+      "excerpt": "Bridge between Energy Pipeline Binding and Curvature and GR Bricks.",
+      "bodyMD": "Cross-reference between Energy Pipeline Binding and Curvature and GR Bricks within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "ui",
+        "energy",
+        "pipeline",
+        "curvature",
+        "gr"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "binding-energy-pipeline"
+        },
+        {
+          "rel": "see-also",
+          "to": "binding-curvature-bricks"
+        }
+      ],
+      "bridge": {
+        "left": "binding-energy-pipeline",
+        "right": "binding-curvature-bricks",
+        "relation": "Cross-reference between Energy Pipeline Binding and Curvature and GR Bricks."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "binding-energy-pipeline",
+        "binding-curvature-bricks"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/curvature-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e79416d2cfa49a366bbce49af964d9248502099d3af33126a5e1e0c5a7c9130a",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-binding-energy-pipeline-binding-curvature-bricks",
+      "summary": "Bridge between Energy Pipeline Binding and Curvature and GR Bricks."
     }
   ],
   "schema": {

@@ -16,7 +16,8 @@
         "code-lattice-core",
         "resonance-runtime",
         "resonance-io",
-        "resonance-tests"
+        "resonance-tests",
+        "bridge-code-lattice-core-resonance-runtime"
       ],
       "links": [],
       "summary": "Code-lattice resonance pipeline and diagnostics.",
@@ -639,6 +640,79 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-code-lattice-core-resonance-runtime",
+      "title": "Code Lattice Core <-> Resonance Runtime Bridge",
+      "excerpt": "Bridge between Code Lattice Core and Resonance Runtime.",
+      "bodyMD": "Cross-reference between Code Lattice Core and Resonance Runtime within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "resonance",
+        "schema",
+        "runtime"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "code-lattice-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "resonance-runtime"
+        }
+      ],
+      "bridge": {
+        "left": "code-lattice-core",
+        "right": "resonance-runtime",
+        "relation": "Cross-reference between Code Lattice Core and Resonance Runtime."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "code-lattice-core",
+        "resonance-runtime"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "shared/code-lattice.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:beeb725467f02b2de7eceb23f98296fd864da71711e9f45943cb88880f61b129",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/resonance.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:52b2dd83154833f540976b86255d9aca0d4aa1842fd566e6658af602e5e74513",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-code-lattice-core-resonance-runtime",
+      "summary": "Bridge between Code Lattice Core and Resonance Runtime."
     }
   ],
   "schema": {

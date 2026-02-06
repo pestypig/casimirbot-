@@ -24,7 +24,8 @@
         "potato-threshold",
         "verification-core",
         "stellar-ledger",
-        "sun-ledger"
+        "sun-ledger",
+        "bridge-pipeline-overview-curvature-ledger"
       ],
       "links": [],
       "summary": "A walk from pipeline outputs to ledger verification.",
@@ -567,6 +568,82 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "bridge-pipeline-overview-curvature-ledger",
+      "title": "Pipeline Overview <-> Curvature Ledger Bridge",
+      "excerpt": "Bridge between Pipeline Overview and Curvature Ledger.",
+      "bodyMD": "Cross-reference between Pipeline Overview and Curvature Ledger within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "pipeline",
+        "energy",
+        "proxies",
+        "curvature",
+        "ledger",
+        "constraints"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-ledger-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-overview"
+        },
+        {
+          "rel": "see-also",
+          "to": "curvature-ledger"
+        }
+      ],
+      "bridge": {
+        "left": "pipeline-overview",
+        "right": "curvature-ledger",
+        "relation": "Cross-reference between Pipeline Overview and Curvature Ledger."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "pipeline-overview",
+        "curvature-ledger"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/pipeline.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:68f95fc090448f38ee6d316ddc34fca10c2a8dcd13f6d9a9ac4932af5520629a",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/curvature-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b1674dc1d0926c99450e96ada1613a3067a0fe12ee3568421b7dcd12a4b2ccb7",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-pipeline-overview-curvature-ledger",
+      "summary": "Bridge between Pipeline Overview and Curvature Ledger."
     }
   ],
   "schema": {
