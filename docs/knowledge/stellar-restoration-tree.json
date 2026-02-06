@@ -20,7 +20,9 @@
         "stellar-ledger-stack",
         "stellar-observation-stack",
         "solar-restoration-plan",
-        "bridge-solar-restoration-plan-stellar-ledger-stack"
+        "deep-mixing-plan",
+        "bridge-solar-restoration-plan-stellar-ledger-stack",
+        "bridge-solar-restoration-plan-deep-mixing-plan"
       ],
       "links": [],
       "summary": "A walk from stellar structure to ledgers, monitoring, and restoration plans.",
@@ -694,6 +696,434 @@
       }
     },
     {
+      "id": "deep-mixing-plan",
+      "slug": "deep-mixing-plan",
+      "title": "Deep Mixing Plan",
+      "excerpt": "Tachocline circulation plan for extending solar lifetime.",
+      "bodyMD": "Deep mixing plan describes slow tachocline circulation and guardrails used to extend the Sun's main-sequence lifetime (warp-web/deep-mixing-plan.html, docs/knowledge/deep-mixing.md).\n\nMinimal artifact: deep mixing plan overview.",
+      "tags": [
+        "solar",
+        "mixing",
+        "tachocline",
+        "restoration"
+      ],
+      "children": [
+        "deep-mixing-physics",
+        "deep-mixing-autopilot",
+        "deep-mixing-telemetry",
+        "deep-mixing-ui"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "stellar-restoration-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "solar-restoration-plan"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-deep-mixing"
+        }
+      ],
+      "summary": "Tachocline circulation plan for extending solar lifetime.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "targetDeltaT_Myr",
+          "unit": "Myr",
+          "type": "number",
+          "source": "DeepMixingPreset.targetDeltaT_Myr"
+        },
+        {
+          "name": "epsilon",
+          "unit": "1",
+          "type": "number",
+          "source": "DeepMixingPreset.epsilon"
+        },
+        {
+          "name": "areaFraction",
+          "unit": "1",
+          "type": "number",
+          "source": "DeepMixingPreset.areaFraction"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "vrSetpoint_mps",
+          "unit": "m/s",
+          "type": "number",
+          "source": "deepMixingPhysics.vrSetpoint"
+        }
+      ],
+      "assumptions": [
+        "tachocline circulation is slow and distributed",
+        "guardrails cap luminosity and core temperature drift"
+      ],
+      "validity": {
+        "epsilon": {
+          "min": 0,
+          "max": 1
+        },
+        "areaFraction": {
+          "min": 0.000001,
+          "max": 1
+        }
+      },
+      "deterministic": true,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stellar-restoration-tree",
+        "solar-restoration-plan"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/deep-mixing.md",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:4eceec7e28a4cb1c8993a3e479c229df37b05612c858533ceabd4463f8e283cb"
+        },
+        {
+          "type": "doc",
+          "path": "warp-web/deep-mixing-plan.html",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:624bdc2a7ff35027a7cce0c07fc900bdc121514c1e99fa17235afd6a3ce106aa"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "deep-mixing-physics",
+      "slug": "deep-mixing-physics",
+      "title": "Deep Mixing Physics",
+      "excerpt": "Tachocline mixing setpoint helpers.",
+      "bodyMD": "Deep mixing physics helpers translate epsilon to tachocline flow setpoints (client/src/lib/deepMixingPhysics.ts).\n\nMinimal artifact: vr setpoint helpers.",
+      "tags": [
+        "solar",
+        "mixing",
+        "tachocline",
+        "physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "deep-mixing-plan"
+        }
+      ],
+      "summary": "Tachocline mixing setpoint helpers.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "epsilon",
+          "unit": "1",
+          "type": "number",
+          "source": "DeepMixingPreset.epsilon"
+        },
+        {
+          "name": "areaFraction",
+          "unit": "1",
+          "type": "number",
+          "source": "DeepMixingPreset.areaFraction"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "vrSetpoint_mps",
+          "unit": "m/s",
+          "type": "number",
+          "source": "deepMixingPhysics.vrSetpoint"
+        },
+        {
+          "name": "dotMmix_kg_s",
+          "unit": "kg/s",
+          "type": "number",
+          "source": "deepMixingPhysics.dotMmixFromVr"
+        }
+      ],
+      "assumptions": [
+        "tachocline density treated as constant",
+        "areaFraction clamped to avoid singularities"
+      ],
+      "validity": {
+        "epsilon": {
+          "min": 0,
+          "max": 1
+        },
+        "areaFraction": {
+          "min": 0.000001,
+          "max": 1
+        }
+      },
+      "deterministic": true,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "deep-mixing-plan"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/deepMixingPhysics.ts",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:7b67a9df5a9ff11be96d14e47030b3a85eb82e18b303de70abcd4e0bad695350"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "deep-mixing-autopilot",
+      "slug": "deep-mixing-autopilot",
+      "title": "Deep Mixing Autopilot",
+      "excerpt": "Preset, guardrails, and control trim logic.",
+      "bodyMD": "Autopilot preset and control trim logic for deep mixing (client/src/lib/deepMixingPreset.ts, client/src/pages/helix-core.tsx).\n\nMinimal artifact: preset and control step summary.",
+      "tags": [
+        "solar",
+        "mixing",
+        "autopilot",
+        "guardrails"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "deep-mixing-plan"
+        }
+      ],
+      "summary": "Preset, guardrails, and control trim logic.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "DeepMixingTelemetry",
+          "unit": "dimensionless",
+          "type": "record",
+          "source": "DeepMixingTelemetry"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "duty",
+          "unit": "1",
+          "type": "number",
+          "source": "controlStep"
+        },
+        {
+          "name": "cadenceDays",
+          "unit": "days",
+          "type": "number",
+          "source": "controlStep"
+        }
+      ],
+      "assumptions": [
+        "guardrails enforce luminosity and core temperature caps",
+        "control trim only adjusts cadence and duty"
+      ],
+      "validity": {
+        "duty": {
+          "min": 0.02,
+          "max": 0.4
+        },
+        "cadenceDays": {
+          "min": 20,
+          "max": 90
+        }
+      },
+      "deterministic": true,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "deep-mixing-plan"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/deepMixingPreset.ts",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:592d20c0b763d1daba40020f836b846a7d12c7b5e8ff63de474f102eb5fe8eb9"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-core.tsx",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:1aae5d1325e128a025eaa7b71c0079bcd8b5edbfc587bba46f0b3a8d7979dfbe"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "deep-mixing-telemetry",
+      "slug": "deep-mixing-telemetry",
+      "title": "Deep Mixing Telemetry",
+      "excerpt": "Telemetry schema for deep mixing guardrails.",
+      "bodyMD": "Telemetry schema for deep mixing (DeepMixingTelemetry in client/src/lib/deepMixingPreset.ts).\n\nMinimal artifact: telemetry field list.",
+      "tags": [
+        "solar",
+        "mixing",
+        "telemetry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "deep-mixing-plan"
+        }
+      ],
+      "summary": "Telemetry schema for deep mixing guardrails.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "dLogL_per_Myr",
+          "unit": "1/Myr",
+          "type": "number",
+          "source": "DeepMixingTelemetry"
+        },
+        {
+          "name": "dLogTc_per_Myr",
+          "unit": "1/Myr",
+          "type": "number",
+          "source": "DeepMixingTelemetry"
+        },
+        {
+          "name": "seismicGrowth",
+          "unit": "1",
+          "type": "number",
+          "source": "DeepMixingTelemetry"
+        },
+        {
+          "name": "neutrinoDelta",
+          "unit": "1",
+          "type": "number",
+          "source": "DeepMixingTelemetry"
+        },
+        {
+          "name": "achievedEpsilon",
+          "unit": "1",
+          "type": "number",
+          "source": "DeepMixingTelemetry"
+        }
+      ],
+      "assumptions": [
+        "telemetry values are normalized deltas",
+        "guardrails interpret values per Myr"
+      ],
+      "validity": {},
+      "deterministic": true,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "deep-mixing-plan"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/deepMixingPreset.ts",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:592d20c0b763d1daba40020f836b846a7d12c7b5e8ff63de474f102eb5fe8eb9"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "deep-mixing-ui",
+      "slug": "deep-mixing-ui",
+      "title": "Deep Mixing UI",
+      "excerpt": "UI surface for deep mixing controls and visuals.",
+      "bodyMD": "Deep mixing UI surfaces (client/src/components/DeepMixingSolarView.tsx, client/src/pages/helix-core.tsx, client/src/pages/helix-core.panels.ts).\n\nMinimal artifact: UI wiring and deep mixing panel layout.",
+      "tags": [
+        "solar",
+        "mixing",
+        "ui"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "deep-mixing-plan"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-deep-mixing"
+        }
+      ],
+      "summary": "UI surface for deep mixing controls and visuals.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "deep-mixing-plan"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/DeepMixingSolarView.tsx",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:e7c6d3d0e6f8b2d7f42bb18b0f68c8207eb7838c0ee772b0348af231d8cea0a3"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-core.tsx",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:1aae5d1325e128a025eaa7b71c0079bcd8b5edbfc587bba46f0b3a8d7979dfbe"
+        },
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        },
+        {
+          "type": "doc",
+          "path": "warp-web/deep-mixing-plan.html",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:624bdc2a7ff35027a7cce0c07fc900bdc121514c1e99fa17235afd6a3ce106aa"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
       "id": "bridge-solar-restoration-plan-stellar-ledger-stack",
       "title": "Solar Restoration Plan <-> Stellar Ledger Stack Bridge",
       "excerpt": "Bridge between Solar Restoration Plan and Stellar Ledger Stack.",
@@ -767,6 +1197,80 @@
       ],
       "slug": "bridge-solar-restoration-plan-stellar-ledger-stack",
       "summary": "Bridge between Solar Restoration Plan and Stellar Ledger Stack."
+    },
+    {
+      "id": "bridge-solar-restoration-plan-deep-mixing-plan",
+      "title": "Solar Restoration Plan <-> Deep Mixing Plan Bridge",
+      "excerpt": "Bridge between Solar Restoration Plan and Deep Mixing Plan.",
+      "bodyMD": "Cross-reference between Solar Restoration Plan and Deep Mixing Plan within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "restoration",
+        "solar",
+        "plan",
+        "mixing"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "stellar-restoration-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "solar-restoration-plan"
+        },
+        {
+          "rel": "see-also",
+          "to": "deep-mixing-plan"
+        }
+      ],
+      "bridge": {
+        "left": "solar-restoration-plan",
+        "right": "deep-mixing-plan",
+        "relation": "Cross-reference between Solar Restoration Plan and Deep Mixing Plan."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "solar-restoration-plan",
+        "deep-mixing-plan"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/solar-restoration.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:acd9d5f26eff13797063abf2bdfddf3f246639aaae330bd51d4deccf7aa7bf0b",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/deep-mixing.md",
+          "repo_rev": "caaae92216bf393991dc3955038c93f6d321b818",
+          "content_hash": "sha256:4eceec7e28a4cb1c8993a3e479c229df37b05612c858533ceabd4463f8e283cb",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-solar-restoration-plan-deep-mixing-plan",
+      "summary": "Bridge between Solar Restoration Plan and Deep Mixing Plan."
     }
   ],
   "schema": {

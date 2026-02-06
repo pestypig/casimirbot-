@@ -8741,6 +8741,11 @@ const buildToolResultsBlock = (items: HelixAskPromptItem[]): string => {
   return `${clipped}\nEND_TOOL_RESULTS`;
 };
 
+const toolResultsHas = (toolResultsBlock: string | undefined, type: string): boolean => {
+  if (!toolResultsBlock?.trim()) return false;
+  return toolResultsBlock.includes(`[${type}]`);
+};
+
 const buildToolResultsFallbackAnswer = (args: {
   definitionFocus: boolean;
   docBlocks: Array<{ path: string; block: string }>;
@@ -9369,6 +9374,7 @@ function buildHelixAskSynthesisPrompt(
   const twoParagraphContract = hasTwoParagraphContract(question);
   const spec = resolveHelixAskVerbositySpec(verbosity);
   const paragraphDescriptor = verbosity === "brief" ? "short " : "";
+  const hasCodeSpans = toolResultsHas(toolResultsBlock, "code_spans");
   if (format === "steps") {
     lines.push("Use only the evidence steps below. Do not add new steps.");
     if (stageTags) {
@@ -9395,6 +9401,11 @@ function buildHelixAskSynthesisPrompt(
       lines.push(
         "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
       );
+      if (!hasCodeSpans) {
+        lines.push(
+          "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
+        );
+      }
       lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
       lines.push(toolResultsBlock.trim());
     }
@@ -9423,6 +9434,11 @@ function buildHelixAskSynthesisPrompt(
       lines.push(
         "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
       );
+      if (!hasCodeSpans) {
+        lines.push(
+          "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
+        );
+      }
       lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
       lines.push(toolResultsBlock.trim());
     }
@@ -9461,6 +9477,7 @@ function buildHelixAskPromptSynthesisPrompt(
   const twoParagraphContract = hasTwoParagraphContract(question);
   const spec = resolveHelixAskVerbositySpec(verbosity);
   const paragraphDescriptor = verbosity === "brief" ? "short " : "";
+  const hasCodeSpans = toolResultsHas(toolResultsBlock, "code_spans");
   if (format === "steps") {
     lines.push("Use only the evidence steps below. Do not add new steps.");
     if (stageTags) {
@@ -9484,6 +9501,11 @@ function buildHelixAskPromptSynthesisPrompt(
       lines.push(
         "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
       );
+      if (!hasCodeSpans) {
+        lines.push(
+          "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
+        );
+      }
       lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
       lines.push(toolResultsBlock.trim());
     }
@@ -9508,6 +9530,11 @@ function buildHelixAskPromptSynthesisPrompt(
       lines.push(
         "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
       );
+      if (!hasCodeSpans) {
+        lines.push(
+          "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
+        );
+      }
       lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
       lines.push(toolResultsBlock.trim());
     }
@@ -9550,6 +9577,7 @@ function buildHelixAskHybridPrompt(
   const hasConstraintEvidence = Boolean(constraintEvidence?.trim());
   const spec = resolveHelixAskVerbositySpec(verbosity);
   const paragraphDescriptor = verbosity === "brief" ? "short " : "";
+  const hasCodeSpans = toolResultsHas(toolResultsBlock, "code_spans");
   if (format === "steps") {
     lines.push(
       `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
@@ -9627,6 +9655,11 @@ function buildHelixAskHybridPrompt(
     lines.push(
       "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
     );
+    if (!hasCodeSpans) {
+      lines.push(
+        "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
+      );
+    }
     lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
     lines.push(toolResultsBlock.trim());
     lines.push("");

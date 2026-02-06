@@ -80,13 +80,47 @@ This tree connects star physics, ledgers, and restoration obligations. Minimal a
 - type: concept
 - summary: Solar restoration connects physics to commitment (docs/knowledge/solar-restoration.md). Minimal artifact: restoration objectives list.
 
+### Node: Deep Mixing Plan
+- id: deep-mixing-plan
+- type: concept
+- summary: Deep mixing plan describes slow tachocline circulation and guardrails used to extend the Sun's main-sequence lifetime (warp-web/deep-mixing-plan.html, docs/knowledge/deep-mixing.md). Minimal artifact: deep mixing plan overview.
+
+### Node: Deep Mixing Physics
+- id: deep-mixing-physics
+- type: concept
+- summary: Deep mixing physics helpers translate epsilon to tachocline flow setpoints (client/src/lib/deepMixingPhysics.ts). Minimal artifact: vr setpoint helpers.
+
+### Node: Deep Mixing Autopilot
+- id: deep-mixing-autopilot
+- type: concept
+- summary: Autopilot preset and control trim logic for deep mixing (client/src/lib/deepMixingPreset.ts, client/src/pages/helix-core.tsx). Minimal artifact: preset and control step summary.
+
+### Node: Deep Mixing Telemetry
+- id: deep-mixing-telemetry
+- type: concept
+- summary: Telemetry schema for deep mixing (DeepMixingTelemetry in client/src/lib/deepMixingPreset.ts). Minimal artifact: telemetry field list.
+
+### Node: Deep Mixing UI
+- id: deep-mixing-ui
+- type: concept
+- summary: Deep mixing UI surfaces (client/src/components/DeepMixingSolarView.tsx, client/src/pages/helix-core.tsx, client/src/pages/helix-core.panels.ts). Minimal artifact: UI wiring and deep mixing panel layout.
+
 ### Node: Solar Restoration Plan <-> Stellar Ledger Stack Bridge
 - id: bridge-solar-restoration-plan-stellar-ledger-stack
 - type: bridge
 - summary: Cross-reference between Solar Restoration Plan and Stellar Ledger Stack within this tree. Minimal artifact: left/right evidence anchors.
+
+### Node: Solar Restoration Plan <-> Deep Mixing Plan Bridge
+- id: bridge-solar-restoration-plan-deep-mixing-plan
+- type: bridge
+- summary: Cross-reference between Solar Restoration Plan and Deep Mixing Plan within this tree. Minimal artifact: left/right evidence anchors.
 
 ## Bridges
 
 ### Bridge: Solar Restoration Plan <-> Stellar Ledger Stack
 - relation: Cross-reference between Solar Restoration Plan and Stellar Ledger Stack.
 - summary: Cross-reference between Solar Restoration Plan and Stellar Ledger Stack within this tree. Minimal artifact: left/right evidence anchors.
+
+### Bridge: Solar Restoration Plan <-> Deep Mixing Plan
+- relation: Cross-reference between Solar Restoration Plan and Deep Mixing Plan.
+- summary: Cross-reference between Solar Restoration Plan and Deep Mixing Plan within this tree. Minimal artifact: left/right evidence anchors.
