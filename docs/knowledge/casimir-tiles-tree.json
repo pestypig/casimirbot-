@@ -38,6 +38,13 @@
         "tiles",
         "overview"
       ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/casimir-tiles.md",
+          "contains": "Definition"
+        }
+      ],
       "children": [],
       "links": [
         {
@@ -56,6 +63,13 @@
         "mechanism",
         "casimir",
         "tiles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/casimir-tile-mechanism.md",
+          "heading": "1) Mechanism in one view"
+        }
       ],
       "children": [],
       "links": [
@@ -113,6 +127,18 @@
         "guardrails",
         "code-map",
         "casimir"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/guarded-casimir-tile-code-mapped.md",
+          "heading": "2.1 Ideal parallel-plate Casimir energy and pressure"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "symbol": "casimirPressure_Pa"
+        }
       ],
       "children": [],
       "links": [
@@ -215,6 +241,13 @@
         "static",
         "baseline"
       ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/sim_core/static-casimir.ts",
+          "symbol": "calculateCasimirEnergy"
+        }
+      ],
       "children": [],
       "links": [
         {
@@ -233,6 +266,13 @@
         "casimir",
         "dynamic",
         "sweep"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/dynamic/dynamic-casimir.ts",
+          "symbol": "calculateDynamicCasimir"
+        }
       ],
       "children": [],
       "links": [
@@ -253,6 +293,13 @@
         "inference",
         "force"
       ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/sim_core/casimir-inference.ts",
+          "symbol": "inferEnergyFromForceSeries"
+        }
+      ],
       "children": [],
       "links": [
         {
@@ -272,6 +319,13 @@
         "metric",
         "geometry"
       ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/dynamic/natario-metric.ts",
+          "symbol": "natarioFromPipeline"
+        }
+      ],
       "children": [],
       "links": [
         {
@@ -290,6 +344,13 @@
         "stress-energy",
         "casimir",
         "equations"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "modules/dynamic/stress-energy-equations.ts",
+          "symbol": "stressEnergyFromDensity"
+        }
       ],
       "children": [],
       "links": [

@@ -126,6 +126,7 @@ import {
   readDocSectionIndex,
   selectDocSectionMatch,
   type DocSection,
+  findDocSectionByHeading,
 } from "../services/helix-ask/doc-sections";
 import {
   evaluateClaimCoverage,
@@ -161,6 +162,7 @@ import {
 } from "../services/helix-ask/math";
 import {
   resolveHelixAskGraphPack,
+  type HelixAskGraphEvidence,
   type HelixAskGraphPack,
 } from "../services/helix-ask/graph-resolver";
 import {
@@ -7546,6 +7548,101 @@ const buildDefinitionRegistryBlocks = (
   return blocks;
 };
 
+const normalizeGraphEvidenceKey = (entry: HelixAskGraphEvidence): string => {
+  const parts = [
+    entry.type,
+    entry.path ?? "",
+    entry.symbol ?? "",
+    entry.heading ?? "",
+    entry.field ?? "",
+    entry.contains ?? "",
+    entry.note ?? "",
+  ]
+    .map((value) => value.toLowerCase().trim())
+    .filter(Boolean);
+  return parts.join("|");
+};
+
+const collectGraphEvidenceItems = (graphPack: HelixAskGraphPack | null): HelixAskGraphEvidence[] => {
+  if (!graphPack?.frameworks?.length) return [];
+  const collected: HelixAskGraphEvidence[] = [];
+  const seen = new Set<string>();
+  for (const framework of graphPack.frameworks) {
+    const nodes = [...(framework.path ?? []), ...(framework.anchors ?? [])];
+    for (const node of nodes) {
+      if (!node.evidence?.length) continue;
+      for (const entry of node.evidence) {
+        const key = normalizeGraphEvidenceKey(entry);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        collected.push(entry);
+      }
+    }
+  }
+  return collected;
+};
+
+const buildGraphEvidenceMatchTerms = (
+  entry: HelixAskGraphEvidence,
+  fallback: { tokens: string[]; phrases: string[] },
+): { tokens: string[]; phrases: string[] } => {
+  const seed = (entry.contains ?? entry.heading ?? entry.symbol ?? entry.field ?? "").trim();
+  if (!seed) return fallback;
+  const tokens = new Set<string>();
+  filterSignalTokens(tokenizeAskQuery(seed))
+    .map((token) => token.toLowerCase())
+    .forEach((token) => tokens.add(token));
+  const phrases = seed.includes(" ") ? [seed.toLowerCase()] : [];
+  return {
+    tokens: tokens.size > 0 ? Array.from(tokens) : fallback.tokens,
+    phrases: phrases.length > 0 ? phrases : fallback.phrases,
+  };
+};
+
+const buildGraphEvidenceDocBlocks = (args: {
+  evidence: HelixAskGraphEvidence[];
+  question: string;
+  conceptMatch: HelixAskConceptMatch | null;
+  existingBlocks: Array<{ path: string; block: string }>;
+}): { blocks: Array<{ path: string; block: string }>; paths: string[] } => {
+  const docEvidence = args.evidence.filter((entry) => entry.type === "doc" && entry.path);
+  if (docEvidence.length === 0) return { blocks: [], paths: [] };
+  const existing = new Set(args.existingBlocks.map((block) => block.path.replace(/\\/g, "/").toLowerCase()));
+  const fallbackTerms = buildDefinitionMatchTerms(args.question, args.conceptMatch);
+  const blocks: Array<{ path: string; block: string }> = [];
+  const paths: string[] = [];
+  for (const entry of docEvidence) {
+    const normalizedPath = (entry.path ?? "").replace(/\\/g, "/").trim();
+    if (!normalizedPath) continue;
+    const key = normalizedPath.toLowerCase();
+    if (existing.has(key)) continue;
+    const index = readDocSectionIndex(normalizedPath);
+    if (!index.sections.length) continue;
+    let snippet = "";
+    if (entry.heading) {
+      const section = findDocSectionByHeading(index, entry.heading);
+      if (section) {
+        snippet = buildDocSectionSnippet(section);
+      }
+    }
+    if (!snippet) {
+      const matchTerms = buildGraphEvidenceMatchTerms(entry, fallbackTerms);
+      const match = selectDocSectionMatch(index, matchTerms.tokens, matchTerms.phrases);
+      if (match.snippet) {
+        snippet = match.snippet;
+      } else {
+        snippet = buildDocSectionSnippet(index.sections[0]);
+      }
+    }
+    if (!snippet) continue;
+    const block = `${normalizedPath}\n${snippet}`;
+    blocks.push({ path: normalizedPath, block });
+    paths.push(normalizedPath);
+    existing.add(key);
+  }
+  return { blocks, paths };
+};
+
   const DOC_PROOF_SPAN_RE = /\bSpan:\s*L\d+/i;
   const DOC_SECTION_LINE_RE = /\b(Section|Title|Heading|Subheading|Doc):\s+/i;
 
@@ -8326,6 +8423,74 @@ const extractCodeSpanFromFile = (
   } catch {
     return { snippet: "" };
   }
+};
+
+const buildGraphEvidenceCodeSpans = async (args: {
+  evidence: HelixAskGraphEvidence[];
+  question: string;
+  topicProfile?: HelixAskTopicProfile | null;
+}): Promise<HelixAskCodeSpan[]> => {
+  if (!HELIX_ASK_CODE_ALIGNMENT) return [];
+  const entries = args.evidence.filter((entry) => entry.type !== "doc");
+  if (entries.length === 0) return [];
+  const spans: HelixAskCodeSpan[] = [];
+  const seen = new Set<string>();
+  let bytesUsed = 0;
+  let snapshot: Awaited<ReturnType<typeof loadCodeLattice>> | null = null;
+  const ensureSnapshot = async () => {
+    if (snapshot === null) {
+      snapshot = await loadCodeLattice();
+    }
+    return snapshot;
+  };
+  for (const entry of entries) {
+    if (spans.length >= HELIX_ASK_CODE_ALIGN_MAX_SPANS) break;
+    const symbol = (entry.symbol ?? entry.field ?? entry.contains ?? "").trim();
+    if (!symbol) continue;
+    let filePath = entry.path;
+    if (!filePath) {
+      const lattice = await ensureSnapshot();
+      if (!lattice) continue;
+      const multi = collectAskCandidatesMultiChannel(lattice, symbol, args.question, {
+        topicProfile: args.topicProfile,
+      });
+      const flat = multi.lists.flatMap((list) => list.candidates);
+      flat.sort((a, b) => b.score - a.score);
+      if (entry.type === "test") {
+        const testCandidate = flat.find((candidate) =>
+          /(^|\/)(tests?|specs?)[/\\]/i.test(candidate.filePath ?? "") || /\.spec\./i.test(candidate.filePath ?? ""),
+        );
+        if (testCandidate?.filePath) {
+          filePath = testCandidate.filePath;
+        }
+      }
+      if (!filePath) {
+        filePath = flat[0]?.filePath;
+      }
+    }
+    if (!filePath) continue;
+    const { snippet, span } = extractCodeSpanFromFile(filePath, symbol);
+    const trimmedSnippet = snippet ? clipAskText(snippet, 400) : "";
+    if (!trimmedSnippet) continue;
+    const key = `${symbol}|${filePath}`.toLowerCase();
+    if (seen.has(key)) continue;
+    const candidateBytes = trimmedSnippet.length;
+    if (bytesUsed + candidateBytes > HELIX_ASK_CODE_ALIGN_MAX_BYTES && spans.length > 0) break;
+    bytesUsed += candidateBytes;
+    const isTest =
+      entry.type === "test" ||
+      /(^|\/)(tests?|specs?)[/\\]/i.test(filePath) ||
+      /\.spec\./i.test(filePath);
+    spans.push({
+      symbol,
+      filePath,
+      snippet: trimmedSnippet,
+      span,
+      isTest,
+    });
+    seen.add(key);
+  }
+  return spans;
 };
 
 const buildCodeAlignmentFromDocBlocks = async (
@@ -12774,10 +12939,14 @@ const executeHelixAsk = async ({
       definition_doc_required?: boolean;
       definition_doc_ok?: boolean;
       definition_doc_blocks?: number;
-      definition_doc_span_rate?: number;
-      definition_registry_paths?: string[];
-      definition_registry_blocks?: number;
-      claim_ref_rate?: number;
+        definition_doc_span_rate?: number;
+        definition_registry_paths?: string[];
+        definition_registry_blocks?: number;
+        graph_evidence_count?: number;
+        graph_evidence_doc_blocks?: number;
+        graph_evidence_code_spans?: number;
+        graph_evidence_types?: string[];
+        claim_ref_rate?: number;
       report_mode?: boolean;
       report_mode_reason?: string;
       report_blocks_count?: number;
@@ -14726,6 +14895,7 @@ const executeHelixAsk = async ({
     let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
     let docSlotTargets: string[] = [];
     let docBlocks: Array<{ path: string; block: string }> = [];
+    let graphEvidenceItems: HelixAskGraphEvidence[] = [];
     let minDocEvidenceCards = 0;
     const providedContextFiles = Array.isArray((parsed.data as any).contextFiles)
       ? (parsed.data as any).contextFiles
@@ -17910,6 +18080,38 @@ const executeHelixAsk = async ({
         }
       }
 
+      graphEvidenceItems = collectGraphEvidenceItems(graphPack);
+      if (graphEvidenceItems.length > 0) {
+        const graphDoc = buildGraphEvidenceDocBlocks({
+          evidence: graphEvidenceItems,
+          question: baseQuestion,
+          conceptMatch,
+          existingBlocks: docBlocks,
+        });
+        if (graphDoc.blocks.length > 0) {
+          const existing = new Set(docBlocks.map((block) => block.path.replace(/\\/g, "/").toLowerCase()));
+          const mergedBlocks = [...docBlocks];
+          graphDoc.blocks.forEach((block) => {
+            const key = block.path.replace(/\\/g, "/").toLowerCase();
+            if (!existing.has(key)) {
+              mergedBlocks.push(block);
+              existing.add(key);
+            }
+          });
+          docBlocks = mergedBlocks;
+        }
+        if (graphDoc.paths.length > 0) {
+          contextFiles = Array.from(new Set([...contextFiles, ...graphDoc.paths]));
+        }
+        if (debugPayload) {
+          debugPayload.graph_evidence_count = graphEvidenceItems.length;
+          debugPayload.graph_evidence_doc_blocks = graphDoc.blocks.length;
+          debugPayload.graph_evidence_types = Array.from(
+            new Set(graphEvidenceItems.map((entry) => entry.type)),
+          ).sort();
+        }
+      }
+
       if (graphPack) {
         const bindingBlocks =
           definitionFocus && docBlocks.length > 0
@@ -17953,21 +18155,56 @@ const executeHelixAsk = async ({
         }
       }
 
-      if (HELIX_ASK_CODE_ALIGNMENT && docBlocks.length > 0) {
-        codeAlignment = await buildCodeAlignmentFromDocBlocks(
-          docBlocks,
-          baseQuestion,
-          topicProfile,
-        );
-        if (debugPayload) {
-          debugPayload.code_alignment_applied = true;
-          debugPayload.code_alignment_symbols = codeAlignment.symbols.slice();
-          debugPayload.code_alignment_resolved = codeAlignment.resolved.slice();
-          debugPayload.code_spans_added = codeAlignment.spans.length;
+        if (HELIX_ASK_CODE_ALIGNMENT && (docBlocks.length > 0 || graphEvidenceItems.length > 0)) {
+          if (docBlocks.length > 0) {
+            codeAlignment = await buildCodeAlignmentFromDocBlocks(
+              docBlocks,
+              baseQuestion,
+              topicProfile,
+            );
+          } else {
+            codeAlignment = { spans: [], symbols: [], resolved: [] };
+          }
+          if (graphEvidenceItems.length > 0) {
+            const alignment = codeAlignment ?? { spans: [], symbols: [], resolved: [] };
+            codeAlignment = alignment;
+            const graphEvidenceSpans = await buildGraphEvidenceCodeSpans({
+              evidence: graphEvidenceItems,
+              question: baseQuestion,
+              topicProfile,
+            });
+            if (graphEvidenceSpans.length > 0) {
+              const existing = new Set(
+                (alignment.spans ?? []).map((span) =>
+                  `${span.symbol}|${span.filePath}`.toLowerCase(),
+                ),
+              );
+              const merged = [...(alignment.spans ?? [])];
+              graphEvidenceSpans.forEach((span) => {
+                const key = `${span.symbol}|${span.filePath}`.toLowerCase();
+                if (!existing.has(key)) {
+                  merged.push(span);
+                  existing.add(key);
+                  if (alignment.resolved && !alignment.resolved.includes(span.filePath)) {
+                    alignment.resolved.push(span.filePath);
+                  }
+                }
+              });
+              alignment.spans = merged;
+              if (debugPayload) {
+                debugPayload.graph_evidence_code_spans = graphEvidenceSpans.length;
+              }
+            }
+          }
+          if (debugPayload) {
+            debugPayload.code_alignment_applied = true;
+            debugPayload.code_alignment_symbols = codeAlignment.symbols.slice();
+            debugPayload.code_alignment_resolved = codeAlignment.resolved.slice();
+            debugPayload.code_spans_added = codeAlignment.spans.length;
+          }
+        } else if (debugPayload) {
+          debugPayload.code_alignment_applied = false;
         }
-      } else if (debugPayload) {
-        debugPayload.code_alignment_applied = false;
-      }
 
       const promptRetrievalConfidence =
         typeof debugPayload?.retrieval_confidence === "number"

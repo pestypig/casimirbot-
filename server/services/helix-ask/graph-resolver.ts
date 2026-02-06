@@ -14,6 +14,17 @@ export type HelixAskGraphResolvedNode = {
   depth: number;
   relation?: string;
   role?: string;
+  evidence?: HelixAskGraphEvidence[];
+};
+
+export type HelixAskGraphEvidence = {
+  type: "doc" | "code" | "test" | "telemetry";
+  path?: string;
+  symbol?: string;
+  heading?: string;
+  field?: string;
+  contains?: string;
+  note?: string;
 };
 
 export type HelixAskGraphFramework = {
@@ -80,6 +91,7 @@ type GraphNode = {
   tags: string[];
   children: string[];
   links: GraphLink[];
+  evidence?: HelixAskGraphEvidence[];
   searchText: string;
   tagText: string;
 };
@@ -187,6 +199,35 @@ const buildSearchText = (node: GraphNode): string => {
 
 const buildTagText = (node: GraphNode): string => normalizeText((node.tags ?? []).join(" "));
 
+const normalizeEvidenceEntry = (value: unknown): HelixAskGraphEvidence | null => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const type = typeof raw.type === "string" ? raw.type.trim().toLowerCase() : "";
+  if (!["doc", "code", "test", "telemetry"].includes(type)) return null;
+  const entry: HelixAskGraphEvidence = { type: type as HelixAskGraphEvidence["type"] };
+  const assignString = (key: Exclude<keyof HelixAskGraphEvidence, "type">) => {
+    const rawValue = raw[key as string];
+    if (typeof rawValue !== "string") return;
+    const trimmed = rawValue.trim();
+    if (!trimmed) return;
+    entry[key] = trimmed;
+  };
+  assignString("path");
+  assignString("symbol");
+  assignString("heading");
+  assignString("field");
+  assignString("contains");
+  assignString("note");
+  return entry;
+};
+
+const normalizeEvidenceList = (value: unknown): HelixAskGraphEvidence[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => normalizeEvidenceEntry(entry))
+    .filter((entry): entry is HelixAskGraphEvidence => Boolean(entry));
+};
+
 const coerceNode = (raw: any): GraphNode | null => {
   if (!raw || typeof raw !== "object") return null;
   const id = typeof raw.id === "string" ? raw.id.trim() : "";
@@ -198,6 +239,7 @@ const coerceNode = (raw: any): GraphNode | null => {
   const tags = ensureArray<string>(raw.tags).filter((entry) => typeof entry === "string");
   const children = ensureArray<string>(raw.children).filter((entry) => typeof entry === "string");
   const links = ensureArray<GraphLink>(raw.links).filter((link) => link && typeof link === "object");
+  const evidence = normalizeEvidenceList(raw.evidence);
   const node: GraphNode = {
     id,
     slug,
@@ -207,6 +249,7 @@ const coerceNode = (raw: any): GraphNode | null => {
     tags,
     children,
     links,
+    evidence: evidence.length > 0 ? evidence : undefined,
     searchText: "",
     tagText: "",
   };
@@ -412,6 +455,7 @@ const resolveRoles = (
         depth: 0,
         relation: "role",
         role,
+        evidence: best.evidence,
       });
     }
   }
@@ -521,6 +565,7 @@ const buildFrameworkCandidate = (
     score: entry.score,
     depth: 0,
     relation: "anchor",
+    evidence: entry.node.evidence,
   }));
   const maxDepth = treeConfig.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxNodes = treeConfig.maxNodes ?? DEFAULT_MAX_NODES;
@@ -564,6 +609,7 @@ const buildFrameworkCandidate = (
         score: entry.score,
         depth: current.depth + 1,
         relation: neighbor.rel,
+        evidence: node.evidence,
       });
       queue.push({ id: neighbor.id, depth: current.depth + 1 });
     }
