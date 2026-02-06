@@ -35,6 +35,41 @@ Recommended for reproducibility:
 
 Template: `docs/knowledge/dag-node-schema.md`
 
+## DAG Full-Access Checklist (Must Complete)
+To give Helix Ask full access to DAG nodes across the repo, complete all items below.
+
+1) **Schema coverage per tree**
+- Add DAG fields to every node in core trees:
+  - `docs/knowledge/casimir-tiles-tree.json`
+  - `docs/knowledge/stellar-restoration-tree.json`
+  - `docs/knowledge/warp/**` trees
+  - `docs/knowledge/ideology-tree.json`
+
+2) **Dependencies + DAG edges**
+- Add `dependencies` arrays and/or `links: [{ rel: "depends-on", to: "node-id" }]` to all derived nodes.
+- Ensure no cycles (DAG only).
+
+3) **Evidence completeness**
+Each node must include at least:
+- 1 doc anchor (definition/assumptions)
+- 1 code anchor (implementation)
+- 1 telemetry field or test (behavior constraint)
+If telemetry is missing, tests are mandatory.
+
+4) **Environment + version pins (science-grade)**
+Add evidence-level provenance:
+- `repo_rev` (commit SHA or tag)
+- `content_hash` (sha256 of snippet or file slice)
+- `environment.lockfile` (e.g., `package-lock.json`)
+
+5) **Binding coverage**
+- Enforce a minimum `tree_walk_binding_rate` (target ≥ 0.5).
+- If below threshold, raise a warning in debug output.
+
+6) **Batch expansion**
+- Apply the schema to remaining trees beyond the core set above.
+- Prioritize trees with highest Helix Ask hit rate.
+
 ## Non-Goals
 - Re-introducing multi-LLM planning or multi-LLM evidence distillation.
 - Allowing tree JSON alone to stand in for definitions when a doc span exists.
