@@ -121,7 +121,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -181,7 +183,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -241,7 +245,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -301,7 +307,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -367,7 +375,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -434,7 +444,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -500,7 +512,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -566,7 +580,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -632,7 +648,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

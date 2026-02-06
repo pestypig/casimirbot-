@@ -87,7 +87,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -150,7 +152,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-classical-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -199,7 +203,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-classical-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -248,7 +254,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-classical-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -297,7 +305,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-classical-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -342,7 +352,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -399,7 +411,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-statistical-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -448,7 +462,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-statistical-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -497,7 +513,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-statistical-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -561,7 +579,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -610,7 +630,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-data-contracts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -665,7 +687,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-data-contracts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -717,7 +741,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -766,7 +792,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-quantum-stochastic"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -827,7 +855,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-quantum-stochastic"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -873,7 +903,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -930,7 +962,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-approximation-ladders"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -979,7 +1013,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-approximation-ladders"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1034,7 +1070,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-approximation-ladders"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1083,7 +1121,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-approximation-ladders"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1147,7 +1187,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1202,7 +1244,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-collapse-constraints"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1251,7 +1295,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-collapse-constraints"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1296,7 +1342,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-mechanics-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1359,7 +1407,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-reality-bounds"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1408,7 +1458,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-reality-bounds"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1457,7 +1509,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "uncertainty-reality-bounds"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

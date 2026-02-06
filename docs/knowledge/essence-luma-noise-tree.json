@@ -96,7 +96,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -150,7 +152,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -204,7 +208,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -258,7 +264,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -318,7 +326,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -372,7 +382,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -432,7 +444,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -486,7 +500,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -536,7 +552,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "essence-luma-noise-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

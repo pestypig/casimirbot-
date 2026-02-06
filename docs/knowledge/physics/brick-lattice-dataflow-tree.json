@@ -308,7 +308,9 @@
       "environment": {
         "runtime": "node"
       },
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -580,7 +582,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -647,7 +651,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -714,7 +720,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -777,7 +785,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -838,7 +848,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

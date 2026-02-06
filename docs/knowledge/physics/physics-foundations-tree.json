@@ -98,7 +98,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -161,7 +163,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -210,7 +214,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -259,7 +265,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -309,7 +317,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -372,7 +382,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "field-equations-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -421,7 +433,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "field-equations-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -470,7 +484,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "field-equations-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -518,7 +534,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -581,7 +599,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stress-energy-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -630,7 +650,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stress-energy-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -679,7 +701,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -742,7 +766,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "energy-conditions-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -791,7 +817,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "energy-conditions-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -840,7 +868,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "energy-conditions-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -898,7 +928,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -947,7 +979,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "casimir-phenomena"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -996,7 +1030,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "casimir-phenomena"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1045,7 +1081,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "casimir-phenomena"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1094,7 +1132,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "casimir-phenomena"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1145,7 +1185,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1208,7 +1250,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1257,7 +1301,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1306,7 +1352,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1355,7 +1403,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1403,7 +1453,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1466,7 +1518,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1515,7 +1569,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1564,7 +1620,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1613,7 +1671,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1656,7 +1716,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1713,7 +1775,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "time-bounds-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1762,7 +1826,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1825,7 +1891,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "viability-and-claims"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1874,7 +1942,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "viability-and-claims"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1923,7 +1993,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "viability-and-claims"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1972,7 +2044,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2021,7 +2095,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2070,7 +2146,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2119,7 +2197,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2174,7 +2254,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2229,7 +2311,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2284,7 +2368,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

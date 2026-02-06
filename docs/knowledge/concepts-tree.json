@@ -80,7 +80,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "concepts-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -136,7 +138,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "epistemic-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -184,7 +188,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "epistemic-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -232,7 +238,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "epistemic-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -276,7 +284,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "concepts-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -332,7 +342,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "reasoning-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -380,7 +392,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "reasoning-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -422,7 +436,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "concepts-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -478,7 +494,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "model-landscape-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -525,7 +543,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "reasoning-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

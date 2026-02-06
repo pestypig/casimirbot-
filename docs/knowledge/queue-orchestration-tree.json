@@ -87,7 +87,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -135,7 +137,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -201,7 +205,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -255,7 +261,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -309,7 +317,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -363,7 +373,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

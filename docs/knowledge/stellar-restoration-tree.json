@@ -82,7 +82,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-restoration-tree"
+      ],
       "evidence": [
         {
           "type": "doc",
@@ -145,7 +147,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-structure-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -188,7 +192,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-restoration-tree"
+      ],
       "evidence": [
         {
           "type": "doc",
@@ -245,7 +251,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-evolution-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -289,7 +297,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-restoration-tree"
+      ],
       "evidence": [
         {
           "type": "doc",
@@ -346,7 +356,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-ledger-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -395,7 +407,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-ledger-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -440,7 +454,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-restoration-tree"
+      ],
       "evidence": [
         {
           "type": "code",
@@ -503,7 +519,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-observation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -552,7 +570,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-observation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -601,7 +621,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-observation-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -654,7 +676,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stellar-restoration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

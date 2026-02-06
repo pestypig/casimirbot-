@@ -101,7 +101,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -149,7 +151,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -198,7 +202,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -247,7 +253,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -297,7 +305,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -353,7 +363,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -401,7 +413,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -449,7 +463,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -497,7 +513,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -545,7 +563,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -593,7 +613,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -641,7 +663,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -689,7 +713,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -744,7 +770,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -800,7 +828,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -848,7 +878,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -896,7 +928,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -944,7 +978,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -992,7 +1028,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1040,7 +1078,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1088,7 +1128,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1136,7 +1178,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1184,7 +1228,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1232,7 +1278,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1280,7 +1328,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1328,7 +1378,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1376,7 +1428,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

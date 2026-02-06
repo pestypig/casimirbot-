@@ -107,7 +107,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-specialists-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -156,7 +158,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-specialists-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -213,7 +217,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-specialists-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -268,7 +274,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-specialists-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -339,7 +347,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-specialists-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -404,7 +414,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-specialists-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -453,7 +465,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "debate-specialists-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

@@ -86,7 +86,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -134,7 +136,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "code-lattice-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -191,7 +195,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -239,7 +245,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-runtime"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -287,7 +295,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-runtime"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -358,7 +368,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -406,7 +418,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-io"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -454,7 +468,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-io"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -502,7 +518,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-io"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -550,7 +568,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-io"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -604,7 +624,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "resonance-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

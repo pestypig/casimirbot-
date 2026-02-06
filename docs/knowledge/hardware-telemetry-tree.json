@@ -87,7 +87,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "hardware-telemetry-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -141,7 +143,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "hardware-telemetry-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -196,7 +200,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "hardware-telemetry-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -258,7 +264,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "hardware-telemetry-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -318,7 +326,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "hardware-telemetry-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -366,7 +376,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "hardware-telemetry-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

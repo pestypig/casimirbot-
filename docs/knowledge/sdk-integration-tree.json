@@ -111,7 +111,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -164,7 +166,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -215,7 +219,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -264,7 +270,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -319,7 +327,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
