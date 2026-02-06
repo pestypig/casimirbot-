@@ -761,7 +761,7 @@
         }
       ],
       "summary": "Stress-energy grids for GR evolution.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
@@ -770,26 +770,95 @@
         {
           "type": "code",
           "path": "server/gr/evolution/stress-energy.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/stress-energy-units.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "grid",
+          "unit": "m",
+          "type": "GridSpec",
+          "source": "modules/gr/bssn-state.ts"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rho",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sx",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sy",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_xx",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_yy",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_zz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_xy",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_xz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_yz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        }
+      ],
+      "assumptions": [
+        "field arrays match grid cell count",
+        "stress-energy stored on uniform grid"
+      ],
+      "validity": {
+        "grid": {
+          "minCells": 1
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
+      "environment": {
+        "runtime": "node"
+      },
       "dependencies": [],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -812,31 +881,111 @@
         }
       ],
       "summary": "Integrals over stress-energy fields.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "modules/gr/stress-energy-integrals.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/mass-semantics.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/stress-energy-integrals.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "rho",
+          "unit": "J/m^3",
+          "type": "Float32Array",
+          "source": "gr-stress-energy.rho"
+        },
+        {
+          "name": "Sx",
+          "unit": "J/m^3",
+          "type": "Float32Array",
+          "source": "gr-stress-energy.Sx"
+        },
+        {
+          "name": "Sy",
+          "unit": "J/m^3",
+          "type": "Float32Array",
+          "source": "gr-stress-energy.Sy"
+        },
+        {
+          "name": "Sz",
+          "unit": "J/m^3",
+          "type": "Float32Array",
+          "source": "gr-stress-energy.Sz"
+        },
+        {
+          "name": "grid",
+          "unit": "m",
+          "type": "GridSpec",
+          "source": "modules/gr/bssn-state.ts"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "totalEnergy_J",
+          "unit": "J",
+          "type": "float"
+        },
+        {
+          "name": "totalMomentum_kg_m_s",
+          "unit": "kg*m/s",
+          "type": "vec3"
+        },
+        {
+          "name": "momentumMagnitude_kg_m_s",
+          "unit": "kg*m/s",
+          "type": "float"
+        },
+        {
+          "name": "invariantMass_kg",
+          "unit": "kg",
+          "type": "float"
+        },
+        {
+          "name": "invariantMassEnergy_J",
+          "unit": "J",
+          "type": "float"
+        },
+        {
+          "name": "cellVolume_m3",
+          "unit": "m^3",
+          "type": "float"
+        },
+        {
+          "name": "sampleCount",
+          "unit": "count",
+          "type": "int"
+        }
+      ],
+      "assumptions": [
+        "grid spacing is uniform within cell",
+        "fields are sampled on the same grid"
+      ],
+      "validity": {
+        "spacing": {
+          "min": 1e-12
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-stress-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },

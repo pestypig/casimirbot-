@@ -2031,31 +2031,126 @@
         }
       ],
       "summary": "Compute stress-energy tensors from pipeline fields.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "modules/dynamic/stress-energy-equations.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/alcubierre-alignment.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/stress-energy-equations.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "gap_m",
+          "unit": "m",
+          "type": "float",
+          "source": "pipeline:gap_nm"
+        },
+        {
+          "name": "gammaGeo",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:gammaGeo"
+        },
+        {
+          "name": "cavityQ",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:cavityQ"
+        },
+        {
+          "name": "gammaVdB",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:gammaVdB"
+        },
+        {
+          "name": "qSpoilingFactor",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:qSpoilingFactor"
+        },
+        {
+          "name": "dutyEff",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:dutyEff"
+        },
+        {
+          "name": "rho0Scale",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:rho0Scale"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rho_avg",
+          "unit": "J/m^3",
+          "type": "float"
+        },
+        {
+          "name": "rho_inst",
+          "unit": "J/m^3",
+          "type": "float"
+        },
+        {
+          "name": "T00",
+          "unit": "J/m^3",
+          "type": "float"
+        },
+        {
+          "name": "T11",
+          "unit": "J/m^3",
+          "type": "float"
+        },
+        {
+          "name": "T22",
+          "unit": "J/m^3",
+          "type": "float"
+        },
+        {
+          "name": "T33",
+          "unit": "J/m^3",
+          "type": "float"
+        }
+      ],
+      "assumptions": [
+        "parallel-plate Casimir baseline from gap_m",
+        "perfect-fluid proxy with w = -1",
+        "duty cycle applied as FR-consistent average"
+      ],
+      "validity": {
+        "gap_m": {
+          "min": 1e-12
+        },
+        "dutyEff": {
+          "min": 0,
+          "max": 1
+        },
+        "cavityQ": {
+          "min": 1
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "pipeline-stress-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -2078,31 +2173,167 @@
         }
       ],
       "summary": "Brick that packages stress-energy for GR.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/stress-energy-brick.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/alcubierre-alignment.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/gr-solver-progress.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/stress-energy-brick.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "StressEnergyBrickParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "StressEnergyBrickParams.bounds"
+        },
+        {
+          "name": "phase01",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:phase01"
+        },
+        {
+          "name": "sigmaSector",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:sigmaSector"
+        },
+        {
+          "name": "dutyFR",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:dutyFR"
+        },
+        {
+          "name": "q",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:q"
+        },
+        {
+          "name": "gammaGeo",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:gammaGeo"
+        },
+        {
+          "name": "gammaVdB",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:gammaVdB"
+        },
+        {
+          "name": "ampBase",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:ampBase"
+        },
+        {
+          "name": "zeta",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline:zeta"
+        },
+        {
+          "name": "hullAxes",
+          "unit": "m",
+          "type": "vec3",
+          "source": "pipeline:hullAxes"
+        },
+        {
+          "name": "hullWall",
+          "unit": "m",
+          "type": "float",
+          "source": "pipeline:hullWall"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "t00",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sx",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sy",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "divS",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "totalEnergy_J",
+          "unit": "J",
+          "type": "float"
+        },
+        {
+          "name": "avgT00",
+          "unit": "J/m^3",
+          "type": "float"
+        },
+        {
+          "name": "avgFluxMagnitude",
+          "unit": "J/m^3",
+          "type": "float"
+        }
+      ],
+      "assumptions": [
+        "brick grid is axis-aligned within bounds",
+        "stress-energy mapping uses pipeline snapshot",
+        "finite-difference divergence on regular grid"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        },
+        "dutyFR": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "stress-energy-equations"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -2125,7 +2356,7 @@
         }
       ],
       "summary": "GR stress-energy field representation.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
@@ -2134,26 +2365,95 @@
         {
           "type": "code",
           "path": "server/gr/evolution/stress-energy.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/stress-energy-units.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "grid",
+          "unit": "m",
+          "type": "GridSpec",
+          "source": "modules/gr/bssn-state.ts"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rho",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sx",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sy",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "Sz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_xx",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_yy",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_zz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_xy",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_xz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        },
+        {
+          "name": "S_yz",
+          "unit": "J/m^3",
+          "type": "Float32Array"
+        }
+      ],
+      "assumptions": [
+        "field arrays match grid cell count",
+        "stress-energy stored on uniform grid"
+      ],
+      "validity": {
+        "grid": {
+          "minCells": 1
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
+      "environment": {
+        "runtime": "node"
+      },
       "dependencies": [],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
@@ -2176,31 +2476,111 @@
         }
       ],
       "summary": "Compute integrals over stress-energy fields.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "modules/gr/stress-energy-integrals.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/mass-semantics.md"
+        },
+        {
+          "type": "test",
+          "path": "tests/stress-energy-integrals.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
+      "inputs": [
+        {
+          "name": "rho",
+          "unit": "J/m^3",
+          "type": "Float32Array",
+          "source": "gr-stress-energy-fields.rho"
+        },
+        {
+          "name": "Sx",
+          "unit": "J/m^3",
+          "type": "Float32Array",
+          "source": "gr-stress-energy-fields.Sx"
+        },
+        {
+          "name": "Sy",
+          "unit": "J/m^3",
+          "type": "Float32Array",
+          "source": "gr-stress-energy-fields.Sy"
+        },
+        {
+          "name": "Sz",
+          "unit": "J/m^3",
+          "type": "Float32Array",
+          "source": "gr-stress-energy-fields.Sz"
+        },
+        {
+          "name": "grid",
+          "unit": "m",
+          "type": "GridSpec",
+          "source": "modules/gr/bssn-state.ts"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "totalEnergy_J",
+          "unit": "J",
+          "type": "float"
+        },
+        {
+          "name": "totalMomentum_kg_m_s",
+          "unit": "kg*m/s",
+          "type": "vec3"
+        },
+        {
+          "name": "momentumMagnitude_kg_m_s",
+          "unit": "kg*m/s",
+          "type": "float"
+        },
+        {
+          "name": "invariantMass_kg",
+          "unit": "kg",
+          "type": "float"
+        },
+        {
+          "name": "invariantMassEnergy_J",
+          "unit": "J",
+          "type": "float"
+        },
+        {
+          "name": "cellVolume_m3",
+          "unit": "m^3",
+          "type": "float"
+        },
+        {
+          "name": "sampleCount",
+          "unit": "count",
+          "type": "int"
+        }
+      ],
+      "assumptions": [
+        "grid spacing is uniform within cell",
+        "fields are sampled on the same grid"
+      ],
+      "validity": {
+        "spacing": {
+          "min": 1e-12
+        }
+      },
+      "deterministic": true,
       "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-stress-energy-fields"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
+          "tolerance"
         ]
       }
     },
