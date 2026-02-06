@@ -3135,8 +3135,8 @@ const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
 const HELIX_ASK_WARP_PATH_BOOST =
   /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline|docs\/knowledge\/warp)/i;
 const HELIX_ASK_CONCEPTUAL_FOCUS = /\b(what is|what's|define|definition|meaning|concept|theory)\b/i;
-const HELIX_ASK_DEFINITION_FOCUS =
-  /\b(what does\b[^?]{0,80}\bmean\b|what is|what's|define|definition|meaning|concept|theory)\b/i;
+  const HELIX_ASK_DEFINITION_FOCUS =
+    /\b(what does\b[^?]{0,80}\bmean\b|what is|what's|define|definition|meaning|concept|theory|in\s+(gpa|pa|kpa|mpa|bar|psi|hz|khz|mhz|ghz|w|mw|gw|j|ev|kg|g|m|cm|mm|nm|s|ms|ns))\b/i;
 const HELIX_ASK_CONCEPT_FAST_PATH_INTENTS = new Set([
   "repo.warp_definition_docs_first",
   "repo.warp_conceptual_explain",
@@ -14511,14 +14511,14 @@ const executeHelixAsk = async ({
       repoExpectationScore = Math.max(repoExpectationScore, 1);
       repoExpectationSignals.push("repo_hint");
     }
-    const repoExpectationLevel =
+    let repoExpectationLevel =
       repoExpectationScore >= 3
         ? "high"
         : repoExpectationScore >= 2
           ? "medium"
           : "low";
     let requiresRepoEvidence = explicitRepoExpectation;
-    const hasRepoHints =
+    let hasRepoHints =
       explicitRepoExpectation ||
       HELIX_ASK_REPO_HINT.test(baseQuestion) ||
       repoExpectationLevel !== "low";
@@ -15121,6 +15121,33 @@ const executeHelixAsk = async ({
       }
       if (conceptMatch) {
         answerPath.push(`concept:${conceptMatch.card.id}`);
+        if (repoExpectationScore < 2) {
+          repoExpectationScore = 2;
+        }
+        if (!repoExpectationSignals.includes("concept_match")) {
+          repoExpectationSignals.push("concept_match");
+        }
+        repoExpectationLevel =
+          repoExpectationScore >= 3
+            ? "high"
+            : repoExpectationScore >= 2
+              ? "medium"
+              : "low";
+        hasRepoHints = true;
+        if (intentStrategy !== "constraint_report") {
+          requiresRepoEvidence = true;
+          if (!isRepoQuestion) {
+            isRepoQuestion = true;
+            if (debugPayload) {
+              debugPayload.is_repo_question = true;
+            }
+          }
+        }
+        if (debugPayload) {
+          debugPayload.repo_expectation_score = repoExpectationScore;
+          debugPayload.repo_expectation_level = repoExpectationLevel;
+          debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
+        }
       }
     }
     const normalizeConceptTags = (tags?: string[]): HelixAskTopicTag[] => {
@@ -15829,7 +15856,11 @@ const executeHelixAsk = async ({
     }
 
     const forcePlanPass =
-      blockScoped || repoExpectationLevel !== "low" || requiresRepoEvidence || conceptFastPath;
+      blockScoped ||
+      repoExpectationLevel !== "low" ||
+      requiresRepoEvidence ||
+      conceptFastPath ||
+      Boolean(conceptMatch);
     const microPassDecision = decideHelixAskMicroPass(baseQuestion, formatSpec);
     const skipMicroPass = intentStrategy === "constraint_report" || mathSolverOk;
     const microPassEnabled =
@@ -17819,7 +17850,7 @@ const executeHelixAsk = async ({
             intentDomain === "repo" ||
             intentDomain === "hybrid" ||
             intentDomain === "falsifiable";
-          const definitionDocRequired = definitionFocus && repoDocsRequired;
+          const definitionDocRequired = definitionFocus && (repoDocsRequired || Boolean(conceptMatch));
           const definitionDocBlocks = resolveDefinitionDocBlocks(
             docBlocks,
             conceptMatch,
