@@ -70,6 +70,14 @@ Add evidence-level provenance:
 - Apply the schema to remaining trees beyond the core set above.
 - Prioritize trees with highest Helix Ask hit rate.
 
+## Node Acceptance Gate (Must for “Grounded”)
+To prevent lazy or purely narrative nodes, Helix Ask should only treat a node as
+grounded when it satisfies:
+- 1 derivation doc (formula/assumptions, not just summary)
+- 1 implementation code anchor (actual symbol used in pipeline)
+- 1 behavior proof (telemetry field or test)
+- explicit assumptions + validity regime present
+
 ## Non-Goals
 - Re-introducing multi-LLM planning or multi-LLM evidence distillation.
 - Allowing tree JSON alone to stand in for definitions when a doc span exists.
