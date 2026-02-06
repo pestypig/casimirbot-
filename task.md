@@ -6,6 +6,13 @@ Last updated: 2026-02-05
 ## Goal
 Make Helix Ask behave like a tool-using agent while keeping single-LLM final generation. Retrieval should act like a deterministic tool loop, and evidence must be treated as ground truth.
 
+## Research Alignment (Codex Loop vs Helix Ask)
+- Codex uses an iterative tool loop with structured intermediate artifacts as inputs (tool outputs are first-class).
+- Helix Ask is single-LLM; to match agent behavior we must shift iteration into deterministic retrieval/actions before the final LLM call.
+- Context compaction must be deterministic; evidence needs to be prioritized (definition → contract → entrypoint → tests).
+- Ambiguity should be evidence-dominant: only clarify if senses remain split after evidence pass.
+- Tool results must be authoritative: the final call cannot deny evidence that exists.
+
 ## Core Principles
 - Evidence is tool output, not suggestion.
 - Retrieval runs before any coverage gate that can fail a slot.
@@ -118,6 +125,11 @@ For ambiguous prompts:
 Define a deterministic score, for example:
 score = evidence_mass * slot_coverage_ratio * proof_density
 Clarify if top_two_score_gap < dominance_threshold.
+
+Clarify responses must include:
+- queries searched
+- top candidate files/headers
+- which term failed dominance
 
 ### 4. Debug output
 - ambiguity_candidates

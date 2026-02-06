@@ -155,3 +155,50 @@ npm run helix:ask:regression
 
 CPU-only: expect ~3-4 tokens/sec generation on Qwen2.5-3B Q4.
 Set longer timeouts on client requests (60-120s) for first response.
+
+## Runtime Constraints Report (Snapshot)
+
+This snapshot captures the current Replit runtime limits and their sources so we
+can revisit them when moving inference off CPU.
+
+### Token Limits
+
+- Context window hard cap: 4096 tokens (`LLM_LOCAL_CONTEXT_TOKENS`, `.replit`)
+- Max output tokens: 2048 (`LLM_LOCAL_MAX_TOKENS`, `.replit`)
+- Context clamp: 2048–4096 (`server/services/llm/local-runtime.ts`)
+- Default context: 3072 (`server/services/llm/local-runtime.ts`)
+
+### Retrieval Limits
+
+- Max TopK files: 4 (`server/services/llm/local-runtime.ts`)
+- Max knowledge bytes: 80,000 per query (`server/services/llm/local-runtime.ts`)
+
+### Runtime Limits
+
+- Job timeout: 1,200,000 ms / 20 min (`HELIX_ASK_JOB_TIMEOUT_MS`, `.replit`)
+- Spawn timeout: 60,000 ms default (`LLM_LOCAL_SPAWN_TIMEOUT_MS`, `server/skills/llm.local.spawn.ts`)
+- Job TTL: 30 min (`server/services/helix-ask/job-store.ts`)
+- Job cleanup: 60 sec (`server/services/helix-ask/job-store.ts`)
+- Circuit breaker: 3 failures → 60s cooldown (`server/skills/llm.local.spawn.ts`)
+- LLM RPM limit: 60 req/min (`server/skills/llm.local.spawn.ts`)
+- Concurrency: 1 (serialized LLM inference, `server/skills/llm.local.spawn.ts`)
+
+### Model + Throughput
+
+- Model: `qwen2.5-3b-instruct-q4_k_m.gguf` (~2.0 GB, Q4)
+- CPU-only throughput: ~3–4 tok/s (see `docs/replit-runtime.md` above)
+- Max 2048 output tokens ≈ 9–10 minutes at 3.5 tok/s
+
+### Scaling Guidance (CPU-only)
+
+- Safe concurrent LLM calls: 1 (additional requests queue)
+- 60s p95: short answers (~200 tokens)
+- 120s p95: medium answers (~400 tokens)
+- 300s p95: long answers (~1k–2k tokens)
+
+### Known Gaps
+
+- GGUF native context (model may support >4k; environment clamps to 4k)
+- No GPU acceleration
+- No explicit HTTP rate limiting for `/api/agi/*`
+- Queue depth not bounded

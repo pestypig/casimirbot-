@@ -16,6 +16,7 @@ type HelixAskEnvelopeBuildInput = {
   mode: HelixAskEnvelopeMode;
   evidenceText?: string;
   traceId?: string;
+  treeWalk?: string;
 };
 
 const isProofRef = (value: string) =>
@@ -234,12 +235,13 @@ export const buildHelixAskEnvelope = (
   input: HelixAskEnvelopeBuildInput,
 ): HelixAskResponseEnvelope => {
   const treeWalkExtract = extractTreeWalkBlock(input.answer);
+  const treeWalkBlock = input.treeWalk?.trim() || treeWalkExtract.block;
   const answerText = treeWalkExtract.stripped || input.answer;
   const summarySplit = splitAnswerForEnvelope(answerText, input.format);
   const summary = summarySplit.summary.trim();
   const details = summarySplit.details?.trim();
   const sections: HelixAskEnvelopeSection[] = [];
-  const treeWalkSection = buildTreeWalkSection(treeWalkExtract.block, input.mode);
+  const treeWalkSection = buildTreeWalkSection(treeWalkBlock, input.mode);
   if (treeWalkSection) sections.push(treeWalkSection);
   sections.push(...buildDetailSections(details, input.tier, input.mode));
 

@@ -2671,12 +2671,85 @@ const HELIX_ASK_EVIDENCE_TOKENS = clampNumber(
   64,
   1024,
 );
+const HELIX_ASK_TOOL_RESULTS =
+  String(process.env.HELIX_ASK_TOOL_RESULTS ?? process.env.VITE_HELIX_ASK_TOOL_RESULTS ?? "1").trim() !== "0";
+const HELIX_ASK_TOOL_RESULTS_MAX_CHARS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_TOOL_RESULTS_MAX_CHARS ??
+      process.env.VITE_HELIX_ASK_TOOL_RESULTS_MAX_CHARS,
+    6000,
+  ),
+  800,
+  20000,
+);
+const HELIX_ASK_COMPACTION_MAX_BLOCKS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_COMPACTION_MAX_BLOCKS ??
+      process.env.VITE_HELIX_ASK_COMPACTION_MAX_BLOCKS,
+    12,
+  ),
+  4,
+  60,
+);
+const HELIX_ASK_COMPACTION_MAX_BYTES = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_COMPACTION_MAX_BYTES ??
+      process.env.VITE_HELIX_ASK_COMPACTION_MAX_BYTES,
+    18000,
+  ),
+  2000,
+  200000,
+);
+const HELIX_ASK_COMPACTION_MAX_PER_FILE = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_COMPACTION_MAX_PER_FILE ??
+      process.env.VITE_HELIX_ASK_COMPACTION_MAX_PER_FILE,
+    2,
+  ),
+  1,
+  6,
+);
+const HELIX_ASK_CODE_ALIGNMENT =
+  String(process.env.HELIX_ASK_CODE_ALIGNMENT ?? process.env.VITE_HELIX_ASK_CODE_ALIGNMENT ?? "1").trim() !== "0";
+const HELIX_ASK_CODE_ALIGN_MAX_SYMBOLS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_CODE_ALIGN_MAX_SYMBOLS ??
+      process.env.VITE_HELIX_ASK_CODE_ALIGN_MAX_SYMBOLS,
+    6,
+  ),
+  1,
+  30,
+);
+const HELIX_ASK_CODE_ALIGN_MAX_SPANS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_CODE_ALIGN_MAX_SPANS ??
+      process.env.VITE_HELIX_ASK_CODE_ALIGN_MAX_SPANS,
+    6,
+  ),
+  1,
+  30,
+);
+const HELIX_ASK_CODE_ALIGN_MAX_BYTES = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_CODE_ALIGN_MAX_BYTES ??
+      process.env.VITE_HELIX_ASK_CODE_ALIGN_MAX_BYTES,
+    8000,
+  ),
+  1000,
+  20000,
+);
+const HELIX_ASK_CODE_ALIGN_TESTS =
+  String(process.env.HELIX_ASK_CODE_ALIGN_TESTS ?? "1").trim() !== "0";
 const HELIX_ASK_TREE_WALK_MODE_RAW = String(process.env.HELIX_ASK_TREE_WALK_MODE ?? "full").trim();
 const HELIX_ASK_TREE_WALK_MAX_STEPS = clampNumber(
   readNumber(process.env.HELIX_ASK_TREE_WALK_MAX_STEPS ?? 0, 0),
   0,
   60,
 );
+const HELIX_ASK_TREE_WALK_INJECT =
+  String(process.env.HELIX_ASK_TREE_WALK_INJECT ?? "0").trim() === "1";
+const HELIX_ASK_TREE_WALK_BINDING =
+  String(process.env.HELIX_ASK_TREE_WALK_BINDING ?? "1").trim() !== "0";
 const HELIX_ASK_ANSWER_MAX_TOKENS = clampNumber(
   readNumber(
     process.env.HELIX_ASK_ANSWER_MAX_TOKENS ??
@@ -2906,6 +2979,18 @@ const HELIX_ASK_AMBIGUITY_RESOLVER =
   String(process.env.HELIX_ASK_AMBIGUITY_RESOLVER ?? "1").trim() !== "0";
 const HELIX_ASK_AMBIGUITY_LABEL_LLM =
   String(process.env.HELIX_ASK_AMBIGUITY_LABEL_LLM ?? "0").trim() === "1";
+const HELIX_ASK_AMBIGUITY_EVIDENCE_PASS =
+  String(process.env.HELIX_ASK_AMBIGUITY_EVIDENCE_PASS ?? "1").trim() !== "0";
+const HELIX_ASK_AMBIGUITY_DOMINANCE_THRESHOLD = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUITY_DOMINANCE_THRESHOLD, 0.18),
+  0.05,
+  0.8,
+);
+const HELIX_ASK_AMBIGUITY_SENSE_TOPK = clampNumber(
+  readNumber(process.env.HELIX_ASK_AMBIGUITY_SENSE_TOPK, 2),
+  2,
+  6,
+);
 const HELIX_ASK_AMBIGUITY_SHORT_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_AMBIGUITY_SHORT_TOKENS, 4),
   2,
@@ -7396,23 +7481,166 @@ const isDefinitionQuestion = (question: string): boolean =>
       .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
       .join("|");
     if (!escaped) return docBlocks;
-    const termRe = new RegExp(`\\b(?:${escaped})\\b`, "i");
-    const byTerm = docBlocks.filter(
-      (block) => termRe.test(block.block) || termRe.test(block.path),
-    );
-    return byTerm.length > 0 ? byTerm : docBlocks;
-  };
+  const termRe = new RegExp(`\\b(?:${escaped})\\b`, "i");
+  const byTerm = docBlocks.filter(
+    (block) => termRe.test(block.block) || termRe.test(block.path),
+  );
+  return byTerm.length > 0 ? byTerm : docBlocks;
+};
 
-  const selectDocBlocks = (
-    contextText: string,
-    definitionFocus: boolean,
-  ): { docBlocks: Array<{ path: string; block: string }>; proofSpanRate: number } => {
+const extractDocBlockHeader = (block: { path: string; block: string }): string => {
+  const lines = block.block.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const line of lines) {
+    if (DOC_SECTION_LINE_RE.test(line)) {
+      return line;
+    }
+  }
+  return lines[1] ?? lines[0] ?? block.path;
+};
+
+const scoreDocBlock = (
+  block: { path: string; block: string },
+  definitionFocus: boolean,
+): { score: number; reasons: string[] } => {
+  const pathLower = block.path.toLowerCase();
+  const textLower = block.block.toLowerCase();
+  let score = 0;
+  const reasons: string[] = [];
+  if (definitionFocus && isDefinitionDocPath(block.path)) {
+    score += 4;
+    reasons.push("definition_doc");
+  }
+  if (/\bdefinition\b|\bmeaning\b|\boverview\b/.test(textLower)) {
+    score += 3;
+    reasons.push("definition_terms");
+  }
+  if (/\bcontract\b|\bguardrail\b|\bpolicy\b|\bmust\b|\bshould\b/.test(textLower)) {
+    score += 2;
+    reasons.push("policy");
+  }
+  if (/\bentrypoint\b|\bapi\b|\binterface\b|\bschema\b/.test(textLower)) {
+    score += 2;
+    reasons.push("entrypoint");
+  }
+  if (/(^|\/)(tests?|specs?)[/\\]/i.test(block.path) || /\btest\b|\bspec\b/.test(textLower)) {
+    score += 1;
+    reasons.push("test");
+  }
+  if (pathLower.includes("docs/knowledge") || pathLower.includes("docs/ethos")) {
+    score += 1;
+    reasons.push("core_docs");
+  }
+  return { score, reasons };
+};
+
+const compactDocBlocks = (
+  docBlocks: Array<{ path: string; block: string }>,
+  options: {
+    maxBlocks: number;
+    maxBytes: number;
+    maxPerFile: number;
+    definitionFocus: boolean;
+  },
+): { blocks: Array<{ path: string; block: string }>; summary: HelixAskCompactionSummary } => {
+  if (!docBlocks.length) {
+    return {
+      blocks: [],
+      summary: {
+        applied: false,
+        kept: 0,
+        dropped: 0,
+        maxBlocks: options.maxBlocks,
+        maxBytes: options.maxBytes,
+        maxPerFile: options.maxPerFile,
+        policy: "definition->policy->entrypoint->tests",
+      },
+    };
+  }
+  const policy = "definition->policy->entrypoint->tests";
+  const deduped: Array<{
+    path: string;
+    block: string;
+    header: string;
+    score: number;
+    reasons: string[];
+  }> = [];
+  const seen = new Set<string>();
+  for (const block of docBlocks) {
+    const header = extractDocBlockHeader(block);
+    const hash = crypto.createHash("sha1").update(block.block).digest("hex");
+    const key = `${block.path.toLowerCase()}::${header.toLowerCase()}::${hash}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const scored = scoreDocBlock(block, options.definitionFocus);
+    deduped.push({ ...block, header, score: scored.score, reasons: scored.reasons });
+  }
+  const sorted = deduped.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const pathCompare = a.path.localeCompare(b.path);
+    if (pathCompare !== 0) return pathCompare;
+    return a.header.localeCompare(b.header);
+  });
+  const kept: Array<{ path: string; block: string }> = [];
+  const perFileCount = new Map<string, number>();
+  let totalBytes = 0;
+  for (const entry of sorted) {
+    if (kept.length >= options.maxBlocks) break;
+    const currentBytes = totalBytes + entry.block.length;
+    if (currentBytes > options.maxBytes) break;
+    const key = entry.path.toLowerCase();
+    const count = perFileCount.get(key) ?? 0;
+    if (count >= options.maxPerFile) continue;
+    kept.push({ path: entry.path, block: entry.block });
+    perFileCount.set(key, count + 1);
+    totalBytes = currentBytes;
+  }
+  const dropped = Math.max(0, docBlocks.length - kept.length);
+  return {
+    blocks: kept,
+    summary: {
+      applied: dropped > 0,
+      kept: kept.length,
+      dropped,
+      maxBlocks: options.maxBlocks,
+      maxBytes: options.maxBytes,
+      maxPerFile: options.maxPerFile,
+      policy,
+    },
+  };
+};
+
+const selectDocBlocks = (
+  contextText: string,
+  definitionFocus: boolean,
+): { docBlocks: Array<{ path: string; block: string }>; proofSpanRate: number; compaction: HelixAskCompactionSummary } => {
   const blocks = splitAskContextBlocks(contextText);
   const docBlocksAll = blocks.filter((block) => /(^|\/)docs\//i.test(block.path));
   const docBlocks = definitionFocus
     ? docBlocksAll.filter((block) => isDefinitionDocPath(block.path))
     : docBlocksAll;
-  return { docBlocks, proofSpanRate: computeProofSpanRate(docBlocks) };
+  const compaction = compactDocBlocks(docBlocks, {
+    maxBlocks: HELIX_ASK_COMPACTION_MAX_BLOCKS,
+    maxBytes: HELIX_ASK_COMPACTION_MAX_BYTES,
+    maxPerFile: HELIX_ASK_COMPACTION_MAX_PER_FILE,
+    definitionFocus,
+  });
+  return { docBlocks: compaction.blocks, proofSpanRate: computeProofSpanRate(compaction.blocks), compaction: compaction.summary };
+};
+
+const applyCompactionDebug = (
+  debugPayload: Record<string, any> | null | undefined,
+  summary: HelixAskCompactionSummary | null | undefined,
+): void => {
+  if (!debugPayload || !summary) return;
+  debugPayload.compaction_applied = summary.applied;
+  debugPayload.compaction_dropped = summary.dropped;
+  debugPayload.compaction_kept = summary.kept;
+  debugPayload.compaction_policy = summary.policy;
+  debugPayload.compaction_budget = {
+    maxBlocks: summary.maxBlocks,
+    maxBytes: summary.maxBytes,
+    maxPerFile: summary.maxPerFile,
+  };
 };
 
 const computeProofSpanRate = (docBlocks: Array<{ path: string; block: string }>): number => {
@@ -7747,6 +7975,8 @@ function extractContextFromPrompt(prompt: string): string {
   ];
 
   const INLINE_JSON_TEXT_RE = /\{\s*"text"\s*:\s*"([^"]+)"[^}]*\}/g;
+  const NO_EVIDENCE_RE =
+    /\b(no|not enough)\s+repo[-\s]?evidenced?\b|\bno\s+repo\s+evidence\b|\bno\s+evidence\s+(was|is)\s+found\b|\bno\s+repo[-\s]?grounded\b|\bcould\s+not\s+confirm\b/i;
 
   function stripInlineJsonArtifacts(value: string): string {
     if (!value) return value;
@@ -7893,6 +8123,305 @@ function buildDocEvidenceScaffold(
   return bullets.join("\n");
 }
 
+function buildCodeEvidenceBullet(span: HelixAskCodeSpan): string {
+  const spanLabel = span.span ? `${span.span} ` : "";
+  const snippet = clipAskText(span.snippet, 240);
+  const prefix = span.isTest ? "Test" : "Code";
+  const summary = snippet ? ensureSentence(snippet) : "See the implementation for details.";
+  return `- ${prefix}: ${spanLabel}${summary} (see ${span.filePath})`;
+}
+
+const SYMBOL_TOKEN_RE = /\b[A-Za-z_][A-Za-z0-9_]{2,}\b/g;
+const SYMBOL_STOPWORDS = new Set(
+  [
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "this",
+    "that",
+    "into",
+    "what",
+    "does",
+    "mean",
+    "repo",
+    "docs",
+    "document",
+    "definition",
+    "overview",
+    "section",
+    "span",
+    "file",
+    "files",
+    "path",
+    "paths",
+    "system",
+    "module",
+    "modules",
+    "function",
+    "functions",
+    "class",
+    "classes",
+    "types",
+    "type",
+    "data",
+    "info",
+    "note",
+    "notes",
+    "key",
+    "keys",
+    "value",
+    "values",
+  ].map((entry) => entry.toLowerCase()),
+);
+
+const extractSymbolCandidates = (blocks: Array<{ path: string; block: string }>): string[] => {
+  const counts = new Map<string, number>();
+  const pushToken = (token: string) => {
+    const trimmed = token.trim();
+    if (trimmed.length < 3) return;
+    const lower = trimmed.toLowerCase();
+    if (SYMBOL_STOPWORDS.has(lower)) return;
+    const symbolLike =
+      /[A-Z]/.test(trimmed) || /_/.test(trimmed) || /\d/.test(trimmed) || /::|\./.test(trimmed);
+    if (!symbolLike) return;
+    counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
+  };
+  for (const block of blocks) {
+    const content = block.block.split(/\r?\n/).slice(1).join(" ");
+    const matches = content.match(SYMBOL_TOKEN_RE) ?? [];
+    for (const match of matches) {
+      pushToken(match);
+    }
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .map(([token]) => token);
+};
+
+const extractCodeSpanFromFile = (
+  filePath: string,
+  symbol: string,
+): { snippet: string; span?: string } => {
+  const resolved = path.resolve(filePath);
+  if (!fs.existsSync(resolved)) {
+    return { snippet: "" };
+  }
+  try {
+    const raw = fs.readFileSync(resolved, "utf8");
+    const lines = raw.split(/\r?\n/);
+    const lowerSymbol = symbol.toLowerCase();
+    let index = lines.findIndex((line) => line.includes(symbol));
+    if (index < 0) {
+      index = lines.findIndex((line) => line.toLowerCase().includes(lowerSymbol));
+    }
+    if (index < 0) return { snippet: "" };
+    const start = Math.max(0, index - 2);
+    const end = Math.min(lines.length - 1, index + 2);
+    const snippet = lines.slice(start, end + 1).join("\n").trim();
+    const span = `Span: L${start + 1}-L${end + 1}`;
+    return { snippet, span };
+  } catch {
+    return { snippet: "" };
+  }
+};
+
+const buildCodeAlignmentFromDocBlocks = async (
+  blocks: Array<{ path: string; block: string }>,
+  question: string,
+  topicProfile?: HelixAskTopicProfile | null,
+): Promise<HelixAskCodeAlignment> => {
+  if (!HELIX_ASK_CODE_ALIGNMENT || blocks.length === 0) {
+    return { spans: [], symbols: [], resolved: [] };
+  }
+  const symbols = extractSymbolCandidates(blocks).slice(0, HELIX_ASK_CODE_ALIGN_MAX_SYMBOLS);
+  if (symbols.length === 0) {
+    return { spans: [], symbols: [], resolved: [] };
+  }
+  const snapshot = await loadCodeLattice();
+  if (!snapshot) {
+    return { spans: [], symbols, resolved: [] };
+  }
+  const spans: HelixAskCodeSpan[] = [];
+  const resolved: string[] = [];
+  let bytesUsed = 0;
+  for (const symbol of symbols) {
+    if (spans.length >= HELIX_ASK_CODE_ALIGN_MAX_SPANS) break;
+    const multi = collectAskCandidatesMultiChannel(snapshot, symbol, question, {
+      topicProfile,
+    });
+    const flat = multi.lists.flatMap((list) => list.candidates);
+    flat.sort((a, b) => b.score - a.score);
+    const top = flat[0];
+    if (!top?.filePath) continue;
+    const { snippet, span } = extractCodeSpanFromFile(top.filePath, symbol);
+    const trimmedSnippet = snippet ? clipAskText(snippet, 400) : "";
+    if (!trimmedSnippet) continue;
+    const candidateBytes = trimmedSnippet.length;
+    if (bytesUsed + candidateBytes > HELIX_ASK_CODE_ALIGN_MAX_BYTES && spans.length > 0) break;
+    bytesUsed += candidateBytes;
+    const isTest = /(^|\/)(tests?|specs?)[/\\]/i.test(top.filePath) || /\.spec\./i.test(top.filePath);
+    spans.push({
+      symbol,
+      filePath: top.filePath,
+      snippet: trimmedSnippet,
+      span,
+      isTest,
+    });
+    resolved.push(top.filePath);
+    if (HELIX_ASK_CODE_ALIGN_TESTS && !isTest) {
+      const testCandidate = flat.find((entry) =>
+        /(^|\/)(tests?|specs?)[/\\]/i.test(entry.filePath) || /\.spec\./i.test(entry.filePath),
+      );
+      if (testCandidate && spans.length < HELIX_ASK_CODE_ALIGN_MAX_SPANS) {
+        const testSpan = extractCodeSpanFromFile(testCandidate.filePath, symbol);
+        if (testSpan.snippet) {
+          spans.push({
+            symbol,
+            filePath: testCandidate.filePath,
+            snippet: clipAskText(testSpan.snippet, 320),
+            span: testSpan.span,
+            isTest: true,
+          });
+          resolved.push(testCandidate.filePath);
+        }
+      }
+    }
+  }
+  return { spans, symbols, resolved };
+};
+
+const buildPromptItemHash = (type: string, content: string): string => {
+  return crypto.createHash("sha256").update(`${type}\n${content}`).digest("hex").slice(0, 12);
+};
+
+const buildHelixAskPromptItems = (args: {
+  intentId?: string;
+  intentDomain?: string;
+  intentTier?: string;
+  queries?: string[];
+  contextFiles?: string[];
+  retrievalConfidence?: number;
+  docBlocks?: Array<{ path: string; block: string }>;
+  codeAlignment?: HelixAskCodeAlignment | null;
+  treeWalk?: string;
+  slotCoverage?: { missingSlots: string[]; ratio: number } | null;
+  docCoverage?: { missingSlots: string[]; ratio: number } | null;
+  graphPack?: HelixAskGraphPack | null;
+}): HelixAskPromptItem[] => {
+  const items: HelixAskPromptItem[] = [];
+  const pushItem = (type: string, content: string, label?: string) => {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    const hash = buildPromptItemHash(type, trimmed);
+    items.push({
+      id: `${type}:${hash}`,
+      type,
+      label,
+      content: trimmed,
+      hash,
+      size: trimmed.length,
+    });
+  };
+  if (args.intentId) {
+    pushItem(
+      "intent",
+      `intent=${args.intentId} domain=${args.intentDomain ?? "-"} tier=${args.intentTier ?? "-"}`,
+    );
+  }
+  if (args.queries?.length || args.contextFiles?.length) {
+    const lines = [
+      args.queries?.length ? `queries: ${args.queries.join("; ")}` : "",
+      args.contextFiles?.length ? `files: ${args.contextFiles.slice(0, 12).join(", ")}` : "",
+      typeof args.retrievalConfidence === "number"
+        ? `confidence: ${args.retrievalConfidence.toFixed(2)}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    pushItem("retrieval_summary", lines);
+  }
+  if (args.graphPack?.treeIds?.length) {
+    pushItem("selected_trees", args.graphPack.treeIds.join(", "));
+  }
+  if (args.docBlocks?.length) {
+    const docLines = args.docBlocks
+      .map((block) => `- ${extractDocBlockHeader(block)} (${block.path})`)
+      .join("\n");
+    pushItem("doc_spans", docLines);
+  }
+  if (args.codeAlignment?.spans?.length) {
+    const codeLines = args.codeAlignment.spans
+      .map((span) => `- ${span.symbol} ${span.span ?? ""} (${span.filePath})`)
+      .join("\n");
+    pushItem("code_spans", codeLines);
+  }
+  if (args.treeWalk?.trim()) {
+    pushItem("tree_walk", args.treeWalk.trim());
+  }
+  if (args.slotCoverage || args.docCoverage) {
+    const coverageLines = [
+      args.slotCoverage
+        ? `slot_coverage: ${args.slotCoverage.ratio.toFixed(2)} missing=${args.slotCoverage.missingSlots.join(",") || "none"}`
+        : "",
+      args.docCoverage
+        ? `doc_coverage: ${args.docCoverage.ratio.toFixed(2)} missing=${args.docCoverage.missingSlots.join(",") || "none"}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    pushItem("slot_coverage", coverageLines);
+  }
+  return items;
+};
+
+const buildToolResultsBlock = (items: HelixAskPromptItem[]): string => {
+  if (!items.length) return "";
+  const lines: string[] = ["TOOL_RESULTS"];
+  for (const item of items) {
+    if (!["retrieval_summary", "doc_spans", "code_spans", "tree_walk"].includes(item.type)) {
+      continue;
+    }
+    lines.push(`[${item.type}]`);
+    lines.push(item.content);
+    lines.push("");
+  }
+  lines.push("END_TOOL_RESULTS");
+  const raw = lines.join("\n").trim();
+  if (raw.length <= HELIX_ASK_TOOL_RESULTS_MAX_CHARS) return raw;
+  const clipped = clipAskText(raw, HELIX_ASK_TOOL_RESULTS_MAX_CHARS);
+  if (clipped.includes("END_TOOL_RESULTS")) return clipped;
+  return `${clipped}\nEND_TOOL_RESULTS`;
+};
+
+const buildToolResultsFallbackAnswer = (args: {
+  definitionFocus: boolean;
+  docBlocks: Array<{ path: string; block: string }>;
+  codeAlignment?: HelixAskCodeAlignment | null;
+  treeWalk?: string;
+}): string => {
+  const lines: string[] = ["Confirmed:"];
+  if (args.docBlocks.length > 0) {
+    const limit = Math.min(args.docBlocks.length, 3);
+    for (let i = 0; i < limit; i += 1) {
+      const label = args.definitionFocus && i === 0 ? "Definition" : "Evidence";
+      lines.push(buildDocEvidenceBullet(args.docBlocks[i], label));
+    }
+  }
+  if (args.codeAlignment?.spans?.length) {
+    const limit = Math.min(args.codeAlignment.spans.length, 3);
+    for (let i = 0; i < limit; i += 1) {
+      lines.push(buildCodeEvidenceBullet(args.codeAlignment.spans[i]));
+    }
+  }
+  if (args.treeWalk?.trim()) {
+    lines.push("");
+    lines.push(args.treeWalk.trim());
+  }
+  return lines.join("\n");
+};
+
 type HelixAskTreeWalkMetrics = {
   treeCount: number;
   nodeCount: number;
@@ -7901,6 +8430,7 @@ type HelixAskTreeWalkMetrics = {
   stepCount: number;
   treeIds: string[];
   primaryTreeId?: string;
+  boundCount?: number;
 };
 
 type HelixAskTreeWalkMode = "full" | "root_to_anchor" | "root_only" | "anchor_only";
@@ -7922,9 +8452,46 @@ const resolveHelixAskTreeWalkMode = (
   return "full";
 };
 
+const buildTreeWalkBindingSet = (
+  pack: HelixAskGraphPack | null,
+  docBlocks: Array<{ path: string; block: string }>,
+): Set<string> => {
+  const bound = new Set<string>();
+  if (!pack?.frameworks?.length || docBlocks.length === 0) return bound;
+  const docText = docBlocks.map((block) => block.block.toLowerCase()).join("\n");
+  const headerTerms = new Set<string>();
+  const pathTerms = new Set<string>();
+  for (const block of docBlocks) {
+    const header = extractDocBlockHeader(block);
+    if (header) headerTerms.add(normalizeTreeWalkKey(header));
+    const fileStem = path.basename(block.path, path.extname(block.path));
+    if (fileStem) pathTerms.add(normalizeTreeWalkKey(fileStem));
+  }
+  for (const framework of pack.frameworks) {
+    for (const node of framework.path ?? []) {
+      const title = node.title ?? "";
+      const id = node.id ?? "";
+      const titleKey = normalizeTreeWalkKey(title);
+      const idKey = normalizeTreeWalkKey(id);
+      const titleHit =
+        (title && docText.includes(title.toLowerCase())) ||
+        (titleKey && (headerTerms.has(titleKey) || pathTerms.has(titleKey)));
+      const idHit =
+        (id && docText.includes(id.toLowerCase())) ||
+        (idKey && (headerTerms.has(idKey) || pathTerms.has(idKey)));
+      if (titleHit || idHit) {
+        if (id) bound.add(id);
+        if (titleKey) bound.add(titleKey);
+        if (idKey) bound.add(idKey);
+      }
+    }
+  }
+  return bound;
+};
+
 function buildHelixAskTreeWalk(
   pack: HelixAskGraphPack | null,
-  options: { mode: HelixAskTreeWalkMode; maxSteps: number },
+  options: { mode: HelixAskTreeWalkMode; maxSteps: number; boundNodes?: Set<string> },
 ): { text: string; metrics: HelixAskTreeWalkMetrics | null } {
   if (!pack?.frameworks?.length) {
     return { text: "", metrics: null };
@@ -7933,6 +8500,7 @@ function buildHelixAskTreeWalk(
   let nodeCount = 0;
   let nodesWithText = 0;
   let nodesWithoutText = 0;
+  let boundCount = 0;
   const stepCap = options.maxSteps > 0 ? options.maxSteps : null;
   for (const framework of pack.frameworks) {
     const label = framework.treeLabel ?? framework.treeId;
@@ -7989,11 +8557,18 @@ function buildHelixAskTreeWalk(
     selected.forEach((node, idx) => {
       nodeCount += 1;
       const title = node.title ?? node.id;
+      const normalizedTitle = normalizeTreeWalkKey(title);
+      const bound =
+        !options.boundNodes ||
+        options.boundNodes.has(node.id) ||
+        options.boundNodes.has(normalizedTitle);
+      if (bound) boundCount += 1;
       const roleLabel = node.role
         ? `Role:${node.role}`
         : anchorIds.has(node.id)
           ? "Anchor"
           : "Walk";
+      const role = bound ? roleLabel : "Hint";
       const idSuffix =
         node.id && normalizeTreeWalkKey(title) !== normalizeTreeWalkKey(node.id)
           ? ` (${node.id})`
@@ -8009,8 +8584,11 @@ function buildHelixAskTreeWalk(
         nodesWithoutText += 1;
         detail = "No detail provided in the tree node.";
       }
+      if (!bound) {
+        detail = "Navigation hint only; no doc span bound.";
+      }
       lines.push(
-        `${idx + 1}. ${roleLabel}: ${title}${idSuffix} - ${detail} (${framework.sourcePath})`,
+        `${idx + 1}. ${role}: ${title}${idSuffix} - ${detail} (${framework.sourcePath})`,
       );
     });
     lines.push("");
@@ -8024,6 +8602,7 @@ function buildHelixAskTreeWalk(
     stepCount: nodeCount,
     treeIds: pack.treeIds,
     primaryTreeId: pack.primaryTreeId,
+    boundCount,
   };
   return { text: trimmed, metrics };
 }
@@ -8229,6 +8808,7 @@ function buildHelixAskSynthesisPrompt(
   format: HelixAskFormat,
   stageTags: boolean,
   verbosity: HelixAskVerbosity,
+  toolResultsBlock?: string,
   softExpansionSentences = 0,
 ): string {
   const lines = [
@@ -8258,6 +8838,14 @@ function buildHelixAskSynthesisPrompt(
     lines.push(
       "If the evidence includes a block starting with \"Tree Walk:\", include that block verbatim after the steps (keep its numbering and header).",
     );
+    if (toolResultsBlock?.trim()) {
+      lines.push("Tool results are authoritative. Use them as ground truth.");
+      lines.push(
+        "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
+      );
+      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push(toolResultsBlock.trim());
+    }
     lines.push("Evidence steps:");
   } else {
     lines.push("Use only the evidence bullets below. Do not add new claims.");
@@ -8277,6 +8865,14 @@ function buildHelixAskSynthesisPrompt(
       lines.push(
         `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
       );
+    }
+    if (toolResultsBlock?.trim()) {
+      lines.push("Tool results are authoritative. Use them as ground truth.");
+      lines.push(
+        "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
+      );
+      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push(toolResultsBlock.trim());
     }
     lines.push("Evidence bullets:");
   }
@@ -8304,6 +8900,7 @@ function buildHelixAskPromptSynthesisPrompt(
   format: HelixAskFormat,
   stageTags: boolean,
   verbosity: HelixAskVerbosity,
+  toolResultsBlock?: string,
   softExpansionSentences = 0,
 ): string {
   const lines = [
@@ -8330,6 +8927,14 @@ function buildHelixAskPromptSynthesisPrompt(
         `After the steps, add a paragraph starting with \"In practice,\" (${spec.steps.inPractice} sentences).`,
       );
     }
+    if (toolResultsBlock?.trim()) {
+      lines.push("Tool results are authoritative. Use them as ground truth.");
+      lines.push(
+        "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
+      );
+      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push(toolResultsBlock.trim());
+    }
     lines.push("Evidence steps:");
   } else {
     lines.push("Use only the evidence bullets below. Do not add new claims.");
@@ -8345,6 +8950,14 @@ function buildHelixAskPromptSynthesisPrompt(
       lines.push(
         `End with a paragraph starting with \"In practice,\" (${spec.paragraphs.inPractice} sentences).`,
       );
+    }
+    if (toolResultsBlock?.trim()) {
+      lines.push("Tool results are authoritative. Use them as ground truth.");
+      lines.push(
+        "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
+      );
+      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push(toolResultsBlock.trim());
     }
     lines.push("Evidence bullets:");
   }
@@ -8375,6 +8988,7 @@ function buildHelixAskHybridPrompt(
   verbosity: HelixAskVerbosity,
   constraintEvidence?: string,
   composite = false,
+  toolResultsBlock?: string,
 ): string {
   const lines = [
     "You are Helix Ask, a hybrid assistant.",
@@ -8456,6 +9070,15 @@ function buildHelixAskHybridPrompt(
   lines.push("");
   lines.push(`Question: ${question}`);
   lines.push("");
+  if (toolResultsBlock?.trim()) {
+    lines.push("Tool results are authoritative. Use them as ground truth.");
+    lines.push(
+      "If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.",
+    );
+    lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+    lines.push(toolResultsBlock.trim());
+    lines.push("");
+  }
   lines.push("General reasoning:");
   lines.push(generalScaffold || "No general reasoning provided.");
   lines.push("");
@@ -11715,6 +12338,39 @@ type HelixAskControllerStep = {
   retrievalConfidence?: number;
 };
 
+type HelixAskCompactionSummary = {
+  applied: boolean;
+  kept: number;
+  dropped: number;
+  maxBlocks: number;
+  maxBytes: number;
+  maxPerFile: number;
+  policy: string;
+};
+
+type HelixAskPromptItem = {
+  id: string;
+  type: string;
+  label?: string;
+  content: string;
+  hash: string;
+  size: number;
+};
+
+type HelixAskCodeSpan = {
+  symbol: string;
+  filePath: string;
+  snippet: string;
+  span?: string;
+  isTest?: boolean;
+};
+
+type HelixAskCodeAlignment = {
+  spans: HelixAskCodeSpan[];
+  symbols: string[];
+  resolved: string[];
+};
+
 const executeHelixAsk = async ({
   request,
   personaId,
@@ -12106,6 +12762,35 @@ const executeHelixAsk = async ({
       controller_steps?: HelixAskControllerStep[];
       controller_stop_reason?: string;
       controller_attempts?: number;
+      retrieval_iterations?: number;
+      prompt_items?: Array<{
+        type: string;
+        hash: string;
+        size: number;
+        label?: string;
+      }>;
+      prompt_item_count?: number;
+      tool_results_block?: string;
+      tool_results_hash?: string;
+      tool_results_items?: string[];
+      tool_results_present?: boolean;
+      tool_results_fallback_applied?: boolean;
+      tool_results_fallback_reason?: string;
+      compaction_applied?: boolean;
+      compaction_dropped?: number;
+      compaction_kept?: number;
+      compaction_policy?: string;
+      compaction_budget?: {
+        maxBlocks: number;
+        maxBytes: number;
+        maxPerFile: number;
+      };
+      code_alignment_applied?: boolean;
+      code_alignment_symbols?: string[];
+      code_alignment_resolved?: string[];
+      code_spans_added?: number;
+      tree_walk_bound_nodes?: number;
+      tree_walk_binding_rate?: number;
       plan_scope_allowlist_tiers?: number;
       plan_scope_avoidlist?: number;
       plan_scope_must_include?: number;
@@ -12398,6 +13083,14 @@ const executeHelixAsk = async ({
       ambiguity_resolver_short_prompt?: boolean;
       ambiguity_resolver_top_score?: number;
       ambiguity_resolver_margin?: number;
+      ambiguity_evidence_pass?: boolean;
+      ambiguity_evidence_scores?: Array<{
+        label: string;
+        score: number;
+        docShare: number;
+        matchRatio: number;
+      }>;
+      ambiguity_selected?: string;
       ambiguity_target_span?: string;
       ambiguity_cluster_count?: number;
       ambiguity_cluster_top_mass?: number;
@@ -13680,9 +14373,86 @@ const executeHelixAsk = async ({
       repoExpectationLevel,
       seedLabels: ambiguitySeedLabels,
     });
-    const ambiguityResolution = blockScoped
+    let ambiguityResolution = blockScoped
       ? { ...ambiguityResolutionRaw, shouldClarify: false, reason: undefined }
       : ambiguityResolutionRaw;
+    if (
+      ambiguityResolution.shouldClarify &&
+      HELIX_ASK_AMBIGUITY_EVIDENCE_PASS &&
+      ambiguityClusterSummary?.clusters?.length
+    ) {
+      const senseCandidates = ambiguityClusterSummary.clusters
+        .slice(0, Math.max(2, HELIX_ASK_AMBIGUITY_SENSE_TOPK))
+        .filter((cluster) => cluster.label);
+      if (senseCandidates.length >= 2) {
+        const scores: Array<{
+          label: string;
+          score: number;
+          docShare: number;
+          matchRatio: number;
+        }> = [];
+        for (const sense of senseCandidates) {
+          const senseQueries = mergeHelixAskQueries(
+            [baseQuestion],
+            [sense.label],
+            Math.max(3, HELIX_ASK_QUERY_MERGE_MAX - 2),
+          );
+          const senseContext = await buildAskContextFromQueries(
+            baseQuestion,
+            senseQueries,
+            HELIX_ASK_AMBIGUITY_SENSE_TOPK,
+            topicProfile,
+          );
+          const senseEvidence = evaluateEvidenceEligibility(baseQuestion, senseContext.context, {
+            minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+            minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+            signalTokens: ambiguitySeedLabels,
+            useQuestionTokens: true,
+          });
+          const docHits = senseContext.files.filter((filePath) => /(^|\/)docs\//i.test(filePath));
+          const docShare = senseContext.files.length
+            ? docHits.length / senseContext.files.length
+            : 0;
+          const score = Math.min(
+            1,
+            senseEvidence.matchRatio + (docShare >= 0.4 ? 0.1 : 0),
+          );
+          scores.push({
+            label: sense.label,
+            score: Number(score.toFixed(4)),
+            docShare: Number(docShare.toFixed(4)),
+            matchRatio: Number(senseEvidence.matchRatio.toFixed(4)),
+          });
+        }
+        scores.sort((a, b) => b.score - a.score);
+        const top = scores[0];
+        const second = scores[1];
+        const margin = top && second ? top.score - second.score : top?.score ?? 0;
+        if (top && margin >= HELIX_ASK_AMBIGUITY_DOMINANCE_THRESHOLD) {
+          ambiguityResolution = {
+            ...ambiguityResolution,
+            shouldClarify: false,
+            reason: "evidence_dominance",
+          };
+          logEvent(
+            "Ambiguity evidence",
+            "dominant",
+            `sense=${top.label} margin=${margin.toFixed(2)}`,
+          );
+        } else {
+          logEvent(
+            "Ambiguity evidence",
+            "split",
+            `top=${top?.label ?? "n/a"} margin=${margin.toFixed(2)}`,
+          );
+        }
+        if (debugPayload) {
+          debugPayload.ambiguity_evidence_pass = true;
+          debugPayload.ambiguity_evidence_scores = scores;
+          debugPayload.ambiguity_selected = top?.label;
+        }
+      }
+    }
     let preIntentClarify: string | null = null;
     if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
       debugPayload.ambiguity_resolver_applied = ambiguityResolution.shouldClarify;
@@ -13976,6 +14746,11 @@ const executeHelixAsk = async ({
     let graphPack: HelixAskGraphPack | null = null;
     let treeWalkBlock = "";
     let treeWalkMetrics: HelixAskTreeWalkMetrics | null = null;
+    let treeWalkMode: HelixAskTreeWalkMode = resolveHelixAskTreeWalkMode(
+      HELIX_ASK_TREE_WALK_MODE_RAW,
+      verbosity,
+    );
+    let codeAlignment: HelixAskCodeAlignment | null = null;
     let graphResolverPreferred = false;
     let mathSolveResult: HelixAskMathSolveResult | null = null;
     let verificationAnchorRequired = false;
@@ -13984,6 +14759,8 @@ const executeHelixAsk = async ({
     let forcedAnswerIsHard = false;
     let retrievalQueries: string[] = [];
     let retrievalFilesSnapshot: string[] = [];
+    let promptItems: HelixAskPromptItem[] = [];
+    let toolResultsBlock = "";
     if (preIntentClarify) {
       if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
         const scientific = buildScientificMicroReport({
@@ -14180,33 +14957,9 @@ const executeHelixAsk = async ({
           })),
         };
       }
-      const treeWalkMode = resolveHelixAskTreeWalkMode(HELIX_ASK_TREE_WALK_MODE_RAW, verbosity);
-      const treeWalk = buildHelixAskTreeWalk(graphPack, {
-        mode: treeWalkMode,
-        maxSteps: HELIX_ASK_TREE_WALK_MAX_STEPS,
-      });
-      treeWalkBlock = treeWalk.text;
-      treeWalkMetrics = treeWalk.metrics;
-      if (treeWalkMetrics) {
-        const treeWalkDetail = [
-          `mode=${treeWalkMode}`,
-          treeWalkMetrics.stepCount ? `steps=${treeWalkMetrics.stepCount}` : null,
-          treeWalkMetrics.treeCount ? `trees=${treeWalkMetrics.treeCount}` : null,
-        ]
-          .filter(Boolean)
-          .join(" | ");
-        logEvent("Tree walk", "ready", treeWalkDetail);
-      }
       if (debugPayload) {
         debugPayload.tree_walk_mode = treeWalkMode;
         debugPayload.tree_walk_max_steps = HELIX_ASK_TREE_WALK_MAX_STEPS;
-        if (treeWalkMetrics) {
-          debugPayload.tree_walk = treeWalkMetrics;
-          debugPayload.tree_walk_lines = treeWalkBlock
-            ? treeWalkBlock.split(/\r?\n/).filter((line) => line.trim()).length
-            : 0;
-          debugPayload.tree_walk_block_present = Boolean(treeWalkBlock);
-        }
       }
     }
     const baseEvidenceSignalTokens = Array.from(
@@ -15444,6 +16197,7 @@ const executeHelixAsk = async ({
           }
           const selectedDocs = selectDocBlocks(contextText, definitionFocus);
           docBlocks = selectedDocs.docBlocks;
+          applyCompactionDebug(debugPayload, selectedDocs.compaction);
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
@@ -15647,6 +16401,7 @@ const executeHelixAsk = async ({
             const refreshedDocs = selectDocBlocks(contextText, definitionFocus);
             const refreshedDocBlocks = refreshedDocs.docBlocks;
             docBlocks = refreshedDocBlocks;
+            applyCompactionDebug(debugPayload, refreshedDocs.compaction);
             if (debugPayload) {
               debugPayload.proof_span_rate = Math.max(
                 debugPayload.proof_span_rate ?? 0,
@@ -15891,6 +16646,7 @@ const executeHelixAsk = async ({
         if (!docSlotSummary) {
           const selectedDocs = selectDocBlocks(contextText, definitionFocus);
           docBlocks = selectedDocs.docBlocks;
+          applyCompactionDebug(debugPayload, selectedDocs.compaction);
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
@@ -16050,6 +16806,7 @@ const executeHelixAsk = async ({
         if (docSlotSummary) {
           const selectedDocs = selectDocBlocks(contextText, definitionFocus);
           docBlocks = selectedDocs.docBlocks;
+          applyCompactionDebug(debugPayload, selectedDocs.compaction);
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
@@ -16390,6 +17147,7 @@ const executeHelixAsk = async ({
           const attemptDocBlocks = attemptDocSelection.docBlocks;
           const attemptDocText = attemptDocBlocks.map((block) => block.block).join("\n\n");
           docBlocks = attemptDocBlocks;
+          applyCompactionDebug(debugPayload, attemptDocSelection.compaction);
           if (debugPayload) {
             debugPayload.proof_span_rate = Math.max(
               debugPayload.proof_span_rate ?? 0,
@@ -17014,6 +17772,106 @@ const executeHelixAsk = async ({
         }
       }
 
+      if (graphPack) {
+        const boundNodes = HELIX_ASK_TREE_WALK_BINDING
+          ? buildTreeWalkBindingSet(graphPack, docBlocks)
+          : undefined;
+        const treeWalk = buildHelixAskTreeWalk(graphPack, {
+          mode: treeWalkMode,
+          maxSteps: HELIX_ASK_TREE_WALK_MAX_STEPS,
+          boundNodes,
+        });
+        treeWalkBlock = treeWalk.text;
+        treeWalkMetrics = treeWalk.metrics;
+        if (treeWalkMetrics) {
+          const bindingRate =
+            treeWalkMetrics.nodeCount > 0 && typeof treeWalkMetrics.boundCount === "number"
+              ? treeWalkMetrics.boundCount / treeWalkMetrics.nodeCount
+              : 0;
+          const treeWalkDetail = [
+            `mode=${treeWalkMode}`,
+            treeWalkMetrics.stepCount ? `steps=${treeWalkMetrics.stepCount}` : null,
+            treeWalkMetrics.treeCount ? `trees=${treeWalkMetrics.treeCount}` : null,
+            typeof treeWalkMetrics.boundCount === "number"
+              ? `bound=${treeWalkMetrics.boundCount}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" | ");
+          logEvent("Tree walk", "ready", treeWalkDetail);
+          if (debugPayload) {
+            debugPayload.tree_walk = treeWalkMetrics;
+            debugPayload.tree_walk_lines = treeWalkBlock
+              ? treeWalkBlock.split(/\r?\n/).filter((line) => line.trim()).length
+              : 0;
+            debugPayload.tree_walk_block_present = Boolean(treeWalkBlock);
+            debugPayload.tree_walk_bound_nodes = treeWalkMetrics.boundCount ?? 0;
+            debugPayload.tree_walk_binding_rate = Number(bindingRate.toFixed(3));
+          }
+        }
+      }
+
+      if (HELIX_ASK_CODE_ALIGNMENT && docBlocks.length > 0) {
+        codeAlignment = await buildCodeAlignmentFromDocBlocks(
+          docBlocks,
+          baseQuestion,
+          topicProfile,
+        );
+        if (debugPayload) {
+          debugPayload.code_alignment_applied = true;
+          debugPayload.code_alignment_symbols = codeAlignment.symbols.slice();
+          debugPayload.code_alignment_resolved = codeAlignment.resolved.slice();
+          debugPayload.code_spans_added = codeAlignment.spans.length;
+        }
+      } else if (debugPayload) {
+        debugPayload.code_alignment_applied = false;
+      }
+
+      const promptRetrievalConfidence =
+        typeof debugPayload?.retrieval_confidence === "number"
+          ? debugPayload.retrieval_confidence
+          : 0;
+      promptItems = buildHelixAskPromptItems({
+        intentId: intentProfile.id,
+        intentDomain,
+        intentTier,
+        queries: retrievalQueries.length ? retrievalQueries : undefined,
+        contextFiles,
+        retrievalConfidence: promptRetrievalConfidence,
+        docBlocks,
+        codeAlignment,
+        treeWalk: treeWalkBlock,
+        slotCoverage: coverageSlotSummary
+          ? { missingSlots: coverageSlotSummary.missingSlots ?? [], ratio: coverageSlotSummary.ratio ?? 0 }
+          : null,
+        docCoverage: docSlotSummary
+          ? { missingSlots: docSlotSummary.missingSlots ?? [], ratio: docSlotSummary.ratio ?? 0 }
+          : null,
+        graphPack,
+      });
+      toolResultsBlock = HELIX_ASK_TOOL_RESULTS ? buildToolResultsBlock(promptItems) : "";
+      if (debugPayload) {
+        debugPayload.prompt_items = promptItems.map((item) => ({
+          type: item.type,
+          hash: item.hash,
+          size: item.size,
+          label: item.label,
+        }));
+        debugPayload.prompt_item_count = promptItems.length;
+        debugPayload.tool_results_block = toolResultsBlock || undefined;
+        debugPayload.tool_results_present = Boolean(toolResultsBlock);
+        debugPayload.tool_results_items = promptItems
+          .filter((item) => ["retrieval_summary", "doc_spans", "code_spans", "tree_walk"].includes(item.type))
+          .map((item) => item.type);
+        if (toolResultsBlock) {
+          debugPayload.tool_results_hash = crypto
+            .createHash("sha1")
+            .update(toolResultsBlock)
+            .digest("hex")
+            .slice(0, 12);
+        }
+      }
+
       if (isRepoQuestion && !dryRun) {
         const combinedContext = wantsHybrid
           ? contextText
@@ -17218,10 +18076,20 @@ const executeHelixAsk = async ({
         }
       }
 
+      if (repoScaffold && codeAlignment?.spans?.length) {
+        const codeEvidence = codeAlignment.spans
+          .slice(0, 2)
+          .map((span) => buildCodeEvidenceBullet(span))
+          .join("\n");
+        if (codeEvidence.trim()) {
+          repoScaffold = mergeEvidenceScaffolds(repoScaffold, codeEvidence);
+        }
+      }
+
       if (isRepoQuestion || wantsHybrid) {
-        if (treeWalkBlock) {
+        if (treeWalkBlock && HELIX_ASK_TREE_WALK_INJECT) {
           repoScaffold = mergeEvidenceScaffolds(repoScaffold, treeWalkBlock);
-        } else if (graphPack?.scaffoldText) {
+        } else if (graphPack?.scaffoldText && HELIX_ASK_TREE_WALK_INJECT) {
           repoScaffold = mergeEvidenceScaffolds(repoScaffold, graphPack.scaffoldText);
         }
       }
@@ -17608,6 +18476,7 @@ const executeHelixAsk = async ({
           verbosity,
           constraintEvidenceText,
           compositeRequest.enabled,
+          toolResultsBlock,
         );
         prompt = ensureFinalMarker(hybridPrompt);
         evidenceText = [repoScaffold, generalEvidence, constraintEvidenceText]
@@ -17653,6 +18522,7 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
             verbosity,
+            toolResultsBlock,
             softExpansionBudget,
           ),
         );
@@ -17673,6 +18543,7 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
             verbosity,
+            toolResultsBlock,
             softExpansionBudget,
           ),
         );
@@ -17779,6 +18650,7 @@ const executeHelixAsk = async ({
                 formatSpec.format,
                 formatSpec.stageTags,
                 verbosity,
+                toolResultsBlock,
                 softExpansionBudget,
               ),
             );
@@ -17970,7 +18842,7 @@ const executeHelixAsk = async ({
         answerText = fallbackAnswer;
         answerPath.push("answer:fallback");
       }
-      if (treeWalkBlock && typeof result?.text === "string") {
+      if (treeWalkBlock && HELIX_ASK_TREE_WALK_INJECT && typeof result?.text === "string") {
         const treeWalkApplied = ensureTreeWalkInAnswer(result.text, treeWalkBlock);
         if (treeWalkApplied.injected) {
           result.text = treeWalkApplied.text;
@@ -18033,6 +18905,22 @@ const executeHelixAsk = async ({
           cleaned = stripTruncationMarkers(cleaned);
           cleaned = stripInlineJsonArtifacts(cleaned);
         }
+      const toolResultsPresent = Boolean(toolResultsBlock?.trim());
+      const hasToolEvidence =
+        docBlocks.length > 0 || (codeAlignment?.spans?.length ?? 0) > 0;
+      if (toolResultsPresent && hasToolEvidence && NO_EVIDENCE_RE.test(cleaned)) {
+        cleaned = buildToolResultsFallbackAnswer({
+          definitionFocus,
+          docBlocks,
+          codeAlignment,
+          treeWalk: HELIX_ASK_TREE_WALK_INJECT ? treeWalkBlock : undefined,
+        });
+        answerPath.push("toolResultsFallback");
+        if (debugPayload) {
+          debugPayload.tool_results_fallback_applied = true;
+          debugPayload.tool_results_fallback_reason = "llm_denied_evidence";
+        }
+      }
       const baselineCleaned = cleaned;
       const allowCitationRepair =
         !HELIX_ASK_SINGLE_LLM &&
@@ -18898,6 +19786,7 @@ const executeHelixAsk = async ({
         mode: resolveEnvelopeMode(verbosity),
         evidenceText,
         traceId: askTraceId,
+        treeWalk: treeWalkBlock || undefined,
       });
     }
     logDebug("streamEmitter.finalize start", {
