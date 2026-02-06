@@ -90,6 +90,11 @@ Resonance stack for code-lattice computations. Minimal artifact: code-lattice co
 - type: bridge
 - summary: Bridge between stewardship-ledger and resonance-runtime (stewardship-guardrail).
 
+### Node: Resonance IO <-> Verification Checklist
+- id: bridge-resonance-io-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and resonance-io (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Code Lattice Core <-> Resonance Runtime
@@ -103,3 +108,7 @@ Resonance stack for code-lattice computations. Minimal artifact: code-lattice co
 ### Bridge: stewardship-ledger <-> Resonance Runtime
 - relation: stewardship-guardrail
 - summary: Bridge between stewardship-ledger and resonance-runtime (stewardship-guardrail).
+
+### Bridge: verification-checklist <-> Resonance IO
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and resonance-io (verification-anchor).

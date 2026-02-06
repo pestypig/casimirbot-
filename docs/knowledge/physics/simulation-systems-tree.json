@@ -738,7 +738,9 @@
         "simulation",
         "artifacts"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-artifacts-stewardship-ledger"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -1000,6 +1002,81 @@
         ]
       },
       "summary": "Bridge between verification-checklist and simulation-streaming."
+    },
+    {
+      "id": "bridge-simulation-artifacts-stewardship-ledger",
+      "slug": "bridge-simulation-artifacts-stewardship-ledger",
+      "title": "Simulation Artifacts <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and simulation-artifacts.",
+      "bodyMD": "Bridge between stewardship-ledger and simulation-artifacts (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "artifacts"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-artifacts"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-artifacts"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "simulation-artifacts",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "simulation-artifacts"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "252c16c9fff0d9a6d6085dfbb417f84ac72b5a06",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/simulation-systems-tree.json",
+          "repo_rev": "252c16c9fff0d9a6d6085dfbb417f84ac72b5a06",
+          "content_hash": "sha256:547e8154312394f205f1821852015b1288770b81cd471583388729ab54bd7937"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between stewardship-ledger and simulation-artifacts."
     }
   ],
   "schema": {

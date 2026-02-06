@@ -64,7 +64,9 @@
         "hardware",
         "ingest"
       ],
-      "children": [],
+      "children": [
+        "bridge-hardware-ingest-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -619,6 +621,81 @@
         ]
       },
       "summary": "Bridge between verification-checklist and hardware-scheduler."
+    },
+    {
+      "id": "bridge-hardware-ingest-verification-checklist",
+      "slug": "bridge-hardware-ingest-verification-checklist",
+      "title": "Hardware Ingest <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and hardware-ingest.",
+      "bodyMD": "Bridge between verification-checklist and hardware-ingest (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "hardware",
+        "ingest"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-ingest"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-ingest"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "hardware-ingest",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "hardware-ingest"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "252c16c9fff0d9a6d6085dfbb417f84ac72b5a06",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/helix-core.ts",
+          "repo_rev": "252c16c9fff0d9a6d6085dfbb417f84ac72b5a06",
+          "content_hash": "sha256:df54877e753629e1410478685b192cbbe3794cd9946823a79fc4724231f1a97d"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and hardware-ingest."
     }
   ],
   "schema": {
