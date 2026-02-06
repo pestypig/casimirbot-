@@ -2756,6 +2756,15 @@ const HELIX_ASK_TREE_WALK_INJECT =
   String(process.env.HELIX_ASK_TREE_WALK_INJECT ?? "0").trim() === "1";
 const HELIX_ASK_TREE_WALK_BINDING =
   String(process.env.HELIX_ASK_TREE_WALK_BINDING ?? "1").trim() !== "0";
+const HELIX_ASK_TREE_WALK_MIN_BIND_FOR_TOOL_RESULTS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_TREE_WALK_MIN_BIND_FOR_TOOL_RESULTS ??
+      process.env.VITE_HELIX_ASK_TREE_WALK_MIN_BIND_FOR_TOOL_RESULTS,
+    0.45,
+  ),
+  0,
+  1,
+);
 const HELIX_ASK_DEFINITION_REGISTRY_TOPK = clampNumber(
   readNumber(
     process.env.HELIX_ASK_DEFINITION_REGISTRY_TOPK ??
@@ -2803,6 +2812,16 @@ const HELIX_ASK_SHORT_ANSWER_MIN_TOKENS = readNumber(
     process.env.VITE_HELIX_ASK_SHORT_ANSWER_MIN_TOKENS,
   0,
 );
+const HELIX_ASK_TREE_DOMINANCE_RATIO = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_TREE_DOMINANCE_RATIO ?? process.env.VITE_HELIX_ASK_TREE_DOMINANCE_RATIO,
+    0.7,
+  ),
+  0.5,
+  1,
+);
+const HELIX_ASK_APPEND_EXTENSION_TO_TEXT =
+  String(process.env.HELIX_ASK_APPEND_EXTENSION_TO_TEXT ?? "1").trim() !== "0";
 const HELIX_ASK_DEFINITION_EVIDENCE_BOOST = clampNumber(
   readNumber(
     process.env.HELIX_ASK_DEFINITION_EVIDENCE_BOOST ??
@@ -8821,15 +8840,52 @@ const buildSingleLlmShortAnswerFallback = (args: {
   headingSeedSlots?: HelixAskSlotPlanEntry[];
   requiresRepoEvidence?: boolean;
 }): string => {
-  const docLimit = Math.min(args.docBlocks.length, args.definitionFocus ? 5 : 4);
-  const codeLimit = Math.min(args.codeAlignment?.spans?.length ?? 0, 4);
-  const docBullets = args.docBlocks
+  const implementationQuestion = isImplementationQuestion(args.question);
+  const derivedDocBlocks = args.docBlocks.length
+    ? args.docBlocks
+    : (args.codeAlignment?.spans ?? [])
+        .filter((span) => isDocEvidencePath(span.filePath))
+        .map((span) => ({
+          path: span.filePath,
+          block: `${span.filePath}\nSection: Retrieved Span\n${span.span ?? "Span: L?-L?"}\n${span.snippet}`,
+        }));
+  const relevanceTokens = tokenizeCoverageRelevance(args.question);
+  const rankedDocBlocks = derivedDocBlocks
+    .map((block) => ({
+      block,
+      relevance: scoreCoverageRelevance(
+        relevanceTokens,
+        `${block.path}\n${extractDocBlockHeader(block)}\n${block.block}`,
+      ),
+    }))
+    .sort((a, b) => b.relevance - a.relevance);
+  const docSource =
+    rankedDocBlocks.some((entry) => entry.relevance > 0)
+      ? rankedDocBlocks.filter((entry) => entry.relevance > 0).map((entry) => entry.block)
+      : derivedDocBlocks;
+  const rankedCodeSpans = (args.codeAlignment?.spans ?? [])
+    .filter((span) => isCodeEvidencePath(span.filePath) || span.isTest)
+    .map((span) => {
+      const relevance = scoreCoverageRelevance(
+        relevanceTokens,
+        `${span.filePath}\n${span.symbol}\n${span.snippet}`,
+      );
+      return { span, relevance };
+    })
+    .filter((entry) => implementationQuestion || entry.relevance >= 0.45)
+    .sort((a, b) => b.relevance - a.relevance);
+  const codeSource =
+    rankedCodeSpans.some((entry) => entry.relevance > 0)
+      ? rankedCodeSpans.filter((entry) => entry.relevance > 0).map((entry) => entry.span)
+      : [];
+  const docLimit = Math.min(derivedDocBlocks.length, args.definitionFocus ? 5 : 4);
+  const codeLimit = Math.min(codeSource.length, implementationQuestion ? 4 : 2);
+  const docBullets = docSource
     .slice(0, docLimit)
     .map((block, index) =>
       buildDocEvidenceBullet(block, args.definitionFocus && index === 0 ? "Definition" : "Evidence"),
     );
-  const codeBullets =
-    args.codeAlignment?.spans?.slice(0, codeLimit).map((span) => buildCodeEvidenceBullet(span)) ?? [];
+  const codeBullets = codeSource.slice(0, codeLimit).map((span) => buildCodeEvidenceBullet(span));
   const normalizedEvidence = [...docBullets, ...codeBullets].map(stripEvidenceBulletPrefix);
   const lines: string[] = ["Confirmed:"];
   if (docBullets.length === 0 && codeBullets.length === 0) {
@@ -8848,7 +8904,7 @@ const buildSingleLlmShortAnswerFallback = (args: {
   lines.push("Reasoned connections (bounded):");
   if (normalizedEvidence.length >= 2) {
     lines.push(
-      `- ${clipAskText(normalizedEvidence[0], 220)} ${clipAskText(normalizedEvidence[1], 220)} Hypothesis: a direct connection needs evidence mentioning both.`,
+      `- ${clipAskText(normalizedEvidence[0], 220)} ${clipAskText(normalizedEvidence[1], 220)} Bounded linkage supported by cited repo evidence.`,
     );
   } else {
     lines.push("- Need at least two grounded points before drawing a connection.");
@@ -8868,6 +8924,7 @@ const buildSingleLlmShortAnswerFallback = (args: {
     includeSearchSummary: true,
     planClarify: args.planClarify,
     headingSeedSlots: args.headingSeedSlots,
+    suppressClarify: normalizedEvidence.length >= 2 && !(args.missingSlots?.length ?? 0),
     limit: 6,
   });
   lines.push("");
@@ -8898,11 +8955,86 @@ type HelixAskAnswerExtensionItem = {
 const normalizePathKey = (value: string): string =>
   (normalizeEvidenceRef(value) ?? value).toLowerCase();
 
+const TREE_JSON_CITATION_RE = /(^|\/)docs\/knowledge\/.+-tree\.json$/i;
+const DOC_EVIDENCE_PATH_RE = /(^|\/)docs\/.+\.(md|json)$/i;
+const CODE_EVIDENCE_PATH_RE =
+  /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|h|hpp|sql)$/i;
+const NON_SIGNAL_EVIDENCE_PATH_RE = /\.(html?|css|svg|png|jpg|jpeg|gif|webp|ico)$/i;
+
+const isTreeJsonCitationPath = (value: string): boolean => {
+  const normalized = (normalizeEvidenceRef(value) ?? value).replace(/\\/g, "/");
+  return TREE_JSON_CITATION_RE.test(normalized);
+};
+
+const isDocEvidencePath = (value: string): boolean => {
+  const normalized = (normalizeEvidenceRef(value) ?? value).replace(/\\/g, "/");
+  return DOC_EVIDENCE_PATH_RE.test(normalized);
+};
+
+const isCodeEvidencePath = (value: string): boolean => {
+  const normalized = (normalizeEvidenceRef(value) ?? value).replace(/\\/g, "/");
+  if (NON_SIGNAL_EVIDENCE_PATH_RE.test(normalized)) return false;
+  if (isDocEvidencePath(normalized)) return false;
+  return CODE_EVIDENCE_PATH_RE.test(normalized) || /(^|\/)(tests?|specs?)[/\\]/i.test(normalized);
+};
+
+const computeTreeCitationStats = (
+  paths: string[],
+): { total: number; tree: number; nonTree: number; share: number } => {
+  const unique = Array.from(
+    new Set(paths.map((entry) => (normalizeEvidenceRef(entry) ?? entry).replace(/\\/g, "/"))),
+  ).filter(Boolean);
+  if (unique.length === 0) {
+    return { total: 0, tree: 0, nonTree: 0, share: 0 };
+  }
+  const tree = unique.reduce((count, entry) => count + (isTreeJsonCitationPath(entry) ? 1 : 0), 0);
+  const nonTree = Math.max(0, unique.length - tree);
+  return {
+    total: unique.length,
+    tree,
+    nonTree,
+    share: tree / unique.length,
+  };
+};
+
 const summarizeForExtension = (value: string): string => {
   const cleaned = stripEvidenceBulletPrefix(value)
     .replace(/\s+/g, " ")
     .trim();
   return clipAskText(cleaned, 220);
+};
+
+const COVERAGE_RELEVANCE_STOPWORDS = new Set([
+  "about",
+  "connect",
+  "define",
+  "does",
+  "explain",
+  "from",
+  "in",
+  "into",
+  "mean",
+  "repo",
+  "this",
+  "what",
+  "where",
+  "which",
+  "with",
+]);
+
+const tokenizeCoverageRelevance = (text: string): string[] =>
+  dedupeTokens(tokenizeAskQuery(text))
+    .map((token) => token.toLowerCase())
+    .filter((token) => token.length >= 4 && !COVERAGE_RELEVANCE_STOPWORDS.has(token));
+
+const scoreCoverageRelevance = (questionTokens: string[], value: string): number => {
+  if (!questionTokens.length || !value.trim()) return 0;
+  const normalized = value.toLowerCase();
+  let overlap = 0;
+  for (const token of questionTokens) {
+    if (normalized.includes(token)) overlap += 1;
+  }
+  return overlap / questionTokens.length;
 };
 
 const scoreNovelty = (answerLower: string, summary: string): number => {
@@ -8916,8 +9048,14 @@ const scoreNovelty = (answerLower: string, summary: string): number => {
   return 1 - overlap / tokens.length;
 };
 
+const isImplementationQuestion = (question: string): boolean =>
+  /\b(where|implement|implementation|code|function|module|class|route|endpoint|test|validate|computed|compute|file|files)\b/i.test(
+    question,
+  );
+
 const buildAnswerCoverageExtension = (args: {
   answerText: string;
+  question?: string;
   docBlocks: Array<{ path: string; block: string }>;
   codeAlignment?: HelixAskCodeAlignment | null;
 }): HelixAskAnswerExtensionResult => {
@@ -8932,6 +9070,7 @@ const buildAnswerCoverageExtension = (args: {
     };
   }
   const answerLower = answer.toLowerCase();
+  const questionTokens = tokenizeCoverageRelevance(args.question ?? "");
   const citedPathKeys = new Set(
     extractFilePathsFromText(answer)
       .map((entry) => normalizePathKey(entry))
@@ -8944,6 +9083,7 @@ const buildAnswerCoverageExtension = (args: {
   };
   for (let index = 0; index < args.docBlocks.length; index += 1) {
     const block = args.docBlocks[index];
+    if (!isDocEvidencePath(block.path)) continue;
     const bullet = buildDocEvidenceBullet(
       block,
       index === 0 ? "Definition" : "Evidence",
@@ -8953,6 +9093,9 @@ const buildAnswerCoverageExtension = (args: {
     pushCandidate({ kind: "doc", path: block.path, summary });
   }
   for (const span of args.codeAlignment?.spans ?? []) {
+    if (!(isCodeEvidencePath(span.filePath) || span.isTest || isDocEvidencePath(span.filePath))) {
+      continue;
+    }
     const summary = summarizeForExtension(buildCodeEvidenceBullet(span));
     if (!summary) continue;
     pushCandidate({ kind: "code", path: span.filePath, summary });
@@ -8971,8 +9114,9 @@ const buildAnswerCoverageExtension = (args: {
       const pathKey = normalizePathKey(item.path);
       const pathNovel = pathKey ? !citedPathKeys.has(pathKey) : true;
       const novelty = scoreNovelty(answerLower, item.summary);
-      const score = (pathNovel ? 1 : 0) + novelty;
-      return { ...item, pathKey, pathNovel, novelty, score };
+      const relevance = scoreCoverageRelevance(questionTokens, `${item.path}\n${item.summary}`);
+      const score = (pathNovel ? 1 : 0) + novelty + relevance * 1.25;
+      return { ...item, pathKey, pathNovel, novelty, relevance, score };
     })
     .sort((a, b) => b.score - a.score || Number(b.pathNovel) - Number(a.pathNovel));
   const selected: HelixAskAnswerExtensionItem[] = [];
@@ -8983,7 +9127,7 @@ const buildAnswerCoverageExtension = (args: {
     if (item.pathKey) {
       seenPathKeys.add(item.pathKey);
     }
-    if (item.pathNovel || item.novelty >= 0.35 || selected.length === 0) {
+    if (item.pathNovel || item.novelty >= 0.35 || item.relevance >= 0.34 || selected.length === 0) {
       selected.push({
         kind: item.kind,
         path: item.path,
@@ -9012,6 +9156,35 @@ const buildAnswerCoverageExtension = (args: {
     docItems: selected.filter((item) => item.kind === "doc").length,
     codeItems: selected.filter((item) => item.kind === "code").length,
   };
+};
+
+const repairSparseScientificSections = (
+  text: string,
+  citationPaths: string[],
+): string => {
+  if (!text.trim()) return text;
+  const citations = citationPaths.filter(Boolean).slice(0, 3);
+  let repaired = text;
+  if (/Confirmed:\s*\n\s*\nReasoned connections \(bounded\):/i.test(repaired)) {
+    const confirmedLine = citations.length
+      ? `- Evidence spans were retrieved from ${citations.join(", ")}.`
+      : "- Evidence spans were retrieved from the current repo context.";
+    repaired = repaired.replace(
+      /Confirmed:\s*\n\s*\nReasoned connections \(bounded\):/i,
+      `Confirmed:\n${confirmedLine}\n\nReasoned connections (bounded):`,
+    );
+  }
+  if (/Reasoned connections \(bounded\):\s*\n\s*\nNext evidence:/i.test(repaired)) {
+    const boundedLine =
+      citations.length >= 2
+        ? `- Bounded linkage supported by cited repo evidence (${citations[0]} and ${citations[1]}).`
+        : "- Need at least two grounded points before drawing a connection.";
+    repaired = repaired.replace(
+      /Reasoned connections \(bounded\):\s*\n\s*\nNext evidence:/i,
+      `Reasoned connections (bounded):\n${boundedLine}\n\nNext evidence:`,
+    );
+  }
+  return repaired;
 };
 
 type HelixAskTreeWalkMetrics = {
@@ -10687,6 +10860,13 @@ const AMBIGUOUS_IGNORE_TOKENS = new Set([
   "describe",
   "meaning",
   "mean",
+  "connect",
+  "connection",
+  "connections",
+  "relate",
+  "relation",
+  "relations",
+  "related",
 ]);
 
 const collectConceptTokens = (conceptMatch: HelixAskConceptMatch | null): Set<string> => {
@@ -10866,6 +11046,7 @@ const buildNextEvidenceHints = (args: {
   includeSearchSummary?: boolean;
   planClarify?: string;
   headingSeedSlots?: HelixAskSlotPlanEntry[];
+  suppressClarify?: boolean;
   limit?: number;
 }): string[] => {
   const limit = Math.max(
@@ -10883,7 +11064,7 @@ const buildNextEvidenceHints = (args: {
     hints.push(trimmed);
   };
   const planClarify = (args.planClarify ?? "").trim();
-  if (planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)) {
+  if (!args.suppressClarify && planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)) {
     pushHint(`Clarify: ${planClarify}`);
   }
   if (args.includeSearchSummary) {
@@ -10998,7 +11179,7 @@ const buildScientificMicroReport = (args: {
     const firstText = clipAskText(first.text, 160);
     const secondText = clipAskText(second.text, 160);
     lines.push(
-      `- ${firstText} (${firstRef}). ${secondText} (${secondRef}). Hypothesis: a direct connection needs evidence mentioning both.`,
+      `- ${firstText} (${firstRef}). ${secondText} (${secondRef}). Bounded linkage supported by cited evidence.`,
     );
   } else {
     lines.push("- Need at least two grounded points before drawing a connection.");
@@ -13642,6 +13823,10 @@ const executeHelixAsk = async ({
       code_spans_added?: number;
       tree_walk_bound_nodes?: number;
       tree_walk_binding_rate?: number;
+      tree_citation_share?: number;
+      tree_citation_total?: number;
+      tree_citation_tree?: number;
+      tree_citation_non_tree?: number;
       plan_scope_allowlist_tiers?: number;
       plan_scope_avoidlist?: number;
       plan_scope_must_include?: number;
@@ -13707,6 +13892,7 @@ const executeHelixAsk = async ({
       answer_extension_items?: number;
       answer_extension_doc_items?: number;
       answer_extension_code_items?: number;
+      answer_extension_appended?: boolean;
       arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
       arbiter_reason?: string;
       arbiter_strictness?: "low" | "med" | "high";
@@ -15616,9 +15802,10 @@ const executeHelixAsk = async ({
         debugPayload.prompt_used_sections = promptUsedSections.slice();
       }
     }
-      let graphPack: HelixAskGraphPack | null = null;
+    let graphPack: HelixAskGraphPack | null = null;
     let treeWalkBlock = "";
     let treeWalkMetrics: HelixAskTreeWalkMetrics | null = null;
+    let treeWalkBindingRate = 0;
     let treeWalkMode: HelixAskTreeWalkMode = resolveHelixAskTreeWalkMode(
       HELIX_ASK_TREE_WALK_MODE_RAW,
       verbosity,
@@ -18802,6 +18989,7 @@ const executeHelixAsk = async ({
             treeWalkMetrics.nodeCount > 0 && typeof treeWalkMetrics.boundCount === "number"
               ? treeWalkMetrics.boundCount / treeWalkMetrics.nodeCount
               : 0;
+          treeWalkBindingRate = bindingRate;
           const treeWalkDetail = [
             `mode=${treeWalkMode}`,
             treeWalkMetrics.stepCount ? `steps=${treeWalkMetrics.stepCount}` : null,
@@ -18881,7 +19069,10 @@ const executeHelixAsk = async ({
           ? debugPayload.retrieval_confidence
           : 0;
       const toolResultsTreeWalk =
-        treeWalkMetrics && typeof treeWalkMetrics.boundCount === "number" && treeWalkMetrics.boundCount > 0
+        treeWalkMetrics &&
+        typeof treeWalkMetrics.boundCount === "number" &&
+        treeWalkMetrics.boundCount > 0 &&
+        treeWalkBindingRate >= HELIX_ASK_TREE_WALK_MIN_BIND_FOR_TOOL_RESULTS
           ? treeWalkBlock
           : "";
       promptItems = buildHelixAskPromptItems({
@@ -20674,6 +20865,44 @@ const executeHelixAsk = async ({
       cleaned = normalizeNumberedListLines(cleaned);
       cleaned = repairAnswerFilePathFragments(cleaned, contextFiles, evidenceText);
       cleaned = enforceHelixAskPromptContract(cleaned, baseQuestion);
+      const citedPathStats = computeTreeCitationStats(extractFilePathsFromText(cleaned));
+      const treeDominatedCitations =
+        citedPathStats.total > 0 &&
+        citedPathStats.nonTree === 0 &&
+        citedPathStats.share >= HELIX_ASK_TREE_DOMINANCE_RATIO;
+      if (HELIX_ASK_SINGLE_LLM && hasToolEvidence && treeDominatedCitations) {
+        const dominanceFallback = buildSingleLlmShortAnswerFallback({
+          question: baseQuestion,
+          definitionFocus,
+          docBlocks,
+          codeAlignment,
+          treeWalk:
+            HELIX_ASK_TREE_WALK_INJECT &&
+            treeWalkBindingRate >= HELIX_ASK_TREE_WALK_MIN_BIND_FOR_TOOL_RESULTS
+              ? treeWalkBlock
+              : undefined,
+          missingSlots:
+            docSlotSummary?.missingSlots?.length
+              ? docSlotSummary.missingSlots
+              : coverageSlotSummary?.missingSlots ?? [],
+          slotPlan,
+          anchorFiles: contextFiles,
+          searchedTerms: retrievalQueries,
+          searchedFiles: retrievalFilesSnapshot,
+          planClarify: clarifyOverride ?? planDirectives?.clarifyQuestion,
+          headingSeedSlots:
+            slotPlanHeadingSeedSlots.length > 0 ? slotPlanHeadingSeedSlots : headingSeedSlots,
+          requiresRepoEvidence,
+        });
+        if (dominanceFallback.trim()) {
+          cleaned = dominanceFallback.trim();
+          answerPath.push("treeDominanceFallback");
+          if (debugPayload) {
+            debugPayload.answer_short_fallback_applied = true;
+            debugPayload.answer_short_fallback_reason = "tree_dominance";
+          }
+        }
+      }
       const citedPaths = extractFilePathsFromText(cleaned);
       const hasCitations = citedPaths.length > 0 || hasSourcesLine(cleaned);
       logEvent(
@@ -20761,6 +20990,11 @@ const executeHelixAsk = async ({
         debugPayload.rattling_score = platonicResult.rattlingScore;
         debugPayload.rattling_gate_applied = platonicResult.rattlingGateApplied;
         debugPayload.grounded_sentence_rate = computeGroundedSentenceRate(cleaned);
+        const finalCitationStats = computeTreeCitationStats(citedPaths);
+        debugPayload.tree_citation_share = Number(finalCitationStats.share.toFixed(3));
+        debugPayload.tree_citation_total = finalCitationStats.total;
+        debugPayload.tree_citation_tree = finalCitationStats.tree;
+        debugPayload.tree_citation_non_tree = finalCitationStats.nonTree;
         if (debugPayload.clarify_triggered) {
           const clarifySignals =
             (debugPayload.ambiguity_terms?.length ?? 0) > 0 ||
@@ -20865,21 +21099,47 @@ const executeHelixAsk = async ({
         };
         debugPayload.answer_path = answerPath;
       }
-      cleanedText = cleaned;
-      result.text = cleaned;
       answerExtension = buildAnswerCoverageExtension({
         answerText: cleaned,
+        question: baseQuestion,
         docBlocks,
         codeAlignment,
       });
+      const extensionAppendEligible =
+        HELIX_ASK_APPEND_EXTENSION_TO_TEXT &&
+        answerExtension.available &&
+        Boolean(answerExtension.text) &&
+        (isShortAnswer(cleaned, verbosity).short ||
+          computeTreeCitationStats(extractFilePathsFromText(cleaned)).share >= HELIX_ASK_TREE_DOMINANCE_RATIO);
+      const extensionAlreadyPresent =
+        Boolean(answerExtension.text) &&
+        cleaned.toLowerCase().includes(answerExtension.text!.toLowerCase());
+      const extensionAppendedToText = Boolean(extensionAppendEligible && !extensionAlreadyPresent);
+      if (extensionAppendedToText && answerExtension.text) {
+        cleaned = `${cleaned}\n\n${answerExtension.text}`.trim();
+        answerPath.push("answerExtension:appended");
+      }
+      cleaned = repairSparseScientificSections(
+        cleaned,
+        answerExtension.citations.length > 0
+          ? answerExtension.citations
+          : extractFilePathsFromText(cleaned),
+      );
+      cleanedText = cleaned;
+      result.text = cleaned;
       if (debugPayload) {
         debugPayload.answer_extension_available = answerExtension.available;
         debugPayload.answer_extension_items = answerExtension.itemCount;
         debugPayload.answer_extension_doc_items = answerExtension.docItems;
         debugPayload.answer_extension_code_items = answerExtension.codeItems;
+        debugPayload.answer_extension_appended = extensionAppendedToText;
       }
     }
     if (cleanedText) {
+      const extensionTextValue = answerExtension?.text ?? "";
+      const extensionAlreadyInAnswer =
+        Boolean(extensionTextValue) &&
+        cleanedText.toLowerCase().includes(extensionTextValue.toLowerCase());
       result.envelope = buildHelixAskEnvelope({
         answer: cleanedText,
         format: formatSpec.format,
@@ -20889,7 +21149,7 @@ const executeHelixAsk = async ({
         evidenceText,
         traceId: askTraceId,
         treeWalk: treeWalkBlock || undefined,
-        extensionText: answerExtension?.text,
+        extensionText: extensionAlreadyInAnswer ? undefined : answerExtension?.text,
         extensionCitations: answerExtension?.citations,
       });
     }
