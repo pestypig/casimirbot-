@@ -27,6 +27,7 @@ type PanelReport = {
 
 const REPORT_PATH = path.join("reports", "panel-cross-concepts.json");
 const OUTPUT_PATH = path.join("docs", "knowledge", "panel-registry-tree.json");
+const CONCEPT_OUTPUT_PATH = path.join("docs", "knowledge", "panel-concepts-tree.json");
 
 const sha256 = (filePath: string): string | null => {
   try {
@@ -71,6 +72,7 @@ const run = () => {
   const registryHash = sha256("client/src/pages/helix-core.panels.ts");
   const panelNodes: any[] = [];
   const bridgeNodes: any[] = [];
+  const conceptNodes: any[] = [];
 
   for (const panel of report.panels) {
     const nodeId = `panel-${panel.id}`;
@@ -260,6 +262,65 @@ const run = () => {
         ]
       }
     });
+
+    const conceptLinks: Array<{ rel: string; to: string }> = [
+      { rel: "parent", to: "panel-concepts-tree" }
+    ];
+    const conceptSeeAlso = new Set<string>();
+    (panel.termHits ?? []).forEach((hit) => {
+      hit.treeMatches?.forEach((match) => {
+        if (match.treeId === "panel-registry-tree" || match.treeId === "panel-concepts-tree") return;
+        if (!match.nodeId) return;
+        conceptSeeAlso.add(match.nodeId);
+      });
+    });
+    for (const nodeIdMatch of Array.from(conceptSeeAlso).slice(0, 6)) {
+      conceptLinks.push({ rel: "see-also", to: nodeIdMatch });
+    }
+
+    const conceptTags = Array.from(
+      new Set([
+        "panel-concept",
+        panel.id,
+        ...(panel.keywords ?? []),
+        ...(panel.terms ?? []),
+        ...(panel.units ?? []),
+        ...(panel.telemetryTokens ?? [])
+      ]),
+    ).slice(0, 32);
+
+    conceptNodes.push({
+      id: `panel-concept-${panel.id}`,
+      slug: `panel-concept-${panel.id}`,
+      title: `${title} Concept`,
+      excerpt: `Concept surface derived from panel ${panel.id}.`,
+      bodyMD: bodyLines.join("\n"),
+      tags: conceptTags,
+      links: conceptLinks,
+      summary: `Concept surface derived from panel ${panel.id}.`,
+      nodeType: "concept",
+      inputs: [],
+      outputs: [],
+      assumptions: [],
+      validity: {},
+      deterministic: null,
+      tolerance: null,
+      environment: null,
+      dependencies: ["panel-concepts-tree"],
+      evidence: evidence.filter((entry) => entry.content_hash || entry.type !== "code"),
+      predictability: {
+        status: "partial",
+        missing: [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    });
   }
 
   const rootNode = {
@@ -314,8 +375,61 @@ const run = () => {
     }
   };
 
+  const conceptRoot = {
+    id: "panel-concepts-tree",
+    slug: "panel-concepts-tree",
+    title: "Panel Concepts Tree",
+    excerpt: "Panel-derived concepts for cross-concept discovery.",
+    bodyMD:
+      "This tree enumerates concepts inferred from UI panels (keywords, telemetry tokens, units) so Helix Ask can cross-map panel surfaces to DAG concepts.\n\nMinimal artifact: panel registry term map.",
+    tags: ["ui", "panels", "concepts"],
+    children: conceptNodes.map((node) => node.id),
+    links: [],
+    summary: "Panel-derived concepts for cross-concept discovery.",
+    nodeType: "concept",
+    inputs: [],
+    outputs: [],
+    assumptions: [],
+    validity: {},
+    deterministic: null,
+    tolerance: null,
+    environment: null,
+    dependencies: [],
+    evidence: [
+      {
+        type: "doc",
+        path: "client/src/pages/helix-core.panels.ts",
+        repo_rev: repoRev,
+        content_hash: registryHash ? `sha256:${registryHash}` : undefined
+      }
+    ],
+    predictability: {
+      status: "partial",
+      missing: [
+        "inputs",
+        "outputs",
+        "assumptions",
+        "validity",
+        "deterministic",
+        "tolerance",
+        "environment"
+      ]
+    }
+  };
+  const conceptPayload = {
+    version: 1,
+    rootId: "panel-concepts-tree",
+    nodes: [conceptRoot, ...conceptNodes],
+    schema: {
+      name: "helix-ask-dag-node",
+      version: 1
+    }
+  };
+
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(payload, null, 2));
+  fs.writeFileSync(CONCEPT_OUTPUT_PATH, JSON.stringify(conceptPayload, null, 2));
   console.log(`Wrote ${OUTPUT_PATH} (${payload.nodes.length} nodes).`);
+  console.log(`Wrote ${CONCEPT_OUTPUT_PATH} (${conceptPayload.nodes.length} nodes).`);
 };
 
 run();
