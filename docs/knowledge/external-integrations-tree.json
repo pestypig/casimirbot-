@@ -48,7 +48,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/external-integrations-tree.json"
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
     },
@@ -79,7 +81,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "external-integrations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -95,7 +99,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/external-integrations-tree.json"
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
     },
@@ -126,7 +132,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "external-integrations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -142,7 +150,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/external-integrations-tree.json"
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
     },
@@ -173,7 +183,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "external-integrations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -189,7 +201,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/external-integrations-tree.json"
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
     },
@@ -220,7 +234,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "external-integrations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -236,7 +252,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/external-integrations-tree.json"
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
     },
@@ -267,7 +285,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "external-integrations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -283,7 +303,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/external-integrations-tree.json"
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
     },
@@ -314,7 +336,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "external-integrations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -330,7 +354,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/external-integrations-tree.json"
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
     },
@@ -361,7 +387,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "external-integrations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -377,7 +405,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/external-integrations-tree.json"
+          "path": "docs/knowledge/external-integrations-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1300b130c3c4ed9b832542d1fcc08791a1981bbaf53ec42f0f5c6c170f1ac4d"
         }
       ]
     }

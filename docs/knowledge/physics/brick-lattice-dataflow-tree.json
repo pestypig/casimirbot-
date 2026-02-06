@@ -51,7 +51,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/brick-lattice-dataflow-tree.json"
+          "path": "docs/knowledge/physics/brick-lattice-dataflow-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d929e3315d1aafbff04d4557e6988aed4e7f6004d8dbf14112c2803f66275d36"
         }
       ]
     },
@@ -78,11 +80,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/stress-energy-brick.ts"
+          "path": "server/stress-energy-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1a79a1ddd1873ecf5031860ddae0cd106448d9f46490bd92ac1d18b0da161f2e"
         },
         {
           "type": "test",
-          "path": "tests/stress-energy-brick.spec.ts"
+          "path": "tests/stress-energy-brick.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5c33bb7b66d252d2f435603fefdf6bb13b87e4ce997390fc2f330a76148acd6e"
         }
       ],
       "inputs": [
@@ -213,7 +219,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/curvature-brick.ts"
+          "path": "server/curvature-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e79416d2cfa49a366bbce49af964d9248502099d3af33126a5e1e0c5a7c9130a"
         }
       ],
       "inputs": [
@@ -300,7 +308,9 @@
       "environment": {
         "runtime": "node"
       },
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -331,11 +341,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr-evolve-brick.ts"
+          "path": "server/gr-evolve-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:60729772df9bb52a622e5fb4b7450b05a6e74a9273a27701b96c2c6248923654"
         },
         {
           "type": "test",
-          "path": "tests/gr-advection-stability.spec.ts"
+          "path": "tests/gr-advection-stability.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:428c275547add7ed7803b1dd101b35293b9f5f3ff9955931fb17a8335e4a741c"
         }
       ],
       "inputs": [
@@ -440,11 +454,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr-initial-brick.ts"
+          "path": "server/gr-initial-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ae6fbe227e8182d60c074fb894651c7e6336b38918644333434ed23bd0e44b1a"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/york-time-constraints.md"
+          "path": "docs/knowledge/physics/york-time-constraints.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1835eac20b5f3decbb2d464faeaa48042bb96b376188c0a304777c00b4b92aff"
         }
       ],
       "inputs": [
@@ -546,11 +564,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/curvature-brick.ts"
+          "path": "server/curvature-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e79416d2cfa49a366bbce49af964d9248502099d3af33126a5e1e0c5a7c9130a"
         },
         {
           "type": "code",
-          "path": "server/stress-energy-brick.ts"
+          "path": "server/stress-energy-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1a79a1ddd1873ecf5031860ddae0cd106448d9f46490bd92ac1d18b0da161f2e"
         }
       ],
       "inputs": [],
@@ -560,7 +582,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -597,19 +621,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/lib/lattice-frame.ts"
+          "path": "client/src/lib/lattice-frame.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6efd4fc114632fe500b7eabc0a71cf77a00597fc6ad8573a9d571afde90cdf49"
         },
         {
           "type": "code",
-          "path": "client/src/lib/lattice-sdf.ts"
+          "path": "client/src/lib/lattice-sdf.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:91fb0a6cf34b59f1b849a5919a386792087238aab87c166fe34cce3f88aace0d"
         },
         {
           "type": "code",
-          "path": "client/src/lib/lattice-surface.ts"
+          "path": "client/src/lib/lattice-surface.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cf966d6f954c8a4c34b10372343df606ac3e6150a24aa13a136a8aebc1d5ed84"
         },
         {
           "type": "code",
-          "path": "client/src/lib/lattice-export.ts"
+          "path": "client/src/lib/lattice-export.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:785f842caf3009dfe47f7bd03958f48a25064863a8b423282de6d247b5ffc972"
         }
       ],
       "inputs": [],
@@ -619,7 +651,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -656,19 +690,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/hooks/useGrBrick.ts"
+          "path": "client/src/hooks/useGrBrick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:91ccb5f63caf4a083950b85b6b4d8a1ab575d01abd892276ae0438f2f89810fe"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useGrEvolveBrick.ts"
+          "path": "client/src/hooks/useGrEvolveBrick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c31cf85c4bb7eac9a15ef1e4b0d3e0ce67d45defd965afd5449071645f27c7f4"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useStressEnergyBrick.ts"
+          "path": "client/src/hooks/useStressEnergyBrick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d625cd2b70710a3543440c0e70297f8e6a34126017a46c889ac1c96f96eef16b"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useLapseBrick.ts"
+          "path": "client/src/hooks/useLapseBrick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:aa474b09be92fed5ff1c70b42a850fc12ef07cfa454dcd420b76cc12650f41ee"
         }
       ],
       "inputs": [],
@@ -678,7 +720,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -741,7 +785,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -778,15 +824,21 @@
       "evidence": [
         {
           "type": "test",
-          "path": "tests/stress-energy-brick.spec.ts"
+          "path": "tests/stress-energy-brick.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5c33bb7b66d252d2f435603fefdf6bb13b87e4ce997390fc2f330a76148acd6e"
         },
         {
           "type": "test",
-          "path": "tests/gr-constraint-gate.spec.ts"
+          "path": "tests/gr-constraint-gate.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bd73c7623295f4551b7e822a2ed4e7c36fb4854288ba690fd43d169a62958cf7"
         },
         {
           "type": "test",
-          "path": "tests/gr-constraint-network.spec.ts"
+          "path": "tests/gr-constraint-network.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:18f690ecc03a52d9b71d6d34a4d899000e49d273244648b3861c02c313301f2c"
         }
       ],
       "inputs": [],
@@ -796,7 +848,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "brick-lattice-dataflow-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

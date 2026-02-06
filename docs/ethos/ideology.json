@@ -97,43 +97,43 @@
           "type": "doc",
           "path": "docs/ethos/why.md",
           "title": "Mission Ethos Seeds",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d17c7c7f5804f27879b281fccae65e2ac25e170660b1a5397c80b1d6b532b72d"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -202,43 +202,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "interbeing-systems",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -304,43 +304,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "sangha-architecture",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -465,33 +465,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "citizens-arc",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -569,43 +569,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "citizens-arc-anti-mutation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -683,43 +683,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "citizens-arc-stress-test",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -785,33 +785,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "right-speech-infrastructure",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -881,43 +881,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "restorative-harm-repair",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -983,43 +983,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "impermanence-by-design",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1089,43 +1089,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "koan-governance",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1201,33 +1201,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "three-tenets-loop",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1309,33 +1309,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "civic-signal-loop",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1409,33 +1409,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "no-bypass-guardrail",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1509,43 +1509,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "capture-resistance",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1619,43 +1619,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "scarcity-justice",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1729,43 +1729,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "data-dignity",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1835,43 +1835,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "civic-memory-continuity",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -1941,43 +1941,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "skillful-mediation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -2047,43 +2047,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "external-interface-integrity",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -2177,43 +2177,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "verification-based-diplomacy",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -2287,43 +2287,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "shadow-rail-interdiction",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -2397,43 +2397,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "dignified-exit-design",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -2507,43 +2507,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "repair-debt-compact",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -2648,43 +2648,43 @@
           "type": "doc",
           "path": "docs/ethos/why.md",
           "title": "Mission Ethos Seeds",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d17c7c7f5804f27879b281fccae65e2ac25e170660b1a5397c80b1d6b532b72d"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -2764,43 +2764,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "bodhisattva-craft",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -2880,43 +2880,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "stewardship-ledger",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3001,43 +3001,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "beginners-mind",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3117,33 +3117,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "inner-spark",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3221,43 +3221,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "dream-integrity",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3336,43 +3336,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "struggle-testament",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3446,43 +3446,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "devotion-course",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3571,43 +3571,43 @@
           "type": "doc",
           "path": "docs/ethos/why.md",
           "title": "Mission Ethos Seeds",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d17c7c7f5804f27879b281fccae65e2ac25e170660b1a5397c80b1d6b532b72d"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3686,43 +3686,43 @@
           "type": "doc",
           "path": "docs/product-narrative.md",
           "title": "Product Narrative",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:0109dc0c1ad40f249e0a7011bc37c1a4fe9268f4b43a86e26975d6f6d9f1d00c"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3833,33 +3833,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "integrity-protocols",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -3933,33 +3933,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "provenance-protocol",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4034,33 +4034,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "liveness-or-it-didnt-happen",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4135,43 +4135,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "voice-integrity",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4257,33 +4257,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "feedback-loop-hygiene",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4368,43 +4368,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "habit-pressure-break",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4476,43 +4476,43 @@
           "type": "doc",
           "path": "docs/casimir-tile-mechanism.md",
           "title": "Casimir Tile Mechanism",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:100ded5f8596d639ff80e36473c85cba62d96d2b1af158948a9165e5a0e1d100"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4580,33 +4580,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "compromised-channel-response",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4681,43 +4681,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "reciprocity-contract",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4805,33 +4805,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "phoenix-averaging",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -4909,33 +4909,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "solitude-to-signal",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5023,33 +5023,33 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "promise-trials",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "doc",
           "path": "docs/BUSINESS_MODEL.md",
           "contains": "Noise field generation",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2ca351ad826dd396ce4f9ecdd45591f551e84e9210511a35bbf631bafeba192e"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/certainty-framework-tree.json",
           "contains": "noisegen-confidence",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:948ec02f16ecf17851274525a2a1e0a114fcf9dc9e972226f371b597906b3c22"
         },
         {
           "type": "code",
           "path": "server/services/noisegen-planner-model.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e6e900ae36d00862dc4bd66f49a0d89f7bedf9b47f070cdd3d773fa5b273f44c"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5123,43 +5123,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "lifetime-trust-ledger",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5225,43 +5225,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "jurisdictional-floor",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5327,43 +5327,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "two-key-approval",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5453,43 +5453,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "lawful-interface-protocol",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5562,43 +5562,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "federal-civic-listening-circuit",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5671,43 +5671,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "metric-integrity-guardrail",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5780,43 +5780,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "harm-weighted-priority-standard",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -5892,43 +5892,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "integration-ladder",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -6001,43 +6001,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "local-stability-compact",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -6109,43 +6109,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "access-to-counsel-pathway",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],
@@ -6217,43 +6217,43 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "training-certification-gate",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
           "path": "client/src/components/IdeologyPanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
         },
         {
           "type": "code",
           "path": "client/src/components/MissionEthosSourcePanel.tsx",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
         },
         {
           "type": "code",
           "path": "client/src/hooks/use-ideology.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
         },
         {
           "type": "code",
           "path": "client/src/lib/ideology-types.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
         },
         {
           "type": "code",
           "path": "server/routes/ethos.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
         },
         {
           "type": "telemetry",
           "path": "docs/ethos/ideology-telemetry-schema.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
         }
       ],

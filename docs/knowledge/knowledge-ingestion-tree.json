@@ -51,19 +51,19 @@
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "code",
           "path": "server/db/knowledge.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:b6dac5b4855705a953e08440de67303c8cdf9f30d2e2db502948033aacb71748"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ]
@@ -92,25 +92,25 @@
         {
           "type": "code",
           "path": "server/services/knowledge/corpus.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ef07d340d9a06662d44c8b74a8e589b074c1a7807d9fc3907b4a753c0fe74227"
         },
         {
           "type": "code",
           "path": "server/routes/knowledge.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:f2add329a95fcac70453c1964fd551ad0e822b1884316026609e28becec6f34b"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -121,7 +121,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -158,19 +160,19 @@
         {
           "type": "code",
           "path": "server/services/knowledge/validation.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:2946cdff522a07403e5a6c52dd792fcab55b1e276c83e1902b2c89b3bd2f7628"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -181,7 +183,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -218,19 +222,19 @@
         {
           "type": "code",
           "path": "server/services/knowledge/merge.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:08a4d1735218953ef5a05b86c779725bd6a30556096290dae4975378ce837828"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -241,7 +245,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -278,19 +284,19 @@
         {
           "type": "code",
           "path": "server/services/knowledge/citations.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:73c0ae1cd6dac5dd0d2e1bc7242725c569c50d3f0c6931945e74f5d2134c5ad3"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -301,7 +307,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -338,25 +346,25 @@
         {
           "type": "code",
           "path": "server/services/vectorizer.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:924a09b4371414472c10a1b274aa1fcd975879d01bea9b34a9bd7c62c8038c76"
         },
         {
           "type": "code",
           "path": "server/routes/vectorizer.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:be6f9d44fe92978b0c8e5efdbcdcedadfaf6acc2ea6ecdf153090b7cda9ee717"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -367,7 +375,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -405,25 +415,25 @@
         {
           "type": "code",
           "path": "server/routes/search.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:619aa73307367f43efa5d53cd21aa261f90c19ddb9eacdc1916f8352e5e91583"
         },
         {
           "type": "code",
           "path": "server/services/search/repo-index.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:07a21dfc6a90ab2d06b9d8e1bc7daefc925fb24325ea8dd0043bd8ae5a3f3fd4"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -434,7 +444,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -471,25 +483,25 @@
         {
           "type": "code",
           "path": "client/src/lib/knowledge/atom-extraction.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:698d946255a47194c77d739df188c93622ebf4d0c41547e8030de6a31ab06e77"
         },
         {
           "type": "code",
           "path": "client/src/lib/knowledge/atom-curation.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6ee248f41ddb7e9c65a2456f7947f5b105725d0ffe1acd70a77783be829ff047"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -500,7 +512,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -549,13 +563,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -566,7 +580,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -603,25 +619,25 @@
         {
           "type": "code",
           "path": "server/db/knowledge.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:b6dac5b4855705a953e08440de67303c8cdf9f30d2e2db502948033aacb71748"
         },
         {
           "type": "code",
           "path": "server/db/migrations/010_knowledge_corpus.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:b6f15daad6ceb5fd3464bd6d122cdcd62165ee6989440dbcf2b8c3228c524c50"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/knowledge-ingestion-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6e4f05f350e7bc867ee1e2397fe26c55de3787b65a54d545583d0f9a80517d31"
         },
         {
           "type": "test",
           "path": "tests/essence-ingest.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:e7235fe556e61fffb4ab47a4a299de700db2437165098112281b5efe3a55f548"
         }
       ],
@@ -632,7 +648,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "knowledge-ingestion-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

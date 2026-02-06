@@ -53,7 +53,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/agi-runtime-tree.json"
+          "path": "docs/knowledge/agi-runtime-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f0120ec7daf0aa5619a192a152f06619d4d1f78013e5d35eaa1b9236c2682a11"
         }
       ]
     },
@@ -84,7 +86,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.plan.ts"
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150"
         }
       ],
       "inputs": [],
@@ -94,7 +98,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -130,23 +136,33 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/planner/chat-b.ts"
+          "path": "server/services/planner/chat-b.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:40408e6369f2742902580df89a9f928b3651294cdfbdf8ef682c10a7bb96bbaa"
         },
         {
           "type": "code",
-          "path": "server/services/planner/grounding.ts"
+          "path": "server/services/planner/grounding.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fa6a7db95bb325d3ea6034a5b8910bca339752558596efdfeafe6b3d6bcf430e"
         },
         {
           "type": "code",
-          "path": "server/services/planner/agent-map.ts"
+          "path": "server/services/planner/agent-map.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:40154d8aed9b5887040c8925b36c113cafe5056102d652acd7dfaf657c4c9956"
         },
         {
           "type": "code",
-          "path": "server/services/planner/why-belongs.ts"
+          "path": "server/services/planner/why-belongs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3a1ecfe0dbaeaec7bd70f63641931c5562ca8fe417dd73a29363674bda89981c"
         },
         {
           "type": "code",
-          "path": "server/services/planner/supplements.ts"
+          "path": "server/services/planner/supplements.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:34754e232145ddd33602372d4a8cd2093896cee3dbbcccc8bfb57d7b072bd1df"
         }
       ],
       "inputs": [],
@@ -156,7 +172,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -193,23 +211,33 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/agi/refinery-gates.ts"
+          "path": "server/services/agi/refinery-gates.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e99e6151a402ec84ad48e41a81b4e896b28e549ff6d30bcff0f5c28313586026"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-trajectory.ts"
+          "path": "server/services/agi/refinery-trajectory.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:95da97f4f0e2905258ac19be8b1f270bc8ac15e21769a62cab12ef9dd7be32a8"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-variants.ts"
+          "path": "server/services/agi/refinery-variants.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fa1aade417385aa178f8c440b381b7634aeefb792ca20e96a7562a9e2717a7b6"
         },
         {
           "type": "code",
-          "path": "server/services/agi/refinery-policy.ts"
+          "path": "server/services/agi/refinery-policy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:15a2a53f34f844a61d9d02382188bdc0d2bbd16e6880c85ecb59da4e194bbc34"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.refinery.ts"
+          "path": "server/routes/agi.refinery.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:76dc0dd7ba736f1715eaabb4c3b85177bbeaf3838a65482797a7a367b1c24f93"
         }
       ],
       "inputs": [],
@@ -219,7 +247,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -260,19 +290,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.trace.ts"
+          "path": "server/routes/agi.trace.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:93fb8a815424e0b816bb8c7afa080571d98c14996d770535b6ec6146667033c7"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.memory.ts"
+          "path": "server/routes/agi.memory.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b7af03d95aac09a76e8c9b493f488dec41eaf00f187f910f0eecddddf70cdf3b"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.memory.trace.ts"
+          "path": "server/routes/agi.memory.trace.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2ec988f35146667e8a7fdba10578a95cd198476d871246473b0bac39e0ffd854"
         },
         {
           "type": "code",
-          "path": "server/services/observability/training-trace-store.ts"
+          "path": "server/services/observability/training-trace-store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:43adcf455f0aa7cd01fd9baa3fcb0ff8858c7ca2613544c6315dcc313666c4a3"
         }
       ],
       "inputs": [],
@@ -282,7 +320,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -318,11 +358,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/agi/eval-smoke.ts"
+          "path": "server/services/agi/eval-smoke.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d9a5ba95d4dff7bc037e05e25f0068441fdd322563dd7646e202f77d31c668f9"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.eval.ts"
+          "path": "server/routes/agi.eval.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d413d98cc913066ca64a1b8e4daea59f9fc078da9325cd7913c5533230ba9da4"
         }
       ],
       "inputs": [],
@@ -332,7 +376,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -368,15 +414,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.adapter.ts"
+          "path": "server/routes/agi.adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1ead09a322c50ae3834ca1510213b3e3e2468b297e8ea656acadfdc81f8aec64"
         },
         {
           "type": "doc",
-          "path": "docs/ADAPTER-CONTRACT.md"
+          "path": "docs/ADAPTER-CONTRACT.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e833cb9059a666d11bc3a9fdfe928d8e79a1fb25582d62b7c8cec1a0ce8d5947"
         },
         {
           "type": "code",
-          "path": "cli/casimir-verify.ts"
+          "path": "cli/casimir-verify.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6cd7089a337749588054caa18bb460d406560a4951abdd22295ef17fc0154a60"
         }
       ],
       "inputs": [],
@@ -386,7 +438,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -422,11 +476,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.chat.ts"
+          "path": "server/routes/agi.chat.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5cfdc68a4c4e153cf8310c15a085644d591aa46eb3993f8b4d14a1361fd34fd4"
         },
         {
           "type": "code",
-          "path": "server/services/agi/chat-render.ts"
+          "path": "server/services/agi/chat-render.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:560810eb1f12a33bb1b85957b019ee937dd399013c92931c6ca1c8b5052b29c6"
         }
       ],
       "inputs": [],
@@ -436,7 +494,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -472,7 +532,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.contributions.ts"
+          "path": "server/routes/agi.contributions.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fcb9ce731bb6def8e61688e2b06b234c978177553d55f3a87bf437cd7c6e8897"
         }
       ],
       "inputs": [],
@@ -482,7 +544,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -518,7 +582,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.constraint-packs.ts"
+          "path": "server/routes/agi.constraint-packs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:54171e728cc38123b3d4a474531b619ac761c6cbdf9cf11a73b0ccc854629463"
         }
       ],
       "inputs": [],
@@ -528,7 +594,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -564,7 +632,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/resilience/circuit-breaker.ts"
+          "path": "server/services/resilience/circuit-breaker.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e2812cf9c97d4a7add3ab162b30054d45bdaf6dc0df647ba1717525116cfb3e3"
         }
       ],
       "inputs": [],
@@ -574,7 +644,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -610,7 +682,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/learning/reflect.ts"
+          "path": "server/services/learning/reflect.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:598eedcd1fec83ecc0ef9e68d86954fea490a68f71ea74cffd34249c39ee8115"
         }
       ],
       "inputs": [],
@@ -620,7 +694,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -660,15 +736,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/planner/knowledge-compositor.ts"
+          "path": "server/services/planner/knowledge-compositor.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:07fdd8dc9667eff6dff35df20f4d251c3426f085774da995c390df030fc74c53"
         },
         {
           "type": "code",
-          "path": "server/services/knowledge/merge.ts"
+          "path": "server/services/knowledge/merge.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:08a4d1735218953ef5a05b86c779725bd6a30556096290dae4975378ce837828"
         },
         {
           "type": "code",
-          "path": "server/config/knowledge.ts"
+          "path": "server/config/knowledge.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:561f7a537b6762bfedd88f34c21962c22b451505de807bfdbed11c4c8b330922"
         }
       ],
       "inputs": [],
@@ -678,7 +760,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "agi-runtime-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

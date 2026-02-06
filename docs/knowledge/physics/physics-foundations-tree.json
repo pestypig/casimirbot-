@@ -55,11 +55,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/viability-definition.md"
+          "path": "docs/knowledge/physics/viability-definition.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:409025ccc5f7268d4112bdc21c3d1fd716bbf0bcbd15bbcee1c403fa500b950b"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/energy-conditions.md"
+          "path": "docs/knowledge/physics/energy-conditions.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cfa8949441bef4cec276f2dc2274b7affd811c7feb2d2d8c27341fd96d3e0625"
         }
       ]
     },
@@ -94,7 +98,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -110,11 +116,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/spacetime-metric-basics.md"
+          "path": "docs/knowledge/physics/spacetime-metric-basics.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4ab3cf6d8319b9fee249c3240e77ffd62ca2651a6642ce17ffd73dcfc4f2ce17"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/connection-curvature.md"
+          "path": "docs/knowledge/physics/connection-curvature.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:abe794c5d6c0eeb56d22b888d8002deb0dfc06e138cf228ebf9de3469c9100f5"
         }
       ]
     },
@@ -141,7 +151,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/spacetime-metric-basics.md"
+          "path": "docs/knowledge/physics/spacetime-metric-basics.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4ab3cf6d8319b9fee249c3240e77ffd62ca2651a6642ce17ffd73dcfc4f2ce17"
         }
       ],
       "inputs": [],
@@ -151,7 +163,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -188,7 +202,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/connection-curvature.md"
+          "path": "docs/knowledge/physics/connection-curvature.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:abe794c5d6c0eeb56d22b888d8002deb0dfc06e138cf228ebf9de3469c9100f5"
         }
       ],
       "inputs": [],
@@ -198,7 +214,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -235,7 +253,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/boundary-conditions-modes.md"
+          "path": "docs/knowledge/physics/boundary-conditions-modes.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:875aee66bffeb84f9a406d2faaf486811dbfa962aeefdf9e9f414a76092a8bd3"
         }
       ],
       "inputs": [],
@@ -245,7 +265,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "geometry-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -295,7 +317,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -311,11 +335,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/einstein-field-equations.md"
+          "path": "docs/knowledge/physics/einstein-field-equations.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b3fa4a3bdb5b8600a6821dc6cde1599d8993c379c7d48a0c8d2bc8d7b63cd525"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/adm-3plus1.md"
+          "path": "docs/knowledge/physics/adm-3plus1.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d535d77287658eb17eca83a253aa2ef10251c2bde79d05e55f47dfdef589c6f3"
         }
       ]
     },
@@ -342,7 +370,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/einstein-field-equations.md"
+          "path": "docs/knowledge/physics/einstein-field-equations.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b3fa4a3bdb5b8600a6821dc6cde1599d8993c379c7d48a0c8d2bc8d7b63cd525"
         }
       ],
       "inputs": [],
@@ -352,7 +382,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "field-equations-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -389,7 +421,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/adm-3plus1.md"
+          "path": "docs/knowledge/physics/adm-3plus1.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d535d77287658eb17eca83a253aa2ef10251c2bde79d05e55f47dfdef589c6f3"
         }
       ],
       "inputs": [],
@@ -399,7 +433,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "field-equations-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -436,7 +472,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/york-time-constraints.md"
+          "path": "docs/knowledge/physics/york-time-constraints.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1835eac20b5f3decbb2d464faeaa48042bb96b376188c0a304777c00b4b92aff"
         }
       ],
       "inputs": [],
@@ -446,7 +484,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "field-equations-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -494,7 +534,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -510,11 +552,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:19cff33aa85b85791c4069def797748b931dd812da9dc3dabb1bf263f084de7a"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/negative-energy-interpretation.md"
+          "path": "docs/knowledge/physics/negative-energy-interpretation.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bc847bfba9cd1c3b8935cd5dba4b20187e930406f78c4b04405640884554c6cd"
         }
       ]
     },
@@ -541,7 +587,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:19cff33aa85b85791c4069def797748b931dd812da9dc3dabb1bf263f084de7a"
         }
       ],
       "inputs": [],
@@ -551,7 +599,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stress-energy-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -588,7 +638,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/energy-mass-equivalence.md"
+          "path": "docs/knowledge/physics/energy-mass-equivalence.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9b19f9cde7b0c8648d85d71c54e4f8bff1b393f0d8800ac2443b7bb4fe062095"
         }
       ],
       "inputs": [],
@@ -598,7 +650,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "stress-energy-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -647,7 +701,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -663,11 +719,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/energy-conditions.md"
+          "path": "docs/knowledge/physics/energy-conditions.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cfa8949441bef4cec276f2dc2274b7affd811c7feb2d2d8c27341fd96d3e0625"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7ca013891c69a6f8bb7b051555aab6e11101d638bc8eefd672c27769a5ae43dd"
         }
       ]
     },
@@ -694,7 +754,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/energy-conditions.md"
+          "path": "docs/knowledge/physics/energy-conditions.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cfa8949441bef4cec276f2dc2274b7affd811c7feb2d2d8c27341fd96d3e0625"
         }
       ],
       "inputs": [],
@@ -704,7 +766,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "energy-conditions-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -741,7 +805,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/negative-energy-interpretation.md"
+          "path": "docs/knowledge/physics/negative-energy-interpretation.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bc847bfba9cd1c3b8935cd5dba4b20187e930406f78c4b04405640884554c6cd"
         }
       ],
       "inputs": [],
@@ -751,7 +817,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "energy-conditions-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -788,7 +856,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+          "path": "docs/knowledge/physics/ford-roman-quantum-inequality.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7ca013891c69a6f8bb7b051555aab6e11101d638bc8eefd672c27769a5ae43dd"
         }
       ],
       "inputs": [],
@@ -798,7 +868,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "energy-conditions-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -844,7 +916,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/casimir-force-energy.md"
+          "path": "docs/knowledge/physics/casimir-force-energy.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fe43291a90b111c35905fdd287ab682e87a472a0932e929ffa0b8d2d3d8e14a2"
         }
       ],
       "inputs": [],
@@ -854,7 +928,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -891,7 +967,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/casimir-force-energy.md"
+          "path": "docs/knowledge/physics/casimir-force-energy.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fe43291a90b111c35905fdd287ab682e87a472a0932e929ffa0b8d2d3d8e14a2"
         }
       ],
       "inputs": [],
@@ -901,7 +979,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "casimir-phenomena"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -938,7 +1018,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/casimir-geometry-effects.md"
+          "path": "docs/knowledge/physics/casimir-geometry-effects.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1c3f0590e5174e5a3df54d81e275246b74ca2b1fcd0a7bbca7152cc1eeaaab9f"
         }
       ],
       "inputs": [],
@@ -948,7 +1030,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "casimir-phenomena"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -985,7 +1069,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/dynamic-casimir-effect.md"
+          "path": "docs/knowledge/physics/dynamic-casimir-effect.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5e64dd98a978169f5aa81ff831b8363a604d1d66f493436c2b480cf14d7cb692"
         }
       ],
       "inputs": [],
@@ -995,7 +1081,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "casimir-phenomena"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1032,7 +1120,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/vacuum-fluctuations.md"
+          "path": "docs/knowledge/physics/vacuum-fluctuations.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2d8adae314be06a764e1d26a55b34be6f63f576beb7353337d0235cadfe8a589"
         }
       ],
       "inputs": [],
@@ -1042,7 +1132,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "casimir-phenomena"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1093,7 +1185,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1109,11 +1203,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/units-systems.md"
+          "path": "docs/knowledge/physics/units-systems.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:317c2f0124a0fc42707110081ffedc44c98e2a18c393acaaf7443ba84a7c93a4"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/scaling-laws.md"
+          "path": "docs/knowledge/physics/scaling-laws.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:72bb0803d8f77701c9cf0bae65f8ce80a64e97f4b9d015b229112224896332bb"
         }
       ]
     },
@@ -1140,7 +1238,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/units-systems.md"
+          "path": "docs/knowledge/physics/units-systems.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:317c2f0124a0fc42707110081ffedc44c98e2a18c393acaaf7443ba84a7c93a4"
         }
       ],
       "inputs": [],
@@ -1150,7 +1250,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1187,7 +1289,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/dimensional-analysis.md"
+          "path": "docs/knowledge/physics/dimensional-analysis.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:87c37ae76651a2c6cd188f88f04c80185ef6a9f9c0295f274c7d7d0212f5300d"
         }
       ],
       "inputs": [],
@@ -1197,7 +1301,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1234,7 +1340,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/scaling-laws.md"
+          "path": "docs/knowledge/physics/scaling-laws.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:72bb0803d8f77701c9cf0bae65f8ce80a64e97f4b9d015b229112224896332bb"
         }
       ],
       "inputs": [],
@@ -1244,7 +1352,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1281,7 +1391,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/fundamental-constants.md"
+          "path": "docs/knowledge/physics/fundamental-constants.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3edba7966388cde5105c12ae34f88d24cea2709f06b6dd4ff9e325040ce800d3"
         }
       ],
       "inputs": [],
@@ -1291,7 +1403,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1339,7 +1453,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1355,11 +1471,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/numerical-precision.md"
+          "path": "docs/knowledge/physics/numerical-precision.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:06789e573c5ec3537be0db51cb5a97b22cd5d1bc7b651407cd8635c65d06bd32"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stability-timestep.md"
+          "path": "docs/knowledge/physics/stability-timestep.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ddb054d94b2dd772195534006881e64a12f2c85813de571cd29407106091258e"
         }
       ]
     },
@@ -1386,7 +1506,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/discretization-mesh.md"
+          "path": "docs/knowledge/physics/discretization-mesh.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7e497860b0d131d22e24f69394f3865824aab5d7146c2c55da36fefb08354ff9"
         }
       ],
       "inputs": [],
@@ -1396,7 +1518,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1433,7 +1557,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/numerical-precision.md"
+          "path": "docs/knowledge/physics/numerical-precision.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:06789e573c5ec3537be0db51cb5a97b22cd5d1bc7b651407cd8635c65d06bd32"
         }
       ],
       "inputs": [],
@@ -1443,7 +1569,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1480,7 +1608,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stability-timestep.md"
+          "path": "docs/knowledge/physics/stability-timestep.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ddb054d94b2dd772195534006881e64a12f2c85813de571cd29407106091258e"
         }
       ],
       "inputs": [],
@@ -1490,7 +1620,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1527,7 +1659,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/visualization-scaling.md"
+          "path": "docs/knowledge/physics/visualization-scaling.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:12c92819da785e0fdbf2af33a6581b92033aa4ef73b77a10186423ab81c78264"
         }
       ],
       "inputs": [],
@@ -1537,7 +1671,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1580,7 +1716,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1596,7 +1734,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+          "path": "docs/knowledge/physics/sampling-time-bounds.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:63bfb24d0701cac0d54c8d77d9497e49861142b1b604eb75ac4a55ab1e03f55e"
         }
       ]
     },
@@ -1623,7 +1763,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/sampling-time-bounds.md"
+          "path": "docs/knowledge/physics/sampling-time-bounds.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:63bfb24d0701cac0d54c8d77d9497e49861142b1b604eb75ac4a55ab1e03f55e"
         }
       ],
       "inputs": [],
@@ -1633,7 +1775,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "time-bounds-stack"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1682,7 +1826,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1698,11 +1844,15 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/viability-definition.md"
+          "path": "docs/knowledge/physics/viability-definition.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:409025ccc5f7268d4112bdc21c3d1fd716bbf0bcbd15bbcee1c403fa500b950b"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/no-feasibility-claims.md"
+          "path": "docs/knowledge/physics/no-feasibility-claims.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:76858aa3d49b270ed303e68306d5a9bb51b47c2b5ff01b5aace0c7fa61e8e33c"
         }
       ]
     },
@@ -1729,7 +1879,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/viability-definition.md"
+          "path": "docs/knowledge/physics/viability-definition.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:409025ccc5f7268d4112bdc21c3d1fd716bbf0bcbd15bbcee1c403fa500b950b"
         }
       ],
       "inputs": [],
@@ -1739,7 +1891,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "viability-and-claims"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1776,7 +1930,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/no-feasibility-claims.md"
+          "path": "docs/knowledge/physics/no-feasibility-claims.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:76858aa3d49b270ed303e68306d5a9bb51b47c2b5ff01b5aace0c7fa61e8e33c"
         }
       ],
       "inputs": [],
@@ -1786,7 +1942,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "viability-and-claims"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1823,7 +1981,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/certificate-integrity.md"
+          "path": "docs/knowledge/physics/certificate-integrity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:15f0af7ebbc8cb6535b3fd5fbbcb8e2d47a0d983f8454ad7f8d3d45b6e876842"
         }
       ],
       "inputs": [],
@@ -1833,7 +1993,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "viability-and-claims"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1870,7 +2032,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/gr-units.ts"
+          "path": "shared/gr-units.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3301a3202c67c93541d477ead9629fdefdafac7bf19f164e5c532d8a5ad6b432"
         }
       ],
       "inputs": [],
@@ -1880,7 +2044,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "units-and-scaling"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1917,7 +2083,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/curvature-diagnostics.ts"
+          "path": "shared/curvature-diagnostics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:afcc5bf3284b269b90bcde1f8da3226cd993d447a9b72e2520c86b53adb3d145"
         }
       ],
       "inputs": [],
@@ -1927,7 +2095,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1964,7 +2134,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/qi-diagnostics.ts"
+          "path": "shared/qi-diagnostics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8a2ed57bfeba3b160fac320746462eeca117d7d144ee93e37f3880a02350297c"
         }
       ],
       "inputs": [],
@@ -1974,7 +2146,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "numerics-and-stability"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2011,7 +2185,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/quantum-gr-bridge.md"
+          "path": "docs/quantum-gr-bridge.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1f5812f179ecbd59a21567b9236155d4705f47bc686613e304d0fa541225ae1c"
         }
       ],
       "inputs": [],
@@ -2021,7 +2197,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2076,7 +2254,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2131,7 +2311,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2186,7 +2368,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "physics-foundations-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

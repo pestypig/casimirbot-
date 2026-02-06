@@ -46,7 +46,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/sdk-integration-tree.json"
+          "path": "docs/knowledge/sdk-integration-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a60e89f69ce3d4a9bbcc3b343c49336f882eb836cf3c2248ff5d76dd69a2f9f0"
         }
       ]
     },
@@ -85,15 +87,21 @@
         },
         {
           "type": "code",
-          "path": "sdk/src/index.ts"
+          "path": "sdk/src/index.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9dc71afa271288227ba93b682e557e60a1534ef49572b9d34f381be4e2963df4"
         },
         {
           "type": "code",
-          "path": "sdk/src/client.ts"
+          "path": "sdk/src/client.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cd8ded0aad61ef245cdb0d4309c7b3a059604531cb0a02375e648db62dd77589"
         },
         {
           "type": "code",
-          "path": "sdk/src/types.ts"
+          "path": "sdk/src/types.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0a4501109fe2e7cf32c3e6bd61d6160983ba95e36fa861f5694487d57ec739e0"
         }
       ],
       "inputs": [],
@@ -103,7 +111,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -144,7 +154,9 @@
         },
         {
           "type": "code",
-          "path": "sdk/src/runtime.ts"
+          "path": "sdk/src/runtime.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:aee260d8c6fe5b638035c9919e75889b806cc1c617229c4eff553069189550d2"
         }
       ],
       "inputs": [],
@@ -154,7 +166,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -205,7 +219,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -242,7 +258,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "sdk/README.md"
+          "path": "sdk/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b79de4d2f9baac3aa95d8f79f9db682bb204f38481aee94a7641c50948b619e8"
         }
       ],
       "inputs": [],
@@ -252,7 +270,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -307,7 +327,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "sdk-integration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

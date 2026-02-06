@@ -47,7 +47,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/queue-orchestration-tree.json"
+          "path": "docs/knowledge/queue-orchestration-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:238094b3fa166706d07fe4ca71961b242c8a01be6f3d4d8f15084e882296c8da"
         }
       ]
     },
@@ -73,7 +75,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/queue/index.ts"
+          "path": "server/queue/index.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bdb919aeb2e0914f7dae27eae8c9996f73e89cea45c79f9615a6a4615cce0bce"
         }
       ],
       "inputs": [],
@@ -83,7 +87,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -119,7 +125,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/jobs.ts"
+          "path": "server/routes/jobs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:95da7f81910021fc6ea712ab1f3c2d0e425e4711747f4a50a25b7ec638132dc1"
         }
       ],
       "inputs": [],
@@ -129,7 +137,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -165,19 +175,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/jobs/engine.ts"
+          "path": "server/services/jobs/engine.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e464af801a4d69b604330c606ae845bd78157e85995356a236f2c8e9eeefc98c"
         },
         {
           "type": "code",
-          "path": "server/services/jobs/payouts.ts"
+          "path": "server/services/jobs/payouts.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ecc2da8dd06e8e05fd37a07638fa000fa8ad797dcc17ecf19bc8786a17c6158c"
         },
         {
           "type": "code",
-          "path": "server/services/jobs/token-budget.ts"
+          "path": "server/services/jobs/token-budget.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c75c8ca57c66494889be3708eae10584941faf73be366f8e3e7602da19ccdd1c"
         },
         {
           "type": "code",
-          "path": "server/services/jobs/proposals.ts"
+          "path": "server/services/jobs/proposals.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f19b66f1883962941b3f5accad92366c58771a3ab9314a811bf4916bca6e137b"
         }
       ],
       "inputs": [],
@@ -187,7 +205,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -223,11 +243,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/essence/ingest-jobs.ts"
+          "path": "server/services/essence/ingest-jobs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e4669bde47c8d130ab9cc767069321497611a9242524311927a1d1a474481c96"
         },
         {
           "type": "code",
-          "path": "server/queue/index.ts"
+          "path": "server/queue/index.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bdb919aeb2e0914f7dae27eae8c9996f73e89cea45c79f9615a6a4615cce0bce"
         }
       ],
       "inputs": [],
@@ -237,7 +261,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -273,11 +299,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/profile-summarizer-job.ts"
+          "path": "server/services/profile-summarizer-job.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b46dd24e9c55e45e83167892d85d33dc3f387df04987ade2b2ef19e6e4162693"
         },
         {
           "type": "code",
-          "path": "server/services/profile-summarizer.ts"
+          "path": "server/services/profile-summarizer.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d2a115959a12bc17d9cc1dee44d5333724991390d751a2c3347bc219eaa9ca24"
         }
       ],
       "inputs": [],
@@ -287,7 +317,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -323,11 +355,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/orchestrator.ts"
+          "path": "server/services/orchestrator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a8e78b4e10f3a86deba492c0a42f40d81e6ee8a77e8afaab5681ef565c765230"
         },
         {
           "type": "code",
-          "path": "server/routes/orchestrator.ts"
+          "path": "server/routes/orchestrator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1b843f75de64b23e6413b04476e05f4aa7248c51b8b69163118634b231bb8cf5"
         }
       ],
       "inputs": [],
@@ -337,7 +373,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "queue-orchestration-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

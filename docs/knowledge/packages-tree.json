@@ -45,7 +45,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/packages-tree.json"
+          "path": "docs/knowledge/packages-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ed8825a8da815c59aefae72151ad95d6e7a10d47d06e7a6a19264bb764160b8a"
         }
       ]
     },
@@ -76,7 +78,9 @@
         },
         {
           "type": "doc",
-          "path": "packages/create-casimir-verifier/README.md"
+          "path": "packages/create-casimir-verifier/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3eae7caebab6f8aa1076f7e638271274019697854abd7a85bdf9a12a55c416c6"
         }
       ],
       "inputs": [],
@@ -86,7 +90,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "packages-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -127,7 +133,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "packages-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -143,7 +151,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "packages/app-native/bundle.env"
+          "path": "packages/app-native/bundle.env",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:41b630f027e75b9eca90fb4dd20dab68ec2f79b9dd52c3c6eb3f901406aaebc1"
         }
       ]
     },
@@ -180,7 +190,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "packages-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -221,7 +233,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "packages/create-casimir-verifier/README.md"
+          "path": "packages/create-casimir-verifier/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3eae7caebab6f8aa1076f7e638271274019697854abd7a85bdf9a12a55c416c6"
         }
       ],
       "inputs": [],
@@ -231,7 +245,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "packages-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

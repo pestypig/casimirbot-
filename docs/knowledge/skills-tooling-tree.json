@@ -48,7 +48,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/skills-tooling-tree.json"
+          "path": "docs/knowledge/skills-tooling-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3ffab7e851e0a5d8c593e0190b829a06741e150a171053414ef718b0314d20b7"
         }
       ]
     },
@@ -75,11 +77,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/skills.ts"
+          "path": "shared/skills.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:39e019f5b16b2527bb84eae4a895798decd3088f37032a77c492981e6fe5780f"
         },
         {
           "type": "code",
-          "path": "server/skills/index.ts"
+          "path": "server/skills/index.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:695fe3e1c9290405d766131c192cd3325f3369d5257f31a983a579f0bc880b6f"
         }
       ],
       "inputs": [],
@@ -89,7 +95,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "skills-tooling-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -130,7 +138,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.plan.ts"
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150"
         }
       ],
       "inputs": [],
@@ -140,7 +150,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "skills-tooling-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -181,23 +193,33 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/physics.warp.ask.ts"
+          "path": "server/skills/physics.warp.ask.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d947b58c0c157369869987b02f8f686b3753d4e3feea52ea4a2b79b51ce416e9"
         },
         {
           "type": "code",
-          "path": "server/skills/physics.warp.viability.ts"
+          "path": "server/skills/physics.warp.viability.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f7831405d56ba9c67c669658084f1cfc7071a0ab743e848477bfac166c4e34d6"
         },
         {
           "type": "code",
-          "path": "server/skills/physics.gr.assistant.ts"
+          "path": "server/skills/physics.gr.assistant.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9843871c225a55615a51a29022d5faa960431e1c5ef2fef12506f11a2a1ef7cf"
         },
         {
           "type": "code",
-          "path": "server/skills/physics.gr.grounding.ts"
+          "path": "server/skills/physics.gr.grounding.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b1c9eb98c4480c3dcaef66d725135c5f422a08496f13e17974571f578b51303b"
         },
         {
           "type": "code",
-          "path": "server/skills/physics.curvature.ts"
+          "path": "server/skills/physics.curvature.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ff7458c1f1c2f756339d8f72eadcd3c40919ad52cba30a3089779dfc7e477d3a"
         }
       ],
       "inputs": [],
@@ -207,7 +229,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "skills-tooling-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -244,47 +268,69 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/docs.readme.ts"
+          "path": "server/skills/docs.readme.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0d32d1c887cd6b909f44288109394c00559b676992be0663e77b0e49d6c97560"
         },
         {
           "type": "code",
-          "path": "server/skills/docs.heading.section.md.ts"
+          "path": "server/skills/docs.heading.section.md.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:61e5117f9ab51c600b1950e59fb998600a6f779d5a1c346eed13bcf471e62291"
         },
         {
           "type": "code",
-          "path": "server/skills/docs.table.extract.ts"
+          "path": "server/skills/docs.table.extract.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6e6e50e781b09897d068cb70208b8b7cccf2bf9d89f9723c3c3ac0f5b82ca9f7"
         },
         {
           "type": "code",
-          "path": "server/skills/docs.contradiction.scan.ts"
+          "path": "server/skills/docs.contradiction.scan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2fdf02a6d3b69f4e1112836100699b7467baa4e0bd3ca5e106e92a3062fd6dc5"
         },
         {
           "type": "code",
-          "path": "server/skills/docs.evidence.search.md.ts"
+          "path": "server/skills/docs.evidence.search.md.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:013fd843f09b7bab93036ce60070e7ab9f2366fc743fbc86f9b7a4b8c2a040a8"
         },
         {
           "type": "code",
-          "path": "server/skills/docs.evidence.search.pdf.ts"
+          "path": "server/skills/docs.evidence.search.pdf.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a3b4cc7b64485c0232d80d36c02c462cfabab30c42e667eef139cd290795a78a"
         },
         {
           "type": "code",
-          "path": "server/skills/repo.graph.search.ts"
+          "path": "server/skills/repo.graph.search.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a71808deb2657e0f6736b5ccac6bda75776a9b76bcba7e65117bc4467d372c26"
         },
         {
           "type": "code",
-          "path": "server/skills/repo.diff.review.ts"
+          "path": "server/skills/repo.diff.review.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bcf1e43a9ff25c72be9086e1fe24e15334efc664f801f53490cbf006ca0eaa83"
         },
         {
           "type": "code",
-          "path": "server/skills/repo.patch.simulate.ts"
+          "path": "server/skills/repo.patch.simulate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b2286d1c483c820a240afa95d60b3b7bf2a3de60f764ebd30c56a45377b3712c"
         },
         {
           "type": "code",
-          "path": "server/skills/citation.verify.span.ts"
+          "path": "server/skills/citation.verify.span.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b150b48ea81118c3730a1d8a312505ac064be53ae73fafed4e44a9736626d74c"
         },
         {
           "type": "code",
-          "path": "server/skills/numeric.extract.units.ts"
+          "path": "server/skills/numeric.extract.units.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8236ee2ab516e1a7b8c4f8ef63d3d8a917a74231b1433e63c5d6695ec004b9ac"
         }
       ],
       "inputs": [],
@@ -294,7 +340,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "skills-tooling-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -331,35 +379,51 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/luma.generate.ts"
+          "path": "server/skills/luma.generate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7d65e6682bae008ac2f76298454f293d79f00e3b9a178aa416216cf98b3469d7"
         },
         {
           "type": "code",
-          "path": "server/skills/luma.http.ts"
+          "path": "server/skills/luma.http.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c926897ebdb57c5e5c0ca8c6b40e1465f46eb33c46a8db1d1b0e58cd2fa5b223"
         },
         {
           "type": "code",
-          "path": "server/skills/noise.gen.cover.ts"
+          "path": "server/skills/noise.gen.cover.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8ee70c870850ada1c1d2980144e4f5d6fd88e7043a69891b6d99aa306ffb5dd8"
         },
         {
           "type": "code",
-          "path": "server/skills/noise.gen.fingerprint.ts"
+          "path": "server/skills/noise.gen.fingerprint.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:680dfb4ac9f4f6a6b4472f4b9db58863cf7538b17ebf26fe56ed179608eb4abd"
         },
         {
           "type": "code",
-          "path": "server/skills/stt.whisper.ts"
+          "path": "server/skills/stt.whisper.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6a0f19c002a22d99df117a011aace14d7e05c95ccb72f78f1fd1cabc8f5d808f"
         },
         {
           "type": "code",
-          "path": "server/skills/stt.whisper.http.ts"
+          "path": "server/skills/stt.whisper.http.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4449dd8eb7054f96252c3c6eb33f390229558b8dd8ea15d524a021964c8fa87c"
         },
         {
           "type": "code",
-          "path": "server/skills/vision.http.ts"
+          "path": "server/skills/vision.http.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6f7831ffb0cd26f3e5aaf1a7984a2d6d88f48d19cc4f6bcfe5ce6a56502fb74e"
         },
         {
           "type": "code",
-          "path": "server/skills/fashion.looks.ts"
+          "path": "server/skills/fashion.looks.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f8b322b83d0d5644f308838767ed148c6fbd30b3c95d43e771eea1a1546c1dda"
         }
       ],
       "inputs": [],
@@ -369,7 +433,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "skills-tooling-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -410,15 +476,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/skills/telemetry.badges.ts"
+          "path": "server/skills/telemetry.badges.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4a628f566ab0ea95a97cd94144222ea8eff6d3f7e636f0eb0021a03ce748bd3d"
         },
         {
           "type": "code",
-          "path": "server/skills/telemetry.panels.ts"
+          "path": "server/skills/telemetry.panels.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a19dc79491f8ef91b264ec7af5a2d71c8ac27adc1e48c4bb8d5378eb394fa899"
         },
         {
           "type": "code",
-          "path": "server/skills/telemetry.crosscheck.docs.ts"
+          "path": "server/skills/telemetry.crosscheck.docs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:277080a954239ba3abbf7092c461d037db89902865fac47a2ba0fac365b261cd"
         }
       ],
       "inputs": [],
@@ -428,7 +500,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "skills-tooling-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -465,31 +539,45 @@
       "evidence": [
         {
           "type": "code",
-          "path": "cli/casimir-verify.ts"
+          "path": "cli/casimir-verify.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6cd7089a337749588054caa18bb460d406560a4951abdd22295ef17fc0154a60"
         },
         {
           "type": "code",
-          "path": "cli/physics-ask.ts"
+          "path": "cli/physics-ask.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:acf6a8168212f957f4d956887f5dc38d2e5e8b704338387412110599411a252b"
         },
         {
           "type": "code",
-          "path": "cli/physics-validate.ts"
+          "path": "cli/physics-validate.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ab368576352e1c095217a481712cf4d037da7ffe76232b22ba227b674d59e534"
         },
         {
           "type": "code",
-          "path": "cli/gr-agent-loop.ts"
+          "path": "cli/gr-agent-loop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:783bdb5b85330e63e10b397fb13ad4e5fe0e43489ffcb644f755eae998f03897"
         },
         {
           "type": "code",
-          "path": "tools/tokenizer-verify.ts"
+          "path": "tools/tokenizer-verify.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f30fe5df06438c0092dd79dfdc471d61dfb16fe29c66a7313593ed6646714771"
         },
         {
           "type": "code",
-          "path": "tools/generate-tokenizer-canary.ts"
+          "path": "tools/generate-tokenizer-canary.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1677524f9bec96c49293284d7a4216a8000b517e24a10cc288db4f3c07ffb7e7"
         },
         {
           "type": "code",
-          "path": "scripts/llm-local-smoke.ts"
+          "path": "scripts/llm-local-smoke.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3da8847d3ab633c2bc413876dd7e4402473298dd4a34714c4c6454eea9fb7ea2"
         }
       ],
       "inputs": [],
@@ -499,7 +587,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "skills-tooling-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

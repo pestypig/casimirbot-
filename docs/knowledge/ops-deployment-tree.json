@@ -47,7 +47,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ops-deployment-tree.json"
+          "path": "docs/knowledge/ops-deployment-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:931d45bf82b99d84fcb032ba89e14f0888cfa034287fd1cb053e44cedc338218"
         }
       ]
     },
@@ -77,7 +79,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ops-deployment-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -93,7 +97,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ops-deployment-tree.json"
+          "path": "docs/knowledge/ops-deployment-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:931d45bf82b99d84fcb032ba89e14f0888cfa034287fd1cb053e44cedc338218"
         }
       ]
     },
@@ -119,15 +125,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "cli/casimir-verify.ts"
+          "path": "cli/casimir-verify.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6cd7089a337749588054caa18bb460d406560a4951abdd22295ef17fc0154a60"
         },
         {
           "type": "code",
-          "path": "cli/casimir-collect.ts"
+          "path": "cli/casimir-collect.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2fd187f7a9f19c355efbfe705152c230053fece9c0467610333b8b43a67ed03e"
         },
         {
           "type": "doc",
-          "path": "docs/ADAPTER-CONTRACT.md"
+          "path": "docs/ADAPTER-CONTRACT.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e833cb9059a666d11bc3a9fdfe928d8e79a1fb25582d62b7c8cec1a0ce8d5947"
         }
       ],
       "inputs": [],
@@ -137,7 +149,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ops-deployment-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -173,7 +187,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/observability.client-error.ts"
+          "path": "server/routes/observability.client-error.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1e60c602df0a272e884c907c227b9606acad43e9b4b92d9c41e839d7a0fdf755"
         }
       ],
       "inputs": [],
@@ -183,7 +199,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ops-deployment-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -223,7 +241,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ops-deployment-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -239,7 +259,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ops-deployment-tree.json"
+          "path": "docs/knowledge/ops-deployment-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:931d45bf82b99d84fcb032ba89e14f0888cfa034287fd1cb053e44cedc338218"
         }
       ]
     },
@@ -265,7 +287,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "cli/README.md"
+          "path": "cli/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:31686d6ea1ca456f7fb02c6857245cce7619a29b50e294753fe7e661a5732c70"
         }
       ],
       "inputs": [],
@@ -275,7 +299,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ops-deployment-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -321,7 +347,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ops-deployment-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

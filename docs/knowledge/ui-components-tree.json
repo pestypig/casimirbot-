@@ -62,7 +62,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -72,7 +72,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -109,13 +109,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -126,7 +126,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -176,7 +178,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -193,7 +197,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -203,7 +207,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -236,7 +240,7 @@
         {
           "type": "code",
           "path": "client/src/pages/helix-core.panels.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
         },
         {
@@ -250,13 +254,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -267,7 +271,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-page-surfaces"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -308,13 +314,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -325,7 +331,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-page-surfaces"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -366,13 +374,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -383,7 +391,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-page-surfaces"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -428,13 +438,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -445,7 +455,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-page-surfaces"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -490,13 +502,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -507,7 +519,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-page-surfaces"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -556,13 +570,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -573,7 +587,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-page-surfaces"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -618,13 +634,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -635,7 +651,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-page-surfaces"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -684,13 +702,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -701,7 +719,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-page-surfaces"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -742,7 +762,7 @@
         {
           "type": "code",
           "path": "client/src/pages/helix-core.panels.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
         },
         {
@@ -752,13 +772,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -769,7 +789,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -807,19 +829,19 @@
         {
           "type": "code",
           "path": "client/src/pages/helix-core.panels.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -830,7 +852,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-registry"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -872,13 +896,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -889,7 +913,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-registry"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -937,7 +963,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -954,7 +982,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -964,7 +992,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -1001,13 +1029,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1018,7 +1046,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-physics-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1068,13 +1098,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1085,7 +1115,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-physics-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1135,13 +1167,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1152,7 +1184,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-physics-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1197,13 +1231,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1214,7 +1248,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-physics-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1272,13 +1308,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1289,7 +1325,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-physics-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1338,13 +1376,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1355,7 +1393,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-physics-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1402,7 +1442,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1419,7 +1461,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -1429,7 +1471,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -1466,13 +1508,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1483,7 +1525,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-warp-drive"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1533,13 +1577,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1550,7 +1594,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-warp-drive"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1596,13 +1642,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1613,7 +1659,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-warp-drive"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1655,13 +1703,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1672,7 +1720,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-warp-drive"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1714,13 +1764,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1731,7 +1781,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-warp-drive"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1779,7 +1831,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1796,7 +1850,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -1806,7 +1860,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -1839,13 +1893,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1856,7 +1910,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-casimir-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1910,13 +1966,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1927,7 +1983,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-casimir-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1973,13 +2031,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -1990,7 +2048,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-casimir-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2040,13 +2100,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2057,7 +2117,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-casimir-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2107,13 +2169,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2124,7 +2186,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-casimir-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2174,13 +2238,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2191,7 +2255,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-casimir-energy"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2237,7 +2303,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2254,7 +2322,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -2264,7 +2332,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -2305,13 +2373,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2322,7 +2390,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-curvature-gr"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2368,13 +2438,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2385,7 +2455,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-curvature-gr"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2435,13 +2507,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2452,7 +2524,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-curvature-gr"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2498,13 +2572,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2515,7 +2589,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-curvature-gr"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2565,13 +2641,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2582,7 +2658,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2624,13 +2702,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2641,7 +2719,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-proof-verification"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2691,13 +2771,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2708,7 +2788,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-proof-verification"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2758,13 +2840,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2775,7 +2857,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-proof-verification"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2829,13 +2913,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2846,7 +2930,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2891,13 +2977,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2908,7 +2994,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-knowledge-ideology"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -2954,13 +3042,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -2971,7 +3059,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-knowledge-ideology"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3016,13 +3106,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3033,7 +3123,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-knowledge-ideology"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3092,13 +3184,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3109,7 +3201,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3162,13 +3256,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3179,7 +3273,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-stellar-solar"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3220,13 +3316,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3237,7 +3333,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-stellar-solar"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3279,13 +3377,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3296,7 +3394,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-stellar-solar"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3338,13 +3438,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3355,7 +3455,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-stellar-solar"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3397,7 +3499,7 @@
         {
           "type": "code",
           "path": "client/src/components/Hull3DRenderer.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:64417383f95c5cc049181e432cfade012bde925a0477057fbf821e45a19290f1"
         },
         {
@@ -3407,13 +3509,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3424,7 +3526,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3462,7 +3566,7 @@
         {
           "type": "code",
           "path": "client/src/components/Hull3DRenderer.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:64417383f95c5cc049181e432cfade012bde925a0477057fbf821e45a19290f1"
         },
         {
@@ -3476,13 +3580,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3493,7 +3597,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-lattice-time-dilation"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3542,13 +3648,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3559,7 +3665,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-lattice-time-dilation"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3612,13 +3720,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3629,7 +3737,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-lattice-time-dilation"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3680,13 +3790,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3697,7 +3807,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3742,13 +3854,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3759,7 +3871,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-noise-essence"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3808,13 +3922,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3825,7 +3939,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-noise-essence"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3878,13 +3994,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3895,7 +4011,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-noise-essence"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3936,13 +4054,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -3953,7 +4071,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-panel-noise-essence"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -3998,7 +4118,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4015,7 +4137,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -4025,7 +4147,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -4054,19 +4176,19 @@
         {
           "type": "code",
           "path": "client/src/components/Hull3DRenderer.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:64417383f95c5cc049181e432cfade012bde925a0477057fbf821e45a19290f1"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4077,7 +4199,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-renderers-3d"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4123,13 +4247,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4140,7 +4264,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-renderers-3d"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4186,13 +4312,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4203,7 +4329,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-renderers-3d"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4257,13 +4385,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4274,7 +4402,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4320,13 +4450,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4337,7 +4467,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-hud-overlays"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4387,13 +4519,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4404,7 +4536,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-hud-overlays"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4446,13 +4580,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4463,7 +4597,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-hud-overlays"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4508,7 +4644,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4525,7 +4663,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -4535,7 +4673,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -4564,31 +4702,31 @@
         {
           "type": "code",
           "path": "client/src/hooks/use-energy-pipeline.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:52ea9c015d9d59e71e63f8938a69e2a3ac92d1156236ffd45a66f91be05ca999"
         },
         {
           "type": "code",
           "path": "client/src/hooks/useGrBrick.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:91ccb5f63caf4a083950b85b6b4d8a1ab575d01abd892276ae0438f2f89810fe"
         },
         {
           "type": "code",
           "path": "client/src/hooks/useStressEnergyBrick.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d625cd2b70710a3543440c0e70297f8e6a34126017a46c889ac1c96f96eef16b"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4599,7 +4737,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-hooks-state"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4637,31 +4777,31 @@
         {
           "type": "code",
           "path": "client/src/store/useDesktopStore.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6d773477a9275d3a4519979a884c77235c03daf5b3f43f69f125a4aac84819f8"
         },
         {
           "type": "code",
           "path": "client/src/store/useFlightDirectorStore.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:4c4681beda0f91cb497a8f176b9088374ce668421ae981cb8976a351ff14dd77"
         },
         {
           "type": "code",
           "path": "client/src/store/useAgiChatStore.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:0d5aae03997dd9d5e80db010454523a0fdf44e8cd8f275dbef4b4fe38b893135"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4672,7 +4812,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-hooks-state"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4710,31 +4852,31 @@
         {
           "type": "code",
           "path": "client/src/lib/simulation-api.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:9476100cb5d89f7350c694272b88e55a1a995dd932c2d7ec877c27dc2df82475"
         },
         {
           "type": "code",
           "path": "client/src/lib/warp-pipeline-adapter.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:eb18a6848260106c274ce9e2c2831a3c0b2913b10b499407f1bea169f1a3965f"
         },
         {
           "type": "code",
           "path": "client/src/lib/curvature-brick.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cc7458b35aae3b5144415a6b2890536000a1593f42150b6afadc9d14f8cb7b9d"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4745,7 +4887,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-hooks-state"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4787,7 +4931,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4804,7 +4950,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -4814,7 +4960,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -4846,7 +4992,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-primitives"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4863,7 +5011,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -4873,7 +5021,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -4905,13 +5053,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -4922,7 +5070,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4963,7 +5113,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -4980,7 +5132,7 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
@@ -4990,7 +5142,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ]
@@ -5038,13 +5190,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -5055,7 +5207,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -5100,13 +5254,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -5117,7 +5271,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-visualization-utils"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -5162,13 +5318,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -5179,7 +5335,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-visualization-utils"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -5224,13 +5382,13 @@
         {
           "type": "doc",
           "path": "docs/knowledge/ui-components-tree.json",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:3709b15c695db2f5a7f710ab699d4f2d6931ea82cb6806148515279dcb38b7c9"
         },
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -5241,7 +5399,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-visualization-utils"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -5295,7 +5455,7 @@
         {
           "type": "test",
           "path": "tests/warpfield-lattice.integration.spec.ts",
-          "repo_rev": "6e1f4a8bac9e40e44e8f991dad5692e07f3b2982",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cec0619f2d36134b58e12472086971e6c929c1e15105b5d7497082064cdba3e8"
         }
       ],
@@ -5306,7 +5466,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-components-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

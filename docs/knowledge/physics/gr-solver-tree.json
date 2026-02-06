@@ -53,7 +53,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/gr-solver-tree.json"
+          "path": "docs/knowledge/physics/gr-solver-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ed887d7c2f0e727373cae717c79ffdb9c0c626641f354bed5d775871de86a33b"
         }
       ]
     },
@@ -80,7 +82,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/gr-solver-progress.md"
+          "path": "docs/gr-solver-progress.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2cdb431e8047772cff50ef1aa17c1d3821c85f5907639399343c3eaeb5724d49"
         }
       ],
       "inputs": [],
@@ -90,7 +94,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "gr-solver-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -127,7 +133,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/gr-solver-robustness.md"
+          "path": "docs/gr-solver-robustness.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e9e3f763b8d45fc81442c97d0911239c994929ef35b90ffa99c0895a7710b3f4"
         }
       ],
       "inputs": [],
@@ -137,7 +145,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "gr-solver-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -181,11 +191,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/bssn-evolve.ts"
+          "path": "modules/gr/bssn-evolve.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:005333fef06936ba8dce8e87cc44fe4b85b6ef9751cbc33c11d35ffca697ec9a"
         },
         {
           "type": "test",
-          "path": "tests/gr-constraints.spec.ts"
+          "path": "tests/gr-constraints.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a9ab0fe6fd575ec08c04482fb4f7400109dd6bd5c44881c712d06e73746b9273"
         }
       ],
       "inputs": [
@@ -316,11 +330,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-constraint-network.ts"
+          "path": "server/gr/gr-constraint-network.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:42350d38712d298bab68f6a50e0e65068c4227f6657ca4416842383de1b262ed"
         },
         {
           "type": "test",
-          "path": "tests/gr-constraint-network.spec.ts"
+          "path": "tests/gr-constraint-network.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:18f690ecc03a52d9b71d6d34a4d899000e49d273244648b3861c02c313301f2c"
         }
       ],
       "inputs": [
@@ -464,15 +482,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/constraint-evaluator.ts"
+          "path": "server/gr/constraint-evaluator.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:58f921a7dc19cb9e7d86b3fd8148cd7d371be85af493e33131664bbb591a9755"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/viability-definition.md"
+          "path": "docs/knowledge/physics/viability-definition.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:409025ccc5f7268d4112bdc21c3d1fd716bbf0bcbd15bbcee1c403fa500b950b"
         },
         {
           "type": "test",
-          "path": "tests/gr-constraint-gate.spec.ts"
+          "path": "tests/gr-constraint-gate.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bd73c7623295f4551b7e822a2ed4e7c36fb4854288ba690fd43d169a62958cf7"
         }
       ],
       "inputs": [
@@ -579,19 +603,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-agent-loop.ts"
+          "path": "server/gr/gr-agent-loop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:234aa5b6de9b00526ced566a829e91c62aafac553ae4d25420d3ec4c0d075084"
         },
         {
           "type": "test",
-          "path": "tests/gr-agent-loop.spec.ts"
+          "path": "tests/gr-agent-loop.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4f6cc2b8bf9a8aefc91ea618d850013db234df92d032b83c6aebe334182b822e"
         },
         {
           "type": "test",
-          "path": "tests/gr-agent-loop-baseline.spec.ts"
+          "path": "tests/gr-agent-loop-baseline.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ebdf946be6f7dc8f3f1cb4a29d2c7b4322fcd9d876ec448058b9be1ac60a0beb"
         },
         {
           "type": "doc",
-          "path": "docs/gr-solver-progress.md"
+          "path": "docs/gr-solver-progress.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2cdb431e8047772cff50ef1aa17c1d3821c85f5907639399343c3eaeb5724d49"
         }
       ],
       "inputs": [
@@ -697,19 +729,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/evolution.ts"
+          "path": "server/gr/evolution.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:73890a290c2f10920a418195ed0a8e4f9cef94cfab719106431cbdd9c6c17ef7"
         },
         {
           "type": "code",
-          "path": "server/gr/evolution/solver.ts"
+          "path": "server/gr/evolution/solver.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a37c1de776730ffc8c8608e9799a35459eb2ad792dd1b42bab5f61102593e752"
         },
         {
           "type": "code",
-          "path": "server/gr/evolution/brick.ts"
+          "path": "server/gr/evolution/brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2177ed423cc5d52be46ca3b0513836e5589ecd08b20440243586db6fcfe0db53"
         },
         {
           "type": "code",
-          "path": "server/gr-evolve-brick.ts"
+          "path": "server/gr-evolve-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:60729772df9bb52a622e5fb4b7450b05a6e74a9273a27701b96c2c6248923654"
         }
       ],
       "inputs": [
@@ -828,15 +868,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/evolution/initial-data.ts"
+          "path": "server/gr/evolution/initial-data.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:777d6c276debabdd947943bbfd25a5eea2bf9d5fd25fd35a8855ecfdbed6a06d"
         },
         {
           "type": "code",
-          "path": "server/gr-initial-brick.ts"
+          "path": "server/gr-initial-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ae6fbe227e8182d60c074fb894651c7e6336b38918644333434ed23bd0e44b1a"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/york-time-constraints.md"
+          "path": "docs/knowledge/physics/york-time-constraints.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1835eac20b5f3decbb2d464faeaa48042bb96b376188c0a304777c00b4b92aff"
         }
       ],
       "inputs": [
@@ -946,15 +992,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/evolution/solver.ts"
+          "path": "server/gr/evolution/solver.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a37c1de776730ffc8c8608e9799a35459eb2ad792dd1b42bab5f61102593e752"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stability-timestep.md"
+          "path": "docs/knowledge/physics/stability-timestep.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ddb054d94b2dd772195534006881e64a12f2c85813de571cd29407106091258e"
         },
         {
           "type": "test",
-          "path": "tests/gr-advection-stability.spec.ts"
+          "path": "tests/gr-advection-stability.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:428c275547add7ed7803b1dd101b35293b9f5f3ff9955931fb17a8335e4a741c"
         }
       ],
       "inputs": [
@@ -1082,15 +1134,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/evolution/brick.ts"
+          "path": "server/gr/evolution/brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2177ed423cc5d52be46ca3b0513836e5589ecd08b20440243586db6fcfe0db53"
         },
         {
           "type": "code",
-          "path": "server/gr-evolve-brick.ts"
+          "path": "server/gr-evolve-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:60729772df9bb52a622e5fb4b7450b05a6e74a9273a27701b96c2c6248923654"
         },
         {
           "type": "test",
-          "path": "tests/gr-advection-stability.spec.ts"
+          "path": "tests/gr-advection-stability.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:428c275547add7ed7803b1dd101b35293b9f5f3ff9955931fb17a8335e4a741c"
         }
       ],
       "inputs": [
@@ -1200,7 +1258,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/bssn-state.ts"
+          "path": "modules/gr/bssn-state.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:23140509ae9989dc7d13cf24e903fce9e3cf3a76ec891c6edcaa8b45bb75be4f"
         }
       ],
       "inputs": [],
@@ -1247,7 +1307,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/rk4.ts"
+          "path": "modules/gr/rk4.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:eb78ab9e1e91c51e16c761d65b0bfe8b44000696a3613fabc9054d7519b9249f"
         }
       ],
       "inputs": [
@@ -1329,11 +1391,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/stencils.ts"
+          "path": "modules/gr/stencils.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4a75421d917849191ad6d88d393690e6a985c40802ea5a81c5ebc499b964eb91"
         },
         {
           "type": "test",
-          "path": "tests/gr-advection-stability.spec.ts"
+          "path": "tests/gr-advection-stability.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:428c275547add7ed7803b1dd101b35293b9f5f3ff9955931fb17a8335e4a741c"
         }
       ],
       "inputs": [
@@ -1414,11 +1480,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/gr-diagnostics.ts"
+          "path": "modules/gr/gr-diagnostics.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:aa214909c47355620546fbd59f17fcfd24fdc4911b9256ca3b5d9ba9fe791f7a"
         },
         {
           "type": "test",
-          "path": "tests/gr-advection-stability.spec.ts"
+          "path": "tests/gr-advection-stability.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:428c275547add7ed7803b1dd101b35293b9f5f3ff9955931fb17a8335e4a741c"
         }
       ],
       "inputs": [
@@ -1490,19 +1560,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/stress-energy.ts"
+          "path": "modules/gr/stress-energy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e81b426f011036603535a1acd775238bceea2cbdaf15637168839c7d8f59997e"
         },
         {
           "type": "code",
-          "path": "server/gr/evolution/stress-energy.ts"
+          "path": "server/gr/evolution/stress-energy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e028fce91cab163847455c7ad9f8adff69dcac17b3a51033e3e1bd2f6012ec98"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:19cff33aa85b85791c4069def797748b931dd812da9dc3dabb1bf263f084de7a"
         },
         {
           "type": "test",
-          "path": "tests/stress-energy-units.spec.ts"
+          "path": "tests/stress-energy-units.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0260089e099a17bf4d56203a12d37aa3519d3c510f6ccc2207bd70b5499e659f"
         }
       ],
       "inputs": [
@@ -1610,15 +1688,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/gr/stress-energy-integrals.ts"
+          "path": "modules/gr/stress-energy-integrals.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e4cb7d92064040e6701e76b568eaac158a9764f7d4bc61b787c85f61f84fb499"
         },
         {
           "type": "doc",
-          "path": "docs/mass-semantics.md"
+          "path": "docs/mass-semantics.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:80e2ea46dbad40df9544971143bd293069f3ae37df0115212f31a33e2c6c19b8"
         },
         {
           "type": "test",
-          "path": "tests/stress-energy-integrals.spec.ts"
+          "path": "tests/stress-energy-integrals.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:83d4dfbc178d525315b88f9155f70c753425573c18e72ef930dbcec5425364f6"
         }
       ],
       "inputs": [
@@ -1737,11 +1821,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-constraint-policy.ts"
+          "path": "server/gr/gr-constraint-policy.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:43dccc4a3dafd165b36c4c1a2fecace77a0740e91ee0f0523536394ebd8c36e9"
         },
         {
           "type": "doc",
-          "path": "WARP_AGENTS.md"
+          "path": "WARP_AGENTS.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ea15b50192ab5837923460268e2cf14a528ef7cbcc542a0bad31e56494a36e8d"
         }
       ],
       "inputs": [
@@ -1789,7 +1877,9 @@
       "environment": {
         "runtime": "node"
       },
-      "dependencies": [],
+      "dependencies": [
+        "gr-solver-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1820,11 +1910,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-evaluation.ts"
+          "path": "server/gr/gr-evaluation.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e7f1cf62f13502502937c571ccbb19c5d54fd7998f541857f2b47c23ef42402d"
         },
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/viability-definition.md"
+          "path": "docs/knowledge/physics/viability-definition.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:409025ccc5f7268d4112bdc21c3d1fd716bbf0bcbd15bbcee1c403fa500b950b"
         }
       ],
       "inputs": [
@@ -1969,19 +2063,27 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-worker.ts"
+          "path": "server/gr/gr-worker.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:684bf9ed277c6a998a23b60851abd813140b43ba3fb5eb9b3922b8d8312c959c"
         },
         {
           "type": "code",
-          "path": "server/gr/gr-worker-client.ts"
+          "path": "server/gr/gr-worker-client.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:50ab0baca2b7fba2f93fd40b06b7fb2bdca4f94d551ee8c9a173afd52ad83e51"
         },
         {
           "type": "code",
-          "path": "server/gr/gr-worker-types.ts"
+          "path": "server/gr/gr-worker-types.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a99c9eb9aaf9fa28e29ee92a236acddf8bab04815a10d6233f2612f342141757"
         },
         {
           "type": "code",
-          "path": "server/gr/gr-os-payload.ts"
+          "path": "server/gr/gr-os-payload.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:06d1fdeb607406df189b7d10d9a0b1ef39703fd13c692f5651f1b3a792a105b1"
         }
       ]
     },
@@ -2008,7 +2110,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-worker.ts"
+          "path": "server/gr/gr-worker.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:684bf9ed277c6a998a23b60851abd813140b43ba3fb5eb9b3922b8d8312c959c"
         }
       ],
       "inputs": [
@@ -2077,7 +2181,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-worker-client.ts"
+          "path": "server/gr/gr-worker-client.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:50ab0baca2b7fba2f93fd40b06b7fb2bdca4f94d551ee8c9a173afd52ad83e51"
         }
       ],
       "inputs": [
@@ -2149,7 +2255,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-worker-types.ts"
+          "path": "server/gr/gr-worker-types.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a99c9eb9aaf9fa28e29ee92a236acddf8bab04815a10d6233f2612f342141757"
         }
       ],
       "inputs": [],
@@ -2208,11 +2316,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-os-payload.ts"
+          "path": "server/gr/gr-os-payload.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:06d1fdeb607406df189b7d10d9a0b1ef39703fd13c692f5651f1b3a792a105b1"
         },
         {
           "type": "test",
-          "path": "tests/gr-os-payload.spec.ts"
+          "path": "tests/gr-os-payload.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4e412d971aff2063985eef47d44503a54339a122be7ad4dc012263386a15b1f8"
         }
       ],
       "inputs": [
@@ -2299,7 +2411,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-assistant-adapter.ts"
+          "path": "server/gr/gr-assistant-adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f4618fcb26a71efa625f2fa0c16ed9afbbf44f86097e1c325b7a0ff9f38cf6f9"
         }
       ],
       "inputs": [
@@ -2380,7 +2494,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/gr/gr-agent-loop-schema.ts"
+          "path": "server/gr/gr-agent-loop-schema.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9e456ec0c3fa647c6e31f68360dec5060ab93cbb686bcbc9a6fe7d27e07d0a25"
         }
       ],
       "inputs": [
@@ -2445,15 +2561,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "tools/gr_assistant/README.md"
+          "path": "tools/gr_assistant/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cb909867429138278f3ac0567fabdfbc0b8423b09bb8928ea17c591112ef5615"
         },
         {
           "type": "code",
-          "path": "tools/gr_assistant/server.py"
+          "path": "tools/gr_assistant/server.py",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e22023a36ea3e7d4e511ada5a4e669353a7c4b59c7f1aeafe584196e23910904"
         },
         {
           "type": "code",
-          "path": "tools/gr_assistant/orchestrator.py"
+          "path": "tools/gr_assistant/orchestrator.py",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c734d1c1cf3268510bfb3527815df71719c7d8e7128df44b0d84172be59f6228"
         }
       ],
       "inputs": [

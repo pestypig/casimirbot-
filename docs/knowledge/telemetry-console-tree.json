@@ -48,7 +48,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/telemetry-console-tree.json"
+          "path": "docs/knowledge/telemetry-console-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:df11d6dbd324f457f3bba2aacc37893b0bca990fac7c78d44114c3fc14cc504c"
         }
       ]
     },
@@ -75,7 +77,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/agi.plan.ts"
+          "path": "server/routes/agi.plan.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:824a659ba10d1c89af764a53110d4a35ecea10b21cc20689c3acf0b491fa1150"
         }
       ],
       "inputs": [],
@@ -85,7 +89,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "telemetry-console-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -122,15 +128,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/console-telemetry/store.ts"
+          "path": "server/services/console-telemetry/store.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1b5f21b2c71e99f7eb6fd0e81d093b8efeab69033cef627314f69470b69d2acb"
         },
         {
           "type": "code",
-          "path": "server/services/console-telemetry/persist.ts"
+          "path": "server/services/console-telemetry/persist.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f9385dd2e3c434e807624f68dab106fc63b6d6ff796e354045d9a344165acda4"
         },
         {
           "type": "code",
-          "path": "server/services/console-telemetry/summarize.ts"
+          "path": "server/services/console-telemetry/summarize.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a0ea767fe2887792fefeabc5528624ef8ac82aebea166b8ed72f3e263e1ddfba"
         },
         {
           "type": "code",
@@ -138,7 +150,9 @@
         },
         {
           "type": "code",
-          "path": "shared/desktop.ts"
+          "path": "shared/desktop.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:36600f550029e880e530e020cbee8a15f4bec1651a58d06d3ff166ad048cc308"
         }
       ],
       "inputs": [],
@@ -148,7 +162,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "telemetry-console-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -189,15 +205,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/lib/agi/consoleTelemetry.ts"
+          "path": "client/src/lib/agi/consoleTelemetry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7f3e8baa87cc1f1f5901bff35f501e87bb54747bf5c0990a399af137230ae56f"
         },
         {
           "type": "code",
-          "path": "client/src/lib/desktop/panelRegistry.ts"
+          "path": "client/src/lib/desktop/panelRegistry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7c204bca05ac48f6e8aef124e9066d2bfa46d6baf970d9b7addbd2819276845a"
         },
         {
           "type": "code",
-          "path": "client/src/lib/desktop/panelTelemetryBus.ts"
+          "path": "client/src/lib/desktop/panelTelemetryBus.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ace980346ef6e968001a9e26b968c3254e5346c5fee9aeed28513d196d6de0fb"
         }
       ],
       "inputs": [],
@@ -207,7 +229,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "telemetry-console-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -248,27 +272,39 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/telemetry/badges.ts"
+          "path": "server/services/telemetry/badges.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:638df7dc7041cb347ffd9bdd1ed0bc9a915527d34e4ea97f60d9a0b22daba4bb"
         },
         {
           "type": "code",
-          "path": "server/services/telemetry/panels.ts"
+          "path": "server/services/telemetry/panels.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ff1c7e0b05ca77e712086e401c003c6b402a31faef22cb7777dd473bf68d85c9"
         },
         {
           "type": "code",
-          "path": "server/skills/telemetry.badges.ts"
+          "path": "server/skills/telemetry.badges.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4a628f566ab0ea95a97cd94144222ea8eff6d3f7e636f0eb0021a03ce748bd3d"
         },
         {
           "type": "code",
-          "path": "server/skills/telemetry.panels.ts"
+          "path": "server/skills/telemetry.panels.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a19dc79491f8ef91b264ec7af5a2d71c8ac27adc1e48c4bb8d5378eb394fa899"
         },
         {
           "type": "code",
-          "path": "shared/badge-telemetry.ts"
+          "path": "shared/badge-telemetry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a4f726c62ffdf8eeaaf04cb906273e7447a364989ac433f1d9d195574acc30bf"
         },
         {
           "type": "code",
-          "path": "shared/star-telemetry.ts"
+          "path": "shared/star-telemetry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:08cee2fa3d4507f29eb57fb6eb010e5dd26cd30f7338172d34c7322c5e2f494f"
         }
       ],
       "inputs": [],
@@ -278,7 +314,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "telemetry-console-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -315,11 +353,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/observability/constraint-pack-telemetry.ts"
+          "path": "server/services/observability/constraint-pack-telemetry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a8ce69548e53c3ff295c04a65a4133a224b0837b5dfe01d45de72b59c9557de3"
         },
         {
           "type": "code",
-          "path": "server/services/observability/tool-event-adapters.ts"
+          "path": "server/services/observability/tool-event-adapters.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1b31a1f73c03123ac687d1109d9b3bf42c3aa42d7cb23a3ef45ba37a7743b508"
         }
       ],
       "inputs": [],
@@ -329,7 +371,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "telemetry-console-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -370,11 +414,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/casimir/telemetry.ts"
+          "path": "server/services/casimir/telemetry.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4081f7ae3b41c76ed334b049bfd632a1de4799202606d112b49b80845deb10ad"
         },
         {
           "type": "code",
-          "path": "server/services/casimir/__tests__/casimir-telemetry.spec.ts"
+          "path": "server/services/casimir/__tests__/casimir-telemetry.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:688078387b31d87cc59541beeadc4adf17a7d373c5fd8df13dcdc092a73c854e"
         }
       ],
       "inputs": [],
@@ -384,7 +432,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "telemetry-console-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -421,11 +471,15 @@
       "evidence": [
         {
           "type": "test",
-          "path": "tests/console-summary.spec.ts"
+          "path": "tests/console-summary.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:df9b6783472be209dbc2f9deb861492b25f1e61c0ed0ba9aaee9e8224be321ff"
         },
         {
           "type": "code",
-          "path": "server/services/casimir/__tests__/casimir-telemetry.spec.ts"
+          "path": "server/services/casimir/__tests__/casimir-telemetry.spec.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:688078387b31d87cc59541beeadc4adf17a7d373c5fd8df13dcdc092a73c854e"
         }
       ],
       "inputs": [],
@@ -435,7 +489,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "telemetry-console-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

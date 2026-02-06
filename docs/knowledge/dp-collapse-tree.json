@@ -48,7 +48,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/dp-collapse-tree.json"
+          "path": "docs/knowledge/dp-collapse-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8a94ffc1a1e512758b79bb7e1cfdb9db8eeb968a1ca0d68f199281add69fd1b2"
         }
       ]
     },
@@ -75,7 +77,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/DP_COLLAPSE_DERIVATION.md"
+          "path": "docs/DP_COLLAPSE_DERIVATION.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:875f58336e3fcd4dd0f8a6a50b4cbd080644c2c363f79ea50525dfd7c1e636e6"
         }
       ],
       "inputs": [],
@@ -85,7 +89,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "dp-collapse-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -122,7 +128,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/dp-collapse.ts"
+          "path": "shared/dp-collapse.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bedeec6e6ba6f90e374ae38571ab906015aea830a2b28555902e7f3f21a99b7a"
         }
       ],
       "inputs": [],
@@ -132,7 +140,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "dp-collapse-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -169,7 +179,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/dp-adapters.ts"
+          "path": "server/services/dp-adapters.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4bf358ef102a97f5532be2450dc330c9b9088660685897c58dfe87d5dabf6e0f"
         }
       ],
       "inputs": [],
@@ -179,7 +191,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "dp-collapse-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -216,7 +230,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/dp-adapter-build.ts"
+          "path": "server/services/dp-adapter-build.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f3b863698489d3a5b3476913945c6377c9faa5cab05e541fb46700a3a7d131e8"
         }
       ],
       "inputs": [],
@@ -226,7 +242,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "dp-collapse-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -263,7 +281,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "shared/dp-planner.ts"
+          "path": "shared/dp-planner.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:2a137c8be3137cbb49649dd8b302b4ed5b8f86856e394a0d212624aecf1c3559"
         }
       ],
       "inputs": [],
@@ -273,7 +293,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "dp-collapse-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -310,7 +332,9 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/services/dp-planner.ts"
+          "path": "server/services/dp-planner.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:69a50ae8af1742acda04e14641222d41de049316f427aa3bfbed5b31b4d195a2"
         }
       ],
       "inputs": [],
@@ -320,7 +344,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "dp-collapse-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

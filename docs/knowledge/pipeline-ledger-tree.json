@@ -52,7 +52,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/pipeline-ledger-tree.json"
+          "path": "docs/knowledge/pipeline-ledger-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f55065b44892f62a07b08764ac458b5c7422b8dee8540bcb099bcf87282d9562"
         }
       ]
     },
@@ -79,7 +81,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/pipeline.md"
+          "path": "docs/knowledge/pipeline.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:68f95fc090448f38ee6d316ddc34fca10c2a8dcd13f6d9a9ac4932af5520629a"
         }
       ],
       "inputs": [],
@@ -89,7 +93,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -126,7 +132,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/curvature-ledger.md"
+          "path": "docs/knowledge/curvature-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b1674dc1d0926c99450e96ada1613a3067a0fe12ee3568421b7dcd12a4b2ccb7"
         }
       ],
       "inputs": [],
@@ -136,7 +144,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -173,7 +183,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/warp-ledger.md"
+          "path": "docs/knowledge/warp-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:71b5a69420a195537257daf630f5b0a8d2acec27b89c988eb75ffe3f74766e64"
         }
       ],
       "inputs": [],
@@ -183,7 +195,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -220,7 +234,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/stewardship-ledger.md"
+          "path": "docs/knowledge/stewardship-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:67a08aa680ecd5b4f48b83e01716d3ad4a953532af4f519eb1f403996d2b73c0"
         }
       ],
       "inputs": [],
@@ -230,7 +246,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -267,7 +285,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/kappa-proxy.md"
+          "path": "docs/knowledge/kappa-proxy.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f69b2817823fc395191159df4bbb1f7d6ce45feb25c803bb2f827169bcee2ab4"
         }
       ],
       "inputs": [],
@@ -277,7 +297,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -314,7 +336,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/qi-bounds.md"
+          "path": "docs/knowledge/qi-bounds.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0f2de67edf4ff01ab6cbb3764e1eddd51a3ac28eb599b4440782f03a5d598c67"
         }
       ],
       "inputs": [],
@@ -324,7 +348,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -361,7 +387,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/potato-threshold.md"
+          "path": "docs/knowledge/potato-threshold.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c999c52dc51df8700cc3ccf0817c9c93db45191b96ccb106b41e4c14e29fd99b"
         }
       ],
       "inputs": [],
@@ -371,7 +399,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -408,7 +438,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/verification.md"
+          "path": "docs/knowledge/verification.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:060d2be778fa65d72c3bde366bad0df041053bcd99ca493762f129eaeab124f0"
         }
       ],
       "inputs": [],
@@ -418,7 +450,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -455,7 +489,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/stellar-ledger.md"
+          "path": "docs/knowledge/stellar-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:97085a2390e8f5172f36e81feb07118279d79d211519a3b4c8e63421ef4fe56d"
         }
       ],
       "inputs": [],
@@ -465,7 +501,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -502,7 +540,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/sun-ledger.md"
+          "path": "docs/knowledge/sun-ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4f8cf66831ca7a90c4ecff7c4c371ab818ac1c0225cd4b1e7326e4e32bac766c"
         }
       ],
       "inputs": [],
@@ -512,7 +552,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "pipeline-ledger-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

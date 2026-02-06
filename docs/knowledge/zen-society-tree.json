@@ -44,7 +44,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/zen-society-tree.json"
+          "path": "docs/knowledge/zen-society-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ea40222cc8d9c4cf716007022b8f331c478fe1591b101b08aae69fddb91c640"
         }
       ]
     },
@@ -75,15 +77,21 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/README.md"
+          "path": "docs/zen-society/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:70d1ce0b246dc205b751c5b4f2fe241c9a6e6eca10bb6952401d17c168ce7604"
         },
         {
           "type": "doc",
-          "path": "docs/zen-society/gates.md"
+          "path": "docs/zen-society/gates.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a7299b527e5160c8220ae75b60f12ca8dd070696b98296b93ffcb896d8910b7d"
         },
         {
           "type": "doc",
-          "path": "docs/zen-society/public-safety-governance-spine.md"
+          "path": "docs/zen-society/public-safety-governance-spine.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6a7e0fd43695fb23835d3ad6fb35e8f24a10ae0624c1fa6a9726b8be89f18f51"
         }
       ],
       "inputs": [],
@@ -93,7 +101,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -129,7 +139,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/README.md"
+          "path": "docs/zen-society/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:70d1ce0b246dc205b751c5b4f2fe241c9a6e6eca10bb6952401d17c168ce7604"
         }
       ],
       "inputs": [],
@@ -139,7 +151,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -176,7 +190,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/gates.md"
+          "path": "docs/zen-society/gates.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a7299b527e5160c8220ae75b60f12ca8dd070696b98296b93ffcb896d8910b7d"
         }
       ],
       "inputs": [],
@@ -186,7 +202,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -223,7 +241,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/public-safety-governance-spine.md"
+          "path": "docs/zen-society/public-safety-governance-spine.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6a7e0fd43695fb23835d3ad6fb35e8f24a10ae0624c1fa6a9726b8be89f18f51"
         }
       ],
       "inputs": [],
@@ -233,7 +253,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-core"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -283,7 +305,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -299,7 +323,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/zen-society-tree.json"
+          "path": "docs/knowledge/zen-society-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ea40222cc8d9c4cf716007022b8f331c478fe1591b101b08aae69fddb91c640"
         }
       ]
     },
@@ -325,7 +351,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/decision-log.md"
+          "path": "docs/zen-society/templates/decision-log.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0ee6cabbcb56d0f75c43c5ead46f2fc851d47f68bc8aa7dc40a5e145e1b766fb"
         }
       ],
       "inputs": [],
@@ -335,7 +363,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -371,7 +401,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/pillar-01-dignity.md"
+          "path": "docs/zen-society/templates/pillar-01-dignity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:30524c521919d08126aed69339703543ba4676dcb0ab002a3504a1692c4a0935"
         }
       ],
       "inputs": [],
@@ -381,7 +413,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -417,7 +451,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/pillar-02-services.md"
+          "path": "docs/zen-society/templates/pillar-02-services.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:146823ec78c3d353ccb2b0bd6bf16b481fc6cc8df017d1888cf42aca8690dbb2"
         }
       ],
       "inputs": [],
@@ -427,7 +463,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -463,7 +501,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/pillar-03-contracts.md"
+          "path": "docs/zen-society/templates/pillar-03-contracts.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:12c81a29d8d70dcc5a02cfc838d14b0c79304b386b9c0f27acc39ded71793aa5"
         }
       ],
       "inputs": [],
@@ -473,7 +513,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -509,7 +551,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/pillar-04-finance.md"
+          "path": "docs/zen-society/templates/pillar-04-finance.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ae5e6ac449547632653582cbc1d51f841c6d0ff3e9e1d67c7b72104d2d64c00a"
         }
       ],
       "inputs": [],
@@ -519,7 +563,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -555,7 +601,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/pillar-05-consent.md"
+          "path": "docs/zen-society/templates/pillar-05-consent.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1ddde93561d9589b7a9de7ed2677ba84d6d10e185fd5399b20ec54a4bd536840"
         }
       ],
       "inputs": [],
@@ -565,7 +613,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -601,7 +651,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/pillar-06-verification.md"
+          "path": "docs/zen-society/templates/pillar-06-verification.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ee428c1f9c564f3ce2c06b0fa21699cc148af1235972ff91082f20df7371aa5"
         }
       ],
       "inputs": [],
@@ -611,7 +663,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -647,7 +701,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/signatory-registry.md"
+          "path": "docs/zen-society/templates/signatory-registry.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:68741aba819c97cc90a57432d3f6fcdfd04f76ab791744a7b1b577cf7a41963f"
         }
       ],
       "inputs": [],
@@ -657,7 +713,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-templates"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -712,7 +770,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -728,7 +788,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/zen-society-tree.json"
+          "path": "docs/knowledge/zen-society-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ea40222cc8d9c4cf716007022b8f331c478fe1591b101b08aae69fddb91c640"
         }
       ]
     },
@@ -754,7 +816,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/access-to-counsel-pathway.md"
+          "path": "docs/zen-society/templates/artifacts/access-to-counsel-pathway.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:441e50e365151c8a6138026a796a8ae589e2d69b7e841cbd772ee082e02cc962"
         }
       ],
       "inputs": [],
@@ -764,7 +828,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -800,7 +866,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/charter.md"
+          "path": "docs/zen-society/templates/artifacts/charter.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1521feceb27f6192f3ee7801755e74bea44ce9c97f2a55ca1fca0045f3fdcc76"
         }
       ],
       "inputs": [],
@@ -810,7 +878,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -846,7 +916,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/civic-signal-survey.md"
+          "path": "docs/zen-society/templates/artifacts/civic-signal-survey.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:65e7e2fcb22177aeacd056bbb4de1f8c11cf7666bb5aefbaad6cb85e7fa92e16"
         }
       ],
       "inputs": [],
@@ -856,7 +928,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -892,7 +966,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/dashboard.md"
+          "path": "docs/zen-society/templates/artifacts/dashboard.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e5be8c58f9875816a431649676c68accdf579ff04b8b175011179d4f7476786a"
         }
       ],
       "inputs": [],
@@ -902,7 +978,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -938,7 +1016,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/federal-civic-listening-circuit.md"
+          "path": "docs/zen-society/templates/artifacts/federal-civic-listening-circuit.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a05d2207c56b92d279a88061cbe8760de03217c626833397601556bb73270568"
         }
       ],
       "inputs": [],
@@ -948,7 +1028,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -984,7 +1066,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/harm-weighted-priority-standard.md"
+          "path": "docs/zen-society/templates/artifacts/harm-weighted-priority-standard.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b7856ee05fd76c1fdf62e005e4c51890769a04e140590078a60a84a8056e15c3"
         }
       ],
       "inputs": [],
@@ -994,7 +1078,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1030,7 +1116,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/integration-ladder.md"
+          "path": "docs/zen-society/templates/artifacts/integration-ladder.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f2ae87a5bc047f1367701d8a493140baa6a50bdbf287b6104778e5505cfa3790"
         }
       ],
       "inputs": [],
@@ -1040,7 +1128,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1076,7 +1166,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/lawful-interface-protocol.md"
+          "path": "docs/zen-society/templates/artifacts/lawful-interface-protocol.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a836ac5cf2b9bfca472af8b3bf900315a3ba18629a98479b9b96fb57536c22d9"
         }
       ],
       "inputs": [],
@@ -1086,7 +1178,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1122,7 +1216,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/ledger.md"
+          "path": "docs/zen-society/templates/artifacts/ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:847fcd683371049b4c11a20bd4b797fe97ef48a3843dee6fac9f3d8d8dcaea18"
         }
       ],
       "inputs": [],
@@ -1132,7 +1228,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1168,7 +1266,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/local-stability-compact.md"
+          "path": "docs/zen-society/templates/artifacts/local-stability-compact.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:82b4daadfdb01a2b7ed4d1234ea4059f0fa2ee8f265084e57a9b750c9cdcf7d3"
         }
       ],
       "inputs": [],
@@ -1178,7 +1278,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1214,7 +1316,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/metric-integrity-guardrail.md"
+          "path": "docs/zen-society/templates/artifacts/metric-integrity-guardrail.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:08e8318367d52c5d222bd2735fc8bbf62522a016b91fe2abd0d73a3a496549fa"
         }
       ],
       "inputs": [],
@@ -1224,7 +1328,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1260,7 +1366,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/protocol.md"
+          "path": "docs/zen-society/templates/artifacts/protocol.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3039af98b7068b3a9e27a0f7d916d51e04e3922ee98d01ad9e3a86d987b17fd3"
         }
       ],
       "inputs": [],
@@ -1270,7 +1378,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -1306,7 +1416,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/training-certification-gate.md"
+          "path": "docs/zen-society/templates/artifacts/training-certification-gate.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:698ea9ccfdf4a9daf53d3375c80357d43071166b929ec85c397c9045b9685a65"
         }
       ],
       "inputs": [],
@@ -1316,7 +1428,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [

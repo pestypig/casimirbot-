@@ -50,7 +50,9 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/ui-backend-binding-tree.json"
+          "path": "docs/knowledge/ui-backend-binding-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5d7e675a36599dc3b1bdc0022eecc9448d1bd060cc6e396ecf59811d48afae7c"
         }
       ]
     },
@@ -77,11 +79,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/energy-pipeline.ts"
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f567d48d24322650e4841ab96c8c87b5557531540098a229eadfd9e7aa8d45c9"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/use-energy-pipeline.ts"
+          "path": "client/src/hooks/use-energy-pipeline.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:52ea9c015d9d59e71e63f8938a69e2a3ac92d1156236ffd45a66f91be05ca999"
         },
         {
           "type": "code",
@@ -103,7 +109,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -140,27 +148,39 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/curvature-brick.ts"
+          "path": "server/curvature-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e79416d2cfa49a366bbce49af964d9248502099d3af33126a5e1e0c5a7c9130a"
         },
         {
           "type": "code",
-          "path": "server/gr-evolve-brick.ts"
+          "path": "server/gr-evolve-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:60729772df9bb52a622e5fb4b7450b05a6e74a9273a27701b96c2c6248923654"
         },
         {
           "type": "code",
-          "path": "server/routes/physics.curvature.ts"
+          "path": "server/routes/physics.curvature.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f3ae952c137ea9bfe2bb5ada5af4fdac395b402323c6d6bd236e3e8b3e4bf2f2"
         },
         {
           "type": "code",
-          "path": "client/src/lib/curvature-brick.ts"
+          "path": "client/src/lib/curvature-brick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cc7458b35aae3b5144415a6b2890536000a1593f42150b6afadc9d14f8cb7b9d"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useGrBrick.ts"
+          "path": "client/src/hooks/useGrBrick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:91ccb5f63caf4a083950b85b6b4d8a1ab575d01abd892276ae0438f2f89810fe"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useGrEvolveBrick.ts"
+          "path": "client/src/hooks/useGrEvolveBrick.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:c31cf85c4bb7eac9a15ef1e4b0d3e0ce67d45defd965afd5449071645f27c7f4"
         },
         {
           "type": "code",
@@ -178,7 +198,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -215,15 +237,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "modules/warp/warp-module.ts"
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
         },
         {
           "type": "code",
-          "path": "server/routes/warp-viability.ts"
+          "path": "server/routes/warp-viability.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d30c23713c78acb8d473db53598d82af3af086440f6cfde014f6c102a350e3dd"
         },
         {
           "type": "code",
-          "path": "client/src/lib/warp-pipeline-adapter.ts"
+          "path": "client/src/lib/warp-pipeline-adapter.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:eb18a6848260106c274ce9e2c2831a3c0b2913b10b499407f1bea169f1a3965f"
         },
         {
           "type": "code",
@@ -245,7 +273,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -282,11 +312,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/benchmarks.collapse.ts"
+          "path": "server/routes/benchmarks.collapse.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:5874c515d90c53d637e985bd060bd45c0dc1e0ed0811e61913c4a6a1bc541896"
         },
         {
           "type": "code",
-          "path": "shared/collapse-benchmark.ts"
+          "path": "shared/collapse-benchmark.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3f0560fee01d8206a6aa50e5d8981b4879dfdb133056ca6372b21b6253c39d84"
         },
         {
           "type": "code",
@@ -304,7 +338,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -341,15 +377,21 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes.ts"
+          "path": "server/routes.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0dcc6da8765d93d821cdfdec3a55581ee6b8923855881341fc1184c87b41f41a"
         },
         {
           "type": "code",
-          "path": "server/services/scuffem.ts"
+          "path": "server/services/scuffem.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ae7fe285bff08d61a69fe727136b37da34f56d51038b6a9e4e9f1246d5cd1604"
         },
         {
           "type": "code",
-          "path": "client/src/lib/simulation-api.ts"
+          "path": "client/src/lib/simulation-api.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:9476100cb5d89f7350c694272b88e55a1a995dd932c2d7ec877c27dc2df82475"
         },
         {
           "type": "code",
@@ -363,7 +405,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -400,11 +444,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/helix-core.ts"
+          "path": "server/helix-core.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:df54877e753629e1410478685b192cbbe3794cd9946823a79fc4724231f1a97d"
         },
         {
           "type": "code",
-          "path": "client/src/hooks/useHardwareFeeds.ts"
+          "path": "client/src/hooks/useHardwareFeeds.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f6be5c34a283b9ed015fd25a7eafb1d4361a9bf7966b9934da6c54704269119f"
         },
         {
           "type": "code",
@@ -430,7 +478,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -467,11 +517,15 @@
       "evidence": [
         {
           "type": "code",
-          "path": "server/routes/knowledge.ts"
+          "path": "server/routes/knowledge.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f2add329a95fcac70453c1964fd551ad0e822b1884316026609e28becec6f34b"
         },
         {
           "type": "code",
-          "path": "server/services/knowledge/corpus.ts"
+          "path": "server/services/knowledge/corpus.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ef07d340d9a06662d44c8b74a8e589b074c1a7807d9fc3907b4a753c0fe74227"
         },
         {
           "type": "code",
@@ -493,7 +547,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
@@ -542,11 +598,15 @@
         },
         {
           "type": "code",
-          "path": "server/routes/agi.constraint-packs.ts"
+          "path": "server/routes/agi.constraint-packs.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:54171e728cc38123b3d4a474531b619ac761c6cbdf9cf11a73b0ccc854629463"
         },
         {
           "type": "code",
-          "path": "server/routes/agi.eval.ts"
+          "path": "server/routes/agi.eval.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d413d98cc913066ca64a1b8e4daea59f9fc078da9325cd7913c5533230ba9da4"
         }
       ],
       "inputs": [],
@@ -556,7 +616,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
       "predictability": {
         "status": "partial",
         "missing": [
