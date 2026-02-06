@@ -184,7 +184,9 @@
         "simulation",
         "storage"
       ],
-      "children": [],
+      "children": [
+        "bridge-simulation-storage-stewardship-ledger"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -1077,6 +1079,81 @@
         ]
       },
       "summary": "Bridge between stewardship-ledger and simulation-artifacts."
+    },
+    {
+      "id": "bridge-simulation-storage-stewardship-ledger",
+      "slug": "bridge-simulation-storage-stewardship-ledger",
+      "title": "Simulation Storage <-> Stewardship Ledger",
+      "excerpt": "Bridge between stewardship-ledger and simulation-storage.",
+      "bodyMD": "Bridge between stewardship-ledger and simulation-storage (stewardship-guardrail).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "simulation",
+        "storage"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "simulation-storage"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-storage"
+        }
+      ],
+      "bridge": {
+        "left": "stewardship-ledger",
+        "right": "simulation-storage",
+        "relation": "stewardship-guardrail"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "stewardship-ledger",
+        "simulation-storage"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/stewardship-ledger.md",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:813754d24a2b5e597c1676781e1b40e58ac4cb089e08c30926a321d3a4d4116b"
+        },
+        {
+          "type": "code",
+          "path": "server/db/simulations.ts",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:7d8ef5fd06bed8ef620bc4fcafaeb34e4320e010e398b8e34376efa509336a92"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between stewardship-ledger and simulation-storage."
     }
   ],
   "schema": {

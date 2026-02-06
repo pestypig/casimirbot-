@@ -116,7 +116,9 @@
         "hardware",
         "bus"
       ],
-      "children": [],
+      "children": [
+        "bridge-hardware-bus-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -696,6 +698,81 @@
         ]
       },
       "summary": "Bridge between verification-checklist and hardware-ingest."
+    },
+    {
+      "id": "bridge-hardware-bus-verification-checklist",
+      "slug": "bridge-hardware-bus-verification-checklist",
+      "title": "Hardware Bus <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and hardware-bus.",
+      "bodyMD": "Bridge between verification-checklist and hardware-bus (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "hardware",
+        "bus"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "hardware-bus"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-bus"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "hardware-bus",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "hardware-bus"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/hardware-sector-bus.ts",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:2d61cdd97fdffd32b556b73de67986c8c623e11c303284bee126ceb98d0dde4c"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and hardware-bus."
     }
   ],
   "schema": {

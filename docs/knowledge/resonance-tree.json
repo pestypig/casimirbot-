@@ -273,7 +273,9 @@
         "resonance",
         "engine"
       ],
-      "children": [],
+      "children": [
+        "bridge-resonance-engine-verification-checklist"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -940,6 +942,81 @@
         ]
       },
       "summary": "Bridge between verification-checklist and resonance-io."
+    },
+    {
+      "id": "bridge-resonance-engine-verification-checklist",
+      "slug": "bridge-resonance-engine-verification-checklist",
+      "title": "Resonance Engine <-> Verification Checklist",
+      "excerpt": "Bridge between verification-checklist and resonance-engine.",
+      "bodyMD": "Bridge between verification-checklist and resonance-engine (verification-anchor).",
+      "tags": [
+        "bridge",
+        "ethos",
+        "mission",
+        "stewardship",
+        "verification",
+        "physics",
+        "resonance",
+        "engine"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "resonance-engine"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "resonance-engine"
+        }
+      ],
+      "bridge": {
+        "left": "verification-checklist",
+        "right": "resonance-engine",
+        "relation": "verification-anchor"
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "verification-checklist",
+        "resonance-engine"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/verification-checklist.md",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+        },
+        {
+          "type": "code",
+          "path": "server/services/code-lattice/resonance.ts",
+          "repo_rev": "2c698bcf627b6129c1b26209257bcb8d3b3467e4",
+          "content_hash": "sha256:52b2dd83154833f540976b86255d9aca0d4aa1842fd566e6658af602e5e74513"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "summary": "Bridge between verification-checklist and resonance-engine."
     }
   ],
   "schema": {

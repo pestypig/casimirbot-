@@ -95,6 +95,11 @@ Resonance stack for code-lattice computations. Minimal artifact: code-lattice co
 - type: bridge
 - summary: Bridge between verification-checklist and resonance-io (verification-anchor).
 
+### Node: Resonance Engine <-> Verification Checklist
+- id: bridge-resonance-engine-verification-checklist
+- type: bridge
+- summary: Bridge between verification-checklist and resonance-engine (verification-anchor).
+
 ## Bridges
 
 ### Bridge: Code Lattice Core <-> Resonance Runtime
@@ -112,3 +117,7 @@ Resonance stack for code-lattice computations. Minimal artifact: code-lattice co
 ### Bridge: verification-checklist <-> Resonance IO
 - relation: verification-anchor
 - summary: Bridge between verification-checklist and resonance-io (verification-anchor).
+
+### Bridge: verification-checklist <-> Resonance Engine
+- relation: verification-anchor
+- summary: Bridge between verification-checklist and resonance-engine (verification-anchor).

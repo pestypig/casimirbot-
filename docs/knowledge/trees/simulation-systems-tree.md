@@ -105,6 +105,11 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 - type: bridge
 - summary: Bridge between stewardship-ledger and simulation-artifacts (stewardship-guardrail).
 
+### Node: Simulation Storage <-> Stewardship Ledger
+- id: bridge-simulation-storage-stewardship-ledger
+- type: bridge
+- summary: Bridge between stewardship-ledger and simulation-storage (stewardship-guardrail).
+
 ## Bridges
 
 ### Bridge: Simulation Contracts <-> Simulation API
@@ -122,3 +127,7 @@ This tree maps simulation-only systems: contracts, APIs, modules, and UI surface
 ### Bridge: stewardship-ledger <-> Simulation Artifacts
 - relation: stewardship-guardrail
 - summary: Bridge between stewardship-ledger and simulation-artifacts (stewardship-guardrail).
+
+### Bridge: stewardship-ledger <-> Simulation Storage
+- relation: stewardship-guardrail
+- summary: Bridge between stewardship-ledger and simulation-storage (stewardship-guardrail).
