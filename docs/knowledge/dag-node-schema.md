@@ -17,6 +17,19 @@ environment are explicit and auditable.
 - `deterministic`, `tolerance`.
 - `environment`.
 - `dependencies` (node ids) and/or `links` with `rel="depends-on"`.
+- `predictability` (status + missing fields).
+
+## Defaults (physics trees first)
+Physics trees should include the predictability fields even if incomplete so
+Helix Ask can surface missing inputs/assumptions directly:
+- `inputs`, `outputs` (empty arrays if unknown)
+- `assumptions` (empty array if unknown)
+- `validity` (empty object if unknown)
+- `deterministic` (null if unknown)
+- `tolerance` (null if unknown)
+- `environment` (null if unknown)
+- `dependencies` (empty array if unknown)
+- `predictability`: `{ status, missing[] }`
 
 ## Evidence types
 - `doc`: docs with `path` and optional `heading` or `contains`.
@@ -61,6 +74,11 @@ environment are explicit and auditable.
   "links": [
     { "rel": "depends-on", "to": "casimir-static-engine" }
   ],
+
+  "predictability": {
+    "status": "complete",
+    "missing": []
+  },
 
   "evidence": [
     {
