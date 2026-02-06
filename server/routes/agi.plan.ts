@@ -122,7 +122,11 @@ import {
 } from "../services/helix-ask/format";
 import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
 import { extractFilePathsFromText } from "../services/helix-ask/paths";
-import { readDocSectionIndex, selectDocSectionMatch } from "../services/helix-ask/doc-sections";
+import {
+  readDocSectionIndex,
+  selectDocSectionMatch,
+  type DocSection,
+} from "../services/helix-ask/doc-sections";
 import {
   evaluateClaimCoverage,
   evaluateEvidenceEligibility,
@@ -2750,6 +2754,15 @@ const HELIX_ASK_TREE_WALK_INJECT =
   String(process.env.HELIX_ASK_TREE_WALK_INJECT ?? "0").trim() === "1";
 const HELIX_ASK_TREE_WALK_BINDING =
   String(process.env.HELIX_ASK_TREE_WALK_BINDING ?? "1").trim() !== "0";
+const HELIX_ASK_DEFINITION_REGISTRY_TOPK = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_DEFINITION_REGISTRY_TOPK ??
+      process.env.VITE_HELIX_ASK_DEFINITION_REGISTRY_TOPK,
+    2,
+  ),
+  1,
+  6,
+);
 const HELIX_ASK_ANSWER_MAX_TOKENS = clampNumber(
   readNumber(
     process.env.HELIX_ASK_ANSWER_MAX_TOKENS ??
@@ -7444,6 +7457,94 @@ const isDefinitionDocPath = (filePath: string): boolean => {
 
 const isDefinitionQuestion = (question: string): boolean =>
   HELIX_ASK_DEFINITION_FOCUS.test(question);
+
+const collectDefinitionRegistryPaths = (
+  question: string,
+  conceptMatch: HelixAskConceptMatch | null,
+  definitionFocus: boolean,
+): string[] => {
+  if (!definitionFocus) return [];
+  const paths = new Set<string>();
+  const addPath = (value?: string) => {
+    if (!value) return;
+    const normalized = value.replace(/\\/g, "/").trim();
+    if (!normalized) return;
+    if (!isDefinitionDocPath(normalized)) return;
+    paths.add(normalized);
+  };
+  if (conceptMatch) {
+    addPath(conceptMatch.card.sourcePath);
+    (conceptMatch.card.mustIncludeFiles ?? []).forEach((filePath) => addPath(filePath));
+  } else {
+    const candidates = listConceptCandidates(question, HELIX_ASK_DEFINITION_REGISTRY_TOPK);
+    candidates.forEach((candidate) => {
+      addPath(candidate.card.sourcePath);
+      (candidate.card.mustIncludeFiles ?? []).forEach((filePath) => addPath(filePath));
+    });
+  }
+  return Array.from(paths);
+};
+
+const buildDefinitionMatchTerms = (
+  question: string,
+  conceptMatch: HelixAskConceptMatch | null,
+): { tokens: string[]; phrases: string[] } => {
+  const phrases: string[] = [];
+  const tokens = new Set<string>();
+  if (conceptMatch?.card) {
+    const terms = [
+      conceptMatch.card.id,
+      conceptMatch.card.label ?? "",
+      ...(conceptMatch.card.aliases ?? []),
+    ].filter(Boolean);
+    terms.forEach((term) => {
+      if (term.includes(" ")) phrases.push(term.toLowerCase());
+      term
+        .split(/\s+/)
+        .map((chunk) => chunk.trim())
+        .filter(Boolean)
+        .forEach((chunk) => tokens.add(chunk.toLowerCase()));
+    });
+  }
+  if (tokens.size === 0) {
+    tokenizeAskQuery(question).forEach((token) => tokens.add(token.toLowerCase()));
+  }
+  return { tokens: Array.from(tokens), phrases };
+};
+
+const buildDocSectionSnippet = (section: DocSection): string => {
+  const headerPath = section.headerPath.join(" > ") || section.heading || "Overview";
+  const lines = section.bodyLines.filter((line) => line.trim().length > 0);
+  const snippetLines = lines.slice(0, 4).map((line) => line.trimEnd());
+  const spanStart = section.bodyStartLine;
+  const spanEnd = section.bodyStartLine + Math.max(0, snippetLines.length - 1);
+  return [`Section: ${headerPath}`, `Span: L${spanStart}-L${spanEnd}`, ...snippetLines]
+    .filter(Boolean)
+    .join("\n");
+};
+
+const buildDefinitionRegistryBlocks = (
+  definitionPaths: string[],
+  question: string,
+  conceptMatch: HelixAskConceptMatch | null,
+  existingBlocks: Array<{ path: string; block: string }>,
+): Array<{ path: string; block: string }> => {
+  if (definitionPaths.length === 0) return [];
+  const existing = new Set(existingBlocks.map((block) => block.path.replace(/\\/g, "/").toLowerCase()));
+  const { tokens, phrases } = buildDefinitionMatchTerms(question, conceptMatch);
+  const blocks: Array<{ path: string; block: string }> = [];
+  for (const definitionPath of definitionPaths) {
+    const normalized = definitionPath.replace(/\\/g, "/");
+    if (existing.has(normalized.toLowerCase())) continue;
+    const index = readDocSectionIndex(normalized);
+    if (!index.sections.length) continue;
+    const match = selectDocSectionMatch(index, tokens, phrases);
+    const snippet = match.snippet ?? buildDocSectionSnippet(index.sections[0]);
+    const block = `${normalized}\n${snippet}`;
+    blocks.push({ path: normalized, block });
+  }
+  return blocks;
+};
 
   const DOC_PROOF_SPAN_RE = /\bSpan:\s*L\d+/i;
   const DOC_SECTION_LINE_RE = /\b(Section|Title|Heading|Subheading|Doc):\s+/i;
@@ -12674,6 +12775,8 @@ const executeHelixAsk = async ({
       definition_doc_ok?: boolean;
       definition_doc_blocks?: number;
       definition_doc_span_rate?: number;
+      definition_registry_paths?: string[];
+      definition_registry_blocks?: number;
       claim_ref_rate?: number;
       report_mode?: boolean;
       report_mode_reason?: string;
@@ -17772,9 +17875,48 @@ const executeHelixAsk = async ({
         }
       }
 
+      const definitionRegistryPaths = collectDefinitionRegistryPaths(
+        baseQuestion,
+        conceptMatch,
+        definitionFocus,
+      );
+      if (definitionRegistryPaths.length > 0) {
+        const registryBlocks = buildDefinitionRegistryBlocks(
+          definitionRegistryPaths,
+          baseQuestion,
+          conceptMatch,
+          docBlocks,
+        );
+        if (registryBlocks.length > 0) {
+          const existing = new Set(
+            docBlocks.map((block) => block.path.replace(/\\/g, "/").toLowerCase()),
+          );
+          const mergedBlocks = [...docBlocks];
+          registryBlocks.forEach((block) => {
+            const key = block.path.replace(/\\/g, "/").toLowerCase();
+            if (!existing.has(key)) {
+              mergedBlocks.push(block);
+              existing.add(key);
+            }
+          });
+          docBlocks = mergedBlocks;
+        }
+        if (definitionRegistryPaths.length > 0) {
+          contextFiles = Array.from(new Set([...contextFiles, ...definitionRegistryPaths]));
+        }
+        if (debugPayload) {
+          debugPayload.definition_registry_paths = definitionRegistryPaths.slice(0, 6);
+          debugPayload.definition_registry_blocks = registryBlocks.length;
+        }
+      }
+
       if (graphPack) {
+        const bindingBlocks =
+          definitionFocus && docBlocks.length > 0
+            ? resolveDefinitionDocBlocks(docBlocks, conceptMatch, definitionFocus)
+            : docBlocks;
         const boundNodes = HELIX_ASK_TREE_WALK_BINDING
-          ? buildTreeWalkBindingSet(graphPack, docBlocks)
+          ? buildTreeWalkBindingSet(graphPack, bindingBlocks)
           : undefined;
         const treeWalk = buildHelixAskTreeWalk(graphPack, {
           mode: treeWalkMode,
@@ -17831,6 +17973,10 @@ const executeHelixAsk = async ({
         typeof debugPayload?.retrieval_confidence === "number"
           ? debugPayload.retrieval_confidence
           : 0;
+      const toolResultsTreeWalk =
+        treeWalkMetrics && typeof treeWalkMetrics.boundCount === "number" && treeWalkMetrics.boundCount > 0
+          ? treeWalkBlock
+          : "";
       promptItems = buildHelixAskPromptItems({
         intentId: intentProfile.id,
         intentDomain,
@@ -17840,7 +17986,7 @@ const executeHelixAsk = async ({
         retrievalConfidence: promptRetrievalConfidence,
         docBlocks,
         codeAlignment,
-        treeWalk: treeWalkBlock,
+        treeWalk: toolResultsTreeWalk,
         slotCoverage: coverageSlotSummary
           ? { missingSlots: coverageSlotSummary.missingSlots ?? [], ratio: coverageSlotSummary.ratio ?? 0 }
           : null,
