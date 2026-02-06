@@ -395,7 +395,10 @@
         }
       },
       "deterministic": true,
-      "tolerance": null,
+      "tolerance": {
+        "cfl_max": 0.5,
+        "abs": 0.000001
+      },
       "environment": {
         "runtime": "node"
       },
@@ -404,10 +407,8 @@
         "brick-stress-energy"
       ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "tolerance"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {

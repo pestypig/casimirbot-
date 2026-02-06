@@ -3249,7 +3249,9 @@
         }
       },
       "deterministic": true,
-      "tolerance": null,
+      "tolerance": {
+        "abs": 0.000001
+      },
       "environment": {
         "runtime": "node"
       },
@@ -3260,10 +3262,8 @@
         "gr-constraint-policy"
       ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "tolerance"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {

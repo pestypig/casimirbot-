@@ -263,7 +263,16 @@
         }
       },
       "deterministic": true,
-      "tolerance": null,
+      "tolerance": {
+        "alpha_maxAbs": 1e-12,
+        "beta_maxAbs": 1e-12,
+        "maxAbsH": 1e-12,
+        "maxAbsM": 1e-12,
+        "rmsH": 0.01,
+        "rmsM": 0.001,
+        "alpha_maxRel": 0.001,
+        "convergence_ratio_min": 2.5
+      },
       "environment": {
         "runtime": "node"
       },
@@ -274,10 +283,8 @@
         "gr-stress-energy"
       ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "tolerance"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -411,7 +418,9 @@
         }
       },
       "deterministic": true,
-      "tolerance": null,
+      "tolerance": {
+        "abs": 0.000001
+      },
       "environment": {
         "runtime": "node"
       },
@@ -422,10 +431,8 @@
         "gr-constraint-policy"
       ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "tolerance"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -562,32 +569,99 @@
         }
       ],
       "summary": "Orchestration loop for GR evaluation and proposals.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-agent-loop.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-agent-loop.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-agent-loop-baseline.spec.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/gr-solver-progress.md"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "inputs": [
+        {
+          "name": "options",
+          "unit": "1",
+          "type": "GrAgentLoopOptions",
+          "source": "runGrAgentLoop.options"
+        },
+        {
+          "name": "pipelineState",
+          "unit": "1",
+          "type": "EnergyPipelineState",
+          "source": "energy-pipeline.getGlobalPipelineState"
+        },
+        {
+          "name": "thresholds",
+          "unit": "1",
+          "type": "GrConstraintThresholds",
+          "source": "GrAgentLoopOptions.thresholds"
+        },
+        {
+          "name": "policy",
+          "unit": "1",
+          "type": "GrConstraintPolicy",
+          "source": "GrAgentLoopOptions.policy"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "result",
+          "unit": "1",
+          "type": "GrAgentLoopResult"
+        },
+        {
+          "name": "attempts",
+          "unit": "1",
+          "type": "GrAgentLoopAttempt[]"
+        },
+        {
+          "name": "stateHistory",
+          "unit": "1",
+          "type": "GrAgentLoopStateEvent[]"
+        }
+      ],
+      "assumptions": [
+        "Pipeline state can be cloned and restored between attempts",
+        "Acceptance requires constraint evaluation pass and certified initial data",
+        "Strategy proposals adjust duty/gamma parameters monotonically"
+      ],
+      "validity": {
+        "maxIterations": {
+          "min": 1
+        },
+        "budgetMs": {
+          "min": 0
+        }
+      },
+      "deterministic": false,
+      "tolerance": {
+        "note": "Timing and acceptance depend on runtime budget and thresholds"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-evolution-orchestration",
+        "gr-initial-data",
+        "gr-evolution-brick",
+        "gr-constraint-gate",
+        "gr-constraint-policy",
+        "gr-evaluation"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -613,7 +687,7 @@
         }
       ],
       "summary": "Orchestrate GR evolution runs and bricks.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
@@ -632,25 +706,97 @@
           "path": "server/gr-evolve-brick.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "inputs": [
+        {
+          "name": "dims",
+          "unit": "voxels",
+          "type": "tuple[int,int,int]",
+          "source": "GrEvolveBrickParams.dims"
+        },
+        {
+          "name": "bounds",
+          "unit": "m",
+          "type": "bbox",
+          "source": "GrEvolveBrickParams.bounds"
+        },
+        {
+          "name": "dt_s",
+          "unit": "s",
+          "type": "float",
+          "source": "GrEvolveBrickParams.dt_s"
+        },
+        {
+          "name": "steps",
+          "unit": "steps",
+          "type": "int",
+          "source": "GrEvolveBrickParams.steps"
+        },
+        {
+          "name": "iterations",
+          "unit": "steps",
+          "type": "int",
+          "source": "GrEvolveBrickParams.iterations"
+        },
+        {
+          "name": "tolerance",
+          "unit": "1",
+          "type": "float",
+          "source": "GrEvolveBrickParams.tolerance"
+        },
+        {
+          "name": "includeExtra",
+          "unit": "1",
+          "type": "boolean",
+          "source": "GrEvolveBrickParams.includeExtra"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "initialBrick",
+          "unit": "1",
+          "type": "GrInitialBrick"
+        },
+        {
+          "name": "evolveBrick",
+          "unit": "1",
+          "type": "GrEvolveBrick"
+        },
+        {
+          "name": "diagnostics",
+          "unit": "1",
+          "type": "GrPipelineDiagnostics"
+        }
+      ],
+      "assumptions": [
+        "Initial data solve feeds evolution",
+        "Evolution bricks wrap diagnostics for downstream evaluation"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        },
+        "dt_s": {
+          "min": 0
+        },
+        "steps": {
+          "min": 0
+        }
+      },
+      "deterministic": true,
+      "tolerance": {
+        "note": "Derived from initial/evolve solver tolerances"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-initial-data",
+        "gr-evolution-solver",
+        "gr-evolution-brick"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -1009,7 +1155,10 @@
         }
       },
       "deterministic": true,
-      "tolerance": null,
+      "tolerance": {
+        "cfl_max": 0.5,
+        "abs": 0.000001
+      },
       "environment": {
         "runtime": "node"
       },
@@ -1018,10 +1167,8 @@
         "gr-constraint-gate"
       ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "tolerance"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -1771,27 +1918,66 @@
         }
       ],
       "summary": "Worker processes for GR evaluation.",
-      "nodeType": "concept",
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "nodeType": "derived",
+      "inputs": [
+        {
+          "name": "request",
+          "unit": "1",
+          "type": "GrWorkerRequest",
+          "source": "gr-worker-client"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "response",
+          "unit": "1",
+          "type": "GrWorkerResponse"
+        }
+      ],
+      "assumptions": [
+        "Worker threads are available when enabled",
+        "Worker client mediates timeouts and request IDs"
+      ],
+      "validity": {
+        "timeoutMs": {
+          "min": 0
+        }
+      },
+      "deterministic": false,
+      "tolerance": {
+        "note": "Subject to worker scheduling and timeout configuration"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-worker",
+        "gr-worker-client",
+        "gr-worker-types",
+        "gr-os-payload"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
-      }
+        "status": "complete",
+        "missing": []
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/gr/gr-worker.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr/gr-worker-client.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr/gr-worker-types.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/gr/gr-os-payload.ts"
+        }
+      ]
     },
     {
       "id": "gr-worker",
@@ -1812,32 +1998,54 @@
         }
       ],
       "summary": "Worker runtime for GR evaluations.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-worker.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "inputs": [
+        {
+          "name": "request",
+          "unit": "1",
+          "type": "GrWorkerRequest",
+          "source": "gr-worker-types"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "response",
+          "unit": "1",
+          "type": "GrWorkerResponse"
+        }
+      ],
+      "assumptions": [
+        "Worker has parentPort and can post messages",
+        "Brick builders are deterministic given params"
+      ],
+      "validity": {
+        "kind": {
+          "values": [
+            "initial",
+            "evolve"
+          ]
+        }
+      },
+      "deterministic": true,
+      "tolerance": {
+        "note": "Inherits initial/evolve solver tolerances"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-initial-data",
+        "gr-evolution-brick"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -1859,32 +2067,57 @@
         }
       ],
       "summary": "Client interface for GR worker calls.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-worker-client.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "inputs": [
+        {
+          "name": "params",
+          "unit": "1",
+          "type": "GrInitialBrickParams|GrEvolveBrickParams",
+          "source": "runGrInitialBrickInWorker/runGrEvolveBrickInWorker"
+        },
+        {
+          "name": "timeoutMs",
+          "unit": "ms",
+          "type": "int",
+          "source": "GR_WORKER_TIMEOUT_MS"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "brick",
+          "unit": "1",
+          "type": "GrInitialBrick|GrEvolveBrick"
+        }
+      ],
+      "assumptions": [
+        "Worker enabled via GR_WORKER_ENABLED",
+        "Worker entry resolved from dist or server sources"
+      ],
+      "validity": {
+        "timeoutMs": {
+          "min": 0
+        }
+      },
+      "deterministic": false,
+      "tolerance": {
+        "note": "Timeout governed by GR_WORKER_TIMEOUT_MS"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-worker",
+        "gr-worker-types"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -1906,7 +2139,7 @@
         }
       ],
       "summary": "Shared types for GR worker payloads.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
@@ -1914,24 +2147,36 @@
         }
       ],
       "inputs": [],
-      "outputs": [],
-      "assumptions": [],
+      "outputs": [
+        {
+          "name": "request",
+          "unit": "1",
+          "type": "GrWorkerRequest"
+        },
+        {
+          "name": "response",
+          "unit": "1",
+          "type": "GrWorkerResponse"
+        }
+      ],
+      "assumptions": [
+        "Worker request/response types mirror brick schemas"
+      ],
       "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "deterministic": true,
+      "tolerance": {
+        "note": "Schema definitions only"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-initial-data",
+        "gr-evolution-brick"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -1953,32 +2198,74 @@
         }
       ],
       "summary": "Payload schema for GR OS telemetry.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-os-payload.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/gr-os-payload.spec.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "inputs": [
+        {
+          "name": "evaluation",
+          "unit": "1",
+          "type": "GrEvaluation",
+          "source": "gr-evaluation"
+        },
+        {
+          "name": "diagnostics",
+          "unit": "1",
+          "type": "GrPipelineDiagnostics|null",
+          "source": "gr-evolution-brick"
+        },
+        {
+          "name": "essenceId",
+          "unit": "1",
+          "type": "string",
+          "source": "GrOsPayloadInput.essenceId"
+        },
+        {
+          "name": "informationBoundary",
+          "unit": "1",
+          "type": "TInformationBoundary",
+          "source": "GrOsPayloadInput.informationBoundary"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "payload",
+          "unit": "1",
+          "type": "GrOsPayload"
+        }
+      ],
+      "assumptions": [
+        "Evaluation includes gate status and certificate metadata",
+        "Diagnostics may be absent but constraints still reported"
+      ],
+      "validity": {
+        "diagnostics": {
+          "nullable": true
+        }
+      },
+      "deterministic": true,
+      "tolerance": {
+        "note": "Metrics must remain finite"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-evaluation",
+        "gr-constraint-policy",
+        "gr-constraint-gate"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -2002,32 +2289,66 @@
         }
       ],
       "summary": "Adapter for GR assistant workflows.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-assistant-adapter.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "inputs": [
+        {
+          "name": "brick",
+          "unit": "1",
+          "type": "GrEvolveBrick|GrEvolveBrickResponse",
+          "source": "gr-evolution-brick"
+        },
+        {
+          "name": "sample",
+          "unit": "m",
+          "type": "GrAssistantSampleInput",
+          "source": "buildMetricSpecFromBrick.sample"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "metric",
+          "unit": "1",
+          "type": "MetricSpec"
+        },
+        {
+          "name": "diagnostics",
+          "unit": "1",
+          "type": "GrPipelineDiagnostics"
+        },
+        {
+          "name": "invariants",
+          "unit": "1",
+          "type": "Record<string,unknown>|null"
+        }
+      ],
+      "assumptions": [
+        "Required channels (alpha/beta/gamma) present in brick",
+        "Sample coordinates map to voxel indices"
+      ],
+      "validity": {
+        "dims": {
+          "min": 1
+        }
+      },
+      "deterministic": true,
+      "tolerance": {
+        "note": "Channel min/max used to compute diagnostics"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-evolution-brick"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -2049,32 +2370,50 @@
         }
       ],
       "summary": "Schema for GR agent loop runs.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "code",
           "path": "server/gr/gr-agent-loop-schema.ts"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "inputs": [
+        {
+          "name": "options",
+          "unit": "1",
+          "type": "GrAgentLoopOptionsInput",
+          "source": "grAgentLoopOptionsSchema"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "schema",
+          "unit": "1",
+          "type": "ZodSchema"
+        }
+      ],
+      "assumptions": [
+        "Zod schema validates loop option ranges"
+      ],
+      "validity": {
+        "maxIterations": {
+          "min": 1,
+          "max": 50
+        }
+      },
+      "deterministic": true,
+      "tolerance": {
+        "note": "Schema validation only"
+      },
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "gr-constraint-policy"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     },
     {
@@ -2096,32 +2435,58 @@
         }
       ],
       "summary": "Standalone GR helper service for metric checks.",
-      "nodeType": "concept",
+      "nodeType": "derived",
       "evidence": [
         {
           "type": "doc",
           "path": "tools/gr_assistant/README.md"
+        },
+        {
+          "type": "code",
+          "path": "tools/gr_assistant/server.py"
+        },
+        {
+          "type": "code",
+          "path": "tools/gr_assistant/orchestrator.py"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
-      "validity": {},
-      "deterministic": null,
-      "tolerance": null,
-      "environment": null,
-      "dependencies": [],
+      "inputs": [
+        {
+          "name": "metric",
+          "unit": "1",
+          "type": "MetricSpec",
+          "source": "tools.gr_assistant.server"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "validation",
+          "unit": "1",
+          "type": "MetricValidation"
+        }
+      ],
+      "assumptions": [
+        "Tool server is stateless and deterministic",
+        "Metric payloads include 4x4 g_dd"
+      ],
+      "validity": {
+        "g_dd": {
+          "shape": "4x4"
+        }
+      },
+      "deterministic": true,
+      "tolerance": {
+        "note": "Pure tensor checks"
+      },
+      "environment": {
+        "runtime": "python"
+      },
+      "dependencies": [
+        "gr-assistant-adapter"
+      ],
       "predictability": {
-        "status": "partial",
-        "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
-          "validity",
-          "deterministic",
-          "tolerance",
-          "environment"
-        ]
+        "status": "complete",
+        "missing": []
       }
     }
   ],
